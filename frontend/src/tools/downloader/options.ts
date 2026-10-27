@@ -6,16 +6,33 @@ function oneOf<T extends string>(enumObj: Record<string, T>, v: unknown): T | un
   return typeof v === "string" && v !== "" && Object.values(enumObj).includes(v as T) ? (v as T) : undefined;
 }
 
+/** Mirrors Go's DefaultOptions() (modules/downloader/options.go). */
+export const DEFAULT_OPTIONS: DownloaderOptions = {
+  mode: DownloadMode.ModeAudio,
+  audioFormat: AudioFormat.FormatMP3,
+  audioQuality: AudioQuality.Quality320,
+  maxResolution: MaxResolution.Res1080,
+  trimEnabled: false,
+  trimStart: "",
+  trimEnd: "",
+  embedMetadata: true,
+  embedThumbnail: true,
+  playlist: false,
+};
+
 /** Merges saved module state (JSON text) over defaults; unknown or invalid fields are ignored. */
 export function mergeOptions(defaults: DownloaderOptions, savedJson: string | null | undefined): DownloaderOptions {
-  const out: DownloaderOptions = { ...defaults };
-  if (!savedJson) return out;
-  let raw: unknown;
+  if (!savedJson) return { ...defaults };
   try {
-    raw = JSON.parse(savedJson);
+    return sanitizeOptions(JSON.parse(savedJson), defaults);
   } catch {
-    return out;
+    return { ...defaults };
   }
+}
+
+/** `sanitize` for useModuleOptions: parsed saved state over defaults. */
+export function sanitizeOptions(raw: unknown, defaults: DownloaderOptions): DownloaderOptions {
+  const out: DownloaderOptions = { ...defaults };
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return out;
   const r = raw as Record<string, unknown>;
   out.mode = oneOf(DownloadMode, r.mode) ?? out.mode;

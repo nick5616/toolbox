@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Banner,
   Button,
+  ConfirmDialog,
   PathText,
   Section,
   SegmentedControl,
@@ -11,8 +12,9 @@ import {
   Tooltip,
   toast,
 } from "@/components";
-import { DepSource, DepState, LibraryService, SettingsService, Theme } from "@/lib/api";
+import { DepSource, DepState, DepsService, LibraryService, SettingsService, Theme } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { formatBytes } from "@/lib/format";
 import { useDeps, type DepView } from "@/state/deps";
 import { isActive, useJobs } from "@/state/jobs";
 import { useModules } from "@/state/modules";
@@ -21,6 +23,9 @@ import styles from "./SettingsView.module.css";
 
 const YTDLP_ID = "yt-dlp";
 const YTDLP_JOB_MODULE = "system-ytdlp-update";
+const UV_ID = "uv";
+const AUDIO_ENGINE_ID = "audio-engine";
+const AUDIO_ENGINE_JOB_MODULE = "system-audio-engine";
 
 const themeOptions = [
   { value: Theme.ThemeSystem, label: "System" },
@@ -54,7 +59,112 @@ function DepChip({ dep }: { dep: DepView }) {
     const chip = <Badge tone="danger">Error</Badge>;
     return dep.error ? <Tooltip label={dep.error}>{chip}</Tooltip> : chip;
   }
+  if (dep.state === DepState.DepOutdated) return <Badge tone="warn">Update</Badge>;
   return <Badge tone={dep.required ? "danger" : "warn"}>Missing</Badge>;
+}
+
+/** Audio engine actions (install/update/repair/remove) plus the models sub-row. */
+function AudioEngineActions({ dep }: { dep: DepView }) {
+  const jobsById = useJobs((s) => s.byId);
+  const busy = useMemo(
+    () => Object.values(jobsById).some((j) => j.moduleId === AUDIO_ENGINE_JOB_MODULE && isActive(j)),
+    [jobsById],
+  );
+  const [queuing, setQueuing] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const installed = dep.state === DepState.DepOK || dep.state === DepState.DepOutdated;
+
+  const install = async () => {
+    setQueuing(true);
+    try {
+      useJobs.getState().upsert(await DepsService.InstallAudioEngine());
+    } catch (e) {
+      fail(e);
+    } finally {
+      setQueuing(false);
+    }
+  };
+  const remove = async () => {
+    setConfirmRemove(false);
+    try {
+      await DepsService.RemoveAudioEngine();
+      toast({ title: "Audio engine removed" });
+      await useDeps.getState().recheck();
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  const label = dep.state === DepState.DepOutdated ? "Update" : dep.state === DepState.DepOK ? "Repair" : "Install";
+  return (
+    <span className={styles.actionGroup}>
+      <Button size="sm" variant="secondary" loading={queuing || busy} onClick={() => void install()}>
+        {label}
+      </Button>
+      {installed && (
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmRemove(true)}>
+          Remove
+        </Button>
+      )}
+      <ConfirmDialog
+        open={confirmRemove}
+        tone="danger"
+        title="Remove the audio engine?"
+        body="Remove the audio engine? This frees about 1.2 GB. Downloaded models are kept."
+        confirmLabel="Remove"
+        onConfirm={() => void remove()}
+        onCancel={() => setConfirmRemove(false)}
+      />
+    </span>
+  );
+}
+
+function ModelsRow() {
+  const [bytes, setBytes] = useState<number | null>(null);
+  const [confirm, setConfirm] = useState(false);
+
+  const refresh = async () => {
+    try {
+      setBytes(await DepsService.ModelsUsage());
+    } catch {
+      setBytes(null);
+    }
+  };
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  const clear = async () => {
+    setConfirm(false);
+    try {
+      await DepsService.ClearModels();
+      toast({ title: "Models cleared" });
+    } catch (e) {
+      fail(e);
+    }
+    await refresh();
+  };
+
+  return (
+    <tr>
+      <td colSpan={5} className={styles.subRow}>
+        <span>Models: {bytes == null ? "…" : formatBytes(bytes)}</span>
+        <span aria-hidden="true"> · </span>
+        <Button size="sm" variant="ghost" disabled={!bytes} onClick={() => setConfirm(true)}>
+          Clear models
+        </Button>
+        <ConfirmDialog
+          open={confirm}
+          tone="danger"
+          title="Clear downloaded models?"
+          body="Models are downloaded again the next time a tool needs them."
+          confirmLabel="Clear models"
+          onConfirm={() => void clear()}
+          onCancel={() => setConfirm(false)}
+        />
+      </td>
+    </tr>
+  );
 }
 
 function DepsTable() {
@@ -67,6 +177,19 @@ function DepsTable() {
     [jobsById],
   );
   const [queuing, setQueuing] = useState(false);
+  const [uvQueuing, setUvQueuing] = useState(false);
+
+  const updateUv = async () => {
+    setUvQueuing(true);
+    try {
+      useJobs.getState().upsert(await DepsService.UpdateUv());
+      toast({ title: "uv update queued" });
+    } catch (e) {
+      fail(e);
+    } finally {
+      setUvQueuing(false);
+    }
+  };
 
   const updateYtDlp = async () => {
     setQueuing(true);
@@ -119,7 +242,8 @@ function DepsTable() {
             const ok = d.state === DepState.DepOK;
             const names = d.requiredBy.map((id) => modulesById[id]?.name ?? id);
             return (
-              <tr key={d.id}>
+              <Fragment key={d.id}>
+              <tr>
                 <td>
                   <div className={styles.toolName}>{d.name}</div>
                   <div className={styles.subtle}>{d.purpose}</div>
@@ -151,6 +275,12 @@ function DepsTable() {
                     >
                       {ok ? "Update" : "Install"}
                     </Button>
+                  ) : d.id === UV_ID ? (
+                    <Button size="sm" variant="secondary" loading={uvQueuing} onClick={() => void updateUv()}>
+                      {ok ? "Update" : "Install"}
+                    </Button>
+                  ) : d.id === AUDIO_ENGINE_ID ? (
+                    <AudioEngineActions dep={d} />
                   ) : !ok ? (
                     <Button
                       size="sm"
@@ -163,6 +293,8 @@ function DepsTable() {
                   ) : null}
                 </td>
               </tr>
+              {d.id === AUDIO_ENGINE_ID && d.state !== DepState.DepMissing ? <ModelsRow /> : null}
+              </Fragment>
             );
           })}
         </tbody>

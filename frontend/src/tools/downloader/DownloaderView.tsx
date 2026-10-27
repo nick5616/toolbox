@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, PathText, toast } from "@/components";
-import { DownloaderService, DownloadMode, LibraryService, SettingsService, type DownloaderOptions } from "@/lib/api";
+import { DownloaderService, DownloadMode, LibraryService, type DownloaderOptions } from "@/lib/api";
 import { useCommands } from "@/lib/commands";
 import { toAppError } from "@/lib/errors";
 import { useShortcut } from "@/lib/shortcuts";
@@ -11,16 +11,16 @@ import { DepsBanner, useDepsBlockReason } from "./DepsBanner";
 import { OptionsPanel } from "./OptionsPanel";
 import { RecentDownloads } from "./RecentDownloads";
 import { UrlInput } from "./UrlInput";
-import { MODULE_ID, mergeOptions, serializeOptions } from "./options";
+import { useModuleOptions } from "../_kit/useModuleOptions";
+import { DEFAULT_OPTIONS, MODULE_ID, sanitizeOptions } from "./options";
 import { validateTrim, type TrimErrors } from "./timecode";
 import { parseUrls, urlsError, validUrls } from "./urls";
 import styles from "./DownloaderView.module.css";
 
-const SAVE_DEBOUNCE_MS = 300;
-
 export default function DownloaderView(_props: ToolViewProps) {
   const [text, setText] = useState("");
-  const [options, setOptions] = useState<DownloaderOptions | null>(null);
+  const [opts, setOpts, loaded] = useModuleOptions(MODULE_ID, DEFAULT_OPTIONS, sanitizeOptions);
+  const options: DownloaderOptions | null = loaded ? opts : null;
   const [serverUrlErrors, setServerUrlErrors] = useState<Record<string, string>>({});
   const [serverTrim, setServerTrim] = useState<TrimErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -31,32 +31,7 @@ export default function DownloaderView(_props: ToolViewProps) {
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const submitRef = useRef<HTMLButtonElement>(null);
-  const dirty = useRef(false);
 
-  // Load defaults + saved state.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [defaults, saved] = await Promise.all([DownloaderService.Defaults(), SettingsService.ModuleState(MODULE_ID)]);
-        if (!cancelled) setOptions(mergeOptions(defaults, saved));
-      } catch (e) {
-        if (!cancelled) toast({ title: "Couldn't load downloader options", description: toAppError(e).message, tone: "danger" });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Debounced save.
-  useEffect(() => {
-    if (!options || !dirty.current) return;
-    const t = setTimeout(() => {
-      SettingsService.SetModuleState(MODULE_ID, serializeOptions(options)).catch(() => undefined);
-    }, SAVE_DEBOUNCE_MS);
-    return () => clearTimeout(t);
-  }, [options]);
 
   // Handoff from drop/paste.
   useEffect(() => {
@@ -78,9 +53,9 @@ export default function DownloaderView(_props: ToolViewProps) {
   }, [options, serverTrim]);
 
   const patchOptions = useCallback((patch: Partial<DownloaderOptions>) => {
-    dirty.current = true;
+
     setServerTrim({});
-    setOptions((o) => (o ? { ...o, ...patch } : o));
+    setOpts((o) => ({ ...o, ...patch }));
   }, []);
 
   const onText = useCallback((v: string) => {

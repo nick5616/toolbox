@@ -6,6 +6,7 @@ import {
   SettingsService,
 } from "@/lib/api";
 import { on } from "@/lib/events";
+import { routeFilesDropped } from "@/shell/dropRouting";
 import { useDeps } from "./deps";
 import { useJobs } from "./jobs";
 import { useLibrary } from "./library";
@@ -27,7 +28,7 @@ export function subscribeAll(): void {
     on("library:removed", (p) => useLibrary.getState().removeLocal(p.ids ?? [])),
     on("deps:changed", (p) => useDeps.getState().setAll(p.deps ?? [])),
     on("settings:changed", (s) => useSettings.getState().set(s)),
-    on("app:files-dropped", (d) => useUI.getState().setDrop(d)),
+    on("app:files-dropped", routeFilesDropped),
     on("app:navigate", (n) => useUI.getState().navigate(n.target)),
   ];
 }
