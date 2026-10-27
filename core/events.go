@@ -1,0 +1,31 @@
+package core
+
+// Event names. They are registered with Wails (typed) in api/events.go.
+const (
+	EventJobsChanged     = "jobs:changed"      // Job
+	EventJobsRemoved     = "jobs:removed"      // JobsRemoved
+	EventJobsProgress    = "jobs:progress"     // JobProgress (throttled ≤ 1/100ms/job)
+	EventJobsLog         = "jobs:log"          // JobLogBatch (batched every 150ms/job)
+	EventLibraryAdded    = "library:added"     // Output
+	EventLibraryRemoved  = "library:removed"   // OutputsRemoved
+	EventDepsChanged     = "deps:changed"      // DepsChanged
+	EventSettingsChanged = "settings:changed"  // Settings
+	EventFilesDropped    = "app:files-dropped" // FilesDropped
+	EventNavigate        = "app:navigate"      // Navigate
+)
+
+// Emitter publishes events to the UI. Core code depends on this interface,
+// never on Wails directly. Implementations must be safe for concurrent use.
+type Emitter interface {
+	Emit(name string, data any)
+}
+
+// EmitterFunc adapts a function to Emitter.
+type EmitterFunc func(name string, data any)
+
+func (f EmitterFunc) Emit(name string, data any) { f(name, data) }
+
+// NopEmitter discards events.
+type NopEmitter struct{}
+
+func (NopEmitter) Emit(string, any) {}
