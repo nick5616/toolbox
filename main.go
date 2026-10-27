@@ -59,6 +59,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	settings.SetSupportDir(paths.SupportDir)
 	if err := os.MkdirAll(settings.Current().LibraryDir, 0o755); err != nil {
 		slog.Warn("library folder unavailable", "dir", settings.Current().LibraryDir, "err", err)
 	}
