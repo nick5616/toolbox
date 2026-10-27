@@ -1,0 +1,19 @@
+[youtube] Extracting URL: https://www.youtube.com/watch?v=jNQXAC9IVRw
+[youtube] jNQXAC9IVRw: Downloading webpage
+stderr:WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[info] jNQXAC9IVRw: Downloading 1 format(s): 133+140
+[info] jNQXAC9IVRw: Downloading 1 time ranges: 5.0-12.0
+[tbx:start] jNQXAC9IVRw|133+140|NA|NA|Me at the zoo
+[download] Destination: Me at the zoo [jNQXAC9IVRw] [cut 0m05s-0m12s].mp4
+[tbx:dl] finished|292211|292211|NA|290969.92354673124|NA|NA|NA
+stderr:[tbx:pp] started|ThumbnailsConvertor
+stderr:[tbx:pp] finished|ThumbnailsConvertor
+stderr:[tbx:pp] started|VideoRemuxer
+stderr:[tbx:pp] finished|VideoRemuxer
+stderr:[tbx:pp] started|Metadata
+stderr:[tbx:pp] finished|Metadata
+stderr:[tbx:pp] started|EmbedThumbnail
+stderr:[tbx:pp] finished|EmbedThumbnail
+stderr:[tbx:pp] started|MoveFiles
+stderr:[tbx:pp] finished|MoveFiles
+[tbx:out] {{HOME}}/Me at the zoo [jNQXAC9IVRw] [cut 0m05s-0m12s].mp4

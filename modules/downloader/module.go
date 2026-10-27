@@ -1,14 +1,10 @@
 // Package downloader is the yt-dlp based Downloader module. See SPEC.md §7.
 //
-// CONTRACT STUB (foundation): options.go and service.go are final; WP-D
-// implements module.go's bodies plus validate.go, args.go, progress.go and
-// run.go. Exported signatures are frozen.
+// Validate lives in validate.go, argument building in args.go, progress
+// parsing in progress.go and Run in run.go.
 package downloader
 
 import (
-	"context"
-	"encoding/json"
-
 	"toolbox/core"
 )
 
@@ -43,14 +39,4 @@ func (m *Module) Descriptor() core.Descriptor {
 		Order:        10,
 		SplitInputs:  true,
 	}
-}
-
-// Validate implements core.Module.
-func (m *Module) Validate(inputs []string, options json.RawMessage) error {
-	return core.NotImplemented("downloader.Validate")
-}
-
-// Run implements core.Module.
-func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
-	return core.NotImplemented("downloader.Run")
 }

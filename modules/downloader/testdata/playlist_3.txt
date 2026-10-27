@@ -1,0 +1,35 @@
+[youtube:tab] Extracting URL: https://www.youtube.com/playlist?list=PLabc
+[youtube:tab] PLabc: Downloading playlist
+[download] Downloading playlist: Zoo Mix
+[youtube:tab] Playlist Zoo Mix: Downloading 3 items of 3
+[download] Downloading item 1 of 3
+[tbx:start] aaa111|251|1|3|First clip
+[tbx:dl] downloading|100000|200000|NA|500000.0|0|1|3
+[tbx:dl] downloading|200000|200000|NA|500000.0|0|1|3
+[tbx:dl] finished|200000|200000|NA|500000.0|NA|1|3
+stderr:[tbx:pp] started|ExtractAudio
+stderr:[tbx:pp] finished|ExtractAudio
+stderr:[tbx:pp] started|MoveFiles
+stderr:[tbx:pp] finished|MoveFiles
+[tbx:out] {{HOME}}/Zoo Mix/01 - First clip [aaa111].mp3
+[download] Downloading item 2 of 3
+[tbx:start] bbb222|251|2|3|Second clip
+[tbx:dl] downloading|150000|300000|NA|600000.0|0|2|3
+[tbx:dl] downloading|300000|300000|NA|600000.0|0|2|3
+[tbx:dl] finished|300000|300000|NA|600000.0|NA|2|3
+stderr:[tbx:pp] started|ExtractAudio
+stderr:[tbx:pp] finished|ExtractAudio
+stderr:[tbx:pp] started|MoveFiles
+stderr:[tbx:pp] finished|MoveFiles
+[tbx:out] {{HOME}}/Zoo Mix/02 - Second clip [bbb222].mp3
+[download] Downloading item 3 of 3
+[tbx:start] ccc333|251|3|3|Third clip
+[tbx:dl] downloading|50000|100000|NA|400000.0|0|3|3
+[tbx:dl] downloading|100000|100000|NA|400000.0|0|3|3
+[tbx:dl] finished|100000|100000|NA|400000.0|NA|3|3
+stderr:[tbx:pp] started|ExtractAudio
+stderr:[tbx:pp] finished|ExtractAudio
+stderr:[tbx:pp] started|MoveFiles
+stderr:[tbx:pp] finished|MoveFiles
+[tbx:out] {{HOME}}/Zoo Mix/03 - Third clip [ccc333].mp3
+[download] Finished downloading playlist: Zoo Mix
