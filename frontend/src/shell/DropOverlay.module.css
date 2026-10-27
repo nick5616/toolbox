@@ -1,0 +1,112 @@
+.hint {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0;
+  background: color-mix(in srgb, var(--bg-app) 70%, transparent);
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+:global(.file-drop-target-active) .hint {
+  opacity: 1;
+}
+
+.hintBox {
+  position: absolute;
+  inset: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  color: var(--fg-muted);
+  font-size: var(--text-lg);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.panel {
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--bg-raised);
+  border: 1px solid var(--pop-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.count {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.names {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.none,
+.unsupported {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.matches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.match {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.matchText {
+  flex: 1;
+  min-width: 0;
+}
+
+.matchName {
+  font-weight: 500;
+}
+
+.matchFiles {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foot {
+  display: flex;
+  justify-content: flex-end;
+}
