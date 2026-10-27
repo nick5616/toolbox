@@ -428,9 +428,4 @@ export enum Theme {
     ThemeSystem = "system",
     ThemeDark = "dark",
     ThemeLight = "light",
-
-    /**
-     * Default setting values.
-     */
-    DefaultTheme = "dark",
 };

@@ -26,8 +26,11 @@ const (
 	DefaultConcurrency = 3
 	MinConcurrency     = 1
 	MaxConcurrency     = 8
-	DefaultTheme       = ThemeDark
 )
+
+// DefaultTheme is a var (not a const) so the binding generator doesn't add it
+// to the TS Theme enum.
+var DefaultTheme = ThemeDark
 
 // MaxModuleStateBytes caps a module's stored UI state.
 const MaxModuleStateBytes = 64 * 1024
