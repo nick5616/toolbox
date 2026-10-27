@@ -91,9 +91,9 @@
   --fg-muted: #55575f;
   --fg-subtle: #868892;
   --fg-faint: #b4b5bc;
-  --accent: #dd6416;
+  --accent: #bd5310;
   --accent-fg: #ffffff;
-  --accent-soft: rgba(221, 100, 22, 0.12);
+  --accent-soft: rgba(189, 83, 16, 0.12);
   --ok: #15803d;
   --ok-soft: rgba(21, 128, 61, 0.14);
   --warn: #a16207;

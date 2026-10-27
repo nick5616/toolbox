@@ -56,9 +56,8 @@ describe.each(Object.keys(themes))("contrast (%s)", (name) => {
     expect(contrast(t["--accent"] as string, t["--bg-panel"] as string)).toBeGreaterThanOrEqual(3);
   });
 
-  // Not required by the spec table; light theme (white on #DD6416) is 3.55:1, so only the
-  // 3:1 UI-component bar is enforced here. Primary buttons are 500-weight 13px labels.
-  it("--accent-fg on --accent >= 3:1", () => {
-    expect(contrast(t["--accent-fg"] as string, t["--accent"] as string)).toBeGreaterThanOrEqual(3);
+  // Primary buttons put 13px text on the accent, so hold it to AA.
+  it("--accent-fg on --accent >= 4.5:1", () => {
+    expect(contrast(t["--accent-fg"] as string, t["--accent"] as string)).toBeGreaterThanOrEqual(4.5);
   });
 });
