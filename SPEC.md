@@ -1185,7 +1185,7 @@ frontend/ … (§8.1)
 
 ### 11.3 Manual smoke checklist (the architect runs it on Windows during integration; you run it on the Mac)
 
-Run `task dev:sandbox`. Then confirm:
+Run `wails3 task dev:sandbox`. Then confirm:
 
 1. The app opens with the dark theme, the sidebar, the Downloader view and an idle tray.
 2. Settings → Dependencies shows ffmpeg OK and yt-dlp missing. **Install yt-dlp** runs as a job with progress, and afterwards the status is OK with source managed.

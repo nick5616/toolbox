@@ -56,7 +56,7 @@ On the Windows dev box, Go lives in `%LOCALAPPDATA%\Programs\go1.27.3` and Node 
 ### Commands
 
 ```sh
-task dev:sandbox            # wails3 dev with support/library dirs under .dev/ (preferred)
+wails3 task dev:sandbox     # wails3 dev with support/library dirs under .dev/ (preferred)
 TOOLBOX_VIEW=settings ...   # optional: open on a view (library, settings, or a module id)
 wails3 dev                  # dev against the real support dir and ~/Toolbox
 wails3 build                # production binary in bin/

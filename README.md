@@ -14,7 +14,7 @@ brew install go node ffmpeg deno          # macOS
 
 ```sh
 cd frontend && npm install && cd ..
-task dev:sandbox      # dev mode, data under .dev/
+wails3 task dev:sandbox   # dev mode, data under .dev/
 wails3 build          # production binary in bin/
 ```
 
