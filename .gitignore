@@ -1,0 +1,21 @@
+# Build output
+bin/
+build/bin/
+frontend/dist/
+frontend/node_modules/
+
+# Local sandbox / scratch
+.dev/
+*.db
+*.db-shm
+*.db-wal
+
+# Claude Code local state
+.claude/worktrees/
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
