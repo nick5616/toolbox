@@ -82,6 +82,8 @@ def stems_separate(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
     key = (model, fmt, out_dir)
     try:
         if _state["key"] != key or _state["sep"] is None:
+            # Importing torch/audio-separator and probing hardware takes seconds.
+            ctx.stage("Preparing")
             _state.update(key=None, sep=None)
             sep = _new_separator(fmt, out_dir)
             present = os.path.exists(os.path.join(models_dir, model))
