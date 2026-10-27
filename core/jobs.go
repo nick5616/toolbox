@@ -363,7 +363,7 @@ func (m *Jobs) run(aj *activeJob) {
 		j.Status, j.Message = JobCancelled, ""
 		j.ErrorCode, j.Error, j.ErrorHint = "", "", ""
 	case runErr == nil:
-		j.Status, j.Progress, j.Message = JobDone, 1, ""
+		j.Status, j.Progress = JobDone, 1 // keep the module's last message, e.g. "Already up to date"
 		j.ErrorCode, j.Error, j.ErrorHint = "", "", ""
 	case closing && ctx.Err() != nil:
 		j.Status, j.Message = JobFailed, ""

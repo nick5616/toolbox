@@ -475,7 +475,8 @@ func TestProgressMonotonicAndOverlay(t *testing.T) {
 	check(1, "over")
 	check(-1, "unknown")
 	done := e.em.waitStatus(t, j.ID, JobDone)
-	if done.Progress != 1 || done.Message != "" {
+	// A finished job keeps the module's last message (e.g. "Already up to date").
+	if done.Progress != 1 || done.Message != "unknown" {
 		t.Fatalf("done job = %+v", done)
 	}
 }
