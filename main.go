@@ -173,6 +173,20 @@ func run() error {
 		BackgroundColour: application.NewRGB(11, 12, 14),
 		URL:              startURL(),
 	})
+	// Keep the native title bar in step with the app theme (Windows).
+	applyTitleBar := func() {
+		t := settings.Current().Theme
+		dark := t == core.ThemeDark || (t == core.ThemeSystem && app.Env.IsDarkMode())
+		application.InvokeSync(func() { setTitleBarDark(win, dark) })
+	}
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { applyTitleBar() })
+	app.Event.OnApplicationEvent(events.Common.ThemeChanged, func(*application.ApplicationEvent) { applyTitleBar() })
+	settings.OnChange(func(old, new core.Settings) {
+		if old.Theme != new.Theme {
+			applyTitleBar()
+		}
+	})
+
 	win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
 		files := e.Context().DroppedFiles()
 		drop := core.FilesDropped{Paths: files, Result: reg.Match(files)}
