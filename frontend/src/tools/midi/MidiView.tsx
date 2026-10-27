@@ -3,7 +3,7 @@ import { Badge, Button, EmptyState, Field, Icon, SegmentedControl, Section, Slid
 import { JobStatus, MidiRange, MidiService } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
 import { useOrderedJobs } from "@/state/jobs";
-import { FileToolLayout, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { FileToolLayout, runLabel, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -39,7 +39,7 @@ export default function MidiView({ moduleId }: ToolViewProps) {
     <FileToolLayout
       moduleId={moduleId}
       inputs={inputs}
-      runLabel={`Transcribe ${n} ${n === 1 ? "file" : "files"}`}
+      runLabel={runLabel("Transcribe", n, "file", "files")}
       onRun={onRun}
       running={running}
       inputErrors={inputErrors}

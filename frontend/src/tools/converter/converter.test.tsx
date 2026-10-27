@@ -84,7 +84,7 @@ describe("ConverterView", () => {
     await screen.findByRole("option", { name: "Audio · MP3 · 320 kbps" });
     await user.click(screen.getByRole("button", { name: "Add files…" }));
     expect(await screen.findByText("MP3 · 320 kbps can't take an image file")).toBeTruthy();
-    const btn = screen.getByRole("button", { name: /Convert 0 files/ });
+    const btn = screen.getByRole("button", { name: /Convert files/ });
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 

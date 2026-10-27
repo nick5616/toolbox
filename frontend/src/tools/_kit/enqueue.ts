@@ -51,3 +51,8 @@ export async function submitJobs(
     return { ok: false, inputErrors };
   }
 }
+
+/** Run-button label: "Split tracks" when empty, else "Split 3 tracks" / "Split 1 track". */
+export function runLabel(verb: string, n: number, singular: string, plural: string): string {
+  return n === 0 ? `${verb} ${plural}` : `${verb} ${n} ${n === 1 ? singular : plural}`;
+}

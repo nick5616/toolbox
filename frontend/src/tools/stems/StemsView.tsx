@@ -4,7 +4,7 @@ import { JobStatus, LibraryService, StemsFormat, StemsService, type PresetInfo, 
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { useOrderedJobs, type JobView } from "@/state/jobs";
-import { FileToolLayout, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { FileToolLayout, runLabel, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -161,7 +161,7 @@ export default function StemsView({ moduleId }: ToolViewProps) {
     <FileToolLayout
       moduleId={moduleId}
       inputs={inputs}
-      runLabel={`Split ${n} ${n === 1 ? "track" : "tracks"}`}
+      runLabel={runLabel("Split", n, "track", "tracks")}
       onRun={onRun}
       running={running}
       inputErrors={inputErrors}

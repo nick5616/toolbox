@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Button, ConfirmDialog, EmptyState, Section } from "@/components";
 import { BpmKeyService, JobStatus } from "@/lib/api";
 import { isActive, useJobs, useOrderedJobs } from "@/state/jobs";
-import { FileToolLayout, ResultTable, useFileInputs } from "@/tools/_kit";
+import { FileToolLayout, ResultTable, runLabel, useFileInputs } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import { bpmColumns } from "./columns";
@@ -47,7 +47,7 @@ export default function BpmKeyView({ moduleId }: ToolViewProps) {
       <FileToolLayout
         moduleId={moduleId}
         inputs={inputs}
-        runLabel={`Analyze ${n} ${n === 1 ? "file" : "files"}`}
+        runLabel={runLabel("Analyze", n, "file", "files")}
         onRun={onRun}
         running={running}
         inputErrors={inputErrors}

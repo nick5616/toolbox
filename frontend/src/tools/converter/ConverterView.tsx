@@ -3,7 +3,7 @@ import { EmptyState, Field, Icon, Section, Select, Switch, cx } from "@/componen
 import { ConverterService, MaxHeight, OutputKind, type PresetInfo } from "@/lib/api";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { useRecentOutputs } from "@/state/library";
-import { FileToolLayout, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { FileToolLayout, runLabel, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -73,7 +73,7 @@ export default function ConverterView({ moduleId }: ToolViewProps) {
     <FileToolLayout
       moduleId={moduleId}
       inputs={inputs}
-      runLabel={`Convert ${n} ${n === 1 ? "file" : "files"}`}
+      runLabel={runLabel("Convert", n, "file", "files")}
       onRun={onRun}
       running={running}
       inputErrors={inputErrors}
