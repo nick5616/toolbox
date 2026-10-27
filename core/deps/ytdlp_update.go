@@ -1,6 +1,9 @@
 package deps
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -10,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -49,14 +53,18 @@ func assetName(goos, goarch string) string {
 	return ""
 }
 
+// updater is the hidden install/update module for one managed binary
+// (yt-dlp by default, uv via RegisterUVUpdater) and the engine behind
+// Service.InstallManagedBinary.
 type updater struct {
 	svc     *Service
+	spec    BinarySpec
 	apiBase string
 	client  *http.Client
 	version func(ctx context.Context, path string) (string, error)
 	goos    string
 	goarch  string
-	maxSize int64
+	maxSize int64 // 0 = spec.MaxBytes
 }
 
 // RegisterUpdater registers the hidden yt-dlp install/update module.
@@ -66,8 +74,8 @@ func RegisterUpdater(reg *core.Registry, s *Service) error {
 
 func newUpdater(s *Service, apiBase string) *updater {
 	return &updater{
-		svc: s, apiBase: apiBase, client: &http.Client{},
-		goos: runtime.GOOS, goarch: runtime.GOARCH, maxSize: maxDownload,
+		svc: s, spec: YtDlpBinary(), apiBase: apiBase, client: &http.Client{},
+		goos: runtime.GOOS, goarch: runtime.GOARCH,
 		version: func(ctx context.Context, path string) (string, error) {
 			return proc.Output(ctx, versionTimeout, path, "--version")
 		},
@@ -75,11 +83,15 @@ func newUpdater(s *Service, apiBase string) *updater {
 }
 
 func (u *updater) Descriptor() core.Descriptor {
-	return core.Descriptor{
+	d := core.Descriptor{
 		ID: UpdateModuleID, Name: "yt-dlp updater", Tagline: "Install or update yt-dlp",
 		Icon: "refresh-cw", Category: core.CategoryUtility, Status: core.StatusReady,
 		Hidden: true, MaxConcurrent: 1, OutputSubdir: "",
 	}
+	if u.spec.DepID == UV {
+		d.ID, d.Name, d.Tagline = UVUpdateModuleID, "uv updater", "Install or update uv"
+	}
+	return d
 }
 
 func (u *updater) Validate(inputs []string, options json.RawMessage) error {
@@ -107,12 +119,15 @@ func (r release) asset(name string) string {
 	return ""
 }
 
-func (u *updater) managedPath() string {
-	name := "yt-dlp"
+func (u *updater) managedPath(b BinarySpec) string {
+	return filepath.Join(u.svc.binDir, u.exe(b.DepID))
+}
+
+func (u *updater) exe(name string) string {
 	if u.goos == "windows" {
-		name += ".exe"
+		return name + ".exe"
 	}
-	return filepath.Join(u.svc.binDir, name)
+	return name
 }
 
 // get performs a GET whose response headers must arrive within the request
@@ -150,9 +165,43 @@ func netErr(ctx context.Context, what string, err error) error {
 }
 
 func (u *updater) Run(ctx context.Context, job *core.JobContext) error {
+	return u.install(ctx, job, u.spec)
+}
+
+func (u *updater) limit(b BinarySpec) int64 {
+	switch {
+	case u.maxSize > 0:
+		return u.maxSize
+	case b.MaxBytes > 0:
+		return b.MaxBytes
+	}
+	return maxDownload
+}
+
+func sizeText(n int64) string {
+	if n >= 1<<20 {
+		return fmt.Sprintf("%d MB", n>>20)
+	}
+	return fmt.Sprintf("%d bytes", n)
+}
+
+// versionMatches reports whether a --version output names the release tag
+// (yt-dlp prints just the tag; uv prints "uv 0.13.6 (…)").
+func versionMatches(out, tag string) bool {
+	tag = strings.TrimPrefix(strings.TrimSpace(tag), "v")
+	for _, f := range strings.Fields(out) {
+		if strings.TrimPrefix(f, "v") == tag {
+			return true
+		}
+	}
+	return false
+}
+
+func (u *updater) install(ctx context.Context, job *core.JobContext, b BinarySpec) error {
+	label := b.DepID
 	job.Progress(core.IndeterminateProgress, "Checking latest release")
-	job.Logf("Checking the latest yt-dlp release")
-	rel, err := u.fetchRelease(ctx)
+	job.Logf("Checking the latest %s release", label)
+	rel, err := u.fetchRelease(ctx, b)
 	if err != nil {
 		return err
 	}
@@ -162,23 +211,37 @@ func (u *updater) Run(ctx context.Context, job *core.JobContext) error {
 	}
 	job.Logf("Latest release: %s", tag)
 
-	dest := u.managedPath()
+	dest := u.managedPath(b)
 	if isFile(dest) {
-		if cur, err := u.version(ctx, dest); err == nil && strings.TrimSpace(cur) == tag {
+		if cur, err := u.version(ctx, dest); err == nil && versionMatches(cur, tag) {
 			job.Logf("Installed version %s is current", tag)
 			job.Progress(1, "Already up to date ("+tag+")")
 			return nil
 		}
 	}
 
-	name := assetName(u.goos, u.goarch)
-	if name == "" {
+	if b.Asset == nil {
 		return core.Errorf(core.CodeInternal, "Unsupported platform")
 	}
-	assetURL, sumsURL := rel.asset(name), rel.asset(sumsAsset)
+	name, err := b.Asset(u.goos, u.goarch)
+	if err != nil || name == "" {
+		return core.Errorf(core.CodeInternal, "Unsupported platform")
+	}
+	assetURL := rel.asset(name)
 	if assetURL == "" {
 		return core.Errorf(core.CodeToolFailed, "Release has no %s download", name)
 	}
+	var sumsName string
+	switch b.Checksum {
+	case ChecksumPerAsset:
+		sumsName = name + ".sha256"
+	default:
+		sumsName = b.SumsFile
+		if sumsName == "" {
+			sumsName = sumsAsset
+		}
+	}
+	sumsURL := rel.asset(sumsName)
 	if sumsURL == "" {
 		return core.Errorf(core.CodeToolFailed, "Release has no checksum file")
 	}
@@ -186,12 +249,17 @@ func (u *updater) Run(ctx context.Context, job *core.JobContext) error {
 	if err := os.MkdirAll(job.TempDir, 0o755); err != nil {
 		return core.Errorf(core.CodeInternal, "Couldn't create a temporary folder").WithCause(err)
 	}
-	job.Logf("Downloading %s", sumsAsset)
+	job.Logf("Downloading %s", sumsName)
 	sums, err := u.fetchText(ctx, sumsURL)
 	if err != nil {
 		return err
 	}
-	want := findSum(sums, name)
+	var want string
+	if b.Checksum == ChecksumPerAsset {
+		want = singleSum(sums)
+	} else {
+		want = findSum(sums, name)
+	}
 	if want == "" {
 		return core.Errorf(core.CodeToolFailed, "Checksum for %s not found", name)
 	}
@@ -199,7 +267,7 @@ func (u *updater) Run(ctx context.Context, job *core.JobContext) error {
 	tmp := filepath.Join(job.TempDir, name)
 	defer os.Remove(tmp)
 	job.Logf("Downloading %s", name)
-	got, err := u.download(ctx, assetURL, tmp, job)
+	got, err := u.download(ctx, assetURL, tmp, job, label, u.limit(b))
 	if err != nil {
 		return err
 	}
@@ -212,34 +280,44 @@ func (u *updater) Run(ctx context.Context, job *core.JobContext) error {
 	}
 	job.Logf("Checksum OK")
 
-	if err := os.Chmod(tmp, 0o755); err != nil {
-		return core.Errorf(core.CodeInternal, "Couldn't make yt-dlp executable").WithCause(err)
+	src := tmp
+	if b.ArchiveEntry != "" {
+		src = filepath.Join(job.TempDir, u.exe(b.DepID)+".extracted")
+		defer os.Remove(src)
+		if err := u.extract(tmp, name, b.ArchiveEntry, src, u.limit(b)); err != nil {
+			return err
+		}
+		job.Logf("Extracted %s", b.ArchiveEntry)
+	}
+
+	if err := os.Chmod(src, 0o755); err != nil {
+		return core.Errorf(core.CodeInternal, "Couldn't make %s executable", label).WithCause(err)
 	}
 	if err := os.MkdirAll(u.svc.binDir, 0o755); err != nil {
 		return core.Errorf(core.CodeInternal, "Couldn't create the tools folder").WithCause(err)
 	}
 	job.Progress(0.97, "Installing")
-	if err := os.Rename(tmp, dest); err != nil {
+	if err := os.Rename(src, dest); err != nil {
 		if u.goos == "windows" {
-			return core.Errorf(core.CodeConflict, "yt-dlp is in use; wait for downloads to finish").WithCause(err)
+			return core.Errorf(core.CodeConflict, "%s is in use; wait for running tasks to finish", label).WithCause(err)
 		}
-		return core.Errorf(core.CodeInternal, "Couldn't install yt-dlp").WithCause(err)
+		return core.Errorf(core.CodeInternal, "Couldn't install %s", label).WithCause(err)
 	}
 	job.Logf("Installed to %s", dest)
 
 	ver, err := u.version(ctx, dest)
 	if err != nil {
-		return core.Errorf(core.CodeToolFailed, "The new yt-dlp didn't run").WithCause(err)
+		return core.Errorf(core.CodeToolFailed, "The new %s didn't run", label).WithCause(err)
 	}
-	job.Logf("yt-dlp reports version %s", strings.TrimSpace(ver))
+	job.Logf("%s reports version %s", label, firstLine(ver))
 	u.svc.Detect(ctx)
-	job.Progress(1, "Installed yt-dlp "+tag)
+	job.Progress(1, "Installed "+label+" "+tag)
 	return nil
 }
 
-func (u *updater) fetchRelease(ctx context.Context) (release, error) {
+func (u *updater) fetchRelease(ctx context.Context, b BinarySpec) (release, error) {
 	var rel release
-	resp, cancel, err := u.get(ctx, u.apiBase+"/repos/yt-dlp/yt-dlp/releases/latest")
+	resp, cancel, err := u.get(ctx, u.apiBase+"/repos/"+b.Repo+"/releases/latest")
 	if err != nil {
 		return rel, netErr(ctx, "Couldn't reach GitHub", err)
 	}
@@ -276,19 +354,34 @@ func findSum(sums, name string) string {
 	return ""
 }
 
+// singleSum parses a per-asset .sha256 file: "<hex>  <name>" or just "<hex>".
+func singleSum(text string) string {
+	for _, line := range strings.Split(text, "\n") {
+		f := strings.Fields(line)
+		if len(f) == 0 {
+			continue
+		}
+		if _, err := hex.DecodeString(f[0]); err != nil || len(f[0]) != 64 {
+			return ""
+		}
+		return f[0]
+	}
+	return ""
+}
+
 // download streams url to path and returns the SHA-256 hex digest.
-func (u *updater) download(ctx context.Context, url, path string, job *core.JobContext) (string, error) {
+func (u *updater) download(ctx context.Context, url, path string, job *core.JobContext, label string, limit int64) (string, error) {
 	resp, cancel, err := u.get(ctx, url)
 	if err != nil {
-		return "", netErr(ctx, "Couldn't download yt-dlp", err)
+		return "", netErr(ctx, "Couldn't download "+label, err)
 	}
 	defer cancel()
 	defer resp.Body.Close()
 	total := resp.ContentLength
 	tooBig := func() error {
-		return core.Errorf(core.CodeToolFailed, "Download is too large (over 200 MB)")
+		return core.Errorf(core.CodeToolFailed, "Download is too large (over %s)", sizeText(limit))
 	}
-	if total > u.maxSize {
+	if total > limit {
 		return "", tooBig()
 	}
 	f, err := os.Create(path)
@@ -306,7 +399,7 @@ func (u *updater) download(ctx context.Context, url, path string, job *core.JobC
 		r, rerr := resp.Body.Read(buf)
 		if r > 0 {
 			n += int64(r)
-			if n > u.maxSize {
+			if n > limit {
 				return "", tooBig()
 			}
 			h.Write(buf[:r])
@@ -314,9 +407,9 @@ func (u *updater) download(ctx context.Context, url, path string, job *core.JobC
 				return "", core.Errorf(core.CodeInternal, "Couldn't write the download").WithCause(werr)
 			}
 			if total > 0 {
-				job.Progress(0.95*float64(n)/float64(total), fmt.Sprintf("Downloading yt-dlp (%d%%)", n*100/total))
+				job.Progress(0.95*float64(n)/float64(total), fmt.Sprintf("Downloading %s (%d%%)", label, n*100/total))
 			} else {
-				job.Progress(core.IndeterminateProgress, "Downloading yt-dlp")
+				job.Progress(core.IndeterminateProgress, "Downloading "+label)
 			}
 		}
 		if rerr == io.EOF {
@@ -333,4 +426,84 @@ func (u *updater) download(ctx context.Context, url, path string, job *core.JobC
 		return "", core.Errorf(core.CodeInternal, "Couldn't write the download").WithCause(err)
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// memberMatches reports whether an archive member name is the wanted binary
+// (at the top level or inside a top-level folder).
+func (u *updater) memberMatches(member, entry string) bool {
+	base := path.Base(strings.ReplaceAll(member, `\`, "/"))
+	return base == entry || base == entry+".exe"
+}
+
+// extract copies the named member of a .zip or .tar.gz archive to dest.
+func (u *updater) extract(archive, assetName, entry, dest string, limit int64) error {
+	notFound := core.Errorf(core.CodeToolFailed, "The download didn't contain %s", entry)
+	bad := func(err error) error {
+		return core.Errorf(core.CodeToolFailed, "Couldn't unpack the download").WithCause(err)
+	}
+	write := func(r io.Reader) error {
+		out, err := os.Create(dest)
+		if err != nil {
+			return core.Errorf(core.CodeInternal, "Couldn't write the download").WithCause(err)
+		}
+		n, err := io.Copy(out, io.LimitReader(r, limit+1))
+		cerr := out.Close()
+		if err != nil {
+			return bad(err)
+		}
+		if cerr != nil {
+			return core.Errorf(core.CodeInternal, "Couldn't write the download").WithCause(cerr)
+		}
+		if n > limit {
+			os.Remove(dest)
+			return core.Errorf(core.CodeToolFailed, "Download is too large (over %s)", sizeText(limit))
+		}
+		return nil
+	}
+	switch {
+	case strings.HasSuffix(assetName, ".zip"):
+		zr, err := zip.OpenReader(archive)
+		if err != nil {
+			return bad(err)
+		}
+		defer zr.Close()
+		for _, f := range zr.File {
+			if f.FileInfo().IsDir() || !u.memberMatches(f.Name, entry) {
+				continue
+			}
+			rc, err := f.Open()
+			if err != nil {
+				return bad(err)
+			}
+			defer rc.Close()
+			return write(rc)
+		}
+		return notFound
+	case strings.HasSuffix(assetName, ".tar.gz"), strings.HasSuffix(assetName, ".tgz"):
+		f, err := os.Open(archive)
+		if err != nil {
+			return bad(err)
+		}
+		defer f.Close()
+		gz, err := gzip.NewReader(f)
+		if err != nil {
+			return bad(err)
+		}
+		defer gz.Close()
+		tr := tar.NewReader(gz)
+		for {
+			h, err := tr.Next()
+			if err == io.EOF {
+				return notFound
+			}
+			if err != nil {
+				return bad(err)
+			}
+			if h.Typeflag != tar.TypeReg || !u.memberMatches(h.Name, entry) {
+				continue
+			}
+			return write(tr)
+		}
+	}
+	return bad(fmt.Errorf("unknown archive type %q", assetName))
 }
