@@ -1,2 +1,28 @@
-// Design-system primitives. Owned by WP-E (see SPEC.md §8.5).
-export {};
+// Design-system primitives (SPEC 8.5).
+export { Badge, type BadgeProps, type BadgeTone } from "./Badge";
+export { Banner, type BannerProps, type BannerTone } from "./Banner";
+export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./Button";
+export { cx } from "./cx";
+export { DropZone, type DropZoneProps } from "./DropZone";
+export { EmptyState, type EmptyStateProps } from "./EmptyState";
+export { Field, type FieldControlProps, type FieldProps } from "./Field";
+export { FileList, type FileListItem, type FileListProps } from "./FileList";
+export { Icon, iconNames, type IconName, type IconProps } from "./Icon";
+export { IconButton, type IconButtonProps } from "./IconButton";
+export { Kbd, type KbdProps } from "./Kbd";
+export { Meter, type MeterProps, type MeterStatus } from "./Meter";
+export { PathText, splitPath, type PathTextProps } from "./PathText";
+export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from "./SegmentedControl";
+export { Section, type SectionProps } from "./Section";
+export { Select, type SelectOption, type SelectProps } from "./Select";
+export { Spinner, type SpinnerProps } from "./Spinner";
+export { Stepper, type StepperProps } from "./Stepper";
+export { StatusChip, type ChipStatus, type StatusChipProps } from "./StatusChip";
+export { Switch, type SwitchProps } from "./Switch";
+export { TextArea, type TextAreaProps } from "./TextArea";
+export { TextField, type TextFieldProps } from "./TextField";
+export { TimecodeInput, type TimecodeInputProps } from "./TimecodeInput";
+export { Toaster } from "./Toaster";
+export { dismissToast, toast, type ToastOptions, type ToastTone } from "./toast";
+export { Tooltip, useDelayedHover, type TooltipProps } from "./Tooltip";
+export { Gallery } from "./Gallery";

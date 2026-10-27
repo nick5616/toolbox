@@ -1,0 +1,35 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  user-select: none;
+}
+
+.required {
+  color: var(--accent);
+}
+
+.hint,
+.error {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
+.hint {
+  color: var(--fg-muted);
+}
+
+.error {
+  color: var(--danger);
+}

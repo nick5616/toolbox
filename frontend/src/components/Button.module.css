@@ -1,0 +1,94 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-size: var(--text-md);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.loading:disabled {
+  opacity: 0.8;
+}
+
+.sm {
+  height: var(--control-h-compact);
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+}
+
+.kbd {
+  margin-right: -4px;
+  opacity: 0.8;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--fg));
+}
+.primary:active {
+  background: color-mix(in srgb, var(--accent) 76%, var(--bg-app));
+}
+.primary .kbd {
+  color: inherit;
+}
+
+.secondary {
+  background: var(--bg-raised);
+  border-color: var(--line-strong);
+  color: var(--fg);
+}
+.secondary:hover {
+  background: var(--bg-hover);
+}
+.secondary:active {
+  background: var(--bg-active);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--fg-muted);
+}
+.ghost:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.ghost:active {
+  background: var(--bg-active);
+}
+
+.danger {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger);
+}
+.danger:hover {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+.danger:active {
+  background: color-mix(in srgb, var(--danger) 30%, transparent);
+}

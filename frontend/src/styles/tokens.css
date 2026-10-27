@@ -1,0 +1,107 @@
+/* Design tokens ("Console", SPEC 8.4). Dark is the default; light via data-theme. */
+:root {
+  --font-ui: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --text-xs: 11px;
+  --text-xs-lh: 16px;
+  --text-sm: 12px;
+  --text-sm-lh: 18px;
+  --text-md: 13px;
+  --text-md-lh: 20px;
+  --text-lg: 15px;
+  --text-lg-lh: 22px;
+  --text-xl: 20px;
+  --text-xl-lh: 28px;
+  --text-2xl: 28px;
+  --text-2xl-lh: 34px;
+
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  --control-h: 28px;
+  --control-h-compact: 24px;
+  --row-h: 32px;
+  --sidebar-item-h: 30px;
+
+  --dur-fast: 120ms;
+  --dur-panel: 180ms;
+  --dur-fade: 80ms;
+  --ease-out: ease-out;
+  --ease-panel: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --mask-on: #000;
+  --focus-ring: 0 0 0 1px var(--bg-panel), 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-app: #0b0c0e;
+  --bg-sidebar: #0f1012;
+  --bg-panel: #131417;
+  --bg-raised: #1a1b1f;
+  --bg-hover: #212227;
+  --bg-active: #292b31;
+  --bg-inset: #0d0e10;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --fg: #ededef;
+  --fg-muted: #a1a2aa;
+  --fg-subtle: #6b6d76;
+  --fg-faint: #45474f;
+  --accent: #ff8c42;
+  --accent-fg: #1a0b02;
+  --accent-soft: rgba(255, 140, 66, 0.14);
+  --ok: #4ade80;
+  --ok-soft: rgba(74, 222, 128, 0.14);
+  --warn: #f5c451;
+  --warn-soft: rgba(245, 196, 81, 0.14);
+  --danger: #ff5c5c;
+  --danger-soft: rgba(255, 92, 92, 0.14);
+  --shadow-pop: 0 16px 48px rgba(0, 0, 0, 0.45);
+  --pop-border: var(--line-strong);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.14);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.24);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg-app: #e8e8eb;
+  --bg-sidebar: #eeeef1;
+  --bg-panel: #f7f7f9;
+  --bg-raised: #ffffff;
+  --bg-hover: #ededf0;
+  --bg-active: #e3e3e8;
+  --bg-inset: #f0f0f3;
+  --line: rgba(10, 10, 20, 0.08);
+  --line-strong: rgba(10, 10, 20, 0.15);
+  --fg: #121316;
+  --fg-muted: #55575f;
+  --fg-subtle: #868892;
+  --fg-faint: #b4b5bc;
+  --accent: #dd6416;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(221, 100, 22, 0.12);
+  --ok: #15803d;
+  --ok-soft: rgba(21, 128, 61, 0.14);
+  --warn: #a16207;
+  --warn-soft: rgba(161, 98, 7, 0.14);
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.14);
+  --shadow-pop: 0 16px 48px rgba(0, 0, 0, 0.45);
+  --pop-border: rgba(20, 20, 40, 0.18);
+  --scrollbar-thumb: rgba(10, 10, 20, 0.2);
+  --scrollbar-thumb-hover: rgba(10, 10, 20, 0.34);
+}

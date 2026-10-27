@@ -1,0 +1,36 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.queued,
+.cancelled {
+  background: var(--bg-hover);
+  color: var(--fg-subtle);
+}
+
+.running {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.done {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.failed {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
