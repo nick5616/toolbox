@@ -40,3 +40,25 @@ Newest last. Format: date — decision — why.
 - 2026-10-27 — Downloader strips yt-dlp's Python `(caused by …)` suffix from error messages and hints "Check that the link is correct…" for HTTP 404 / unreachable pages. — Found during smoke testing; raw messages were noisy.
 - 2026-10-27 — Settings → Dependencies shows each tool's path under its name instead of in a separate column; the table uses fixed column widths. — The six-column table overflowed the 720px layout and caused horizontal scrolling.
 - 2026-10-27 — `TOOLBOX_VIEW` env var opens the app on a given view (dev aid, used for visual QA). — No UI automation is available without opening a debug port; screenshots were taken with passive window capture.
+
+## Phase 2 (approved 2026-10-27)
+
+### Made in SPEC.md
+- 2026-10-27 — Audio engine = one uv-managed CPython **3.12** sidecar over stdio JSON Lines; installed on demand (~1 GB) into the support dir. — 3.13 imported 10× slower in testing; no network listeners; explicit opt-in for the large download.
+- 2026-10-27 — audio-separator 0.47.1 `[cpu]` everywhere (MPS/CoreML on Apple Silicon per upstream docs); basic-pitch 0.4.0 via its bundled ONNX model with uv `exclude-dependencies` (TF/coremltools) and `override-dependencies` (`resampy>=0.4.3`). — basic-pitch's TF pin can't install on 3.12; the ONNX path works unpatched.
+- 2026-10-27 — uv is the second app-managed binary (same verified-download flow as yt-dlp, generalised as `InstallManagedBinary`).
+- 2026-10-27 — Engine recycled after any result with `rssBytes` > 3 GiB; idle stop after 10 min; hard kill + restart if a cancel isn't honoured within 3 s. — MDX separation memory grew 2.9 → 3.9 GB and wasn't released.
+
+### Made during the build
+- 2026-10-27 — Job results (`Job.ResultJSON`, migration 0002) instead of a results table. — Results belong to the job; one nullable column keeps the schema simple; verified upgrading a real Phase 1 database.
+- 2026-10-27 — `core.UniquePath`/`StemName` added to core for collision-free outputs. — Converter and MIDI both needed it.
+- 2026-10-27 — The sidecar's selftest reports `packages["toolbox-sidecar"]`. — The Go setup step reads it for the engine version string.
+- 2026-10-27 — **Sidecar protocol uses private dups of stdin/stdout; fd 0 → NUL, fd 1 → stderr.** — Found by the end-to-end test: on Windows a synchronous read pending on the stdin pipe stalled first-run numba/librosa work (a job hung 18 min; isolated repro: 96 s blocked vs 6 s). Also keeps child processes from writing into the protocol.
+- 2026-10-27 — `proc` caps lines at 1 MiB, so engine replies ≥ 1 MiB fail that call (spec said 16 MiB). — Results are kilobytes; raising the cap wasn't worth the memory risk.
+- 2026-10-27 — Shared tool-view helpers (`submitJobs`, `FileActions`, `runLabel`, result styles) live in `tools/_kit`. — The views builder had put them under `tools/stems/shared`; moved at integration.
+- 2026-10-27 — BPM & Key "Copy CSV" uses the table's columns (`File,BPM,Key,Camelot,Confidence,Analyzed`). — Spec listed five lowercase columns; the kit builds CSV from visible columns.
+- 2026-10-27 — Converter select labels are prefixed ("Audio · MP3 · 320 kbps") instead of `<optgroup>`s. — The Select component has no group support; not worth extending for one view.
+- 2026-10-27 — Converter submits only compatible inputs when some don't fit the preset (others stay flagged). — Avoids failing a whole batch over one wrong file.
+- 2026-10-27 — Downloader options now use the kit's `useModuleOptions` with static defaults mirroring Go's `DefaultOptions()`. — The hook needs defaults synchronously.
+- 2026-10-27 — Stems reports a "Preparing" stage before importing torch/audio-separator. — Without it the first seconds of a job showed no message.
+- 2026-10-27 — Windows title bar follows the app theme via `DwmSetWindowAttribute(DWMWA_USE_IMMERSIVE_DARK_MODE)` on `NativeWindow()`; updated on startup, settings change and OS theme change. — Wails v3 has no runtime setter.
