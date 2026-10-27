@@ -7,12 +7,14 @@ separated), it is imported after the real handlers so tests can register extras.
 from __future__ import annotations
 
 import importlib
+import io
 import json
 import logging
 import os
 import sys
 import threading
 import traceback
+import typing
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from . import __version__, progress
@@ -130,10 +132,38 @@ def _recover_id(line: str) -> str | None:
     return None
 
 
+def _isolate_stdio() -> tuple[typing.BinaryIO, typing.TextIO]:
+    """Gives the protocol private copies of stdin/stdout and points fds 0/1
+    at NUL/stderr.
+
+    On Windows a synchronous ReadFile pending on the stdin pipe blocks other
+    operations on that pipe, e.g. a library spawning a subprocess (which
+    duplicates the standard handles). With the main thread parked in
+    readline(), first-run numba/librosa work stalled until the next request
+    arrived. Library code (and child processes) must therefore never see the
+    protocol pipes. This also stops children from writing into the protocol.
+    """
+    in_fd, out_fd = os.dup(0), os.dup(1)  # non-inheritable by default
+    nul = os.open(os.devnull, os.O_RDONLY)
+    os.dup2(nul, 0)
+    os.close(nul)
+    os.dup2(2, 1)
+    proto_in = os.fdopen(in_fd, "rb", buffering=0)
+    proto_out = io.TextIOWrapper(
+        os.fdopen(out_fd, "wb", buffering=0), encoding="utf-8", newline="\n", write_through=True
+    )
+    sys.stdin = open(os.devnull, encoding="utf-8")  # noqa: SIM115
+    return proto_in, proto_out
+
+
 def main(argv: list[str] | None = None) -> int:
     """Runs the sidecar (or --selftest). Returns the process exit code."""
     argv = sys.argv[1:] if argv is None else argv
-    real_stdout = sys.stdout
+    if "--selftest" in argv:
+        real_stdout = sys.stdout
+        proto_in = None
+    else:
+        proto_in, real_stdout = _isolate_stdio()
     sys.stdout = sys.stderr
     logging.basicConfig(
         stream=sys.stderr,
@@ -155,7 +185,8 @@ def main(argv: list[str] | None = None) -> int:
     writer.ready({"version": __version__, "python": python_version(), "pid": os.getpid()})
     server = _Server(writer)
 
-    stdin = sys.stdin.buffer
+    assert proto_in is not None
+    stdin = io.BufferedReader(proto_in)  # type: ignore[arg-type]
     while True:
         raw = stdin.readline(MAX_LINE_BYTES + 2)
         if not raw:
