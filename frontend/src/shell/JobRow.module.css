@@ -1,0 +1,85 @@
+.wrap {
+  border-bottom: 1px solid var(--line);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 20px minmax(80px, 1fr) auto 80px minmax(60px, 1.2fr) 64px auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--row-h);
+  padding: 2px var(--space-4);
+}
+
+.compact .row {
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}
+
+.row:hover {
+  background: var(--bg-hover);
+}
+
+.icon {
+  display: inline-flex;
+  color: var(--fg-muted);
+}
+
+.title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-md);
+}
+
+.meter {
+  width: 80px;
+}
+
+.message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-subtle);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.actions {
+  display: inline-flex;
+  gap: 2px;
+  min-width: 24px;
+  justify-content: flex-end;
+}
+
+.remove {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.row:hover .remove,
+.remove:focus-visible {
+  opacity: 1;
+}
+
+.error {
+  padding: 0 var(--space-4) var(--space-2) 52px;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
+.errorMsg {
+  color: var(--danger);
+}
+
+.errorHint {
+  color: var(--fg-muted);
+}

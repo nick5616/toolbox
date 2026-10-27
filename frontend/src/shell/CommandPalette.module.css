@@ -1,0 +1,114 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 18vh;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.dialog {
+  width: 600px;
+  max-width: calc(100vw - 32px);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border: 1px solid var(--pop-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+  animation: palette-in var(--dur-fast) var(--ease-out);
+}
+
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog {
+    animation: palette-fade var(--dur-fade) linear;
+  }
+
+  @keyframes palette-fade {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  height: 48px;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg-muted);
+}
+
+.input {
+  flex: 1;
+  background: none;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  font-size: var(--text-lg);
+  color: var(--fg);
+}
+
+.input::placeholder {
+  color: var(--fg-subtle);
+}
+
+.list {
+  overflow-y: auto;
+  padding: var(--space-2);
+}
+
+.group {
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-subtle);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 32px;
+  padding: 0 var(--space-2);
+  border-radius: var(--r-md);
+  color: var(--fg-muted);
+}
+
+.selected {
+  background: var(--bg-active);
+  color: var(--fg);
+}
+
+.title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title mark {
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.empty {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--fg-subtle);
+}
