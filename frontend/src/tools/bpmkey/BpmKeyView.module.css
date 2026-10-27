@@ -1,0 +1,25 @@
+.bar {
+  display: inline-block;
+  width: 48px;
+  height: 4px;
+  margin-right: var(--space-2);
+  vertical-align: middle;
+  border-radius: 2px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.dim {
+  opacity: 0.5;
+}
