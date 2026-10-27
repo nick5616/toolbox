@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0409": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "Toolbox",
+			"FileDescription": "Local media and utility toolbox",
+			"LegalCopyright": "Personal use",
+			"ProductName": "Toolbox",
+			"Comments": "(c) 2026 Toolbox"
+		}
+	}
+}
