@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Badge, Button, EmptyState, Icon, IconButton, Select, TextField, toast } from "@/components";
-import { LibraryService, OutputKind } from "@/lib/api";
+import { Badge, Button, EmptyState, Icon, IconButton, MenuButton, Select, TextField, toast, type MenuItem } from "@/components";
+import { LibraryService, ModulesService, OutputKind } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { revealLabel } from "@/lib/platform";
 import { useShortcut } from "@/lib/shortcuts";
 import { useLibrary, type OutputView } from "@/state/library";
+import { useUI } from "@/state/ui";
 import { isReady, useModules } from "@/state/modules";
 import styles from "./LibraryView.module.css";
 
@@ -20,6 +21,19 @@ const kindIcon: Record<string, string> = {
 function fail(e: unknown): void {
   const err = toAppError(e);
   toast({ tone: "danger", title: err.message, description: err.hint });
+}
+
+/** Ready modules that accept `path`, as menu items that hand the file off. */
+async function sendToItems(path: string): Promise<MenuItem[]> {
+  const res = await ModulesService.Match([path]);
+  return (res.matches ?? [])
+    .filter((m) => isReady(m.module))
+    .map((m) => ({
+      id: m.module.id,
+      label: m.module.name,
+      icon: m.module.icon,
+      onSelect: () => useUI.getState().handOff({ moduleId: m.module.id, inputs: [path] }),
+    }));
 }
 
 export function LibraryView() {
@@ -177,6 +191,16 @@ export function LibraryView() {
                   disabled={o.missing}
                   onClick={() => void reveal(o)}
                 />
+                {!o.missing && (
+                  <MenuButton
+                    size="sm"
+                    variant="ghost"
+                    icon="external-link"
+                    label="Send to…"
+                    emptyLabel="No tools accept this file"
+                    items={() => sendToItems(o.path)}
+                  />
+                )}
                 <IconButton
                   size="sm"
                   icon="external-link"
