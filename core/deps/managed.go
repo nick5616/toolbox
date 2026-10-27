@@ -2,13 +2,13 @@ package deps
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"toolbox/core"
 )
 
-// Phase 2 contract (SPEC.md §3.3). CONTRACT STUB (foundation): WP-S1
-// implements these and refactors the yt-dlp updater onto InstallManagedBinary.
-// Exported names and signatures are frozen.
+// Phase 2 contract (SPEC.md §3.3).
 
 // UV is the uv dependency ID; UVUpdateModuleID its hidden install/update module.
 const (
@@ -37,22 +37,70 @@ type BinarySpec struct {
 	MaxBytes     int64
 }
 
+var errUnsupportedPlatform = errors.New("unsupported platform")
+
 // YtDlpBinary and UVBinary are the two managed binaries.
-func YtDlpBinary() BinarySpec { return BinarySpec{DepID: YtDlp, Repo: "yt-dlp/yt-dlp"} }
-func UVBinary() BinarySpec    { return BinarySpec{DepID: UV, Repo: "astral-sh/uv"} }
+func YtDlpBinary() BinarySpec {
+	return BinarySpec{
+		DepID: YtDlp, Repo: "yt-dlp/yt-dlp",
+		Asset: func(goos, goarch string) (string, error) {
+			if n := assetName(goos, goarch); n != "" {
+				return n, nil
+			}
+			return "", errUnsupportedPlatform
+		},
+		Checksum: ChecksumSumsFile, SumsFile: sumsAsset,
+		MaxBytes: maxDownload,
+	}
+}
+
+func UVBinary() BinarySpec {
+	return BinarySpec{
+		DepID: UV, Repo: "astral-sh/uv",
+		Asset:        uvAsset,
+		Checksum:     ChecksumPerAsset,
+		ArchiveEntry: "uv",
+		MaxBytes:     maxDownload,
+	}
+}
+
+func uvAsset(goos, goarch string) (string, error) {
+	arch := ""
+	switch goarch {
+	case "arm64":
+		arch = "aarch64"
+	case "amd64":
+		arch = "x86_64"
+	default:
+		return "", errUnsupportedPlatform
+	}
+	switch goos {
+	case "darwin":
+		return "uv-" + arch + "-apple-darwin.tar.gz", nil
+	case "windows":
+		return "uv-" + arch + "-pc-windows-msvc.zip", nil
+	case "linux":
+		return "uv-" + arch + "-unknown-linux-gnu.tar.gz", nil
+	}
+	return "", errUnsupportedPlatform
+}
 
 // InstallManagedBinary downloads the latest release of b into the managed bin
 // dir with checksum verification, reporting progress through job, then
 // re-detects. A no-op (message "Already up to date (<tag>)") when current.
 func (s *Service) InstallManagedBinary(ctx context.Context, job *core.JobContext, b BinarySpec) error {
-	return core.NotImplemented("managed binary install")
+	base := s.githubBase
+	if base == "" {
+		base = githubAPI
+	}
+	return newUpdater(s, base).install(ctx, job, b)
 }
 
 // RegisterUVUpdater registers the hidden uv install/update module.
-func RegisterUVUpdater(reg *core.Registry, s *Service) error { return nil }
+func RegisterUVUpdater(reg *core.Registry, s *Service) error {
+	u := newUpdater(s, githubAPI)
+	u.spec = UVBinary()
+	return reg.Register(u)
+}
 
-// RegisterVirtual adds a dependency detected by a function instead of by
-// running a binary (e.g. the audio engine). spec supplies ID, Name, Purpose,
-// Managed and InstallHint; detect returns its status (Path is what Resolve
-// returns when OK). It participates in List, Detect, Resolve and deps:changed.
-func (s *Service) RegisterVirtual(spec Spec, detect func(ctx context.Context) core.DepStatus) {}
+func (b BinarySpec) String() string { return fmt.Sprintf("%s (%s)", b.DepID, b.Repo) }

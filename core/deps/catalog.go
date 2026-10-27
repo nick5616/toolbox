@@ -65,5 +65,15 @@ func Catalog() []Spec {
 				"linux":   "sudo apt install libimage-exiftool-perl",
 			},
 		},
+		{
+			ID: UV, Name: "uv", Purpose: "Installs the Python runtime for the audio engine",
+			Binary: "uv", VersionArgs: []string{"--version"},
+			VersionRegex: regexp.MustCompile(`^uv (\S+)`), Managed: true,
+			InstallHint: map[string]string{
+				"darwin":  "Installed with the audio engine",
+				"windows": "Installed with the audio engine",
+				"linux":   "Installed with the audio engine",
+			},
+		},
 	}
 }
