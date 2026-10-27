@@ -1,13 +1,14 @@
 // Package store is the SQLite implementation of core.JobStore,
 // core.OutputStore and core.SettingsStore. See SPEC.md §5.
-//
-// CONTRACT STUB (foundation). WP-A replaces the bodies; exported signatures
-// are frozen.
 package store
 
 import (
-	"context"
 	"database/sql"
+	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"toolbox/core"
 
@@ -27,43 +28,43 @@ var (
 
 // Open opens (creating if needed) and migrates the database at path.
 func Open(path string) (*DB, error) {
-	return &DB{}, nil
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, fmt.Errorf("create database dir: %w", err)
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolve database path: %w", err)
+	}
+	db, err := sql.Open("sqlite", dsn(abs))
+	if err != nil {
+		return nil, fmt.Errorf("open database: %w", err)
+	}
+	db.SetMaxOpenConns(1)
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("open database %q: %w", path, err)
+	}
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return &DB{sql: db}, nil
+}
+
+// dsn builds a file: URI with pragmas. The path is percent-encoded so spaces
+// and backslash-converted Windows paths survive.
+func dsn(abs string) string {
+	p := filepath.ToSlash(abs)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p // C:/x -> /C:/x
+	}
+	u := url.URL{Scheme: "file", Path: p}
+	q := url.Values{}
+	for _, pr := range []string{"busy_timeout(5000)", "journal_mode(WAL)", "foreign_keys(1)", "synchronous(NORMAL)"} {
+		q.Add("_pragma", pr)
+	}
+	return u.String() + "?" + q.Encode()
 }
 
 // Close closes the database.
-func (d *DB) Close() error { return nil }
-
-func (d *DB) InsertJob(ctx context.Context, j core.Job) error { return core.NotImplemented("store") }
-func (d *DB) UpdateJob(ctx context.Context, j core.Job) error { return core.NotImplemented("store") }
-func (d *DB) GetJob(ctx context.Context, id string) (core.Job, error) {
-	return core.Job{}, core.NotImplemented("store")
-}
-func (d *DB) ListJobs(ctx context.Context, f core.JobFilter) ([]core.Job, error) {
-	return []core.Job{}, nil
-}
-func (d *DB) DeleteJobs(ctx context.Context, ids []string) error { return core.NotImplemented("store") }
-func (d *DB) AppendLogs(ctx context.Context, jobID string, lines []core.LogLine) error {
-	return core.NotImplemented("store")
-}
-func (d *DB) Logs(ctx context.Context, jobID string) ([]core.LogLine, error) {
-	return []core.LogLine{}, nil
-}
-func (d *DB) CountLogs(ctx context.Context, jobID string) (int, error) { return 0, nil }
-
-func (d *DB) UpsertOutput(ctx context.Context, o core.Output) (core.Output, error) {
-	return core.Output{}, core.NotImplemented("store")
-}
-func (d *DB) GetOutput(ctx context.Context, id string) (core.Output, error) {
-	return core.Output{}, core.NotImplemented("store")
-}
-func (d *DB) ListOutputs(ctx context.Context, q core.OutputQuery) (core.OutputPage, error) {
-	return core.OutputPage{Items: []core.Output{}}, nil
-}
-func (d *DB) DeleteOutput(ctx context.Context, id string) error { return core.NotImplemented("store") }
-
-func (d *DB) GetSetting(ctx context.Context, key string) (string, bool, error) {
-	return "", false, nil
-}
-func (d *DB) SetSetting(ctx context.Context, key, value string) error {
-	return core.NotImplemented("store")
-}
+func (d *DB) Close() error { return d.sql.Close() }
