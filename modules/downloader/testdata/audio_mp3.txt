@@ -1,0 +1,27 @@
+[youtube] Extracting URL: https://www.youtube.com/watch?v=jNQXAC9IVRw
+[youtube] jNQXAC9IVRw: Downloading webpage
+stderr:WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[info] jNQXAC9IVRw: Downloading 1 format(s): 251
+[tbx:start] jNQXAC9IVRw|251|NA|NA|Me at the zoo
+[download] Destination: Me at the zoo [jNQXAC9IVRw].webm
+[tbx:dl] downloading|1024|252182|NA|405070.95124021504|0|NA|NA
+[tbx:dl] downloading|3072|252182|NA|982905.018536883|0|NA|NA
+[tbx:dl] downloading|7168|252182|NA|2022520.7582912883|0|NA|NA
+[tbx:dl] downloading|15360|252182|NA|3904042.506362865|0|NA|NA
+[tbx:dl] downloading|31744|252182|NA|7306771.275161892|0|NA|NA
+[tbx:dl] downloading|64512|252182|NA|7963240.226257394|0|NA|NA
+[tbx:dl] downloading|130048|252182|NA|2407184.766753311|0|NA|NA
+[tbx:dl] downloading|252182|252182|NA|3330744.7965865256|0|NA|NA
+[tbx:dl] finished|252182|252182|NA|1558351.510911266|NA|NA|NA
+stderr:[tbx:pp] started|ThumbnailsConvertor
+stderr:[tbx:pp] finished|ThumbnailsConvertor
+[ExtractAudio] Destination: Me at the zoo [jNQXAC9IVRw].mp3
+stderr:[tbx:pp] started|ExtractAudio
+stderr:[tbx:pp] finished|ExtractAudio
+stderr:[tbx:pp] started|Metadata
+stderr:[tbx:pp] finished|Metadata
+stderr:[tbx:pp] started|EmbedThumbnail
+stderr:[tbx:pp] finished|EmbedThumbnail
+stderr:[tbx:pp] started|MoveFiles
+stderr:[tbx:pp] finished|MoveFiles
+[tbx:out] {{HOME}}/Me at the zoo [jNQXAC9IVRw].mp3

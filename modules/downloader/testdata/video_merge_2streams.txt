@@ -1,0 +1,39 @@
+[youtube] Extracting URL: https://www.youtube.com/watch?v=jNQXAC9IVRw
+[youtube] jNQXAC9IVRw: Downloading webpage
+stderr:WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. See  https://github.com/yt-dlp/yt-dlp/wiki/EJS  for details on installing one
+[info] jNQXAC9IVRw: Downloading 1 format(s): 133+140
+[tbx:start] jNQXAC9IVRw|133+140|NA|NA|Me at the zoo
+[tbx:dl] downloading|1024|433081|NA|152244.4187019248|2|NA|NA
+[tbx:dl] downloading|3072|433081|NA|416744.3524160683|1|NA|NA
+[tbx:dl] downloading|7168|433081|NA|918709.5820320855|0|NA|NA
+[tbx:dl] downloading|15360|433081|NA|1876132.3696088996|0|NA|NA
+[tbx:dl] downloading|31744|433081|NA|3688403.4067261345|0|NA|NA
+[tbx:dl] downloading|64512|433081|NA|7018102.441914149|0|NA|NA
+[tbx:dl] downloading|130048|433081|NA|5093766.077023645|0|NA|NA
+[tbx:dl] downloading|261120|433081|NA|6372243.810720706|0|NA|NA
+[tbx:dl] downloading|433081|433081|NA|8061999.842991749|0|NA|NA
+[tbx:dl] finished|433081|433081|NA|2757643.2099710796|NA|NA|NA
+[tbx:dl] downloading|1024|309288|NA|35915.00159716357|8|NA|NA
+[tbx:dl] downloading|3072|309288|NA|104783.41252531167|2|NA|NA
+[tbx:dl] downloading|7168|309288|NA|241238.02283614306|1|NA|NA
+[tbx:dl] downloading|15360|309288|NA|510645.034122524|0|NA|NA
+[tbx:dl] downloading|31744|309288|NA|1039854.3136651542|0|NA|NA
+[tbx:dl] downloading|64512|309288|NA|2072733.6350042897|0|NA|NA
+[tbx:dl] downloading|130048|309288|NA|4117680.093245161|0|NA|NA
+[tbx:dl] downloading|261120|309288|NA|8072949.2535289135|0|NA|NA
+[tbx:dl] downloading|309288|309288|NA|9058108.114793247|0|NA|NA
+[tbx:dl] finished|309288|309288|NA|5471034.344748474|NA|NA|NA
+stderr:[tbx:pp] started|ThumbnailsConvertor
+stderr:[tbx:pp] finished|ThumbnailsConvertor
+[Merger] Merging formats into "Me at the zoo [jNQXAC9IVRw].mp4"
+stderr:[tbx:pp] started|Merger
+stderr:[tbx:pp] finished|Merger
+stderr:[tbx:pp] started|VideoRemuxer
+stderr:[tbx:pp] finished|VideoRemuxer
+stderr:[tbx:pp] started|Metadata
+stderr:[tbx:pp] finished|Metadata
+stderr:[tbx:pp] started|EmbedThumbnail
+stderr:[tbx:pp] finished|EmbedThumbnail
+stderr:[tbx:pp] started|MoveFiles
+stderr:[tbx:pp] finished|MoveFiles
+[tbx:out] {{HOME}}/Me at the zoo [jNQXAC9IVRw].mp4

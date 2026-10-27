@@ -1,0 +1,13 @@
+[generic] Extracting URL: https://example.com/live/stream.m3u8
+[info] stream: Downloading 1 format(s): hls-1080
+[tbx:start] stream|hls-1080|NA|NA|Live stream | part 1
+[download] Destination: Live stream part 1 [stream].mp4
+[tbx:dl] downloading|524288|NA|NA|1048576.5|NA|NA|NA
+[tbx:dl] downloading|5242880|NA|NA|2097152.25|NA|NA|NA
+[tbx:dl] downloading|12897484|NA|NA|2097152.25|NA|NA|NA
+[tbx:dl] finished|12897484|12897484|NA|2097152.25|NA|NA|NA
+stderr:[tbx:pp] started|Metadata
+stderr:[tbx:pp] finished|Metadata
+stderr:[tbx:pp] started|MoveFiles
+stderr:[tbx:pp] finished|MoveFiles
+[tbx:out] {{HOME}}/Live stream part 1 [stream].mp4
