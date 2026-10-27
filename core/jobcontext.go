@@ -17,6 +17,7 @@ type JobHooks struct {
 	Title    func(title string)
 	Output   func(path string) (Output, error)
 	Tool     func(depID string) (string, error)
+	Result   func(result json.RawMessage)
 }
 
 // JobContext is what Module.Run receives.
@@ -83,6 +84,25 @@ func (j *JobContext) Tool(depID string) (string, error) {
 		return "", ErrDependencyMissing(depID, "")
 	}
 	return j.hooks.Tool(depID)
+}
+
+// MaxResultBytes caps a job's result JSON.
+const MaxResultBytes = 64 * 1024
+
+// SetResult records module-specific result data (any JSON-marshalable
+// value, ≤ 64 KB) on the job. It replaces any earlier result.
+func (j *JobContext) SetResult(v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Errorf("encode job result: %w", err)
+	}
+	if len(b) > MaxResultBytes {
+		return ValidationError("Job result is too large", nil)
+	}
+	if j.hooks.Result != nil {
+		j.hooks.Result(json.RawMessage(b))
+	}
+	return nil
 }
 
 // DecodeOptions strictly decodes the job's options into T. Empty options

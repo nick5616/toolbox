@@ -39,6 +39,8 @@ type Job struct {
 	StartedAt       int64     `json:"startedAt"`
 	FinishedAt      int64     `json:"finishedAt"`
 	Outputs         []Output  `json:"outputs"`
+	// ResultJSON is module-specific result data (e.g. BPM & key); "" if none.
+	ResultJSON string `json:"resultJson"`
 }
 
 // JobFilter selects jobs, newest first.
@@ -155,9 +157,10 @@ type SettingsPatch struct {
 type DepState string
 
 const (
-	DepOK      DepState = "ok"
-	DepMissing DepState = "missing"
-	DepError   DepState = "error"
+	DepOK       DepState = "ok"
+	DepMissing  DepState = "missing"
+	DepError    DepState = "error"
+	DepOutdated DepState = "outdated" // installed, but older than this build expects
 )
 
 // DepSource says where a tool was found.
@@ -209,6 +212,19 @@ type MatchResult struct {
 type FilesDropped struct {
 	Paths  []string    `json:"paths"`
 	Result MatchResult `json:"result"`
+	// TargetID is the id of the drop-target element ("tool-drop:<moduleId>"
+	// routes straight to that tool).
+	TargetID string `json:"targetId"`
+}
+
+// FileInfo describes a local file for input lists.
+type FileInfo struct {
+	Path      string     `json:"path"`
+	Name      string     `json:"name"`
+	SizeBytes int64      `json:"sizeBytes"`
+	Exists    bool       `json:"exists"`
+	IsDir     bool       `json:"isDir"`
+	Kind      OutputKind `json:"kind"`
 }
 
 // Navigate is the payload of app:navigate.

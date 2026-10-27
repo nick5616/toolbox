@@ -42,7 +42,7 @@ func TestMigrationsIdempotent(t *testing.T) {
 	}
 	defer db.Close()
 	var n int
-	if err := db.sql.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 1 {
+	if err := db.sql.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 2 {
 		t.Fatalf("migrations = %d, %v", n, err)
 	}
 	if v, ok, _ := db.GetSetting(context.Background(), "k"); !ok || v != `"v"` {
@@ -359,5 +359,35 @@ func TestSettingsKV(t *testing.T) {
 	db.SetSetting(ctx, "a", "2")
 	if v, ok, _ := db.GetSetting(ctx, "a"); !ok || v != "2" {
 		t.Fatalf("got %q %v", v, ok)
+	}
+}
+
+func TestMigrationUpgradesPhase1DB(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a Phase 1 database: only migration 0001 applied.
+	for _, q := range []string{`ALTER TABLE jobs DROP COLUMN result`, `DELETE FROM schema_migrations WHERE version = 2`} {
+		if _, err := db.sql.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+
+	db, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := context.Background()
+	j := core.Job{ID: "j1", ModuleID: "m", Status: core.JobDone, Inputs: []string{}, Attempt: 1, CreatedAt: 1, ResultJSON: `{"bpm":120}`}
+	if err := db.InsertJob(ctx, j); err != nil {
+		t.Fatal(err)
+	}
+	got, err := db.GetJob(ctx, "j1")
+	if err != nil || got.ResultJSON != `{"bpm":120}` {
+		t.Fatalf("result = %q, %v", got.ResultJSON, err)
 	}
 }

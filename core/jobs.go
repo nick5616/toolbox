@@ -200,6 +200,10 @@ func (m *Jobs) Submit(ctx context.Context, moduleID string, inputs []string, opt
 			clean = append(clean, in)
 		}
 	}
+	if desc.MaxInputs > 0 && len(clean) > desc.MaxInputs {
+		return nil, ValidationError(fmt.Sprintf("At most %d files at a time", desc.MaxInputs),
+			map[string]string{"inputs": fmt.Sprintf("At most %d files at a time", desc.MaxInputs)})
+	}
 	if strings.TrimSpace(optionsJSON) == "" {
 		optionsJSON = "{}"
 	}
@@ -447,6 +451,9 @@ func (m *Jobs) execute(aj *activeJob, lg *jobLog) (err error) {
 			return o, nil
 		},
 		Tool: m.tools,
+		Result: func(r json.RawMessage) {
+			m.update(aj, func(j *Job) { j.ResultJSON = string(r) })
+		},
 	}
 	jc := NewJobContext(JobContext{
 		ID: job.ID, ModuleID: job.ModuleID, Inputs: job.Inputs,
@@ -480,6 +487,9 @@ func (m *Jobs) overlay(j *Job) {
 		j.Progress, j.Message = aj.job.Progress, aj.job.Message
 		j.CancelRequested, j.Title = aj.job.CancelRequested, aj.job.Title
 		j.Outputs = append([]Output{}, aj.job.Outputs...)
+		if aj.job.ResultJSON != "" {
+			j.ResultJSON = aj.job.ResultJSON
+		}
 	}
 }
 
@@ -576,6 +586,7 @@ func (m *Jobs) Retry(ctx context.Context, id string) (Job, error) {
 	j.ErrorCode, j.Error, j.ErrorHint = "", "", ""
 	j.StartedAt, j.FinishedAt = 0, 0
 	j.CancelRequested = false
+	j.ResultJSON = ""
 	if err := m.store.UpdateJob(ctx, j); err != nil {
 		return Job{}, err
 	}

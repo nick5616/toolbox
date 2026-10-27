@@ -1,6 +1,7 @@
 package proc
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -40,6 +41,16 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(0)
 	case "sleep":
 		time.Sleep(time.Minute)
+		os.Exit(0)
+	case "echo":
+		// Echo stdin lines back upper-cased until "quit".
+		sc := bufio.NewScanner(os.Stdin)
+		for sc.Scan() {
+			if sc.Text() == "quit" {
+				os.Exit(0)
+			}
+			fmt.Println(strings.ToUpper(sc.Text()))
+		}
 		os.Exit(0)
 	}
 	os.Exit(2)
@@ -154,5 +165,70 @@ func TestLineWriterCRLFAcrossWrites(t *testing.T) {
 	w.Flush()
 	if strings.Join(got, "|") != "a|b|c" {
 		t.Fatalf("lines = %q", got)
+	}
+}
+
+func TestStartStdinRoundTrip(t *testing.T) {
+	lines := make(chan string, 4)
+	s := helper("echo")
+	s.OnStdout = func(l string) { lines <- l }
+	p, err := Start(context.Background(), s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Fprintln(p.Stdin(), "hello")
+	select {
+	case got := <-lines:
+		if got != "HELLO" {
+			t.Fatalf("got %q", got)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("no echo")
+	}
+	fmt.Fprintln(p.Stdin(), "quit")
+	res, err := p.Wait()
+	if err != nil || res.ExitCode != 0 {
+		t.Fatalf("wait = %+v, %v", res, err)
+	}
+	if p.Kill() != nil {
+		t.Fatal("kill after exit should be a no-op")
+	}
+}
+
+func TestStartKillKillsTree(t *testing.T) {
+	pids := make(chan [2]int, 1)
+	s := helper("parent")
+	s.OnStdout = func(l string) {
+		var a, b int
+		if _, err := fmt.Sscanf(l, "pids %d %d", &a, &b); err == nil {
+			pids <- [2]int{a, b}
+		}
+	}
+	p, err := Start(context.Background(), s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got [2]int
+	select {
+	case got = <-pids:
+	case <-time.After(10 * time.Second):
+		t.Fatal("no pids")
+	}
+	if err := p.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-p.Done():
+	case <-time.After(10 * time.Second):
+		t.Fatal("not done after kill")
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for _, pid := range got {
+		for alive(pid) {
+			if time.Now().After(deadline) {
+				t.Fatalf("pid %d alive after Kill", pid)
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
 	}
 }

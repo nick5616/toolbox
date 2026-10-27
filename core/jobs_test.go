@@ -889,3 +889,49 @@ func TestShutdownTimeout(t *testing.T) {
 	close(release)
 	must(t, e.m.Shutdown(5*time.Second))
 }
+
+func TestResultPersistedAndClearedOnRetry(t *testing.T) {
+	var attempts atomic.Int32
+	m := mod("a", func(ctx context.Context, jc *JobContext) error {
+		must(t, jc.SetResult(map[string]int{"n": int(attempts.Add(1))}))
+		if attempts.Load() == 1 {
+			return ValidationError("first fails", nil)
+		}
+		return nil
+	})
+	e := setup(t, 1, m)
+	e.start(t)
+	j := e.submit(t, "a", "x")[0]
+	failed := e.em.waitStatus(t, j.ID, JobFailed)
+	if failed.ResultJSON != `{"n":1}` {
+		t.Fatalf("failed result = %q", failed.ResultJSON)
+	}
+	r, err := e.m.Retry(context.Background(), j.ID)
+	must(t, err)
+	if r.ResultJSON != "" {
+		t.Fatalf("retry kept result %q", r.ResultJSON)
+	}
+	done := e.em.waitStatus(t, j.ID, JobDone)
+	if done.ResultJSON != `{"n":2}` {
+		t.Fatalf("done result = %q", done.ResultJSON)
+	}
+	got, err := e.m.Get(context.Background(), j.ID)
+	must(t, err)
+	if got.ResultJSON != `{"n":2}` {
+		t.Fatalf("persisted result = %q", got.ResultJSON)
+	}
+}
+
+func TestMaxInputs(t *testing.T) {
+	m := mod("a", func(ctx context.Context, jc *JobContext) error { return nil })
+	m.d.MaxInputs = 2
+	e := setup(t, 1, m)
+	e.start(t)
+	_, err := e.m.Submit(context.Background(), "a", []string{"1", "2", "3"}, "{}")
+	if ae := AsAppError(err); ae.Code != CodeValidation || ae.Fields["inputs"] == "" {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := e.m.Submit(context.Background(), "a", []string{"1", "2", "2"}, "{}"); err != nil {
+		t.Fatalf("dedupe should bring it under the cap: %v", err)
+	}
+}

@@ -54,6 +54,8 @@ type Descriptor struct {
 	SplitInputs bool `json:"-"`
 	// MaxConcurrent caps running jobs of this module; 0 = global limit only.
 	MaxConcurrent int `json:"-"`
+	// MaxInputs caps inputs per submission; 0 = no limit.
+	MaxInputs int `json:"maxInputs"`
 }
 
 // Module is implemented by every tool. See CLAUDE.md "How to add a module".
