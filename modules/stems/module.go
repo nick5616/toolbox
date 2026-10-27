@@ -42,10 +42,10 @@ func (m *Module) Descriptor() core.Descriptor {
 
 // Validate implements core.Module.
 func (m *Module) Validate(inputs []string, options json.RawMessage) error {
-	return core.NotImplemented("stems.Validate")
+	return m.validate(inputs, options)
 }
 
 // Run implements core.Module.
 func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
-	return core.NotImplemented("stems.Run")
+	return m.run(ctx, job)
 }
