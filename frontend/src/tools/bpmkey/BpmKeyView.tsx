@@ -4,7 +4,7 @@ import { BpmKeyService, JobStatus } from "@/lib/api";
 import { isActive, useJobs, useOrderedJobs } from "@/state/jobs";
 import { FileToolLayout, ResultTable, useFileInputs } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
-import { submitJobs } from "@/tools/stems/shared/enqueue";
+import { submitJobs } from "@/tools/_kit/enqueue";
 import { bpmColumns } from "./columns";
 import { MAX_ROWS, parseBpmKeyResult, type BpmRow } from "./results";
 

@@ -5,9 +5,9 @@ import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { useRecentOutputs } from "@/state/library";
 import { FileToolLayout, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
-import { FileActions } from "@/tools/stems/shared/FileActions";
-import { submitJobs } from "@/tools/stems/shared/enqueue";
-import shared from "@/tools/stems/shared/results.module.css";
+import { FileActions } from "@/tools/_kit/FileActions";
+import { submitJobs } from "@/tools/_kit/enqueue";
+import shared from "@/tools/_kit/results.module.css";
 import {
   DEFAULT_CONVERTER_OPTIONS,
   incompatibleInputs,

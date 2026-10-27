@@ -5,9 +5,9 @@ import { formatRelativeTime } from "@/lib/format";
 import { useOrderedJobs } from "@/state/jobs";
 import { FileToolLayout, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
-import { FileActions } from "@/tools/stems/shared/FileActions";
-import { submitJobs } from "@/tools/stems/shared/enqueue";
-import shared from "@/tools/stems/shared/results.module.css";
+import { FileActions } from "@/tools/_kit/FileActions";
+import { submitJobs } from "@/tools/_kit/enqueue";
+import shared from "@/tools/_kit/results.module.css";
 import { DEFAULT_MIDI_OPTIONS, formatPitchRange, parseMidiResult, sanitizeMidiOptions } from "./options";
 import styles from "./MidiView.module.css";
 

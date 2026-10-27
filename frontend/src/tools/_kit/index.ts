@@ -9,3 +9,5 @@ export type { DepsGateState } from "./DepsGate";
 export { ResultTable, toCsv } from "./ResultTable";
 export type { ResultColumn, ResultTableProps } from "./ResultTable";
 export { useModuleOptions } from "./useModuleOptions";
+export { submitJobs } from "./enqueue";
+export { FileActions } from "./FileActions";

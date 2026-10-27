@@ -6,9 +6,9 @@ import { formatBytes } from "@/lib/format";
 import { useOrderedJobs, type JobView } from "@/state/jobs";
 import { FileToolLayout, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
-import { FileActions } from "./shared/FileActions";
-import { submitJobs } from "./shared/enqueue";
-import shared from "./shared/results.module.css";
+import { FileActions } from "@/tools/_kit/FileActions";
+import { submitJobs } from "@/tools/_kit/enqueue";
+import shared from "@/tools/_kit/results.module.css";
 import { DEFAULT_STEMS_OPTIONS, dirname, parseStemsResult, sanitizeStemsOptions } from "./options";
 import styles from "./StemsView.module.css";
 

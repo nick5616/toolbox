@@ -29,7 +29,7 @@ vi.mock("@/lib/api", async (orig) => {
 import { useToastStore } from "@/components/toast";
 import StemsView from "./StemsView";
 import { DEFAULT_STEMS_OPTIONS, dirname, parseStemsResult, sanitizeStemsOptions } from "./options";
-import { mapInputErrors } from "./shared/enqueue";
+import { mapInputErrors } from "@/tools/_kit/enqueue";
 
 describe("stems options", () => {
   it("sanitize keeps only valid fields", () => {
