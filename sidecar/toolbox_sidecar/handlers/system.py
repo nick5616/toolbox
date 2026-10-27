@@ -18,7 +18,10 @@ _PACKAGES = {
 
 
 def package_versions() -> dict[str, str]:
-    out: dict[str, str] = {}
+    from .. import __version__
+
+    # The engine's own version comes first; the Go setup step reads it.
+    out: dict[str, str] = {"toolbox-sidecar": __version__}
     for key, dist in _PACKAGES.items():
         try:
             out[key] = metadata.version(dist)

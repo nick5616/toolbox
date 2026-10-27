@@ -4,7 +4,7 @@ from toolbox_sidecar import handlers  # noqa: F401
 from toolbox_sidecar.protocol import Writer
 from toolbox_sidecar.registry import HANDLERS, Context
 
-KEYS = {"torch", "audio_separator", "librosa", "onnxruntime", "basic_pitch"}
+KEYS = {"toolbox-sidecar", "torch", "audio_separator", "librosa", "onnxruntime", "basic_pitch"}
 
 
 def ctx():
