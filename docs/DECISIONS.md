@@ -29,3 +29,5 @@ Newest last. Format: date — decision — why.
 - 2026-10-27 — `frontend/dist/.gitkeep` is committed (and re-copied by Vite from `public/`). — `//go:embed all:frontend/dist` must match a file for `go build ./...` to work in fresh worktrees.
 - 2026-10-27 — Removed the template's `frontend/.npmrc` (`minimum-release-age`). — npm 11 warns on every command because it doesn't support the key.
 - 2026-10-27 — No native application menu on Windows. — Standard frame without a menu bar matches the spec's "native frame"; Ctrl+, etc. are handled in the frontend.
+- 2026-10-27 — Builders run as `general-purpose` agents pinned to Sonnet with worktree isolation, with the rules of `.claude/agents/builder.md` pasted into each brief. — The architect session was started from the home directory, so the repo's `builder` agent type wasn't loaded. Behaviour is equivalent.
+- 2026-10-27 — No `go test -race` on the Windows dev box; concurrency suites run with `-count=20` instead. — `-race` needs cgo and there is no C toolchain here (installing one needs admin). Run `go test -race ./...` on the Mac.
