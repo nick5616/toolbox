@@ -1,0 +1,47 @@
+.wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.bubble {
+  position: absolute;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--fg);
+  background: var(--bg-raised);
+  border: 1px solid var(--pop-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+  animation: in var(--dur-fast) var(--ease-out);
+}
+
+.top {
+  bottom: calc(100% + 6px);
+  left: 50%;
+  translate: -50% 0;
+}
+
+.bottom {
+  top: calc(100% + 6px);
+  left: 50%;
+  translate: -50% 0;
+}
+
+.right {
+  left: calc(100% + 6px);
+  top: 50%;
+  translate: 0 -50%;
+}
+
+@keyframes in {
+  from {
+    opacity: 0;
+  }
+}

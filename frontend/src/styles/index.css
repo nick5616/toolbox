@@ -1,9 +1,3 @@
-/* STUB (foundation). WP-E replaces this file (tokens, base, fonts). */
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
-  background: #0b0c0e;
-  color: #ededef;
-}
+@import "./fonts.css";
+@import "./tokens.css";
+@import "./base.css";

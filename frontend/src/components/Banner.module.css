@@ -1,0 +1,64 @@
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-left-width: 2px;
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+}
+
+.icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.body {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
+.title + .body {
+  margin-top: 2px;
+}
+
+.action {
+  flex: none;
+  align-self: center;
+}
+
+.info {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 60%, var(--bg-raised));
+}
+.info .icon {
+  color: var(--accent);
+}
+
+.warn {
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn-soft) 60%, var(--bg-raised));
+}
+.warn .icon {
+  color: var(--warn);
+}
+
+.danger {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger-soft) 60%, var(--bg-raised));
+}
+.danger .icon {
+  color: var(--danger);
+}

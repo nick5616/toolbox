@@ -1,0 +1,76 @@
+.meter {
+  --meter-fill: var(--accent);
+  position: relative;
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  background: var(--line-strong);
+  /* 3px lit segments with 1px gaps, like a level meter. */
+  -webkit-mask-image: repeating-linear-gradient(90deg, var(--mask-on) 0 3px, transparent 3px 4px);
+  mask-image: repeating-linear-gradient(90deg, var(--mask-on) 0 3px, transparent 3px 4px);
+}
+
+.sm {
+  height: 3px;
+}
+
+.fill {
+  height: 100%;
+  background: var(--meter-fill);
+  transition: width 100ms linear;
+}
+
+.queued,
+.cancelled {
+  --meter-fill: var(--fg-faint);
+}
+
+.running {
+  --meter-fill: var(--accent);
+}
+
+.done {
+  --meter-fill: var(--ok);
+}
+
+.done .fill {
+  animation: brighten 600ms ease-out;
+}
+
+.failed {
+  --meter-fill: var(--danger);
+}
+
+.indeterminate .fill {
+  width: 30% !important;
+  transition: none;
+  animation: sweep 1.2s linear infinite;
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(333.34%);
+  }
+}
+
+@keyframes brighten {
+  0% {
+    filter: brightness(1.7);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .indeterminate .fill,
+  .done .fill {
+    animation: none;
+  }
+  .indeterminate .fill {
+    transform: none;
+  }
+}
