@@ -99,7 +99,10 @@ func sortDescriptors(ds []Descriptor) {
 		if ds[i].Order != ds[j].Order {
 			return ds[i].Order < ds[j].Order
 		}
-		return ds[i].Name < ds[j].Name
+		if ds[i].Name != ds[j].Name {
+			return ds[i].Name < ds[j].Name
+		}
+		return ds[i].ID < ds[j].ID
 	})
 }
 
