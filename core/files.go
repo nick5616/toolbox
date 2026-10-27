@@ -60,3 +60,21 @@ func StatFiles(paths []string) []FileInfo {
 	}
 	return out
 }
+
+// UniquePath returns dir/<stem><ext>, or dir/<stem> (1)<ext>, (2)… if taken.
+// It never returns an existing path.
+func UniquePath(dir, stem, ext string) string {
+	p := filepath.Join(dir, stem+ext)
+	for i := 1; ; i++ {
+		if _, err := os.Lstat(p); os.IsNotExist(err) {
+			return p
+		}
+		p = filepath.Join(dir, fmt.Sprintf("%s (%d)%s", stem, i, ext))
+	}
+}
+
+// StemName is a file's base name without its extension.
+func StemName(path string) string {
+	base := filepath.Base(path)
+	return strings.TrimSuffix(base, filepath.Ext(base))
+}

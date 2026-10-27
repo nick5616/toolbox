@@ -72,3 +72,18 @@ func TestSetResult(t *testing.T) {
 		t.Fatalf("oversize err = %v", err)
 	}
 }
+
+func TestUniquePath(t *testing.T) {
+	dir := t.TempDir()
+	if got := UniquePath(dir, "a", ".mp3"); got != filepath.Join(dir, "a.mp3") {
+		t.Fatalf("got %s", got)
+	}
+	must(t, os.WriteFile(filepath.Join(dir, "a.mp3"), nil, 0o644))
+	must(t, os.WriteFile(filepath.Join(dir, "a (1).mp3"), nil, 0o644))
+	if got := UniquePath(dir, "a", ".mp3"); got != filepath.Join(dir, "a (2).mp3") {
+		t.Fatalf("got %s", got)
+	}
+	if StemName("/x/Song.final.wav") != "Song.final" {
+		t.Fatal("StemName")
+	}
+}
