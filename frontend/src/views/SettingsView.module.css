@@ -41,6 +41,7 @@
 
 .table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--text-md);
   color: var(--fg);
@@ -118,4 +119,31 @@
 .pathRow > :first-child {
   flex: 1;
   min-width: 0;
+}
+
+.colStatus {
+  width: 92px;
+}
+.colVersion {
+  width: 128px;
+}
+.colSource {
+  width: 84px;
+}
+.colAction {
+  width: 184px;
+}
+
+.version {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.depPath {
+  display: flex;
+  min-width: 0;
+  margin-top: var(--space-1);
 }

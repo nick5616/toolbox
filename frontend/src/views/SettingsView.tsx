@@ -96,13 +96,19 @@ function DepsTable() {
       }
     >
       <table className={styles.table}>
+        <colgroup>
+          <col />
+          <col className={styles.colStatus} />
+          <col className={styles.colVersion} />
+          <col className={styles.colSource} />
+          <col className={styles.colAction} />
+        </colgroup>
         <thead>
           <tr>
             <th>Tool</th>
             <th>Status</th>
             <th>Version</th>
             <th>Source</th>
-            <th>Path</th>
             <th>
               <span className={styles.srOnly}>Action</span>
             </th>
@@ -117,6 +123,11 @@ function DepsTable() {
                 <td>
                   <div className={styles.toolName}>{d.name}</div>
                   <div className={styles.subtle}>{d.purpose}</div>
+                  {ok && d.path ? (
+                    <div className={styles.depPath}>
+                      <PathText path={d.path} copy />
+                    </div>
+                  ) : null}
                   {names.length > 0 ? (
                     <div className={styles.subtle}>Required by {names.join(", ")}</div>
                   ) : d.recommendedBy.length > 0 ? (
@@ -126,9 +137,10 @@ function DepsTable() {
                 <td>
                   <DepChip dep={d} />
                 </td>
-                <td className={styles.mono}>{ok ? d.version : ""}</td>
+                <td className={styles.version} title={ok ? d.version : undefined}>
+                  {ok ? d.version : ""}
+                </td>
                 <td>{ok ? (sourceLabel[d.source] ?? "") : ""}</td>
-                <td>{ok && d.path ? <PathText path={d.path} copy /> : null}</td>
                 <td className={styles.action}>
                   {d.id === YTDLP_ID ? (
                     <Button

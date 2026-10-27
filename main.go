@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -130,12 +131,15 @@ func run() error {
 		MinWidth:       960,
 		MinHeight:      600,
 		EnableFileDrop: true,
+		Windows: application.WindowsWindow{
+			Theme: application.Dark,
+		},
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 44,
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
 		BackgroundColour: application.NewRGB(11, 12, 14),
-		URL:              "/",
+		URL:              startURL(),
 	})
 	win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
 		files := e.Context().DroppedFiles()
@@ -143,6 +147,15 @@ func run() error {
 	})
 
 	return app.Run()
+}
+
+// startURL honours $TOOLBOX_VIEW (dev aid: open on a given view, e.g.
+// "settings" or a module ID) via the frontend's ?view= parameter.
+func startURL() string {
+	if v := os.Getenv("TOOLBOX_VIEW"); v != "" {
+		return "/?view=" + url.QueryEscape(v)
+	}
+	return "/"
 }
 
 // setupLogging writes slog output to the support log file (rotated at 5 MB)

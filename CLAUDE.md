@@ -57,11 +57,13 @@ On the Windows dev box, Go lives in `%LOCALAPPDATA%\Programs\go1.27.3` and Node 
 
 ```sh
 task dev:sandbox            # wails3 dev with support/library dirs under .dev/ (preferred)
+TOOLBOX_VIEW=settings ...   # optional: open on a view (library, settings, or a module id)
 wails3 dev                  # dev against the real support dir and ~/Toolbox
 wails3 build                # production binary in bin/
 wails3 generate bindings -clean=true -ts -i   # regenerate frontend/bindings (architect only)
 
 go build ./... && go vet ./... && go test -race ./...   # backend checks (-race needs cgo; omit on Windows without a C toolchain)
+go test -tags integration ./integration/ ./modules/downloader/  # real yt-dlp + network
 gofmt -l .                                             # must print nothing
 cd frontend && npm run check                           # typecheck + vitest + check:any
 ```

@@ -321,3 +321,13 @@ func TestRunCancel(t *testing.T) {
 		t.Fatalf("cancel took %v; fake was not killed", d)
 	}
 }
+
+func TestCleanErrorMessageAndNotFoundHint(t *testing.T) {
+	msg := cleanErrorMessage("[generic] x: Unable to download webpage: HTTP Error 404: Not Found (caused by <HTTPError 404: Not Found>)")
+	if msg != "[generic] x: Unable to download webpage: HTTP Error 404: Not Found" {
+		t.Fatalf("clean = %q", msg)
+	}
+	if h := hintFor(msg, false); h != "Check that the link is correct and the page still exists" {
+		t.Fatalf("hint = %q", h)
+	}
+}

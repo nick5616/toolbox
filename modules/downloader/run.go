@@ -164,6 +164,7 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 		if msg == "" {
 			msg = fmt.Sprintf("yt-dlp exited with code %d", res.ExitCode)
 		}
+		msg = cleanErrorMessage(msg)
 		return core.Errorf(core.CodeToolFailed, "%s", msg).
 			WithHint(hintFor(msg, jsRuntime == "")).
 			WithCause(runErr)
@@ -220,6 +221,17 @@ func hintFor(msg string, noJS bool) string {
 		return ffmpegInstallHint()
 	case has("Private video", "Video unavailable"):
 		return "The video is private or unavailable"
+	case has("HTTP Error 404", "Unable to download webpage"):
+		return "Check that the link is correct and the page still exists"
 	}
 	return ""
+}
+
+// cleanErrorMessage drops yt-dlp's Python exception suffix, e.g.
+// "… HTTP Error 404: Not Found (caused by <HTTPError 404: Not Found>)".
+func cleanErrorMessage(msg string) string {
+	if i := strings.Index(msg, " (caused by "); i > 0 {
+		msg = msg[:i]
+	}
+	return strings.TrimSpace(msg)
 }

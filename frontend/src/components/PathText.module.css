@@ -19,14 +19,15 @@
 }
 
 .head {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .tail {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  max-width: 75%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

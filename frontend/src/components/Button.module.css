@@ -56,6 +56,12 @@
 .primary .kbd {
   color: inherit;
 }
+/* Key caps on the accent: tint from the button's own text colour so they
+   stay legible in both themes (the default inset background is too dark). */
+.primary .kbd > span {
+  background: color-mix(in srgb, var(--accent-fg) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent-fg) 30%, transparent);
+}
 
 .secondary {
   background: var(--bg-raised);
