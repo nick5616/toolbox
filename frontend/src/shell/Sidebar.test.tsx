@@ -9,7 +9,7 @@ import { Sidebar } from "./Sidebar";
 function mod(id: string, name: string, status: ModuleStatus, order: number): Descriptor {
   return {
     id, name, tagline: "", description: "", icon: "box", category: Category.$zero, status,
-    accepts: { extensions: null, urls: false }, requires: null, recommends: null, outputSubdir: "", order, hidden: false,
+    accepts: { extensions: null, urls: false }, requires: null, recommends: null, outputSubdir: "", order, hidden: false, maxInputs: 0,
   };
 }
 

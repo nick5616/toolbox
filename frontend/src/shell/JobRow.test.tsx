@@ -8,7 +8,7 @@ function mk(status: JobStatus, extra: Partial<Job> = {}) {
   return normalizeJob({
     id: "j1", moduleId: "downloader", title: "My video", status, progress: 0.5, message: "", inputs: null,
     optionsJson: "{}", errorCode: ErrorCode.$zero, error: "", errorHint: "", attempt: 1, cancelRequested: false,
-    createdAt: 1, startedAt: 1, finishedAt: 0, outputs: null, ...extra,
+    createdAt: 1, startedAt: 1, finishedAt: 0, outputs: null, resultJson: "", ...extra,
   });
 }
 

@@ -14,6 +14,7 @@ import (
 
 	"toolbox/core"
 	"toolbox/core/deps"
+	"toolbox/core/sidecar"
 )
 
 // ModulesService exposes the registry.
@@ -205,11 +206,13 @@ func (s *SettingsService) AppInfo() core.AppInfo {
 	}
 }
 
-// DepsService exposes dependency status and the yt-dlp installer.
+// DepsService exposes dependency status and the managed installers.
 type DepsService struct {
-	Deps *deps.Service
-	Jobs *core.Jobs
-	Reg  *core.Registry
+	Deps   *deps.Service
+	Jobs   *core.Jobs
+	Reg    *core.Registry
+	Engine *sidecar.Manager
+	Paths  core.Paths
 }
 
 // List returns cached dependency statuses.
@@ -243,4 +246,60 @@ func (s *DepsService) UpdateYtDlp() (core.Job, error) {
 		return core.Job{}, core.Errorf(core.CodeInternal, "No update job was created")
 	}
 	return jobs[0], nil
+}
+
+// engineUsers are the modules that run on the audio engine.
+func (s *DepsService) engineUsers() []string { return s.Reg.RequiringDep(sidecar.DepID) }
+
+func (s *DepsService) submitSystem(moduleID string) (core.Job, error) {
+	if s.Jobs.HasActive(moduleID) {
+		return core.Job{}, core.Errorf(core.CodeConflict, "Already in progress")
+	}
+	jobs, err := s.Jobs.Submit(context.Background(), moduleID, nil, "{}")
+	if err != nil {
+		return core.Job{}, err
+	}
+	if len(jobs) == 0 {
+		return core.Job{}, core.Errorf(core.CodeInternal, "No job was created")
+	}
+	return jobs[0], nil
+}
+
+// InstallAudioEngine queues install / update / repair of the audio engine.
+func (s *DepsService) InstallAudioEngine() (core.Job, error) {
+	if s.Jobs.HasActive(s.engineUsers()...) {
+		return core.Job{}, core.Errorf(core.CodeConflict, "Wait for running audio jobs to finish")
+	}
+	return s.submitSystem(sidecar.SetupModuleID)
+}
+
+// RemoveAudioEngine deletes the installed engine (models are kept).
+func (s *DepsService) RemoveAudioEngine() error {
+	if s.Jobs.HasActive(append(s.engineUsers(), sidecar.SetupModuleID)...) {
+		return core.Errorf(core.CodeConflict, "Wait for running audio jobs to finish")
+	}
+	if err := sidecar.Remove(s.Paths, s.Engine); err != nil {
+		return err
+	}
+	s.Deps.Detect(context.Background())
+	return nil
+}
+
+// ModelsUsage is the size of downloaded models in bytes.
+func (s *DepsService) ModelsUsage() (int64, error) { return sidecar.ModelsUsage(s.Paths) }
+
+// ClearModels deletes downloaded models.
+func (s *DepsService) ClearModels() error {
+	if s.Jobs.HasActive(s.engineUsers()...) {
+		return core.Errorf(core.CodeConflict, "Wait for running audio jobs to finish")
+	}
+	return sidecar.ClearModels(s.Paths)
+}
+
+// UpdateUv queues the uv install/update job.
+func (s *DepsService) UpdateUv() (core.Job, error) {
+	if s.Jobs.HasActive(sidecar.SetupModuleID) {
+		return core.Job{}, core.Errorf(core.CodeConflict, "Wait for the audio engine setup to finish")
+	}
+	return s.submitSystem(deps.UVUpdateModuleID)
 }

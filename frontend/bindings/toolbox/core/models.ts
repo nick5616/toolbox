@@ -73,6 +73,11 @@ export enum DepState {
     DepOK = "ok",
     DepMissing = "missing",
     DepError = "error",
+
+    /**
+     * installed, but older than this build expects
+     */
+    DepOutdated = "outdated",
 };
 
 /**
@@ -140,6 +145,11 @@ export interface Descriptor {
      * system modules: not listed, not matched
      */
     "hidden": boolean;
+
+    /**
+     * MaxInputs caps inputs per submission; 0 = no limit.
+     */
+    "maxInputs": number;
 }
 
 /**
@@ -164,11 +174,29 @@ export enum ErrorCode {
 };
 
 /**
+ * FileInfo describes a local file for input lists.
+ */
+export interface FileInfo {
+    "path": string;
+    "name": string;
+    "sizeBytes": number;
+    "exists": boolean;
+    "isDir": boolean;
+    "kind": OutputKind;
+}
+
+/**
  * FilesDropped is the payload of app:files-dropped.
  */
 export interface FilesDropped {
     "paths": string[] | null;
     "result": MatchResult;
+
+    /**
+     * TargetID is the id of the drop-target element ("tool-drop:<moduleId>"
+     * routes straight to that tool).
+     */
+    "targetId": string;
 }
 
 /**
@@ -196,6 +224,11 @@ export interface Job {
     "startedAt": number;
     "finishedAt": number;
     "outputs": Output[] | null;
+
+    /**
+     * ResultJSON is module-specific result data (e.g. BPM & key); "" if none.
+     */
+    "resultJson": string;
 }
 
 /**
@@ -396,6 +429,30 @@ export interface OutputQuery {
  */
 export interface OutputsRemoved {
     "ids": string[] | null;
+}
+
+/**
+ * PresetInfo describes a module preset for the UI. Fields that don't apply to
+ * a module are zero.
+ */
+export interface PresetInfo {
+    "id": string;
+    "label": string;
+
+    /**
+     * UI grouping, e.g. "Audio", "Video", "Image"
+     */
+    "group": string;
+    "kind": OutputKind;
+    "ext": string;
+    "acceptsKinds": OutputKind[] | null;
+    "downloadBytes": number;
+    "stems": string[] | null;
+
+    /**
+     * "fast" | "best"
+     */
+    "speed": string;
 }
 
 /**

@@ -22,6 +22,10 @@ type Paths struct {
 	LogDir     string
 	LogFile    string
 	DBPath     string
+	// Audio engine (Phase 2)
+	SidecarDir string // installed Python project + .venv
+	PythonDir  string // uv-managed CPython installs
+	ModelsDir  string // downloaded ML models
 }
 
 // NewPaths derives all paths from a support dir.
@@ -34,6 +38,9 @@ func NewPaths(supportDir string) Paths {
 		LogDir:     filepath.Join(supportDir, "logs"),
 		LogFile:    filepath.Join(supportDir, "logs", "toolbox.log"),
 		DBPath:     filepath.Join(supportDir, "toolbox.db"),
+		SidecarDir: filepath.Join(supportDir, "sidecar"),
+		PythonDir:  filepath.Join(supportDir, "python"),
+		ModelsDir:  filepath.Join(supportDir, "models"),
 	}
 }
 
@@ -57,7 +64,7 @@ func ResolvePaths() (Paths, error) {
 
 // Ensure creates all directories.
 func (p Paths) Ensure() error {
-	for _, d := range []string{p.SupportDir, p.BinDir, p.TmpDir, p.CacheDir, p.LogDir} {
+	for _, d := range []string{p.SupportDir, p.BinDir, p.TmpDir, p.CacheDir, p.LogDir, p.ModelsDir} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			return fmt.Errorf("create %s: %w", d, err)
 		}

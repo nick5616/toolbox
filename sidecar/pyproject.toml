@@ -1,0 +1,31 @@
+[project]
+name = "toolbox-sidecar"
+version = "0.2.0"
+description = "Toolbox audio engine: stems, BPM & key, audio-to-MIDI over stdio JSON lines"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "audio-separator[cpu]==0.47.1",
+  "audioread>=3.0",        # imported by audio-separator but not declared
+  "librosa>=1.0,<2",
+  "onnxruntime>=1.31",
+  "soundfile>=0.14",
+  "numpy>=2.5",
+  "psutil>=7",
+  "pretty_midi>=0.2.11",
+  "mir_eval>=0.8",
+  "basic-pitch==0.4.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+# basic-pitch 0.4.0 hard-requires tensorflow<2.15.1 (no py3.12 wheels) and
+# coremltools on macOS. We only use its bundled ONNX model via onnxruntime.
+exclude-dependencies = ["tensorflow", "tensorflow-macos", "coremltools"]
+# resampy<0.4.3 (basic-pitch's pin) imports pkg_resources, removed in setuptools 81.
+override-dependencies = ["resampy>=0.4.3"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: needs model downloads; run with TOOLBOX_SLOW=1"]

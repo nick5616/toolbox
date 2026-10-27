@@ -6,7 +6,7 @@ function job(id: string, status: JobStatus, createdAt: number, finishedAt = 0): 
   return {
     id, moduleId: "downloader", title: id, status, progress: 0, message: "", inputs: null, optionsJson: "{}",
     errorCode: ErrorCode.$zero, error: "", errorHint: "", attempt: 1, cancelRequested: false,
-    createdAt, startedAt: 0, finishedAt, outputs: null,
+    createdAt, startedAt: 0, finishedAt, outputs: null, resultJson: "",
   };
 }
 

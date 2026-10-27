@@ -19,6 +19,7 @@ export type {
     DepStatus,
     DepsChanged,
     Descriptor,
+    FileInfo,
     FilesDropped,
     Job,
     JobFilter,
@@ -33,6 +34,7 @@ export type {
     OutputPage,
     OutputQuery,
     OutputsRemoved,
+    PresetInfo,
     Settings,
     SettingsPatch
 } from "./models.js";

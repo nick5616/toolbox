@@ -63,7 +63,7 @@ wails3 build                # production binary in bin/
 wails3 generate bindings -clean=true -ts -i   # regenerate frontend/bindings (architect only)
 
 go build ./... && go vet ./... && go test -race ./...   # backend checks (-race needs cgo; omit on Windows without a C toolchain)
-go test -tags integration ./integration/ ./modules/downloader/  # real yt-dlp + network
+go test -tags integration ./integration/ ./modules/downloader/ ./modules/converter/  # real tools + network
 gofmt -l .                                             # must print nothing
 cd frontend && npm run check                           # typecheck + vitest + check:any
 ```
@@ -130,6 +130,25 @@ The job manager creates `OutputDir` and `TempDir` before `Run`, deletes `TempDir
 5. Run all checks; add a DECISIONS.md entry if anything diverged from the spec.
 
 ---
+
+## Audio engine (Python sidecar)
+
+The audio tools (stems, BPM & key, audio→MIDI) run on a local Python 3.12 engine managed by **uv**. Full design: SPEC.md §4 (Phase 2).
+
+- **Source:** `sidecar/` (pyproject + `uv.lock` + `toolbox_sidecar/`). Go embeds it (`sidecar/embed.go`, package `sidecarfiles`, `Hash()`); the app writes it into `<support>/sidecar/` and runs `uv sync --frozen --no-dev` there. Changing any embedded file changes the hash, so installed engines show as **outdated** until the user clicks Update.
+- **Paths:** venv `<support>/sidecar/.venv`, CPython `<support>/python`, models `<support>/models`, numba cache `<support>/cache/numba`. Nothing goes to `/tmp`, `~/.cache` or the home dir.
+- **Protocol:** JSON Lines on stdio only (never HTTP). Requests `{id, method, params}`; events `{id, event: progress|log|output, data}`; exactly one `{id, result}` or `{id, error:{code,message,hint}}`; `$cancel`, `$shutdown`; a `ready` event on start. stdout is protocol-only — Python's `print` goes to stderr.
+- **Go side:** `core/sidecar.Manager` (implements `Caller`) starts the engine lazily, multiplexes calls, maps cancellation (`$cancel`, then kill+restart after 3 s), restarts after crashes, stops after 10 idle minutes and recycles after results with `rssBytes` > 3 GiB.
+- **Lock changes:** edit `sidecar/pyproject.toml`, then run `uv lock` in `sidecar/` and check `uv.lock` still has `macosx_14_0_arm64` wheels for torch and onnxruntime. Keep `exclude-dependencies`/`override-dependencies` (basic-pitch needs them).
+- **Tests:** `cd sidecar && uv run --group dev pytest` (set `UV_CACHE_DIR`/`UV_PYTHON_INSTALL_DIR` to a dir under `.dev/` when running locally). Slow model tests need `TOOLBOX_SLOW=1`.
+
+### How to add a sidecar handler
+
+1. Add `sidecar/toolbox_sidecar/handlers/<area>.py` with `@handler("<area>.<name>")` functions taking `(ctx: Context, params: dict) -> dict`; import the module in `handlers/__init__.py`.
+2. Validate params → `raise HandlerError("validation", "…")`; report with `ctx.stage()/ctx.progress()/ctx.log()/ctx.output()`; call `ctx.check_cancelled()` between expensive steps.
+3. Add pytest tests with generated signals (see `tests/conftest.py`).
+4. In the Go module's `Run`: `job.Tool(sidecar.DepID)` (fails fast with an install hint), then `caller.Call(ctx, "<area>.<name>", params, onEvent)` mapping progress→`job.Progress`, log→`job.Log`, output→`job.Output`; decode the result and `job.SetResult(...)` if the module returns data.
+5. New Python deps: add to `pyproject.toml`, `uv lock`, and note the size impact in DECISIONS.md.
 
 ## Conventions
 

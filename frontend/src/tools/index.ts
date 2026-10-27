@@ -11,4 +11,8 @@ export interface ToolViewProps {
  */
 export const toolViews: Record<string, LazyExoticComponent<ComponentType<ToolViewProps>>> = {
   downloader: lazy(() => import("./downloader/DownloaderView")),
+  stems: lazy(() => import("./stems/StemsView")),
+  "bpm-key": lazy(() => import("./bpmkey/BpmKeyView")),
+  "audio-to-midi": lazy(() => import("./midi/MidiView")),
+  converter: lazy(() => import("./converter/ConverterView")),
 };

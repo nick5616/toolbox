@@ -16,22 +16,6 @@ func concat(sets ...[]string) []string { return slices.Concat(sets...) }
 // Descriptors returns every placeholder.
 func Descriptors() []core.Descriptor {
 	return []core.Descriptor{
-		{ID: "stems", Name: "Stem Splitter", Icon: "audio-lines", Category: core.CategoryAudio, Order: 100,
-			Tagline:     "Split a song into vocals, drums, bass and more",
-			Description: "Separate any track into individual stems using local machine-learning models.",
-			Accepts:     core.Accepts{Extensions: core.AudioExtensions}},
-		{ID: "bpm-key", Name: "BPM & Key", Icon: "activity", Category: core.CategoryAudio, Order: 110,
-			Tagline:     "Detect tempo and musical key",
-			Description: "Analyse audio files for tempo and key, and tag them for your crate.",
-			Accepts:     core.Accepts{Extensions: core.AudioExtensions}},
-		{ID: "audio-to-midi", Name: "Audio → MIDI", Icon: "piano", Category: core.CategoryAudio, Order: 120,
-			Tagline:     "Transcribe melodies into MIDI",
-			Description: "Turn recorded melodies and chords into editable MIDI clips.",
-			Accepts:     core.Accepts{Extensions: core.AudioExtensions}},
-		{ID: "converter", Name: "Converter", Icon: "repeat", Category: core.CategoryMedia, Order: 130,
-			Tagline:     "Convert audio, video and images with presets",
-			Description: "Batch-convert media between formats with sensible presets, powered by ffmpeg.",
-			Accepts:     core.Accepts{Extensions: concat(core.AudioExtensions, core.VideoExtensions, core.ImageExtensions)}},
 		{ID: "bg-remover", Name: "Background Remover", Icon: "wand-sparkles", Category: core.CategoryImage, Order: 140,
 			Tagline:     "Cut subjects out of photos",
 			Description: "Remove image backgrounds locally, leaving a clean transparent PNG.",

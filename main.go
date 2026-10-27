@@ -16,9 +16,14 @@ import (
 	"toolbox/api"
 	"toolbox/core"
 	"toolbox/core/deps"
+	"toolbox/core/sidecar"
 	"toolbox/core/store"
+	"toolbox/modules/bpmkey"
+	"toolbox/modules/converter"
 	"toolbox/modules/downloader"
+	"toolbox/modules/midi"
 	"toolbox/modules/placeholders"
+	"toolbox/modules/stems"
 )
 
 //go:embed all:frontend/dist
@@ -69,14 +74,36 @@ func run() error {
 	depSvc := deps.New(paths.BinDir, deps.Catalog(), reg, emitter)
 	jobs := core.NewJobs(db, db, reg, emitter, depSvc.Resolve, settings.Current, paths.TmpDir)
 
-	if err := downloader.Register(reg, filepath.Join(paths.CacheDir, "yt-dlp")); err != nil {
-		return err
-	}
-	if err := placeholders.Register(reg); err != nil {
-		return err
-	}
-	if err := deps.RegisterUpdater(reg, depSvc); err != nil {
-		return err
+	// Audio engine: a virtual dependency plus a lazily started sidecar.
+	engine := sidecar.NewManager(paths, func() (string, error) { return depSvc.Resolve(sidecar.DepID) }, emitter)
+	defer engine.Stop()
+	depSvc.RegisterVirtual(deps.Spec{
+		ID: sidecar.DepID, Name: "Audio engine", Managed: true,
+		Purpose:     "Python runtime for stems, BPM & key and MIDI (≈1 GB)",
+		InstallHint: map[string]string{"darwin": "Install from Settings → Dependencies", "windows": "Install from Settings → Dependencies", "linux": "Install from Settings → Dependencies"},
+	}, func(ctx context.Context) core.DepStatus { return sidecar.Detect(ctx, paths) })
+
+	for _, register := range []func() error{
+		func() error { return downloader.Register(reg, filepath.Join(paths.CacheDir, "yt-dlp")) },
+		func() error { return stems.Register(reg, engine) },
+		func() error { return bpmkey.Register(reg, engine) },
+		func() error { return midi.Register(reg, engine) },
+		func() error { return converter.Register(reg) },
+		func() error { return placeholders.Register(reg) },
+		func() error { return deps.RegisterUpdater(reg, depSvc) },
+		func() error { return deps.RegisterUVUpdater(reg, depSvc) },
+		func() error {
+			return sidecar.RegisterSetup(reg, paths, engine,
+				func() (string, error) { return depSvc.Resolve(deps.UV) },
+				func(ctx context.Context, job *core.JobContext) error {
+					return depSvc.InstallManagedBinary(ctx, job, deps.UVBinary())
+				},
+				func(ctx context.Context) { depSvc.Detect(ctx) })
+		},
+	} {
+		if err := register(); err != nil {
+			return err
+		}
 	}
 
 	settings.OnChange(func(old, new core.Settings) {
@@ -101,8 +128,13 @@ func run() error {
 			application.NewServiceWithOptions(&api.JobsService{Jobs: jobs}, opts),
 			application.NewServiceWithOptions(&api.LibraryService{Outputs: db, Settings: settings, Paths: paths, Em: emitter}, opts),
 			application.NewServiceWithOptions(&api.SettingsService{Settings: settings, Paths: paths}, opts),
-			application.NewServiceWithOptions(&api.DepsService{Deps: depSvc, Jobs: jobs, Reg: reg}, opts),
+			application.NewServiceWithOptions(&api.DepsService{Deps: depSvc, Jobs: jobs, Reg: reg, Engine: engine, Paths: paths}, opts),
+			application.NewServiceWithOptions(&api.FilesService{Reg: reg}, opts),
 			application.NewServiceWithOptions(downloader.NewService(jobs), opts),
+			application.NewServiceWithOptions(stems.NewService(jobs), opts),
+			application.NewServiceWithOptions(bpmkey.NewService(jobs), opts),
+			application.NewServiceWithOptions(midi.NewService(jobs), opts),
+			application.NewServiceWithOptions(converter.NewService(jobs), opts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -143,7 +175,11 @@ func run() error {
 	})
 	win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
 		files := e.Context().DroppedFiles()
-		emitter.Emit(core.EventFilesDropped, core.FilesDropped{Paths: files, Result: reg.Match(files)})
+		drop := core.FilesDropped{Paths: files, Result: reg.Match(files)}
+		if d := e.Context().DropTargetDetails(); d != nil {
+			drop.TargetID = d.ElementID
+		}
+		emitter.Emit(core.EventFilesDropped, drop)
 	})
 
 	return app.Run()

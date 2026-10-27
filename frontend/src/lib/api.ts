@@ -4,6 +4,7 @@
 
 export {
   DepsService,
+  FilesService,
   JobsService,
   LibraryService,
   ModulesService,
@@ -11,6 +12,10 @@ export {
 } from "@bindings/api";
 
 export * as DownloaderService from "@bindings/modules/downloader/service";
+export * as StemsService from "@bindings/modules/stems/service";
+export * as BpmKeyService from "@bindings/modules/bpmkey/service";
+export * as MidiService from "@bindings/modules/midi/service";
+export * as ConverterService from "@bindings/modules/converter/service";
 
 export {
   Category,
@@ -30,6 +35,7 @@ export type {
   DepStatus,
   DepsChanged,
   Descriptor,
+  FileInfo,
   FilesDropped,
   Job,
   JobFilter,
@@ -44,6 +50,7 @@ export type {
   OutputPage,
   OutputQuery,
   OutputsRemoved,
+  PresetInfo,
   Settings,
   SettingsPatch,
 } from "@bindings/core/models";
@@ -55,3 +62,11 @@ export {
   Mode as DownloadMode,
 } from "@bindings/modules/downloader/models";
 export type { Options as DownloaderOptions } from "@bindings/modules/downloader/models";
+
+export { Format as StemsFormat, Preset as StemsPreset } from "@bindings/modules/stems/models";
+export type { Options as StemsOptions } from "@bindings/modules/stems/models";
+export type { Result as BpmKeyResult, KeyCandidate } from "@bindings/modules/bpmkey/models";
+export { Range as MidiRange } from "@bindings/modules/midi/models";
+export type { Options as MidiOptions, Result as MidiResult } from "@bindings/modules/midi/models";
+export { MaxHeight } from "@bindings/modules/converter/models";
+export type { Options as ConverterOptions } from "@bindings/modules/converter/models";

@@ -242,3 +242,17 @@ type AppInfo struct {
 	LogPath    string `json:"logPath"`
 	LibraryDir string `json:"libraryDir"`
 }
+
+// PresetInfo describes a module preset for the UI. Fields that don't apply to
+// a module are zero.
+type PresetInfo struct {
+	ID            string       `json:"id"`
+	Label         string       `json:"label"`
+	Group         string       `json:"group"` // UI grouping, e.g. "Audio", "Video", "Image"
+	Kind          OutputKind   `json:"kind"`
+	Ext           string       `json:"ext"`
+	AcceptsKinds  []OutputKind `json:"acceptsKinds"`
+	DownloadBytes int64        `json:"downloadBytes"`
+	Stems         []string     `json:"stems"`
+	Speed         string       `json:"speed"` // "fast" | "best"
+}
