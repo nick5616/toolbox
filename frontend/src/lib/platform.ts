@@ -37,3 +37,29 @@ export function comboTokens(combo: string): string[] {
 export function formatCombo(combo: string): string {
   return comboTokens(combo).join(isMac ? "" : "+");
 }
+
+const accelModifiers: Record<string, string> = {
+  cmdorctrl: "Mod",
+  cmd: "Mod",
+  command: "Mod",
+  ctrl: "Ctrl",
+  control: "Ctrl",
+  optionoralt: "Alt",
+  alt: "Alt",
+  option: "Alt",
+  shift: "Shift",
+  super: "Super",
+};
+
+/**
+ * Converts a Wails accelerator ("CmdOrCtrl+Alt+V", used for global hotkeys)
+ * to a display combo for <Kbd> ("Mod+Alt+V"). "" stays "".
+ */
+export function acceleratorToCombo(accel: string): string {
+  if (!accel) return "";
+  const parts = accel.split("+");
+  const key = parts.pop() ?? "";
+  const mods = parts.map((p) => accelModifiers[p.trim().toLowerCase()] ?? p.trim());
+  const k = key.length === 1 ? key.toUpperCase() : key.charAt(0).toUpperCase() + key.slice(1);
+  return [...mods, k].join("+");
+}

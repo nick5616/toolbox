@@ -15,11 +15,29 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as core$0 from "../core/models.js";
 
 /**
+ * ImageDataURL returns a browser-displayable image file (jpg, png, webp,
+ * gif, bmp; ≤ 20 MB) as a data URL, for thumbnails. The user already chose
+ * the file; non-image files are never read.
+ */
+export function ImageDataURL(path: string): $CancellablePromise<string> {
+    return $Call.ByID(3458743427, path);
+}
+
+/**
  * Pick shows a native multi-select file dialog filtered to the module's
  * accepted extensions. Cancelling returns an empty list.
  */
 export function Pick(moduleID: string): $CancellablePromise<string[] | null> {
     return $Call.ByID(816694024, moduleID);
+}
+
+/**
+ * ReadText returns up to maxBytes (≤ 256 KB; ≤ 0 means 256 KB) of a text
+ * file inside the library or the app's support folder, cut at a UTF-8
+ * boundary.
+ */
+export function ReadText(path: string, maxBytes: number): $CancellablePromise<string> {
+    return $Call.ByID(2449925902, path, maxBytes);
 }
 
 /**

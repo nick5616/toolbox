@@ -13,8 +13,13 @@ declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
             "app:files-dropped": core$0.FilesDropped;
+            "app:hidden-to-tray": core$0.HiddenToTray;
             "app:navigate": core$0.Navigate;
+            "clipboard:added": core$0.ClipItem;
+            "clipboard:removed": core$0.ClipsRemoved;
+            "clipboard:state": core$0.ClipboardState;
             "deps:changed": core$0.DepsChanged;
+            "hotkeys:status": core$0.HotkeysChanged;
             "jobs:changed": core$0.Job;
             "jobs:log": core$0.JobLogBatch;
             "jobs:progress": core$0.JobProgress;
@@ -22,6 +27,7 @@ declare module "@wailsio/runtime" {
             "library:added": core$0.Output;
             "library:removed": core$0.OutputsRemoved;
             "settings:changed": core$0.Settings;
+            "window:show": core$0.ShowView;
         }
     }
 }

@@ -17,7 +17,7 @@ vi.mock("@/lib/api", async (orig) => {
 
 import { DepSource, DepState, Theme, type DepStatus, type Settings, type SettingsPatch } from "@/lib/api";
 import { useDeps } from "@/state/deps";
-import { useSettings } from "@/state/settings";
+import { defaultSettings, useSettings } from "@/state/settings";
 import { SettingsView } from "./SettingsView";
 
 function dep(id: string, name: string, state: DepState): DepStatus {
@@ -44,7 +44,7 @@ describe("SettingsView", () => {
     update = vi.fn<(p: Partial<SettingsPatch>) => Promise<Settings>>().mockResolvedValue({} as Settings);
     useSettings.setState({
       update,
-      settings: { libraryDir: "/lib", concurrency: 3, theme: Theme.ThemeDark },
+      settings: { ...defaultSettings(), libraryDir: "/lib" },
       appInfo: null,
     });
     useDeps.getState().setAll([

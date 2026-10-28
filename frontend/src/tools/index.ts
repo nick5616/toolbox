@@ -15,4 +15,15 @@ export const toolViews: Record<string, LazyExoticComponent<ComponentType<ToolVie
   "bpm-key": lazy(() => import("./bpmkey/BpmKeyView")),
   "audio-to-midi": lazy(() => import("./midi/MidiView")),
   converter: lazy(() => import("./converter/ConverterView")),
+  transcribe: lazy(() => import("./transcribe/TranscribeView")),
+  exif: lazy(() => import("./exif/ExifView")),
+  clipboard: lazy(() => import("./clipboard/ClipboardView")),
+};
+
+/**
+ * Views a popup window can show (`/?window=popup&view=<id>`), rendered by
+ * PopupShell without the sidebar or job tray.
+ */
+export const popupViews: Record<string, LazyExoticComponent<ComponentType>> = {
+  clipboard: lazy(() => import("./clipboard/ClipboardPopup")),
 };

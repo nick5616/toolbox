@@ -57,6 +57,13 @@ export function RemoveAudioEngine(): $CancellablePromise<void> {
 }
 
 /**
+ * UpdateExiftool queues the ExifTool install/update job.
+ */
+export function UpdateExiftool(): $CancellablePromise<core$0.Job> {
+    return $Call.ByID(3826108315);
+}
+
+/**
  * UpdateUv queues the uv install/update job.
  */
 export function UpdateUv(): $CancellablePromise<core$0.Job> {

@@ -1,6 +1,25 @@
 import { create } from "zustand";
 import { SettingsService, Theme, type AppInfo, type Settings, type SettingsPatch } from "@/lib/api";
 
+/** Mirrors core.DefaultHotkeys / DefaultClipboardSettings (used until settings load). */
+export const DEFAULT_HOTKEYS: Record<string, string> = {
+  clipboard: "CmdOrCtrl+Alt+V",
+  quickOpen: "CmdOrCtrl+Alt+Space",
+};
+
+/** Default settings (mirrors Go; used before load and as a test fixture base). */
+export function defaultSettings(): Settings {
+  return {
+    libraryDir: "",
+    concurrency: 3,
+    theme: Theme.ThemeDark,
+    keepInTray: true,
+    startAtLogin: false,
+    hotkeys: { ...DEFAULT_HOTKEYS },
+    clipboard: { enabled: false, images: true, retentionDays: 30, maxItems: 500 },
+  };
+}
+
 interface SettingsState {
   settings: Settings;
   appInfo: AppInfo | null;
@@ -11,7 +30,7 @@ interface SettingsState {
 }
 
 export const useSettings = create<SettingsState>((set) => ({
-  settings: { libraryDir: "", concurrency: 3, theme: Theme.ThemeDark },
+  settings: defaultSettings(),
   appInfo: null,
   set: (s) => {
     set({ settings: s });
@@ -23,6 +42,10 @@ export const useSettings = create<SettingsState>((set) => ({
       libraryDir: patch.libraryDir ?? null,
       concurrency: patch.concurrency ?? null,
       theme: patch.theme ?? null,
+      keepInTray: patch.keepInTray ?? null,
+      startAtLogin: patch.startAtLogin ?? null,
+      hotkeys: patch.hotkeys ?? null,
+      clipboard: patch.clipboard ?? null,
     });
     set({ settings: next });
     applyTheme(next.theme);

@@ -24,10 +24,10 @@ vi.mock("@/lib/api", async (orig) => {
   };
 });
 
-import { DepSource, DepState, Theme, type DepStatus } from "@/lib/api";
+import { DepSource, DepState, type DepStatus } from "@/lib/api";
 import { useDeps } from "@/state/deps";
 import { useJobs } from "@/state/jobs";
-import { useSettings } from "@/state/settings";
+import { defaultSettings, useSettings } from "@/state/settings";
 import { SettingsView } from "./SettingsView";
 
 function dep(id: string, state: DepState): DepStatus {
@@ -58,7 +58,7 @@ describe("Settings audio engine", () => {
     updateUv.mockResolvedValue({ ...job, moduleId: "system-uv" });
     usage.mockResolvedValue(2048);
     useJobs.getState().setAll([]);
-    useSettings.setState({ settings: { libraryDir: "/lib", concurrency: 3, theme: Theme.ThemeDark }, appInfo: null });
+    useSettings.setState({ settings: { ...defaultSettings(), libraryDir: "/lib" }, appInfo: null });
   });
 
   it("installs when missing", async () => {

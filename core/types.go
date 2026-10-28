@@ -170,7 +170,7 @@ type SettingsPatch struct {
 
 	KeepInTray   *bool              `json:"keepInTray"`
 	StartAtLogin *bool              `json:"startAtLogin"`
-	Hotkeys      map[string]string  `json:"hotkeys"`   // nil = unchanged; replaces the whole map
+	Hotkeys      map[string]string  `json:"hotkeys"`   // nil = unchanged; entries override, other actions keep their value
 	Clipboard    *ClipboardSettings `json:"clipboard"` // replaces the whole struct
 }
 

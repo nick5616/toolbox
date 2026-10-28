@@ -14,14 +14,39 @@ import "../github.com/wailsapp/wails/v3/internal/eventcreate.js";
 export const AppFilesDropped = "app:files-dropped";
 
 /**
+ * Name of the custom event "app:hidden-to-tray".
+ */
+export const AppHiddenToTray = "app:hidden-to-tray";
+
+/**
  * Name of the custom event "app:navigate".
  */
 export const AppNavigate = "app:navigate";
 
 /**
+ * Name of the custom event "clipboard:added".
+ */
+export const ClipboardAdded = "clipboard:added";
+
+/**
+ * Name of the custom event "clipboard:removed".
+ */
+export const ClipboardRemoved = "clipboard:removed";
+
+/**
+ * Name of the custom event "clipboard:state".
+ */
+export const ClipboardState = "clipboard:state";
+
+/**
  * Name of the custom event "deps:changed".
  */
 export const DepsChanged = "deps:changed";
+
+/**
+ * Name of the custom event "hotkeys:status".
+ */
+export const HotkeysStatus = "hotkeys:status";
 
 /**
  * Name of the custom event "jobs:changed".
@@ -57,4 +82,9 @@ export const LibraryRemoved = "library:removed";
  * Name of the custom event "settings:changed".
  */
 export const SettingsChanged = "settings:changed";
+
+/**
+ * Name of the custom event "window:show".
+ */
+export const WindowShow = "window:show";
 

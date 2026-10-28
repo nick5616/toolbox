@@ -1,5 +1,7 @@
 import {
+  ClipboardService,
   DepsService,
+  DesktopService,
   JobsService,
   LibraryService,
   ModulesService,
@@ -7,6 +9,8 @@ import {
 } from "@/lib/api";
 import { on } from "@/lib/events";
 import { routeFilesDropped } from "@/shell/dropRouting";
+import { notifyHiddenToTray } from "@/shell/hiddenToTray";
+import { useDesktop } from "./desktop";
 import { useDeps } from "./deps";
 import { useJobs } from "./jobs";
 import { useLibrary } from "./library";
@@ -29,8 +33,42 @@ export function subscribeAll(): void {
     on("deps:changed", (p) => useDeps.getState().setAll(p.deps ?? [])),
     on("settings:changed", (s) => useSettings.getState().set(s)),
     on("app:files-dropped", routeFilesDropped),
-    on("app:navigate", (n) => useUI.getState().navigate(n.target)),
+    on("app:navigate", (n) => {
+      if (n.target === "palette") useUI.getState().setPaletteOpen(true);
+      else useUI.getState().navigate(n.target);
+    }),
+    ...subscribeDesktop(),
+    on("app:hidden-to-tray", () => notifyHiddenToTray()),
   ];
+}
+
+/** Events every window (main and popups) needs. */
+function subscribeDesktop(): Array<() => void> {
+  return [
+    on("clipboard:state", (s) => useDesktop.getState().setClipboardState(s)),
+    on("hotkeys:status", (h) => useDesktop.getState().setHotkeys(h.items ?? [])),
+  ];
+}
+
+let popupUnsubscribers: Array<() => void> = [];
+
+/**
+ * Bootstrap for popup windows: settings, modules and desktop state only (no
+ * jobs, library or drop routing).
+ */
+export async function bootstrapPopup(): Promise<void> {
+  for (const u of popupUnsubscribers) u();
+  popupUnsubscribers = [on("settings:changed", (s) => useSettings.getState().set(s)), ...subscribeDesktop()];
+  const [settings, modules, clip, hotkeys] = await Promise.all([
+    SettingsService.Get(),
+    ModulesService.List(),
+    ClipboardService.State(),
+    DesktopService.HotkeyStatus(),
+  ]);
+  useSettings.getState().set(settings);
+  useModules.getState().setAll(modules ?? []);
+  useDesktop.getState().setClipboardState(clip);
+  useDesktop.getState().setHotkeys(hotkeys ?? []);
 }
 
 /**
@@ -40,13 +78,15 @@ export function subscribeAll(): void {
 export async function bootstrap(): Promise<void> {
   // Subscribe first so nothing emitted during loading is lost.
   subscribeAll();
-  const [settings, appInfo, modules, jobs, deps, recent] = await Promise.all([
+  const [settings, appInfo, modules, jobs, deps, recent, clip, hotkeys] = await Promise.all([
     SettingsService.Get(),
     SettingsService.AppInfo(),
     ModulesService.List(),
     JobsService.List({ moduleId: "", statuses: [], limit: 200 }),
     DepsService.List(),
     LibraryService.Recent({ moduleId: "", search: "", limit: 100, cursor: "" }),
+    ClipboardService.State(),
+    DesktopService.HotkeyStatus(),
   ]);
   useSettings.getState().set(settings);
   useSettings.getState().setAppInfo(appInfo);
@@ -54,6 +94,8 @@ export async function bootstrap(): Promise<void> {
   useJobs.getState().setAll(jobs ?? []);
   useDeps.getState().setAll(deps ?? []);
   useLibrary.getState().setPage(recent.items ?? [], recent.nextCursor);
+  useDesktop.getState().setClipboardState(clip);
+  useDesktop.getState().setHotkeys(hotkeys ?? []);
 
   // Fall back to the first ready module if the remembered view no longer exists.
   const ui = useUI.getState();

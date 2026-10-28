@@ -4,6 +4,7 @@
 
 export {
   DepsService,
+  DesktopService,
   FilesService,
   JobsService,
   LibraryService,
@@ -16,9 +17,13 @@ export * as StemsService from "@bindings/modules/stems/service";
 export * as BpmKeyService from "@bindings/modules/bpmkey/service";
 export * as MidiService from "@bindings/modules/midi/service";
 export * as ConverterService from "@bindings/modules/converter/service";
+export * as ClipboardService from "@bindings/modules/clipboard/service";
+export * as TranscribeService from "@bindings/modules/transcribe/service";
+export * as ExifService from "@bindings/modules/exif/service";
 
 export {
   Category,
+  ClipKind,
   DepSource,
   DepState,
   ErrorCode,
@@ -32,11 +37,19 @@ export {
 export type {
   Accepts,
   AppInfo,
+  ClipItem,
+  ClipPage,
+  ClipQuery,
+  ClipboardSettings,
+  ClipboardState,
+  ClipsRemoved,
   DepStatus,
   DepsChanged,
   Descriptor,
   FileInfo,
   FilesDropped,
+  HotkeyStatus,
+  HotkeysChanged,
   Job,
   JobFilter,
   JobLogBatch,
@@ -53,6 +66,7 @@ export type {
   PresetInfo,
   Settings,
   SettingsPatch,
+  ShowView,
 } from "@bindings/core/models";
 
 export {
@@ -70,3 +84,18 @@ export { Range as MidiRange } from "@bindings/modules/midi/models";
 export type { Options as MidiOptions, Result as MidiResult } from "@bindings/modules/midi/models";
 export { MaxHeight } from "@bindings/modules/converter/models";
 export type { Options as ConverterOptions } from "@bindings/modules/converter/models";
+export { Model as TranscribeModel, Task as TranscribeTask } from "@bindings/modules/transcribe/models";
+export type {
+  Language,
+  Options as TranscribeOptions,
+  Result as TranscribeResult,
+} from "@bindings/modules/transcribe/models";
+export { Action as ExifAction } from "@bindings/modules/exif/models";
+export type {
+  GeoPoint,
+  MetaField,
+  MetaGroup,
+  MetadataView,
+  Options as ExifOptions,
+  Result as ExifResult,
+} from "@bindings/modules/exif/models";

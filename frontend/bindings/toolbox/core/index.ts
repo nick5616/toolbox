@@ -3,6 +3,7 @@
 
 export {
     Category,
+    ClipKind,
     DepSource,
     DepState,
     ErrorCode,
@@ -16,11 +17,20 @@ export {
 export type {
     Accepts,
     AppInfo,
+    ClipItem,
+    ClipPage,
+    ClipQuery,
+    ClipboardSettings,
+    ClipboardState,
+    ClipsRemoved,
     DepStatus,
     DepsChanged,
     Descriptor,
     FileInfo,
     FilesDropped,
+    HiddenToTray,
+    HotkeyStatus,
+    HotkeysChanged,
     Job,
     JobFilter,
     JobLogBatch,
@@ -36,5 +46,6 @@ export type {
     OutputsRemoved,
     PresetInfo,
     Settings,
-    SettingsPatch
+    SettingsPatch,
+    ShowView
 } from "./models.js";

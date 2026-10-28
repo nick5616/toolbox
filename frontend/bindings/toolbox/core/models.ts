@@ -47,6 +47,127 @@ export enum Category {
 };
 
 /**
+ * ClipItem is one clipboard history entry.
+ */
+export interface ClipItem {
+    "id": string;
+    "kind": ClipKind;
+
+    /**
+     * full text (kind=text)
+     */
+    "text": string;
+
+    /**
+     * first 300 chars, whitespace-collapsed
+     */
+    "preview": string;
+
+    /**
+     * <support>/clipboard/<id>.png (kind=image)
+     */
+    "imagePath": string;
+    "width": number;
+    "height": number;
+    "byteSize": number;
+    "pinned": boolean;
+    "createdAt": number;
+    "lastUsedAt": number;
+}
+
+/**
+ * ClipKind is the type of a clipboard history item.
+ */
+export enum ClipKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ClipText = "text",
+    ClipImage = "image",
+};
+
+/**
+ * ClipPage is one page of clipboard history.
+ */
+export interface ClipPage {
+    "items": ClipItem[] | null;
+
+    /**
+     * "" = end
+     */
+    "nextCursor": string;
+}
+
+/**
+ * ClipQuery pages through clipboard history: pinned first, then most
+ * recently used.
+ */
+export interface ClipQuery {
+    /**
+     * case-insensitive substring of preview
+     */
+    "search": string;
+
+    /**
+     * "" = all
+     */
+    "kind": ClipKind;
+
+    /**
+     * default 100, max 500
+     */
+    "limit": number;
+
+    /**
+     * opaque; "" = first page
+     */
+    "cursor": string;
+}
+
+/**
+ * ClipboardSettings configure clipboard history recording.
+ */
+export interface ClipboardSettings {
+    "enabled": boolean;
+    "images": boolean;
+
+    /**
+     * 1, 7, 30, 90, or 0 = forever
+     */
+    "retentionDays": number;
+
+    /**
+     * 50–5000
+     */
+    "maxItems": number;
+}
+
+/**
+ * ClipboardState is the payload of clipboard:state.
+ */
+export interface ClipboardState {
+    /**
+     * enabled and watching
+     */
+    "recording": boolean;
+    "paused": boolean;
+
+    /**
+     * "" = fine
+     */
+    "error": string;
+}
+
+/**
+ * ClipsRemoved is the payload of clipboard:removed.
+ */
+export interface ClipsRemoved {
+    "ids": string[] | null;
+}
+
+/**
  * DepSource says where a tool was found.
  */
 export enum DepSource {
@@ -147,6 +268,12 @@ export interface Descriptor {
     "hidden": boolean;
 
     /**
+     * JobLess modules have a UI but never run jobs (e.g. Clipboard History);
+     * Jobs.Submit rejects them.
+     */
+    "jobLess": boolean;
+
+    /**
      * MaxInputs caps inputs per submission; 0 = no limit.
      */
     "maxInputs": number;
@@ -197,6 +324,37 @@ export interface FilesDropped {
      * routes straight to that tool).
      */
     "targetId": string;
+}
+
+/**
+ * HiddenToTray is the payload of app:hidden-to-tray.
+ */
+export interface HiddenToTray {
+}
+
+/**
+ * HotkeyStatus reports whether a global hotkey is registered.
+ */
+export interface HotkeyStatus {
+    "action": string;
+
+    /**
+     * "" = disabled
+     */
+    "accelerator": string;
+    "registered": boolean;
+
+    /**
+     * e.g. "In use by another app"
+     */
+    "error": string;
+}
+
+/**
+ * HotkeysChanged is the payload of hotkeys:status.
+ */
+export interface HotkeysChanged {
+    "items": HotkeyStatus[] | null;
 }
 
 /**
@@ -349,7 +507,7 @@ export enum ModuleStatus {
  */
 export interface Navigate {
     /**
-     * "settings" | "library" | module ID
+     * "settings" | "library" | "palette" (open the command palette) | module ID
      */
     "target": string;
 }
@@ -462,6 +620,19 @@ export interface Settings {
     "libraryDir": string;
     "concurrency": number;
     "theme": Theme;
+
+    /**
+     * Phase 3 (SPEC.md §3.2)
+     */
+    "keepInTray": boolean;
+    "startAtLogin": boolean;
+
+    /**
+     * Hotkeys maps a hotkey action (HotkeyClipboard, HotkeyQuickOpen) to a
+     * Wails accelerator such as "CmdOrCtrl+Alt+V"; "" = disabled.
+     */
+    "hotkeys": { [_ in string]?: string } | null;
+    "clipboard": ClipboardSettings;
 }
 
 /**
@@ -471,6 +642,26 @@ export interface SettingsPatch {
     "libraryDir": string | null;
     "concurrency": number | null;
     "theme": Theme | null;
+    "keepInTray": boolean | null;
+    "startAtLogin": boolean | null;
+
+    /**
+     * nil = unchanged; entries override, other actions keep their value
+     */
+    "hotkeys": { [_ in string]?: string } | null;
+
+    /**
+     * replaces the whole struct
+     */
+    "clipboard": ClipboardSettings | null;
+}
+
+/**
+ * ShowView is the payload of window:show: the window should show View
+ * (reset search/selection, focus the input).
+ */
+export interface ShowView {
+    "view": string;
 }
 
 /**
