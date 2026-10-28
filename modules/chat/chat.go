@@ -1,14 +1,13 @@
 // Package chat is Local Chat: an app-managed llama-server on 127.0.0.1 with
 // a random port and per-launch key, an optional Ollama backend, a pinned
 // model catalog and stored conversations. See SPEC.md §4.
-//
-// CONTRACT STUB (foundation): the exported types and signatures in chat.go
-// and service.go are final; CH1 implements them.
 package chat
 
 import (
 	"context"
 	"encoding/json"
+	"sync"
+	"time"
 
 	"toolbox/core"
 )
@@ -37,16 +36,62 @@ type Config struct {
 	RegisterOutput func(path string) error
 }
 
+// Timings of the server lifecycle and streaming; tests shorten them.
+type timings struct {
+	ready     time.Duration // server readiness timeout
+	poll      time.Duration // /health poll interval
+	idle      time.Duration // stop the server after this long without requests
+	persist   time.Duration // save the streaming assistant message this often
+	coalesce  time.Duration // delta event coalescing interval
+	killGrace time.Duration // wait for a killed server to exit
+}
+
+func defaultTimings() timings {
+	return timings{
+		ready: 120 * time.Second, poll: 250 * time.Millisecond, idle: 20 * time.Minute,
+		persist: 2 * time.Second, coalesce: 40 * time.Millisecond, killGrace: 5 * time.Second,
+	}
+}
+
 // Chat owns the server lifecycle and generation. Safe for concurrent use.
 type Chat struct {
 	cfg Config
+	tm  timings
+
+	// Test seams.
+	serverEnv []string                    // extra environment for llama-server
+	modelURL  func(e catalogEntry) string // model download URL
+	entries   func() []catalogEntry       // the catalog
+	dlMu      sync.Mutex                  // one model download at a time
+
+	srvMu sync.Mutex // serialises server start/stop
+
+	mu        sync.Mutex // protects the fields below
+	srv       *server
+	status    core.ChatStatus
+	ollamaErr string // note shown when Ollama is configured but unreachable
+	gen       *generation
+	idleTimer *time.Timer
 }
 
 // New returns Local Chat (no server is started until the first Send).
-func New(cfg Config) *Chat { return &Chat{cfg: cfg} }
+func New(cfg Config) *Chat {
+	c := &Chat{cfg: cfg, tm: defaultTimings()}
+	c.status = core.ChatStatus{State: core.ChatStopped}
+	c.modelURL = func(e catalogEntry) string { return e.URL() }
+	c.entries = func() []catalogEntry { return catalog }
+	if c.cfg.Emitter == nil {
+		c.cfg.Emitter = core.NopEmitter{}
+	}
+	return c
+}
 
-// Stop stops any generation and the server (app quit).
-func (c *Chat) Stop() {}
+// Stop stops any generation (saving it as stopped) and the server. The Chat
+// stays usable: the next Send starts the server again.
+func (c *Chat) Stop() {
+	c.stopGeneration()
+	c.stopServer()
+}
 
 // Module is the job-less Local Chat module (it has a UI, never runs jobs).
 type Module struct{ c *Chat }
@@ -67,6 +112,8 @@ func Register(reg *core.Registry, c *Chat) error {
 	return reg.Register(&ModelModule{c: c})
 }
 
+var _ core.ModelProvider = (*Module)(nil)
+
 // Descriptor implements core.Module.
 func (m *Module) Descriptor() core.Descriptor {
 	return core.Descriptor{
@@ -83,16 +130,21 @@ func (m *Module) Validate([]string, json.RawMessage) error { return core.ErrJobL
 // Run implements core.Module.
 func (m *Module) Run(context.Context, *core.JobContext) error { return core.ErrJobLess }
 
-// ModelPresent implements core.ModelProvider (CH1).
-func (m *Module) ModelPresent(preset string) bool { return false }
+// ModelPresent implements core.ModelProvider.
+func (m *Module) ModelPresent(preset string) bool { return m.c.modelPresent(preset) }
 
-// FetchModel implements core.ModelProvider (CH1).
+// FetchModel implements core.ModelProvider: a no-op when the model is
+// present, else the same Range-resuming, sha-verified download as the model job.
 func (m *Module) FetchModel(ctx context.Context, job *core.JobContext, preset string) error {
-	return errNotBuilt
+	e, ok := m.c.lookup(preset)
+	if !ok {
+		return core.ValidationError("Unknown chat model "+preset, nil)
+	}
+	return m.c.downloadModel(ctx, job, e)
 }
 
-// RemoveModel implements core.ModelProvider (CH1).
-func (m *Module) RemoveModel(preset string) error { return errNotBuilt }
+// RemoveModel implements core.ModelProvider.
+func (m *Module) RemoveModel(preset string) error { return m.c.deleteModel(preset) }
 
 // Descriptor implements core.Module.
 func (m *ModelModule) Descriptor() core.Descriptor {
@@ -104,11 +156,26 @@ func (m *ModelModule) Descriptor() core.Descriptor {
 
 // Validate implements core.Module.
 func (m *ModelModule) Validate(inputs []string, options json.RawMessage) error {
-	_, err := core.DecodeOptionsJSON[ModelOptions](options)
-	return err
+	o, err := core.DecodeOptionsJSON[ModelOptions](options)
+	if err != nil {
+		return err
+	}
+	if _, ok := m.c.lookup(o.Model); !ok {
+		return core.ValidationError("Unknown chat model", map[string]string{"model": "Pick a model from the list"})
+	}
+	return nil
 }
 
 // Run implements core.Module.
-func (m *ModelModule) Run(ctx context.Context, job *core.JobContext) error { return errNotBuilt }
-
-var errNotBuilt = core.Errorf(core.CodeInternal, "Local Chat isn't available yet")
+func (m *ModelModule) Run(ctx context.Context, job *core.JobContext) error {
+	o, err := core.DecodeOptions[ModelOptions](job)
+	if err != nil {
+		return err
+	}
+	e, ok := m.c.lookup(o.Model)
+	if !ok {
+		return core.ValidationError("Unknown chat model", nil)
+	}
+	job.SetTitle("Download " + e.Label)
+	return m.c.downloadModel(ctx, job, e)
+}
