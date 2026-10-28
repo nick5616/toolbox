@@ -125,6 +125,7 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 	if err := json.Unmarshal(raw, &res); err != nil {
 		return core.Errorf(core.CodeInternal, "The AI engine returned an unreadable result").WithCause(err)
 	}
+	res.Model = o.Model // the engine reports the model file; the UI wants the preset
 	sink.register(res.Output)
 	if sink.err != nil {
 		return sink.err

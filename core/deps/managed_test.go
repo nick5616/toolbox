@@ -298,7 +298,7 @@ func TestUVUpdaterModule(t *testing.T) {
 		t.Error("inputs should be rejected")
 	}
 	// Not counted as a requirer of anything, and uv itself has no RequiredBy.
-	if st := find(t, s.List(), UV); len(st.RequiredBy) != 0 || !st.Managed || st.InstallHint != "Installed with the audio engine" {
+	if st := find(t, s.List(), UV); len(st.RequiredBy) != 0 || !st.Managed || st.InstallHint != "Installed with the AI engine" {
 		t.Errorf("uv status %+v", st)
 	}
 }
