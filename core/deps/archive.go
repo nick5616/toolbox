@@ -454,6 +454,72 @@ func safeJoin(dest, name string) (string, error) {
 	return filepath.Join(dest, filepath.FromSlash(clean)), nil
 }
 
+// symlinkAsCopy is true where symlinks can't be created without privileges
+// (Windows): tar symlink entries are copied as files instead.
+var symlinkAsCopy = runtime.GOOS == "windows"
+
+type pendingLink struct{ link, target string }
+
+// safeSymlinkTarget checks a tar symlink: the target must be relative and,
+// resolved against the link's folder, stay inside dest. It returns the
+// resolved path of the target.
+func safeSymlinkTarget(dest, linkPath, linkname string) (string, error) {
+	n := strings.ReplaceAll(linkname, `\`, "/")
+	if n == "" || strings.HasPrefix(n, "/") || (len(n) > 1 && n[1] == ':') {
+		return "", fmt.Errorf("unsafe archive: symlink target %q", linkname)
+	}
+	resolved := filepath.Join(filepath.Dir(linkPath), filepath.FromSlash(n))
+	rel, err := filepath.Rel(dest, resolved)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("unsafe archive: symlink target %q escapes the folder", linkname)
+	}
+	return resolved, nil
+}
+
+// copyPendingLinks copies each symlink's target file to the link path
+// (following chains of links), within the remaining size budget. Links whose
+// target is a folder or absent are skipped.
+func copyPendingLinks(links []pendingLink, budget int64, bad func(error) error) error {
+	for len(links) > 0 {
+		var rest []pendingLink
+		for _, l := range links {
+			fi, err := os.Stat(l.target)
+			if err != nil || !fi.Mode().IsRegular() {
+				rest = append(rest, l)
+				continue
+			}
+			if budget -= fi.Size(); budget < 0 {
+				return core.Errorf(core.CodeToolFailed, "Download is too large")
+			}
+			if err := copyFileMode(l.target, l.link, fi.Mode().Perm()); err != nil {
+				return bad(err)
+			}
+		}
+		if len(rest) == len(links) {
+			break
+		}
+		links = rest
+	}
+	return nil
+}
+
+func copyFileMode(src, dst string, mode os.FileMode) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode|0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
+}
+
 // extractArchive unpacks a .zip or .tar.gz into dest, rejecting path
 // traversal and capping the total unpacked size at limit.
 func extractArchive(ctx context.Context, archive, assetName, dest string, limit int64) error {
@@ -536,13 +602,14 @@ func extractArchive(ctx context.Context, archive, assetName, dest string, limit 
 		}
 		defer gz.Close()
 		tr := tar.NewReader(gz)
+		var links []pendingLink
 		for {
 			if err := cancelled(ctx); err != nil {
 				return err
 			}
 			h, err := tr.Next()
 			if err == io.EOF {
-				return nil
+				return copyPendingLinks(links, limit-total, bad)
 			}
 			if err != nil {
 				return bad(err)
@@ -562,6 +629,19 @@ func extractArchive(ctx context.Context, archive, assetName, dest string, limit 
 			case tar.TypeReg:
 				if err := writeFile(target, os.FileMode(h.Mode).Perm(), tr); err != nil {
 					return err
+				}
+			case tar.TypeSymlink:
+				linkTarget, err := safeSymlinkTarget(dest, target, h.Linkname)
+				if err != nil {
+					return bad(err)
+				}
+				if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+					return bad(err)
+				}
+				if symlinkAsCopy {
+					links = append(links, pendingLink{link: target, target: linkTarget})
+				} else if err := os.Symlink(filepath.FromSlash(h.Linkname), target); err != nil {
+					return bad(err)
 				}
 			}
 		}
