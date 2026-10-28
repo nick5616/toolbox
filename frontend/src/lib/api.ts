@@ -9,6 +9,7 @@ export {
   JobsService,
   LibraryService,
   ModulesService,
+  PacksService,
   SettingsService,
 } from "@bindings/api";
 
@@ -23,9 +24,16 @@ export * as ExifService from "@bindings/modules/exif/service";
 export * as BgRemoveService from "@bindings/modules/bgremove/service";
 export * as UpscaleService from "@bindings/modules/upscale/service";
 export * as PdfService from "@bindings/modules/pdf/service";
+export * as ChatService from "@bindings/modules/chat/service";
+export * as OcrService from "@bindings/modules/ocr/service";
+export * as VaultService from "@bindings/modules/vault/service";
 
 export {
   Category,
+  ChatBackend,
+  ChatMessageStatus,
+  ChatRole,
+  ChatServerState,
   ClipKind,
   DepSource,
   DepState,
@@ -34,12 +42,35 @@ export {
   LogStream,
   ModuleStatus,
   OutputKind,
+  PackComponentKind,
+  PackComponentState,
+  PackState,
   Theme,
 } from "@bindings/core/models";
 
 export type {
   Accepts,
   AppInfo,
+  ChatConversation,
+  ChatConversationPatch,
+  ChatDelta,
+  ChatDone,
+  ChatMessage,
+  ChatPage,
+  ChatSettings,
+  ChatStatus,
+  DiskInfo,
+  PackComponentStatus,
+  PackInstallResult,
+  PackKept,
+  PackRemovePreview,
+  PackStatus,
+  PackUnlock,
+  PacksChanged,
+  SetupSettings,
+  ToolsDirInfo,
+  VaultSettings,
+  VaultState,
   ClipItem,
   ClipPage,
   ClipQuery,
@@ -124,3 +155,8 @@ export type {
   PageSize as PdfPageSize,
   Result as PdfResult,
 } from "@bindings/modules/pdf/models";
+
+export type { ConversationView, ModelInfo as ChatModelInfo, SendResult as ChatSendResult } from "@bindings/modules/chat/models";
+export { ImageOutput as OcrImageOutput, Language as OcrLanguage, PDFOutput as OcrPdfOutput } from "@bindings/modules/ocr/models";
+export type { LanguageInfo as OcrLanguageInfo, Options as OcrOptions, Result as OcrResult } from "@bindings/modules/ocr/models";
+export type { Entry as VaultEntry } from "@bindings/modules/vault/models";

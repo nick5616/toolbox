@@ -17,6 +17,17 @@ export function defaultSettings(): Settings {
     startAtLogin: false,
     hotkeys: { ...DEFAULT_HOTKEYS },
     clipboard: { enabled: false, images: true, retentionDays: 30, maxItems: 500, autoPaste: false },
+    chat: {
+      defaultModel: "qwen3-4b",
+      systemPrompt: "You are a helpful assistant. Answer concisely.",
+      temperature: 0.7,
+      contextSize: 8192,
+      gpu: true,
+      ollamaURL: "",
+    },
+    vault: { autoLockMinutes: 10 },
+    // true until settings load, so the setup screen never flashes for existing installs.
+    setup: { done: true },
   };
 }
 
@@ -46,6 +57,9 @@ export const useSettings = create<SettingsState>((set) => ({
       startAtLogin: patch.startAtLogin ?? null,
       hotkeys: patch.hotkeys ?? null,
       clipboard: patch.clipboard ?? null,
+      chat: patch.chat ?? null,
+      vault: patch.vault ?? null,
+      setup: patch.setup ?? null,
     });
     set({ settings: next });
     applyTheme(next.theme);

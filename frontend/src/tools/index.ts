@@ -21,6 +21,9 @@ export const toolViews: Record<string, LazyExoticComponent<ComponentType<ToolVie
   "bg-remover": lazy(() => import("./bgremove/BgRemoveView")),
   upscaler: lazy(() => import("./upscale/UpscaleView")),
   pdf: lazy(() => import("./pdf/PdfView")),
+  "llm-chat": lazy(() => import("./chat/ChatView")),
+  ocr: lazy(() => import("./ocr/OcrView")),
+  vault: lazy(() => import("./vault/VaultView")),
 };
 
 /**

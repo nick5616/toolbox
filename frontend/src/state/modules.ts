@@ -5,7 +5,7 @@ import { ModuleStatus, type Descriptor } from "@/lib/api";
 export type ModuleView = Descriptor & {
   requires: string[];
   recommends: string[];
-  accepts: { extensions: string[]; urls: boolean };
+  accepts: { extensions: string[]; urls: boolean; any: boolean };
 };
 
 export function normalizeModule(d: Descriptor): ModuleView {
@@ -13,7 +13,7 @@ export function normalizeModule(d: Descriptor): ModuleView {
     ...d,
     requires: d.requires ?? [],
     recommends: d.recommends ?? [],
-    accepts: { extensions: d.accepts.extensions ?? [], urls: d.accepts.urls },
+    accepts: { extensions: d.accepts.extensions ?? [], urls: d.accepts.urls, any: d.accepts.any },
   };
 }
 
