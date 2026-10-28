@@ -353,14 +353,23 @@ func (i *archiveInstaller) install(ctx context.Context, job *core.JobContext, a 
 		tmp := filepath.Join(job.TempDir, assets[n])
 		defer os.Remove(tmp)
 		job.Logf("Downloading %s", assets[n])
-		got, err := i.downloadRange(ctx, p.URL(assets[n]), tmp, job, label, limit, lo, hi)
-		if err != nil {
-			return err
-		}
-		if !strings.EqualFold(got, wants[n]) {
+		// A mismatch is retried once from scratch (truncated downloads happen).
+		for attempt := 1; ; attempt++ {
+			got, err := i.downloadRange(ctx, p.URL(assets[n]), tmp, job, label, limit, lo, hi)
+			if err != nil {
+				return err
+			}
+			if strings.EqualFold(got, wants[n]) {
+				break
+			}
 			job.Logf("Checksum mismatch for %s: expected %s, got %s", assets[n], wants[n], got)
-			return core.Errorf(core.CodeToolFailed, "Checksum mismatch").
-				WithHint("The download was corrupted. Try again.")
+			_ = os.Remove(tmp)
+			if attempt >= 2 {
+				return core.Errorf(core.CodeToolFailed, "The download was corrupted — try again").
+					WithCause(fmt.Errorf("Checksum mismatch for %s", assets[n])).
+					WithHint("The download didn't match its pinned checksum twice.")
+			}
+			job.Logf("Retrying the download of %s", assets[n])
 		}
 		archives[n] = tmp
 	}
