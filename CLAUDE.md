@@ -64,7 +64,9 @@ wails3 build                # production binary in bin/
 wails3 generate bindings -clean=true -ts -i   # regenerate frontend/bindings (architect only)
 
 go build ./... && go vet ./... && go test -race ./...   # backend checks (-race needs cgo; omit on Windows without a C toolchain)
-go test -tags integration ./integration/ ./modules/downloader/ ./modules/converter/ ./modules/exif/  # real tools + network
+go test -tags integration ./integration/ ./modules/downloader/ ./modules/converter/ ./modules/exif/ ./modules/upscale/  # real tools + network (upscale needs a Vulkan GPU, else skips)
+TOOLBOX_PDF_SAMPLES=1 go test -run TestSamples -v ./modules/pdf/   # every PDF action on the research PDFs in .dev/p4-research/pdf/inputs
+go run ./build/icongen/main.go && wails3 task common:generate:icons  # regenerate app/tray icons from the shapes in build/icongen
 TOOLBOX_ENGINE_E2E=1 go test -tags integration -run TestEndToEndAudioEngine -timeout 40m ./integration/  # fresh engine install + all engine tools
 gofmt -l .                                             # must print nothing
 cd frontend && npm run check                           # typecheck + vitest + check:any
