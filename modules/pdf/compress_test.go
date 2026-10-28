@@ -140,7 +140,12 @@ func TestCMYKConversion(t *testing.T) {
 	}
 	// Full black ink (K) is black.
 	c.SetCMYK(0, 0, color.CMYK{0, 0, 0, 255})
-	if got := cmykToRGBA(c, true).RGBAAt(0, 0); got != (color.RGBA{0, 0, 0, 255}) {
+	if got := cmykToRGBA(c, true).RGBAAt(0, 0); got.R > 60 || got.G > 60 || got.B > 60 {
 		t.Errorf("inverted black = %v", got)
+	}
+	// Without /Decode, decoded K=0 means raw K=255 = full black ink.
+	c.SetCMYK(0, 0, color.CMYK{255, 255, 255, 0})
+	if got := cmykToRGBA(c, false).RGBAAt(0, 0); got.R > 60 || got.G > 60 || got.B > 60 {
+		t.Errorf("plain black = %v", got)
 	}
 }

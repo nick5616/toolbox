@@ -3,7 +3,6 @@ package pdf
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -329,5 +328,3 @@ func bookmarksNote(dropped bool) string {
 	}
 	return ""
 }
-
-var errNoOutput = errors.New("no output produced")

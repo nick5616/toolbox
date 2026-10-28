@@ -46,6 +46,9 @@ func TestMain(m *testing.M) {
 		code = 1
 	}
 	_ = os.RemoveAll(base)
+	if pdfiumDir != "" {
+		_ = os.RemoveAll(pdfiumDir)
+	}
 	os.Exit(code)
 }
 

@@ -57,6 +57,9 @@ type imgResult struct {
 	data  []byte
 	w, h  int
 	gray  bool
+	// keepCS: the output has the original component count, so the original
+	// colour space (ICC profile, Cal*) stays valid.
+	keepCS bool
 }
 
 // compressResult describes a finished compression.
@@ -350,7 +353,8 @@ func recompressOne(j imgJob, quality int) (imgResult, bool) {
 		return imgResult{}, false
 	}
 	nb := img.Bounds()
-	return imgResult{objNr: j.objNr, data: buf.Bytes(), w: nb.Dx(), h: nb.Dy(), gray: isGray}, true
+	return imgResult{objNr: j.objNr, data: buf.Bytes(), w: nb.Dx(), h: nb.Dy(), gray: isGray,
+		keepCS: j.comps == map[bool]int{true: 1, false: 3}[isGray]}, true
 }
 
 // decodeImage returns the pixels as Gray or RGB-compatible (never CMYK).
@@ -400,11 +404,43 @@ func cmykToRGBA(c *image.CMYK, invert bool) *image.RGBA {
 			if !invert {
 				p = color.CMYK{C: 255 - p.C, M: 255 - p.M, Y: 255 - p.Y, K: 255 - p.K}
 			}
-			r, g, bl := color.CMYKToRGB(p.C, p.M, p.Y, p.K)
+			r, g, bl := cmykPoly(float64(p.C)/255, float64(p.M)/255, float64(p.Y)/255, float64(p.K)/255)
 			out.SetRGBA(x, y, color.RGBA{R: r, G: g, B: bl, A: 255})
 		}
 	}
 	return out
+}
+
+func clamp8(v float64) uint8 {
+	switch {
+	case v <= 0:
+		return 0
+	case v >= 255:
+		return 255
+	}
+	return uint8(v + 0.5)
+}
+
+// cmykPoly approximates a SWOP press profile (the polynomial fit pdf.js and
+// most viewers use) so converted colours stay close to what viewers show for
+// untagged DeviceCMYK. Inputs are ink amounts in 0..1.
+func cmykPoly(c, m, y, k float64) (r, g, b uint8) {
+	r = clamp8(255 +
+		c*(-4.387332384609988*c+54.48615194189176*m+18.82290502165302*y+212.25662451639585*k-285.2331026137004) +
+		m*(1.7149763477362134*m-5.6096736904047315*y-17.873870861415444*k-5.497006427196366) +
+		y*(-2.5217340131683033*y-21.248923337353073*k+17.5119270841813) +
+		k*(-21.86122147463605*k-189.48180835922747))
+	g = clamp8(255 +
+		c*(8.841041422036149*c+60.118027045597366*m+6.871425592049007*y+31.159100130055922*k-79.2970844816548) +
+		m*(-15.310361306967817*m+17.575251261109482*y+131.35250912493976*k-190.9453302588951) +
+		y*(4.444339102852739*y+9.8632861493405*k-24.86741582555878) +
+		k*(-20.737325471181034*k-187.80453709719578))
+	b = clamp8(255 +
+		c*(0.8842522430003296*c+8.078677503112928*m+30.89978309703729*y-0.23883238689178934*k-14.183576799673286) +
+		m*(10.49593273432072*m+63.02378494754052*y+50.606957656360734*k-112.23884253719248) +
+		y*(0.03296041114873217*y+115.60384449646641*k-193.58209356861505) +
+		k*(-22.33816807309886*k-180.12613974708367))
+	return r, g, b
 }
 
 // applyResult swaps the stream of a recompressed image for the JPEG data.
@@ -428,10 +464,12 @@ func applyResult(xctx *model.Context, r imgResult) {
 	sd.Dict["Width"] = types.Integer(r.w)
 	sd.Dict["Height"] = types.Integer(r.h)
 	sd.Dict["BitsPerComponent"] = types.Integer(8)
-	if r.gray {
-		sd.Dict["ColorSpace"] = types.Name("DeviceGray")
-	} else {
-		sd.Dict["ColorSpace"] = types.Name("DeviceRGB")
+	if !r.keepCS { // otherwise keep the original (e.g. ICCBased) colour space
+		if r.gray {
+			sd.Dict["ColorSpace"] = types.Name("DeviceGray")
+		} else {
+			sd.Dict["ColorSpace"] = types.Name("DeviceRGB")
+		}
 	}
 	delete(sd.Dict, "Decode")
 	delete(sd.Dict, "DecodeParms")
