@@ -3,6 +3,7 @@ module toolbox
 go 1.27
 
 require (
+	filippo.io/age v1.3.2
 	github.com/ebitengine/purego v0.10.1
 	github.com/klippa-app/go-pdfium v1.21.4
 	github.com/oklog/ulid/v2 v2.1.2
@@ -15,6 +16,7 @@ require (
 )
 
 require (
+	filippo.io/hpke v0.4.0 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/coder/websocket v1.8.14 // indirect

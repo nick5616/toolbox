@@ -17,7 +17,10 @@ const (
 	itemRecentFmt = "recent:%d"
 	itemSettings  = "settings"
 	itemQuit      = "quit"
-	itemSep       = "-"
+	// --- vault (VA1) ---
+	itemLockVault = "lock-vault"
+	// --- end vault ---
+	itemSep = "-"
 )
 
 const maxRecent = 5
@@ -30,6 +33,9 @@ type trayState struct {
 	Paused           bool
 	Running          int // running + queued jobs
 	Recent           []core.Output
+	// --- vault (VA1) ---
+	VaultUnlocked bool
+	// --- end vault ---
 }
 
 // trayItem is one row of the tray menu.
@@ -62,6 +68,11 @@ func trayModel(s trayState) []trayItem {
 		}
 		m = append(m, p)
 	}
+	// --- vault (VA1) ---
+	if s.VaultUnlocked {
+		m = append(m, item(itemLockVault, "Lock vault"))
+	}
+	// --- end vault ---
 	m = append(m, trayItem{ID: itemSep, Separator: true})
 	if s.Running > 0 {
 		label := fmt.Sprintf("Running: %d jobs", s.Running)

@@ -117,8 +117,10 @@ func run() error {
 	vaultSvc := vault.New(vault.Config{
 		LibraryDir: libraryDir, OpenDir: filepath.Join(paths.TmpDir, "vault-open"),
 		Settings: settings, Jobs: jobs, Emitter: emitter,
+		OpenFile: func(path string) error { return application.Get().Browser.OpenFile(path) },
 	})
 	defer vaultSvc.Close()
+	vaultAPI := vault.NewService(vaultSvc)
 	// --- end Vault ---
 
 	// --- Tool packs (PK1 may edit this block) ---
@@ -211,7 +213,7 @@ func run() error {
 			application.NewServiceWithOptions(pdf.NewService(jobs, pdfMod), opts),
 			application.NewServiceWithOptions(chat.NewService(chatSvc), opts),
 			application.NewServiceWithOptions(ocr.NewService(jobs), opts),
-			application.NewServiceWithOptions(vault.NewService(vaultSvc), opts),
+			application.NewServiceWithOptions(vaultAPI, opts),
 			application.NewServiceWithOptions(packsAPI, opts),
 		},
 		Assets: application.AssetOptions{
@@ -272,7 +274,7 @@ func run() error {
 	// --- desktop shell (WP-D1): tray, close-to-tray, login item, hotkeys, popup ---
 	shell := desktop.New(desktop.Options{
 		App: app, Main: win, Settings: settings, Jobs: jobs, Outputs: db, Emitter: emitter,
-		Clipboard: clipHistory,
+		Clipboard: clipHistory, Vault: vaultAPI,
 		DarkMode: func() bool {
 			t := settings.Current().Theme
 			return t == core.ThemeDark || (t == core.ThemeSystem && app.Env.IsDarkMode())

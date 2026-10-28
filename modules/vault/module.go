@@ -1,13 +1,13 @@
 // Package vault is a passphrase-encrypted file store (age). See SPEC.md §6.
-//
-// CONTRACT STUB (foundation): module.go and service.go signatures are final;
-// VA1 implements the store, the state machine and the jobs.
 package vault
 
 import (
 	"context"
 	"encoding/json"
 	"sync"
+	"time"
+
+	"filippo.io/age"
 
 	"toolbox/core"
 )
@@ -54,11 +54,52 @@ type Config struct {
 // Vault holds the vault state. Safe for concurrent use.
 type Vault struct {
 	cfg Config
-	mu  sync.Mutex
+
+	// opMu serialises every index mutation, passphrase change and unlock.
+	// Lock order: opMu before mu.
+	opMu sync.Mutex
+
+	// mu guards the fields below (short critical sections only).
+	mu         sync.Mutex
+	identity   *age.X25519Identity // non-nil exactly while unlocked
+	idx        *index
+	dir        string // vault folder while unlocked
+	session    string // per-unlock ID; names the open-copies folder
+	lastActive time.Time
+	lastEmit   time.Time
+	active     int // running vault jobs
+	cancels    map[int]context.CancelFunc
+	nextCancel int
+	wipeTimer  *time.Timer
+	closed     bool
+	started    bool
+	stop       chan struct{}
+	notice     string // set when the index came from the .bak copy
+
+	// Test hooks (unexported).
+	now        func() time.Time
+	workFactor int
+	retryEvery time.Duration
+	tickEvery  time.Duration
+	minutes    func() int // nil = read from Settings
+	submit     func(ctx context.Context, inputs []string, optionsJSON string) ([]core.Job, error)
 }
 
 // New returns a locked vault.
-func New(cfg Config) *Vault { return &Vault{cfg: cfg} }
+func New(cfg Config) *Vault {
+	if cfg.Emitter == nil {
+		cfg.Emitter = core.NopEmitter{}
+	}
+	v := &Vault{
+		cfg: cfg, cancels: map[int]context.CancelFunc{}, stop: make(chan struct{}),
+		now: time.Now, workFactor: defaultWorkFactor,
+		retryEvery: 30 * time.Second, tickEvery: 10 * time.Second,
+	}
+	v.submit = func(ctx context.Context, inputs []string, optionsJSON string) ([]core.Job, error) {
+		return v.cfg.Jobs.Submit(ctx, ModuleID, inputs, optionsJSON)
+	}
+	return v
+}
 
 // Module implements core.Module for add/export jobs.
 type Module struct{ v *Vault }
@@ -91,7 +132,52 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 
 // Start begins housekeeping: wipes leftover temporary open copies (crash
 // leftovers) and starts the auto-lock timer. Call once at app start.
-func (v *Vault) Start(ctx context.Context) {}
+func (v *Vault) Start(ctx context.Context) {
+	v.mu.Lock()
+	if v.started || v.closed {
+		v.mu.Unlock()
+		return
+	}
+	v.started = true
+	v.mu.Unlock()
+
+	v.wipeOpen()
+	if v.cfg.Settings != nil {
+		v.cfg.Settings.OnChange(func(old, new core.Settings) {
+			if old.Vault != new.Vault {
+				v.emitState()
+			}
+		})
+	}
+	go func() {
+		t := time.NewTicker(v.tickEvery)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-v.stop:
+				return
+			case <-t.C:
+				v.checkAutoLock()
+			}
+		}
+	}()
+}
 
 // Close locks the vault (app quit).
-func (v *Vault) Close() {}
+func (v *Vault) Close() {
+	v.mu.Lock()
+	if !v.closed {
+		v.closed = true
+		close(v.stop)
+	}
+	v.mu.Unlock()
+	v.lock()
+	v.mu.Lock()
+	if v.wipeTimer != nil {
+		v.wipeTimer.Stop()
+		v.wipeTimer = nil
+	}
+	v.mu.Unlock()
+}
