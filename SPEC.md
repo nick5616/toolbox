@@ -1,689 +1,728 @@
-# Toolbox — Phase 4 Spec: Background Remover, Upscaler, PDF Toolkit, app icon
+# Toolbox — Phase 5 Spec: Local Chat, OCR, Vault, Tool Packs
 
-Status: **APPROVED 2026-10-27** — binding. Approved together with three additions (§13: HEIC input, opt-in auto-paste, CPU upscaling fallback).
-Date: 2026-10-27. Author: architect session (Opus).
+Status: **APPROVED 2026-10-28.**
+Date: 2026-10-28. Author: architect session (Opus).
 
-Phases 1–3 are shipped; their specs are archived in `docs/specs/phase-{1,2,3}.md`, and every contract there still holds unless changed here. "P1 §x" / "P2 §x" / "P3 §x" refer to those files.
+Phases 1–4 are shipped; their specs are archived in `docs/specs/phase-{1..4}.md`, and every contract there still holds unless changed here. "P4 §x" etc. refer to those files.
 
 ---
 
 ## 0. Research findings this spec relies on
 
-Verified hands-on on this Windows machine (i7-11700K, RTX 3070, 32 GB) on 2026-10-27, in `.dev/p4-research/{bg,upscale,pdf}/`, except where marked *docs only*.
+Verified hands-on on this Windows machine (RTX 3070, 32 GB, usually ~6 GB free) on 2026-10-28, in `.dev/p5-research/{llm,ocr,vault}/`, except where marked *docs only*.
+
+### 0.1 Local Chat
 
 | Topic | Finding | Consequence |
 |---|---|---|
-| Background removal: `rembg` 2.0.86 | It works, but adds scikit-image, pymatting (which needs numba), imageio and jsonschema (about 30 MB more). A cold `import` takes 49 s, and the default ONNX Runtime session peaks at 10.7 GB RAM. | **Don't use rembg.** We write about 100 lines of our own inference with onnxruntime, numpy, scipy and Pillow, all already in `uv.lock` with macOS arm64 wheels. Pillow becomes an explicit dependency, and the lock doesn't change. |
-| Background models (CPU, warm) | All models are downloaded from `https://github.com/danielgatis/rembg/releases/download/v0.0.0/<file>`.<br>• **BiRefNet-general-lite**, `BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx`: 224 MB, about 8 s per image, MIT, sha256 `5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333`. Excellent on hair, pets, products and people.<br>• **isnet-general-use**, `isnet-general-use.onnx`: 178.6 MB, about 0.9 s, Apache-2.0, sha256 `60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a`. Good, but hair edges are soft.<br>• **BiRefNet-general**, `BiRefNet-general-epoch_244.onnx`: 972.7 MB, about 14.5 s, MIT, sha256 `58f621f00f5d756097615970a88a791584600dcf7c45b18a0a6267535a1ebd3c`. Slightly crisper than lite.<br>• The u2net, u2netp and silueta models lost the face on the portrait test.<br>• RMBG-2.0 is licensed for non-commercial use only. | The three presets are **Balanced** (BiRefNet-lite, the default), **Fast** (isnet) and **Best** (BiRefNet full). The u2net family and RMBG are not offered. |
-| Background pipeline details | Pre-processing:<br>• `exif_transpose`, convert to sRGB via `ImageCms` if an ICC profile is present, then RGB.<br>• Resize to 1024² (bilinear) and scale to /255.<br>• BiRefNet normalises with ImageNet mean/std, sigmoid on its single output `output_image`.<br>• isnet normalises with mean 0.5 / std 1.0, uses output 0, min-max normalised, no sigmoid.<br>• Input name `input_image`, NCHW float32.<br>• Resize the mask back with bicubic.<br>Session settings:<br>• `enable_cpu_mem_arena=False` and `enable_mem_pattern=False` cut BiRefNet's peak RAM from 9–13 GB to **6–7 GB** (isnet 0.75 GB). After a run, RSS drops back to 0.4 / 1.1 GB.<br>• `log_severity_level=3` silences hundreds of warnings.<br>• Creating a session takes 7.5–10 s, so cache it per model.<br>• Thread count barely matters.<br>Large images: a 24 MP input processes fine (the model input is always 1024²); post-processing takes about 3 s and the PNG is about 12 MB. | Background removal becomes a sidecar handler. The session is cached per model, and cancellation is checked before and after the uninterruptible `run`. |
-| Upscaler binary | **upscayl-ncnn**, tag `20251207-174704`, AGPL-3.0, maintained (repo pushed 2026-04). It is used only as a separate process. Release assets:<br>• `upscayl-bin-20251207-174704-windows.zip`: 2.42 MB, sha256 `1f0f65c5d2ade866555e2ac467d35952c35a47080a4060fe56a1ab028f67258a`.<br>• `upscayl-bin-20251207-174704-macos.zip`: 9.34 MB, sha256 `277419791281a56eae0c739c70120b974d7267cf7c2de8e86dc09798d4b314db`. The macOS binary is universal, with MoltenVK statically linked.<br>• Each zip contains only `<top>/upscayl-bin[.exe]`, a LICENSE and a README, with no models.<br>• The Windows exe imports `VCOMP140.DLL`. | It becomes a managed tool with **pinned** versions and checksums. |
-| Upscaler models | Real-ESRGAN `v0.2.5.0`, `realesrgan-ncnn-vulkan-20220424-windows.zip`: 45.5 MB, sha256 `abc02804e17982a3be33675e4d471e91ea374e65b70167abc09e31acb412802d`, BSD-3. The `models/` files are byte-identical across the OS zips: `realesrgan-x4plus`, `realesrgan-x4plus-anime` and `realesr-animevideov3-x{2,3,4}` (`.param` plus `.bin`, 46 MB). The zip also ships `vcomp140.dll`. | Download the Windows zip on every OS for the models only. On Windows, `vcomp140.dll` is also copied next to `upscayl-bin.exe`. |
-| Upscaler CLI | `upscayl-bin -i IN -o OUT.<ext> -n <model> -z <modelScale> -s <outScale> -m <dir>/models [-c <q>] [-t 0] [-g N]`.<br>• `-z` is the model's native scale and `-s` the output scale, so `-z 4 -s 2` gives a true 2× from x4 models.<br>• The `-m` path must contain the string `models`.<br>• The output format follows the extension (png, jpg, webp), and alpha is kept.<br>• Progress lines match `^\d+(\.\d+)?%` on stderr, unbuffered when piped (`\r\n` on Windows).<br>• Non-ASCII paths work; the original Real-ESRGAN exe crashes on CJK output paths.<br>• Killing it mid-run leaves no output file.<br>• A missing or unreadable input exits 0 with no output.<br>• With no usable GPU it exits non-zero with `invalid gpu device`, `Invalid GPU Device` or `vkCreateInstance failed`. | We parse progress and check that the output exists. GPU failure becomes a clear error (see §5.3). |
-| Upscaler performance and quality | Warm runs on the RTX 3070: a 480×640 image at 4× takes 4.8 s with x4plus, 2.1 s with anime and 1.3 s with animevideov3. A 3000×1997 image at 4× takes **33 s**, 1.6 GB RAM and 1.4 GB VRAM, and makes an 87 MB PNG. **The very first run takes 18–50 s** (shader compilation). Quality: x4plus is best for photos (recovers real fur and whiskers); x4plus-anime is crispest for line art and screenshots; animevideov3 is soft but fast. There is **no CPU fallback** in ncnn. torch+spandrel on CPU takes 90 s for 480×640. | Presets **Photo**, **Illustration** and **Fast**. Output is capped at 100 MP. The first run shows an indeterminate "Starting GPU…" state. No CPU fallback in Phase 4. |
-| PDF operations: **pdfcpu v0.16.4** | Apache-2.0 and pure Go (also builds for darwin/arm64), adding about 9.6 MB to the binary. The `pkg/api` functions all work: merge, split, collect (extract and reorder), remove pages, rotate, optimize, AES-256 encrypt and decrypt, image import, validate and info. Speed:<br>• The 15-page arXiv file takes about 1 s per op (default optimize-on-write; 140 ms without).<br>• A 568-page file takes 1–4 s per op.<br>• A 221 MB file takes 0.2–0.5 s, with up to 730 MB of heap.<br>Paths with non-ASCII characters work. Relaxed validation repairs common damage. **It writes a config dir under the user config dir unless `api.DisableConfigDir()` is called**; a nil configuration is an error. Collect, remove and split **drop bookmarks and metadata** (links and form fields survive). Merge keeps them and adds one bookmark per file. | All structural PDF operations run in Go via pdfcpu. Call `api.DisableConfigDir()` once and always pass `model.NewStatelessConfiguration()`. |
-| PDF compression | pdfcpu optimize does not shrink scans, and grew the IRS file to 121%. A Go prototype that reads JPEG (DCT) image streams from pdfcpu's model, downsamples them, re-encodes and writes with `api.WriteContextFile` worked:<br>• the 30-page 29.6 MB scan went to 11.6 MB (q70, 1650 px) and 5.5 MB with more aggressive settings;<br>• a colour CMYK page went from 2.4 MB to 190 KB;<br>• the 221 MB file went to 21 MB in 24.5 s single-threaded.<br>pikepdf gives the same ratios but its macOS arm64 wheel needs macOS 15. Ghostscript is AGPL and only ships as an installer on Windows. | Compression is done **in Go**, with a worker pool. |
-| PDF rendering: **go-pdfium v1.21.4, WebAssembly mode** (MIT; PDFium is BSD/Apache) | Pure Go via wazero and builds for darwin/arm64. The probe binary was 15 MB. Initialisation takes **2.6 s**. Renders take 10–23 ms per page at 36 dpi and 20–60 ms at 150 dpi, including JBIG2 scans and forms, at excellent quality. **By default it mounts the host filesystem root into the WASM sandbox.** It opens documents from bytes (`requests.OpenDocument{File: &b, Password}`). | Thumbnails and PDF → images are rendered **in Go**, with no frontend PDF library. Mount **no filesystem**; open documents from bytes. Use a wazero compilation cache in `<support>/cache/pdfium` to cut the start time. |
-| Engine additions (`.dev/p4-research/engine04`) | **pillow-heif 1.8.1** (BSD-3; bundles the LGPL libheif) and **spandrel 0.4.2** (MIT; pulls in safetensors 0.8.0 and einops 0.8.2) resolve together with the engine lock, and all have macOS arm64 wheels. A HEIC write/read round trip works. spandrel loads the Real-ESRGAN `.pth` files. CPU timings for 320×240 → 4× (torch 2.14.1+cpu, 8 threads) are below. Roughly 120, 36 and 4 s per input megapixel. | HEIC goes through pillow-heif in the engine, and CPU upscaling through spandrel in the engine (§13). |
-| pdf.js 6.4.299 | Works offline in the webview, but adds 7 MB of assets and renders outside the job system. | Not used (go-pdfium covers it). |
+| **llama.cpp `llama-server` build b11938** (MIT) | GitHub `releases/latest` (v0.7.0) has no binaries. The binaries live in `bNNNNN` prerelease tags. All assets below are at `https://github.com/ggml-org/llama.cpp/releases/download/b11938/<asset>`. | Pin `b11938` explicitly. |
+| Windows asset | `llama-b11938-bin-win-vulkan-x64.zip`: 37,184,647 B, sha256 `9ecd072c6e785fa2b932229c86f845695198195c4f29b99b85ed42dccb022aa6`. It holds 53 files (104 MB unpacked). `llama-server.exe` is a stub that loads `llama-server-impl.dll`, `llama*.dll`, `ggml*.dll` and `libomp.dll`. | Keep the whole folder. |
+| macOS asset | `llama-b11938-bin-macos-arm64.tar.gz`: 16,341,137 B, sha256 `b1ed33aacd0927eaa69644e6b15e3206115f7f80dfc7501de86df89dab853e9f`. Metal is built in. It contains about 20 **dylib symlinks**. | The archive extractor must support symlinks (§3.3). |
+| Licence file | The Windows zip lacks the llama.cpp MIT licence. | Ship it ourselves (§3.3). |
+| Port | `--port 0` binds a random port and logs `listening on http://127.0.0.1:<port>` (about 4 s after start). An occupied port gives `couldn't bind HTTP server socket` and exit code 1. | Parse the port from the log. |
+| Auth | With `--api-key-file <f>` (or the env var `LLAMA_API_KEY`), `/v1/*` and `/props` return 401 without the key. **`/health` is unauthenticated.** | Meets our "127.0.0.1 plus a random per-launch token" rule. Nothing sensitive is on `/health`. |
+| Streaming | `/v1/chat/completions` with `stream:true` and `stream_options.include_usage` sends SSE `data:` chunks (role, then content deltas, then finish, then a usage chunk with `timings.predicted_per_second`), then `data: [DONE]`. Closing the request **cancels generation within ~1 s**. | Use a stdlib SSE reader; cancel through the request context. |
+| Speed and memory | Qwen3-4B-Instruct-2507 Q4_K_M on the RTX 3070 with Vulkan: generation 76–110 tok/s, prompt eval about 4,400 tok/s (bench). It used about 3.7 GB VRAM at `-c 8192` and a 3 GB working set. On CPU (`-ngl 0`) generation is 4–10 tok/s. | GPU is the default path. |
+| GPU failures | A VRAM shortage with `--fit on` (the default) shrinks the context or offloaded layers to fit. With fit off it logs `ErrorOutOfDeviceMemory` and exits 1. | Keep fit on. On a non-zero exit, show the log tail. |
+| Idle sleep | `--sleep-idle-seconds N` unloads the weights: the process drops to 22 MB and VRAM is freed. The next request reloads (about 6 s). | Use it to free memory while idle. |
+| Process | A single process. A tree-kill frees its VRAM. | Run it through `core/proc`. |
+| **Models** (sha256 from HF `lfs.oid`, verified on download) | Qwen3-4B-Instruct-2507 Q4_K_M (Apache-2.0, 2,497,281,120 B) was downloaded in 4 m 37 s with sha256 verified. It answered code, arithmetic and translation prompts correctly with `--jinja`. HF supports Range resume through its CDN redirect. Not chat-tested here (download cap): Qwen3.5-2B and Gemma 4 E4B. Llama 3.2 and Gemma 3 have non-permissive licences. | Catalog in §4.2. Unverified models are verified during the build or dropped. |
+| Ollama (*docs only*; not installed here) | No authentication. It listens on 127.0.0.1:11434 by default. `/api/tags` lists models and `/api/chat` streams NDJSON. | Optional backend that talks to an Ollama the user already runs: outbound to localhost only, opt-in. |
+
+### 0.2 OCR
+
+| Topic | Finding | Consequence |
+|---|---|---|
+| **RapidOCR 3.10.0** (Apache-2.0; PaddleOCR weights under Apache-2.0) | The 27 MB wheel bundles the PP-OCRv6 small detection and recognition models plus the cls model. It covers Latin-script languages, Chinese and Japanese, with no download. On known text: English 0% CER, German/French 0.6%. A dense English 200 dpi scan page takes 3–5 s on CPU, a sparse page 1–1.5 s, with about 170 MB RSS. `return_word_box=True` gives word quads at no extra cost. | It becomes the OCR engine, running in the AI engine. Pages render at 200 dpi. |
+| Other scripts | v6 small has no Cyrillic or Arabic. The v5 mobile recognition models cover Cyrillic, Arabic, Korean, Greek, Thai and Devanagari (7–8 MB each), paired with v5 mobile detection (4.8 MB). Downloads come from `modelscope.cn` with sha256 listed in RapidOCR's `default_models.yaml` (verified). Arabic needs `python-bidi`. | A language picker maps each choice to a detection/recognition pair (§5.1). |
+| Searchable PDF prototype (`.dev/p5-research/ocr/scripts/compose.py`) | It uses pypdf (BSD). For each page it appends a content stream of hex CID text in render mode 3 (invisible), with a 624-byte embedded glyphless Type0 font and an identity ToUnicode map. A per-word `Tz` stretches each word to its box. It inverts `/Rotate` 0/90/180/270, cropbox offsets and skew. **The original image streams are byte-identical and the render diff is 0.** Text extracts correctly with pdfium and pypdf. Size grows about 10%. `pdfcpu stamp` misplaced text on rotated pages. | The PDF overlay happens in the engine with pypdf (§5.3). |
+| Dependencies | `rapidocr`, `python-bidi` and `pypdf` add opencv-python-headless (113 MB installed), shapely, pyclipper, omegaconf and colorlog. All have macOS arm64 wheels, and no existing lock entry changes. | Engine 0.5.0. Existing installs show **Update**. |
+| Rejected | Tesseract (installer-only on Windows), OCRmyPDF (needs Tesseract), surya (unclear weight licence), PyMuPDF (AGPL). | — |
+
+### 0.3 Vault
+
+| Topic | Finding | Consequence |
+|---|---|---|
+| **filippo.io/age v1.3.2** (BSD-3) | Pure Go; builds for darwin/arm64 with CGO off. One X25519 identity wrapped by a scrypt passphrase recipient: unwrapping takes 98 ms at work factor 15, **588 ms at 18** and 2.3 s at 20. A wrong passphrase gives a clear error. Streaming encryption of 256 MiB took 585 ms (about 440 MB/s); decryption took 389 ms. Overhead is 16 B per 64 KiB chunk plus the header. A flipped byte gives "failed to decrypt and authenticate payload chunk". | Unlocking takes one scrypt at work factor 18; file contents use the fast X25519 recipient. Tampering is detected. |
+
+### 0.4 Tool packs (sizes measured in `.dev/support` and `.dev/p5-research/packs/` on 2026-10-28)
+
+| Topic | Finding | Consequence |
+|---|---|---|
+| **FFmpeg, Windows** | Gyan's versioned release builds on GitHub persist (`GyanD/codexffmpeg`, tags `8.1` … `9.0.2`). BtbN autobuild tags are rotated away, so they can't be pinned. `ffmpeg-9.0.2-essentials_build.zip` is 114,768,076 B, sha256 `60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba` (also the GitHub asset digest). It unpacks to `ffmpeg-9.0.2-essentials_build/bin/{ffmpeg,ffprobe,ffplay}.exe` (105.4 + 105.2 + 106.9 MB, static) plus `LICENSE` (GPLv3). The encoders include libx264, libx265, libvpx-vp9, libaom-av1, libopus, libmp3lame, libwebp, aac and flac. | Pin 9.0.2 and keep only `ffmpeg.exe`, `ffprobe.exe` and `LICENSE`: **210.6 MB** on disk. |
+| **FFmpeg, macOS arm64** | Martin Riedl's builds (`ffmpeg.martin-riedl.de`) are signed and notarized, with a `.sha256` next to every file. The versioned URL is `https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/{ffmpeg,ffprobe}.zip`. `ffmpeg.zip`: 28,395,699 B, sha256 `c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924`, holding one 66,332,880 B binary. `ffprobe.zip`: 28,317,701 B, sha256 `fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6`, holding one 66,158,064 B binary. **The first ffprobe download arrived truncated (22 MB) and failed the checksum**; the retry was fine. | Pin 9.0.2 as a two-part archive: **132.5 MB** on disk. Retry once on a checksum mismatch before failing. |
+| **Deno v2.9.8** (MIT) | `deno-x86_64-pc-windows-msvc.zip`: 42,917,472 B, sha256 `cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf`, holding `deno.exe` (98,081,568 B). `deno-aarch64-apple-darwin.zip`: 38,770,795 B, sha256 `9f0bf660393da2eaff044cdc7444cb08c73f235849b61d224d825a194ce7c98e`, holding `deno` (81,512,928 B). | Managed, pinned. **98.1 MB** on Windows, **81.5 MB** on Mac. |
+| Installed sizes in the dev sandbox | yt-dlp 23 MB; ExifTool 35 MB; upscaler (binary + models) 52 MB; uv 31 MB + CPython 70 MB + engine venv (0.4.x) 1.3 GB; htdemucs 81 MB; Whisper small 464 MB; BiRefNet lite 224 MB; pdfium cache 21 MB. | The pack sizes in §7.2. The 0.5.0 engine (OCR adds about 150–200 MB) is measured at build time. |
+| Engine and FFmpeg | The engine inherits the app's environment and never names FFmpeg itself; audio-separator writes MP3 stems through pydub, which looks for `ffmpeg` on `PATH`. | The sidecar manager puts the resolved FFmpeg folder first on the engine's `PATH` (§7.6), and the Music pack includes FFmpeg. |
+| Stem output size | audio-separator writes WAV as 16-bit 44.1 kHz stereo PCM: **10.1 MB per minute per stem**. On a 19 s test clip the 4 WAV stems totalled 13.4 MB and the 4 FLAC stems 2.5 MB (−81%; music compresses less, typically −40–60%). A 3-minute song gives ~120 MB of WAV stems; the user flagged this as too big. | FLAC becomes the default stem format, with a size hint (§7.7). |
 
 ---
 
 ## 1. Goals
 
-1. **Background Remover:** photo in, transparent PNG of the subject out. Three model presets, plus options for a solid background colour, mask only, cropping to the subject, and edge cleanup. Runs in the existing Python engine on CPU.
-2. **Upscaler:** 2× or 4× with Real-ESRGAN models through the managed `upscayl-bin`, on the GPU via Vulkan (or MoltenVK on macOS). Three presets.
-3. **PDF Toolkit:** merge, split, organize pages (extract, delete, reorder, rotate), compress, images → PDF, PDF → images, add a password and remove a password. Everything runs in Go, with page thumbnails.
-4. **A real app and tray icon**, replacing the Wails "W".
-5. **Shared image preview plumbing:** a thumbnail service that can show huge outputs, and a before/after compare slider.
+1. **Local Chat:** chat with local language models, fully offline after the model download.
+   - It runs on an app-managed `llama-server` (GPU through Vulkan or Metal) that listens only on 127.0.0.1, on a random port, behind a random per-launch key.
+   - It includes a model catalog with download, resume and delete.
+   - Conversations are stored locally, answers stream, can be stopped, and can be exported as Markdown.
+   - An optional "use my running Ollama" backend is available.
+2. **OCR:** images to text, and scanned PDFs to **searchable PDFs** (an invisible text layer with the original pages untouched). It supports Latin, CJK, Cyrillic, Arabic, Korean, Greek, Thai and Devanagari.
+3. **Vault:** a passphrase-encrypted store for files (age).
+   - Encrypted copies are added, never moved.
+   - Unlocking holds the key in memory only; the vault auto-locks.
+   - Files can be opened as temporary decrypted copies that are wiped on lock, or exported. Images can be previewed in memory.
+   - A recovery key is shown once.
+4. **Tool packs and first-run setup:** on first launch a full-window setup screen offers six **tool packs** (Media, Music, Image, Speech, Documents, Local Chat). Each pack lists every download with its project link, licence and measured size, and the tools it unlocks. Shared parts (the AI engine, FFmpeg) are counted once. A disk meter shows the effect on the chosen drive, and the heavy files can live on another drive. Packs install as cancellable jobs and can be added or removed later in Settings. **FFmpeg and Deno become app-managed** (pinned, verified downloads); a copy already on the system still counts.
+5. **Smaller stems by default:** the Stem Splitter defaults to FLAC and says how big each format gets.
+6. **Mac verification checklist** (`docs/MAC-CHECKLIST.md`): everything from Phases 3–5 that can only be checked on the Mac, as a step-by-step list for the user.
 
-## 2. Non-goals (Phase 4)
+## 2. Non-goals (Phase 5)
 
-- **GPU or CoreML acceleration for background removal.**
-- **Batch "remove background then upscale" pipelines.**
-- **PDF features left out:** text editing, OCR, form filling, signatures, watermarks, PDF/A conversion, keeping bookmarks through split or organize, and permission flags beyond a plain password.
-- Local Chat, Web Archiver and Vault stay placeholders.
-- macOS hands-on QA. Windows is verified here; macOS is covered by cross-builds plus docs, as in earlier phases.
+- Chat with documents (RAG), tool calling or web access, image input (vision), voice, and fine-tuning. Arbitrary GGUF import is a non-goal too: models come from the catalog only.
+- More than one loaded model at a time; parallel conversations generating at once (one generation at a time).
+- A CUDA build of llama.cpp (+670 MB for little gain over Vulkan); Linux chat runtime.
+- OCR: reading-order analysis for multi-column layouts, handwriting, tables to spreadsheet, OCR of encrypted PDFs (the user removes the password first with the PDF Toolkit), Apple Vision fast path.
+- Vault: sync or cloud, sharing, secure deletion of the user's originals, hiding file sizes, multiple vaults, folders more than one level deep.
+- Tool packs: choosing individual models inside a pack (each pack installs its tools' default models; the other presets still download on first use, as today), user-defined packs, automatic updates, Linux packs, moving the database, settings or library (only the heavy tool files move). Tools that aren't built yet are never shown on pack cards.
 
 ---
 
 ## 3. Foundation changes
 
-### 3.1 Go dependencies
-`github.com/pdfcpu/pdfcpu v0.16.4`, `github.com/klippa-app/go-pdfium v1.21.4` (WebAssembly subpackage only, and never the cgo `single_threaded`/`multi_threaded` packages), and `golang.org/x/image` promoted to a direct dependency (webp, bmp and tiff decoders; `draw` for scaling).
+### 3.1 Dependencies
+- **Go:** `filippo.io/age v1.3.2`; `golang.org/x/sys` becomes a direct dependency (free disk space on Windows).
+- **Engine:** `pyproject.toml` adds `rapidocr>=3.10.0`, `python-bidi>=0.6.12` and `pypdf>=6`, and bumps the version to **0.5.0**. The description gains "OCR". Run `uv lock` and verify macOS arm64 wheels.
 
-### 3.2 Engine update (sidecar 0.4.0)
-- `pyproject.toml`: add `"pillow>=12"` (it already arrives via torchvision, but becomes explicit), bump the version to `0.4.0` and the description to "Toolbox engine: stems, BPM & key, MIDI, transcription, background removal". Run `uv lock`. The lock should change only in the root package entry, and the macOS arm64 wheels must still be there.
-- **The engine is renamed for users.** The dep ID stays `audio-engine` (`sidecar.DepID`), so stored state and code don't churn. Its display name becomes **"AI engine"**, with Purpose "Python runtime for stems, BPM & key, MIDI, transcription and background removal (≈1.4 GB)". Every UI string that says "audio engine" becomes "AI engine", including the DepsGate banner, Settings and the CLAUDE.md user-facing notes. Code identifiers keep their names.
-- Existing installs then show **Update** (the Phase 2 flow).
+### 3.2 Shared PDF renderer
+The go-pdfium WebAssembly pool moves from `modules/pdf/render.go` into **`core/pdfium`**, with its tests. OCR needs it too, and modules don't import each other.
 
-### 3.3 Managed archives v2: pinned, multi-part (`core/deps/archive.go`)
-
-`ArchiveSpec` is generalised so the upscaler (two archives, pinned checksums) and ExifTool (one archive, `checksums.txt`) share one installer:
-
+API:
 ```go
-type ArchivePart struct {
-    Name   string                                             // "main", "models", …
-    Asset  func(goos, goarch, version string) (string, error) // asset file name
-    URL    func(asset string) string                          // download URL (may redirect)
-    SHA256 func(asset string) string                          // pinned hex; "" → look up in ArchiveSpec.ChecksumsURL
-}
-type ArchiveSpec struct {
-    DepID        string
-    InstallDir   string // relative to BinDir
-    VersionURL   string // latest version as plain text; "" when Version is pinned
-    Version      string // pinned version (no network version check)
-    ChecksumsURL string // "SHA2-256(<asset>)= <hex>" lines, for parts without a pinned SHA256
-    Parts        []ArchivePart
-    // Layout builds installDir (which does not exist yet) from the extracted
-    // parts: roots maps part name → extracted root (top folder unwrapped).
-    Layout       func(roots map[string]string, installDir string) error
-    MaxBytes     int64 // per part
-}
+type Renderer struct{ … } // lazy pool, no FS mounts, compilation cache dir, idle close (P4 §6.4 rules unchanged)
+func New(cacheDir string) *Renderer
+func (r *Renderer) Close()
+func (r *Renderer) PageCount(ctx, doc []byte, password string) (int, error)
+func (r *Renderer) Render(ctx, doc []byte, password string, page /*1-based*/ int, dpi int) (image.Image, error)
+func (r *Renderer) PageText(ctx, doc []byte, password string, page int) (string, error) // text already on the page (for "skip pages with text")
 ```
 
-- **Flow:** resolve the version (fetch it, or use the pinned one). Skip the install if `<installDir>/VERSION` already matches. For each part: compute the checksum, download with progress (the overall progress is split across parts in proportion to their sizes, or evenly when the size is unknown), verify, and extract into its own temp dir. Then run `Layout` into `<bin>/<InstallDir>.new` and **write `<bin>/<InstallDir>.new/VERSION`**. Swap the folders atomically (the Phase 3 logic). Finally re-detect.
-- **Migration:** ExifTool becomes a single part named `"main"`. The behaviour stays the same and its tests are adapted.
-- **Detection by VERSION file:** `deps.Spec` gains `VersionFile string`. When set (relative to `ArchiveDir`), the version comes from that file instead of running the binary, and the binary only has to exist.
-- **Outdated state:** a new field `PinnedVersion string` marks the dep as `outdated` when the installed VERSION differs. This lets future app updates bump pins.
+`main.go` creates one renderer (`<support>/cache/pdfium`) and passes it to `pdf.New` and `ocr.New`. The behaviour of `modules/pdf` stays the same.
 
-**Upscaler dep** (`deps.Upscayl = "upscayl"`):
-- Name "Upscaler engine", Purpose "Real-ESRGAN image upscaling on your GPU (≈50 MB)", Binary `upscayl-bin`.
-- `ArchiveDir "upscaler"`, `VersionFile "VERSION"`, `PinnedVersion "20251207-174704+models-0.2.5.0"`, Managed.
-- Install hint (Linux and unsupported architectures): "The upscaler isn't available for this platform yet".
+### 3.3 Managed archives: symlinks, licence files, pinned per-OS assets
+- **Symlinks:** `extractArchive` handles tar `TypeSymlink` entries. The target must be relative and resolve inside the extraction root; anything else fails with "unsafe archive". On Windows, symlink entries are copied as files.
+- **Llama runtime dep:** ID `llama-runtime`, Name "Chat engine", Purpose "llama.cpp runtime for Local Chat (≈40 MB)", Binary `llama-server`, `ArchiveDir "llama"`, `VersionFile "VERSION"`, `PinnedVersion "b11938"`, Managed. Hint for unsupported platforms: "Local Chat isn't available for this platform yet".
+- **Install:** hidden installer module `system-llama-install`; bound method `DepsService.InstallChatEngine()`.
+- **Assets:** one part `main`. Windows (amd64; arm64 runs it under emulation) uses the Vulkan zip; darwin/arm64 uses the macOS tarball. darwin/amd64 and linux are unsupported. The SHA256 values are pinned from §0.1.
+- **Layout:** copy the whole top folder. Write `LICENSE-llama.cpp` with the MIT text (embedded in Go). Set mode 0755 on `llama-server` on unix.
 
-`UpscaylArchive()` has two parts:
-- **`main`**: `upscayl-bin-20251207-174704-{windows|macos}.zip` from `https://github.com/upscayl/upscayl-ncnn/releases/download/20251207-174704/<asset>`, with the pinned sha256 values from §0. Supported platforms are windows/amd64, windows/arm64 (runs under x64 emulation) and darwin/any (universal binary). Anything else returns an error with the hint.
-- **`models`**: `realesrgan-ncnn-vulkan-20220424-windows.zip` from `https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/<asset>`, with the pinned sha256 from §0, on every OS.
+### 3.4 Settings additions
 
-Layout:
-- `<dir>/upscayl-bin[.exe]`, with mode 0755 on unix.
-- `<dir>/LICENSE-upscayl`.
-- `<dir>/models/{realesrgan-x4plus, realesrgan-x4plus-anime, realesr-animevideov3-x2, realesr-animevideov3-x3, realesr-animevideov3-x4}.{param,bin}` (only these 10 files).
-- Windows only: `<dir>/vcomp140.dll`, taken from the models archive.
-- Then `VERSION`.
+| Field | Key | Default | Rules |
+|---|---|---|---|
+| `Chat.DefaultModel string` | `chat.defaultModel` | `"qwen3-4b"` | A catalog ID, or `"ollama:<name>"`. |
+| `Chat.SystemPrompt string` | `chat.systemPrompt` | `"You are a helpful assistant. Answer concisely."` | At most 4,000 characters. |
+| `Chat.Temperature float64` | `chat.temperature` | `0.7` | Between 0 and 2. |
+| `Chat.ContextSize int` | `chat.contextSize` | `8192` | One of 4096, 8192, 16384, 32768. |
+| `Chat.GPU bool` | `chat.gpu` | `true` | `false` passes `-ngl 0 --device none` (CPU). |
+| `Chat.OllamaURL string` | `chat.ollamaURL` | `""` (off) | Empty, or an `http://` URL whose host is `127.0.0.1`, `localhost` or `::1` (validated). |
+| `Vault.AutoLockMinutes int` | `vault.autoLockMinutes` | `10` | One of 1, 5, 10, 30, 60, or 0 (lock only on quit or manually). |
+| `Setup.Done bool` | `setup.done` | `false` | Set by **Install** or **Skip for now** on the setup screen (§7.4). Existing installs also see the screen once, with their packs shown as installed. |
+| `Stems` module state `format` | (module state) | `"flac"` | Only the default changes; a format the user already picked is kept. |
 
-A hidden installer module `system-upscaler-install` and a bound method `DepsService.InstallUpscaler() (core.Job, error)`. The Phase 3 DepsGate pattern gains an Install/Update button for this dep.
+The tools folder location is **not** a setting: it's read before the database opens (§7.3).
 
-### 3.4 Image thumbnails (`api/files.go`)
+`SettingsPatch` gets matching fields; each struct is replaced whole, as for `clipboard`.
 
-```go
-// ImageThumb decodes an image (jpg, png, gif, webp, bmp, tif/tiff) and returns a
-// data URL scaled so its longest side is ≤ maxDim (64..1600, clamped).
-// Encoded as PNG when the image has any non-opaque pixel, else JPEG q85.
-// Guards: file ≤ 400 MB; DecodeConfig first, refuse > 300 MP ("Too large to preview").
-// Results are cached in memory (LRU, 64 entries, key path+size+mtime+maxDim).
-ImageThumb(path string, maxDim int) (string, error)
+### 3.5 Storage: migration `0004_chat.sql`
+
+```sql
+CREATE TABLE chat_conversations (
+  id TEXT PRIMARY KEY,               -- ULID
+  title TEXT NOT NULL,               -- first user message, trimmed to 80 chars; renameable
+  model TEXT NOT NULL,               -- catalog id or "ollama:<name>"
+  system_prompt TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE chat_messages (
+  id TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user','assistant')),
+  content TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'done' CHECK (status IN ('done','stopped','error')),
+  error TEXT NOT NULL DEFAULT '',
+  tokens INTEGER NOT NULL DEFAULT 0,
+  tokens_per_sec REAL NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX chat_messages_conv_idx ON chat_messages(conversation_id, created_at);
+CREATE INDEX chat_conversations_updated_idx ON chat_conversations(updated_at DESC);
 ```
 
-- Scaling uses `golang.org/x/image/draw.CatmullRom` for small images and `ApproxBiLinear` above 40 MP.
-- Thumbnails decode on a bounded worker (2 at a time), so the UI never blocks the Go event loop.
-- Like `ImageDataURL`, it accepts any existing file with an image extension.
-- `ImageDataURL` stays for small originals (EXIF uses it).
+The `core.ChatStore` interface (implemented by `core/store`) has:
+- `CreateConversation`, `UpdateConversation(id, title?, model?, systemPrompt?)`, `TouchConversation`, `DeleteConversation`, `GetConversation`;
+- `ListConversations(search string, limit, cursor)` (LIKE on title and on message content);
+- `AddMessage`, `UpdateMessage(id, content, status, error, tokens, tps)`, `ListMessages(convID)`, `DeleteMessagesFrom(convID, messageID)` (for regenerate and edit).
 
-### 3.5 Shared UI pieces (frontend)
-- **`components/CompareSlider.tsx`:** two images stacked (before/after) with a draggable vertical divider. It responds to keyboard (←/→ 5%, Home/End), has `aria-valuenow`, and has an optional checkerboard background (a `--checker-*` token pair for light and dark). It is used by the Background Remover and the Upscaler.
-- **`components/Checkerboard` CSS utility class** for transparent previews.
-- **`components/ColorSwatchPicker.tsx`:** swatches for white, black and transparent, plus a custom hex field (validated `#rrggbb`).
+Wire types in `core/types.go`: `ChatConversation`, `ChatMessage`, `ChatPage`, plus the events in §4.4.
 
-### 3.6 App and tray icon
-- **Design:** a rounded-square app icon (macOS squircle proportions, 824 px tile on a 1024 canvas, per Apple's grid) with a graphite vertical gradient (`#2a2d33` → `#111316`) and a **toolbox glyph** in the app accent orange `#ff8c42`. The glyph is a trapezoid lid with a handle arch, a box body, and a latch notch, drawn with a 1 px lighter top highlight. It is legible at 16 px.
-- **Generator:** the geometry lives in one place. `build/icongen/main.go` (`//go:build ignore`) rasterises it with `golang.org/x/image/vector` and writes:
-  - `build/appicon.png` (1024).
-  - `build/appicon.icon/Assets/toolbox.svg`, also referenced from `icon.json`, which drops the Wails SVG.
-  - `desktop/icons/tray.png`: a 32 px orange glyph on transparent (Windows and Linux).
-  - `desktop/icons/tray_template.png`: a 32 px black glyph with alpha (the macOS template image).
-  - `frontend/src/assets/logo.svg`: the glyph, shown next to "Toolbox" in the sidebar.
-- **Platform files:** run `wails3 task common:generate:icons` (or the equivalent `wails3 generate icons …`) to regenerate `build/windows/icon.ico` and `build/darwin/icons.icns`. `build/darwin/Assets.car` can only be rebuilt on a Mac (Xcode `actool`), so the darwin Taskfile regenerates it from `appicon.icon` on the next Mac build. This is recorded as a Mac follow-up.
-- `desktop/icons/gen.go` (the Phase 3 downsampler) is deleted.
-
-### 3.7 Placeholders
-`bg-remover`, `upscaler` and `pdf` are removed from `modules/placeholders`. The real modules reuse those IDs, so stored module state and links keep working.
+### 3.6 Placeholders
+`llm-chat` and `vault` are removed from `modules/placeholders`, and the real modules reuse those IDs. Web Archiver stays a placeholder. **OCR is a new module** with ID `ocr`.
 
 ---
 
-## 4. Background Remover (`modules/bgremove` + sidecar `handlers/bgremove.py`)
+## 4. Local Chat (`modules/chat`, ID `llm-chat`)
 
-Descriptor:
+The descriptor is `JobLess` (like Clipboard History). Name "Local Chat", icon `message-square`, Category ai, Order 180. `Requires []` (the view gates on `llama-runtime` only when a local model is selected). Model downloads are jobs of a hidden module, `system-chat-model` (§4.2).
 
-| Field | Value |
-|---|---|
-| ID | `bg-remover` |
-| Name | "Background Remover" |
-| Icon | `wand-sparkles` |
-| Category | image |
-| Order | 140 |
-| Accepts | `.jpg .jpeg .png .webp .bmp .tif .tiff` |
-| Requires | `audio-engine` |
-| OutputSubdir | `Cutouts` |
-| SplitInputs | true |
-| MaxConcurrent | 1 |
-| MaxInputs | 200 |
+### 4.1 Server lifecycle (`modules/chat/server.go`)
+- **At most one `llama-server`.** It starts lazily on the first `Send` for a local model, or when a different local model is selected. A model switch stops the old server first.
+- **Command line:** `llama-server -m <gguf> --host 127.0.0.1 --port 0 --api-key-file <key> --jinja -ngl 99 -c <ctx> --no-webui --sleep-idle-seconds 300`. With GPU off it uses `-ngl 0 --device none`; the builder verifies that `--device none` works with the Vulkan build, and if not, falls back to `-ngl 0` only and records that.
+- **Key:** 32 random bytes as hex, written to `<support>/tmp/llama-<ulid>.key` (0600). The file is deleted once the server is ready.
+- **Readiness:**
+  1. Parse `listening on http://127.0.0.1:(\d+)` from the merged stdout/stderr.
+  2. Poll `GET /health` every 250 ms until it returns 200, for up to 120 s.
+  3. If the process exits first, fail with `tool_failed` "The chat engine didn't start" and the last 10 log lines in the error detail. "couldn't bind" retries once.
+  4. If a GPU start fails with a Vulkan or out-of-memory error, retry once on CPU and emit `chat:status` with `backend:"cpu"` and a notice.
+- **Stopping:** the server is fully stopped after **20 idle minutes** (no requests), at app quit (hooked in `main.go`) and when its model is deleted. Its log is kept in a 200-line ring buffer and written to the app log at debug level.
+- **`Status()`** returns `ChatStatus{State: stopped|starting|ready|error, Model, Backend: gpu|cpu|ollama, Port: 0 (never exposed to the UI), Error}`, also emitted as `chat:status`.
 
-Tagline and description are kept from the placeholder.
+### 4.2 Model catalog (`modules/chat/catalog.go`)
+Pinned entries hold ID, label, HF repo, file, size, sha256, licence, RAM hint, context default and an `IsDefault` flag. URLs are `https://huggingface.co/<repo>/resolve/main/<file>`.
 
-### 4.1 Options
+| ID | Label | Repo / file | Size | sha256 | Licence | Hint |
+|---|---|---|---|---|---|---|
+| `qwen3-4b` (default) | Qwen3 4B Instruct | `unsloth/Qwen3-4B-Instruct-2507-GGUF` / `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` | 2,497,281,120 | `3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597` | Apache-2.0 | "Best all-rounder · needs ~4 GB free" |
+| `qwen3.5-2b` | Qwen3.5 2B | `unsloth/Qwen3.5-2B-GGUF` / `Qwen3.5-2B-Q4_K_M.gguf` | 1,280,835,840 | `aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223` | Apache-2.0 | "Small and quick · ~2 GB" |
+| `gemma4-e4b` | Gemma 4 E4B | `unsloth/gemma-4-E4B-it-GGUF` / `gemma-4-E4B-it-Q4_K_M.gguf` | 4,977,171,584 | `85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87` | Apache-2.0 | "Strongest · needs ~7 GB free (16 GB Macs+)" |
+
+- **Download job** (`system-chat-model`, options `{model}`): stream to `<support>/models/llm/<file>.part` with HTTP Range resume (a `.part` survives cancel or restart, and the next attempt resumes), verify sha256, then rename. A mismatch deletes the file and fails with "The download was corrupted — try again". Only one download runs at a time. Progress is reported as "1.2 GB of 2.5 GB · 18 MB/s".
+- **Delete:** stop the server if it uses that model, remove the file and any `.part`. Models also count in Settings → Models usage and "Clear models".
+- **Verification:** Qwen3.5-2B and Gemma 4 E4B must be **verified during the build**: download, load with `--jinja` and a 3-prompt check. Gemma is verified only if at least 8 GB RAM is free; otherwise it ships marked `Verified: false` and the UI shows "not tested on this machine". A model that fails is dropped from the catalog and recorded in DECISIONS.md.
+
+### 4.3 Ollama backend (optional)
+When `chat.ollamaURL` is set:
+- `Models()` also lists `GET <url>/api/tags` entries as `ollama:<name>` (a 2 s timeout; unreachable gives a status note, never an error dialog).
+- Chat uses `POST <url>/api/chat` with `stream:true` (NDJSON) and the same message history, and cancels by closing the request.
+- The UI marks these models "via Ollama" and says once, in Settings: "Ollama has no access control; any app on this computer can use it".
+
+### 4.4 Bound service (`chat.Service`) and events
 
 ```go
-type Model string      // "fast" | "balanced" | "best"
-type Output string     // "transparent" | "color" | "mask"
-type Options struct {
-    Model      Model  `json:"model"`      // default "balanced"
-    Output     Output `json:"output"`     // default "transparent"
-    Color      string `json:"color"`      // "#rrggbb", used when Output=="color"; default "#ffffff"
-    Crop       bool   `json:"crop"`       // crop to subject bounds; default false
-    Padding    int    `json:"padding"`    // px around the crop, 0..500; default 24
-    CleanEdges bool   `json:"cleanEdges"` // edge colour decontamination; default true
-    Refine     bool   `json:"refine"`     // guided-filter edge refinement; default false
-}
+Catalog() []ModelInfo                 // catalog + installed/downloading state + Verified flag; plus ollama models when enabled
+DownloadModel(id string) (core.Job, error)
+DeleteModel(id string) error
+Status() ChatStatus
+Conversations(search string, cursor string) (core.ChatPage, error)
+Conversation(id string) (ConversationView, error)   // conversation + messages
+NewConversation(model string) (core.ChatConversation, error)
+UpdateConversation(id string, patch ConversationPatch) (core.ChatConversation, error) // title, model, systemPrompt
+DeleteConversation(id string) error
+Send(conversationID string, text string) (SendResult, error)  // appends user msg + empty assistant msg; returns their IDs; streams via events
+Regenerate(conversationID string) (SendResult, error)        // deletes last assistant msg, re-sends
+EditAndResend(conversationID, messageID, text string) (SendResult, error) // truncates from messageID, re-sends
+Stop(conversationID string) error
+Export(conversationID string) (string, error)                 // Markdown file in <library>/Chats/<title>.md (UniquePath); registered as an output; returns path
 ```
 
-`presets.go` defines `Presets() []core.PresetInfo` (ID, Label, `DownloadBytes`) plus a Go table mapping preset → `{file, sha256, url, kind: "birefnet"|"isnet"}`, using the values from §0:
-- **fast**: label "Fast", isnet, 179 MB.
-- **balanced**: label "Balanced", BiRefNet lite, 224 MB.
-- **best**: label "Best", BiRefNet, 973 MB.
+- **Events:**
+  - `chat:delta` `{conversationId, messageId, delta}`: coalesced, at most every 40 ms.
+  - `chat:done` `{conversationId, messageId, status: done|stopped|error, error, tokens, tokensPerSec}`.
+  - `chat:status` (ChatStatus).
+- **Rules:**
+  - **One generation at a time**: `Send` while one is running returns `conflict` "Wait for the current answer or stop it".
+  - The assistant message is persisted every 2 s while streaming and finally on done.
+  - On app quit, a running stream is stopped and saved as `stopped`.
+- **History sent:** the system prompt plus every message in the conversation. If the estimated tokens (chars/3.5) exceed 75% of the context, the oldest turns are dropped and the UI shows "Older messages were left out to fit the context".
+- **Title:** the first user message (trimmed). There is no LLM-generated title.
 
-### 4.2 Sidecar method `bgremove.run`
-
-Params: `{input, outputDir, baseName, model: {file, sha256, url, kind}, modelDir, output, color, crop, padding, cleanEdges, refine}`.
-
-1. **Validate** the params (`HandlerError("validation")`).
-2. **Downloading model:** if `<modelDir>/<file>` is missing, download it via the existing download/progress shim used by transcribe (urllib with streaming, written to a `.part` file in the model dir). Verify the **sha256**; on mismatch delete it and fail with "Model download was corrupted — try again". Rename into place.
-3. **Loading model:** create an ONNX Runtime session with the options from §0 (no mem arena, no mem pattern, severity 3, CPU EP). Cache one session per model file in the process and evict the others, so only one model is resident.
-4. **Load the image** (`Image.open`, `exif_transpose`, ICC → sRGB via `ImageCms` when `icc_profile` is present, then RGB). Pillow errors become "Couldn't read this image".
-5. **Run the model.** Pre-process per kind (§0), then a single `session.run`. Call `check_cancelled()` before and after.
-6. **Build the mask:** produce the per-kind output, then uint8, then resize back with bicubic. If `refine` is set, apply a guided filter (grey guide, r=8, eps=1e-3, `scipy.ndimage.uniform_filter`).
-7. **Compose:**
-   - `transparent`: RGBA = image + mask. If `cleanEdges` is set, pixels with alpha < 250 within 6 px of the opaque region (alpha ≥ 250) take the colour of the nearest opaque pixel (`scipy.ndimage.distance_transform_edt` with `return_indices`).
-   - `color`: alpha-composite onto the colour (cleanEdges applied first) and save as RGB.
-   - `mask`: L-mode mask.
-   - If `crop` is set, crop to the bbox of alpha > 8, expand by `padding`, and clamp to the image. If the mask is empty, don't crop and log "No subject found".
-8. **Save** as PNG (optimize=False, compress_level=6) to `<baseName> (no background).png`, `(on colour).png` or `(mask).png`, using the Python unique-path helper (numbering from " (1)", as in Phase 3). Then call `ctx.output(path)`.
-9. **Result:** `{width, height, subjectCoverage (0..1 share of alpha>127), model, output}`.
-
-Progress stages: "Downloading model" (0–100%), "Loading model", "Removing background" (indeterminate), "Saving". Model dir: `$TOOLBOX_MODELS_DIR/bg/`.
-
-### 4.3 Go module
-`Run` calls `job.Tool(sidecar.DepID)`, then `Call("bgremove.run", …)` with the P2 §6 event mapping, then `SetResult(...)`.
-
-- **Title** = the file name.
-- **Message:** "Subject covers 38% · 1600×1200". If coverage is below 0.5%, the message reads "No clear subject found".
-- **Validate:** enums; a colour hex is required when Output is `color`; padding range.
-
-### 4.4 UI (`tools/bgremove/BgRemoveView.tsx`)
-
-FileToolLayout. Options:
-- **Model** as 3 radio cards: label, download size and a hint. Fast: "~1 s, softer hair". Balanced: "~8 s, great edges". Best: "~15 s, finest detail, needs ~7 GB RAM". Balanced also says "needs ~7 GB RAM".
-- **Background** as a SegmentedControl (Transparent / Colour / Mask only). Colour shows the `ColorSwatchPicker`.
-- **Crop to subject** switch, plus a padding Stepper when it's on.
-- **Clean edges** switch.
-- **Refine edges** switch, with the help text "Sharper hair, may leak on busy backgrounds".
-
-A DepsGate covers the AI engine (install/update).
-
-**Results:** a grid of cards per finished job.
-- Each card shows a `CompareSlider` (original thumbnail vs result thumbnail via `ImageThumb(…, 800)`, with a checkerboard under the result), the file name, dimensions, and Reveal/Open/Copy path actions.
-- Clicking a card opens a large preview dialog with the slider at 1600 px.
-- Running jobs show the stage and progress (Meter).
+### 4.5 UI (`tools/chat/ChatView.tsx`)
+- **Layout:** a left column holds conversations (New chat button, search field, list grouped Today / Earlier with a rename/delete menu). The main column holds the thread; a top bar has the model picker and a gear for the system prompt and temperature for this conversation.
+- **Empty state (no model installed):** model cards (label, size, licence, hint, Download with progress, cancel). If the chat engine is missing, the DepsGate offers **Install chat engine (≈40 MB)**.
+- **Thread:**
+  - User and assistant bubbles; assistant text is rendered as **Markdown by a small in-house renderer**. It produces React elements and never raw HTML: paragraphs, headings, lists, blockquote, bold/italic, inline code, and fenced code blocks with a language label and a **Copy** button. Links show as text with a copy action; nothing navigates.
+  - A streaming caret, then "Stopped" or error states with **Retry**.
+  - Per-message actions: Copy, and for user messages Edit & resend (the last one only, or any, which truncates).
+  - A footer shows "42 tok/s · GPU".
+- **Composer:** an auto-growing textarea. Enter sends, Shift+Enter adds a newline, Esc or the **Stop** button stops. It is disabled while the engine starts ("Loading model…" with a spinner; the first start takes about 5 s).
+- **Settings → Chat:** default model, system prompt, temperature, context size, the "Use GPU" switch, the Ollama URL field with a test button, and installed models with Delete.
+- **Palette:** "New chat", "Open chat history".
 
 ---
 
-## 5. Upscaler (`modules/upscale`)
+## 5. OCR (`modules/ocr`, ID `ocr`)
 
-Descriptor:
+Descriptor: Name "OCR", icon `scan-text`, Category document, Order 195, Accepts `.pdf .jpg .jpeg .png .webp .bmp .tif .tiff .heic .heif`, Requires `audio-engine`, OutputSubdir `OCR`, SplitInputs, MaxConcurrent 1, MaxInputs 200. Tagline "Turn scans and photos into text". Description "Extract text from images and make scanned PDFs searchable, offline."
 
-| Field | Value |
-|---|---|
-| ID | `upscaler` |
-| Name | "Upscaler" |
-| Icon | `maximize-2` |
-| Category | image |
-| Order | 150 |
-| Accepts | `.jpg .jpeg .png .webp` |
-| Requires | `upscayl` |
-| OutputSubdir | `Upscaled` |
-| SplitInputs | true |
-| MaxConcurrent | 1 (one GPU) |
-| MaxInputs | 200 |
-
-### 5.1 Options
+### 5.1 Options and language presets
 
 ```go
-type Model string  // "photo" | "illustration" | "fast"
-type Format string // "same" | "png" | "jpg" | "webp"
+type Language string // "latin" (default; also CJK) | "cyrillic" | "arabic" | "korean" | "greek" | "thai" | "devanagari"
 type Options struct {
-    Model  Model  `json:"model"`  // default "photo"
-    Scale  int    `json:"scale"`  // 2 | 4; default 4
-    Format Format `json:"format"` // default "same"
+    Language    Language `json:"language"`
+    PDFOutput   string   `json:"pdfOutput"`   // "searchable" (default) | "text" | "both"
+    ImageOutput string   `json:"imageOutput"` // "text" (default) | "json" (lines + word boxes) — images only
+    SkipText    bool     `json:"skipText"`    // PDFs: skip pages that already contain text (default true)
 }
 ```
 
-Each preset maps to a model and the `-z`/`-s` flags:
+`presets.go` maps each language to `{det, rec}` model entries (file, url, sha256). Default (`latin`) uses the **bundled v6 small models**, so there is no download.
 
-| Preset | 2× | 4× |
+| Language | Detection | Recognition (sha256) |
 |---|---|---|
-| photo | `realesrgan-x4plus`, `-z 4 -s 2` | `realesrgan-x4plus`, `-z 4 -s 4` |
-| illustration | `realesrgan-x4plus-anime`, `-z 4 -s 2` | `realesrgan-x4plus-anime`, `-z 4 -s 4` |
-| fast | `realesr-animevideov3-x2`, `-z 2 -s 2` | `realesr-animevideov3-x4`, `-z 4 -s 4` |
+| latin | bundled PP-OCRv6 det small | bundled PP-OCRv6 rec small |
+| cyrillic | `ch_PP-OCRv5_det_mobile.onnx` (`4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae`) | `cyrillic_PP-OCRv5_rec_mobile.onnx` (`90f761b4bfcce0c8c561c0cb5c887b0971d3ec01c32164bdf7374a35b0982711`) |
+| arabic | same v5 det | `arabic_PP-OCRv5_rec_mobile.onnx` (`c1192e632d0baa9146ae5b756a0e635e3dc63c1733737ebfd1629e87144e9295`) |
+| korean | same v5 det | `korean_PP-OCRv5_rec_mobile.onnx` (`cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b`) |
+| greek | same v5 det | `el_PP-OCRv5_rec_mobile.onnx` (`b4368bccd557123c702b7549fee6cd1e94b581337d1c9b65310f109131542b7f`) |
+| thai | same v5 det | `th_PP-OCRv5_rec_mobile.onnx` (`de541dd83161c241ff426f7ecfd602a0ba77d686cf3ab9a6c255ea82fd08006e`) |
+| devanagari | same v5 det | `devanagari_PP-OCRv5_rec_mobile.onnx` (`d6f0a906580e3fa6b324a318718f1f31f268b6ea8ef985f91c2012a37f52c91e`) |
 
-Format `same` keeps png/jpg/webp as is. When the input is a PNG with an alpha channel, the output is **always PNG**, whatever the chosen format. JPG and WebP use `-c` quality 90. The builder verifies `-c` semantics against the real binary and records them in DECISIONS.md.
+- **URLs:** `https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv5/{det,rec}/<file>`. The builder records exact sizes, and confirms that the v5 recognition ONNX files carry their character dictionary. If one doesn't, the builder adds the dictionary file to the preset with its sha256.
+- **Model directory:** `<support>/models/ocr/`. The engine is always given explicit model paths and must never self-download.
 
-### 5.2 Validation (at submit, in Go)
-- `image.DecodeConfig` (with the webp decoder registered) gives the dimensions. If the output would exceed **100 MP** (W·s × H·s), the error is "Too large to upscale {s}× ({W}×{H} → {W·s}×{H·s}); try 2× or a smaller image". Undecodable files: "Couldn't read this image".
-- Scale must be 2 or 4. The enums are checked.
+### 5.2 Images → text (sidecar `ocr.image`)
+- **Params:** `{input, outputDir, baseName, det, rec (model entries; null = bundled), modelDir, output: "text"|"json"}`.
+- **Steps:**
+  1. Ensure the models (shared sha-verified download helper).
+  2. `load_image` (HEIC included).
+  3. Run RapidOCR with `return_word_box=True`.
+  4. Sort lines top-to-bottom, then left-to-right.
+  5. Write `<baseName> (text).txt` (lines joined with `\n`, blank line between blocks), or `.json` (`{width, height, lines:[{text, confidence, box:[[x,y]×4], words:[{text, box}]}]}`).
+- **Result:** `{lines, characters, meanConfidence, output, preview (first 2,000 chars)}`.
 
-### 5.3 Run
-1. `job.Tool(deps.Upscayl)` gives the exe; the models dir is `<exe dir>/models`. If `<model>.param` or `<model>.bin` is missing, fail with `dependency_missing` "Upscaler models are missing" and the hint "Reinstall the upscaler from Settings → Dependencies".
-2. Output: `core.UniquePath(OutputDir, stem+" ("+s+"x)", ext)`. Write to a temp name in the same dir (`.<ulid>.tmp.<ext>`; the extension is needed for format selection), then rename.
-3. Run `proc` with `-i in -o tmp -n model -z Z -s S -m modelsDir [-c 90] -t 0`. Progress:
-   - Before the first `%` line: indeterminate "Starting GPU…". After 8 s without one, it becomes "Starting GPU — the first run can take up to a minute".
-   - After that, `pct/100` with the message "Upscaling · 42%".
-   - Log stderr lines (excluding `%` lines) to the job log.
-4. Cancellation: `proc` kills the tree, then the tmp file is removed.
-5. Errors:
-   - Stderr matching `(?i)invalid gpu device|vkCreateInstance failed|no vulkan|vkEnumeratePhysicalDevices` gives `dependency_missing` "No compatible GPU found", with the hint "The upscaler needs a GPU with Vulkan support (any Apple Silicon Mac, or a recent NVIDIA/AMD/Intel GPU with current drivers)".
-   - A non-zero exit, or **a missing or empty tmp file after exit 0**, gives `tool_failed` "Upscaling failed" plus the last 5 stderr lines in the job log.
-6. Result: `{inWidth, inHeight, outWidth, outHeight, model, scale, bytes}`. The message reads "640×480 → 2560×1920".
+### 5.3 PDF → searchable PDF (Go + sidecar `ocr.pdf`)
+1. **Go** reads the PDF. An encrypted input fails with `validation` "Remove this PDF's password first (PDF Toolkit → Remove password)". Go then renders each page via `core/pdfium` at **200 dpi** into `TempDir/pages/p0001.png`. If `skipText` is on and `PageText` has at least 20 non-space characters, the page is skipped and recorded. Progress is page by page ("Rendering 3/30"). Cancellation is checked per page.
+2. **Sidecar `ocr.pdf`:**
+   - **Params:** `{input, pages:[{page, png, skip}], dpi, outputDir, baseName, det, rec, modelDir, pdfOutput}`.
+   - **OCR:** each non-skipped page, with progress per page ("Reading page 3 of 30") and `check_cancelled()` between pages.
+   - **Overlay:** port the prototype `compose.py` into `toolbox_sidecar/pdftext.py`: the glyphless font (generated once and embedded as a constant), word-level `Tz` fitting, the inverse `/Rotate` and cropbox transform, appended content stream, and one shared font resource.
+   - **Output files:** the searchable PDF goes to `<baseName> (searchable).pdf` via pypdf `PdfWriter` (clone the reader, add the streams, keep metadata, bookmarks and links). With `text`/`both`, the text is also written to `<baseName> (text).txt`, with `\f` between pages.
+   - **Result:** `{pages, pagesOcred, pagesSkipped, characters, meanConfidence, outputs[]}`.
+   - **Invariants:** the original page content and images are unchanged (§10 test). The input is never modified.
+3. **Go** registers the outputs and writes the message, e.g. "30 pages · 2 already had text · 41,203 characters".
 
-### 5.4 UI (`tools/upscale/UpscaleView.tsx`)
+### 5.4 UI (`tools/ocr/OcrView.tsx`)
+FileToolLayout with these options:
+- **Language** Select, with a "downloads ~13 MB on first use" note for non-Latin.
+- **PDF output** SegmentedControl: Searchable PDF / Text / Both.
+- **Image output** SegmentedControl: Text / Text + positions (JSON).
+- **Skip pages that already have text** switch.
 
-FileToolLayout. Options:
-- **Model** as radio cards: Photo ("Best for photos"), Illustration ("Line art, anime, screenshots & text"), Fast ("Quickest, softer").
-- **Scale** as a SegmentedControl (2× / 4×).
-- **Format** Select.
-- **Input rows** show "W×H → W·s×H·s". The size is read via `FilesService.ImageThumb`'s companion `FilesService.ImageSize(path) (core.Size, error)` (new; DecodeConfig only). Rows over the cap show an inline warning, and the Start button excludes them with a toast.
-
-DepsGate covers `upscayl`, with Install/Update (≈50 MB). Results use the same card grid as the Background Remover: `CompareSlider` with the original scaled to the same display box, and pixel-crisp off for the before image so the improvement is visible. A banner appears if the last job failed with "No compatible GPU found".
+A DepsGate covers the AI engine. **Results:** per job a card with the output files (Reveal/Open), plus for images a **text preview panel** (the first 2,000 chars, monospace) with **Copy text**, done through the existing clipboard service write path (`ClipboardService` already writes text; add `CopyText(text string)` if no bound method exists) and recorded as a self-copy so history doesn't double it. The panel also offers **Save as…** via Reveal.
 
 ---
 
-## 6. PDF Toolkit (`modules/pdf`)
+## 6. Vault (`modules/vault`, ID `vault`)
 
-Descriptor:
+The descriptor is a normal module (jobs for add/export), Name "Vault", icon `lock`, Category utility, Order 210, Accepts any extension (`Accepts.Any = true`; the drop matcher lists Vault last), Requires none, OutputSubdir `Vault exports`, SplitInputs false, MaxConcurrent 1. `core.Accepts` gains `Any bool` if it doesn't exist, and the matcher puts Any-modules last.
 
-| Field | Value |
-|---|---|
-| ID | `pdf` |
-| Name | "PDF Toolkit" |
-| Icon | `file-text` |
-| Category | document |
-| Order | 190 |
-| Accepts | `.pdf` + `.jpg .jpeg .png .tif .tiff .webp` (images only for images → PDF) |
-| Requires | none |
-| OutputSubdir | `PDF` |
-| SplitInputs | **false** (the service decides per action) |
-| MaxConcurrent | 2 |
-| MaxInputs | 500 |
+### 6.1 On-disk format (`<library>/Vault/`)
+```
+vault.json      {"format":1,"created":<ms>,"kdf":"age-scrypt","workFactor":18}   (plaintext, no secrets)
+identity.age    X25519 identity (AGE-SECRET-KEY-1…) encrypted to the passphrase (age scrypt recipient, work factor 18)
+index.age       JSON index encrypted to the vault recipient; index.age.bak = previous version
+blobs/<2-char>/<ulid>.age   each file's contents encrypted to the vault recipient (streaming)
+```
+- **Index:** `{version:1, entries:[{id, name, folder ("" = root, one level), size, modTime, addedAt, blob, sha256}]}`. It is written atomically (`index.age.tmp` → rename, the previous file kept as `.bak`) after every change. On load, if `index.age` fails to decrypt or parse, the app tries `.bak` and tells the user.
+- **Recovery key:** the identity string, shown once at creation ("Save this somewhere safe. It's the only way in if you forget your passphrase"), with **Copy** and an "I've saved it" confirmation before the vault opens. It is also shown later after re-entering the passphrase.
+- **Filesystem view:** names, folders and contents are hidden. File count and approximate sizes are visible.
 
-### 6.1 Options
-
+### 6.2 Service (`vault.Service`, bound) and state
 ```go
-type Action string // "merge" | "split" | "organize" | "compress" | "images-to-pdf" | "pdf-to-images" | "protect" | "unlock"
-type PageEdit struct {
-    Page   int `json:"page"`   // 1-based source page
-    Rotate int `json:"rotate"` // 0 | 90 | 180 | 270 (clockwise, added to the page's rotation)
-}
-type Options struct {
-    Action Action `json:"action"`
-
-    // split
-    SplitMode string `json:"splitMode"` // "every" | "ranges"; default "every"
-    Every     int    `json:"every"`     // ≥1; default 1
-    Ranges    string `json:"ranges"`    // "1-3, 5, 8-" (8- = to end); each range → one file
-
-    // organize (single input): the output pages, in order
-    Pages []PageEdit `json:"pages"` // ≥1
-
-    // compress
-    Level string `json:"level"` // "small" | "balanced" | "high"; default "balanced"
-
-    // images-to-pdf
-    PageSize string `json:"pageSize"` // "a4" | "letter" | "fit"; default "a4"
-    Margin   string `json:"margin"`   // "none" | "small" (≈ 0.5 in); default "small"
-
-    // pdf-to-images
-    ImageFormat string `json:"imageFormat"` // "png" | "jpg"; default "png"
-    DPI         int    `json:"dpi"`         // 72 | 150 | 300; default 150
-    PageRange   string `json:"pageRange"`   // "" = all, else ranges syntax
-
-    // protect / unlock / any encrypted input: never persisted (see 6.2)
-    PasswordRef string `json:"passwordRef"` // opaque ID of an in-memory secret
-}
+State() VaultState                       // {exists, unlocked, entries int, autoLockMinutes, lockAt int64}
+Create(passphrase string) (string, error) // returns the recovery key (shown once); passphrase ≥ 8 chars
+Unlock(secret string) error              // passphrase or AGE-SECRET-KEY-1… recovery key; wrong → validation "Wrong passphrase"
+Lock() error
+List(folder string, search string) ([]Entry, error)      // requires unlocked
+Folders() ([]string, error)
+Enqueue(paths []string, folder string) ([]core.Job, error)   // add files (one job; copies, never moves)
+Rename(id, name string) error; Move(ids []string, folder string) error; Delete(ids []string) error
+Open(id string) error                    // decrypt to <support>/tmp/vault-open/<session>/<name>, open with the default app
+Preview(id string) (string, error)       // images ≤ 20 MB → data URL, decrypted in memory only
+Export(ids []string) ([]core.Job, error) // decrypt into <library>/Vault exports/ (UniquePath), registered outputs
+ChangePassphrase(old, new string) error  // re-wraps identity.age only
+RecoveryKey(passphrase string) (string, error)
 ```
 
-### 6.2 Passwords are never persisted
-Job options are stored in SQLite, so passwords never go in them.
+- **Memory:** the unlocked identity lives only in Go memory, in a single `*age.X25519Identity` field. Lock clears it and the decrypted index (best effort; Go can't guarantee zeroing).
+- **Auto-lock:** after `autoLockMinutes` without vault calls or vault jobs, at app quit, and from the tray menu item **Lock vault** (shown only while unlocked). Events: `vault:state`.
+- **Lock behaviour:** any vault job queued or running fails with `validation` "The vault is locked" (running jobs are cancelled). Every file under `<support>/tmp/vault-open/` is deleted; on Windows, files still open in another app are retried every 30 s until gone. **At app start that folder is wiped** (crash leftovers).
+- **Add jobs (`action: "add"`):**
+  - Stream each input through age to a blob, computing the sha256 of the plaintext along the way. Progress is by bytes.
+  - Cancellation removes the partial blob.
+  - Files over 20 GB are refused.
+  - The index is written after each file, so a cancel keeps the files already added.
+  - Name clashes in a folder get " (1)" etc.
+- **Export jobs (`action: "export"`):** decrypt to `<library>/Vault exports/<name>` (UniquePath) and verify the sha256. A mismatch deletes the output and fails with "This file is damaged in the vault".
+- **Mutual exclusion:** add, export, delete, rename and move hold one vault mutex; index writes are serialized.
 
-- `pdf.Service` holds an in-memory `secrets` map from ref (ULID) to `{password, newPassword}`. The bound methods take passwords as separate arguments, store them, and put only `PasswordRef` in the options.
-- `Run` takes the secret by ref. A secret is deleted when its job reaches a terminal state, and **retries keep it** until then.
-- After an app restart, a queued job whose secret is missing fails with `validation` "The password isn't kept after a restart — run this again".
+### 6.3 UI (`tools/vault/VaultView.tsx`)
+- **No vault yet:** an explainer (what's encrypted, what isn't, "forgetting the passphrase means losing the files unless you kept the recovery key", "adding files copies them; your originals stay where they are — delete them yourself if you want"). Then a **Create vault** form (passphrase plus confirm, a simple strength hint based on length and character classes, minimum 8), then the recovery-key screen.
+- **Locked:** a passphrase field and an **Unlock** button, plus a "Use recovery key" link that switches the field. "Wrong passphrase" is shown inline.
+- **Unlocked:**
+  - **Header:** a lock icon with "Unlocked · locks in 9 min" (live), a **Lock** button and an **Add files** button (picker plus drop zone).
+  - **Left:** the folders list (All files, root, and folders; New folder).
+  - **Main:** a table of name, size, added date and type icon, with a search field. Row actions: Open, Preview (images), Export, Rename, Move to…, Delete (ConfirmDialog: "Permanently delete from the vault?"). Multi-select allows Export, Move and Delete.
+- **Settings → Vault:** the auto-lock Select, **Change passphrase…**, **Show recovery key…** (asks for the passphrase), and **Reveal vault folder**.
+- **Palette:** "Lock vault", "Open vault".
 
-### 6.3 Bound service
+---
 
+## 7. Tool packs and first-run setup (`core/packs`, `views/setup`)
+
+### 7.1 Concepts
+- A **pack** is a named group of **components** that together unlock some tools. A **component** is either a **dep** (a `core/deps` ID with an installer) or a **model** (a module preset that downloads files).
+- A component can belong to several packs (the AI engine, FFmpeg). It is installed once and **counted once**: in a selection, a shared component's size goes to the first selected pack in catalog order, and every other selected pack lists it as "with <pack>".
+- A component found on the system (FFmpeg or Deno on `PATH`) has state `system`. It counts as present, costs 0 bytes and is never removed by the app.
+- **Built-in tools** need no download: Clipboard History, PDF Toolkit and Vault. They're listed on the setup screen but are not a pack.
+- Every non-hidden, non-placeholder, non-built-in module belongs to **exactly one** pack (a test enforces this, so a future module can't be left out).
+
+### 7.2 Catalog (`core/packs/catalog.go`)
+Pure data, with per-OS sizes measured on the pinned versions (§0.4). `Download` is what's fetched; `Disk` is what stays. Sizes for components already present are 0.
+
+**Components**
+
+| ID | Kind / ref | Label · link · licence | Windows download / disk | macOS arm64 download / disk |
+|---|---|---|---|---|
+| `ffmpeg` | dep `ffmpeg` (+`ffprobe`, same folder) | FFmpeg 9.0.2 · ffmpeg.org · GPL-3.0 | 114.8 MB / 210.6 MB | 56.7 MB / 132.5 MB |
+| `yt-dlp` | dep `yt-dlp` | yt-dlp · github.com/yt-dlp/yt-dlp · Unlicense | 23 MB / 23 MB | builder measures `yt-dlp_macos` |
+| `deno` | dep `deno` | Deno 2.9.8 · deno.com · MIT | 42.9 MB / 98.1 MB | 38.8 MB / 81.5 MB |
+| `engine` | dep `audio-engine` (uv, CPython, venv) | AI engine (Python, PyTorch, ONNX Runtime) · github.com/astral-sh/uv · BSD/MIT/Apache | builder measures 0.5.0 (≈1.0 GB / ≈1.6 GB) | builder measures on the Mac; until then the Windows numbers |
+| `stems-default` | model `stems` / `four-fast` | Demucs 4-stem · github.com/facebookresearch/demucs · MIT | 84 MB / 81 MB | same |
+| `whisper-default` | model `transcribe` / `small` | Whisper small · huggingface.co/Systran/faster-whisper-small · MIT | 464 MB / 464 MB | same |
+| `bg-default` | model `bgremove` / `balanced` | BiRefNet lite · github.com/ZhengPeng7/BiRefNet · MIT | 224 MB / 224 MB | same |
+| `upscaler` | dep `upscayl` | Real-ESRGAN upscaler · github.com/upscayl/upscayl-ncnn · AGPL-3.0 (models BSD-3) | 47.9 MB / 52 MB | 54.8 MB / builder measures |
+| `exiftool` | dep `exiftool` | ExifTool · exiftool.org · Artistic/GPL | builder measures download / 35 MB | builder measures |
+| `chat-engine` | dep `llama-runtime` | llama.cpp b11938 · github.com/ggml-org/llama.cpp · MIT | 37.2 MB / 104 MB | 16.3 MB / builder measures |
+| `chat-default` | model `llm-chat` / `qwen3-4b` | Qwen3 4B Instruct · huggingface.co/Qwen/Qwen3-4B-Instruct-2507 · Apache-2.0 | 2.50 GB / 2.50 GB | same |
+
+**Packs** (catalog order = display order; Windows disk size when installed alone)
+
+| ID | Name · icon | Components | Unlocks (module → components it needs) | Alone |
+|---|---|---|---|---|
+| `media` | Media · `film` | ffmpeg, yt-dlp, deno | Downloader → ffmpeg, yt-dlp, deno · Converter → ffmpeg | ≈332 MB |
+| `music` | Music · `audio-lines` | engine, ffmpeg, stems-default | Stem Splitter → engine, ffmpeg, stems-default · BPM & Key → engine · Audio → MIDI → engine | ≈1.9 GB |
+| `image` | Image · `wand-sparkles` | engine, bg-default, upscaler, exiftool | Background Remover → engine, bg-default · Upscaler → upscaler · EXIF → exiftool | ≈1.9 GB |
+| `speech` | Speech · `captions` | engine, whisper-default | Transcribe → engine, whisper-default | ≈2.1 GB |
+| `documents` | Documents · `scan-text` | engine | OCR → engine (Latin and CJK built in; other scripts ≈13 MB each on first use) | ≈1.6 GB |
+| `chat` | Local Chat · `message-square` | chat-engine, chat-default | Local Chat → chat-engine, chat-default | ≈2.6 GB |
+
+Each pack also has a one-line description (e.g. Media: "Download and convert audio and video"; Local Chat: "A private assistant that runs on your GPU · needs about 4 GB of free memory").
+
+### 7.3 Tools folder (`core/paths.go`)
+The heavy files can live somewhere other than the support dir, for example on a second drive.
+- **`Paths.ToolsDir`** is new. `BinDir`, `PythonDir`, `SidecarDir` and `ModelsDir` now derive from it; the DB, logs, settings, tmp, caches and clipboard images stay in the support dir. The default is the support dir itself, so existing installs don't change.
+- **Where it's stored:** a pointer file `<support>/tools-location` holding one absolute path (UTF-8), read by `ResolvePaths` before the DB opens. `TOOLBOX_TOOLS_DIR` overrides it (dev sandboxes and tests); while the env var is set, the UI shows the location as "Set by TOOLBOX_TOOLS_DIR" and disables changing it.
+- **Marker:** a tools folder contains `.toolbox-tools` (empty file).
+- **Picking a folder** (`PickToolsDir`): a native folder dialog. If the picked folder is empty or already has the marker, it's used as is; otherwise the app uses `<picked>/Toolbox Tools` (e.g. picking `D:\` gives `D:\Toolbox Tools`). The picker refuses the library folder and folders inside the support dir other than the support dir itself ("Pick a different folder").
+- **Choosing at setup:** if the user changes the location before anything managed is installed, Install writes the pointer and `<support>/setup-pending.json` (`{packs:[…]}`), then **relaunches the app**. On start, a pending file opens the setup screen in its installing state and submits those packs, then deletes the file.
+- **Moving later** (Settings → Tool packs → Move…): a job of the hidden module `system-tools-move`.
+  1. Stop the engine and the chat server, and refuse while any other job is running ("Wait for running jobs to finish").
+  2. Copy `bin/`, `python/`, `sidecar/` and `models/` to the new folder, with progress by bytes and cancellable (a cancel deletes the partial copy).
+  3. Verify file count and total size.
+  4. Rewrite the `home` line of `sidecar/.venv/pyvenv.cfg` to the new CPython folder.
+  5. Write the marker and the pointer, plus `<support>/tools-move-cleanup` holding the old path.
+  6. Finish with the message "Restart Toolbox to use the new folder" and a **Restart now** action.
+  On the next start, if the new folder has its marker, the app deletes those four subfolders from the old path and removes the cleanup file. If the engine then fails its ready handshake, it shows as needing **Repair** (the existing re-sync).
+- **Unavailable folder:** if `ToolsDir` doesn't exist at start (for example an unplugged drive), the shell shows a warning Banner: "Your tools folder `D:\Toolbox Tools` isn't available. Connect the drive or choose another folder." Its **Choose folder…** button runs the picker and, after confirmation, writes the pointer and relaunches.
+- **Relaunch** (`desktop.Relaunch`): start `os.Executable()` with the same arguments, detached, then quit. Under `wails3 dev` it doesn't relaunch; it shows "Restart the dev server to use the new folder".
+- **Free space** (`core/disk`): `Free(path) (free, total uint64, err)` uses `GetDiskFreeSpaceExW` on Windows (`x/sys/windows`) and `unix.Statfs` elsewhere, walking up to the nearest existing parent.
+
+### 7.4 Setup screen (`frontend/src/views/setup/SetupView.tsx`)
+**When it shows:** at start when `setup.done` is false, or when `setup-pending.json` exists. The main window renders `SetupView` full-window instead of the shell: the custom titlebar stays, but there's no sidebar, job tray or command palette. It can also be reopened from Settings → Tool packs → **Show setup screen**, which overlays the shell and has a close button.
+
+**Layout** (tokens only; matches the approved mockup `.dev/mockups/packs.html` with the changes below):
+- **Content column:** max width 1080 px, centred, padding `--space-10` / `--space-12`. Below 720 px the padding is `--space-4` and cards are 220 px wide.
+- **Header:**
+  - Eyebrow "Welcome to Toolbox" (mono, `--text-xs`, uppercase, `--accent`).
+  - H1 "Which tool packs do you want?" (`--text-2xl`, 600).
+  - Lede (`--text-lg`, `--fg-muted`): "Each pack downloads its own engines and models. Pick what you need now; you can add or remove packs any time in Settings."
+- **Always included:** a row of chips (icon + name) for Clipboard History, PDF Toolkit and Vault, labelled "Always included".
+- **Pack rail:**
+  - Cards sit in one horizontal row with scroll-snap. When the row overflows, chevron IconButtons appear at the edges and the overflowing edge gets a fade. A vertical mouse wheel over the rail scrolls it sideways.
+  - Cards are 252 px wide and all the same height.
+- **Card anatomy**, top to bottom:
+  1. A 40 px icon tile and, on the right, either the selection checkbox or a state badge: **Installed** (ok), **Update available** (warn), **Partly installed**, or **Not available on this computer** (muted, with the reason in a Tooltip).
+  2. Name (`--text-lg`, 600).
+  3. Disk size as the big number (mono, `--text-xl`) with "· 1.1 GB download" after it in `--fg-subtle`. Both are recomputed live for the current selection (§7.1).
+  4. **Unlocks:** each tool's lucide icon and name. Only tools that exist.
+  5. **Downloads:** one row per component with its name as a link (opens in the default browser), its licence (mono `--text-xs`) and its size, right-aligned. Special rows:
+     - a shared component counted elsewhere shows "with Music" in `--fg-faint`, size struck through;
+     - a system copy shows "found on this PC" in `--ok`;
+     - an installed component shows a check and "installed".
+  6. The pack's description in `--fg-subtle` `--text-sm`, pinned to the card bottom.
+- **Selection:** the whole card is a toggle (`<button aria-pressed>`). Selected cards get an `--accent` border, an `--accent-soft` icon tile and a filled checkbox.
+  - Installed packs aren't selectable: their checkbox is replaced by the badge and their text is muted.
+  - Packs with an update are pre-selected.
+  - On a fresh install nothing is pre-selected except **Media**.
+- **Disk section** (below the rail):
+  - A segmented bar (the Meter mask, 8 px tall) showing used (`--fg-faint`), this selection (`--accent`) and free (`--line-strong`), with a legend.
+  - On the right, "128 GB free of 476 GB · 124 GB after" (mono numbers), then the location as a PathText field with a **Change…** button (§7.3).
+  - If the selection doesn't fit, a `--warn` line "Not enough space on this drive" appears and Install is disabled. If the selection leaves less than 5 GB free, the line is "That leaves less than 5 GB free" and Install stays enabled.
+- **Footer bar** (`--bg-sidebar`, top border):
+  - Left: shield icon and "Everything downloads from each project's official releases and is checked against a pinned checksum."
+  - Right: a ghost **Skip for now** button and a primary **Install 3 packs · 2.3 GB** button (disk size; its Tooltip gives the download size). With nothing selected the primary button reads **Install** and is disabled.
+- **Installing state:**
+  - Cards stop toggling. Each selected card replaces its description with a Meter (running → done or failed), a message ("Downloading FFmpeg · 48 of 115 MB", "Setting up the AI engine…") and a Cancel IconButton. Queued packs say "Waiting".
+  - A failed pack shows the error message (the AppError hint in a Tooltip) and **Retry**; the other packs carry on. A cancelled pack says "Cancelled" and offers Retry.
+  - The footer says "Installing 1 of 3". **Continue in background** sets `setup.done` and opens the app; the jobs keep running in the job tray.
+  - When everything has finished, the primary button becomes **Open Toolbox**. It sets `setup.done` and opens the first tool of the first pack that was installed.
+- **Skip for now** sets `setup.done` and opens the Library.
+- **Keyboard:** Tab reaches each card; Left/Right move focus within the rail and scroll the focused card into view; Space or Enter toggles; Ctrl/Cmd+Enter installs. Focus rings use `--focus-ring`. Motion respects `prefers-reduced-motion`.
+- **Both themes** come from tokens; no hard-coded colours (the existing contrast test covers the new tokens if any are added; none are expected).
+
+### 7.5 Settings, DepsGate and palette
+- **Settings → Tool packs** goes at the top of Settings, above Dependencies.
+  - The same `PackCard` component appears in a wrapping grid. Instead of a selection checkbox, each card has actions: **Install**, **Update** or **Remove**.
+  - **Remove** opens a ConfirmDialog built from `RemovePreview`, e.g. "Remove the Image pack? This frees 311 MB. The AI engine stays because Music uses it."
+  - A **Tools folder** row shows the path, free space and a **Move…** button (§7.3).
+  - A **Show setup screen** link.
+- **DepsGate:** when a module's requirements are missing, the gate keeps its existing banner and adds two buttons: a primary **Install what this tool needs (35 MB)** (`InstallFor`) and a secondary **Install the Image pack (1.9 GB)**. Sizes follow §7.1. The existing per-dependency hint text stays below.
+- **Palette:** "Manage tool packs" (opens the Settings section) and "Show setup screen".
+
+### 7.6 Managed FFmpeg and Deno (`core/deps`)
+- **New `Spec.AllowSystem bool`.** Normally a pinned archive only counts in its own folder. With `AllowSystem`, a copy found on `PATH` or in the known dirs also counts (source `system`) and is never marked outdated. Resolution order: the managed folder first, then the system.
+- **`ffmpeg`:** `Managed`, `ArchiveDir "ffmpeg"`, `VersionFile "VERSION"`, `PinnedVersion "9.0.2"`, `AllowSystem`.
+  - `ffprobe` gets the same `ArchiveDir`: one install provides both.
+  - Purpose becomes "Converts and merges audio and video (≈210 MB)".
+  - Installer: the hidden module `system-ffmpeg-install` and `DepsService.InstallFFmpeg()`.
+  - Assets: Windows amd64 uses one part, the Gyan zip (§0.4). Keep only `bin/ffmpeg.exe`, `bin/ffprobe.exe` and `LICENSE`, flattened into `<bin>/ffmpeg/`. darwin/arm64 uses two parts, `ffmpeg.zip` and `ffprobe.zip` (§0.4), with mode 0755.
+  - Unsupported platforms (darwin/amd64, linux) keep today's install hints.
+- **`deno`:** `Managed`, `ArchiveDir "deno"`, `VersionFile "VERSION"`, `PinnedVersion "2.9.8"`, `AllowSystem`. Installer: `system-deno-install` and `DepsService.InstallDeno()`. The assets are in §0.4.
+- **Checksum retry:** a download whose sha256 doesn't match is retried once from scratch before failing with "The download was corrupted — try again". This applies to every managed archive.
+- **Settings → Dependencies:** FFmpeg and Deno rows get Install, Update and Remove like ExifTool. Remove only deletes the managed folder; a system copy then takes over.
+- **Downloader:** the builder confirms that yt-dlp gets the resolved Deno path (managed or system) the same way it does today.
+- **Engine `PATH`:** when `core/sidecar.Manager` starts the engine, it puts the folder of the resolved `ffmpeg` first on the engine's `PATH`. If FFmpeg is missing, `PATH` is left alone.
+
+### 7.7 Stems: FLAC by default
+- `stems.DefaultOptions()` returns `Format: FormatFLAC`.
+- Under the format picker, a hint: "WAV ≈ 10 MB per minute per stem · FLAC is lossless and usually half that · MP3 ≈ 2.4 MB per minute". When the input's duration is known (Library metadata or a previous probe), it instead reads "This song: ≈ 120 MB as WAV · ≈ 60 MB as FLAC · ≈ 29 MB as MP3". Otherwise the per-minute line is shown.
+
+### 7.8 Model providers (`core/module.go`)
 ```go
-type PdfInfo struct {
-    Path      string    `json:"path"`
-    Pages     int       `json:"pages"`
-    Encrypted bool      `json:"encrypted"`
-    NeedsPassword bool  `json:"needsPassword"` // can't open without a user password
-    Restricted bool     `json:"restricted"`    // owner-password permissions block edits
-    Title     string    `json:"title"`
-    PageSizes []core.Size `json:"pageSizes"`   // points, after rotation
-    Bytes     int64     `json:"bytes"`
+// ModelProvider is implemented by modules whose presets download model files.
+type ModelProvider interface {
+    ModelPresent(preset string) bool                                         // cheap file check, no hashing
+    FetchModel(ctx context.Context, job *JobContext, preset string) error    // no-op when present; sha-verified where pinned
+    RemoveModel(preset string) error
 }
-Defaults() Options
-Info(path string, password string) (PdfInfo, error)               // wrong password → validation "Wrong password"
-Thumbnail(path string, page int, width int, password string) (string, error) // data URL (JPEG q80), width 80..1200
-Enqueue(paths []string, opts Options, password string, newPassword string) ([]core.Job, error)
 ```
+- **stems:** sidecar `stems.prefetch {model}` runs `load_model` (audio-separator downloads it). Present means the model file is in `<models>/audio-separator/`.
+- **transcribe:** sidecar `transcribe.prefetch {preset}` runs the existing `snapshot_download`. Present means `<models>/whisper/<preset>/model.bin`.
+- **bgremove:** sidecar `bgremove.prefetch {preset}` runs the existing sha-verified download. Present means the file is in `<models>/bg/`.
+- **chat:** reuses its own Go download (Range resume, sha) inside the given job.
+- **Scoped progress:** `JobContext.Scoped(from, to float64) *JobContext` returns a view whose `Progress` maps 0..1 into `[from, to]`. Logs, title and context are shared. The pack installer uses it to run dep installer modules (`reg.Module(id).Run`) and model fetches inside one pack job.
 
-- **Job split by action.** `merge` and `images-to-pdf` make **one** job with all inputs, in the given order. Every other action makes one job **per input**. `organize` requires exactly one input.
-- **Input validation:** PDF actions accept only `.pdf` and `images-to-pdf` only images, each with a clear message. Ranges are parsed and checked against the page count at submit time, using `Info`. Inputs larger than 500 MB get "PDFs over 500 MB aren't supported".
-- **Password meanings:**
-  - `protect`: `newPassword` is required, and `password` opens an already-encrypted input.
-  - `unlock`: `password` is required.
-  - Any other action on an encrypted input needs `password`.
-
-### 6.4 Implementation (`modules/pdf/`)
-- **`pdfcpu.go`:**
-  - `init` calls `api.DisableConfigDir()`.
-  - `conf(password)` returns `model.NewStatelessConfiguration()` with `UserPW` and `OwnerPW` = password and `ValidationMode` relaxed.
-  - Each pdfcpu call goes through a helper that runs it in a goroutine and returns early on `ctx.Done()`. pdfcpu has no context, so the goroutine finishes in the background and its partial output is deleted.
-- **`render.go`:** one lazy go-pdfium WebAssembly pool, used both by `Thumbnail` and by `pdf-to-images`.
-  - Pool settings: `MinIdle 0`, `MaxIdle 1`, `MaxTotal 2`, `FSConfig: wazero.NewFSConfig()` (**no mounts**), and a `RuntimeConfig` built from go-pdfium's defaults plus `WithCompilationCache(wazero.NewCompilationCacheWithDir(<support>/cache/pdfium))`. The core features go-pdfium needs must be kept.
-  - Documents open from bytes, and a small LRU (2 docs) is keyed by path, mtime and password hash. Thumbnails are cached in memory (LRU 300).
-  - The pool closes after 5 idle minutes and at app quit (`Close()` hooked in `main.go`).
-- **Actions** (`<stem>` is the input file name without extension; all outputs via `core.UniquePath`):
-
-  | Action | How | Output |
-  |---|---|---|
-  | merge | `api.MergeCreateFile(ctx, inputs, out, false, conf)` | `<first stem> (merged).pdf` |
-  | split, every | `api.SplitFile` (every N pages) | `<stem> (pages a-b).pdf` |
-  | split, ranges | `api.CollectFile` once per range | `<stem> (pages a-b).pdf` |
-  | organize | `CollectFile` with the page order, then `RotateFile` for each rotation group, on output page numbers, in place on the temp file, then move | `<stem> (edited).pdf` |
-  | compress | see below | `<stem> (compressed).pdf` |
-  | images-to-pdf | `api.ImportImagesFile` with `pdfcpu.Import` config: `a4`/`letter` give `f:A4`/`f:Letter`, `pos:c`, `sc:1 rel`, plus margin; `fit` gives `pos:full` with DPI-correct page size | `<first stem>.pdf` |
-  | pdf-to-images | the pdfium pool renders the selected pages at DPI, each encoded PNG or JPEG q90 | `<stem> (pages)/page 001.png` etc. in a subfolder of OutputDir; each file registered via `job.Output` |
-  | protect | `api.EncryptFile` with AES-256, user = owner = newPassword | `<stem> (protected).pdf` |
-  | unlock | `api.DecryptFile` | `<stem> (unlocked).pdf` |
-
-  Details:
-  - **Merge:** progress is per input (indeterminate within).
-  - **Split:** every input page produces a file.
-  - **Images to PDF:** the builder verifies tif and webp support. Formats that fail are removed from Accepts and recorded.
-  - **PDF to images:** progress is pages done ÷ total, and cancellation is checked per page.
-  - **Unlock:** the password must be right.
-- **Compress** (`compress.go`), based on the research prototype `.dev/p4-research/pdf/gopdf/recomp/`:
-  1. Read the context (`api.ReadContextFile`). Collect image XObjects whose filter is `DCTDecode`, or `FlateDecode` 8-bpc DeviceRGB/DeviceGray, with **no SMask/Mask** and both sides ≥ 300 px.
-  2. Work out the largest page each image appears on (via page resources). The pixel cap is `targetDPI × page long edge in inches`, which is conservative and never upsamples.
-
-     | Level | Target DPI | JPEG quality |
-     |---|---|---|
-     | small | 110 | 55 |
-     | balanced | 150 | 70 |
-     | high | 220 | 82 |
-  3. Decode with Go's `image/jpeg` (for CMYK DCT, honour a `/Decode [1 0 …]` array or the Adobe APP14 inversion, test against `scan_color.pdf`) or zlib with raw pixels. Downscale with `draw.ApproxBiLinear` when above the cap. Re-encode as JPEG (Gray stays Gray, CMYK becomes RGB). Replace the stream with `/Filter /DCTDecode`, the new dims and `/ColorSpace`, and drop `DecodeParms`/`Decode`. **Keep the original when the new stream isn't smaller.**
-  4. Run on a worker pool of `max(1, NumCPU/2)`, checking ctx between images.
-  5. Write with `api.WriteContextFile`, then run `api.OptimizeFile` on the result (dedupe). If the final size is ≥ 95% of the input, **delete the output**, and the job succeeds with the message "Already compact — couldn't make it meaningfully smaller" and no output.
-  6. Result: `{bytesBefore, bytesAfter, imagesRecompressed}`, with the message "29.6 MB → 11.6 MB (−61%)".
-- **Errors:**
-  - Malformed PDF (after relaxed repair): `validation` "This PDF is damaged and couldn't be read".
-  - Wrong password: "Wrong password".
-  - Restricted file without the owner password: "This PDF's permissions block editing — enter its owner password".
-- **Bookmarks:** the result message notes "Bookmarks aren't kept" for split and organize, and only when the input had bookmarks.
-
-### 6.5 UI (`tools/pdf/PdfView.tsx`)
-
-**Layout:** a left column with an **action picker**: a vertical list of 8 items with icon, title and one-line description. The right side is the action's panel.
-
-- The current action is remembered via module state.
-- Dropped files go to the current action when they fit it. Otherwise the view switches to the first action that fits: images go to images → PDF, several PDFs go to merge, and one PDF stays on the current PDF action.
-- Each panel has its own inputs (FileList) and a **Run** button. A password field appears when `Info` reports `needsPassword` or `restricted`; an inline "Wrong password" error comes from `Info`.
-
-**Panels:**
-- **Merge:** an ordered list with drag handles, plus up/down buttons for keyboard use. Each row shows the page count and a first-page thumbnail at 48 px. The total page count is shown.
-- **Split:**
-  - A segmented control: "Every N pages" (with a Stepper) or "Custom ranges" (a text field with live parsing). The live parsing produces chips like "1–3", "5" and "8–end", with errors shown inline.
-  - A preview line: "Creates 4 files".
-- **Organize pages:** one PDF. A **page grid** of thumbnails, 140 px wide, lazy-loaded with an IntersectionObserver, rendering at most 4 at once.
-  - **Selection:** click selects, Shift-click selects a range, Mod-click toggles, Mod+A selects all.
-  - **Toolbar:** Rotate left/right (the selection), Delete (selection), Keep only selected, Reverse, Reset.
-  - **Moving pages:** drag to reorder (HTML5 DnD with a drop indicator); with the keyboard, the arrows move focus and Alt+←/→ moves the focused or selected pages.
-  - Each tile shows the original page number, plus a rotation badge when rotated. The output is described as "12 pages (3 removed, 2 rotated)".
-  - **Save as new PDF** enqueues `organize`.
-- **Compress:** three radio cards: Small ("Smallest file, 110 dpi images"), Balanced (default) and High quality. A note says "Text and vector graphics are never degraded; only photos and scans shrink". The result shows before → after.
-- **Images → PDF:** an ordered image list with thumbnails (`ImageThumb` 96) and drag/up/down reordering. Page size is a SegmentedControl (A4 / Letter / Fit to image) and Margin a Switch.
-- **PDF → images:** Format (PNG / JPG), Resolution (72 "Screen" / 150 "Standard" / 300 "Print") and Pages (All / Range field). An estimate line reads "Creates 24 images".
-- **Add password:** a password field plus confirm (they must match, length ≥ 1), with a show/hide toggle. A note says "Uses AES-256. There's no way to recover a forgotten password".
-- **Remove password:** a password field. The text "You need the current password; this tool can't crack PDFs".
-
-Results: the shared recent-outputs list for the module (Reveal/Open). Compress shows the size delta and pdf → images shows a "Open folder" button.
-
----
-
-## 7. Shell, settings and misc
-
-- **Settings → Dependencies:**
-  - The **Upscaler engine** row has Install/Update (managed, pinned) and shows "Pinned version 20251207-174704". The detection details reuse the existing row.
-  - The AI engine row is renamed.
-- **Settings → Models:** the existing "Clear models" now lists the subfolders with their sizes (`whisper/`, `bg/`). The `ModelsInfo` already exists if P2 shipped it; otherwise a simple total is fine. The builder checks and records what it finds.
-- **Command palette:** "Remove background…", "Upscale image…", and "Merge PDFs…", "Compress PDF…" and "Organize PDF pages…" (open the tool with the action preselected via the module handoff).
-- **Drop matching:** images now match Background Remover, Upscaler, EXIF, Converter and PDF (images → PDF). The existing chooser handles several matches; the order follows each module's Order.
-
----
-
-## 8. Bound API changes
-
+### 7.9 Service and install job (`core/packs`, bound `PacksService`)
 ```go
-// api/files.go — FilesService additions
-ImageThumb(path string, maxDim int) (string, error)
-ImageSize(path string) (core.Size, error)            // core.Size{W, H int} (new type, also used by PdfInfo in points)
-
-// api/services.go — DepsService
-InstallUpscaler() (core.Job, error)
-
-// modules
-bgremove.Service { Defaults() Options; Presets() []core.PresetInfo; Enqueue(paths []string, opts Options) ([]core.Job, error) }
-upscale.Service  { Defaults() Options; Enqueue(paths []string, opts Options) ([]core.Job, error) }
-pdf.Service      { Defaults() Options; Info(...); Thumbnail(...); Enqueue(paths, opts, password, newPassword) }
+List() []core.PackStatus
+Disk(path string) (core.DiskInfo, error)            // {path, free, total}; path "" = the current tools dir
+ToolsDir() core.ToolsDirInfo                        // {path, isDefault, fromEnv, available}
+PickToolsDir() (string, error)                      // §7.3; "" when cancelled
+Install(ids []string, toolsDir string) (core.PackInstallResult, error) // {jobs, restart}; toolsDir "" = current
+InstallFor(moduleID string) (core.Job, error)       // only the components that module needs
+RemovePreview(id string) core.PackRemovePreview     // {freedBytes, kept:[{component, usedBy}]}
+Remove(id string) error                             // never removes system copies or components another installed pack uses
+MoveToolsDir(path string) (core.Job, error)
+Relaunch() error
+FinishSetup() error                                 // setup.done = true
 ```
+- **Types** (`core/types.go`):
+  - `PackStatus{id, name, icon, description, state: installed|partial|missing|installing|outdated|unsupported, unsupportedReason, components []PackComponentStatus, unlocks []PackUnlock{moduleId, name, icon}, jobId}`.
+  - `PackComponentStatus{id, name, href, license, kind: dep|model, state: missing|installed|system|outdated|unsupported, downloadBytes, diskBytes, packs []string}`.
+  - The frontend computes the selection-dependent sizes with a pure helper `packSizes(packs, selected)` in `views/setup/packSizes.ts`.
+- **Event:** `packs:changed` (the full list), emitted after `deps:changed`, on pack job state changes and after model fetch or remove.
+- **Install job:**
+  - The hidden module `system-pack-install` takes options `{pack, only []componentId}` (`only` is used by `InstallFor`) and has `MaxConcurrent 1`. One job runs per pack, submitted in catalog order, so a shared component is installed by the first job and the next one finds it present.
+  - Progress is weighted by download bytes. The title is "Install Image pack".
+  - Steps per missing component: deps run their installer module in a scoped context; models call `FetchModel`.
+  - Cancelling stops the current component; components already finished stay installed. A failed component fails the job with that component's AppError, and the message names the component.
+- **States:** a pack is `unsupported` if any component has no asset for this OS and architecture (for example Local Chat on an Intel Mac). It's `outdated` if a managed component is outdated.
 
 ---
 
-## 9. Test plan
+## 8. Mac verification checklist (`docs/MAC-CHECKLIST.md`, architect)
+A numbered, copy-paste-friendly checklist, each item with the expected result. It covers:
+- **Phase 3:** tray template icon, hotkeys, clipboard recording and popup, start at login, ExifTool via the system perl.
+- **Phase 4:** auto-paste with Accessibility (including re-allowing after a rebuild), upscaler with MoltenVK (including first-run time), background removal RAM, `Assets.car` icon regeneration (`wails3 task common:generate:icons` on the Mac).
+- **Phase 5:** chat engine with Metal, and the model RAM guidance (8 GB → Qwen3.5 2B; 16 GB → any).
+- **Tool packs:** the setup screen on a fresh support dir; the managed FFmpeg and Deno run with no Gatekeeper prompt (`ffmpeg -version`, a Converter job, a Downloader job); the Mac sizes the builder couldn't measure (record them so the catalog can be updated); moving the tools folder to an external drive, restarting and running a stem split (the venv `home` rewrite); unplugging that drive and seeing the "isn't available" banner.
+
+Also included: how to collect logs (`<support>/logs/app.log`) and what to send back.
+
+---
+
+## 9. Bound API changes (summary)
+- **`DepsService`:** `InstallChatEngine()`, `InstallFFmpeg()`, `InstallDeno()`, plus Remove for both (same shape as the ExifTool methods).
+- **`PacksService`** (new, §7.9).
+- **`FilesService`:** `OpenURL(url)` only if no bound way to open a link in the default browser exists (https only).
+- **`ClipboardService`:** `CopyText(text)` (only if missing).
+- **New services:** `chat.Service`, `ocr.Service` (`Defaults`, `Languages() []LanguageInfo{id,label,downloadBytes}`, `Enqueue`, `ResultShape`), and `vault.Service` (§6.2).
+- **New events:** `chat:delta`, `chat:done`, `chat:status`, `vault:state`, `packs:changed`.
+
+---
+
+## 10. Test plan
 
 **Go**
-- **`core/deps`:**
-  - `InstallManagedArchive` v2 against httptest: two parts with pinned checksums, a mismatch on one part leaves the old install intact, `VERSION` is written, a matching version is skipped, and `PinnedVersion` produces outdated.
-  - The ExifTool tests keep passing on the migrated spec.
-  - The upscaler `Layout` keeps exactly the 10 model files, the binary, `vcomp140.dll` on Windows only, and LICENSE, with mode 0755 on unix (run with a fake GOOS argument).
-  - Asset and URL functions for each GOOS/GOARCH, including the unsupported ones.
-- **`api/files`:** `ImageThumb` on png with alpha (gives PNG), jpg (gives JPEG), webp, bmp and tiff; scaling bounds; the cache hit; refusal of oversize images (synthetic `DecodeConfig` header); `ImageSize`.
-- **`modules/bgremove`:** Validate; Run against a fake Caller (params include the model table entry, the event mapping, the result message including "No clear subject found").
-- **`modules/upscale`:**
-  - Validate, including the 100 MP cap using generated PNG headers.
-  - Run against a **fake `upscayl-bin`** (re-exec helper) covering: progress lines with `\r\n` → progress, the GPU-error stderr → `dependency_missing`, exit 0 with no output → `tool_failed`, cancellation removes the tmp file, alpha PNG forcing PNG output, and the `-z`/`-s` mapping table.
-  - `//go:build integration`: install the real pinned upscaler into a temp bin dir and upscale a generated 64×64 PNG at 2× and 4×. Assert the output dimensions. Skip with a message when no Vulkan GPU is present.
-- **`modules/pdf`:**
-  - Fixtures are generated at test time with pdfcpu (`api.CreateDemo`-style or import of generated images); any extra PDF fixtures committed under `modules/pdf/testdata/` stay ≤ 200 KB total.
-  - Each action on a 6-page generated PDF: merge page counts; split by every N and by ranges (including `8-` to the end); organize order plus rotation (read back via `PageDimsFile` and the rotate attribute); protect then Info shows NeedsPassword; unlock with the wrong password gives the error, the right one works; images → PDF page sizes.
-  - pdf-to-images output count and dimensions at 72 dpi.
-  - Compress on a generated PDF with a large noisy JPEG produces a smaller file with the same page count and recompressed images, and the "already compact" path for a text-only PDF.
-  - Range parser table tests.
-  - Secrets: there is no password in the persisted options JSON, and a missing secret after a simulated restart gives the error.
-  - **The config dir is never created:** run with `HOME`/`APPDATA` pointing at a temp dir and assert it is still empty.
-  - **pdfium has no FS mount:** a test opens a document from bytes, then asserts a temp file can't be opened through it.
+- `core/deps`:
+  - Tar symlink extraction: a safe relative link works; absolute and `..` escapes are rejected.
+  - Windows copies symlink entries as files.
+  - The llama archive spec: assets and layout per GOOS, licence written, 0755 on unix.
+- `core/pdfium`: the existing pdf render tests move here, plus `PageText`.
+- `core/store`: chat CRUD, cascade delete, search over titles and messages, truncate-from for regenerate.
+- `modules/chat`:
+  - Server lifecycle against a **fake `llama-server`** (re-exec helper). It prints the listening line, serves `/health`, an authenticated `/v1/chat/completions` SSE and 401 without the key, and can exit early, hang or fail to bind. Tests cover the port parse, readiness timeout, early exit with log tail, bind retry, the GPU-fail → CPU retry, idle stop, and that the key file is deleted after ready.
+  - SSE parser (chunk splits, usage chunk, `[DONE]`); cancellation stops the request and saves `stopped`.
+  - Context trimming; one-generation-at-a-time conflict; persistence cadence.
+  - Ollama NDJSON client against httptest; URL validation (non-loopback rejected).
+  - Model download job: Range resume from a partial `.part`, sha mismatch deletes it.
+- `modules/ocr`:
+  - Validate (encrypted PDF rejected, language enum).
+  - Run against a fake Caller: page rendering into TempDir, skip-text pages, params, outputs, message.
+  - `//go:build integration` with the engine: covered in the engine e2e.
+- `modules/vault` (real age, temp dirs, work factor lowered via an unexported test hook):
+  - Create, then unlock with the passphrase and with the recovery key; a wrong passphrase errors.
+  - Add (with a cancel mid-file leaving no partial blob), list, rename, move, delete.
+  - Export verifies the sha, and a tampered blob gives the "damaged" error.
+  - Index `.bak` fallback.
+  - Auto-lock timer with an injectable clock; lock cancels jobs and wipes the open dir; startup wipe.
+  - Change passphrase keeps the files readable.
+  - The vault folder contains no plaintext names (grep test).
+  - Preview size limit.
+- `core/packs`:
+  - Catalog integrity: every non-hidden, non-placeholder, non-built-in module is in exactly one pack; every `Unlocks` component is in its pack; every component ID is used; sizes are non-zero for supported OSes.
+  - Status with fake deps and fake model providers: installed, partial, missing, system, outdated, unsupported.
+  - Install job: components already present are skipped; shared components are installed by the first pack only (two pack jobs in a row); progress is weighted and monotonic; cancel mid-component leaves finished components installed; a failing component names itself.
+  - `InstallFor` installs only that module's components.
+  - `RemovePreview`/`Remove` keep shared components used by another installed pack and never touch system copies.
+- `core/paths` / tools folder: pointer file read, env override, derived dirs, the `Toolbox Tools` subfolder rule, refusing the library and support subfolders.
+- Move job (temp dirs): copy and verify, `pyvenv.cfg` `home` rewrite, cleanup on next start only when the marker is present, cancel removes the partial copy.
+- `core/disk`: free/total for an existing path and for a not-yet-created child path.
+- `core/deps`: `AllowSystem` resolution order (managed first, then system; a system copy is never outdated); the FFmpeg asset layouts per GOOS (flattening, only the three files kept on Windows, 0755 on unix); the Deno archive; checksum retry (first download corrupt, second fine; both corrupt fails).
+- `JobContext.Scoped` progress mapping.
+- `core/sidecar`: the engine's `PATH` starts with the resolved FFmpeg folder.
+- `modules/stems`: default format FLAC; `ModelPresent`/`FetchModel` against a fake Caller (same for transcribe and bgremove).
+- Engine e2e (`integration/engine_test.go`): add `ocr.image` on a generated image with rendered text ("Toolbox OCR 2026", drawn with `golang.org/x/image/font/basicfont`, scaled) asserting the text is found, and `ocr.pdf` on a generated 2-page PDF (pdfcpu image import) asserting extractable text in the output.
 
 **Python**
-- `tests/test_bgremove.py` (pure functions, synthetic images): pre-processing shapes and normalisation per kind; cleanEdges colour bleed; crop with padding and clamping; the empty-mask no-crop; colour and mask compose modes; sha256 mismatch deletes the file; param validation.
-- The slow test (`TOOLBOX_SLOW=1`) runs `fast` (isnet) on a generated image with a clear foreground disc and asserts the mask IoU is above 0.8.
+- `test_ocr.py`: line sorting, TXT/JSON writers, model selection, cancellation between pages.
+- `test_prefetch.py`: `stems.prefetch`, `transcribe.prefetch` and `bgremove.prefetch` validate params and call the download paths (mocked); slow variants download for real.
+- `test_pdftext.py`: the overlay on generated PDFs with `/Rotate` 0/90/180/270 and a cropbox offset. Text extracts (pypdf) in the right place (word bbox centres within tolerance), the original content stream bytes are unchanged, and metadata and outline are kept.
+- Slow test: real RapidOCR on a rendered text image.
 
 **Frontend**
-- CompareSlider (pointer and keyboard).
-- ColorSwatchPicker validation.
-- BgRemove options: colour only when Output is colour.
-- Upscale over-cap warning row.
-- PDF action routing for dropped files, split range parsing chips, organize grid (selection, keyboard move, rotate, delete, the "N pages" summary), password fields (protect confirm mismatch), and merge reordering.
-- DepsGate upscaler install button.
-- Sidebar logo renders.
+- Markdown renderer: no HTML injection (a `<script>` string renders as text), code-block Copy, lists and headings.
+- Chat:
+  - Composer keys (Enter, Shift+Enter, Esc → Stop).
+  - Streaming deltas append to the right message; Stop and Retry; the conflict toast.
+  - Model cards with download progress; the DepsGate.
+- OCR: options, the preview panel with Copy.
+- Setup and packs:
+  - `packSizes`: shared components counted once in catalog order, system and installed components cost 0, deselecting the owner moves the shared size to the next selected pack.
+  - SetupView: toggling, the installed and unsupported cards aren't selectable, the disk warnings (doesn't fit; under 5 GB left), Install label and disabled states, keyboard (arrows, Space, Ctrl+Enter), installing state with per-card progress, failure with Retry, Continue in background, Skip.
+  - Settings → Tool packs: Remove confirm text from `RemovePreview`; DepsGate shows both install buttons with sizes.
+  - Stems: FLAC default and the size hint.
+- Vault:
+  - The create flow (passphrase mismatch, recovery-key confirm gating) and the unlock error.
+  - Auto-lock countdown, table actions, delete confirm.
 
-**Manual smoke (architect, Windows, sandboxed; passive capture only, no keystroke injection):**
-- AI engine update to 0.4.0 in place.
-- Background removal on the research photos with all three presets plus colour, mask and crop.
-- Upscaler install from Settings, 2× and 4× of a photo and an illustration (check the dimensions and look at the crops).
-- PDF: every action on the research PDFs (merge, split, organize via seeded job options, compress the scanned PDF with a size drop, images → PDF, PDF → images, protect, unlock).
-- Thumbnails render in the organize grid (screenshot).
-- New icon in the window and title bar, the taskbar, and the tray.
-- No listening sockets.
-- No `pdfcpu` dir under `%APPDATA%`.
+**Manual smoke (architect, Windows, sandboxed; passive capture; mind free RAM ≥ 5 GB before loading a model):**
+- Chat:
+  - Install the chat engine from Settings, download Qwen3-4B (or reuse the research download by copying it into the sandbox models dir, with sha verified).
+  - Chat via the seeded API path; check streaming, stop and export.
+  - Exactly one listening socket while the server runs, bound to 127.0.0.1, owned by `llama-server`, and 401 without the key. None after idle stop or quit.
+- OCR:
+  - The byford scan → searchable PDF (text extracts; page images unchanged per §10 test).
+  - A photo of text → TXT.
+- Vault:
+  - Create, add, lock (open-dir wiped), unlock, export (checksum equal to the original).
+  - The vault folder holds no plaintext names.
+- Tool packs (a fresh sandbox support dir, with `TOOLBOX_TOOLS_DIR` pointing into `.dev/`):
+  - The setup screen shows; FFmpeg shows "found on this PC" (winget copy). Install Media and Image; check the measured disk use against the catalog (±10%) and record the 0.5.0 engine size.
+  - Take screenshots of the setup screen idle, mid-install and done, in both themes, for the summary.
+  - Install FFmpeg managed in a second sandbox with the winget folder removed from `PATH`; Converter and Downloader jobs work.
+  - Move the tools folder within `.dev/`, restart, run a stem split and a transcription.
 
 ---
 
-## 10. Work packages
+## 11. Work packages
 
 ### Wave 0: foundation (architect)
-1. Go deps (§3.1).
-2. Core and API:
-   - `core.Size`.
-   - Placeholders removed.
-   - Module stubs with **final** options, presets, descriptors and service signatures for `bgremove`, `upscale` and `pdf`.
-   - `FilesService.ImageThumb`/`ImageSize` implemented with tests (small).
-   - The `deps.Upscayl` catalog entry, the `Spec.VersionFile` and `PinnedVersion` fields, and a stub of `UpscaylArchive()` with the final part/asset table.
-   - `DepsService.InstallUpscaler` signature.
-   - `main.go` wiring (including pdf pool `Close()` at quit).
-3. Sidecar: pyproject (Pillow explicit, 0.4.0), `uv lock` (verify macOS arm64 wheels), the AI engine display rename, a `handlers/bgremove.py` stub registered.
-4. **App icon** (§3.6): the generator, regenerated `.ico`/`.icns`/tray PNGs, and the sidebar logo.
-5. Bindings regenerated; `lib/api.ts` re-exports; tool view stubs; "AI engine" string changes in the frontend.
-6. Docs: CLAUDE.md (pdf module notes: config dir and the no-mount rule; the image tools; the AI engine name; archive v2).
+1. Go dep `age`.
+2. Core:
+   - settings additions plus validation, with tests;
+   - migration 0004, the `ChatStore` interface (store implementation stubbed), wire types and events;
+   - `Accepts.Any` and the matcher ordering;
+   - **move the pdfium renderer to `core/pdfium`**, rewire `modules/pdf`, tests green;
+   - the `llama-runtime` catalog entry and installer stub;
+   - `DepsService.InstallChatEngine` signature.
+3. Module stubs with final options/presets/descriptors/services for `chat`, `ocr` and `vault`; placeholders removed; `main.go` wiring (pdfium renderer shared, chat server stopped at quit, vault locked at quit, vault-open dir wiped at start).
+4. Sidecar: deps plus 0.5.0, `uv lock` (verify macOS arm64), handler stubs `ocr.image` and `ocr.pdf`.
+5. Bindings, `lib/api.ts` re-exports, tool view stubs, palette entry stubs.
+6. Docs: CLAUDE.md (chat server rule: 127.0.0.1 only, random port, key file, the only listener in the app; vault rules; OCR model rule) and `docs/MAC-CHECKLIST.md` (§8).
+
+7. Tool packs foundation: `core.ModelProvider`, `JobContext.Scoped`, `Paths.ToolsDir` with the pointer file and env override, `Spec.AllowSystem`, the FFmpeg and Deno catalog entries (installer stubs), the managed-archive checksum retry, `core/packs/catalog.go` with the measured sizes, pack wire types and the `PacksService` signatures (stubbed), the `setup.done` setting, and the stems FLAC default.
 
 ### Wave 1 (parallel)
 
 | WP | Owns | Acceptance |
 |---|---|---|
-| **BG1 Background removal backend** | `sidecar/toolbox_sidecar/handlers/bgremove.py`, `sidecar/tests/test_bgremove.py`, `modules/bgremove/**` (except frozen files) | §4.2–4.3; pytest (+slow) and Go tests |
-| **UP1 Upscaler backend + archive v2** | `core/deps/archive.go`, `core/deps/*upscayl*`, the detection changes in `core/deps/detect.go` for `VersionFile`/`PinnedVersion`, `modules/upscale/**` (except frozen files), `api` body of `InstallUpscaler` | §3.3, §5.2–5.3; Go tests and integration |
-| **PDF1 PDF backend** | `modules/pdf/**` (except frozen files) | §6.2–6.4; Go tests |
-| **UI1 Image tools UI** | `frontend/src/tools/{bgremove,upscale}/**`, `components/CompareSlider.*`, `components/ColorSwatchPicker.*`, the checkerboard tokens/class, the DepsGate upscaler branch in `tools/_kit/DepsGate.tsx` | §3.5, §4.4, §5.4; tests |
-| **UI2 PDF UI** | `frontend/src/tools/pdf/**`, palette entries in `shell/useBuiltinCommands.ts` | §6.5, §7; tests |
-
-The UI packages code against the Wave 0 bindings and run in parallel with the backends.
+| **CH1 Chat backend** | `modules/chat/**` (except frozen files), `core/store/chat.go` + tests, `core/deps` symlink extraction + `llama.go` installer, api `InstallChatEngine` body | §3.3, §3.5, §4.1–4.4, and `ModelProvider` for chat (§7.8); Go tests; catalog verification of the 2 unverified models (memory permitting) |
+| **OC1 OCR** | `sidecar/toolbox_sidecar/handlers/ocr.py`, `toolbox_sidecar/pdftext.py`, `sidecar/tests/test_ocr.py`, `test_pdftext.py`, `modules/ocr/**` (except frozen files) | §5.1–5.3; pytest (+slow), Go tests |
+| **VA1 Vault backend** | `modules/vault/**` (except frozen files), the tray "Lock vault" item (marked block in `desktop/`) | §6.1–6.2; Go tests |
+| **UI-C Chat UI** | `frontend/src/tools/chat/**`, `components/Markdown.*`, `views/SettingsChat.tsx` (+ the section mount in SettingsView) | §4.5; tests |
+| **UI-OV OCR + Vault UI** | `frontend/src/tools/ocr/**`, `frontend/src/tools/vault/**`, `views/SettingsVault.tsx` (+ mount), palette entries in `shell/useBuiltinCommands.ts` (chat, OCR, vault, and the two pack entries from §7.5) | §5.4, §6.3, §7.5 palette; tests |
+| **PK1 Packs backend** | `core/packs/**` (except the frozen catalog), `core/disk/**`, the move job, `core/deps/ffmpeg.go` + `deno.go` installers and their Settings remove paths, the engine `PATH` change in `core/sidecar`, `ModelProvider` in `modules/{stems,transcribe,bgremove}` + sidecar `*.prefetch` handlers and `test_prefetch.py`, `desktop.Relaunch`, the unavailable-folder check at start, api bodies (`PacksService`, `InstallFFmpeg`, `InstallDeno`, `OpenURL` if needed) | §7.1–7.3, §7.6, §7.8, §7.9; Go and pytest tests |
+| **UI-PK Setup + packs UI** | `frontend/src/views/setup/**` (SetupView, PackCard, DiskBar, `packSizes.ts`), `state/packs.ts`, `views/SettingsPacks.tsx` (+ mount), `tools/_kit/DepsGate.*`, the setup gate and unavailable-folder Banner in `App.tsx`/`Shell.tsx`, the stems size hint in `tools/stems/**` | §7.4, §7.5 (except palette), §7.7; tests |
 
 ### Wave 2: integration (architect)
-- Merge and regenerate bindings.
-- Full checks: Go, pytest, frontend, gofmt, and the darwin cross-vet (`./core/... ./modules/...` plus `GOOS=darwin go build` of `modules/pdf`).
-- Engine e2e extended with a `bgremove` `fast` run on the dev photo.
-- Upscaler integration test.
-- `wails3 build`, then the manual smoke from §9.
-- Update DECISIONS.md and write the summary.
+Merge, regenerate bindings, all checks, the engine e2e (with OCR), `wails3 build`, the manual smoke from §10 (memory-aware), DECISIONS.md, and the summary.
 
 ---
 
-## 11. Acceptance criteria
+## 12. Acceptance criteria
+1. **Chat:**
+   - The chat engine installs from Settings (pinned and verified), and the Qwen3-4B download resumes after cancel and is sha-verified.
+   - A conversation streams answers on the GPU; Stop works within about 1 s; conversations persist across restarts; export writes Markdown.
+   - The server is the app's **only** listener: 127.0.0.1, random port, 401 without the key. It is gone after idle stop or quit.
+2. **OCR:**
+   - The byford scan becomes a searchable PDF whose text is selectable and extractable, with page images byte-identical.
+   - A photo of text gives a TXT file and a preview with Copy.
+   - Non-Latin languages download their model once (sha-verified).
+3. **Vault:**
+   - Create shows the recovery key.
+   - Files added are encrypted, with no plaintext names in the folder; originals are untouched.
+   - Unlock works with the passphrase or the recovery key; auto-lock fires and wipes the temporary open copies.
+   - Export round-trips byte-identical; tampering is detected.
+4. **Tool packs:**
+   - A fresh support dir opens on the setup screen. Installing Media and Image from it works end to end, with per-card progress, and the app then opens on a tool from those packs.
+   - Shared components install once, and their size is counted once on screen. A system FFmpeg is detected and skipped.
+   - Measured disk use matches the cards within ±10%, and the catalog is updated with the measured engine size.
+   - FFmpeg and Deno install as pinned, checksum-verified managed tools; a corrupt download is retried once.
+   - Removing a pack frees what the preview said and keeps shared components that are still needed.
+   - The tools folder can be chosen at setup (relaunch, then the install continues) and moved later (restart, the engine still works).
+5. **Stems** default to FLAC and show the size hint.
+6. `docs/MAC-CHECKLIST.md` exists and covers §8.
+7. All checks are clean (`go vet`, `go test`, pytest, `npm run check`, gofmt, darwin cross-vet), and DECISIONS.md is updated.
 
-1. **Background Remover:** turns the research portrait, cat, product and logo photos into clean transparent PNGs with the Balanced preset. Fast and Best work. Colour, mask and crop work. The first use downloads the model with progress, and a corrupted download is rejected. Existing engine installs show **Update** and upgrade in place.
-2. **Upscaler:** installs from Settings (verified pinned checksums) and upscales a photo 2× and 4× with correct output dimensions and visibly better detail than bicubic. Progress is live, cancel leaves no partial file, and missing-GPU and oversize inputs give clear errors.
-3. **PDF Toolkit:** all 8 actions produce correct outputs on the research PDFs, and inputs are untouched (checksums). Compress cuts `scan_synth_30p.pdf` by at least 40% at Balanced. The organize grid shows real thumbnails and saves the edited order and rotation. Passwords never reach the DB, nothing is written to the user config dir, and the WASM renderer has no filesystem access.
-4. **Icon:** the new icon appears in the window, the taskbar and the tray on Windows, and the macOS assets are generated (`icons.icns`, template tray icon).
-5. **Rules:** no listening sockets. Nothing is written outside the support and library dirs. All checks are clean (`go vet`, `go test`, pytest, `npm run check`, gofmt, darwin cross-vet). DECISIONS.md is updated.
-
-## 12. Risks
-
-- **macOS is unverified for the new pieces.** These are: upscayl-bin with MoltenVK (universal binary, exec bit, Gatekeeper; a Go HTTP download sets no quarantine flag), BiRefNet RAM on smaller Macs (6–7 GB peak), and regenerating `Assets.car`.
-- **No GPU means no upscaler.** Acceptable for this user's machines (RTX 3070 and Apple Silicon); revisit if needed.
-- **Compression ratio depends on content.** Only DCT and 8-bit Flate images shrink. JBIG2 and CCITT scans and vector PDFs won't, and the tool says so instead of writing a bigger file. CMYK images become RGB, which shifts colour slightly.
-- **pdfcpu memory** is about 1–3× the file size; inputs are capped at 500 MB.
-- **upscayl-bin is AGPL-3.0**, run only as a separate process and never linked. Fine for a personal app; noted in DECISIONS.md.
-- **First upscaler run** is slow (shader compilation), which the UI messaging covers.
-
----
-
-## 13. Additions approved with the spec (2026-10-27)
-
-### 13.1 HEIC/HEIF input
-- **Engine:** `pyproject.toml` adds `"pillow-heif>=1.8"` and `"spandrel>=0.4.2"` (the latter for §13.3). The version stays `0.4.0`. A shared helper, `toolbox_sidecar/imageio.py`, registers the HEIF opener once and exposes `load_image(path) -> PIL.Image`. That function does the `exif_transpose`, converts ICC to sRGB, and returns RGB, or RGBA when the image has alpha. The bgremove and upscale handlers both use it.
-- **New sidecar method `image.convert`:** takes `{input, output}`, writes a PNG via `load_image` (alpha is kept) and returns `{width, height}`. Go calls it when a tool needs a HEIC decoded.
-- **Background Remover:** Accepts gains `.heic .heif`, and the handler reads them directly.
-- **Upscaler:** Accepts gains `.heic .heif`. Go can't decode HEIC, so:
-  - Validate skips the size cap for HEIC inputs.
-  - `Run` first converts the file via the engine into `TempDir/<stem>.png` (`job.Tool(sidecar.DepID)`). If the engine is missing, it fails with `dependency_missing` "HEIC photos need the AI engine" plus the install hint.
-  - It then checks the cap on the converted size and upscales the PNG.
-  - Format `same` gives PNG for HEIC inputs.
-- **Thumbnails and sizes:** `ImageThumb` and `ImageSize` return `validation` "No preview for HEIC" for `.heic`/`.heif`. The UI shows a file-type tile instead, and "HEIC" where the dimensions would be. EXIF already handles HEIC through ExifTool, so nothing changes there.
-
-### 13.2 Auto-paste from the clipboard popup (opt-in)
-- **Setting:** `ClipboardSettings.AutoPaste bool` (json `autoPaste`, default **false**).
-  - Settings → Clipboard and the tool's settings panel get a switch, "Paste into the previous app after picking an item", with platform notes.
-  - On Linux the switch is disabled ("Not supported on Linux yet").
-- **Interface:** the code lives in `desktop/paste_{windows,darwin,other}.go`, behind `type Paster interface { Remember(); Paste(ctx context.Context) error; Permission() string; RequestPermission() error }`.
-- **Remember:** the shell calls `Remember()` **just before the popup is shown**, whether it was opened by the hotkey or from the tray.
-  - Windows: `GetForegroundWindow`, ignored if it is one of our own windows.
-  - macOS: the frontmost app's PID via `NSWorkspace.sharedWorkspace.frontmostApplication` (purego/objc, already an indirect dependency).
-- **Paste sequence:** it runs only after a successful copy from the **popup** (not the main tool view) with `AutoPaste` on. Steps:
-  1. Hide the popup.
-  2. Re-activate the remembered window or app. Windows: `SetForegroundWindow`, which is allowed because we are in the foreground at that moment. macOS: `activateWithOptions:`.
-  3. Wait until no modifier keys are held, polling every 15 ms. Windows: `GetAsyncKeyState` for Ctrl, Alt, Shift and Win. macOS: `CGEventSourceFlagsState`. If they are still held after 1 s, skip the paste; the item stays copied.
-  4. Wait a further 60 ms.
-  5. Send exactly one paste chord. Windows: `SendInput` Ctrl↓ V↓ V↑ Ctrl↑. macOS: `CGEventCreateKeyboardEvent` for keycode 9 with `kCGEventFlagMaskCommand`, posted to `kCGHIDEventTap`.
-  If nothing was remembered, or that window or app is gone, the item is only copied.
-- **macOS permission:** posting events needs Accessibility permission.
-  - `Permission()` returns `"granted"`, `"denied"` or `"unsupported"` (via `AXIsProcessTrusted()` on macOS). Windows always reports `"granted"`.
-  - Turning the setting on calls `RequestPermission()` (`AXIsProcessTrustedWithOptions` with the prompt option).
-  - The UI shows a status line: "Allowed", or "Needs Accessibility permission" with a button that opens `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`.
-  - Without permission the item is copied and the popup shows a one-line notice rather than failing.
-  - The UI also notes that dev builds may need re-allowing after each rebuild.
-- **Bound methods:** `DesktopService.PastePermission() string`, `DesktopService.RequestPastePermission() error` and `DesktopService.PasteAfterCopy() error`. The popup's copy path calls `ClipboardService.Copy`, then `PasteAfterCopy()`, which does nothing unless auto-paste is enabled.
-- **CLAUDE.md privacy rule update:** the app may send exactly one paste chord, only when the user has enabled auto-paste and picked an item in the popup. Never otherwise.
-- **Tests (fake injector):**
-  - The order is hide, activate, wait for modifiers, then the chord.
-  - It is skipped when the setting is off, when nothing was remembered, when the modifiers never release, and when permission is denied.
-  - `Remember` ignores our own windows.
-- **Hands-on check:** this is **not exercised hands-on** by the architect, since there is no keystroke injection on the user's desktop. The summary lists it as something the user verifies.
-
-### 13.3 Upscaler CPU fallback (AI engine)
-- **Option:** `Options.Device string` (json `device`) is one of `"auto"` (the default), `"gpu"` or `"cpu"`.
-  - `gpu` uses upscayl-bin only (§5.3).
-  - `cpu` uses the engine only.
-  - `auto` uses the GPU when `upscayl` is installed. It reruns on the engine when all three of these hold:
-    - the GPU run failed with the no-GPU error, or `upscayl` isn't installed;
-    - the engine is installed;
-    - the input is within the CPU cap.
-    In that case it logs "No compatible GPU — using the CPU (slower)". Otherwise the original error stands.
-- **CPU cap:** the input must be at most **2 MP**. With `cpu`, validation fails with "Too large for CPU upscaling (max 2 megapixels); use the GPU or a smaller image". The UI shows a time estimate per model from the §0 rates.
-- **Sidecar method `upscale.run`:** params `{input, output, model: {file, sha256, url}, modelDir, scale, format}`.
-  1. Download and verify the model with the same helper as bgremove, into `$TOOLBOX_MODELS_DIR/upscale/`.
-  2. Load it with `spandrel.ModelLoader().load_from_file`, cached per model.
-  3. Use the `mps` device if `torch.backends.mps.is_available()`, else `cpu`.
-  4. Read the image with `load_image`. For alpha images, upscale the RGB and resize the alpha with Lanczos.
-  5. Process in 256 px tiles with 16 px overlap, reporting progress and calling `check_cancelled()` per tile.
-  6. If `scale == 2`, downscale the 4× result with Lanczos.
-  7. Save as PNG, JPEG q90 or WebP q90, then `ctx.output`.
-  8. Result: `{inWidth, inHeight, outWidth, outHeight, device}`.
-- **Models:** pinned in Go `modules/upscale/presets.go`. Sizes and sha256 are verified (the files are in `.dev/p4-research/engine04/models/`).
-
-  | Preset | File | Release | Size | sha256 | CPU time, 320×240 → 4× |
-  |---|---|---|---|---|---|
-  | photo | `RealESRGAN_x4plus.pth` | v0.1.0 | 67,040,989 B | `4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1` | 9.4 s |
-  | illustration | `RealESRGAN_x4plus_anime_6B.pth` | v0.2.2.4 | 17,938,799 B | `f872d837d3c90ed2e05227bed711af5671a6fd1c9f7d7e91c911a61f155e99da` | 2.8 s |
-  | fast | `realesr-animevideov3.pth` | v0.2.5.0 | 2,504,012 B | `b8a8376811077954d82ca3fcf476f1ac3da3e8a68a4f4d71363008000a18b75d` | 0.3 s |
-
-  URLs follow `https://github.com/xinntao/Real-ESRGAN/releases/download/<release>/<file>`.
-- **Descriptor:** `Requires` stays `["upscayl"]`, which drives the DepsGate. The view shows the AI engine gate instead when Device is `cpu`.
-- **UI:** a "Processor" Select (Automatic / GPU / CPU (slower)) below the options. The result message names the device, e.g. "… · CPU".
-- **Tests:**
-  - Go: the device selection matrix with fakes. Cases: GPU works; GPU fails with the no-GPU error and falls back to the CPU; no engine keeps the original error; over the CPU cap keeps the original error; `cpu` forced.
-  - Python: tiled output reassembles to the same result as untiled on a tiny fake model (identity ×4 via nearest); alpha handling; the 2× downscale; cancellation between tiles.
-
-### 13.4 Work package changes
-- **Wave 0** also adds:
-  - the `autoPaste` setting;
-  - the `Paster` interface and stubs, and the `DesktopService` paste methods;
-  - `imageio.py` and the `image.convert` and `upscale.run` stubs;
-  - the engine deps (pillow-heif, spandrel);
-  - the `Device` Options field and the HEIC accepts.
-- **BG1** also owns `toolbox_sidecar/imageio.py`, `image.convert`, and `handlers/upscale.py` with `tests/test_upscale.py`. That makes BG1 the owner of all engine-side image handlers.
-- **UP1** also owns device selection and HEIC conversion in `modules/upscale`.
-- **New D2 Auto-paste (Go):** owns `desktop/paste_*.go`, the paste wiring in `desktop/` (a marked block in `shell.go`/`popup.go`), and the paste method bodies in `api/desktop.go`. Tests per §13.2.
-- **UI1** also takes:
-  - the Processor select and CPU estimate;
-  - the HEIC tiles;
-  - the auto-paste switch and permission status in `tools/clipboard/**` and `views/SettingsClipboard.tsx`;
-  - the popup's call to `PasteAfterCopy`.
+## 13. Risks
+- **Memory:**
+  - LLMs need 3–7 GB free; this machine often has about 6 GB.
+  - The UI shows RAM hints and the server retries on CPU, but a heavily loaded machine will still swap.
+  - The architect's smoke test checks free RAM before loading a model.
+- **llama.cpp moves fast:** the log line used for the port and some flags could change in later builds. That is why the build is pinned, and the fake-server tests pin the behaviour we rely on.
+- **`/health` is unauthenticated** (it leaks nothing but liveness). Every other endpoint requires the key.
+- **modelscope.cn** (OCR model host) can be slow or unreachable. Downloads retry, and only the non-Latin languages need it.
+- **OCR quality:** reading order on multi-column pages and Arabic diacritics are weak. The invisible text layer's selection feel in Preview and Acrobat isn't verified here; it's on the Mac checklist.
+- **Vault limits:**
+  - It protects files at rest only, not on a compromised machine while unlocked.
+  - Go can't guarantee wiping keys from memory.
+  - Opened files exist decrypted on disk until lock; SSD remanence means deleted temp copies may be recoverable.
+  - All of this is stated in the UI.
+- **Ollama has no auth;** it is opt-in and labelled.
+- **FFmpeg hosts:** the macOS builds come from one person's site (Martin Riedl). They're pinned by sha256, so a change or outage makes the install fail cleanly instead of installing something different. Homebrew stays the documented fallback.
+- **Moving a Python venv** isn't officially supported. The `home` rewrite is covered by tests and the Mac checklist, and the engine's Repair (a full re-sync, about 1 GB of downloads) is the fallback.
+- **Static sizes drift:** the catalog sizes belong to the pinned versions. A pin bump must update the sizes, and a test fails if a pinned version changes without its size entry changing.
+- **Relaunching** from inside a Wails app is new; under `wails3 dev` it's replaced by a message.
+- **Free space on APFS** counts purgeable space differently from Finder, so the numbers can differ slightly from what Finder shows.
