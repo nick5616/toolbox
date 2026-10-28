@@ -27,10 +27,22 @@
   position: relative;
   max-width: 1080px;
   margin: 0 auto;
-  padding: var(--space-10) var(--space-12) var(--space-6);
+  padding: var(--space-8) var(--space-12) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-5);
+}
+
+/* The disk bar stays visible above the footer whatever the window height. */
+.tray {
+  flex: none;
+  border-top: 1px solid var(--line);
+}
+
+.trayInner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-12);
 }
 
 .close {
@@ -186,12 +198,18 @@
 }
 
 .total {
+  /* The button lays its parts out as flex items, which drops the space before the size. */
+  margin-left: 0.3em;
   font-family: var(--font-mono);
   font-weight: 400;
   opacity: 0.75;
 }
 
 @media (max-width: 720px) {
+  .trayInner {
+    padding: var(--space-3) var(--space-4);
+  }
+
   .page {
     padding: var(--space-4);
   }

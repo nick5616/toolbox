@@ -199,7 +199,7 @@ func (s *Service) List() []core.PackStatus {
 			ID: p.ID, Name: p.Name, Icon: p.Icon, Description: p.Description,
 			Components: []core.PackComponentStatus{}, Unlocks: []core.PackUnlock{},
 		}
-		var nPresent, nOutdated int
+		var nPresent, nOwn, nOutdated int
 		for _, cid := range p.Components {
 			c, _ := componentByID(cid)
 			state := st[cid]
@@ -216,6 +216,9 @@ func (s *Service) List() []core.PackStatus {
 			}
 			if present(state) {
 				nPresent++
+				if state != core.ComponentSystem {
+					nOwn++
+				}
 			}
 			if state == core.ComponentOutdated {
 				nOutdated++
@@ -242,7 +245,9 @@ func (s *Service) List() []core.PackStatus {
 			ps.State = core.PackOutdated
 		case nPresent == len(p.Components):
 			ps.State = core.PackInstalled
-		case nPresent == 0:
+		// Tools that were already on the computer don't make a pack "partly
+		// installed": nothing of it was installed yet.
+		case nOwn == 0:
 			ps.State = core.PackMissing
 		default:
 			ps.State = core.PackPartial
