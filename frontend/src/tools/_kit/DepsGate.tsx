@@ -202,7 +202,7 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
             ? job.message
             : outdated
               ? "Update the AI engine to keep using the audio tools, transcription, background removal and CPU upscaling."
-              : "Stems, BPM & key, MIDI, transcription and background removal run locally on a Python engine (about 1.2 GB download, 1.4 GB on disk)."}
+              : "Stems, BPM & key, MIDI, transcription, background removal and OCR run locally on a Python engine (about 1 GB download, 1.4 GB on disk)."}
         </Banner>,
       );
     } else if (id === EXIFTOOL_ID) {
