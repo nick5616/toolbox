@@ -14,10 +14,13 @@ const LIMIT = 50;
 /**
  * Hotkey popup (440x560, frameless). Keyboard-first: type to filter, arrows +
  * Enter (or a number key) copy the item and hide the window. Picking an item
- * only copies it; the app never pastes into other apps.
+ * only copies it, unless the user opted in to auto-paste (then the backend
+ * pastes into the previous app via DesktopService.PasteAfterCopy).
  */
 export default function ClipboardPopup() {
   const enabled = useSettings((s) => s.settings.clipboard.enabled);
+  const autoPaste = useSettings((s) => s.settings.clipboard.autoPaste);
+  const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -35,6 +38,7 @@ export default function ClipboardPopup() {
     () =>
       on("window:show", () => {
         setSearch("");
+        setNotice("");
         reset();
         setNow(Date.now());
         refresh();
@@ -55,9 +59,21 @@ export default function ClipboardPopup() {
         toast({ title: "Couldn't copy", description: toAppError(e).message, tone: "danger" });
         return;
       }
-      hide();
+      if (!autoPaste) {
+        hide();
+        return;
+      }
+      try {
+        if ((await DesktopService.PastePermission()) === "denied") {
+          setNotice("Copied. Auto-paste needs Accessibility permission (see Toolbox settings).");
+          return;
+        }
+        await DesktopService.PasteAfterCopy();
+      } catch {
+        hide();
+      }
     },
-    [hide],
+    [hide, autoPaste],
   );
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -144,6 +160,12 @@ export default function ClipboardPopup() {
             </div>
           )}
           {noMatches && <div className={styles.note}>No matching items.</div>}
+        </div>
+      )}
+
+      {notice && (
+        <div className={styles.note} role="status">
+          {notice}
         </div>
       )}
 
