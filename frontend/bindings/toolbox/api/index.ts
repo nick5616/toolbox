@@ -7,6 +7,7 @@ import * as FilesService from "./filesservice.js";
 import * as JobsService from "./jobsservice.js";
 import * as LibraryService from "./libraryservice.js";
 import * as ModulesService from "./modulesservice.js";
+import * as PacksService from "./packsservice.js";
 import * as SettingsService from "./settingsservice.js";
 export {
     DepsService,
@@ -15,5 +16,6 @@ export {
     JobsService,
     LibraryService,
     ModulesService,
+    PacksService,
     SettingsService
 };

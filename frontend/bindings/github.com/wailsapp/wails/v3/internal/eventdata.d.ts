@@ -15,6 +15,9 @@ declare module "@wailsio/runtime" {
             "app:files-dropped": core$0.FilesDropped;
             "app:hidden-to-tray": core$0.HiddenToTray;
             "app:navigate": core$0.Navigate;
+            "chat:delta": core$0.ChatDelta;
+            "chat:done": core$0.ChatDone;
+            "chat:status": core$0.ChatStatus;
             "clipboard:added": core$0.ClipItem;
             "clipboard:removed": core$0.ClipsRemoved;
             "clipboard:state": core$0.ClipboardState;
@@ -26,7 +29,9 @@ declare module "@wailsio/runtime" {
             "jobs:removed": core$0.JobsRemoved;
             "library:added": core$0.Output;
             "library:removed": core$0.OutputsRemoved;
+            "packs:changed": core$0.PacksChanged;
             "settings:changed": core$0.Settings;
+            "vault:state": core$0.VaultState;
             "window:show": core$0.ShowView;
         }
     }

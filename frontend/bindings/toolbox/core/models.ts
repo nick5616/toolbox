@@ -14,6 +14,12 @@ export interface Accepts {
      * URLs is true when the module takes http(s) links.
      */
     "urls": boolean;
+
+    /**
+     * Any is true when the module takes files of every type (e.g. Vault).
+     * Such modules are listed after specific matches.
+     */
+    "any": boolean;
 }
 
 /**
@@ -45,6 +51,181 @@ export enum Category {
     CategoryAI = "ai",
     CategoryUtility = "utility",
 };
+
+/**
+ * ChatBackend says where answers come from.
+ */
+export enum ChatBackend {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ChatBackendGPU = "gpu",
+    ChatBackendCPU = "cpu",
+    ChatBackendOllama = "ollama",
+};
+
+/**
+ * ChatConversation is one stored conversation.
+ */
+export interface ChatConversation {
+    "id": string;
+    "title": string;
+
+    /**
+     * catalog ID or "ollama:<name>"
+     */
+    "model": string;
+    "systemPrompt": string;
+    "createdAt": number;
+    "updatedAt": number;
+}
+
+/**
+ * ChatConversationPatch updates the non-nil fields.
+ */
+export interface ChatConversationPatch {
+    "title": string | null;
+    "model": string | null;
+    "systemPrompt": string | null;
+}
+
+/**
+ * ChatDelta is the payload of chat:delta (coalesced ≤ every 40 ms).
+ */
+export interface ChatDelta {
+    "conversationId": string;
+    "messageId": string;
+    "delta": string;
+}
+
+/**
+ * ChatDone is the payload of chat:done.
+ */
+export interface ChatDone {
+    "conversationId": string;
+    "messageId": string;
+    "status": ChatMessageStatus;
+    "error": string;
+    "tokens": number;
+    "tokensPerSec": number;
+}
+
+/**
+ * ChatMessage is one message in a conversation.
+ */
+export interface ChatMessage {
+    "id": string;
+    "conversationId": string;
+    "role": ChatRole;
+    "content": string;
+    "status": ChatMessageStatus;
+    "error": string;
+    "tokens": number;
+    "tokensPerSec": number;
+    "createdAt": number;
+}
+
+/**
+ * ChatMessageStatus is how an assistant message ended.
+ */
+export enum ChatMessageStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ChatMessageDone = "done",
+    ChatMessageStopped = "stopped",
+    ChatMessageError = "error",
+};
+
+/**
+ * ChatPage is a page of conversations, newest first.
+ */
+export interface ChatPage {
+    "items": ChatConversation[] | null;
+
+    /**
+     * "" = no more
+     */
+    "nextCursor": string;
+}
+
+/**
+ * ChatRole is who wrote a chat message.
+ */
+export enum ChatRole {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ChatRoleUser = "user",
+    ChatRoleAssistant = "assistant",
+};
+
+/**
+ * ChatServerState is the chat engine's lifecycle state.
+ */
+export enum ChatServerState {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ChatStopped = "stopped",
+    ChatStarting = "starting",
+    ChatReady = "ready",
+    ChatError = "error",
+};
+
+/**
+ * ChatSettings configure Local Chat.
+ */
+export interface ChatSettings {
+    /**
+     * catalog ID or "ollama:<name>"
+     */
+    "defaultModel": string;
+
+    /**
+     * ≤ 4,000 characters
+     */
+    "systemPrompt": string;
+
+    /**
+     * 0–2
+     */
+    "temperature": number;
+
+    /**
+     * 4096, 8192, 16384 or 32768
+     */
+    "contextSize": number;
+    "gpu": boolean;
+
+    /**
+     * "" = off; http:// on a loopback host
+     */
+    "ollamaURL": string;
+}
+
+/**
+ * ChatStatus is the payload of chat:status. The port is never sent to the UI.
+ */
+export interface ChatStatus {
+    "state": ChatServerState;
+    "model": string;
+    "backend": ChatBackend;
+    "error": string;
+
+    /**
+     * e.g. "The GPU ran out of memory, so answers run on the CPU"
+     */
+    "notice": string;
+}
 
 /**
  * ClipItem is one clipboard history entry.
@@ -283,6 +464,15 @@ export interface Descriptor {
      * MaxInputs caps inputs per submission; 0 = no limit.
      */
     "maxInputs": number;
+}
+
+/**
+ * DiskInfo is free space on the volume holding Path.
+ */
+export interface DiskInfo {
+    "path": string;
+    "free": number;
+    "total": number;
 }
 
 /**
@@ -596,6 +786,150 @@ export interface OutputsRemoved {
 }
 
 /**
+ * PackComponentKind says how a component is installed.
+ */
+export enum PackComponentKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ComponentDep = "dep",
+    ComponentModel = "model",
+};
+
+/**
+ * PackComponentState is one component's install state.
+ */
+export enum PackComponentState {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ComponentMissing = "missing",
+    ComponentInstalled = "installed",
+
+    /**
+     * found on PATH; costs nothing, never removed
+     */
+    ComponentSystem = "system",
+    ComponentOutdated = "outdated",
+    ComponentUnsupported = "unsupported",
+};
+
+/**
+ * PackComponentStatus is one component of a pack.
+ */
+export interface PackComponentStatus {
+    "id": string;
+    "name": string;
+    "href": string;
+    "license": string;
+    "kind": PackComponentKind;
+    "state": PackComponentState;
+
+    /**
+     * for this OS; 0 when present
+     */
+    "downloadBytes": number;
+
+    /**
+     * for this OS; 0 when present
+     */
+    "diskBytes": number;
+
+    /**
+     * every pack containing it, catalog order
+     */
+    "packs": string[] | null;
+}
+
+/**
+ * PackInstallResult is what Install returns. Restart means the app is about
+ * to relaunch to use a new tools folder; the install continues after it.
+ */
+export interface PackInstallResult {
+    "jobs": Job[] | null;
+    "restart": boolean;
+}
+
+/**
+ * PackKept is a component Remove keeps because another installed pack uses it.
+ */
+export interface PackKept {
+    /**
+     * display name
+     */
+    "component": string;
+
+    /**
+     * pack names
+     */
+    "usedBy": string[] | null;
+}
+
+/**
+ * PackRemovePreview says what removing a pack frees.
+ */
+export interface PackRemovePreview {
+    "freedBytes": number;
+    "kept": PackKept[] | null;
+}
+
+/**
+ * PackState summarises a pack.
+ */
+export enum PackState {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    PackInstalled = "installed",
+    PackPartial = "partial",
+    PackMissing = "missing",
+    PackInstalling = "installing",
+    PackOutdated = "outdated",
+    PackUnsupported = "unsupported",
+};
+
+/**
+ * PackStatus is one pack as the UI sees it.
+ */
+export interface PackStatus {
+    "id": string;
+    "name": string;
+    "icon": string;
+    "description": string;
+    "state": PackState;
+    "unsupportedReason": string;
+    "components": PackComponentStatus[] | null;
+    "unlocks": PackUnlock[] | null;
+
+    /**
+     * running or queued install job, "" = none
+     */
+    "jobId": string;
+}
+
+/**
+ * PackUnlock is a tool a pack unlocks.
+ */
+export interface PackUnlock {
+    "moduleId": string;
+    "name": string;
+    "icon": string;
+}
+
+/**
+ * PacksChanged is the payload of packs:changed.
+ */
+export interface PacksChanged {
+    "packs": PackStatus[] | null;
+}
+
+/**
  * PresetInfo describes a module preset for the UI. Fields that don't apply to
  * a module are zero.
  */
@@ -639,6 +973,13 @@ export interface Settings {
      */
     "hotkeys": { [_ in string]?: string } | null;
     "clipboard": ClipboardSettings;
+
+    /**
+     * Phase 5 (SPEC.md §3.4)
+     */
+    "chat": ChatSettings;
+    "vault": VaultSettings;
+    "setup": SetupSettings;
 }
 
 /**
@@ -660,6 +1001,28 @@ export interface SettingsPatch {
      * replaces the whole struct
      */
     "clipboard": ClipboardSettings | null;
+
+    /**
+     * replaces the whole struct
+     */
+    "chat": ChatSettings | null;
+
+    /**
+     * replaces the whole struct
+     */
+    "vault": VaultSettings | null;
+
+    /**
+     * replaces the whole struct
+     */
+    "setup": SetupSettings | null;
+}
+
+/**
+ * SetupSettings track the first-run setup screen.
+ */
+export interface SetupSettings {
+    "done": boolean;
 }
 
 /**
@@ -691,3 +1054,50 @@ export enum Theme {
     ThemeDark = "dark",
     ThemeLight = "light",
 };
+
+/**
+ * ToolsDirInfo describes the tools folder (SPEC.md §7.3).
+ */
+export interface ToolsDirInfo {
+    "path": string;
+
+    /**
+     * the support dir itself
+     */
+    "isDefault": boolean;
+
+    /**
+     * set by TOOLBOX_TOOLS_DIR; can't be changed in the UI
+     */
+    "fromEnv": boolean;
+
+    /**
+     * the folder exists
+     */
+    "available": boolean;
+}
+
+/**
+ * VaultSettings configure the Vault.
+ */
+export interface VaultSettings {
+    /**
+     * 1, 5, 10, 30, 60, or 0 = only on quit/manual
+     */
+    "autoLockMinutes": number;
+}
+
+/**
+ * VaultState is the payload of vault:state (SPEC.md §6.2).
+ */
+export interface VaultState {
+    "exists": boolean;
+    "unlocked": boolean;
+    "entries": number;
+    "autoLockMinutes": number;
+
+    /**
+     * Unix ms; 0 = no timer
+     */
+    "lockAt": number;
+}

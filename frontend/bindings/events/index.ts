@@ -24,6 +24,21 @@ export const AppHiddenToTray = "app:hidden-to-tray";
 export const AppNavigate = "app:navigate";
 
 /**
+ * Name of the custom event "chat:delta".
+ */
+export const ChatDelta = "chat:delta";
+
+/**
+ * Name of the custom event "chat:done".
+ */
+export const ChatDone = "chat:done";
+
+/**
+ * Name of the custom event "chat:status".
+ */
+export const ChatStatus = "chat:status";
+
+/**
  * Name of the custom event "clipboard:added".
  */
 export const ClipboardAdded = "clipboard:added";
@@ -79,9 +94,19 @@ export const LibraryAdded = "library:added";
 export const LibraryRemoved = "library:removed";
 
 /**
+ * Name of the custom event "packs:changed".
+ */
+export const PacksChanged = "packs:changed";
+
+/**
  * Name of the custom event "settings:changed".
  */
 export const SettingsChanged = "settings:changed";
+
+/**
+ * Name of the custom event "vault:state".
+ */
+export const VaultState = "vault:state";
 
 /**
  * Name of the custom event "window:show".

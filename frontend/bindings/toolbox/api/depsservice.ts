@@ -29,6 +29,27 @@ export function InstallAudioEngine(): $CancellablePromise<core$0.Job> {
 }
 
 /**
+ * InstallChatEngine queues the llama.cpp chat engine install/update (pinned).
+ */
+export function InstallChatEngine(): $CancellablePromise<core$0.Job> {
+    return $Call.ByID(18149833);
+}
+
+/**
+ * InstallDeno queues the managed Deno install/update (pinned).
+ */
+export function InstallDeno(): $CancellablePromise<core$0.Job> {
+    return $Call.ByID(3661523781);
+}
+
+/**
+ * InstallFFmpeg queues the managed FFmpeg install/update (pinned).
+ */
+export function InstallFFmpeg(): $CancellablePromise<core$0.Job> {
+    return $Call.ByID(2152613588);
+}
+
+/**
  * InstallUpscaler queues the upscaler install/update job (pinned versions).
  */
 export function InstallUpscaler(): $CancellablePromise<core$0.Job> {
@@ -61,6 +82,20 @@ export function Recheck(): $CancellablePromise<core$0.DepStatus[] | null> {
  */
 export function RemoveAudioEngine(): $CancellablePromise<void> {
     return $Call.ByID(4042174266);
+}
+
+/**
+ * RemoveDeno deletes the managed Deno (a system copy then takes over).
+ */
+export function RemoveDeno(): $CancellablePromise<void> {
+    return $Call.ByID(4252241878);
+}
+
+/**
+ * RemoveFFmpeg deletes the managed FFmpeg (a system copy then takes over).
+ */
+export function RemoveFFmpeg(): $CancellablePromise<void> {
+    return $Call.ByID(950750283);
 }
 
 /**

@@ -3,6 +3,10 @@
 
 export {
     Category,
+    ChatBackend,
+    ChatMessageStatus,
+    ChatRole,
+    ChatServerState,
     ClipKind,
     DepSource,
     DepState,
@@ -11,12 +15,23 @@ export {
     LogStream,
     ModuleStatus,
     OutputKind,
+    PackComponentKind,
+    PackComponentState,
+    PackState,
     Theme
 } from "./models.js";
 
 export type {
     Accepts,
     AppInfo,
+    ChatConversation,
+    ChatConversationPatch,
+    ChatDelta,
+    ChatDone,
+    ChatMessage,
+    ChatPage,
+    ChatSettings,
+    ChatStatus,
     ClipItem,
     ClipPage,
     ClipQuery,
@@ -26,6 +41,7 @@ export type {
     DepStatus,
     DepsChanged,
     Descriptor,
+    DiskInfo,
     FileInfo,
     FilesDropped,
     HiddenToTray,
@@ -44,9 +60,20 @@ export type {
     OutputPage,
     OutputQuery,
     OutputsRemoved,
+    PackComponentStatus,
+    PackInstallResult,
+    PackKept,
+    PackRemovePreview,
+    PackStatus,
+    PackUnlock,
+    PacksChanged,
     PresetInfo,
     Settings,
     SettingsPatch,
+    SetupSettings,
     ShowView,
-    Size
+    Size,
+    ToolsDirInfo,
+    VaultSettings,
+    VaultState
 } from "./models.js";
