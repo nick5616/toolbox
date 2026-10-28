@@ -1,7 +1,7 @@
 [project]
 name = "toolbox-sidecar"
-version = "0.2.0"
-description = "Toolbox audio engine: stems, BPM & key, audio-to-MIDI over stdio JSON lines"
+version = "0.3.0"
+description = "Toolbox audio engine: stems, BPM & key, audio-to-MIDI, transcription over stdio JSON lines"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "audio-separator[cpu]==0.47.1",
@@ -14,6 +14,8 @@ dependencies = [
   "pretty_midi>=0.2.11",
   "mir_eval>=0.8",
   "basic-pitch==0.4.0",
+  "faster-whisper>=1.2.1",
+  "av>=16,<19",            # PyAV 19 breaks faster-whisper 1.2.1 (metadata_errors TypeError)
 ]
 
 [dependency-groups]

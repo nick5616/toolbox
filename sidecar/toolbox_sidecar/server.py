@@ -41,6 +41,8 @@ def _selftest(real_stdout) -> int:
             logging.getLogger(name).addFilter(lambda r: False)
         import audio_separator  # noqa: F401
         import basic_pitch  # noqa: F401
+        import ctranslate2  # noqa: F401
+        import faster_whisper  # noqa: F401
         import librosa  # noqa: F401
         import onnxruntime  # noqa: F401
         import torch  # noqa: F401

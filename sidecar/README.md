@@ -14,7 +14,7 @@ A single long-running CPython 3.12 process for ML audio tasks — stem separatio
 Startup (sidecar → Go, once):
 
 ```json
-{"id": "", "event": "ready", "data": {"version": "0.2.0", "python": "3.12.16", "pid": 1234}}
+{"id": "", "event": "ready", "data": {"version": "0.3.0", "python": "3.12.16", "pid": 1234}}
 ```
 
 Request (Go → sidecar):

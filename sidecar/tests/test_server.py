@@ -176,5 +176,5 @@ def test_selftest():
     assert len(lines) == 1
     d = json.loads(lines[0])
     assert d["python"].startswith("3.12")
-    assert set(d["packages"]) == {"toolbox-sidecar", "torch", "audio_separator", "librosa", "onnxruntime", "basic_pitch"}
+    assert set(d["packages"]) == {"toolbox-sidecar", "torch", "audio_separator", "librosa", "onnxruntime", "basic_pitch", "faster_whisper", "ctranslate2"}
     assert all(d["packages"].values())

@@ -14,6 +14,8 @@ _PACKAGES = {
     "librosa": "librosa",
     "onnxruntime": "onnxruntime",
     "basic_pitch": "basic-pitch",
+    "faster_whisper": "faster-whisper",
+    "ctranslate2": "ctranslate2",
 }
 
 
