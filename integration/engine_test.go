@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"math"
 	"os"
@@ -16,13 +17,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pdfcpu/pdfcpu/pkg/api"
+	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/math/fixed"
+
 	"toolbox/core"
 	"toolbox/core/deps"
+	"toolbox/core/pdfium"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
 	"toolbox/modules/midi"
+	"toolbox/modules/ocr"
 	"toolbox/modules/stems"
 	"toolbox/modules/transcribe"
 	"toolbox/modules/upscale"
@@ -128,6 +137,8 @@ func TestEndToEndAudioEngine(t *testing.T) {
 	jobs := core.NewJobs(db, db, reg, em, depSvc.Resolve, settings.Current, paths.TmpDir)
 	engine := sidecar.NewManager(paths, func() (string, error) { return depSvc.Resolve(sidecar.DepID) }, em)
 	defer engine.Stop()
+	pdfRenderer := pdfium.New(filepath.Join(paths.CacheDir, "pdfium"))
+	defer pdfRenderer.Close()
 	depSvc.RegisterVirtual(deps.Spec{ID: sidecar.DepID, Name: "AI engine", Managed: true},
 		func(ctx context.Context) core.DepStatus { return sidecar.Detect(ctx, paths) })
 	// Force a real uv download: resolve uv only from the managed bin dir.
@@ -145,6 +156,7 @@ func TestEndToEndAudioEngine(t *testing.T) {
 		stems.Register(reg, engine), bpmkey.Register(reg, engine), midi.Register(reg, engine),
 		transcribe.Register(reg, engine, paths.ModelsDir),
 		bgremove.Register(reg, engine, paths.ModelsDir), upscale.Register(reg, engine, paths.ModelsDir),
+		ocr.Register(reg, engine, pdfRenderer, paths.ModelsDir),
 		sidecar.RegisterSetup(reg, paths, engine, resolveUV,
 			func(ctx context.Context, job *core.JobContext) error {
 				return depSvc.InstallManagedBinary(ctx, job, deps.UVBinary())
@@ -239,6 +251,10 @@ func TestEndToEndAudioEngine(t *testing.T) {
 	// Image tools on the engine (Phase 4): background removal with the fast
 	// model on a generated disc, then CPU upscaling with the fast model.
 	runImageTools(t, ctx, jobs, t.TempDir())
+
+	// OCR (bundled Latin models, no download): an image with rendered text,
+	// then a generated 2-page scanned PDF made searchable.
+	runOCR(t, ctx, jobs, pdfRenderer, t.TempDir())
 
 	// Transcribe (base model, ~142 MB on first use): the synthetic track has
 	// no speech (0 or few segments must still succeed), then real speech if
@@ -370,4 +386,77 @@ func writePNG(t *testing.T, path string, im image.Image) {
 	if err := png.Encode(f, im); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// textImage draws text with basicfont and scales it up so RapidOCR can read it.
+func textImage(text string) image.Image {
+	const scale = 6
+	w := len(text)*basicfont.Face7x13.Advance + 20
+	small := image.NewGray(image.Rect(0, 0, w, 30))
+	draw.Draw(small, small.Bounds(), image.White, image.Point{}, draw.Src)
+	d := &font.Drawer{Dst: small, Src: image.Black, Face: basicfont.Face7x13, Dot: fixed.P(10, 20)}
+	d.DrawString(text)
+	big := image.NewGray(image.Rect(0, 0, w*scale, 30*scale))
+	for y := range big.Bounds().Dy() {
+		for x := range big.Bounds().Dx() {
+			big.SetGray(x, y, small.GrayAt(x/scale, y/scale))
+		}
+	}
+	return big
+}
+
+// runOCR reads text from an image (TXT) and makes a generated 2-page PDF searchable.
+func runOCR(t *testing.T, ctx context.Context, jobs *core.Jobs, r *pdfium.Renderer, dir string) {
+	t.Helper()
+	img := filepath.Join(dir, "sign.png")
+	writePNG(t, img, textImage("Toolbox OCR 2026"))
+	start := time.Now()
+	raw, _ := json.Marshal(ocr.DefaultOptions())
+	created, err := jobs.Submit(ctx, ocr.ModuleID, []string{img}, string(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	j := waitJob(t, ctx, jobs, created[0].ID)
+	var ir ocr.Result
+	if err := json.Unmarshal([]byte(j.ResultJSON), &ir); err != nil || len(j.Outputs) != 1 {
+		t.Fatalf("ocr image result %q outputs %+v: %v", j.ResultJSON, j.Outputs, err)
+	}
+	txt, err := os.ReadFile(j.Outputs[0].Path)
+	if err != nil || !strings.Contains(strings.ToLower(string(txt)), "toolbox") {
+		t.Errorf("ocr image text = %q (%v), preview %q", txt, err, ir.Preview)
+	}
+	t.Logf("ocr (image) in %s: %s", time.Since(start).Round(time.Second), j.Message)
+
+	p1, p2 := filepath.Join(dir, "page1.png"), filepath.Join(dir, "page2.png")
+	writePNG(t, p1, textImage("Toolbox OCR 2026"))
+	writePNG(t, p2, textImage("Searchable second page"))
+	src := filepath.Join(dir, "scan.pdf")
+	c := model.NewStatelessConfiguration()
+	if err := api.ImportImagesFile(ctx, []string{p1, p2}, src, nil, c); err != nil {
+		t.Fatal(err)
+	}
+	start = time.Now()
+	created, err = jobs.Submit(ctx, ocr.ModuleID, []string{src}, string(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	j = waitJob(t, ctx, jobs, created[0].ID)
+	var pr ocr.Result
+	if err := json.Unmarshal([]byte(j.ResultJSON), &pr); err != nil || len(j.Outputs) != 1 {
+		t.Fatalf("ocr pdf result %q outputs %+v: %v", j.ResultJSON, j.Outputs, err)
+	}
+	if pr.Pages != 2 || pr.PagesOcred != 2 || pr.PagesSkipped != 0 {
+		t.Errorf("ocr pdf result = %+v", pr)
+	}
+	out, err := os.ReadFile(j.Outputs[0].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for page, want := range map[int]string{1: "toolbox", 2: "searchable"} {
+		got, err := r.PageText(ctx, out, "", page)
+		if err != nil || !strings.Contains(strings.ToLower(got), want) {
+			t.Errorf("searchable pdf page %d text = %q (%v), want %q", page, got, err, want)
+		}
+	}
+	t.Logf("ocr (pdf) in %s: %s", time.Since(start).Round(time.Second), j.Message)
 }
