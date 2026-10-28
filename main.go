@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"embed"
+	"encoding/hex"
 	"io"
 	"log"
 	"log/slog"
