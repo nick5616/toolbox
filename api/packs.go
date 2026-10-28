@@ -1,6 +1,12 @@
 package api
 
 import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/wailsapp/wails/v3/pkg/application"
+
 	"toolbox/core"
 	"toolbox/core/packs"
 )
@@ -26,7 +32,38 @@ func (s *PacksService) ToolsDir() core.ToolsDirInfo { return s.Packs.ToolsDir() 
 // PickToolsDir shows a native folder dialog and returns the tools folder to
 // use for the picked folder ("" when cancelled).
 func (s *PacksService) PickToolsDir() (string, error) {
-	return "", core.Errorf(core.CodeInternal, "Tool packs aren't available yet")
+	dir, err := application.Get().Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{
+		CanChooseDirectories: true,
+		CanChooseFiles:       false,
+		CanCreateDirectories: true,
+		Title:                "Choose a tools folder",
+		ButtonText:           "Choose",
+		Directory:            s.Packs.ToolsDir().Path,
+	}).PromptForSingleSelection()
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return "", nil
+		}
+		return "", fmt.Errorf("folder dialog: %w", err)
+	}
+	if dir == "" {
+		return "", nil
+	}
+	return s.Packs.ResolveToolsDir(dir)
+}
+
+// Observe feeds the app's deps:changed and jobs:changed events to the pack
+// service, which re-emits packs:changed. Call once after the Wails app exists.
+func (s *PacksService) Observe(app *application.App) {
+	for _, name := range []string{core.EventDepsChanged, core.EventJobsChanged} {
+		app.Event.On(name, func(e *application.CustomEvent) {
+			data := e.Data
+			if j, ok := data.(*core.Job); ok && j != nil {
+				data = *j
+			}
+			s.Packs.OnEvent(e.Name, data)
+		})
+	}
 }
 
 // Install queues pack installs; see packs.Service.Install.

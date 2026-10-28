@@ -178,8 +178,9 @@ func TestServerIdleStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The process exits slightly before the status flips to stopped; wait for both.
 	deadline := time.Now().Add(10 * time.Second)
-	for s.alive() && time.Now().Before(deadline) {
+	for (s.alive() || h.svc.Status().State != core.ChatStopped) && time.Now().Before(deadline) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	if s.alive() {

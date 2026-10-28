@@ -61,6 +61,7 @@ type Manager struct {
 	// Injectable for tests.
 	command      func(python string) (path string, args []string)
 	extraEnv     []string
+	ffmpeg       func() (string, error) // resolves the ffmpeg binary; its folder goes first on PATH
 	readyTimeout time.Duration
 	cancelGrace  time.Duration
 	stopGrace    time.Duration
@@ -110,6 +111,23 @@ func NewManager(p core.Paths, python func() (string, error), em core.Emitter) *M
 	return m
 }
 
+// SetFFmpegResolver sets the function that finds the ffmpeg binary; when it
+// succeeds, the binary's folder is put first on the engine's PATH (pydub
+// looks for ffmpeg there; SPEC.md §7.6). Call before the engine starts.
+func (m *Manager) SetFFmpegResolver(resolve func() (string, error)) {
+	m.mu.Lock()
+	m.ffmpeg = resolve
+	m.mu.Unlock()
+}
+
+// enginePath returns PATH with dir first.
+func enginePath(dir, current string) string {
+	if current == "" {
+		return dir
+	}
+	return dir + string(os.PathListSeparator) + current
+}
+
 func (m *Manager) env() []string {
 	py := filepath.Join(m.paths.CacheDir, "py")
 	env := []string{
@@ -122,6 +140,11 @@ func (m *Manager) env() []string {
 		"TORCH_HOME=" + py,
 		"XDG_CACHE_HOME=" + py,
 		"NO_COLOR=1",
+	}
+	if m.ffmpeg != nil {
+		if exe, err := m.ffmpeg(); err == nil && exe != "" {
+			env = append(env, "PATH="+enginePath(filepath.Dir(exe), os.Getenv("PATH")))
+		}
 	}
 	return append(env, m.extraEnv...)
 }

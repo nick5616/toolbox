@@ -118,3 +118,29 @@ def stems_separate(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
     if not stems:
         raise HandlerError("tool_failed", "The model produced no output files")
     return {"stems": stems, "model": model}
+
+
+@handler("stems.prefetch")
+def stems_prefetch(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
+    """Downloads a separation model without separating anything (tool packs, SPEC §7.8)."""
+    model = params.get("model")
+    if not isinstance(model, str) or not model.strip() or os.path.basename(model) != model:
+        raise HandlerError("validation", "model must be a plain model file name")
+    models_dir = _models_dir()
+    try:
+        ctx.stage("Downloading model")
+        # audio-separator downloads inside load_model; the tqdm shim reports its progress.
+        sep = _new_separator("wav", models_dir)
+        sep.load_model(model_filename=model)
+        del sep
+        import gc
+
+        gc.collect()
+        ctx.check_cancelled()
+    except HandlerError:
+        raise
+    except Exception as e:
+        if _is_download_error(e):
+            raise HandlerError("tool_failed", f"Model download failed: {e}", "Check your connection") from e
+        raise HandlerError("tool_failed", f"Couldn't prepare the model: {e}", "Check the model name and try again") from e
+    return {"model": model}

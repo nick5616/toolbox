@@ -140,6 +140,8 @@ func run() error {
 		StopEngines: func() { engine.Stop(); chatSvc.Stop() },
 	})
 	pendingPacks := packSvc.StartupTasks()
+	// The engine finds ffmpeg (pydub) first on its PATH: managed copy, else system.
+	engine.SetFFmpegResolver(func() (string, error) { return depSvc.Resolve(deps.FFmpeg) })
 	// --- end Tool packs ---
 
 	for _, register := range []func() error{
@@ -162,6 +164,8 @@ func run() error {
 		func() error { return deps.RegisterExifToolUpdater(reg, depSvc) },
 		func() error { return deps.RegisterUpscalerInstaller(reg, depSvc) },
 		func() error { return deps.RegisterLlamaInstaller(reg, depSvc) },
+		func() error { return deps.RegisterFFmpegInstaller(reg, depSvc) },
+		func() error { return deps.RegisterDenoInstaller(reg, depSvc) },
 		func() error { return deps.RegisterUpdater(reg, depSvc) },
 		func() error { return deps.RegisterUVUpdater(reg, depSvc) },
 		func() error {
@@ -249,6 +253,8 @@ func run() error {
 		},
 	})
 	emitter.App = app
+	packsAPI.RelaunchFn = func() error { return desktop.Relaunch(app.Quit) }
+	packsAPI.Observe(app)
 
 	setupMenu(app, emitter)
 
