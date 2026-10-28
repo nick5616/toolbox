@@ -77,7 +77,8 @@ cd frontend && npm run check                           # typecheck + vitest + ch
 ```
 frontend (React, TS strict)          shell/ tools/<module>/ views/ components/ state/ lib/
    │ generated TS bindings (calls) + typed Wails events
-api/       thin Wails services; error marshalling; event registration      (only place importing Wails besides main.go)
+api/       thin Wails services; error marshalling; event registration      (Wails allowed)
+desktop/   tray, close-to-tray, login item, global hotkeys, popup window   (Wails allowed)
 core/      registry · jobs · jobcontext · errors · types · events · paths · settings
 core/proc  subprocess runner with whole-tree kill and hidden windows
 core/store SQLite (modernc.org/sqlite, no CGO): jobs, logs, outputs, tags, settings
@@ -87,7 +88,7 @@ sidecar/   (future) Python ML sidecar over stdio JSON lines
 ```
 
 Rules:
-- `core/**` never imports Wails or `modules/**`. Modules import `core`.
+- `core/**` never imports Wails or `modules/**`. Modules import `core`. Only `main.go`, `api/` and `desktop/` import Wails.
 - The UI only knows **modules**, **jobs**, **outputs**, **deps** and **settings** — never which binary or language does the work.
 - Every slow operation is a **Job**. Every subprocess goes through `core/proc`.
 - All user-facing errors are `*core.AppError` (`code`, `message`, `hint`, `fields`). Wrap everything else with `fmt.Errorf("doing x: %w", err)`.
@@ -149,6 +150,20 @@ The audio tools (stems, BPM & key, audio→MIDI) run on a local Python 3.12 engi
 3. Add pytest tests with generated signals (see `tests/conftest.py`).
 4. In the Go module's `Run`: `job.Tool(sidecar.DepID)` (fails fast with an install hint), then `caller.Call(ctx, "<area>.<name>", params, onEvent)` mapping progress→`job.Progress`, log→`job.Log`, output→`job.Output`; decode the result and `job.SetResult(...)` if the module returns data.
 5. New Python deps: add to `pyproject.toml`, `uv lock`, and note the size impact in DECISIONS.md.
+
+## Desktop shell, popup windows and hotkeys (Phase 3)
+
+- `desktop.Shell` (built in `main.go` after the Wails app) owns the tray, the main window's close hook (close → hide when `keepInTray`), start-at-login, global hotkeys and the popup window. The app never quits because a window closed; it quits from the tray menu, Cmd+Q, or closing with `keepInTray` off.
+- **Popup windows** load `/?window=popup&view=<id>`; `App.tsx` renders `PopupShell` and `bootstrapPopup()` (settings, modules, desktop state only). Add a popup view in `frontend/src/tools/index.ts` → `popupViews`. Each window is its own JS context; Go events reach every window.
+- **Adding a global hotkey:** add an action constant + default in `core` (`HotkeyActions`, `DefaultHotkeys`), handle it in `desktop` (hotkey manager action table), and give it a label in Settings → General. Accelerators use Wails syntax (`CmdOrCtrl+Alt+V`) and must include CmdOrCtrl/Ctrl/Alt/Super (`core.CanonicalAccelerator`). Registration failures are reported via `hotkeys:status`, never fatal.
+
+## Clipboard history privacy rules
+
+- Recording is **off by default** and only starts when the user enables it; the tray and the tool header always show whether it is recording.
+- Never store copies marked sensitive by the OS/password managers (`Data.Sensitive`); skip text > 1 MiB and images > 20 MB.
+- History lives only in the app DB (`clip_items`) and `<support>/clipboard/*.png`; deleting/clearing/pruning removes the image files too. Nothing leaves the machine.
+- The app never pastes into other apps or injects keystrokes; picking an item only copies it.
+- **Automated checks must not disturb the user's clipboard:** write only test strings you created, read the previous text first and restore it afterwards. No keystroke injection.
 
 ## Conventions
 

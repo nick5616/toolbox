@@ -62,3 +62,19 @@ Newest last. Format: date — decision — why.
 - 2026-10-27 — Downloader options now use the kit's `useModuleOptions` with static defaults mirroring Go's `DefaultOptions()`. — The hook needs defaults synchronously.
 - 2026-10-27 — Stems reports a "Preparing" stage before importing torch/audio-separator. — Without it the first seconds of a job showed no message.
 - 2026-10-27 — Windows title bar follows the app theme via `DwmSetWindowAttribute(DWMWA_USE_IMMERSIVE_DARK_MODE)` on `NativeWindow()`; updated on startup, settings change and OS theme change. — Wails v3 has no runtime setter.
+
+## Phase 3 (approved 2026-10-27)
+
+### Made in SPEC.md
+- 2026-10-27 — Clipboard history via `golang.design/x/clipboard` v0.11.0 (Wails' clipboard API is text-only with no change events); opt-in, sensitive copies skipped, no auto-paste.
+- 2026-10-27 — Transcription runs in the existing audio engine with faster-whisper 1.2.1 (CTranslate2, CPU int8); default model `small`; PyAV pinned `<19`. Engine 0.3.0 (+≈157 MB) → existing installs show Update.
+- 2026-10-27 — ExifTool becomes the third app-managed tool, installed as an archive (`InstallManagedArchive`) from SourceForge with exiftool.org checksums; macOS runs the Perl distribution with the system perl.
+
+### Made during the build
+- 2026-10-27 — `ClipStore` gained `TouchClip(id, at)` (not in the spec). — Re-copying an item needs to bump `last_used_at` without re-hashing content.
+- 2026-10-27 — `SettingsPatch.Hotkeys` merges entries into the current map instead of replacing it. — Lets the UI change one shortcut without resending the others; unknown actions are still rejected.
+- 2026-10-27 — Accelerator validation lives in core (`CanonicalAccelerator`): Wails syntax, at least one of CmdOrCtrl/Ctrl/Alt/Super, duplicates compared case- and alias-insensitively. — Rejects shortcuts that would swallow normal typing before the OS is asked.
+- 2026-10-27 — Windows/Linux `DisableQuitOnLastWindowClosed` and macOS `ApplicationShouldTerminateAfterLastWindowClosed: false`; the desktop shell quits explicitly. — Needed for close-to-tray and the hidden popup window.
+- 2026-10-27 — `MetadataView` carries `sizeBytes`, `make`, `model`, `dateTaken` and current editable `fields` in addition to the spec's fields. — The inspector header and the edit dialog need them; avoids a second call.
+- 2026-10-27 — The first-hide-to-tray toast waits until the window is visible again. — The window is hidden when the event arrives.
+- 2026-10-27 — Builders run with reduced test parallelism (`go test -p 2`, `vitest --maxWorkers=2`). — The dev machine had < 4 GB free RAM with six worktrees building at once.
