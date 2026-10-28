@@ -320,3 +320,30 @@ func TestSettingsInvalidStoredHotkeysFallBack(t *testing.T) {
 		t.Fatalf("got %+v", s.Current())
 	}
 }
+
+func TestSettingsBeforeChangeCanAbort(t *testing.T) {
+	st := newMemStore()
+	s, err := NewSettingsService(st, NopEmitter{}, filepath.Join(t.TempDir(), "lib"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fail := true
+	s.BeforeChange(func(old, next Settings) error {
+		if old.StartAtLogin != next.StartAtLogin && fail {
+			return ValidationError("Couldn't change start at login", map[string]string{"startAtLogin": "denied"})
+		}
+		return nil
+	})
+	var changed int
+	s.OnChange(func(Settings, Settings) { changed++ })
+	if _, err := s.Update(context.Background(), SettingsPatch{StartAtLogin: ptr(true)}); !IsCode(err, CodeValidation) {
+		t.Fatalf("err = %v", err)
+	}
+	if s.Current().StartAtLogin || st.m["startAtLogin"] == "true" || changed != 0 {
+		t.Fatal("aborted update was applied")
+	}
+	fail = false
+	if next, err := s.Update(context.Background(), SettingsPatch{StartAtLogin: ptr(true)}); err != nil || !next.StartAtLogin || changed != 1 {
+		t.Fatalf("second update: %+v %v", next, err)
+	}
+}

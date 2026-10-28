@@ -22,6 +22,7 @@ type SettingsService struct {
 	current    Settings
 	supportDir string
 	hooks      []func(old, new Settings)
+	preHooks   []func(old, next Settings) error
 }
 
 // Default setting values.
@@ -341,6 +342,12 @@ func (s *SettingsService) Update(ctx context.Context, p SettingsPatch) (Settings
 			return old, err
 		}
 	}
+	for _, h := range s.preHooks {
+		if err := h(old.clone(), next.clone()); err != nil {
+			s.mu.Unlock()
+			return old.clone(), err
+		}
+	}
 	for _, w := range []struct {
 		changed bool
 		key     string
@@ -421,6 +428,17 @@ func (s *SettingsService) SetModuleState(ctx context.Context, moduleID, stateJSO
 		return fmt.Errorf("save module state: %w", err)
 	}
 	return nil
+}
+
+// BeforeChange registers a hook that runs during Update after validation and
+// before anything is persisted; returning an error aborts the update (use
+// ValidationError with a field to show it inline). It runs under the settings
+// lock, so it must be quick and must not call back into the service. Used to
+// apply OS state that can fail (start at login).
+func (s *SettingsService) BeforeChange(fn func(old, next Settings) error) {
+	s.mu.Lock()
+	s.preHooks = append(s.preHooks, fn)
+	s.mu.Unlock()
 }
 
 // OnChange registers a hook called after every successful Update.
