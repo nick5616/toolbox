@@ -63,7 +63,7 @@ func TestSplitEvery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.outputs) != 6 || filepath.Base(r.outputs[2]) != "doc (pages 3).pdf" {
+	if len(r.outputs) != 6 || filepath.Base(r.outputs[2]) != "doc (page 3).pdf" {
 		t.Errorf("every=1 outputs = %v", r.outputs)
 	}
 }
@@ -83,7 +83,7 @@ func TestSplitRanges(t *testing.T) {
 		names = append(names, filepath.Base(p))
 		pages = append(pages, mustInfo(t, m, p, "").Pages)
 	}
-	if strings.Join(names, "|") != "doc (pages 1-3).pdf|doc (pages 5).pdf|doc (pages 6).pdf" || pages[0] != 3 || pages[1] != 1 || pages[2] != 1 {
+	if strings.Join(names, "|") != "doc (pages 1-3).pdf|doc (page 5).pdf|doc (page 6).pdf" || pages[0] != 3 || pages[1] != 1 || pages[2] != 1 {
 		t.Errorf("names = %v pages = %v", names, pages)
 	}
 

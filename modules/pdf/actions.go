@@ -97,7 +97,7 @@ func (r *runner) split(ctx context.Context) error {
 			// recompute the page span from the position instead.
 			from := i*r.opts.Every + 1
 			to := min(from+r.opts.Every-1, info.Pages)
-			dst := r.outPath(stem, " (pages "+pageRange{from, to}.label()+")")
+			dst := r.outPath(stem, " ("+pageRange{from, to}.fileLabel()+")")
 			if err := moveFile(p.path, dst); err != nil {
 				return fail(err)
 			}
@@ -110,7 +110,7 @@ func (r *runner) split(ctx context.Context) error {
 			return fieldErr("ranges", capitalize(err.Error()))
 		}
 		for i, rg := range ranges {
-			dst := r.outPath(stem, " (pages "+rg.label()+")")
+			dst := r.outPath(stem, " ("+rg.fileLabel()+")")
 			if err := api.CollectFile(ctx, in, dst, []string{rg.label()}, c); err != nil {
 				return fail(err)
 			}

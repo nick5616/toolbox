@@ -19,6 +19,14 @@ func (r pageRange) label() string {
 	return fmt.Sprintf("%d-%d", r.From, r.To)
 }
 
+// fileLabel names a split output: "page 5" or "pages 1-3".
+func (r pageRange) fileLabel() string {
+	if r.From == r.To {
+		return "page " + r.label()
+	}
+	return "pages " + r.label()
+}
+
 // parseRanges parses "1-3, 5, 8-" into ranges, in the order given. "8-" runs
 // to the last page. total is the page count; total <= 0 skips the upper-bound
 // check (syntax-only validation at submit time) and leaves open ranges at 0.
