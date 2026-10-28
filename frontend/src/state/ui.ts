@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { FilesDropped } from "@/lib/api";
 
-/** View ids: "library", "settings", or a module id. */
+/** View ids: "library", "settings", "setup" (the setup overlay), or a module id. */
 export type ViewId = string;
 
 export interface Handoff {
@@ -11,6 +11,8 @@ export interface Handoff {
 
 interface UIState {
   view: ViewId;
+  /** The view to go back to when the "setup" overlay closes. */
+  returnView: ViewId;
   sidebarCollapsed: boolean;
   comingSoonOpen: boolean;
   trayOpen: boolean;
@@ -55,6 +57,7 @@ const saved = load();
 
 export const useUI = create<UIState>((set, get) => ({
   view: initialView(saved),
+  returnView: "library",
   sidebarCollapsed: saved.sidebarCollapsed ?? false,
   comingSoonOpen: saved.comingSoonOpen ?? false,
   trayOpen: saved.trayOpen ?? false,
@@ -64,7 +67,8 @@ export const useUI = create<UIState>((set, get) => ({
   handoff: null,
   expandedLogJobId: null,
 
-  navigate: (view) => set({ view }),
+  navigate: (view) =>
+    set((s) => (view === "setup" && s.view !== "setup" ? { view, returnView: s.view } : { view })),
   setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
   setComingSoonOpen: (comingSoonOpen) => set({ comingSoonOpen }),
   setTrayOpen: (trayOpen) => set({ trayOpen }),

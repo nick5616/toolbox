@@ -1,0 +1,10 @@
+.banner {
+  flex: none;
+  margin: var(--space-2) var(--space-4) 0;
+}
+
+.path {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}

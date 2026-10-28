@@ -6,6 +6,8 @@ import { useUI } from "@/state/ui";
 import { toolViews } from "@/tools";
 import { ComingSoonView } from "@/views/ComingSoonView";
 import { LibraryView } from "@/views/LibraryView";
+import { SetupView } from "@/views/setup/SetupView";
+import { ToolsFolderBanner } from "@/views/setup/ToolsFolderBanner";
 import { SettingsView } from "@/views/SettingsView";
 import { CommandPalette } from "./CommandPalette";
 import { DropOverlay } from "./DropOverlay";
@@ -35,6 +37,7 @@ function ViewRouter({ view }: { view: string }) {
 
 export function Shell() {
   const view = useUI((s) => s.view);
+  const returnView = useUI((s) => s.returnView);
   const collapsed = useUI((s) => s.sidebarCollapsed);
   const setPaletteOpen = useUI((s) => s.setPaletteOpen);
   const byId = useModules((s) => s.byId);
@@ -55,11 +58,13 @@ export function Shell() {
             <Kbd combo="Mod+K" />
           </Button>
         </header>
+        <ToolsFolderBanner />
         <main className={styles.view}>
-          <ViewRouter view={view} />
+          <ViewRouter view={view === "setup" ? returnView : view} />
         </main>
         <JobTray />
       </div>
+      {view === "setup" ? <SetupView overlay onClose={() => useUI.getState().navigate(returnView)} /> : null}
       <CommandPalette />
       <DropOverlay />
       <Toaster />

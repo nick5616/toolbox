@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { bootstrap, bootstrapPopup } from "@/state/bootstrap";
+import { usePacksSync } from "@/state/packs";
+import { useSettings } from "@/state/settings";
 import { toAppError, type AppErrorShape } from "@/lib/errors";
 import { PopupShell } from "@/shell/PopupShell";
 import { Shell } from "@/shell/Shell";
 import { BootError } from "@/views/BootError";
+import { SetupView } from "@/views/setup/SetupView";
 
 type BootState = { kind: "loading" } | { kind: "ready" } | { kind: "error"; error: AppErrorShape };
 
@@ -11,6 +14,13 @@ type BootState = { kind: "loading" } | { kind: "ready" } | { kind: "error"; erro
 export function windowKind(search: string = window.location.search): { popup: boolean; view: string } {
   const q = new URLSearchParams(search);
   return { popup: q.get("window") === "popup", view: q.get("view") ?? "" };
+}
+
+/** The main window: first-run setup until `setup.done`, then the shell. */
+function MainWindow() {
+  usePacksSync();
+  const done = useSettings((s) => s.settings.setup.done);
+  return done ? <Shell /> : <SetupView />;
 }
 
 export function App() {
@@ -26,5 +36,5 @@ export function App() {
 
   if (boot.kind === "loading") return null;
   if (boot.kind === "error") return <BootError error={boot.error} onReload={() => window.location.reload()} />;
-  return win.popup ? <PopupShell view={win.view} /> : <Shell />;
+  return win.popup ? <PopupShell view={win.view} /> : <MainWindow />;
 }
