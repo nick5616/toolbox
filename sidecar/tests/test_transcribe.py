@@ -70,17 +70,17 @@ def test_unique_path(tmp_path: Path):
     d = str(tmp_path)
     assert tr.unique_path(d, "a", "txt") == os.path.join(d, "a.txt")
     (tmp_path / "a.txt").write_text("x")
+    assert tr.unique_path(d, "a", "txt") == os.path.join(d, "a (1).txt")
+    (tmp_path / "a (1).txt").write_text("x")
     assert tr.unique_path(d, "a", "txt") == os.path.join(d, "a (2).txt")
-    (tmp_path / "a (2).txt").write_text("x")
-    assert tr.unique_path(d, "a", "txt") == os.path.join(d, "a (3).txt")
 
 
 def test_write_new_never_overwrites(tmp_path: Path):
     (tmp_path / "a.txt").write_text("old")
     p = tr._write_new(str(tmp_path), "a", "txt", "new")
-    assert p.endswith("a (2).txt")
+    assert p.endswith("a (1).txt")
     assert (tmp_path / "a.txt").read_text() == "old"
-    assert sorted(os.listdir(tmp_path)) == ["a (2).txt", "a.txt"]  # no temp left
+    assert sorted(os.listdir(tmp_path)) == ["a (1).txt", "a.txt"]  # no temp left
 
 
 class FakeModel:
@@ -184,7 +184,7 @@ def test_run_existing_outputs_not_overwritten(audio, tmp_path, cap, fake):
     p = params(audio, tmp_path, formats=["txt"])
     tr.run(cap.ctx, p)
     res = tr.run(cap.ctx, p)
-    assert os.path.basename(res["outputs"][0]) == "in (2).txt"
+    assert os.path.basename(res["outputs"][0]) == "in (1).txt"
 
 
 def test_cancel_between_segments(audio, tmp_path, cap, fake):

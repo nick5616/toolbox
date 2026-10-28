@@ -69,9 +69,10 @@ def to_json(language: str, duration: float, segments: list[dict[str, Any]]) -> s
 
 
 def unique_path(directory: str, base: str, ext: str) -> str:
-    """<dir>/<base>.<ext>, or "<base> (n).<ext>" if taken. Never overwrites."""
+    """<dir>/<base>.<ext>, or "<base> (1).<ext>", (2)… if taken (like Go's
+    core.UniquePath). Never overwrites."""
     path = os.path.join(directory, f"{base}.{ext}")
-    n = 1
+    n = 0
     while os.path.exists(path):
         n += 1
         path = os.path.join(directory, f"{base} ({n}).{ext}")
