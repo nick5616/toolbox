@@ -26,6 +26,8 @@ type Paths struct {
 	SidecarDir string // installed Python project + .venv
 	PythonDir  string // uv-managed CPython installs
 	ModelsDir  string // downloaded ML models
+	// Clipboard history images (Phase 3)
+	ClipboardDir string
 }
 
 // NewPaths derives all paths from a support dir.
@@ -41,6 +43,8 @@ func NewPaths(supportDir string) Paths {
 		SidecarDir: filepath.Join(supportDir, "sidecar"),
 		PythonDir:  filepath.Join(supportDir, "python"),
 		ModelsDir:  filepath.Join(supportDir, "models"),
+
+		ClipboardDir: filepath.Join(supportDir, "clipboard"),
 	}
 }
 

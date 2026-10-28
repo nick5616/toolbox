@@ -250,7 +250,7 @@ type FileInfo struct {
 
 // Navigate is the payload of app:navigate.
 type Navigate struct {
-	Target string `json:"target"` // "settings" | "library" | module ID
+	Target string `json:"target"` // "settings" | "library" | "palette" (open the command palette) | module ID
 }
 
 // AppInfo describes the running app and its directories.

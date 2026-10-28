@@ -3,15 +3,7 @@
 // is built.
 package placeholders
 
-import (
-	"slices"
-
-	"toolbox/core"
-)
-
-var rawPhoto = []string{".dng", ".cr2", ".cr3", ".nef", ".arw", ".raf", ".orf", ".rw2"}
-
-func concat(sets ...[]string) []string { return slices.Concat(sets...) }
+import "toolbox/core"
 
 // Descriptors returns every placeholder.
 func Descriptors() []core.Descriptor {
@@ -24,14 +16,6 @@ func Descriptors() []core.Descriptor {
 			Tagline:     "Enlarge images without the blur",
 			Description: "Upscale images 2× or 4× with Real-ESRGAN running on your machine.",
 			Accepts:     core.Accepts{Extensions: core.ImageExtensions}},
-		{ID: "exif", Name: "EXIF", Icon: "scan-search", Category: core.CategoryImage, Order: 160,
-			Tagline:     "View, edit or strip photo metadata",
-			Description: "Inspect camera metadata, edit fields, or strip location and personal data before sharing.",
-			Accepts:     core.Accepts{Extensions: concat(core.ImageExtensions, rawPhoto)}},
-		{ID: "transcribe", Name: "Transcribe", Icon: "captions", Category: core.CategoryAI, Order: 170,
-			Tagline:     "Speech to text, fully offline",
-			Description: "Transcribe audio and video locally with whisper.cpp, exporting text and subtitles.",
-			Accepts:     core.Accepts{Extensions: concat(core.AudioExtensions, core.VideoExtensions)}},
 		{ID: "llm-chat", Name: "Local Chat", Icon: "message-square", Category: core.CategoryAI, Order: 180,
 			Tagline:     "Chat with local models via Ollama",
 			Description: "A private chat interface for language models running on this machine."},
@@ -45,9 +29,6 @@ func Descriptors() []core.Descriptor {
 		{ID: "vault", Name: "Vault", Icon: "lock", Category: core.CategoryUtility, Order: 210,
 			Tagline:     "Encrypt files you want kept private",
 			Description: "An encrypted folder for sensitive files, unlocked only when you need it."},
-		{ID: "clipboard", Name: "Clipboard History", Icon: "clipboard", Category: core.CategoryUtility, Order: 220,
-			Tagline:     "Everything you copied, one hotkey away",
-			Description: "A searchable clipboard history with a global hotkey popup."},
 	}
 }
 

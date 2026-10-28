@@ -42,7 +42,7 @@ func TestMigrationsIdempotent(t *testing.T) {
 	}
 	defer db.Close()
 	var n int
-	if err := db.sql.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 2 {
+	if err := db.sql.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 3 {
 		t.Fatalf("migrations = %d, %v", n, err)
 	}
 	if v, ok, _ := db.GetSetting(context.Background(), "k"); !ok || v != `"v"` {
@@ -369,7 +369,7 @@ func TestMigrationUpgradesPhase1DB(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Simulate a Phase 1 database: only migration 0001 applied.
-	for _, q := range []string{`ALTER TABLE jobs DROP COLUMN result`, `DELETE FROM schema_migrations WHERE version = 2`} {
+	for _, q := range []string{`ALTER TABLE jobs DROP COLUMN result`, `DROP TABLE clip_items`, `DELETE FROM schema_migrations WHERE version >= 2`} {
 		if _, err := db.sql.Exec(q); err != nil {
 			t.Fatal(err)
 		}
@@ -389,5 +389,29 @@ func TestMigrationUpgradesPhase1DB(t *testing.T) {
 	got, err := db.GetJob(ctx, "j1")
 	if err != nil || got.ResultJSON != `{"bpm":120}` {
 		t.Fatalf("result = %q, %v", got.ResultJSON, err)
+	}
+}
+
+func TestMigrationUpgradesPhase2DB(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "p2.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a Phase 2 database: migrations 0001–0002 applied.
+	for _, q := range []string{`DROP TABLE clip_items`, `DELETE FROM schema_migrations WHERE version = 3`} {
+		if _, err := db.sql.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+	db, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var n int
+	if err := db.sql.QueryRow(`SELECT count(*) FROM clip_items`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("clip_items: %d, %v", n, err)
 	}
 }

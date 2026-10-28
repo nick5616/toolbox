@@ -303,3 +303,11 @@ func (s *DepsService) UpdateUv() (core.Job, error) {
 	}
 	return s.submitSystem(deps.UVUpdateModuleID)
 }
+
+// UpdateExiftool queues the ExifTool install/update job.
+func (s *DepsService) UpdateExiftool() (core.Job, error) {
+	if s.Jobs.HasActive(s.Reg.RequiringDep(deps.ExifTool)...) {
+		return core.Job{}, core.Errorf(core.CodeConflict, "Wait for running EXIF jobs to finish")
+	}
+	return s.submitSystem(deps.ExifToolUpdateModuleID)
+}

@@ -18,12 +18,16 @@ import (
 	"toolbox/core/deps"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
+	"toolbox/desktop"
 	"toolbox/modules/bpmkey"
+	"toolbox/modules/clipboard"
 	"toolbox/modules/converter"
 	"toolbox/modules/downloader"
+	"toolbox/modules/exif"
 	"toolbox/modules/midi"
 	"toolbox/modules/placeholders"
 	"toolbox/modules/stems"
+	"toolbox/modules/transcribe"
 )
 
 //go:embed all:frontend/dist
@@ -79,9 +83,14 @@ func run() error {
 	defer engine.Stop()
 	depSvc.RegisterVirtual(deps.Spec{
 		ID: sidecar.DepID, Name: "Audio engine", Managed: true,
-		Purpose:     "Python runtime for stems, BPM & key and MIDI (≈1 GB)",
+		Purpose:     "Python runtime for stems, BPM & key, MIDI and transcription (≈1.2 GB)",
 		InstallHint: map[string]string{"darwin": "Install from Settings → Dependencies", "windows": "Install from Settings → Dependencies", "linux": "Install from Settings → Dependencies"},
 	}, func(ctx context.Context) core.DepStatus { return sidecar.Detect(ctx, paths) })
+
+	exifMod := exif.New(depSvc.Resolve)
+	defer exifMod.Close()
+	clipHistory := clipboard.New(clipboard.Config{Store: db, Settings: settings, Emitter: emitter, Dir: paths.ClipboardDir})
+	defer clipHistory.Stop()
 
 	for _, register := range []func() error{
 		func() error { return downloader.Register(reg, filepath.Join(paths.CacheDir, "yt-dlp")) },
@@ -89,7 +98,11 @@ func run() error {
 		func() error { return bpmkey.Register(reg, engine) },
 		func() error { return midi.Register(reg, engine) },
 		func() error { return converter.Register(reg) },
+		func() error { return transcribe.Register(reg, engine, paths.ModelsDir) },
+		func() error { return exif.Register(reg, exifMod) },
+		func() error { return clipboard.Register(reg) },
 		func() error { return placeholders.Register(reg) },
+		func() error { return deps.RegisterExifToolUpdater(reg, depSvc) },
 		func() error { return deps.RegisterUpdater(reg, depSvc) },
 		func() error { return deps.RegisterUVUpdater(reg, depSvc) },
 		func() error {
@@ -118,7 +131,9 @@ func run() error {
 		return err
 	}
 	go depSvc.Detect(ctx)
+	clipHistory.Start(ctx)
 
+	desktopSvc := &api.DesktopService{} // Shell is set once the app exists
 	opts := api.Options()
 	app := application.New(application.Options{
 		Name:        "Toolbox",
@@ -129,19 +144,27 @@ func run() error {
 			application.NewServiceWithOptions(&api.LibraryService{Outputs: db, Settings: settings, Paths: paths, Em: emitter}, opts),
 			application.NewServiceWithOptions(&api.SettingsService{Settings: settings, Paths: paths}, opts),
 			application.NewServiceWithOptions(&api.DepsService{Deps: depSvc, Jobs: jobs, Reg: reg, Engine: engine, Paths: paths}, opts),
-			application.NewServiceWithOptions(&api.FilesService{Reg: reg}, opts),
+			application.NewServiceWithOptions(&api.FilesService{Reg: reg, Settings: settings, Paths: paths}, opts),
+			application.NewServiceWithOptions(desktopSvc, opts),
 			application.NewServiceWithOptions(downloader.NewService(jobs), opts),
 			application.NewServiceWithOptions(stems.NewService(jobs), opts),
 			application.NewServiceWithOptions(bpmkey.NewService(jobs), opts),
 			application.NewServiceWithOptions(midi.NewService(jobs), opts),
 			application.NewServiceWithOptions(converter.NewService(jobs), opts),
+			application.NewServiceWithOptions(transcribe.NewService(jobs), opts),
+			application.NewServiceWithOptions(exif.NewService(jobs, exifMod), opts),
+			application.NewServiceWithOptions(clipboard.NewService(clipHistory), opts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
+		// The app lives in the tray: closing windows never quits by itself;
+		// the desktop shell decides (KeepInTray) and quits explicitly.
 		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
+			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
+		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true},
+		Linux:   application.LinuxOptions{DisableQuitOnLastWindowClosed: true},
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID: "dev.toolbox.app",
 			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
@@ -186,6 +209,22 @@ func run() error {
 			applyTitleBar()
 		}
 	})
+
+	// --- desktop shell (WP-D1): tray, close-to-tray, login item, hotkeys, popup ---
+	shell := desktop.New(desktop.Options{
+		App: app, Main: win, Settings: settings, Jobs: jobs, Outputs: db, Emitter: emitter,
+		Clipboard: clipHistory,
+		DarkMode: func() bool {
+			t := settings.Current().Theme
+			return t == core.ThemeDark || (t == core.ThemeSystem && app.Env.IsDarkMode())
+		},
+	})
+	if err := shell.Start(); err != nil {
+		return err
+	}
+	desktopSvc.Shell = shell
+	clipHistory.SetPopupOpener(shell.TogglePopup)
+	// --- end desktop shell ---
 
 	win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
 		files := e.Context().DroppedFiles()

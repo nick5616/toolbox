@@ -19,6 +19,13 @@ func init() {
 	application.RegisterEvent[core.Settings]("settings:changed")
 	application.RegisterEvent[core.FilesDropped]("app:files-dropped")
 	application.RegisterEvent[core.Navigate]("app:navigate")
+
+	application.RegisterEvent[core.ClipItem]("clipboard:added")
+	application.RegisterEvent[core.ClipsRemoved]("clipboard:removed")
+	application.RegisterEvent[core.ClipboardState]("clipboard:state")
+	application.RegisterEvent[core.HotkeysChanged]("hotkeys:status")
+	application.RegisterEvent[core.ShowView]("window:show")
+	application.RegisterEvent[core.HiddenToTray]("app:hidden-to-tray")
 }
 
 // Emitter adapts the Wails event manager to core.Emitter.
