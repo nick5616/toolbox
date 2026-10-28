@@ -66,13 +66,23 @@ func Catalog() []Spec {
 			},
 		},
 		{
-			ID: UV, Name: "uv", Purpose: "Installs the Python runtime for the audio engine",
+			ID: Upscayl, Name: "Upscaler engine", Purpose: "Real-ESRGAN image upscaling on your GPU (≈50 MB)",
+			Binary: "upscayl-bin", Managed: true, ArchiveDir: "upscaler",
+			VersionFile: "VERSION", PinnedVersion: UpscaylVersion,
+			InstallHint: map[string]string{
+				"darwin":  "Install it in Settings → Dependencies",
+				"windows": "Install it in Settings → Dependencies",
+				"linux":   "The upscaler isn't available for this platform yet",
+			},
+		},
+		{
+			ID: UV, Name: "uv", Purpose: "Installs the Python runtime for the AI engine",
 			Binary: "uv", VersionArgs: []string{"--version"},
 			VersionRegex: regexp.MustCompile(`^uv (\S+)`), Managed: true,
 			InstallHint: map[string]string{
-				"darwin":  "Installed with the audio engine",
-				"windows": "Installed with the audio engine",
-				"linux":   "Installed with the audio engine",
+				"darwin":  "Installed with the AI engine",
+				"windows": "Installed with the AI engine",
+				"linux":   "Installed with the AI engine",
 			},
 		},
 	}

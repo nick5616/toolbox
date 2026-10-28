@@ -122,10 +122,10 @@ describe("DepsGate", () => {
     useDeps.getState().setAll([dep("audio-engine", DepState.DepMissing)]);
     installEngine.mockResolvedValue({ id: "j1", moduleId: "system-audio-engine", status: "queued", inputs: null, outputs: null });
     const { result } = renderHook(() => useDepsGate("stems"));
-    expect(result.current).toEqual({ blocked: true, reason: "The audio engine isn't installed" });
+    expect(result.current).toEqual({ blocked: true, reason: "The AI engine isn't installed" });
     render(<DepsGate moduleId="stems" />);
-    expect(screen.getByText("The audio engine isn't installed")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Install audio engine/ }));
+    expect(screen.getByText("The AI engine isn't installed")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Install AI engine/ }));
     await waitFor(() => expect(installEngine).toHaveBeenCalled());
   });
 
@@ -141,7 +141,7 @@ describe("DepsGate", () => {
   it("shows an update banner when outdated", () => {
     useDeps.getState().setAll([dep("audio-engine", DepState.DepOutdated)]);
     render(<DepsGate moduleId="stems" />);
-    expect(screen.getByText("The audio engine needs an update")).toBeTruthy();
+    expect(screen.getByText("The AI engine needs an update")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Update" })).toBeTruthy();
   });
 

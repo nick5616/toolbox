@@ -13,7 +13,7 @@ export const EXIFTOOL_ID = "exiftool";
 export const EXIFTOOL_JOB_MODULE = "system-exiftool-update";
 
 export interface DepsGateState {
-  /** True while a required dependency (incl. the audio engine) isn't OK. */
+  /** True while a required dependency (incl. the AI engine) isn't OK. */
   blocked: boolean;
   /** User-facing reason shown under the run button when blocked. */
   reason: string;
@@ -21,7 +21,7 @@ export interface DepsGateState {
 
 function reasonFor(id: string, name: string, state: DepState | undefined): string {
   if (id === AUDIO_ENGINE_ID) {
-    return state === DepState.DepOutdated ? "The audio engine needs an update" : "The audio engine isn't installed";
+    return state === DepState.DepOutdated ? "The AI engine needs an update" : "The AI engine isn't installed";
   }
   if (id === "ffmpeg" || id === "ffprobe") return "ffmpeg is required";
   return `${name} isn't installed`;
@@ -105,18 +105,18 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
         <Banner
           key={id}
           tone={outdated ? "warn" : "info"}
-          title={outdated ? "The audio engine needs an update" : "The audio engine isn't installed"}
+          title={outdated ? "The AI engine needs an update" : "The AI engine isn't installed"}
           action={
             <Button variant="primary" size="sm" loading={busy} onClick={() => void installEngine()}>
-              {outdated ? "Update" : "Install audio engine"}
+              {outdated ? "Update" : "Install AI engine"}
             </Button>
           }
         >
           {busy && job?.message
             ? job.message
             : outdated
-              ? "Update the Python engine to keep using stem splitting, BPM & key, MIDI and transcription."
-              : "Stem splitting, BPM & key, MIDI and transcription run locally on a Python engine (about 1.2 GB download, 1.4 GB on disk)."}
+              ? "Update the AI engine to keep using the audio tools, transcription, background removal and CPU upscaling."
+              : "Stems, BPM & key, MIDI, transcription and background removal run locally on a Python engine (about 1.2 GB download, 1.4 GB on disk)."}
         </Banner>,
       );
     } else if (id === EXIFTOOL_ID) {

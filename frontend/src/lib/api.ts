@@ -20,6 +20,9 @@ export * as ConverterService from "@bindings/modules/converter/service";
 export * as ClipboardService from "@bindings/modules/clipboard/service";
 export * as TranscribeService from "@bindings/modules/transcribe/service";
 export * as ExifService from "@bindings/modules/exif/service";
+export * as BgRemoveService from "@bindings/modules/bgremove/service";
+export * as UpscaleService from "@bindings/modules/upscale/service";
+export * as PdfService from "@bindings/modules/pdf/service";
 
 export {
   Category,
@@ -67,6 +70,7 @@ export type {
   Settings,
   SettingsPatch,
   ShowView,
+  Size,
 } from "@bindings/core/models";
 
 export {
@@ -99,3 +103,24 @@ export type {
   Options as ExifOptions,
   Result as ExifResult,
 } from "@bindings/modules/exif/models";
+export { Model as BgModel, Output as BgOutput } from "@bindings/modules/bgremove/models";
+export type { Options as BgRemoveOptions, Result as BgRemoveResult } from "@bindings/modules/bgremove/models";
+export {
+  Device as UpscaleDevice,
+  Format as UpscaleFormat,
+  Model as UpscaleModel,
+} from "@bindings/modules/upscale/models";
+export type {
+  Limits as UpscaleLimits,
+  ModelInfo as UpscaleModelInfo,
+  Options as UpscaleOptions,
+  Result as UpscaleResult,
+} from "@bindings/modules/upscale/models";
+export { Action as PdfAction } from "@bindings/modules/pdf/models";
+export type {
+  Info as PdfInfo,
+  Options as PdfOptions,
+  PageEdit as PdfPageEdit,
+  PageSize as PdfPageSize,
+  Result as PdfResult,
+} from "@bindings/modules/pdf/models";

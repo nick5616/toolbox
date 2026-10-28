@@ -16,7 +16,7 @@ export function defaultSettings(): Settings {
     keepInTray: true,
     startAtLogin: false,
     hotkeys: { ...DEFAULT_HOTKEYS },
-    clipboard: { enabled: false, images: true, retentionDays: 30, maxItems: 500 },
+    clipboard: { enabled: false, images: true, retentionDays: 30, maxItems: 500, autoPaste: false },
   };
 }
 

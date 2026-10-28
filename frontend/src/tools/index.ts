@@ -18,6 +18,9 @@ export const toolViews: Record<string, LazyExoticComponent<ComponentType<ToolVie
   transcribe: lazy(() => import("./transcribe/TranscribeView")),
   exif: lazy(() => import("./exif/ExifView")),
   clipboard: lazy(() => import("./clipboard/ClipboardView")),
+  "bg-remover": lazy(() => import("./bgremove/BgRemoveView")),
+  upscaler: lazy(() => import("./upscale/UpscaleView")),
+  pdf: lazy(() => import("./pdf/PdfView")),
 };
 
 /**

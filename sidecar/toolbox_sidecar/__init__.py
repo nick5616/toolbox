@@ -1,3 +1,3 @@
-"""Toolbox audio engine: a long-running sidecar speaking JSON Lines on stdio."""
+"""Toolbox AI engine: a long-running sidecar speaking JSON Lines on stdio."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

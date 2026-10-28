@@ -30,6 +30,31 @@ export function HotkeyStatus(): $CancellablePromise<core$0.HotkeyStatus[] | null
 }
 
 /**
+ * PasteAfterCopy hides the popup and, when auto-paste is enabled, pastes the
+ * just-copied item into the app that was focused before the popup opened.
+ * Without auto-paste (or permission) it only hides the popup.
+ */
+export function PasteAfterCopy(): $CancellablePromise<void> {
+    return $Call.ByID(1785522896);
+}
+
+/**
+ * PastePermission reports whether auto-paste can send keystrokes:
+ * "granted", "denied" (macOS Accessibility not allowed) or "unsupported".
+ */
+export function PastePermission(): $CancellablePromise<string> {
+    return $Call.ByID(2535001346);
+}
+
+/**
+ * RequestPastePermission asks the OS for the permission auto-paste needs
+ * (macOS: the Accessibility prompt). No-op elsewhere.
+ */
+export function RequestPastePermission(): $CancellablePromise<void> {
+    return $Call.ByID(458284165);
+}
+
+/**
  * ShowMain shows and focuses the main window, optionally navigating to view
  * ("palette", "settings", "library" or a module ID).
  */

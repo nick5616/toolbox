@@ -307,6 +307,14 @@ func (s *DepsService) UpdateUv() (core.Job, error) {
 	return s.submitSystem(deps.UVUpdateModuleID)
 }
 
+// InstallUpscaler queues the upscaler install/update job (pinned versions).
+func (s *DepsService) InstallUpscaler() (core.Job, error) {
+	if s.Jobs.HasActive(s.Reg.RequiringDep(deps.Upscayl)...) {
+		return core.Job{}, core.Errorf(core.CodeConflict, "Wait for running upscaling jobs to finish")
+	}
+	return s.submitSystem(deps.UpscalerInstallModuleID)
+}
+
 // UpdateExiftool queues the ExifTool install/update job.
 func (s *DepsService) UpdateExiftool() (core.Job, error) {
 	if s.Jobs.HasActive(s.Reg.RequiringDep(deps.ExifTool)...) {

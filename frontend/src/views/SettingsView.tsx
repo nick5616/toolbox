@@ -67,7 +67,7 @@ function DepChip({ dep }: { dep: DepView }) {
   return <Badge tone={dep.required ? "danger" : "warn"}>Missing</Badge>;
 }
 
-/** Audio engine actions (install/update/repair/remove) plus the models sub-row. */
+/** AI engine actions (install/update/repair/remove) plus the models sub-row. */
 function AudioEngineActions({ dep }: { dep: DepView }) {
   const jobsById = useJobs((s) => s.byId);
   const busy = useMemo(
@@ -92,7 +92,7 @@ function AudioEngineActions({ dep }: { dep: DepView }) {
     setConfirmRemove(false);
     try {
       await DepsService.RemoveAudioEngine();
-      toast({ title: "Audio engine removed" });
+      toast({ title: "AI engine removed" });
       await useDeps.getState().recheck();
     } catch (e) {
       fail(e);
@@ -113,8 +113,8 @@ function AudioEngineActions({ dep }: { dep: DepView }) {
       <ConfirmDialog
         open={confirmRemove}
         tone="danger"
-        title="Remove the audio engine?"
-        body="Remove the audio engine? This frees about 1.2 GB. Downloaded models are kept."
+        title="Remove the AI engine?"
+        body="Remove the AI engine? This frees about 1.4 GB. Downloaded models are kept."
         confirmLabel="Remove"
         onConfirm={() => void remove()}
         onCancel={() => setConfirmRemove(false)}

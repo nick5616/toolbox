@@ -7,6 +7,9 @@ type DesktopShell interface {
 	HotkeyStatus() []core.HotkeyStatus
 	HidePopup() error
 	ShowMain(view string) error
+	PastePermission() string
+	RequestPastePermission() error
+	PasteAfterCopy() error
 }
 
 // DesktopService exposes the desktop shell (tray, hotkeys, popup) to the UI.
@@ -48,4 +51,35 @@ func (s *DesktopService) ShowMain(view string) error {
 		return err
 	}
 	return sh.ShowMain(view)
+}
+
+// PastePermission reports whether auto-paste can send keystrokes:
+// "granted", "denied" (macOS Accessibility not allowed) or "unsupported".
+func (s *DesktopService) PastePermission() string {
+	sh, err := s.shell()
+	if err != nil {
+		return "unsupported"
+	}
+	return sh.PastePermission()
+}
+
+// RequestPastePermission asks the OS for the permission auto-paste needs
+// (macOS: the Accessibility prompt). No-op elsewhere.
+func (s *DesktopService) RequestPastePermission() error {
+	sh, err := s.shell()
+	if err != nil {
+		return err
+	}
+	return sh.RequestPastePermission()
+}
+
+// PasteAfterCopy hides the popup and, when auto-paste is enabled, pastes the
+// just-copied item into the app that was focused before the popup opened.
+// Without auto-paste (or permission) it only hides the popup.
+func (s *DesktopService) PasteAfterCopy() error {
+	sh, err := s.shell()
+	if err != nil {
+		return err
+	}
+	return sh.PasteAfterCopy()
 }

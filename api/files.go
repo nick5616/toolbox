@@ -13,6 +13,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"toolbox/core"
+	"toolbox/core/imaging"
 )
 
 // FilesService lets tools pick and inspect local input files.
@@ -131,4 +132,16 @@ func (s *FilesService) ImageDataURL(path string) (string, error) {
 		return "", fmt.Errorf("read %s: %w", path, err)
 	}
 	return "data:" + typ + ";base64," + base64.StdEncoding.EncodeToString(b), nil
+}
+
+// ImageThumb returns an image (jpg, png, gif, webp, bmp, tif/tiff; ≤ 400 MB,
+// ≤ 300 MP) as a data URL scaled so its longest side is ≤ maxDim (64..1600).
+// PNG when the image has transparency, else JPEG. HEIC → validation error.
+func (s *FilesService) ImageThumb(path string, maxDim int) (string, error) {
+	return imaging.Default().Thumb(path, maxDim)
+}
+
+// ImageSize returns an image's pixel dimensions (header only).
+func (s *FilesService) ImageSize(path string) (core.Size, error) {
+	return imaging.Size(path)
 }

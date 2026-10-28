@@ -84,9 +84,10 @@ desktop/   tray, close-to-tray, login item, global hotkeys, popup window   (Wail
 core/      registry · jobs · jobcontext · errors · types · events · paths · settings
 core/proc  subprocess runner with whole-tree kill and hidden windows
 core/store SQLite (modernc.org/sqlite, no CGO): jobs, logs, outputs, tags, settings
-core/deps  external tool detection + managed installs (yt-dlp, uv, ExifTool archive)
+core/deps  external tool detection + managed installs (yt-dlp, uv, ExifTool + upscaler archives)
+core/imaging  pure-Go image sizes + scaled previews (jpg/png/gif/webp/bmp/tiff; no HEIC)
 modules/   one folder per module (downloader, placeholders, …)
-sidecar/   Python audio engine (stems, BPM/key, MIDI, transcription) over stdio JSON lines
+sidecar/   Python "AI engine" (stems, BPM/key, MIDI, transcription, background removal, CPU upscaling, HEIC decoding) over stdio JSON lines
 ```
 
 Rules:
@@ -134,9 +135,9 @@ The job manager creates `OutputDir` and `TempDir` before `Run`, deletes `TempDir
 
 ---
 
-## Audio engine (Python sidecar)
+## AI engine (Python sidecar)
 
-The audio tools (stems, BPM & key, audio→MIDI) run on a local Python 3.12 engine managed by **uv**. Full design: SPEC.md §4 (Phase 2).
+The audio tools, transcription, background removal, CPU upscaling and HEIC decoding run on a local Python 3.12 engine managed by **uv**. Full design: `docs/specs/phase-2.md` §4. Users see it as **"AI engine"**; in code it is still `sidecar.DepID = "audio-engine"` (renaming the ID would churn stored state).
 
 - **Source:** `sidecar/` (pyproject + `uv.lock` + `toolbox_sidecar/`). Go embeds it (`sidecar/embed.go`, package `sidecarfiles`, `Hash()`); the app writes it into `<support>/sidecar/` and runs `uv sync --frozen --no-dev` there. Changing any embedded file changes the hash, so installed engines show as **outdated** until the user clicks Update.
 - **Paths:** venv `<support>/sidecar/.venv`, CPython `<support>/python`, models `<support>/models`, numba cache `<support>/cache/numba`. Nothing goes to `/tmp`, `~/.cache` or the home dir.
@@ -164,8 +165,15 @@ The audio tools (stems, BPM & key, audio→MIDI) run on a local Python 3.12 engi
 - Recording is **off by default** and only starts when the user enables it; the tray and the tool header always show whether it is recording.
 - Never store copies marked sensitive by the OS/password managers (`Data.Sensitive`); skip text > 1 MiB and images > 20 MB.
 - History lives only in the app DB (`clip_items`) and `<support>/clipboard/*.png`; deleting/clearing/pruning removes the image files too. Nothing leaves the machine.
-- The app never pastes into other apps or injects keystrokes; picking an item only copies it.
+- The app sends a keystroke **only** for opt-in auto-paste: exactly one paste chord (Ctrl+V / Cmd+V) after the user picks an item in the popup with `clipboard.autoPaste` on, into the app that was focused before the popup opened. Never otherwise.
 - **Automated checks must not disturb the user's clipboard:** write only test strings you created, read the previous text first and restore it afterwards. No keystroke injection.
+
+## Image tools and PDF Toolkit (Phase 4)
+
+- **Previews:** use `FilesService.ImageThumb(path, maxDim)` (cached, bounded, works for huge outputs) for thumbnails; `ImageDataURL` only for small originals. HEIC has no Go decoder — show a file-type tile.
+- **Upscaler:** `upscayl-bin` (AGPL-3.0) is only ever run as a separate process; its install (`<bin>/upscaler/`) is pinned by version + sha256 in `core/deps` (managed archive v2 with a `VERSION` file).
+- **PDF:** all PDF work stays in Go. pdfcpu must never write its config dir: `api.DisableConfigDir()` once, and always a `model.NewStatelessConfiguration()`. go-pdfium runs as WebAssembly with **no filesystem mounts** (documents are opened from bytes). Passwords are never stored in job options or the DB — only in the PDF module's in-memory secret store, referenced by `passwordRef`.
+- **Engine model downloads** (background removal, CPU upscaling) are verified against pinned sha256 values from the Go presets and live under `<support>/models/{bg,upscale}/`.
 
 ## Conventions
 

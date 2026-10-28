@@ -21,6 +21,7 @@ const (
 	Deno     = "deno"
 	Node     = "node"
 	ExifTool = "exiftool"
+	Upscayl  = "upscayl"
 )
 
 // UpdateModuleID is the hidden system module that installs/updates yt-dlp.
@@ -34,6 +35,8 @@ type Spec struct {
 	VersionRegex      *regexp.Regexp
 	Managed           bool              // app can install/update it
 	ArchiveDir        string            // managed archive install folder under bin ("" = single binary)
+	VersionFile       string            // relative to ArchiveDir: read the version from this file instead of running the binary
+	PinnedVersion     string            // installed VERSION differing from this → outdated (pinned managed archives)
 	InstallHint       map[string]string // GOOS → hint
 }
 

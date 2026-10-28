@@ -142,6 +142,12 @@ export interface ClipboardSettings {
      * 50–5000
      */
     "maxItems": number;
+
+    /**
+     * AutoPaste pastes into the previously focused app after an item is
+     * picked in the popup (opt-in; Phase 4 SPEC §13.2).
+     */
+    "autoPaste": boolean;
 }
 
 /**
@@ -662,6 +668,14 @@ export interface SettingsPatch {
  */
 export interface ShowView {
     "view": string;
+}
+
+/**
+ * Size is an image's pixel dimensions.
+ */
+export interface Size {
+    "w": number;
+    "h": number;
 }
 
 /**

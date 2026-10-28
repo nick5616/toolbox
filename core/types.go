@@ -160,6 +160,9 @@ type ClipboardSettings struct {
 	Images        bool `json:"images"`
 	RetentionDays int  `json:"retentionDays"` // 1, 7, 30, 90, or 0 = forever
 	MaxItems      int  `json:"maxItems"`      // 50–5000
+	// AutoPaste pastes into the previously focused app after an item is
+	// picked in the popup (opt-in; Phase 4 SPEC §13.2).
+	AutoPaste bool `json:"autoPaste"`
 }
 
 // SettingsPatch updates only the non-nil fields.
@@ -276,6 +279,12 @@ type PresetInfo struct {
 	DownloadBytes int64        `json:"downloadBytes"`
 	Stems         []string     `json:"stems"`
 	Speed         string       `json:"speed"` // "fast" | "best"
+}
+
+// Size is an image's pixel dimensions.
+type Size struct {
+	W int `json:"w"`
+	H int `json:"h"`
 }
 
 // ClipKind is the type of a clipboard history item.

@@ -16,6 +16,9 @@ _PACKAGES = {
     "basic_pitch": "basic-pitch",
     "faster_whisper": "faster-whisper",
     "ctranslate2": "ctranslate2",
+    "pillow": "pillow",
+    "pillow_heif": "pillow-heif",
+    "spandrel": "spandrel",
 }
 
 

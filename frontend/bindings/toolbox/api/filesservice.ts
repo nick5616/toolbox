@@ -24,6 +24,22 @@ export function ImageDataURL(path: string): $CancellablePromise<string> {
 }
 
 /**
+ * ImageSize returns an image's pixel dimensions (header only).
+ */
+export function ImageSize(path: string): $CancellablePromise<core$0.Size> {
+    return $Call.ByID(3515101651, path);
+}
+
+/**
+ * ImageThumb returns an image (jpg, png, gif, webp, bmp, tif/tiff; ≤ 400 MB,
+ * ≤ 300 MP) as a data URL scaled so its longest side is ≤ maxDim (64..1600).
+ * PNG when the image has transparency, else JPEG. HEIC → validation error.
+ */
+export function ImageThumb(path: string, maxDim: number): $CancellablePromise<string> {
+    return $Call.ByID(4219969562, path, maxDim);
+}
+
+/**
  * Pick shows a native multi-select file dialog filtered to the module's
  * accepted extensions. Cancelling returns an empty list.
  */

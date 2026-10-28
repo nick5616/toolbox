@@ -47,5 +47,6 @@ export type {
     PresetInfo,
     Settings,
     SettingsPatch,
-    ShowView
+    ShowView,
+    Size
 } from "./models.js";

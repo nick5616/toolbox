@@ -6,6 +6,7 @@ import { useDeps } from "@/state/deps";
 import { useJobs, isActive } from "@/state/jobs";
 import { useUI } from "@/state/ui";
 import { RECENT_ITEM, SETTINGS_ITEM, useNavGroups, type NavItem } from "./nav";
+import logoUrl from "@/assets/logo.svg";
 import styles from "./Sidebar.module.css";
 
 interface ItemProps {
@@ -81,7 +82,12 @@ export function Sidebar() {
   return (
     <nav className={cx(styles.sidebar, collapsed && styles.collapsed)} aria-label="Sidebar">
       <div className={cx(styles.header, isMac && styles.mac)}>
-        {!collapsed && <span className={styles.brand}>Toolbox</span>}
+        {!collapsed && (
+          <span className={styles.brand}>
+            <span className={styles.logo} style={{ maskImage: `url(${logoUrl})`, WebkitMaskImage: `url(${logoUrl})` }} aria-hidden="true" />
+            Toolbox
+          </span>
+        )}
         <IconButton
           size="sm"
           icon="panel-left"

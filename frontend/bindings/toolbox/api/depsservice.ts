@@ -29,6 +29,13 @@ export function InstallAudioEngine(): $CancellablePromise<core$0.Job> {
 }
 
 /**
+ * InstallUpscaler queues the upscaler install/update job (pinned versions).
+ */
+export function InstallUpscaler(): $CancellablePromise<core$0.Job> {
+    return $Call.ByID(2845475036);
+}
+
+/**
  * List returns cached dependency statuses.
  */
 export function List(): $CancellablePromise<core$0.DepStatus[] | null> {

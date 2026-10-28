@@ -82,7 +82,7 @@ describe("Settings audio engine", () => {
     render(<SettingsView />);
     expect(screen.getByRole("button", { name: "Repair" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-    expect(screen.getByText(/frees about 1.2 GB/)).toBeTruthy();
+    expect(screen.getByText(/frees about 1.4 GB/)).toBeTruthy();
     expect(remove).not.toHaveBeenCalled();
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(remove).toHaveBeenCalled());

@@ -20,15 +20,18 @@ import (
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
 	"toolbox/desktop"
+	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
 	"toolbox/modules/clipboard"
 	"toolbox/modules/converter"
 	"toolbox/modules/downloader"
 	"toolbox/modules/exif"
 	"toolbox/modules/midi"
+	"toolbox/modules/pdf"
 	"toolbox/modules/placeholders"
 	"toolbox/modules/stems"
 	"toolbox/modules/transcribe"
+	"toolbox/modules/upscale"
 )
 
 //go:embed all:frontend/dist
@@ -83,13 +86,15 @@ func run() error {
 	engine := sidecar.NewManager(paths, func() (string, error) { return depSvc.Resolve(sidecar.DepID) }, emitter)
 	defer engine.Stop()
 	depSvc.RegisterVirtual(deps.Spec{
-		ID: sidecar.DepID, Name: "Audio engine", Managed: true,
-		Purpose:     "Python runtime for stems, BPM & key, MIDI and transcription (≈1.2 GB)",
+		ID: sidecar.DepID, Name: "AI engine", Managed: true,
+		Purpose:     "Python runtime for stems, BPM & key, MIDI, transcription and background removal (≈1.4 GB)",
 		InstallHint: map[string]string{"darwin": "Install from Settings → Dependencies", "windows": "Install from Settings → Dependencies", "linux": "Install from Settings → Dependencies"},
 	}, func(ctx context.Context) core.DepStatus { return sidecar.Detect(ctx, paths) })
 
 	exifMod := exif.New(depSvc.Resolve)
 	defer exifMod.Close()
+	pdfMod := pdf.New(filepath.Join(paths.CacheDir, "pdfium"))
+	defer pdfMod.Close()
 	clipHistory := clipboard.New(clipboard.Config{Store: db, Settings: settings, Emitter: emitter, Dir: paths.ClipboardDir})
 	defer clipHistory.Stop()
 
@@ -102,8 +107,12 @@ func run() error {
 		func() error { return transcribe.Register(reg, engine, paths.ModelsDir) },
 		func() error { return exif.Register(reg, exifMod) },
 		func() error { return clipboard.Register(reg) },
+		func() error { return bgremove.Register(reg, engine, paths.ModelsDir) },
+		func() error { return upscale.Register(reg, engine, paths.ModelsDir) },
+		func() error { return pdf.Register(reg, pdfMod) },
 		func() error { return placeholders.Register(reg) },
 		func() error { return deps.RegisterExifToolUpdater(reg, depSvc) },
+		func() error { return deps.RegisterUpscalerInstaller(reg, depSvc) },
 		func() error { return deps.RegisterUpdater(reg, depSvc) },
 		func() error { return deps.RegisterUVUpdater(reg, depSvc) },
 		func() error {
@@ -155,6 +164,9 @@ func run() error {
 			application.NewServiceWithOptions(transcribe.NewService(jobs), opts),
 			application.NewServiceWithOptions(exif.NewService(jobs, exifMod), opts),
 			application.NewServiceWithOptions(clipboard.NewService(clipHistory), opts),
+			application.NewServiceWithOptions(bgremove.NewService(jobs), opts),
+			application.NewServiceWithOptions(upscale.NewService(jobs), opts),
+			application.NewServiceWithOptions(pdf.NewService(jobs, pdfMod), opts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

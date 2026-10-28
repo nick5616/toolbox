@@ -45,7 +45,10 @@ def _selftest(real_stdout) -> int:
         import faster_whisper  # noqa: F401
         import librosa  # noqa: F401
         import onnxruntime  # noqa: F401
+        import pillow_heif  # noqa: F401
+        import spandrel  # noqa: F401
         import torch  # noqa: F401
+        from PIL import Image  # noqa: F401
     except Exception as e:
         print(f"selftest failed: {e!r}", file=sys.stderr)
         return 1
