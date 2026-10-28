@@ -33,6 +33,7 @@ type Spec struct {
 	VersionArgs       []string // e.g. ["--version"]
 	VersionRegex      *regexp.Regexp
 	Managed           bool              // app can install/update it
+	ArchiveDir        string            // managed archive install folder under bin ("" = single binary)
 	InstallHint       map[string]string // GOOS → hint
 }
 

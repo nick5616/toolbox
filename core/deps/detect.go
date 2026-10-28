@@ -67,6 +67,11 @@ func isFile(p string) bool {
 func (s *Service) find(sp Spec) (string, core.DepSource) {
 	name := s.exeName(sp.Binary)
 	if s.binDir != "" {
+		if sp.ArchiveDir != "" {
+			if p := filepath.Join(s.binDir, sp.ArchiveDir, name); isFile(p) {
+				return p, core.SourceManaged
+			}
+		}
 		if p := filepath.Join(s.binDir, name); isFile(p) {
 			return p, core.SourceManaged
 		}

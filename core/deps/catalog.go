@@ -58,11 +58,11 @@ func Catalog() []Spec {
 		{
 			ID: ExifTool, Name: "ExifTool", Purpose: "Reads and edits file metadata",
 			Binary: "exiftool", VersionArgs: []string{"-ver"},
-			VersionRegex: regexp.MustCompile(`^(\S+)`),
+			VersionRegex: regexp.MustCompile(`^(\S+)`), Managed: true, ArchiveDir: "exiftool",
 			InstallHint: map[string]string{
-				"darwin":  "brew install exiftool",
-				"windows": "winget install OliverBetz.ExifTool",
-				"linux":   "sudo apt install libimage-exiftool-perl",
+				"darwin":  "Install it in Settings → Dependencies (or: brew install exiftool)",
+				"windows": "Install it in Settings → Dependencies (or: winget install OliverBetz.ExifTool)",
+				"linux":   "Install it in Settings → Dependencies (or: sudo apt install libimage-exiftool-perl)",
 			},
 		},
 		{

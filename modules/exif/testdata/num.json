@@ -1,0 +1,12 @@
+[{
+  "SourceFile": "C:/x/photo.jpg",
+  "GPS:GPSLatitude": 48.858333,
+  "GPS:GPSLatitudeRef": "N",
+  "GPS:GPSLongitude": 2.294444,
+  "GPS:GPSLongitudeRef": "E",
+  "GPS:GPSAltitude": 35.5,
+  "GPS:GPSAltitudeRef": 0,
+  "Composite:GPSLatitude": 48.858333,
+  "Composite:GPSLongitude": 2.294444,
+  "Composite:GPSAltitude": 35.5
+}]
