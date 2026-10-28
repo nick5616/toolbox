@@ -357,5 +357,9 @@ func (s *DepsService) RemoveDeno() error { return s.removeManaged(deps.Deno, dep
 
 // removeManaged deletes a managed archive tool's folder (PK1).
 func (s *DepsService) removeManaged(depID, installModuleID string) error {
-	return core.Errorf(core.CodeInternal, "Removing this tool isn't available yet")
+	busy := append(s.Reg.RequiringDep(depID), s.Reg.RecommendingDep(depID)...)
+	if s.Jobs.HasActive(append(busy, installModuleID)...) {
+		return core.Errorf(core.CodeConflict, "Wait for running jobs to finish")
+	}
+	return s.Deps.RemoveManaged(depID)
 }
