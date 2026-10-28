@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Field, TextField } from "@/components";
+import { Field, IconButton, TextField } from "@/components";
 
 /** Password input with a show/hide toggle; the value lives only in React state. */
 export function PasswordField({
@@ -30,9 +30,7 @@ export function PasswordField({
           invalid={!!error}
           onChange={(e) => onChange(e.target.value)}
           trailing={
-            <Button size="sm" variant="ghost" aria-label={show ? "Hide password" : "Show password"} onClick={() => setShow((s) => !s)}>
-              {show ? "Hide" : "Show"}
-            </Button>
+            <IconButton size="sm" icon={show ? "eye-off" : "eye"} label={show ? "Hide password" : "Show password"} onClick={() => setShow((s) => !s)} />
           }
         />
       )}

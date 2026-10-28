@@ -78,7 +78,7 @@ export function OrderedList({ files, kind, infos, password, onMove, onRemove, in
             }}
           >
             <span className={styles.handle} aria-hidden="true">
-              ⋮⋮
+              <Icon name="grip-vertical" size={14} />
             </span>
             <span className={styles.index}>{i + 1}</span>
             {kind === "pdf" ? <PdfThumb path={f.path} password={password} /> : <ImageThumb path={f.path} />}

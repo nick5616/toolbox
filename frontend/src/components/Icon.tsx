@@ -16,8 +16,11 @@ import {
   Cpu,
   Download,
   ExternalLink,
+  Eye,
+  EyeOff,
   File as FileIcon,
   FileText,
+  GripVertical,
   Film,
   Folder,
   FolderOpen,
@@ -43,6 +46,7 @@ import {
   RefreshCw,
   Repeat,
   RotateCcw,
+  RotateCw,
   ScanSearch,
   Scissors,
   Search,
@@ -112,6 +116,10 @@ const icons = {
   "pin-off": PinOff,
   pause: Pause,
   "map-pin": MapPin,
+  "rotate-cw": RotateCw,
+  "grip-vertical": GripVertical,
+  eye: Eye,
+  "eye-off": EyeOff,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;

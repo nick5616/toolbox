@@ -107,10 +107,6 @@
   gap: var(--space-2);
 }
 
-.flip svg {
-  transform: scaleX(-1);
-}
-
 .summary {
   margin-left: auto;
   font-family: var(--font-mono);

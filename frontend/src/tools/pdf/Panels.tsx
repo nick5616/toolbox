@@ -152,14 +152,14 @@ export function OrganizePanel(p: PanelProps) {
     if (f && !next.some((t) => t.page === focusPage)) setFocusPage(f.page);
   };
   const reason = p.files.length > 1 ? "Organize works on one PDF at a time — remove the others" : reasonFor(p) || (tiles.length === 0 ? "Keep at least one page" : "");
-  const tb = (label: string, icon: string, onClick: () => void, disabled = false, flip = false) => (
-    <IconButton key={label} icon={icon} label={label} disabled={disabled} onClick={onClick} className={flip ? styles.flip : undefined} />
+  const tb = (label: string, icon: string, onClick: () => void, disabled = false) => (
+    <IconButton key={label} icon={icon} label={label} disabled={disabled} onClick={onClick} />
   );
   return (
     <div className={styles.panel}>
       <div className={styles.toolbar} role="toolbar" aria-label="Page tools">
         {tb("Rotate left", "rotate-ccw", () => setTiles(rotateTiles(tiles, selected, -90)), none)}
-        {tb("Rotate right", "rotate-ccw", () => setTiles(rotateTiles(tiles, selected, 90)), none, true)}
+        {tb("Rotate right", "rotate-cw", () => setTiles(rotateTiles(tiles, selected, 90)), none)}
         {tb("Delete selected", "trash-2", () => afterRemoval(deleteTiles(tiles, selected)), none)}
         <Button size="sm" variant="secondary" disabled={none} onClick={() => afterRemoval(keepOnly(tiles, selected))}>
           Keep only selected
