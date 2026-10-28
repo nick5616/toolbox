@@ -12,6 +12,14 @@ const (
 	EventSettingsChanged = "settings:changed"  // Settings
 	EventFilesDropped    = "app:files-dropped" // FilesDropped
 	EventNavigate        = "app:navigate"      // Navigate
+
+	// Phase 3
+	EventClipboardAdded   = "clipboard:added"    // ClipItem (new or bumped)
+	EventClipboardRemoved = "clipboard:removed"  // ClipsRemoved
+	EventClipboardState   = "clipboard:state"    // ClipboardState
+	EventHotkeysStatus    = "hotkeys:status"     // HotkeysChanged
+	EventWindowShow       = "window:show"        // ShowView (sent when a window is shown)
+	EventHiddenToTray     = "app:hidden-to-tray" // HiddenToTray
 )
 
 // Emitter publishes events to the UI. Core code depends on this interface,

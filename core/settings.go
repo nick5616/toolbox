@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 )
 
@@ -40,7 +43,37 @@ const (
 	keyConcurrency = "concurrency"
 	keyTheme       = "theme"
 	keyModuleState = "moduleState:"
+
+	keyKeepInTray   = "keepInTray"
+	keyStartAtLogin = "startAtLogin"
+	keyHotkeys      = "hotkeys"
+	keyClipboard    = "clipboard"
 )
+
+// DefaultHotkeys returns the default global hotkeys (SPEC.md §3.2).
+func DefaultHotkeys() map[string]string {
+	return map[string]string{
+		HotkeyClipboard: "CmdOrCtrl+Alt+V",
+		HotkeyQuickOpen: "CmdOrCtrl+Alt+Space",
+	}
+}
+
+// HotkeyActions lists the known hotkey actions in UI order.
+func HotkeyActions() []string { return []string{HotkeyClipboard, HotkeyQuickOpen} }
+
+// DefaultClipboardSettings: recording is opt-in.
+func DefaultClipboardSettings() ClipboardSettings {
+	return ClipboardSettings{Enabled: false, Images: true, RetentionDays: 30, MaxItems: 500}
+}
+
+// Clipboard history limits.
+const (
+	MinClipItems = 50
+	MaxClipItems = 5000
+)
+
+// ClipRetentionDays are the allowed retention choices (0 = forever).
+var ClipRetentionDays = []int{1, 7, 30, 90, 0}
 
 // NewSettingsService loads settings, writing defaults on first run.
 // defaultLibraryDir is used when no library dir is stored yet.
@@ -51,7 +84,10 @@ func NewSettingsService(store SettingsStore, em Emitter, defaultLibraryDir strin
 	s := &SettingsService{store: store, em: em}
 	ctx := context.Background()
 
-	cur := Settings{LibraryDir: defaultLibraryDir, Concurrency: DefaultConcurrency, Theme: DefaultTheme}
+	cur := Settings{
+		LibraryDir: defaultLibraryDir, Concurrency: DefaultConcurrency, Theme: DefaultTheme,
+		KeepInTray: true, Hotkeys: DefaultHotkeys(), Clipboard: DefaultClipboardSettings(),
+	}
 	if err := loadSetting(ctx, store, keyLibraryDir, &cur.LibraryDir, func(v string) bool { return v != "" }); err != nil {
 		return nil, err
 	}
@@ -61,6 +97,29 @@ func NewSettingsService(store SettingsStore, em Emitter, defaultLibraryDir strin
 		return nil, err
 	}
 	if err := loadSetting(ctx, store, keyTheme, &cur.Theme, validTheme); err != nil {
+		return nil, err
+	}
+	always := func(bool) bool { return true }
+	if err := loadSetting(ctx, store, keyKeepInTray, &cur.KeepInTray, always); err != nil {
+		return nil, err
+	}
+	if err := loadSetting(ctx, store, keyStartAtLogin, &cur.StartAtLogin, always); err != nil {
+		return nil, err
+	}
+	if err := loadSetting(ctx, store, keyHotkeys, &cur.Hotkeys, func(m map[string]string) bool {
+		return m != nil && len(checkHotkeys(m)) == 0
+	}); err != nil {
+		return nil, err
+	}
+	// Actions added in later versions start at their defaults.
+	for action, accel := range DefaultHotkeys() {
+		if _, ok := cur.Hotkeys[action]; !ok {
+			cur.Hotkeys[action] = accel
+		}
+	}
+	if err := loadSetting(ctx, store, keyClipboard, &cur.Clipboard, func(c ClipboardSettings) bool {
+		return len(checkClipboard(c)) == 0
+	}); err != nil {
 		return nil, err
 	}
 	s.current = cur
@@ -107,11 +166,104 @@ func (s *SettingsService) SetSupportDir(dir string) {
 	s.mu.Unlock()
 }
 
-// Current returns a snapshot of the settings.
+// Current returns a snapshot of the settings. The Hotkeys map is a copy.
 func (s *SettingsService) Current() Settings {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.current
+	return s.current.clone()
+}
+
+func (s Settings) clone() Settings {
+	s.Hotkeys = maps.Clone(s.Hotkeys)
+	return s
+}
+
+// checkHotkeys validates a full hotkey map: known actions, valid
+// accelerators, no duplicates. Returns field errors keyed "hotkeys.<action>".
+func checkHotkeys(m map[string]string) map[string]string {
+	fields := map[string]string{}
+	seen := map[string]string{}
+	for _, action := range slices.Sorted(maps.Keys(m)) {
+		key := "hotkeys." + action
+		if !slices.Contains(HotkeyActions(), action) {
+			fields[key] = "Unknown shortcut action"
+			continue
+		}
+		accel := m[action]
+		if accel == "" {
+			continue
+		}
+		canon, ok := CanonicalAccelerator(accel)
+		if !ok {
+			fields[key] = "Not a valid shortcut (needs Ctrl/Cmd, Alt or Super plus a key)"
+			continue
+		}
+		if other, dup := seen[canon]; dup {
+			fields[key] = "Already used by " + other
+			continue
+		}
+		seen[canon] = action
+	}
+	return fields
+}
+
+func checkClipboard(c ClipboardSettings) map[string]string {
+	fields := map[string]string{}
+	if !slices.Contains(ClipRetentionDays, c.RetentionDays) {
+		fields["clipboard.retentionDays"] = "Must be 1, 7, 30 or 90 days, or forever"
+	}
+	if c.MaxItems < MinClipItems || c.MaxItems > MaxClipItems {
+		fields["clipboard.maxItems"] = fmt.Sprintf("Must be between %d and %d", MinClipItems, MaxClipItems)
+	}
+	return fields
+}
+
+var accelModifiers = map[string]string{
+	"cmdorctrl": "cmdorctrl", "cmd": "cmdorctrl", "command": "cmdorctrl",
+	"ctrl": "ctrl", "control": "ctrl",
+	"optionoralt": "alt", "alt": "alt", "option": "alt",
+	"shift": "shift", "super": "super",
+}
+
+var accelNamedKeys = func() map[string]bool {
+	m := map[string]bool{}
+	for _, k := range []string{"backspace", "tab", "return", "enter", "escape", "left", "right", "up", "down",
+		"space", "delete", "home", "end", "page up", "page down", "plus"} {
+		m[k] = true
+	}
+	for i := 1; i <= 24; i++ {
+		m[fmt.Sprintf("f%d", i)] = true
+	}
+	return m
+}()
+
+// CanonicalAccelerator checks a global-hotkey accelerator in Wails syntax
+// ("CmdOrCtrl+Alt+V") and returns a canonical lowercase form for duplicate
+// detection. A global hotkey needs a key and at least one of
+// CmdOrCtrl/Ctrl/Alt/Super (Shift alone would swallow normal typing).
+func CanonicalAccelerator(accel string) (string, bool) {
+	parts := strings.Split(accel, "+")
+	if len(parts) < 2 {
+		return "", false
+	}
+	key := strings.ToLower(strings.TrimSpace(parts[len(parts)-1]))
+	if !(len([]rune(key)) == 1 || accelNamedKeys[key]) {
+		return "", false
+	}
+	mods := map[string]bool{}
+	strong := false
+	for _, p := range parts[:len(parts)-1] {
+		m, ok := accelModifiers[strings.ToLower(strings.TrimSpace(p))]
+		if !ok {
+			return "", false
+		}
+		mods[m] = true
+		strong = strong || m != "shift"
+	}
+	if !strong {
+		return "", false
+	}
+	return strings.Join(append(slices.Sorted(maps.Keys(mods)), key), "+"), true
 }
 
 // Update validates and applies a patch, persists it, emits settings:changed
@@ -143,9 +295,32 @@ func (s *SettingsService) Update(ctx context.Context, p SettingsPatch) (Settings
 			next.Theme = *p.Theme
 		}
 	}
+	if p.KeepInTray != nil {
+		next.KeepInTray = *p.KeepInTray
+	}
+	if p.StartAtLogin != nil {
+		next.StartAtLogin = *p.StartAtLogin
+	}
+	if p.Hotkeys != nil {
+		// Entries override the current ones; actions not mentioned keep their value.
+		merged := maps.Clone(old.Hotkeys)
+		maps.Copy(merged, p.Hotkeys)
+		if errs := checkHotkeys(merged); len(errs) > 0 {
+			maps.Copy(fields, errs)
+		} else {
+			next.Hotkeys = merged
+		}
+	}
+	if p.Clipboard != nil {
+		if errs := checkClipboard(*p.Clipboard); len(errs) > 0 {
+			maps.Copy(fields, errs)
+		} else {
+			next.Clipboard = *p.Clipboard
+		}
+	}
 	if len(fields) > 0 {
 		s.mu.Unlock()
-		return old, ValidationError("Some settings are invalid", fields)
+		return old.clone(), ValidationError("Some settings are invalid", fields)
 	}
 
 	if next.LibraryDir != old.LibraryDir {
@@ -166,15 +341,33 @@ func (s *SettingsService) Update(ctx context.Context, p SettingsPatch) (Settings
 			return old, err
 		}
 	}
+	for _, w := range []struct {
+		changed bool
+		key     string
+		v       any
+	}{
+		{next.KeepInTray != old.KeepInTray, keyKeepInTray, next.KeepInTray},
+		{next.StartAtLogin != old.StartAtLogin, keyStartAtLogin, next.StartAtLogin},
+		{!maps.Equal(next.Hotkeys, old.Hotkeys), keyHotkeys, next.Hotkeys},
+		{next.Clipboard != old.Clipboard, keyClipboard, next.Clipboard},
+	} {
+		if !w.changed {
+			continue
+		}
+		if err := putSetting(ctx, s.store, w.key, w.v); err != nil {
+			s.mu.Unlock()
+			return old.clone(), err
+		}
+	}
 	s.current = next
-	s.em.Emit(EventSettingsChanged, next)
+	s.em.Emit(EventSettingsChanged, next.clone())
 	hooks := append([]func(old, new Settings){}, s.hooks...)
 	s.mu.Unlock()
 
 	for _, h := range hooks {
-		h(old, next)
+		h(old.clone(), next.clone())
 	}
-	return next, nil
+	return next.clone(), nil
 }
 
 // checkLibraryDir returns a user-facing message, or "" when dir is usable.

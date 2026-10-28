@@ -193,6 +193,9 @@ func (m *Jobs) Submit(ctx context.Context, moduleID string, inputs []string, opt
 	if !ok {
 		return nil, ValidationError(desc.Name+" is coming soon", nil)
 	}
+	if desc.JobLess {
+		return nil, ErrJobLess
+	}
 	clean := make([]string, 0, len(inputs))
 	for _, in := range inputs {
 		in = strings.TrimSpace(in)

@@ -935,3 +935,15 @@ func TestMaxInputs(t *testing.T) {
 		t.Fatalf("dedupe should bring it under the cap: %v", err)
 	}
 }
+
+func TestSubmitRejectsJobLessModules(t *testing.T) {
+	m := mod("clip", nil)
+	m.d.JobLess = true
+	e := setup(t, 1, m)
+	if _, err := e.m.Submit(context.Background(), "clip", nil, ""); !IsCode(err, CodeValidation) || !strings.Contains(err.Error(), "doesn't run jobs") {
+		t.Fatalf("job-less submit: %v", err)
+	}
+	if jobs, _ := e.m.List(context.Background(), JobFilter{}); len(jobs) != 0 {
+		t.Fatalf("jobs created: %v", jobs)
+	}
+}

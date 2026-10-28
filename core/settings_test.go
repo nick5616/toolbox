@@ -2,8 +2,10 @@ package core
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -39,8 +41,9 @@ func TestSettingsDefaultsAndPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Settings{LibraryDir: lib, Concurrency: DefaultConcurrency, Theme: DefaultTheme}
-	if s.Current() != want {
+	want := Settings{LibraryDir: lib, Concurrency: DefaultConcurrency, Theme: DefaultTheme,
+		KeepInTray: true, Hotkeys: DefaultHotkeys(), Clipboard: DefaultClipboardSettings()}
+	if !reflect.DeepEqual(s.Current(), want) {
 		t.Fatalf("defaults: %+v", s.Current())
 	}
 	if st.m["libraryDir"] == "" || st.m["concurrency"] != "3" || st.m["theme"] != `"dark"` {
@@ -143,7 +146,7 @@ func TestSettingsEmitAndOnChange(t *testing.T) {
 	if e := events[0].(Settings); e.Theme != ThemeLight {
 		t.Fatalf("event payload: %+v", e)
 	}
-	if len(calls) != 1 || calls[0].old != before || calls[0].new.Theme != ThemeLight {
+	if len(calls) != 1 || !reflect.DeepEqual(calls[0].old, before) || calls[0].new.Theme != ThemeLight {
 		t.Fatalf("hook calls: %+v", calls)
 	}
 	// failed update fires nothing
@@ -202,3 +205,118 @@ func TestSettingsConcurrent(t *testing.T) {
 func writeFile(p string) error { return os.WriteFile(p, []byte("x"), 0o644) }
 
 func dirExists(p string) bool { fi, err := os.Stat(p); return err == nil && fi.IsDir() }
+
+func TestSettingsPhase3Fields(t *testing.T) {
+	st := newMemStore()
+	s, err := NewSettingsService(st, NopEmitter{}, filepath.Join(t.TempDir(), "lib"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	cur := s.Current()
+	if !cur.KeepInTray || cur.StartAtLogin || cur.Clipboard.Enabled || cur.Clipboard.MaxItems != 500 {
+		t.Fatalf("defaults: %+v", cur)
+	}
+	// Current returns a copy of the hotkey map.
+	cur.Hotkeys[HotkeyClipboard] = "mutated"
+	if s.Current().Hotkeys[HotkeyClipboard] != "CmdOrCtrl+Alt+V" {
+		t.Fatal("Current leaked its hotkey map")
+	}
+
+	next, err := s.Update(ctx, SettingsPatch{
+		KeepInTray: ptr(false), StartAtLogin: ptr(true),
+		Hotkeys:   map[string]string{HotkeyQuickOpen: ""},
+		Clipboard: &ClipboardSettings{Enabled: true, Images: false, RetentionDays: 7, MaxItems: 50},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.KeepInTray || !next.StartAtLogin || next.Hotkeys[HotkeyQuickOpen] != "" ||
+		next.Hotkeys[HotkeyClipboard] != "CmdOrCtrl+Alt+V" || next.Clipboard.RetentionDays != 7 {
+		t.Fatalf("after update: %+v", next)
+	}
+	// Persisted and reloaded.
+	s2, err := NewSettingsService(st, NopEmitter{}, "unused")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(s2.Current(), next) {
+		t.Fatalf("reloaded %+v, want %+v", s2.Current(), next)
+	}
+}
+
+func TestSettingsPhase3Validation(t *testing.T) {
+	cases := []struct {
+		name  string
+		patch SettingsPatch
+		field string
+	}{
+		{"unknown action", SettingsPatch{Hotkeys: map[string]string{"nope": "Ctrl+X"}}, "hotkeys.nope"},
+		{"no modifier", SettingsPatch{Hotkeys: map[string]string{HotkeyClipboard: "V"}}, "hotkeys.clipboard"},
+		{"shift only", SettingsPatch{Hotkeys: map[string]string{HotkeyClipboard: "Shift+V"}}, "hotkeys.clipboard"},
+		{"bad modifier", SettingsPatch{Hotkeys: map[string]string{HotkeyClipboard: "Hyper+V"}}, "hotkeys.clipboard"},
+		{"bad key", SettingsPatch{Hotkeys: map[string]string{HotkeyClipboard: "Ctrl+Banana"}}, "hotkeys.clipboard"},
+		{"duplicate", SettingsPatch{Hotkeys: map[string]string{HotkeyQuickOpen: "cmd+option+v"}}, "hotkeys.quickOpen"},
+		{"retention", SettingsPatch{Clipboard: &ClipboardSettings{RetentionDays: 3, MaxItems: 500}}, "clipboard.retentionDays"},
+		{"max items low", SettingsPatch{Clipboard: &ClipboardSettings{RetentionDays: 30, MaxItems: 10}}, "clipboard.maxItems"},
+		{"max items high", SettingsPatch{Clipboard: &ClipboardSettings{RetentionDays: 0, MaxItems: 5001}}, "clipboard.maxItems"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, err := NewSettingsService(newMemStore(), NopEmitter{}, filepath.Join(t.TempDir(), "lib"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			before := s.Current()
+			_, err = s.Update(context.Background(), tc.patch)
+			var ae *AppError
+			if !errors.As(err, &ae) || ae.Code != CodeValidation || ae.Fields[tc.field] == "" {
+				t.Fatalf("err = %v (fields %v), want field %q", err, fieldsOf(err), tc.field)
+			}
+			if !reflect.DeepEqual(s.Current(), before) {
+				t.Fatal("settings changed after a failed update")
+			}
+		})
+	}
+}
+
+func fieldsOf(err error) map[string]string {
+	var ae *AppError
+	if errors.As(err, &ae) {
+		return ae.Fields
+	}
+	return nil
+}
+
+func TestCanonicalAccelerator(t *testing.T) {
+	for in, want := range map[string]string{
+		"CmdOrCtrl+Alt+V":     "alt+cmdorctrl+v",
+		"Option+Cmd+v":        "alt+cmdorctrl+v",
+		"CmdOrCtrl+Alt+Space": "alt+cmdorctrl+space",
+		"Ctrl+Shift+F12":      "ctrl+shift+f12",
+		"Super+1":             "super+1",
+	} {
+		got, ok := CanonicalAccelerator(in)
+		if !ok || got != want {
+			t.Errorf("%q → %q,%v want %q", in, got, ok, want)
+		}
+	}
+	for _, bad := range []string{"", "V", "Shift+V", "Ctrl+", "Ctrl+Alt", "Meta+V", "Ctrl+Foo"} {
+		if _, ok := CanonicalAccelerator(bad); ok {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+}
+
+func TestSettingsInvalidStoredHotkeysFallBack(t *testing.T) {
+	st := newMemStore()
+	st.m["hotkeys"] = `{"clipboard":"Ctrl+Alt+V","quickOpen":"ctrl+alt+v"}` // duplicate
+	st.m["clipboard"] = `{"enabled":true,"images":true,"retentionDays":5,"maxItems":500}`
+	s, err := NewSettingsService(st, NopEmitter{}, filepath.Join(t.TempDir(), "lib"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(s.Current().Hotkeys, DefaultHotkeys()) || s.Current().Clipboard != DefaultClipboardSettings() {
+		t.Fatalf("got %+v", s.Current())
+	}
+}

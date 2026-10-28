@@ -49,6 +49,9 @@ type Descriptor struct {
 	OutputSubdir string       `json:"outputSubdir"` // relative to the library dir; "" = no outputs
 	Order        int          `json:"order"`
 	Hidden       bool         `json:"hidden"` // system modules: not listed, not matched
+	// JobLess modules have a UI but never run jobs (e.g. Clipboard History);
+	// Jobs.Submit rejects them.
+	JobLess bool `json:"jobLess"`
 
 	// SplitInputs makes Submit create one job per input.
 	SplitInputs bool `json:"-"`
@@ -57,6 +60,10 @@ type Descriptor struct {
 	// MaxInputs caps inputs per submission; 0 = no limit.
 	MaxInputs int `json:"maxInputs"`
 }
+
+// ErrJobLess is returned by Jobs.Submit (and by job-less modules' Validate)
+// for modules that don't run jobs.
+var ErrJobLess = ValidationError("This tool doesn't run jobs", nil)
 
 // Module is implemented by every tool. See CLAUDE.md "How to add a module".
 type Module interface {

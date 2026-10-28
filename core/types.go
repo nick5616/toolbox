@@ -144,6 +144,22 @@ type Settings struct {
 	LibraryDir  string `json:"libraryDir"`
 	Concurrency int    `json:"concurrency"`
 	Theme       Theme  `json:"theme"`
+
+	// Phase 3 (SPEC.md §3.2)
+	KeepInTray   bool `json:"keepInTray"`
+	StartAtLogin bool `json:"startAtLogin"`
+	// Hotkeys maps a hotkey action (HotkeyClipboard, HotkeyQuickOpen) to a
+	// Wails accelerator such as "CmdOrCtrl+Alt+V"; "" = disabled.
+	Hotkeys   map[string]string `json:"hotkeys"`
+	Clipboard ClipboardSettings `json:"clipboard"`
+}
+
+// ClipboardSettings configure clipboard history recording.
+type ClipboardSettings struct {
+	Enabled       bool `json:"enabled"`
+	Images        bool `json:"images"`
+	RetentionDays int  `json:"retentionDays"` // 1, 7, 30, 90, or 0 = forever
+	MaxItems      int  `json:"maxItems"`      // 50–5000
 }
 
 // SettingsPatch updates only the non-nil fields.
@@ -151,6 +167,11 @@ type SettingsPatch struct {
 	LibraryDir  *string `json:"libraryDir"`
 	Concurrency *int    `json:"concurrency"`
 	Theme       *Theme  `json:"theme"`
+
+	KeepInTray   *bool              `json:"keepInTray"`
+	StartAtLogin *bool              `json:"startAtLogin"`
+	Hotkeys      map[string]string  `json:"hotkeys"`   // nil = unchanged; replaces the whole map
+	Clipboard    *ClipboardSettings `json:"clipboard"` // replaces the whole struct
 }
 
 // DepState is the detection result for an external tool.
@@ -256,3 +277,82 @@ type PresetInfo struct {
 	Stems         []string     `json:"stems"`
 	Speed         string       `json:"speed"` // "fast" | "best"
 }
+
+// ClipKind is the type of a clipboard history item.
+type ClipKind string
+
+const (
+	ClipText  ClipKind = "text"
+	ClipImage ClipKind = "image"
+)
+
+// ClipItem is one clipboard history entry.
+type ClipItem struct {
+	ID         string   `json:"id"`
+	Kind       ClipKind `json:"kind"`
+	Text       string   `json:"text"`      // full text (kind=text)
+	Preview    string   `json:"preview"`   // first 300 chars, whitespace-collapsed
+	ImagePath  string   `json:"imagePath"` // <support>/clipboard/<id>.png (kind=image)
+	Width      int      `json:"width"`
+	Height     int      `json:"height"`
+	Hash       string   `json:"-"` // sha256 of kind + content (dedupe key)
+	ByteSize   int64    `json:"byteSize"`
+	Pinned     bool     `json:"pinned"`
+	CreatedAt  int64    `json:"createdAt"`
+	LastUsedAt int64    `json:"lastUsedAt"`
+}
+
+// ClipQuery pages through clipboard history: pinned first, then most
+// recently used.
+type ClipQuery struct {
+	Search string   `json:"search"` // case-insensitive substring of preview
+	Kind   ClipKind `json:"kind"`   // "" = all
+	Limit  int      `json:"limit"`  // default 100, max 500
+	Cursor string   `json:"cursor"` // opaque; "" = first page
+}
+
+// ClipPage is one page of clipboard history.
+type ClipPage struct {
+	Items      []ClipItem `json:"items"`
+	NextCursor string     `json:"nextCursor"` // "" = end
+}
+
+// ClipsRemoved is the payload of clipboard:removed.
+type ClipsRemoved struct {
+	IDs []string `json:"ids"`
+}
+
+// ClipboardState is the payload of clipboard:state.
+type ClipboardState struct {
+	Recording bool   `json:"recording"` // enabled and watching
+	Paused    bool   `json:"paused"`
+	Error     string `json:"error"` // "" = fine
+}
+
+// Hotkey action IDs.
+const (
+	HotkeyClipboard = "clipboard" // toggle the clipboard popup
+	HotkeyQuickOpen = "quickOpen" // show the main window with the command palette
+)
+
+// HotkeyStatus reports whether a global hotkey is registered.
+type HotkeyStatus struct {
+	Action      string `json:"action"`
+	Accelerator string `json:"accelerator"` // "" = disabled
+	Registered  bool   `json:"registered"`
+	Error       string `json:"error"` // e.g. "In use by another app"
+}
+
+// HotkeysChanged is the payload of hotkeys:status.
+type HotkeysChanged struct {
+	Items []HotkeyStatus `json:"items"`
+}
+
+// ShowView is the payload of window:show: the window should show View
+// (reset search/selection, focus the input).
+type ShowView struct {
+	View string `json:"view"`
+}
+
+// HiddenToTray is the payload of app:hidden-to-tray.
+type HiddenToTray struct{}
