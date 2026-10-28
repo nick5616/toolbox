@@ -90,3 +90,11 @@ Newest last. Format: date — decision — why.
 - 2026-10-27 — ExifTool install/update lives in the shared `DepsGate` (like the audio engine) instead of a view-specific banner. — The view showed two overlapping "missing" banners.
 - 2026-10-27 — `TOOLBOX_SHOW_POPUP=1` dev aid opens the clipboard popup 2 s after start. — Visual QA without pressing the global hotkey (no keystroke injection).
 - 2026-10-27 — Kbd renders multi-letter keys as written ("Alt", "Space", "Win") instead of upper-casing them.
+
+## Phase 4 (SPEC.md approved 2026-10-27)
+
+- 2026-10-27 — "Add all them" at approval was read as the three additions offered in that reply (HEIC input, opt-in auto-paste, upscaler CPU fallback), now SPEC §13. OCR/PDF editing/forms/signatures/watermarks/PDF-A, bg-removal GPU, tool chaining and the Local Chat / Web Archiver / Vault tools stay out of Phase 4. — They were offered as the easy additions; the rest are separate phases of work.
+- 2026-10-27 — Background removal uses our own ONNX Runtime pipeline (BiRefNet-lite / isnet / BiRefNet) instead of `rembg`. — rembg adds ~30 MB of deps (numba via pymatting), a 49 s cold import and a 10.7 GB RAM peak.
+- 2026-10-27 — Upscaler runs `upscayl-bin` (AGPL-3.0, separate process only) with Real-ESRGAN v0.2.5.0 ncnn models, pinned by sha256. — Maintained, handles non-ASCII paths (the original Real-ESRGAN exe crashes on CJK paths), true 2× from x4 models.
+- 2026-10-27 — PDF work is all Go: pdfcpu v0.16.4 (operations), go-pdfium v1.21.4 WebAssembly (rendering, no FS mounts), own JPEG recompression for Compress. — Keeps every PDF action a normal job with no engine or frontend PDF library; Ghostscript is AGPL and installer-only on Windows.
+- 2026-10-27 — The Python engine keeps dep ID `audio-engine` but is shown as "AI engine". — It now also removes backgrounds and upscales; renaming the ID would churn stored state.

@@ -1,272 +1,473 @@
-# Toolbox — Phase 3 Spec: always-on utilities, clipboard history, transcription, EXIF
+# Toolbox — Phase 4 Spec: Background Remover, Upscaler, PDF Toolkit, app icon
 
-Status: **APPROVED 2026-10-27** — binding.
+Status: **APPROVED 2026-10-27** — binding. Approved together with three additions (§13: HEIC input, opt-in auto-paste, CPU upscaling fallback).
 Date: 2026-10-27. Author: architect session (Opus).
 
-Phases 1–2 are shipped; their specs are archived in `docs/specs/phase-{1,2}.md`, and every contract there still holds unless changed here. "P1 §x" / "P2 §x" refer to those files.
+Phases 1–3 are shipped; their specs are archived in `docs/specs/phase-{1,2,3}.md`, and every contract there still holds unless changed here. "P1 §x" / "P2 §x" / "P3 §x" refer to those files.
 
 ---
 
 ## 0. Research findings this spec relies on
 
-All verified hands-on on this Windows machine on 2026-10-27 (scratch dirs `.dev/p3-research/`), except where marked *docs only*.
+Verified hands-on on this Windows machine (i7-11700K, RTX 3070, 32 GB) on 2026-10-27, in `.dev/p4-research/{bg,upscale,pdf}/`, except where marked *docs only*.
 
 | Topic | Finding | Consequence |
 |---|---|---|
-| Wails v3.0.0 desktop APIs | System tray (`app.SystemTray.New()`, menus, `AttachWindow`, template icons on mac), frameless popup windows (`Frameless`, `AlwaysOnTop`, `Hidden`, `HideOnFocusLost`, `HideOnEscape`, `Windows.HiddenOnTaskbar`), `app.GlobalShortcut.Register` (error if taken), `app.Autostart.Enable/Disable/IsEnabled` (start at login), `WindowClosing` hook can cancel close. Clipboard API is **text-only with no change notification**. | Everything for tray/hotkeys/popup is first-party; clipboard history needs another library. |
-| `golang.design/x/clipboard` **v0.11.0** (2026-09-26) | No cgo on Windows/macOS (syscalls / purego-objc). `Watch(ctx)` yields `Data{Format, Bytes, Sensitive}` — event-driven on Windows (`AddClipboardFormatListener`), `Sensitive` set for password-manager copies (concealed/excluded formats). Reads/writes text and PNG images. v0.11 changed the API to `Read(ctx, fmt)` / `Write(ctx, fmt, bytes)` with errors. Read-only probe worked; a live copy event was **not** observed (agent avoided touching the clipboard). | Use it for watching + reading + writing. The architect verifies a real copy event during integration. |
-| faster-whisper **1.2.1** + ctranslate2 4.8.4 | Co-resolves with the Phase 2 engine (torch/onnxruntime/numpy pins unchanged). **PyAV 19 breaks it** (`metadata_errors` TypeError) → pin `av>=16,<19` (→ 18.1.0). +157 MB to the engine. CPU int8, 4 threads, 19 s / 190 s clips: `base` 1.2 s / 10.1 s, `small` 3.4 s / 30.2 s (RTF 0.16), `large-v3-turbo` 11.4 s / 86.5 s. Only `small` transcribed the test clip correctly. Models from huggingface.co (`Systran/faster-whisper-{base,small}`, `mobiuslabsgmbh/faster-whisper-large-v3-turbo`; 142 MB / 464 MB / 1.6 GB). `snapshot_download(local_dir=…)` avoids a Windows symlink duplication bug. Segments are a lazy generator → progress = `seg.end / info.duration`, cancel between segments. Word timestamps, language detection (+probability), VAD all work. macOS: ctranslate2 runs **CPU-only** (no Metal) — *docs only*. | Transcription runs in the existing audio engine; default model `small`. Engine pyproject change ⇒ existing installs show **Update** (Phase 2 flow). |
-| pywhispercpp 1.5.1 | Works, Metal dylib in the mac wheel (*docs only*), but slower than faster-whisper for turbo and has a fragile progress API. | Not used in Phase 3 (possible mac accelerator later). |
-| ExifTool **13.59** | `https://exiftool.org/ver.txt` → version; `https://exiftool.org/checksums.txt` → SHA2-256 lines; downloads via `https://sourceforge.net/projects/exiftool/files/<asset>/download` (redirects to a mirror). Windows: `exiftool-<ver>_64.zip` (11 MB) → folder with `exiftool(-k).exe` (must be renamed `exiftool.exe`, else it waits for ENTER) + `exiftool_files/` (keep beside it). macOS/Linux: `Image-ExifTool-<ver>.tar.gz` = Perl script + `lib/`, run with `/usr/bin/perl` (*docs only*: macOS 14/15 ship perl 5.34; Homebrew `exiftool` also works). `-stay_open True -@ -` works on Windows: ~3 ms per command after a 0.2 s start. `-o <new>` writes a new file, never touches the input, fails if `<new>` exists. `-j -n` → JSON with numeric GPS. | ExifTool becomes the **third app-managed tool** (archive install, not a single binary). The EXIF module keeps one `-stay_open` process. |
+| Background removal: `rembg` 2.0.86 | It works, but adds scikit-image, pymatting (which needs numba), imageio and jsonschema (about 30 MB more). A cold `import` takes 49 s, and the default ONNX Runtime session peaks at 10.7 GB RAM. | **Don't use rembg.** We write about 100 lines of our own inference with onnxruntime, numpy, scipy and Pillow, all already in `uv.lock` with macOS arm64 wheels. Pillow becomes an explicit dependency, and the lock doesn't change. |
+| Background models (CPU, warm) | All models are downloaded from `https://github.com/danielgatis/rembg/releases/download/v0.0.0/<file>`.<br>• **BiRefNet-general-lite**, `BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx`: 224 MB, about 8 s per image, MIT, sha256 `5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333`. Excellent on hair, pets, products and people.<br>• **isnet-general-use**, `isnet-general-use.onnx`: 178.6 MB, about 0.9 s, Apache-2.0, sha256 `60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a`. Good, but hair edges are soft.<br>• **BiRefNet-general**, `BiRefNet-general-epoch_244.onnx`: 972.7 MB, about 14.5 s, MIT, sha256 `58f621f00f5d756097615970a88a791584600dcf7c45b18a0a6267535a1ebd3c`. Slightly crisper than lite.<br>• The u2net, u2netp and silueta models lost the face on the portrait test.<br>• RMBG-2.0 is licensed for non-commercial use only. | The three presets are **Balanced** (BiRefNet-lite, the default), **Fast** (isnet) and **Best** (BiRefNet full). The u2net family and RMBG are not offered. |
+| Background pipeline details | Pre-processing:<br>• `exif_transpose`, convert to sRGB via `ImageCms` if an ICC profile is present, then RGB.<br>• Resize to 1024² (bilinear) and scale to /255.<br>• BiRefNet normalises with ImageNet mean/std, sigmoid on its single output `output_image`.<br>• isnet normalises with mean 0.5 / std 1.0, uses output 0, min-max normalised, no sigmoid.<br>• Input name `input_image`, NCHW float32.<br>• Resize the mask back with bicubic.<br>Session settings:<br>• `enable_cpu_mem_arena=False` and `enable_mem_pattern=False` cut BiRefNet's peak RAM from 9–13 GB to **6–7 GB** (isnet 0.75 GB). After a run, RSS drops back to 0.4 / 1.1 GB.<br>• `log_severity_level=3` silences hundreds of warnings.<br>• Creating a session takes 7.5–10 s, so cache it per model.<br>• Thread count barely matters.<br>Large images: a 24 MP input processes fine (the model input is always 1024²); post-processing takes about 3 s and the PNG is about 12 MB. | Background removal becomes a sidecar handler. The session is cached per model, and cancellation is checked before and after the uninterruptible `run`. |
+| Upscaler binary | **upscayl-ncnn**, tag `20251207-174704`, AGPL-3.0, maintained (repo pushed 2026-04). It is used only as a separate process. Release assets:<br>• `upscayl-bin-20251207-174704-windows.zip`: 2.42 MB, sha256 `1f0f65c5d2ade866555e2ac467d35952c35a47080a4060fe56a1ab028f67258a`.<br>• `upscayl-bin-20251207-174704-macos.zip`: 9.34 MB, sha256 `277419791281a56eae0c739c70120b974d7267cf7c2de8e86dc09798d4b314db`. The macOS binary is universal, with MoltenVK statically linked.<br>• Each zip contains only `<top>/upscayl-bin[.exe]`, a LICENSE and a README, with no models.<br>• The Windows exe imports `VCOMP140.DLL`. | It becomes a managed tool with **pinned** versions and checksums. |
+| Upscaler models | Real-ESRGAN `v0.2.5.0`, `realesrgan-ncnn-vulkan-20220424-windows.zip`: 45.5 MB, sha256 `abc02804e17982a3be33675e4d471e91ea374e65b70167abc09e31acb412802d`, BSD-3. The `models/` files are byte-identical across the OS zips: `realesrgan-x4plus`, `realesrgan-x4plus-anime` and `realesr-animevideov3-x{2,3,4}` (`.param` plus `.bin`, 46 MB). The zip also ships `vcomp140.dll`. | Download the Windows zip on every OS for the models only. On Windows, `vcomp140.dll` is also copied next to `upscayl-bin.exe`. |
+| Upscaler CLI | `upscayl-bin -i IN -o OUT.<ext> -n <model> -z <modelScale> -s <outScale> -m <dir>/models [-c <q>] [-t 0] [-g N]`.<br>• `-z` is the model's native scale and `-s` the output scale, so `-z 4 -s 2` gives a true 2× from x4 models.<br>• The `-m` path must contain the string `models`.<br>• The output format follows the extension (png, jpg, webp), and alpha is kept.<br>• Progress lines match `^\d+(\.\d+)?%` on stderr, unbuffered when piped (`\r\n` on Windows).<br>• Non-ASCII paths work; the original Real-ESRGAN exe crashes on CJK output paths.<br>• Killing it mid-run leaves no output file.<br>• A missing or unreadable input exits 0 with no output.<br>• With no usable GPU it exits non-zero with `invalid gpu device`, `Invalid GPU Device` or `vkCreateInstance failed`. | We parse progress and check that the output exists. GPU failure becomes a clear error (see §5.3). |
+| Upscaler performance and quality | Warm runs on the RTX 3070: a 480×640 image at 4× takes 4.8 s with x4plus, 2.1 s with anime and 1.3 s with animevideov3. A 3000×1997 image at 4× takes **33 s**, 1.6 GB RAM and 1.4 GB VRAM, and makes an 87 MB PNG. **The very first run takes 18–50 s** (shader compilation). Quality: x4plus is best for photos (recovers real fur and whiskers); x4plus-anime is crispest for line art and screenshots; animevideov3 is soft but fast. There is **no CPU fallback** in ncnn. torch+spandrel on CPU takes 90 s for 480×640. | Presets **Photo**, **Illustration** and **Fast**. Output is capped at 100 MP. The first run shows an indeterminate "Starting GPU…" state. No CPU fallback in Phase 4. |
+| PDF operations: **pdfcpu v0.16.4** | Apache-2.0 and pure Go (also builds for darwin/arm64), adding about 9.6 MB to the binary. The `pkg/api` functions all work: merge, split, collect (extract and reorder), remove pages, rotate, optimize, AES-256 encrypt and decrypt, image import, validate and info. Speed:<br>• The 15-page arXiv file takes about 1 s per op (default optimize-on-write; 140 ms without).<br>• A 568-page file takes 1–4 s per op.<br>• A 221 MB file takes 0.2–0.5 s, with up to 730 MB of heap.<br>Paths with non-ASCII characters work. Relaxed validation repairs common damage. **It writes a config dir under the user config dir unless `api.DisableConfigDir()` is called**; a nil configuration is an error. Collect, remove and split **drop bookmarks and metadata** (links and form fields survive). Merge keeps them and adds one bookmark per file. | All structural PDF operations run in Go via pdfcpu. Call `api.DisableConfigDir()` once and always pass `model.NewStatelessConfiguration()`. |
+| PDF compression | pdfcpu optimize does not shrink scans, and grew the IRS file to 121%. A Go prototype that reads JPEG (DCT) image streams from pdfcpu's model, downsamples them, re-encodes and writes with `api.WriteContextFile` worked:<br>• the 30-page 29.6 MB scan went to 11.6 MB (q70, 1650 px) and 5.5 MB with more aggressive settings;<br>• a colour CMYK page went from 2.4 MB to 190 KB;<br>• the 221 MB file went to 21 MB in 24.5 s single-threaded.<br>pikepdf gives the same ratios but its macOS arm64 wheel needs macOS 15. Ghostscript is AGPL and only ships as an installer on Windows. | Compression is done **in Go**, with a worker pool. |
+| PDF rendering: **go-pdfium v1.21.4, WebAssembly mode** (MIT; PDFium is BSD/Apache) | Pure Go via wazero and builds for darwin/arm64. The probe binary was 15 MB. Initialisation takes **2.6 s**. Renders take 10–23 ms per page at 36 dpi and 20–60 ms at 150 dpi, including JBIG2 scans and forms, at excellent quality. **By default it mounts the host filesystem root into the WASM sandbox.** It opens documents from bytes (`requests.OpenDocument{File: &b, Password}`). | Thumbnails and PDF → images are rendered **in Go**, with no frontend PDF library. Mount **no filesystem**; open documents from bytes. Use a wazero compilation cache in `<support>/cache/pdfium` to cut the start time. |
+| Engine additions (`.dev/p4-research/engine04`) | **pillow-heif 1.8.1** (BSD-3; bundles the LGPL libheif) and **spandrel 0.4.2** (MIT; pulls in safetensors 0.8.0 and einops 0.8.2) resolve together with the engine lock, and all have macOS arm64 wheels. A HEIC write/read round trip works. spandrel loads the Real-ESRGAN `.pth` files. CPU timings for 320×240 → 4× (torch 2.14.1+cpu, 8 threads) are below. Roughly 120, 36 and 4 s per input megapixel. | HEIC goes through pillow-heif in the engine, and CPU upscaling through spandrel in the engine (§13). |
+| pdf.js 6.4.299 | Works offline in the webview, but adds 7 MB of assets and renders outside the job system. | Not used (go-pdfium covers it). |
 
 ---
 
 ## 1. Goals
 
-1. **Always-on app:** system tray with menu, close-to-tray, start at login (opt-in), configurable **global hotkeys**, and a reusable **popup window**.
-2. **Clipboard History:** opt-in recording of text and images, password-manager copies skipped, search/pin/delete, a hotkey popup to re-copy past items, retention limits.
-3. **Transcribe** (faster-whisper in the audio engine): audio/video → TXT / SRT / VTT / JSON, language auto-detect or fixed, optional translate-to-English, three model sizes.
-4. **EXIF:** inspect metadata of images (and read-only RAW), strip location or all metadata, edit common fields — always into **new** files.
-5. **ExifTool as a managed dependency** (install/update from Settings).
+1. **Background Remover:** photo in, transparent PNG of the subject out. Three model presets, plus options for a solid background colour, mask only, cropping to the subject, and edge cleanup. Runs in the existing Python engine on CPU.
+2. **Upscaler:** 2× or 4× with Real-ESRGAN models through the managed `upscayl-bin`, on the GPU via Vulkan (or MoltenVK on macOS). Three presets.
+3. **PDF Toolkit:** merge, split, organize pages (extract, delete, reorder, rotate), compress, images → PDF, PDF → images, add a password and remove a password. Everything runs in Go, with page thumbnails.
+4. **A real app and tray icon**, replacing the Wails "W".
+5. **Shared image preview plumbing:** a thumbnail service that can show huge outputs, and a before/after compare slider.
 
-## 2. Non-goals (Phase 3)
+## 2. Non-goals (Phase 4)
 
-- Auto-pasting into the previously focused app (needs macOS Accessibility permission / input injection) — Phase 4 candidate. Selecting an item **copies** it and closes the popup.
-- Rich text / HTML / file-list clipboard formats; clipboard sync; OCR; per-app exclusion lists.
-- Diarization, subtitle burn-in, live/microphone transcription, translation into languages other than English.
-- Writing metadata into RAW files; EXIF batch renaming; editing arbitrary tags (only the fixed set in §6.3).
-- Linux tray/hotkeys QA.
+- **GPU or CoreML acceleration for background removal.**
+- **Batch "remove background then upscale" pipelines.**
+- **PDF features left out:** text editing, OCR, form filling, signatures, watermarks, PDF/A conversion, keeping bookmarks through split or organize, and permission flags beyond a plain password.
+- Local Chat, Web Archiver and Vault stay placeholders.
+- macOS hands-on QA. Windows is verified here; macOS is covered by cross-builds plus docs, as in earlier phases.
 
 ---
 
-## 3. Core and app-shell changes (foundation)
+## 3. Foundation changes
 
-### 3.1 Job-less modules
+### 3.1 Go dependencies
+`github.com/pdfcpu/pdfcpu v0.16.4`, `github.com/klippa-app/go-pdfium v1.21.4` (WebAssembly subpackage only, and never the cgo `single_threaded`/`multi_threaded` packages), and `golang.org/x/image` promoted to a direct dependency (webp, bmp and tiff decoders; `draw` for scaling).
 
-Clipboard History is a tool with UI but no jobs. `core.Descriptor` gains `JobLess bool` (json `jobLess`): `Jobs.Submit` rejects it (`validation` "This tool doesn't run jobs"); the module implements `core.Module` with `Validate` returning that error and `Run` never called. The sidebar/palette treat job-less modules like others.
+### 3.2 Engine update (sidecar 0.4.0)
+- `pyproject.toml`: add `"pillow>=12"` (it already arrives via torchvision, but becomes explicit), bump the version to `0.4.0` and the description to "Toolbox engine: stems, BPM & key, MIDI, transcription, background removal". Run `uv lock`. The lock should change only in the root package entry, and the macOS arm64 wheels must still be there.
+- **The engine is renamed for users.** The dep ID stays `audio-engine` (`sidecar.DepID`), so stored state and code don't churn. Its display name becomes **"AI engine"**, with Purpose "Python runtime for stems, BPM & key, MIDI, transcription and background removal (≈1.4 GB)". Every UI string that says "audio engine" becomes "AI engine", including the DepsGate banner, Settings and the CLAUDE.md user-facing notes. Code identifiers keep their names.
+- Existing installs then show **Update** (the Phase 2 flow).
 
-### 3.2 Settings additions
+### 3.3 Managed archives v2: pinned, multi-part (`core/deps/archive.go`)
 
-`core.Settings` gains (persisted keys in brackets, JSON values; validated like P2 §6.1):
-
-| Field | Key | Default | Rules |
-|---|---|---|---|
-| `KeepInTray bool` | `keepInTray` | `true` | closing the main window hides it; Quit only via tray/menu |
-| `StartAtLogin bool` | `startAtLogin` | `false` | applied via Wails Autostart; failure → validation error with the OS message |
-| `Hotkeys map[string]string` | `hotkeys` | `{"clipboard":"CmdOrCtrl+Alt+V","quickOpen":"CmdOrCtrl+Alt+Space"}` | known action IDs only; value "" = disabled; accelerator syntax per Wails; duplicates rejected |
-| `Clipboard ClipboardSettings` | `clipboard` | `{Enabled:false, Images:true, RetentionDays:30, MaxItems:500}` | RetentionDays ∈ {1,7,30,90,0 (= forever)}; MaxItems 50–5000 |
-
-`SettingsPatch` gets matching pointer fields. Validation of a hotkey's *availability* happens in the shell (§3.4), which reports status separately.
-
-### 3.3 Storage (migration `0003_clipboard.sql`)
-
-```sql
-CREATE TABLE clip_items (
-  id           TEXT PRIMARY KEY,          -- ULID
-  kind         TEXT NOT NULL CHECK (kind IN ('text','image')),
-  text         TEXT NOT NULL DEFAULT '',  -- full text (kind=text), ≤ 1 MiB
-  preview      TEXT NOT NULL DEFAULT '',  -- first 300 chars, whitespace-collapsed (search + list)
-  image_path   TEXT NOT NULL DEFAULT '',  -- <support>/clipboard/<id>.png (kind=image)
-  width        INTEGER NOT NULL DEFAULT 0,
-  height       INTEGER NOT NULL DEFAULT 0,
-  hash         TEXT NOT NULL UNIQUE,      -- sha256 of kind + content
-  byte_size    INTEGER NOT NULL DEFAULT 0,
-  pinned       INTEGER NOT NULL DEFAULT 0,
-  created_at   INTEGER NOT NULL,
-  last_used_at INTEGER NOT NULL           -- copy time; bumped on re-copy and when the same content is copied again
-);
-CREATE INDEX clip_items_recent_idx ON clip_items(pinned DESC, last_used_at DESC);
-```
-
-`core.ClipStore` interface (implemented by `core/store`):
-`UpsertClip(ctx, ClipItem) (ClipItem, bool /*inserted*/, error)` (dedupe by hash → bump `last_used_at`), `ListClips(ctx, ClipQuery) (ClipPage, error)` (pinned first, then most recent; `Search` = case-insensitive LIKE on preview; `Kind` filter; cursor paging like outputs), `GetClip`, `SetPinned`, `DeleteClips(ids)`, `ClearClips(keepPinned bool) (deleted []ClipItem, err)`, `PruneClips(olderThanMs int64, maxItems int) ([]ClipItem, error)` (never prunes pinned; returns deleted rows so image files can be removed).
-
-Wire types (`core/types.go`): `ClipItem{ID, Kind, Text, Preview, ImagePath, Width, Height, ByteSize, Pinned, CreatedAt, LastUsedAt}`, `ClipQuery{Search, Kind, Limit, Cursor}`, `ClipPage{Items, NextCursor}`, `ClipsRemoved{IDs}`.
-
-New events: `clipboard:added` (ClipItem — new or bumped), `clipboard:removed` (ClipsRemoved), `clipboard:state` (`ClipboardState{Recording bool; Paused bool; Error string}`), `hotkeys:status` (`HotkeyStatus{Action, Accelerator string; Registered bool; Error string}[]` wrapped in `HotkeysChanged{Items}`), `window:show` (`ShowView{View string}` — tells a window which view to show).
-
-### 3.4 Desktop shell (`desktop/` package — Wails-dependent; the only place besides `main.go`/`api/` allowed to import Wails)
-
-- **Tray** (`desktop/tray.go`): icon (embedded 32 px PNG; macOS uses a template icon variant), tooltip "Toolbox", left-click shows/focuses the main window (macOS: click opens menu, per platform convention). Menu:
-  - **Open Toolbox**
-  - **Clipboard history** (shows popup; label includes the hotkey)
-  - **Pause clipboard history** / **Resume** (checkbox; only when recording is enabled)
-  - separator · **Running: N jobs** (disabled label, updated on `jobs:changed`; hidden when 0)
-  - **Recent outputs ▸** last 5 (click = reveal)
-  - separator · **Settings…** · **Quit Toolbox**
-- **Close-to-tray:** main window `WindowClosing` hook → if `KeepInTray`, hide + cancel; first time, toast "Toolbox is still running in the tray" (frontend, via `window:show`-style event `app:hidden-to-tray`). macOS: `ApplicationShouldTerminateAfterLastWindowClosed: false`; Cmd+Q still quits. Quit path: cancel/stop jobs (P1 §4.6 shutdown) and the engine, then `app.Quit()`.
-- **Start at login:** `SettingsService.Update` hook → `app.Autostart.Enable/Disable`; at startup reconcile setting vs `IsEnabled()` (setting wins; log mismatch).
-- **Hotkeys** (`desktop/hotkeys.go`): `Manager.Apply(map[action]accelerator) []HotkeyStatus` unregisters all then registers each non-empty; registration errors are reported, not fatal; emits `hotkeys:status`. Actions:
-  - `clipboard` → toggle the clipboard popup;
-  - `quickOpen` → show + focus the main window and open the command palette (emit `app:navigate {target:"palette"}`; the frontend treats target `palette` as "open palette").
-  Applied at startup and on settings change.
-- **Popup window** (`desktop/popup.go`): one hidden window created at startup, `Frameless`, `AlwaysOnTop`, `Hidden`, `HideOnFocusLost`, `HideOnEscape`, `DisableResize`, `Windows.HiddenOnTaskbar`, 440×560, `URL "/?window=popup&view=clipboard"`, `BackgroundColour` = theme bg. `Toggle()` centres it on the primary screen's work area (upper third), shows, focuses, and emits `window:show {view:"clipboard"}` so the frontend resets search + selection. Hidden after an item is copied.
-- **Frontend window routing:** `App.tsx` reads `?window=popup` → renders `<PopupShell/>` (no sidebar/tray; just the requested view) instead of `<Shell/>`. Stores bootstrap the same way (each window has its own JS context and subscribes to events independently — P1 §4.9).
-
-### 3.5 Managed archive tools
-
-`deps` gains an **archive installer** alongside `InstallManagedBinary`:
+`ArchiveSpec` is generalised so the upscaler (two archives, pinned checksums) and ExifTool (one archive, `checksums.txt`) share one installer:
 
 ```go
+type ArchivePart struct {
+    Name   string                                             // "main", "models", …
+    Asset  func(goos, goarch, version string) (string, error) // asset file name
+    URL    func(asset string) string                          // download URL (may redirect)
+    SHA256 func(asset string) string                          // pinned hex; "" → look up in ArchiveSpec.ChecksumsURL
+}
 type ArchiveSpec struct {
     DepID        string
-    VersionURL   string                                     // returns the latest version as plain text
-    ChecksumsURL string                                     // lines "SHA2-256(<asset>)= <hex>"
-    Asset        func(goos, goarch, version string) (string, error)
-    DownloadURL  func(asset string) string                  // e.g. SourceForge /download (follows redirects)
-    InstallDir   string                                     // relative to BinDir, e.g. "exiftool"
-    Layout       func(extractedRoot, installDir string) error // move/rename into place
-    MaxBytes     int64
+    InstallDir   string // relative to BinDir
+    VersionURL   string // latest version as plain text; "" when Version is pinned
+    Version      string // pinned version (no network version check)
+    ChecksumsURL string // "SHA2-256(<asset>)= <hex>" lines, for parts without a pinned SHA256
+    Parts        []ArchivePart
+    // Layout builds installDir (which does not exist yet) from the extracted
+    // parts: roots maps part name → extracted root (top folder unwrapped).
+    Layout       func(roots map[string]string, installDir string) error
+    MaxBytes     int64 // per part
 }
-func (s *Service) InstallManagedArchive(ctx context.Context, job *core.JobContext, a ArchiveSpec) error
 ```
 
-Flow: version → (skip if installed version equal) → checksum line for the asset → download to TempDir with progress → verify → extract (zip / tar.gz) → `Layout` into `<bin>/<InstallDir>.new` → swap atomically (rename old → `.old`, new → final, remove `.old`) → verify `--version`-equivalent → re-detect.
+- **Flow:** resolve the version (fetch it, or use the pinned one). Skip the install if `<installDir>/VERSION` already matches. For each part: compute the checksum, download with progress (the overall progress is split across parts in proportion to their sizes, or evenly when the size is unknown), verify, and extract into its own temp dir. Then run `Layout` into `<bin>/<InstallDir>.new` and **write `<bin>/<InstallDir>.new/VERSION`**. Swap the folders atomically (the Phase 3 logic). Finally re-detect.
+- **Migration:** ExifTool becomes a single part named `"main"`. The behaviour stays the same and its tests are adapted.
+- **Detection by VERSION file:** `deps.Spec` gains `VersionFile string`. When set (relative to `ArchiveDir`), the version comes from that file instead of running the binary, and the binary only has to exist.
+- **Outdated state:** a new field `PinnedVersion string` marks the dep as `outdated` when the installed VERSION differs. This lets future app updates bump pins.
 
-**ExifTool spec:** dep `exiftool` (already in the catalog) becomes `Managed`. Assets: windows → `exiftool-<ver>_64.zip`; darwin/linux → `Image-ExifTool-<ver>.tar.gz`. Download `https://sourceforge.net/projects/exiftool/files/<asset>/download`. Layout:
-- Windows: `<bin>/exiftool/exiftool.exe` (renamed from `exiftool(-k).exe`) + `<bin>/exiftool/exiftool_files/`.
-- macOS/Linux: `<bin>/exiftool/exiftool` (the Perl script, chmod 0755) + `<bin>/exiftool/lib/`; runs via its `#!/usr/bin/perl` shebang. If `/usr/bin/perl` is missing → install fails with hint "Install ExifTool with Homebrew: brew install exiftool".
-Resolution order for `exiftool` becomes: `<bin>/exiftool/exiftool[.exe]` (managed) → `<bin>/exiftool[.exe]` → PATH → known dirs. Version check `-ver`. Hidden updater module `system-exiftool-update`; `DepsService.UpdateExiftool()`.
+**Upscaler dep** (`deps.Upscayl = "upscayl"`):
+- Name "Upscaler engine", Purpose "Real-ESRGAN image upscaling on your GPU (≈50 MB)", Binary `upscayl-bin`.
+- `ArchiveDir "upscaler"`, `VersionFile "VERSION"`, `PinnedVersion "20251207-174704+models-0.2.5.0"`, Managed.
+- Install hint (Linux and unsupported architectures): "The upscaler isn't available for this platform yet".
 
-### 3.6 Audio engine update
+`UpscaylArchive()` has two parts:
+- **`main`**: `upscayl-bin-20251207-174704-{windows|macos}.zip` from `https://github.com/upscayl/upscayl-ncnn/releases/download/20251207-174704/<asset>`, with the pinned sha256 values from §0. Supported platforms are windows/amd64, windows/arm64 (runs under x64 emulation) and darwin/any (universal binary). Anything else returns an error with the hint.
+- **`models`**: `realesrgan-ncnn-vulkan-20220424-windows.zip` from `https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/<asset>`, with the pinned sha256 from §0, on every OS.
 
-`sidecar/pyproject.toml` adds `"faster-whisper>=1.2.1"`, `"av>=16,<19"` (comment: PyAV 19 breaks faster-whisper 1.2.1); version → `0.3.0`; regenerate `uv.lock` (check mac arm64 wheels for ctranslate2 and av). Existing installs become `outdated` → the Phase 2 Update flow upgrades them (Transcribe's DepsGate shows "Update audio engine").
+Layout:
+- `<dir>/upscayl-bin[.exe]`, with mode 0755 on unix.
+- `<dir>/LICENSE-upscayl`.
+- `<dir>/models/{realesrgan-x4plus, realesrgan-x4plus-anime, realesr-animevideov3-x2, realesr-animevideov3-x3, realesr-animevideov3-x4}.{param,bin}` (only these 10 files).
+- Windows only: `<dir>/vcomp140.dll`, taken from the models archive.
+- Then `VERSION`.
 
----
+A hidden installer module `system-upscaler-install` and a bound method `DepsService.InstallUpscaler() (core.Job, error)`. The Phase 3 DepsGate pattern gains an Install/Update button for this dep.
 
-## 4. Clipboard History (`modules/clipboard`)
-
-Descriptor: `ID clipboard`, Name "Clipboard History", icon `clipboard`, Category utility, Order 300, `JobLess`, Accepts none, OutputSubdir "". Removed from placeholders.
-
-### 4.1 Recorder (`modules/clipboard/recorder.go`)
-
-- Started at app start when `Settings.Clipboard.Enabled`; stopped/started on settings change; `Pause()/Resume()` (in-memory; resets to recording on restart) from tray/UI.
-- `clipboard.Init()` once; `Watch(ctx)` on text and (if `Images`) image formats. For each change:
-  - `Sensitive` → skip (log at debug, never store).
-  - Text: trim trailing whitespace; skip empty; skip > 1 MiB (store nothing, debug log); `preview` = first 300 chars whitespace-collapsed.
-  - Image: decode PNG for width/height; skip > 20 MB; write `<support>/clipboard/<id>.png` (0600 perms on unix).
-  - hash → `UpsertClip`; emit `clipboard:added`.
-  - **Self-copy suppression:** when the app itself writes an item back (§4.2), the recorder ignores the next change whose hash matches (bumping `last_used_at` instead).
-- Retention: prune on start and hourly (`RetentionDays`, `MaxItems`; pinned exempt); delete image files of pruned rows; emit `clipboard:removed`.
-- Errors from the OS clipboard → `clipboard:state {Error}` and retry with backoff (1 s → 30 s); never crash.
-- If `golang.design/x/clipboard` can't initialise (e.g. headless), state error "Clipboard unavailable" and stay idle.
-
-### 4.2 Service (`modules/clipboard/service.go`, bound)
+### 3.4 Image thumbnails (`api/files.go`)
 
 ```go
-List(q core.ClipQuery) (core.ClipPage, error)
-Copy(id string) error            // writes text or PNG back to the system clipboard, bumps last_used_at
-Pin(id string, pinned bool) (core.ClipItem, error)
-Delete(ids []string) error       // removes rows + image files; emits clipboard:removed
-Clear(keepPinned bool) (int, error)
-State() core.ClipboardState
-Pause() error; Resume() error
-ImageDataURL(id string) (string, error) // "data:image/png;base64,…" (≤ 20 MB) for thumbnails/preview
-OpenPopup() error                // same as the hotkey (used by the in-app "Open popup" button)
+// ImageThumb decodes an image (jpg, png, gif, webp, bmp, tif/tiff) and returns a
+// data URL scaled so its longest side is ≤ maxDim (64..1600, clamped).
+// Encoded as PNG when the image has any non-opaque pixel, else JPEG q85.
+// Guards: file ≤ 400 MB; DecodeConfig first, refuse > 300 MP ("Too large to preview").
+// Results are cached in memory (LRU, 64 entries, key path+size+mtime+maxDim).
+ImageThumb(path string, maxDim int) (string, error)
 ```
 
-### 4.3 UI
+- Scaling uses `golang.org/x/image/draw.CatmullRom` for small images and `ApproxBiLinear` above 40 MP.
+- Thumbnails decode on a bounded worker (2 at a time), so the UI never blocks the Go event loop.
+- Like `ImageDataURL`, it accepts any existing file with an image extension.
+- `ImageDataURL` stays for small originals (EXIF uses it).
 
-- **Tool view** (`tools/clipboard/ClipboardView.tsx`):
-  - When recording is disabled: an empty state explaining what's recorded, where it's stored (local SQLite + PNGs in the app folder), that password-manager copies are skipped, and a primary **Start recording clipboard history** button (sets `clipboard.enabled=true`).
-  - When enabled: header with status pill (Recording / Paused / Error), Pause/Resume, hotkey hint (`Kbd`), "Open popup", "Clear…" (ConfirmDialog with "Keep pinned" checkbox).
-  - Search field (`/` focuses) + kind filter (All / Text / Images); list of items (virtualised-lite: render first 200, "Load more"): text items show preview (mono, 2 lines) + relative time + char count; image items show a 64 px thumbnail (lazy `ImageDataURL`) + dimensions. Row actions: Copy (Enter), Pin/Unpin, Delete. Keyboard: ↑/↓, Enter = copy (toast "Copied"), `Mod+Backspace` = delete, `P` = pin.
-  - Settings panel (collapsible): capture images switch, retention select, max items stepper.
-- **Popup** (`tools/clipboard/ClipboardPopup.tsx`, rendered by `PopupShell`): search input autofocused; list of ~8 visible rows (same row component, compact); ↑/↓/Enter copies + hides window (`application` runtime `Window.Hide()` from JS, or service call); `Esc` hides (window option); pinned items first with a pin glyph; empty state "Nothing copied yet" / "Clipboard history is off — enable it in Toolbox". Number keys `1–9` copy the nth item. Re-focus on every `window:show`.
+### 3.5 Shared UI pieces (frontend)
+- **`components/CompareSlider.tsx`:** two images stacked (before/after) with a draggable vertical divider. It responds to keyboard (←/→ 5%, Home/End), has `aria-valuenow`, and has an optional checkerboard background (a `--checker-*` token pair for light and dark). It is used by the Background Remover and the Upscaler.
+- **`components/Checkerboard` CSS utility class** for transparent previews.
+- **`components/ColorSwatchPicker.tsx`:** swatches for white, black and transparent, plus a custom hex field (validated `#rrggbb`).
+
+### 3.6 App and tray icon
+- **Design:** a rounded-square app icon (macOS squircle proportions, 824 px tile on a 1024 canvas, per Apple's grid) with a graphite vertical gradient (`#2a2d33` → `#111316`) and a **toolbox glyph** in the app accent orange `#ff8c42`. The glyph is a trapezoid lid with a handle arch, a box body, and a latch notch, drawn with a 1 px lighter top highlight. It is legible at 16 px.
+- **Generator:** the geometry lives in one place. `build/icongen/main.go` (`//go:build ignore`) rasterises it with `golang.org/x/image/vector` and writes:
+  - `build/appicon.png` (1024).
+  - `build/appicon.icon/Assets/toolbox.svg`, also referenced from `icon.json`, which drops the Wails SVG.
+  - `desktop/icons/tray.png`: a 32 px orange glyph on transparent (Windows and Linux).
+  - `desktop/icons/tray_template.png`: a 32 px black glyph with alpha (the macOS template image).
+  - `frontend/src/assets/logo.svg`: the glyph, shown next to "Toolbox" in the sidebar.
+- **Platform files:** run `wails3 task common:generate:icons` (or the equivalent `wails3 generate icons …`) to regenerate `build/windows/icon.ico` and `build/darwin/icons.icns`. `build/darwin/Assets.car` can only be rebuilt on a Mac (Xcode `actool`), so the darwin Taskfile regenerates it from `appicon.icon` on the next Mac build. This is recorded as a Mac follow-up.
+- `desktop/icons/gen.go` (the Phase 3 downsampler) is deleted.
+
+### 3.7 Placeholders
+`bg-remover`, `upscaler` and `pdf` are removed from `modules/placeholders`. The real modules reuse those IDs, so stored module state and links keep working.
 
 ---
 
-## 5. Transcribe (`modules/transcribe` + sidecar `handlers/transcribe.py`)
+## 4. Background Remover (`modules/bgremove` + sidecar `handlers/bgremove.py`)
 
-Descriptor: `ID transcribe`, icon `captions`, Category ai, Order 170, Accepts audio+video, Requires `audio-engine`, OutputSubdir `Transcripts`, SplitInputs, MaxConcurrent 1, MaxInputs 100. Removed from placeholders.
+Descriptor:
+
+| Field | Value |
+|---|---|
+| ID | `bg-remover` |
+| Name | "Background Remover" |
+| Icon | `wand-sparkles` |
+| Category | image |
+| Order | 140 |
+| Accepts | `.jpg .jpeg .png .webp .bmp .tif .tiff` |
+| Requires | `audio-engine` |
+| OutputSubdir | `Cutouts` |
+| SplitInputs | true |
+| MaxConcurrent | 1 |
+| MaxInputs | 200 |
+
+Tagline and description are kept from the placeholder.
+
+### 4.1 Options
+
+```go
+type Model string      // "fast" | "balanced" | "best"
+type Output string     // "transparent" | "color" | "mask"
+type Options struct {
+    Model      Model  `json:"model"`      // default "balanced"
+    Output     Output `json:"output"`     // default "transparent"
+    Color      string `json:"color"`      // "#rrggbb", used when Output=="color"; default "#ffffff"
+    Crop       bool   `json:"crop"`       // crop to subject bounds; default false
+    Padding    int    `json:"padding"`    // px around the crop, 0..500; default 24
+    CleanEdges bool   `json:"cleanEdges"` // edge colour decontamination; default true
+    Refine     bool   `json:"refine"`     // guided-filter edge refinement; default false
+}
+```
+
+`presets.go` defines `Presets() []core.PresetInfo` (ID, Label, `DownloadBytes`) plus a Go table mapping preset → `{file, sha256, url, kind: "birefnet"|"isnet"}`, using the values from §0:
+- **fast**: label "Fast", isnet, 179 MB.
+- **balanced**: label "Balanced", BiRefNet lite, 224 MB.
+- **best**: label "Best", BiRefNet, 973 MB.
+
+### 4.2 Sidecar method `bgremove.run`
+
+Params: `{input, outputDir, baseName, model: {file, sha256, url, kind}, modelDir, output, color, crop, padding, cleanEdges, refine}`.
+
+1. **Validate** the params (`HandlerError("validation")`).
+2. **Downloading model:** if `<modelDir>/<file>` is missing, download it via the existing download/progress shim used by transcribe (urllib with streaming, written to a `.part` file in the model dir). Verify the **sha256**; on mismatch delete it and fail with "Model download was corrupted — try again". Rename into place.
+3. **Loading model:** create an ONNX Runtime session with the options from §0 (no mem arena, no mem pattern, severity 3, CPU EP). Cache one session per model file in the process and evict the others, so only one model is resident.
+4. **Load the image** (`Image.open`, `exif_transpose`, ICC → sRGB via `ImageCms` when `icc_profile` is present, then RGB). Pillow errors become "Couldn't read this image".
+5. **Run the model.** Pre-process per kind (§0), then a single `session.run`. Call `check_cancelled()` before and after.
+6. **Build the mask:** produce the per-kind output, then uint8, then resize back with bicubic. If `refine` is set, apply a guided filter (grey guide, r=8, eps=1e-3, `scipy.ndimage.uniform_filter`).
+7. **Compose:**
+   - `transparent`: RGBA = image + mask. If `cleanEdges` is set, pixels with alpha < 250 within 6 px of the opaque region (alpha ≥ 250) take the colour of the nearest opaque pixel (`scipy.ndimage.distance_transform_edt` with `return_indices`).
+   - `color`: alpha-composite onto the colour (cleanEdges applied first) and save as RGB.
+   - `mask`: L-mode mask.
+   - If `crop` is set, crop to the bbox of alpha > 8, expand by `padding`, and clamp to the image. If the mask is empty, don't crop and log "No subject found".
+8. **Save** as PNG (optimize=False, compress_level=6) to `<baseName> (no background).png`, `(on colour).png` or `(mask).png`, using the Python unique-path helper (numbering from " (1)", as in Phase 3). Then call `ctx.output(path)`.
+9. **Result:** `{width, height, subjectCoverage (0..1 share of alpha>127), model, output}`.
+
+Progress stages: "Downloading model" (0–100%), "Loading model", "Removing background" (indeterminate), "Saving". Model dir: `$TOOLBOX_MODELS_DIR/bg/`.
+
+### 4.3 Go module
+`Run` calls `job.Tool(sidecar.DepID)`, then `Call("bgremove.run", …)` with the P2 §6 event mapping, then `SetResult(...)`.
+
+- **Title** = the file name.
+- **Message:** "Subject covers 38% · 1600×1200". If coverage is below 0.5%, the message reads "No clear subject found".
+- **Validate:** enums; a colour hex is required when Output is `color`; padding range.
+
+### 4.4 UI (`tools/bgremove/BgRemoveView.tsx`)
+
+FileToolLayout. Options:
+- **Model** as 3 radio cards: label, download size and a hint. Fast: "~1 s, softer hair". Balanced: "~8 s, great edges". Best: "~15 s, finest detail, needs ~7 GB RAM". Balanced also says "needs ~7 GB RAM".
+- **Background** as a SegmentedControl (Transparent / Colour / Mask only). Colour shows the `ColorSwatchPicker`.
+- **Crop to subject** switch, plus a padding Stepper when it's on.
+- **Clean edges** switch.
+- **Refine edges** switch, with the help text "Sharper hair, may leak on busy backgrounds".
+
+A DepsGate covers the AI engine (install/update).
+
+**Results:** a grid of cards per finished job.
+- Each card shows a `CompareSlider` (original thumbnail vs result thumbnail via `ImageThumb(…, 800)`, with a checkerboard under the result), the file name, dimensions, and Reveal/Open/Copy path actions.
+- Clicking a card opens a large preview dialog with the slider at 1600 px.
+- Running jobs show the stage and progress (Meter).
+
+---
+
+## 5. Upscaler (`modules/upscale`)
+
+Descriptor:
+
+| Field | Value |
+|---|---|
+| ID | `upscaler` |
+| Name | "Upscaler" |
+| Icon | `maximize-2` |
+| Category | image |
+| Order | 150 |
+| Accepts | `.jpg .jpeg .png .webp` |
+| Requires | `upscayl` |
+| OutputSubdir | `Upscaled` |
+| SplitInputs | true |
+| MaxConcurrent | 1 (one GPU) |
+| MaxInputs | 200 |
 
 ### 5.1 Options
 
 ```go
-type Model string // "base" | "small" | "turbo"
-type Task string  // "transcribe" | "translate"  (translate = to English)
+type Model string  // "photo" | "illustration" | "fast"
+type Format string // "same" | "png" | "jpg" | "webp"
 type Options struct {
-    Model    Model    `json:"model"`     // default "small"
-    Language string   `json:"language"`  // "" = auto, else ISO-639-1 from a fixed list (en, es, fr, de, it, pt, nl, ja, ko, zh, ru, …)
-    Task     Task     `json:"task"`      // default "transcribe"
-    Formats  []string `json:"formats"`   // subset of txt|srt|vtt|json; default ["txt","srt"]; ≥1
-    VAD      bool     `json:"vad"`       // default true (skip silence)
+    Model  Model  `json:"model"`  // default "photo"
+    Scale  int    `json:"scale"`  // 2 | 4; default 4
+    Format Format `json:"format"` // default "same"
 }
 ```
 
-Presets (`presets.go`): base → `Systran/faster-whisper-base` (142 MB, "fast"), small → `Systran/faster-whisper-small` (464 MB, "balanced", default), turbo → `mobiuslabsgmbh/faster-whisper-large-v3-turbo` (1.6 GB, "best", slower on CPU). `Presets()` returns `PresetInfo` with `DownloadBytes`.
+Each preset maps to a model and the `-z`/`-s` flags:
 
-### 5.2 Sidecar method `transcribe.run`
+| Preset | 2× | 4× |
+|---|---|---|
+| photo | `realesrgan-x4plus`, `-z 4 -s 2` | `realesrgan-x4plus`, `-z 4 -s 4` |
+| illustration | `realesrgan-x4plus-anime`, `-z 4 -s 2` | `realesrgan-x4plus-anime`, `-z 4 -s 4` |
+| fast | `realesr-animevideov3-x2`, `-z 2 -s 2` | `realesr-animevideov3-x4`, `-z 4 -s 4` |
 
-Params `{input, outputDir, baseName, model (repo id), modelDir, language|null, task, formats[], vad}`. Steps: stage "Downloading model" (if `<modelDir>/<name>` missing: `huggingface_hub.snapshot_download(repo, local_dir=…)` with tqdm progress via the shim) → stage "Loading model" (`WhisperModel(local_dir, device="cpu", compute_type="int8", cpu_threads=min(8, os.cpu_count()))`, cached per model in the process) → `segments, info = model.transcribe(input, language, task, vad_filter, word_timestamps=("json" in formats))` → iterate: progress = `seg.end / info.duration`, message "Transcribing · 1:23 / 4:10", `ctx.check_cancelled()` per segment → write outputs `<baseName>.<ext>` via `UniquePath`-equivalent (Python side: append " (n)" if exists) → `ctx.output(path)` each → result `{language, languageProbability, durationSec, segments, words, outputs[]}`. SRT/VTT formatting per the research helper (`HH:MM:SS,mmm` / `.mmm`); TXT = segments joined with newlines; JSON = `{language, duration, segments:[{start,end,text,words?:[{start,end,word}]}]}`.
+Format `same` keeps png/jpg/webp as is. When the input is a PNG with an alpha channel, the output is **always PNG**, whatever the chosen format. JPG and WebP use `-c` quality 90. The builder verifies `-c` semantics against the real binary and records them in DECISIONS.md.
 
-Model dir: `$TOOLBOX_MODELS_DIR/whisper/<preset name>` (covered by "Clear models").
+### 5.2 Validation (at submit, in Go)
+- `image.DecodeConfig` (with the webp decoder registered) gives the dimensions. If the output would exceed **100 MP** (W·s × H·s), the error is "Too large to upscale {s}× ({W}×{H} → {W·s}×{H·s}); try 2× or a smaller image". Undecodable files: "Couldn't read this image".
+- Scale must be 2 or 4. The enums are checked.
 
-### 5.3 Go module
+### 5.3 Run
+1. `job.Tool(deps.Upscayl)` gives the exe; the models dir is `<exe dir>/models`. If `<model>.param` or `<model>.bin` is missing, fail with `dependency_missing` "Upscaler models are missing" and the hint "Reinstall the upscaler from Settings → Dependencies".
+2. Output: `core.UniquePath(OutputDir, stem+" ("+s+"x)", ext)`. Write to a temp name in the same dir (`.<ulid>.tmp.<ext>`; the extension is needed for format selection), then rename.
+3. Run `proc` with `-i in -o tmp -n model -z Z -s S -m modelsDir [-c 90] -t 0`. Progress:
+   - Before the first `%` line: indeterminate "Starting GPU…". After 8 s without one, it becomes "Starting GPU — the first run can take up to a minute".
+   - After that, `pct/100` with the message "Upscaling · 42%".
+   - Log stderr lines (excluding `%` lines) to the job log.
+4. Cancellation: `proc` kills the tree, then the tmp file is removed.
+5. Errors:
+   - Stderr matching `(?i)invalid gpu device|vkCreateInstance failed|no vulkan|vkEnumeratePhysicalDevices` gives `dependency_missing` "No compatible GPU found", with the hint "The upscaler needs a GPU with Vulkan support (any Apple Silicon Mac, or a recent NVIDIA/AMD/Intel GPU with current drivers)".
+   - A non-zero exit, or **a missing or empty tmp file after exit 0**, gives `tool_failed` "Upscaling failed" plus the last 5 stderr lines in the job log.
+6. Result: `{inWidth, inHeight, outWidth, outHeight, model, scale, bytes}`. The message reads "640×480 → 2560×1920".
 
-Run: `job.Tool(sidecar.DepID)` → `Call("transcribe.run", …)` with event mapping (P2 §6 pattern) → `SetResult({language, languageProbability, durationSec, segments, outputs})` → message "English · 4:10 · 212 segments". Title = file name.
+### 5.4 UI (`tools/upscale/UpscaleView.tsx`)
 
-### 5.4 UI (`tools/transcribe/TranscribeView.tsx`)
+FileToolLayout. Options:
+- **Model** as radio cards: Photo ("Best for photos"), Illustration ("Line art, anime, screenshots & text"), Fast ("Quickest, softer").
+- **Scale** as a SegmentedControl (2× / 4×).
+- **Format** Select.
+- **Input rows** show "W×H → W·s×H·s". The size is read via `FilesService.ImageThumb`'s companion `FilesService.ImageSize(path) (core.Size, error)` (new; DecodeConfig only). Rows over the cap show an inline warning, and the Start button excludes them with a toast.
 
-FileToolLayout; options: Model as 3 radio cards (label, download size, speed hint), Language Select (Auto-detect + list), Task SegmentedControl (Transcribe / Translate to English), Formats as toggle chips (≥ 1 enforced), VAD switch ("Skip silence"). Results: recent transcripts grouped by job — language badge, duration, output files with Reveal/Open, and a **Preview** button opening a side panel with the first ~50 lines of the TXT output (read via a new `FilesService.ReadText(path, maxBytes)` restricted to library/support dirs, ≤ 256 KB).
+DepsGate covers `upscayl`, with Install/Update (≈50 MB). Results use the same card grid as the Background Remover: `CompareSlider` with the original scaled to the same display box, and pixel-crisp off for the before image so the improvement is visible. A banner appears if the last job failed with "No compatible GPU found".
 
 ---
 
-## 6. EXIF (`modules/exif`)
+## 6. PDF Toolkit (`modules/pdf`)
 
-Descriptor: `ID exif`, icon `scan-search`, Category image, Order 160, Accepts images + RAW (P1 placeholder list), Requires `exiftool`, OutputSubdir `Metadata`, SplitInputs, MaxInputs 100. Removed from placeholders.
+Descriptor:
 
-### 6.1 ExifTool session (`modules/exif/session.go`)
+| Field | Value |
+|---|---|
+| ID | `pdf` |
+| Name | "PDF Toolkit" |
+| Icon | `file-text` |
+| Category | document |
+| Order | 190 |
+| Accepts | `.pdf` + `.jpg .jpeg .png .tif .tiff .webp` (images only for images → PDF) |
+| Requires | none |
+| OutputSubdir | `PDF` |
+| SplitInputs | **false** (the service decides per action) |
+| MaxConcurrent | 2 |
+| MaxInputs | 500 |
 
-One long-lived `exiftool -stay_open True -@ -` process (`proc.Start`), started lazily, serialised by a mutex, idle-closed after 5 min, restarted on failure. `Exec(ctx, args ...string) (stdout string, err)`: write args one per line + `-execute<N>`; read stdout until `{ready<N>}`; stderr captured per command. Context cancel → kill + restart. Shutdown on app quit (`-stay_open\nFalse\n`).
-
-### 6.2 Read (direct, not a job)
-
-`ExifService.Read(path string) (MetadataView, error)` — path must exist and have an accepted extension. Runs `-j -G1 -n -struct -charset filename=utf8 <path>` → returns:
+### 6.1 Options
 
 ```go
-type MetadataView struct {
-    Path, Name string
-    Groups []MetaGroup        // ordered: File, EXIF/IFD0, ExifIFD, GPS, XMP-*, IPTC, ICC_Profile, MakerNotes (collapsed), Composite
-    HasLocation bool
-    Location *GeoPoint        // decimal lat/lon (+ altitude) when present
-    Editable bool             // false for RAW and unsupported writers
+type Action string // "merge" | "split" | "organize" | "compress" | "images-to-pdf" | "pdf-to-images" | "protect" | "unlock"
+type PageEdit struct {
+    Page   int `json:"page"`   // 1-based source page
+    Rotate int `json:"rotate"` // 0 | 90 | 180 | 270 (clockwise, added to the page's rotation)
 }
-type MetaGroup struct { Name string; Fields []MetaField }
-type MetaField struct { Tag, Label, Value string } // Value stringified; binary blobs → "(binary, N bytes)"
-```
-
-### 6.3 Jobs: strip and edit (always new files)
-
-```go
-type Action string // "strip-location" | "strip-all" | "edit"
 type Options struct {
-    Action Action            `json:"action"`
-    KeepOrientation bool     `json:"keepOrientation"`   // strip-all: re-add Orientation + ICC profile (default true)
-    Fields map[string]string `json:"fields"`            // edit: subset of Title, Description, Artist, Copyright, Keywords, DateTimeOriginal ("YYYY:MM:DD HH:MM:SS"); "" = remove tag
+    Action Action `json:"action"`
+
+    // split
+    SplitMode string `json:"splitMode"` // "every" | "ranges"; default "every"
+    Every     int    `json:"every"`     // ≥1; default 1
+    Ranges    string `json:"ranges"`    // "1-3, 5, 8-" (8- = to end); each range → one file
+
+    // organize (single input): the output pages, in order
+    Pages []PageEdit `json:"pages"` // ≥1
+
+    // compress
+    Level string `json:"level"` // "small" | "balanced" | "high"; default "balanced"
+
+    // images-to-pdf
+    PageSize string `json:"pageSize"` // "a4" | "letter" | "fit"; default "a4"
+    Margin   string `json:"margin"`   // "none" | "small" (≈ 0.5 in); default "small"
+
+    // pdf-to-images
+    ImageFormat string `json:"imageFormat"` // "png" | "jpg"; default "png"
+    DPI         int    `json:"dpi"`         // 72 | 150 | 300; default 150
+    PageRange   string `json:"pageRange"`   // "" = all, else ranges syntax
+
+    // protect / unlock / any encrypted input: never persisted (see 6.2)
+    PasswordRef string `json:"passwordRef"` // opaque ID of an in-memory secret
 }
 ```
 
-- `strip-location`: `-gps:all= -xmp:geotag= -o <out> <in>`.
-- `strip-all`: `-all= [-tagsFromFile @ -Orientation -ICC_Profile] -o <out> <in>`.
-- `edit`: `-overwrite_original` **never**; `-<Tag>=<value> … -o <out> <in>` (Keywords → `-XMP-dc:Subject` + `-IPTC:Keywords`, multiple via comma split).
-- `<out>` = `core.UniquePath(OutputDir, StemName + suffix, ext)` with suffix " (no location)", " (clean)", " (edited)". RAW inputs → validation "RAW files are read-only here".
-- Validation: action enum; edit requires ≥1 field; DateTimeOriginal format; field values ≤ 2000 chars, no newlines except Description.
-- Result `SetResult({action, removedTags int (from a before/after count), output})`; message e.g. "Removed 14 location tags".
+### 6.2 Passwords are never persisted
+Job options are stored in SQLite, so passwords never go in them.
 
-### 6.4 UI (`tools/exif/ExifView.tsx`)
+- `pdf.Service` holds an in-memory `secrets` map from ref (ULID) to `{password, newPassword}`. The bound methods take passwords as separate arguments, store them, and put only `PasswordRef` in the options.
+- `Run` takes the secret by ref. A secret is deleted when its job reaches a terminal state, and **retries keep it** until then.
+- After an app restart, a queued job whose secret is missing fails with `validation` "The password isn't kept after a restart — run this again".
 
-Two-pane: left = input file list (FileToolLayout inputs); right = **Inspector** for the selected file: header (thumbnail via `FilesService.ImageDataURL(path)` for jpg/png/webp/gif ≤ 20 MB, name, size, camera make/model, date), a prominent **location** card when GPS is present ("Contains location: 48.8584, 2.2945" + "Copy coordinates"), groups as collapsible sections (ResultTable-style rows, search filter). Actions bar applies to all inputs: **Remove location** (primary when any file has GPS), **Remove all metadata** (with "Keep orientation & colour profile" switch), **Edit…** (dialog with the six fields; applies to all selected files; shows current values when one file is selected). Results: recent EXIF outputs with Reveal/Open.
+### 6.3 Bound service
+
+```go
+type PdfInfo struct {
+    Path      string    `json:"path"`
+    Pages     int       `json:"pages"`
+    Encrypted bool      `json:"encrypted"`
+    NeedsPassword bool  `json:"needsPassword"` // can't open without a user password
+    Restricted bool     `json:"restricted"`    // owner-password permissions block edits
+    Title     string    `json:"title"`
+    PageSizes []core.Size `json:"pageSizes"`   // points, after rotation
+    Bytes     int64     `json:"bytes"`
+}
+Defaults() Options
+Info(path string, password string) (PdfInfo, error)               // wrong password → validation "Wrong password"
+Thumbnail(path string, page int, width int, password string) (string, error) // data URL (JPEG q80), width 80..1200
+Enqueue(paths []string, opts Options, password string, newPassword string) ([]core.Job, error)
+```
+
+- **Job split by action.** `merge` and `images-to-pdf` make **one** job with all inputs, in the given order. Every other action makes one job **per input**. `organize` requires exactly one input.
+- **Input validation:** PDF actions accept only `.pdf` and `images-to-pdf` only images, each with a clear message. Ranges are parsed and checked against the page count at submit time, using `Info`. Inputs larger than 500 MB get "PDFs over 500 MB aren't supported".
+- **Password meanings:**
+  - `protect`: `newPassword` is required, and `password` opens an already-encrypted input.
+  - `unlock`: `password` is required.
+  - Any other action on an encrypted input needs `password`.
+
+### 6.4 Implementation (`modules/pdf/`)
+- **`pdfcpu.go`:**
+  - `init` calls `api.DisableConfigDir()`.
+  - `conf(password)` returns `model.NewStatelessConfiguration()` with `UserPW` and `OwnerPW` = password and `ValidationMode` relaxed.
+  - Each pdfcpu call goes through a helper that runs it in a goroutine and returns early on `ctx.Done()`. pdfcpu has no context, so the goroutine finishes in the background and its partial output is deleted.
+- **`render.go`:** one lazy go-pdfium WebAssembly pool, used both by `Thumbnail` and by `pdf-to-images`.
+  - Pool settings: `MinIdle 0`, `MaxIdle 1`, `MaxTotal 2`, `FSConfig: wazero.NewFSConfig()` (**no mounts**), and a `RuntimeConfig` built from go-pdfium's defaults plus `WithCompilationCache(wazero.NewCompilationCacheWithDir(<support>/cache/pdfium))`. The core features go-pdfium needs must be kept.
+  - Documents open from bytes, and a small LRU (2 docs) is keyed by path, mtime and password hash. Thumbnails are cached in memory (LRU 300).
+  - The pool closes after 5 idle minutes and at app quit (`Close()` hooked in `main.go`).
+- **Actions** (`<stem>` is the input file name without extension; all outputs via `core.UniquePath`):
+
+  | Action | How | Output |
+  |---|---|---|
+  | merge | `api.MergeCreateFile(ctx, inputs, out, false, conf)` | `<first stem> (merged).pdf` |
+  | split, every | `api.SplitFile` (every N pages) | `<stem> (pages a-b).pdf` |
+  | split, ranges | `api.CollectFile` once per range | `<stem> (pages a-b).pdf` |
+  | organize | `CollectFile` with the page order, then `RotateFile` for each rotation group, on output page numbers, in place on the temp file, then move | `<stem> (edited).pdf` |
+  | compress | see below | `<stem> (compressed).pdf` |
+  | images-to-pdf | `api.ImportImagesFile` with `pdfcpu.Import` config: `a4`/`letter` give `f:A4`/`f:Letter`, `pos:c`, `sc:1 rel`, plus margin; `fit` gives `pos:full` with DPI-correct page size | `<first stem>.pdf` |
+  | pdf-to-images | the pdfium pool renders the selected pages at DPI, each encoded PNG or JPEG q90 | `<stem> (pages)/page 001.png` etc. in a subfolder of OutputDir; each file registered via `job.Output` |
+  | protect | `api.EncryptFile` with AES-256, user = owner = newPassword | `<stem> (protected).pdf` |
+  | unlock | `api.DecryptFile` | `<stem> (unlocked).pdf` |
+
+  Details:
+  - **Merge:** progress is per input (indeterminate within).
+  - **Split:** every input page produces a file.
+  - **Images to PDF:** the builder verifies tif and webp support. Formats that fail are removed from Accepts and recorded.
+  - **PDF to images:** progress is pages done ÷ total, and cancellation is checked per page.
+  - **Unlock:** the password must be right.
+- **Compress** (`compress.go`), based on the research prototype `.dev/p4-research/pdf/gopdf/recomp/`:
+  1. Read the context (`api.ReadContextFile`). Collect image XObjects whose filter is `DCTDecode`, or `FlateDecode` 8-bpc DeviceRGB/DeviceGray, with **no SMask/Mask** and both sides ≥ 300 px.
+  2. Work out the largest page each image appears on (via page resources). The pixel cap is `targetDPI × page long edge in inches`, which is conservative and never upsamples.
+
+     | Level | Target DPI | JPEG quality |
+     |---|---|---|
+     | small | 110 | 55 |
+     | balanced | 150 | 70 |
+     | high | 220 | 82 |
+  3. Decode with Go's `image/jpeg` (for CMYK DCT, honour a `/Decode [1 0 …]` array or the Adobe APP14 inversion, test against `scan_color.pdf`) or zlib with raw pixels. Downscale with `draw.ApproxBiLinear` when above the cap. Re-encode as JPEG (Gray stays Gray, CMYK becomes RGB). Replace the stream with `/Filter /DCTDecode`, the new dims and `/ColorSpace`, and drop `DecodeParms`/`Decode`. **Keep the original when the new stream isn't smaller.**
+  4. Run on a worker pool of `max(1, NumCPU/2)`, checking ctx between images.
+  5. Write with `api.WriteContextFile`, then run `api.OptimizeFile` on the result (dedupe). If the final size is ≥ 95% of the input, **delete the output**, and the job succeeds with the message "Already compact — couldn't make it meaningfully smaller" and no output.
+  6. Result: `{bytesBefore, bytesAfter, imagesRecompressed}`, with the message "29.6 MB → 11.6 MB (−61%)".
+- **Errors:**
+  - Malformed PDF (after relaxed repair): `validation` "This PDF is damaged and couldn't be read".
+  - Wrong password: "Wrong password".
+  - Restricted file without the owner password: "This PDF's permissions block editing — enter its owner password".
+- **Bookmarks:** the result message notes "Bookmarks aren't kept" for split and organize, and only when the input had bookmarks.
+
+### 6.5 UI (`tools/pdf/PdfView.tsx`)
+
+**Layout:** a left column with an **action picker**: a vertical list of 8 items with icon, title and one-line description. The right side is the action's panel.
+
+- The current action is remembered via module state.
+- Dropped files go to the current action when they fit it. Otherwise the view switches to the first action that fits: images go to images → PDF, several PDFs go to merge, and one PDF stays on the current PDF action.
+- Each panel has its own inputs (FileList) and a **Run** button. A password field appears when `Info` reports `needsPassword` or `restricted`; an inline "Wrong password" error comes from `Info`.
+
+**Panels:**
+- **Merge:** an ordered list with drag handles, plus up/down buttons for keyboard use. Each row shows the page count and a first-page thumbnail at 48 px. The total page count is shown.
+- **Split:**
+  - A segmented control: "Every N pages" (with a Stepper) or "Custom ranges" (a text field with live parsing). The live parsing produces chips like "1–3", "5" and "8–end", with errors shown inline.
+  - A preview line: "Creates 4 files".
+- **Organize pages:** one PDF. A **page grid** of thumbnails, 140 px wide, lazy-loaded with an IntersectionObserver, rendering at most 4 at once.
+  - **Selection:** click selects, Shift-click selects a range, Mod-click toggles, Mod+A selects all.
+  - **Toolbar:** Rotate left/right (the selection), Delete (selection), Keep only selected, Reverse, Reset.
+  - **Moving pages:** drag to reorder (HTML5 DnD with a drop indicator); with the keyboard, the arrows move focus and Alt+←/→ moves the focused or selected pages.
+  - Each tile shows the original page number, plus a rotation badge when rotated. The output is described as "12 pages (3 removed, 2 rotated)".
+  - **Save as new PDF** enqueues `organize`.
+- **Compress:** three radio cards: Small ("Smallest file, 110 dpi images"), Balanced (default) and High quality. A note says "Text and vector graphics are never degraded; only photos and scans shrink". The result shows before → after.
+- **Images → PDF:** an ordered image list with thumbnails (`ImageThumb` 96) and drag/up/down reordering. Page size is a SegmentedControl (A4 / Letter / Fit to image) and Margin a Switch.
+- **PDF → images:** Format (PNG / JPG), Resolution (72 "Screen" / 150 "Standard" / 300 "Print") and Pages (All / Range field). An estimate line reads "Creates 24 images".
+- **Add password:** a password field plus confirm (they must match, length ≥ 1), with a show/hide toggle. A note says "Uses AES-256. There's no way to recover a forgotten password".
+- **Remove password:** a password field. The text "You need the current password; this tool can't crack PDFs".
+
+Results: the shared recent-outputs list for the module (Reveal/Open). Compress shows the size delta and pdf → images shows a "Open folder" button.
 
 ---
 
-## 7. Settings and shell UI
+## 7. Shell, settings and misc
 
-- **Settings → General** (new section, top): "Keep Toolbox running in the tray when the window is closed" switch; "Start Toolbox at login" switch (error → inline); "Global shortcuts" list: action label, `HotkeyRecorder` (new component: focus → press combo → shows `Kbd`; Esc cancels; Backspace clears → disabled), status badge (Active / In use by another app / Disabled) from `hotkeys:status`; "Reset to defaults".
-- **Settings → Dependencies:** ExifTool row gets Install/Update (managed) via `DepsService.UpdateExiftool()`.
-- **Settings → Clipboard** section mirrors the tool's settings panel (same component).
-- **Command palette:** target `palette` from `app:navigate` opens it; new commands: "Open clipboard history", "Pause/Resume clipboard history", "Clear clipboard history…".
-- **Toast** on first hide-to-tray (once per install; remembered via `localStorage`).
+- **Settings → Dependencies:**
+  - The **Upscaler engine** row has Install/Update (managed, pinned) and shows "Pinned version 20251207-174704". The detection details reuse the existing row.
+  - The AI engine row is renamed.
+- **Settings → Models:** the existing "Clear models" now lists the subfolders with their sizes (`whisper/`, `bg/`). The `ModelsInfo` already exists if P2 shipped it; otherwise a simple total is fine. The builder checks and records what it finds.
+- **Command palette:** "Remove background…", "Upscale image…", and "Merge PDFs…", "Compress PDF…" and "Organize PDF pages…" (open the tool with the action preselected via the module handoff).
+- **Drop matching:** images now match Background Remover, Upscaler, EXIF, Converter and PDF (images → PDF). The existing chooser handles several matches; the order follows each module's Order.
 
 ---
 
@@ -274,88 +475,215 @@ Two-pane: left = input file list (FileToolLayout inputs); right = **Inspector** 
 
 ```go
 // api/files.go — FilesService additions
-ReadText(path string, maxBytes int) (string, error)     // library/support dirs only; ≤ 256 KB
-ImageDataURL(path string) (string, error)               // any existing file with an image extension, ≤ 20 MB
+ImageThumb(path string, maxDim int) (string, error)
+ImageSize(path string) (core.Size, error)            // core.Size{W, H int} (new type, also used by PdfInfo in points)
 
-// api/desktop.go — DesktopService (new)
-HotkeyStatus() []core.HotkeyStatus
-HidePopup() error
-ShowMain(view string) error
-
-// api/services.go — DepsService additions
-UpdateExiftool() (core.Job, error)
+// api/services.go — DepsService
+InstallUpscaler() (core.Job, error)
 
 // modules
-clipboard.Service  (§4.2)
-transcribe.Service { Defaults() Options; Presets() []core.PresetInfo; Languages() []Language; Enqueue(paths, opts) ([]core.Job, error) }
-exif.Service       { Read(path string) (MetadataView, error); Enqueue(paths []string, opts Options) ([]core.Job, error) }
+bgremove.Service { Defaults() Options; Presets() []core.PresetInfo; Enqueue(paths []string, opts Options) ([]core.Job, error) }
+upscale.Service  { Defaults() Options; Enqueue(paths []string, opts Options) ([]core.Job, error) }
+pdf.Service      { Defaults() Options; Info(...); Thumbnail(...); Enqueue(paths, opts, password, newPassword) }
 ```
-
-`FilesService.ImageDataURL` accepts any existing file path with an image extension (the user already chose it); it never reads non-image files.
 
 ---
 
 ## 9. Test plan
 
 **Go**
-- `core`: JobLess rejection; settings validation for new fields (hotkey duplicates/unknown actions, retention/max bounds); migration 0003 on a Phase 2 DB.
-- `core/store`: clip upsert dedupe/bump, list ordering (pinned first), search, cursor paging, prune (age, count, pinned exempt, returns rows), clear keepPinned.
-- `core/deps`: `InstallManagedArchive` against httptest (zip + tar.gz, checksums.txt parsing, layout callback, atomic swap keeps the old install on failure, already-up-to-date); ExifTool asset/layout functions per GOOS (Windows rename + `exiftool_files/` kept; unix chmod).
-- `modules/clipboard`: recorder with a fake clipboard source (interface over `golang.design/x/clipboard`): sensitive skipped, size limits, image write + dimensions, self-copy suppression, pause/resume, prune timer (injectable clock), error backoff.
-- `modules/transcribe`: Validate (formats ≥1, language list, model enum), Run against a fake Caller (params, events, result, outputs).
-- `modules/exif`: session against a **fake exiftool** (re-exec helper implementing `-stay_open` framing: `-execute<N>` → `{ready<N>}`), Read JSON → MetadataView (groups, GPS detection, binary blobs), strip/edit arg building, UniquePath outputs, RAW rejection; `//go:build integration` against the real managed ExifTool (installs into a temp support dir, creates a test JPEG with GPS via exiftool, reads, strips, verifies).
-- `desktop`: hotkey `Apply` with a fake registrar (status reporting, unregister on change, duplicates); tray menu model built from state (pure function → labels/enabled flags).
-- Integration (`-tags integration`, `TOOLBOX_ENGINE_E2E=1`): extend the engine test — after install, `transcribe` `base` on the "Me at the zoo" mp3 (or generated speech-free audio → 0 segments handled) asserting outputs exist and SRT parses.
+- **`core/deps`:**
+  - `InstallManagedArchive` v2 against httptest: two parts with pinned checksums, a mismatch on one part leaves the old install intact, `VERSION` is written, a matching version is skipped, and `PinnedVersion` produces outdated.
+  - The ExifTool tests keep passing on the migrated spec.
+  - The upscaler `Layout` keeps exactly the 10 model files, the binary, `vcomp140.dll` on Windows only, and LICENSE, with mode 0755 on unix (run with a fake GOOS argument).
+  - Asset and URL functions for each GOOS/GOARCH, including the unsupported ones.
+- **`api/files`:** `ImageThumb` on png with alpha (gives PNG), jpg (gives JPEG), webp, bmp and tiff; scaling bounds; the cache hit; refusal of oversize images (synthetic `DecodeConfig` header); `ImageSize`.
+- **`modules/bgremove`:** Validate; Run against a fake Caller (params include the model table entry, the event mapping, the result message including "No clear subject found").
+- **`modules/upscale`:**
+  - Validate, including the 100 MP cap using generated PNG headers.
+  - Run against a **fake `upscayl-bin`** (re-exec helper) covering: progress lines with `\r\n` → progress, the GPU-error stderr → `dependency_missing`, exit 0 with no output → `tool_failed`, cancellation removes the tmp file, alpha PNG forcing PNG output, and the `-z`/`-s` mapping table.
+  - `//go:build integration`: install the real pinned upscaler into a temp bin dir and upscale a generated 64×64 PNG at 2× and 4×. Assert the output dimensions. Skip with a message when no Vulkan GPU is present.
+- **`modules/pdf`:**
+  - Fixtures are generated at test time with pdfcpu (`api.CreateDemo`-style or import of generated images); any extra PDF fixtures committed under `modules/pdf/testdata/` stay ≤ 200 KB total.
+  - Each action on a 6-page generated PDF: merge page counts; split by every N and by ranges (including `8-` to the end); organize order plus rotation (read back via `PageDimsFile` and the rotate attribute); protect then Info shows NeedsPassword; unlock with the wrong password gives the error, the right one works; images → PDF page sizes.
+  - pdf-to-images output count and dimensions at 72 dpi.
+  - Compress on a generated PDF with a large noisy JPEG produces a smaller file with the same page count and recompressed images, and the "already compact" path for a text-only PDF.
+  - Range parser table tests.
+  - Secrets: there is no password in the persisted options JSON, and a missing secret after a simulated restart gives the error.
+  - **The config dir is never created:** run with `HOME`/`APPDATA` pointing at a temp dir and assert it is still empty.
+  - **pdfium has no FS mount:** a test opens a document from bytes, then asserts a temp file can't be opened through it.
 
-**Python** — `tests/test_transcribe.py`: SRT/VTT/TXT/JSON writers (pure, table-tested); param validation; slow test (`TOOLBOX_SLOW=1`) running `base` on the downloads mp3 (from `.dev/`, skipped if absent) asserting "elephants" in the text; cancellation between segments.
+**Python**
+- `tests/test_bgremove.py` (pure functions, synthetic images): pre-processing shapes and normalisation per kind; cleanEdges colour bleed; crop with padding and clamping; the empty-mask no-crop; colour and mask compose modes; sha256 mismatch deletes the file; param validation.
+- The slow test (`TOOLBOX_SLOW=1`) runs `fast` (isnet) on a generated image with a clear foreground disc and asserts the mask IoU is above 0.8.
 
-**Frontend** — PopupShell routing (`?window=popup`), ClipboardView states (off/recording/paused/error), popup keyboard (↑↓, Enter → Copy + HidePopup, 1–9), HotkeyRecorder (capture, Esc, Backspace), Transcribe options (formats ≥ 1), EXIF inspector (groups, location card, editable flag), Settings General section.
+**Frontend**
+- CompareSlider (pointer and keyboard).
+- ColorSwatchPicker validation.
+- BgRemove options: colour only when Output is colour.
+- Upscale over-cap warning row.
+- PDF action routing for dropped files, split range parsing chips, organize grid (selection, keyboard move, rotate, delete, the "N pages" summary), password fields (protect confirm mismatch), and merge reordering.
+- DepsGate upscaler install button.
+- Sidebar logo renders.
 
-**Manual smoke (architect, Windows, sandboxed):** tray icon + menu; close-to-tray and Quit; start-at-login toggles the Windows Run entry and back; clipboard hotkey opens the popup over another app, Enter copies (verify with `Get-Clipboard` in PowerShell **only on test strings the architect put there itself**), password-manager concealment can't be simulated → covered by unit tests; transcribe the downloads mp3 (`small`); ExifTool install from Settings, inspect + strip a generated JPEG with GPS; still no listening sockets.
-
-> Clipboard etiquette for automated checks: the architect may only write test strings it created and must restore the user's previous clipboard text afterwards (read it first with `Get-Clipboard`, write it back at the end). No keystroke injection (Phase 1 lesson).
+**Manual smoke (architect, Windows, sandboxed; passive capture only, no keystroke injection):**
+- AI engine update to 0.4.0 in place.
+- Background removal on the research photos with all three presets plus colour, mask and crop.
+- Upscaler install from Settings, 2× and 4× of a photo and an illustration (check the dimensions and look at the crops).
+- PDF: every action on the research PDFs (merge, split, organize via seeded job options, compress the scanned PDF with a size drop, images → PDF, PDF → images, protect, unlock).
+- Thumbnails render in the organize grid (screenshot).
+- New icon in the window and title bar, the taskbar, and the tray.
+- No listening sockets.
+- No `pdfcpu` dir under `%APPDATA%`.
 
 ---
 
 ## 10. Work packages
 
-### Wave 0 — foundation (architect)
-1. Go deps: `golang.design/x/clipboard@v0.11.0`. Core: `JobLess`, settings additions + validation (with tests), wire types + events, migration 0003 + `ClipStore` interface (store implementation stubbed), `FilesService` additions (ReadText/ImageDataURL implemented — small), `desktop/` package API stubs (`Tray`, `Hotkeys`, `Popup`, `Shell` wiring), `api/desktop.go`, module stubs (`clipboard`, `transcribe`, `exif`) with final options/presets/services, placeholders removed, `main.go` wiring (window close hook, popup window creation behind the desktop stubs, ApplicationShouldTerminateAfterLastWindowClosed=false on mac).
-2. Sidecar: pyproject (+faster-whisper, av pin, version 0.3.0), `uv lock` (verify mac arm64 wheels for ctranslate2/av), `handlers/transcribe.py` stub registered.
-3. Bindings regenerated; frontend: `lib/api.ts` re-exports, `PopupShell` + `?window=popup` routing in `App.tsx` (complete — small), tool view stubs, `HotkeyRecorder` component stub, settings section stubs.
-4. Docs: CLAUDE.md (desktop package rule, clipboard privacy rules, how hotkeys are added).
+### Wave 0: foundation (architect)
+1. Go deps (§3.1).
+2. Core and API:
+   - `core.Size`.
+   - Placeholders removed.
+   - Module stubs with **final** options, presets, descriptors and service signatures for `bgremove`, `upscale` and `pdf`.
+   - `FilesService.ImageThumb`/`ImageSize` implemented with tests (small).
+   - The `deps.Upscayl` catalog entry, the `Spec.VersionFile` and `PinnedVersion` fields, and a stub of `UpscaylArchive()` with the final part/asset table.
+   - `DepsService.InstallUpscaler` signature.
+   - `main.go` wiring (including pdf pool `Close()` at quit).
+3. Sidecar: pyproject (Pillow explicit, 0.4.0), `uv lock` (verify macOS arm64 wheels), the AI engine display rename, a `handlers/bgremove.py` stub registered.
+4. **App icon** (§3.6): the generator, regenerated `.ico`/`.icns`/tray PNGs, and the sidebar logo.
+5. Bindings regenerated; `lib/api.ts` re-exports; tool view stubs; "AI engine" string changes in the frontend.
+6. Docs: CLAUDE.md (pdf module notes: config dir and the no-mount rule; the image tools; the AI engine name; archive v2).
 
 ### Wave 1 (parallel)
 
 | WP | Owns | Acceptance |
 |---|---|---|
-| **D1 Desktop shell (Go)** | `desktop/**`, `api/desktop.go` bodies, the `main.go` desktop section (marked block) | §3.4; tests per §9 `desktop` |
-| **CB1 Clipboard backend** | `modules/clipboard/**` (except frozen options/service signatures), `core/store/clipboard.go` + tests | §3.3, §4.1–4.2; tests per §9 |
-| **TR1 Transcribe** | `sidecar/toolbox_sidecar/handlers/transcribe.py`, `sidecar/tests/test_transcribe.py`, `modules/transcribe/**` (except frozen files) | §5.2–5.3; pytest + Go tests |
-| **EX1 EXIF + ExifTool** | `modules/exif/**` (except frozen files), `core/deps/archive.go` + exiftool catalog/layout changes in `core/deps/**` | §3.5, §6.1–6.3; Go tests + integration |
-| **UI1 Clipboard UI** | `frontend/src/tools/clipboard/**` | §4.3; tests |
-| **UI2 Shell/settings UI + Transcribe & EXIF views** | `frontend/src/tools/{transcribe,exif}/**`, `frontend/src/components/HotkeyRecorder.*`, `frontend/src/views/SettingsView*` (General + Clipboard + ExifTool row), palette commands in `frontend/src/shell/useBuiltinCommands.ts` | §5.4, §6.4, §7; tests |
+| **BG1 Background removal backend** | `sidecar/toolbox_sidecar/handlers/bgremove.py`, `sidecar/tests/test_bgremove.py`, `modules/bgremove/**` (except frozen files) | §4.2–4.3; pytest (+slow) and Go tests |
+| **UP1 Upscaler backend + archive v2** | `core/deps/archive.go`, `core/deps/*upscayl*`, the detection changes in `core/deps/detect.go` for `VersionFile`/`PinnedVersion`, `modules/upscale/**` (except frozen files), `api` body of `InstallUpscaler` | §3.3, §5.2–5.3; Go tests and integration |
+| **PDF1 PDF backend** | `modules/pdf/**` (except frozen files) | §6.2–6.4; Go tests |
+| **UI1 Image tools UI** | `frontend/src/tools/{bgremove,upscale}/**`, `components/CompareSlider.*`, `components/ColorSwatchPicker.*`, the checkerboard tokens/class, the DepsGate upscaler branch in `tools/_kit/DepsGate.tsx` | §3.5, §4.4, §5.4; tests |
+| **UI2 PDF UI** | `frontend/src/tools/pdf/**`, palette entries in `shell/useBuiltinCommands.ts` | §6.5, §7; tests |
 
-UI1/UI2 code against the bindings and stubs committed in Wave 0; they run in parallel with the backend packages.
+The UI packages code against the Wave 0 bindings and run in parallel with the backends.
 
-### Wave 3 — integration (architect)
-Merge, regenerate bindings, full checks (Go, pytest, frontend, darwin cross-vet), engine e2e incl. transcription, ExifTool integration test, `wails3 build`, manual smoke per §9 (passive capture + seeded jobs; clipboard etiquette), DECISIONS.md, summary.
+### Wave 2: integration (architect)
+- Merge and regenerate bindings.
+- Full checks: Go, pytest, frontend, gofmt, and the darwin cross-vet (`./core/... ./modules/...` plus `GOOS=darwin go build` of `modules/pdf`).
+- Engine e2e extended with a `bgremove` `fast` run on the dev photo.
+- Upscaler integration test.
+- `wails3 build`, then the manual smoke from §9.
+- Update DECISIONS.md and write the summary.
 
 ---
 
 ## 11. Acceptance criteria
 
-1. The app lives in the tray: closing the window hides it (when enabled), the tray menu works, Quit cleanly stops jobs and the engine; start-at-login can be toggled.
-2. Two global hotkeys work and are rebindable; conflicts are reported in Settings without crashing.
-3. With clipboard history enabled, copied text and images appear in the tool and the popup within 1 s; password-manager copies are never stored; retention and pinning work; selecting an item puts it back on the system clipboard.
-4. Transcribe produces correct TXT/SRT/VTT/JSON for the test clip with `small`, with live progress and cancellation; existing engine installs show **Update** and upgrade in place.
-5. ExifTool installs from Settings on Windows; EXIF reads metadata (including GPS), strips location/all metadata and edits fields into **new** files; inputs are untouched (verified by checksum).
-6. No listening sockets; nothing written outside the support/library dirs; all checks (`go vet`, `go test`, pytest, `npm run check`, gofmt, darwin cross-vet) clean; DECISIONS.md updated.
+1. **Background Remover:** turns the research portrait, cat, product and logo photos into clean transparent PNGs with the Balanced preset. Fast and Best work. Colour, mask and crop work. The first use downloads the model with progress, and a corrupted download is rejected. Existing engine installs show **Update** and upgrade in place.
+2. **Upscaler:** installs from Settings (verified pinned checksums) and upscales a photo 2× and 4× with correct output dimensions and visibly better detail than bicubic. Progress is live, cancel leaves no partial file, and missing-GPU and oversize inputs give clear errors.
+3. **PDF Toolkit:** all 8 actions produce correct outputs on the research PDFs, and inputs are untouched (checksums). Compress cuts `scan_synth_30p.pdf` by at least 40% at Balanced. The organize grid shows real thumbnails and saves the edited order and rotation. Passwords never reach the DB, nothing is written to the user config dir, and the WASM renderer has no filesystem access.
+4. **Icon:** the new icon appears in the window, the taskbar and the tray on Windows, and the macOS assets are generated (`icons.icns`, template tray icon).
+5. **Rules:** no listening sockets. Nothing is written outside the support and library dirs. All checks are clean (`go vet`, `go test`, pytest, `npm run check`, gofmt, darwin cross-vet). DECISIONS.md is updated.
 
 ## 12. Risks
 
-- **Clipboard library on macOS is unverified here** (purego/objc). If `Watch` misbehaves on mac, fall back to polling `changeCount` every 500 ms (decision logged).
-- **Global hotkey collisions** vary per machine/app; defaults chosen to avoid common app shortcuts (Ctrl/Cmd+Alt+V, Ctrl/Cmd+Alt+Space) but users may still need to rebind.
-- **Whisper on macOS is CPU-only** (ctranslate2); `small` will be slower than on GPU. A Metal path (pywhispercpp) is a candidate for later.
-- **ExifTool on macOS depends on system perl**; if Apple removes it, the managed install fails with a Homebrew hint.
-- **Privacy:** clipboard history is opt-in, local only, sensitive copies skipped, and fully clearable; still, recording is visible in the tray and the tool header at all times.
+- **macOS is unverified for the new pieces.** These are: upscayl-bin with MoltenVK (universal binary, exec bit, Gatekeeper; a Go HTTP download sets no quarantine flag), BiRefNet RAM on smaller Macs (6–7 GB peak), and regenerating `Assets.car`.
+- **No GPU means no upscaler.** Acceptable for this user's machines (RTX 3070 and Apple Silicon); revisit if needed.
+- **Compression ratio depends on content.** Only DCT and 8-bit Flate images shrink. JBIG2 and CCITT scans and vector PDFs won't, and the tool says so instead of writing a bigger file. CMYK images become RGB, which shifts colour slightly.
+- **pdfcpu memory** is about 1–3× the file size; inputs are capped at 500 MB.
+- **upscayl-bin is AGPL-3.0**, run only as a separate process and never linked. Fine for a personal app; noted in DECISIONS.md.
+- **First upscaler run** is slow (shader compilation), which the UI messaging covers.
+
+---
+
+## 13. Additions approved with the spec (2026-10-27)
+
+### 13.1 HEIC/HEIF input
+- **Engine:** `pyproject.toml` adds `"pillow-heif>=1.8"` and `"spandrel>=0.4.2"` (the latter for §13.3). The version stays `0.4.0`. A shared helper, `toolbox_sidecar/imageio.py`, registers the HEIF opener once and exposes `load_image(path) -> PIL.Image`. That function does the `exif_transpose`, converts ICC to sRGB, and returns RGB, or RGBA when the image has alpha. The bgremove and upscale handlers both use it.
+- **New sidecar method `image.convert`:** takes `{input, output}`, writes a PNG via `load_image` (alpha is kept) and returns `{width, height}`. Go calls it when a tool needs a HEIC decoded.
+- **Background Remover:** Accepts gains `.heic .heif`, and the handler reads them directly.
+- **Upscaler:** Accepts gains `.heic .heif`. Go can't decode HEIC, so:
+  - Validate skips the size cap for HEIC inputs.
+  - `Run` first converts the file via the engine into `TempDir/<stem>.png` (`job.Tool(sidecar.DepID)`). If the engine is missing, it fails with `dependency_missing` "HEIC photos need the AI engine" plus the install hint.
+  - It then checks the cap on the converted size and upscales the PNG.
+  - Format `same` gives PNG for HEIC inputs.
+- **Thumbnails and sizes:** `ImageThumb` and `ImageSize` return `validation` "No preview for HEIC" for `.heic`/`.heif`. The UI shows a file-type tile instead, and "HEIC" where the dimensions would be. EXIF already handles HEIC through ExifTool, so nothing changes there.
+
+### 13.2 Auto-paste from the clipboard popup (opt-in)
+- **Setting:** `ClipboardSettings.AutoPaste bool` (json `autoPaste`, default **false**).
+  - Settings → Clipboard and the tool's settings panel get a switch, "Paste into the previous app after picking an item", with platform notes.
+  - On Linux the switch is disabled ("Not supported on Linux yet").
+- **Interface:** the code lives in `desktop/paste_{windows,darwin,other}.go`, behind `type Paster interface { Remember(); Paste(ctx context.Context) error; Permission() string; RequestPermission() error }`.
+- **Remember:** the shell calls `Remember()` **just before the popup is shown**, whether it was opened by the hotkey or from the tray.
+  - Windows: `GetForegroundWindow`, ignored if it is one of our own windows.
+  - macOS: the frontmost app's PID via `NSWorkspace.sharedWorkspace.frontmostApplication` (purego/objc, already an indirect dependency).
+- **Paste sequence:** it runs only after a successful copy from the **popup** (not the main tool view) with `AutoPaste` on. Steps:
+  1. Hide the popup.
+  2. Re-activate the remembered window or app. Windows: `SetForegroundWindow`, which is allowed because we are in the foreground at that moment. macOS: `activateWithOptions:`.
+  3. Wait until no modifier keys are held, polling every 15 ms. Windows: `GetAsyncKeyState` for Ctrl, Alt, Shift and Win. macOS: `CGEventSourceFlagsState`. If they are still held after 1 s, skip the paste; the item stays copied.
+  4. Wait a further 60 ms.
+  5. Send exactly one paste chord. Windows: `SendInput` Ctrl↓ V↓ V↑ Ctrl↑. macOS: `CGEventCreateKeyboardEvent` for keycode 9 with `kCGEventFlagMaskCommand`, posted to `kCGHIDEventTap`.
+  If nothing was remembered, or that window or app is gone, the item is only copied.
+- **macOS permission:** posting events needs Accessibility permission.
+  - `Permission()` returns `"granted"`, `"denied"` or `"unsupported"` (via `AXIsProcessTrusted()` on macOS). Windows always reports `"granted"`.
+  - Turning the setting on calls `RequestPermission()` (`AXIsProcessTrustedWithOptions` with the prompt option).
+  - The UI shows a status line: "Allowed", or "Needs Accessibility permission" with a button that opens `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`.
+  - Without permission the item is copied and the popup shows a one-line notice rather than failing.
+  - The UI also notes that dev builds may need re-allowing after each rebuild.
+- **Bound methods:** `DesktopService.PastePermission() string`, `DesktopService.RequestPastePermission() error` and `DesktopService.PasteAfterCopy() error`. The popup's copy path calls `ClipboardService.Copy`, then `PasteAfterCopy()`, which does nothing unless auto-paste is enabled.
+- **CLAUDE.md privacy rule update:** the app may send exactly one paste chord, only when the user has enabled auto-paste and picked an item in the popup. Never otherwise.
+- **Tests (fake injector):**
+  - The order is hide, activate, wait for modifiers, then the chord.
+  - It is skipped when the setting is off, when nothing was remembered, when the modifiers never release, and when permission is denied.
+  - `Remember` ignores our own windows.
+- **Hands-on check:** this is **not exercised hands-on** by the architect, since there is no keystroke injection on the user's desktop. The summary lists it as something the user verifies.
+
+### 13.3 Upscaler CPU fallback (AI engine)
+- **Option:** `Options.Device string` (json `device`) is one of `"auto"` (the default), `"gpu"` or `"cpu"`.
+  - `gpu` uses upscayl-bin only (§5.3).
+  - `cpu` uses the engine only.
+  - `auto` uses the GPU when `upscayl` is installed. It reruns on the engine when all three of these hold:
+    - the GPU run failed with the no-GPU error, or `upscayl` isn't installed;
+    - the engine is installed;
+    - the input is within the CPU cap.
+    In that case it logs "No compatible GPU — using the CPU (slower)". Otherwise the original error stands.
+- **CPU cap:** the input must be at most **2 MP**. With `cpu`, validation fails with "Too large for CPU upscaling (max 2 megapixels); use the GPU or a smaller image". The UI shows a time estimate per model from the §0 rates.
+- **Sidecar method `upscale.run`:** params `{input, output, model: {file, sha256, url}, modelDir, scale, format}`.
+  1. Download and verify the model with the same helper as bgremove, into `$TOOLBOX_MODELS_DIR/upscale/`.
+  2. Load it with `spandrel.ModelLoader().load_from_file`, cached per model.
+  3. Use the `mps` device if `torch.backends.mps.is_available()`, else `cpu`.
+  4. Read the image with `load_image`. For alpha images, upscale the RGB and resize the alpha with Lanczos.
+  5. Process in 256 px tiles with 16 px overlap, reporting progress and calling `check_cancelled()` per tile.
+  6. If `scale == 2`, downscale the 4× result with Lanczos.
+  7. Save as PNG, JPEG q90 or WebP q90, then `ctx.output`.
+  8. Result: `{inWidth, inHeight, outWidth, outHeight, device}`.
+- **Models:** pinned in Go `modules/upscale/presets.go`. Sizes and sha256 are verified (the files are in `.dev/p4-research/engine04/models/`).
+
+  | Preset | File | Release | Size | sha256 | CPU time, 320×240 → 4× |
+  |---|---|---|---|---|---|
+  | photo | `RealESRGAN_x4plus.pth` | v0.1.0 | 67,040,989 B | `4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1` | 9.4 s |
+  | illustration | `RealESRGAN_x4plus_anime_6B.pth` | v0.2.2.4 | 17,938,799 B | `f872d837d3c90ed2e05227bed711af5671a6fd1c9f7d7e91c911a61f155e99da` | 2.8 s |
+  | fast | `realesr-animevideov3.pth` | v0.2.5.0 | 2,504,012 B | `b8a8376811077954d82ca3fcf476f1ac3da3e8a68a4f4d71363008000a18b75d` | 0.3 s |
+
+  URLs follow `https://github.com/xinntao/Real-ESRGAN/releases/download/<release>/<file>`.
+- **Descriptor:** `Requires` stays `["upscayl"]`, which drives the DepsGate. The view shows the AI engine gate instead when Device is `cpu`.
+- **UI:** a "Processor" Select (Automatic / GPU / CPU (slower)) below the options. The result message names the device, e.g. "… · CPU".
+- **Tests:**
+  - Go: the device selection matrix with fakes. Cases: GPU works; GPU fails with the no-GPU error and falls back to the CPU; no engine keeps the original error; over the CPU cap keeps the original error; `cpu` forced.
+  - Python: tiled output reassembles to the same result as untiled on a tiny fake model (identity ×4 via nearest); alpha handling; the 2× downscale; cancellation between tiles.
+
+### 13.4 Work package changes
+- **Wave 0** also adds:
+  - the `autoPaste` setting;
+  - the `Paster` interface and stubs, and the `DesktopService` paste methods;
+  - `imageio.py` and the `image.convert` and `upscale.run` stubs;
+  - the engine deps (pillow-heif, spandrel);
+  - the `Device` Options field and the HEIC accepts.
+- **BG1** also owns `toolbox_sidecar/imageio.py`, `image.convert`, and `handlers/upscale.py` with `tests/test_upscale.py`. That makes BG1 the owner of all engine-side image handlers.
+- **UP1** also owns device selection and HEIC conversion in `modules/upscale`.
+- **New D2 Auto-paste (Go):** owns `desktop/paste_*.go`, the paste wiring in `desktop/` (a marked block in `shell.go`/`popup.go`), and the paste method bodies in `api/desktop.go`. Tests per §13.2.
+- **UI1** also takes:
+  - the Processor select and CPU estimate;
+  - the HEIC tiles;
+  - the auto-paste switch and permission status in `tools/clipboard/**` and `views/SettingsClipboard.tsx`;
+  - the popup's call to `PasteAfterCopy`.
