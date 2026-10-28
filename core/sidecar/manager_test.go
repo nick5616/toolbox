@@ -278,7 +278,7 @@ func TestCancelIgnoredHardKillsAndRestarts(t *testing.T) {
 	select {
 	case err := <-otherErr:
 		ae := core.AsAppError(err)
-		if ae.Code != core.CodeToolFailed || ae.Message != "The audio engine was restarted" {
+		if ae.Code != core.CodeToolFailed || ae.Message != "The AI engine was restarted" {
 			t.Errorf("other call: %v", err)
 		}
 	case <-time.After(10 * time.Second):
@@ -303,7 +303,7 @@ func TestCrashFailsInFlightThenRestartsWithBackoff(t *testing.T) {
 	check := func(err error) {
 		t.Helper()
 		ae := core.AsAppError(err)
-		if err == nil || ae.Code != core.CodeToolFailed || ae.Message != "The audio engine stopped unexpectedly" || ae.Hint == "" {
+		if err == nil || ae.Code != core.CodeToolFailed || ae.Message != "The AI engine stopped unexpectedly" || ae.Hint == "" {
 			t.Fatalf("err=%v", err)
 		}
 	}
@@ -328,7 +328,7 @@ func TestCrashFailsInFlightThenRestartsWithBackoff(t *testing.T) {
 	// Too many crashes: fail fast.
 	start = time.Now()
 	_, err = m.Call(ctx20(t), "ping", nil, nil)
-	if ae := core.AsAppError(err); err == nil || ae.Code != core.CodeToolFailed || ae.Message != "The audio engine keeps stopping" {
+	if ae := core.AsAppError(err); err == nil || ae.Code != core.CodeToolFailed || ae.Message != "The AI engine keeps stopping" {
 		t.Fatalf("err=%v", err)
 	}
 	if time.Since(start) > 200*time.Millisecond {
@@ -343,7 +343,7 @@ func TestHandshakeTimeout(t *testing.T) {
 	start := time.Now()
 	_, err := m.Call(ctx20(t), "ping", nil, nil)
 	ae := core.AsAppError(err)
-	if err == nil || ae.Code != core.CodeToolFailed || ae.Message != "The audio engine didn't start" || ae.Hint != "Repair it in Settings → Dependencies" {
+	if err == nil || ae.Code != core.CodeToolFailed || ae.Message != "The AI engine didn't start" || ae.Hint != "Repair it in Settings → Dependencies" {
 		t.Fatalf("err=%v", err)
 	}
 	if time.Since(start) > 10*time.Second {
@@ -358,7 +358,7 @@ func TestEarlyExitIncludesStderr(t *testing.T) {
 	m := newTestManager(t, "exit_early")
 	_, err := m.Call(ctx20(t), "ping", nil, nil)
 	ae := core.AsAppError(err)
-	if err == nil || ae.Message != "The audio engine didn't start" || ae.Err == nil ||
+	if err == nil || ae.Message != "The AI engine didn't start" || ae.Err == nil ||
 		!strings.Contains(ae.Err.Error(), "boom line one") || !strings.Contains(ae.Err.Error(), "boom line two") {
 		t.Fatalf("err=%v", err)
 	}

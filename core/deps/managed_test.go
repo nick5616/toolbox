@@ -342,7 +342,7 @@ func TestRegisterVirtual(t *testing.T) {
 	path := ""
 	detects := 0
 	s.RegisterVirtual(Spec{
-		ID: "audio-engine", Name: "Audio engine", Purpose: "Python runtime", Managed: true,
+		ID: "audio-engine", Name: "AI engine", Purpose: "Python runtime", Managed: true,
 		InstallHint: map[string]string{s.goos: "Install from Settings → Dependencies"},
 	}, func(ctx context.Context) core.DepStatus {
 		detects++
@@ -354,7 +354,7 @@ func TestRegisterVirtual(t *testing.T) {
 		t.Fatalf("list: %d last=%s", len(list), list[len(list)-1].ID)
 	}
 	ae := list[len(list)-1]
-	if ae.State != core.DepMissing || !ae.Managed || ae.Name != "Audio engine" ||
+	if ae.State != core.DepMissing || !ae.Managed || ae.Name != "AI engine" ||
 		len(ae.RequiredBy) != 1 || ae.RequiredBy[0] != "stems" || !ae.Required ||
 		len(ae.RecommendedBy) != 1 || ae.RecommendedBy[0] != "other" {
 		t.Errorf("pre-detect: %+v", ae)
@@ -372,7 +372,7 @@ func TestRegisterVirtual(t *testing.T) {
 	// Outdated does not resolve.
 	state, path = core.DepOutdated, "/venv/python"
 	_, err = s.Resolve("audio-engine")
-	if ae := core.AsAppError(err); !core.IsCode(err, core.CodeDependencyMissing) || ae.Message != "The audio engine needs an update" || ae.Hint == "" {
+	if ae := core.AsAppError(err); !core.IsCode(err, core.CodeDependencyMissing) || ae.Message != "The AI engine needs an update" || ae.Hint == "" {
 		t.Fatalf("outdated: %+v", ae)
 	}
 

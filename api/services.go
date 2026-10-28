@@ -251,7 +251,7 @@ func (s *DepsService) UpdateYtDlp() (core.Job, error) {
 	return jobs[0], nil
 }
 
-// engineUsers are the modules that run on the audio engine.
+// engineUsers are the modules that run on the AI engine.
 func (s *DepsService) engineUsers() []string { return s.Reg.RequiringDep(sidecar.DepID) }
 
 func (s *DepsService) submitSystem(moduleID string) (core.Job, error) {
@@ -268,7 +268,7 @@ func (s *DepsService) submitSystem(moduleID string) (core.Job, error) {
 	return jobs[0], nil
 }
 
-// InstallAudioEngine queues install / update / repair of the audio engine.
+// InstallAudioEngine queues install / update / repair of the AI engine.
 func (s *DepsService) InstallAudioEngine() (core.Job, error) {
 	if s.Jobs.HasActive(s.engineUsers()...) {
 		return core.Job{}, core.Errorf(core.CodeConflict, "Wait for running audio jobs to finish")
@@ -302,7 +302,7 @@ func (s *DepsService) ClearModels() error {
 // UpdateUv queues the uv install/update job.
 func (s *DepsService) UpdateUv() (core.Job, error) {
 	if s.Jobs.HasActive(sidecar.SetupModuleID) {
-		return core.Job{}, core.Errorf(core.CodeConflict, "Wait for the audio engine setup to finish")
+		return core.Job{}, core.Errorf(core.CodeConflict, "Wait for the AI engine setup to finish")
 	}
 	return s.submitSystem(deps.UVUpdateModuleID)
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"toolbox/core"
 )
@@ -83,7 +84,7 @@ func New(binDir string, specs []Spec, reg *core.Registry, em core.Emitter) *Serv
 func (s *Service) BinDir() string { return s.binDir }
 
 // RegisterVirtual adds a dependency detected by a function instead of by
-// running a binary (e.g. the audio engine). spec supplies ID, Name, Purpose,
+// running a binary (e.g. the AI engine). spec supplies ID, Name, Purpose,
 // Managed and InstallHint; detect returns its status (Path is what Resolve
 // returns when OK). It participates in List, Detect, Resolve and deps:changed.
 func (s *Service) RegisterVirtual(spec Spec, detect func(ctx context.Context) core.DepStatus) {
@@ -179,7 +180,7 @@ func (s *Service) Resolve(depID string) (string, error) {
 	if st.State == core.DepOutdated {
 		return "", (&core.AppError{
 			Code:    core.CodeDependencyMissing,
-			Message: "The " + strings.ToLower(e.Name) + " needs an update",
+			Message: "The " + inSentence(e.Name) + " needs an update",
 		}).WithHint(s.hint(e.Spec))
 	}
 	return "", core.ErrDependencyMissing(depID, s.hint(e.Spec))
@@ -245,4 +246,13 @@ func (s *Service) Detect(ctx context.Context) []core.DepStatus {
 	out := s.List()
 	s.em.Emit(core.EventDepsChanged, core.DepsChanged{Deps: out})
 	return out
+}
+
+// inSentence lower-cases a dependency name for use mid-sentence, keeping a
+// leading acronym ("AI engine" stays, "Upscaler engine" → "upscaler engine").
+func inSentence(name string) string {
+	if len(name) >= 2 && unicode.IsUpper(rune(name[0])) && unicode.IsUpper(rune(name[1])) {
+		return name
+	}
+	return strings.ToLower(name)
 }

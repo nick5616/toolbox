@@ -1,4 +1,4 @@
-// Package bpmkey is the BPM & Key module (librosa via the audio engine).
+// Package bpmkey is the BPM & Key module (librosa via the AI engine).
 // See SPEC.md §6.2.
 //
 // CONTRACT STUB (foundation): options.go and service.go are final; WP-M1

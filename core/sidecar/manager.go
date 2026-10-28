@@ -129,22 +129,22 @@ func (m *Manager) env() []string {
 // ---- errors ---------------------------------------------------------------
 
 func errStopped() error {
-	return core.Errorf(core.CodeToolFailed, "The audio engine stopped unexpectedly").
+	return core.Errorf(core.CodeToolFailed, "The AI engine stopped unexpectedly").
 		WithHint("Retry the job; details are in the app log")
 }
 
 func errRestarted() error {
-	return core.Errorf(core.CodeToolFailed, "The audio engine was restarted").
+	return core.Errorf(core.CodeToolFailed, "The AI engine was restarted").
 		WithHint("Retry the job")
 }
 
 func errShutDown() error {
-	return core.Errorf(core.CodeToolFailed, "The audio engine was stopped").
+	return core.Errorf(core.CodeToolFailed, "The AI engine was stopped").
 		WithHint("Retry the job")
 }
 
 func errTooLarge() error {
-	return core.Errorf(core.CodeToolFailed, "The audio engine sent a reply that was too large").
+	return core.Errorf(core.CodeToolFailed, "The AI engine sent a reply that was too large").
 		WithHint("Retry the job; details are in the app log")
 }
 
@@ -166,7 +166,7 @@ func lastLines(lines []string, n int) []string {
 }
 
 func errNoStart(tail []string) error {
-	e := core.Errorf(core.CodeToolFailed, "The audio engine didn't start").WithHint(repairHint)
+	e := core.Errorf(core.CodeToolFailed, "The AI engine didn't start").WithHint(repairHint)
 	if len(tail) > 0 {
 		e.Err = errors.New(strings.Join(lastLines(tail, 20), "\n"))
 	}
@@ -174,7 +174,7 @@ func errNoStart(tail []string) error {
 }
 
 func errKeepsFailing() error {
-	return core.Errorf(core.CodeToolFailed, "The audio engine keeps stopping").WithHint(repairHint)
+	return core.Errorf(core.CodeToolFailed, "The AI engine keeps stopping").WithHint(repairHint)
 }
 
 // ---- wire format ----------------------------------------------------------
@@ -209,7 +209,7 @@ func mapError(w *wireError) error {
 	}
 	msg := w.Message
 	if msg == "" {
-		msg = "The audio engine reported an error"
+		msg = "The AI engine reported an error"
 	}
 	return &core.AppError{Code: code, Message: msg, Hint: w.Hint}
 }
@@ -406,7 +406,7 @@ func (i *instance) idleFire() {
 	ok := i.active == 0 && !i.dead && !i.draining
 	i.mu.Unlock()
 	if ok {
-		slog.Info("audio engine idle; shutting down", "component", "sidecar")
+		slog.Info("AI engine idle; shutting down", "component", "sidecar")
 		i.shutdown(reasonIdle)
 	}
 }
@@ -471,17 +471,17 @@ func (i *instance) onLine(line string) {
 			c := i.calls[mm[1]]
 			i.mu.Unlock()
 			if c != nil {
-				slog.Warn("audio engine sent an oversized line", "component", "sidecar", "id", mm[1])
+				slog.Warn("AI engine sent an oversized line", "component", "sidecar", "id", mm[1])
 				c.push(item{final: true, err: errTooLarge()})
 				return
 			}
 		}
-		slog.Warn("audio engine sent an oversized line; ignored", "component", "sidecar")
+		slog.Warn("AI engine sent an oversized line; ignored", "component", "sidecar")
 		return
 	}
 	var msg wireMsg
 	if err := json.Unmarshal([]byte(line), &msg); err != nil || (msg.Event == "" && msg.Result == nil && msg.Error == nil) {
-		slog.Warn("non-protocol output from the audio engine", "component", "sidecar", "line", trimLog(line))
+		slog.Warn("non-protocol output from the AI engine", "component", "sidecar", "line", trimLog(line))
 		return
 	}
 	if msg.Event == "ready" {
@@ -589,7 +589,7 @@ func (i *instance) onExit(res proc.Result) {
 	if reason == reasonCrash {
 		now := m.now()
 		m.crashes = append(m.crashes, now)
-		slog.Warn("audio engine exited unexpectedly", "component", "sidecar", "exit", res.ExitCode)
+		slog.Warn("AI engine exited unexpectedly", "component", "sidecar", "exit", res.ExitCode)
 	}
 	m.mu.Unlock()
 	close(i.done)
@@ -621,7 +621,7 @@ func (m *Manager) startLocked() (*instance, error) {
 	})
 	if err != nil {
 		cancel()
-		return nil, core.Errorf(core.CodeToolFailed, "The audio engine didn't start").
+		return nil, core.Errorf(core.CodeToolFailed, "The AI engine didn't start").
 			WithHint(repairHint).WithCause(err)
 	}
 	inst.p.Store(p)
@@ -632,7 +632,7 @@ func (m *Manager) startLocked() (*instance, error) {
 		ok := !inst.ready && !inst.dead
 		inst.mu.Unlock()
 		if ok {
-			slog.Warn("audio engine did not become ready", "component", "sidecar")
+			slog.Warn("AI engine did not become ready", "component", "sidecar")
 			inst.hardKill()
 		}
 	})
@@ -749,7 +749,7 @@ func (m *Manager) Call(ctx context.Context, method string, params any, onEvent f
 		}
 		if err := inst.write(line); err != nil {
 			inst.finish(c)
-			return nil, fmt.Errorf("write to the audio engine: %w", errStopped())
+			return nil, fmt.Errorf("write to the AI engine: %w", errStopped())
 		}
 		return m.await(ctx, inst, c, onEvent)
 	}
@@ -800,7 +800,7 @@ func (m *Manager) cancelCall(ctx context.Context, inst *instance, c *call) (json
 				return nil, it.err
 			}
 		case <-t.C:
-			slog.Warn("audio engine ignored cancel; restarting", "component", "sidecar")
+			slog.Warn("AI engine ignored cancel; restarting", "component", "sidecar")
 			inst.kill(reasonRestart)
 			return nil, ctx.Err()
 		}

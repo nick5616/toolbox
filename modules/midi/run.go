@@ -103,7 +103,7 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 	}
 	var tr transcribeResult
 	if err := json.Unmarshal(raw, &tr); err != nil {
-		return core.Errorf(core.CodeInternal, "The audio engine returned an unreadable result").WithCause(err)
+		return core.Errorf(core.CodeInternal, "The AI engine returned an unreadable result").WithCause(err)
 	}
 	if tr.OutputPath != "" {
 		outs.register(tr.OutputPath)

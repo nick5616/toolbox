@@ -164,13 +164,13 @@ func TestSetupSuccess(t *testing.T) {
 			t.Errorf("sync record lacks %q:\n%s", want, rec)
 		}
 	}
-	if f.msgs[len(f.msgs)-1] != "Audio engine ready" || f.pcts[len(f.pcts)-1] != 1 {
+	if f.msgs[len(f.msgs)-1] != "AI engine ready" || f.pcts[len(f.pcts)-1] != 1 {
 		t.Errorf("final: %q %v", f.msgs[len(f.msgs)-1], f.pcts[len(f.pcts)-1])
 	}
 	var sawUVLine, sawCheck bool
 	for _, m := range f.msgs {
 		sawUVLine = sawUVLine || m == "Installed 68 packages in 1ms"
-		sawCheck = sawCheck || m == "Checking the audio engine"
+		sawCheck = sawCheck || m == "Checking the AI engine"
 	}
 	if !sawUVLine || !sawCheck {
 		t.Errorf("messages: %v", f.msgs)
@@ -261,7 +261,7 @@ func TestDetectStates(t *testing.T) {
 	p := core.NewPaths(t.TempDir())
 	ctx := context.Background()
 	st := Detect(ctx, p)
-	if st.ID != DepID || st.Name != "Audio engine" || st.State != core.DepMissing || !st.Managed ||
+	if st.ID != DepID || st.Name != "AI engine" || st.State != core.DepMissing || !st.Managed ||
 		st.InstallHint != "Install from Settings → Dependencies" || st.Source != core.SourceNone {
 		t.Errorf("missing: %+v", st)
 	}

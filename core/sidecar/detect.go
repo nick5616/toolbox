@@ -27,7 +27,7 @@ func isFile(p string) bool {
 // Python): missing / outdated (hash mismatch) / ok.
 func Detect(ctx context.Context, p core.Paths) core.DepStatus {
 	st := core.DepStatus{
-		ID: DepID, Name: "Audio engine",
+		ID: DepID, Name: "AI engine",
 		Purpose:     "Python runtime for stems, BPM & key and MIDI (≈1 GB)",
 		State:       core.DepMissing,
 		Source:      core.SourceNone,
@@ -63,7 +63,7 @@ func Remove(p core.Paths, m *Manager) error {
 	}
 	for _, d := range []string{p.SidecarDir, p.PythonDir} {
 		if err := os.RemoveAll(d); err != nil {
-			return core.Errorf(core.CodeInternal, "Couldn't remove the audio engine").WithCause(err).
+			return core.Errorf(core.CodeInternal, "Couldn't remove the AI engine").WithCause(err).
 				WithHint("Close anything using it and try again")
 		}
 	}

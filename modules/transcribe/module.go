@@ -1,4 +1,4 @@
-// Package transcribe is Transcribe (faster-whisper via the audio engine).
+// Package transcribe is Transcribe (faster-whisper via the AI engine).
 // See Phase 3 SPEC.md §5.
 //
 // CONTRACT STUB (foundation): options.go, presets.go, module.go and

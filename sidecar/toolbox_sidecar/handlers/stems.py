@@ -27,7 +27,7 @@ _state: dict[str, Any] = {"key": None, "sep": None}
 def _models_dir() -> str:
     root = os.environ.get("TOOLBOX_MODELS_DIR")
     if not root:
-        raise HandlerError("tool_failed", "TOOLBOX_MODELS_DIR isn't set", "Reinstall the audio engine")
+        raise HandlerError("tool_failed", "TOOLBOX_MODELS_DIR isn't set", "Reinstall the AI engine")
     path = os.path.join(root, "audio-separator")
     os.makedirs(path, exist_ok=True)
     return path

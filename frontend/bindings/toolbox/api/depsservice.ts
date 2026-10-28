@@ -22,7 +22,7 @@ export function ClearModels(): $CancellablePromise<void> {
 }
 
 /**
- * InstallAudioEngine queues install / update / repair of the audio engine.
+ * InstallAudioEngine queues install / update / repair of the AI engine.
  */
 export function InstallAudioEngine(): $CancellablePromise<core$0.Job> {
     return $Call.ByID(329182051);

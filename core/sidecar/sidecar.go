@@ -1,4 +1,4 @@
-// Package sidecar runs and installs the Python audio engine (SPEC.md §4):
+// Package sidecar runs and installs the Python AI engine (SPEC.md §4):
 // a uv-managed CPython 3.12 venv in the support dir, spoken to over stdio
 // JSON Lines by a lazily started, idle-stopped, crash-restarted process.
 //

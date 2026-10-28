@@ -37,7 +37,7 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 	}
 	var res Result
 	if err := json.Unmarshal(raw, &res); err != nil {
-		return core.Errorf(core.CodeInternal, "The audio engine returned an unreadable result").WithCause(err)
+		return core.Errorf(core.CodeInternal, "The AI engine returned an unreadable result").WithCause(err)
 	}
 	if outs.err != nil {
 		return outs.err

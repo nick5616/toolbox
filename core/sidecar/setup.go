@@ -41,7 +41,7 @@ func RegisterSetup(reg *core.Registry, p core.Paths, m *Manager, resolveUV func(
 
 func (s *setupModule) Descriptor() core.Descriptor {
 	return core.Descriptor{
-		ID: SetupModuleID, Name: "Audio engine setup", Tagline: "Install, update or repair the audio engine",
+		ID: SetupModuleID, Name: "AI engine setup", Tagline: "Install, update or repair the AI engine",
 		Icon: "audio-lines", Category: core.CategoryUtility, Status: core.StatusReady,
 		Hidden: true, MaxConcurrent: 1, OutputSubdir: "",
 	}
@@ -107,7 +107,7 @@ func (s *setupModule) Run(ctx context.Context, job *core.JobContext) error {
 			return err
 		}
 	}
-	job.Progress(uvProgressEnd, "Preparing the audio engine")
+	job.Progress(uvProgressEnd, "Preparing the AI engine")
 	if ctx.Err() != nil {
 		return cancelled(ctx)
 	}
@@ -124,13 +124,13 @@ func (s *setupModule) Run(ctx context.Context, job *core.JobContext) error {
 	}
 
 	// 4. self-test
-	job.Progress(syncProgressEnd, "Checking the audio engine")
+	job.Progress(syncProgressEnd, "Checking the AI engine")
 	version, err := s.selftest(ctx, job)
 	if err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(s.paths.SidecarDir, versionFile), []byte(version+"\n"), 0o644); err != nil {
-		return core.Errorf(core.CodeInternal, "Couldn't save the audio engine version").WithCause(err)
+		return core.Errorf(core.CodeInternal, "Couldn't save the AI engine version").WithCause(err)
 	}
 
 	// 5. clean up, mark done
@@ -145,12 +145,12 @@ func (s *setupModule) Run(ctx context.Context, job *core.JobContext) error {
 		job.Logf("uv cache clean failed (ignored): %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(s.paths.SidecarDir, hashFile), []byte(sidecarfiles.Hash()+"\n"), 0o644); err != nil {
-		return core.Errorf(core.CodeInternal, "Couldn't save the audio engine marker").WithCause(err)
+		return core.Errorf(core.CodeInternal, "Couldn't save the AI engine marker").WithCause(err)
 	}
 	if s.detect != nil {
 		s.detect(ctx)
 	}
-	job.Progress(1, "Audio engine ready")
+	job.Progress(1, "AI engine ready")
 	return nil
 }
 
@@ -158,7 +158,7 @@ func (s *setupModule) Run(ctx context.Context, job *core.JobContext) error {
 func (s *setupModule) writeProject(job *core.JobContext) error {
 	dir := s.paths.SidecarDir
 	fail := func(err error) error {
-		return core.Errorf(core.CodeInternal, "Couldn't write the audio engine files").WithCause(err)
+		return core.Errorf(core.CodeInternal, "Couldn't write the AI engine files").WithCause(err)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fail(err)
@@ -222,13 +222,13 @@ func (s *setupModule) sync(ctx context.Context, job *core.JobContext, uv string)
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	msg := "Couldn't install the audio engine"
+	msg := "Couldn't install the AI engine"
 	if lastErr != "" {
 		msg = strings.TrimSpace(strings.TrimPrefix(lastErr, "error:"))
 		if msg != "" {
 			msg = strings.ToUpper(msg[:1]) + msg[1:]
 		} else {
-			msg = "Couldn't install the audio engine"
+			msg = "Couldn't install the AI engine"
 		}
 	}
 	return core.Errorf(core.CodeToolFailed, "%s", msg).WithCause(err).WithHint(setupHint)
@@ -271,7 +271,7 @@ func (s *setupModule) selftest(ctx context.Context, job *core.JobContext) (strin
 		if ctx.Err() != nil {
 			return "", cancelled(ctx)
 		}
-		return "", core.Errorf(core.CodeToolFailed, "The audio engine didn't pass its self-check").
+		return "", core.Errorf(core.CodeToolFailed, "The AI engine didn't pass its self-check").
 			WithHint(setupHint).
 			WithCause(fmt.Errorf("%w: %s", err, strings.Join(lastLines(res.StderrTail, 10), "\n")))
 	}
@@ -280,7 +280,7 @@ func (s *setupModule) selftest(ctx context.Context, job *core.JobContext) (strin
 	mu.Unlock()
 	var st selftestResult
 	if line == "" || json.Unmarshal([]byte(line), &st) != nil {
-		return "", core.Errorf(core.CodeToolFailed, "The audio engine's self-check gave no result").
+		return "", core.Errorf(core.CodeToolFailed, "The AI engine's self-check gave no result").
 			WithHint(setupHint).WithCause(errors.New(line))
 	}
 	ver := st.Version

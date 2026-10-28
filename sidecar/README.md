@@ -1,6 +1,6 @@
-# Audio engine (sidecar)
+# AI engine (sidecar)
 
-A single long-running CPython 3.12 process for ML audio tasks — stem separation (audio-separator), BPM & key (librosa), audio→MIDI (Basic Pitch ONNX) — installed and managed by the app with **uv**. See SPEC.md §4 and the "Audio engine" section of CLAUDE.md.
+A single long-running CPython 3.12 process for ML audio tasks — stem separation (audio-separator), BPM & key (librosa), audio→MIDI (Basic Pitch ONNX) — installed and managed by the app with **uv**. See SPEC.md §4 and the "AI engine" section of CLAUDE.md.
 
 ## Process model
 
