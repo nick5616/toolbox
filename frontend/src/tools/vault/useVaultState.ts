@@ -11,7 +11,8 @@ export function useVaultState(): VaultState | null {
     const off = on("vault:state", (s) => {
       if (!cancelled) setState(s);
     });
-    VaultService.State()
+    Promise.resolve()
+      .then(() => VaultService.State())
       .then((s) => !cancelled && setState((cur) => cur ?? s))
       .catch(() => undefined);
     return () => {

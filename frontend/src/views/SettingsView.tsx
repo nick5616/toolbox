@@ -21,6 +21,7 @@ import { useModules } from "@/state/modules";
 import { useSettings } from "@/state/settings";
 import { SettingsClipboard } from "./SettingsClipboard";
 import { SettingsGeneral } from "./SettingsGeneral";
+import { SettingsVault } from "./SettingsVault";
 import styles from "./SettingsView.module.css";
 
 const YTDLP_ID = "yt-dlp";
@@ -438,6 +439,8 @@ export function SettingsView() {
         </Section>
 
         <SettingsClipboard />
+
+        <SettingsVault />
 
         <DepsTable />
 
