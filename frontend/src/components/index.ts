@@ -33,3 +33,5 @@ export type { ConfirmDialogProps } from "./ConfirmDialog";
 export { MenuButton } from "./MenuButton";
 export type { MenuButtonProps, MenuItem } from "./MenuButton";
 export { HotkeyRecorder, type HotkeyRecorderProps } from "./HotkeyRecorder";
+export { CompareSlider, type CompareSliderProps } from "./CompareSlider";
+export { ColorSwatchPicker, normalizeHex, type ColorSwatchPickerProps } from "./ColorSwatchPicker";

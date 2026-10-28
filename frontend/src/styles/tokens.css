@@ -105,3 +105,14 @@
   --scrollbar-thumb: rgba(10, 10, 20, 0.2);
   --scrollbar-thumb-hover: rgba(10, 10, 20, 0.34);
 }
+
+/* Checkerboard under transparent previews. */
+:root {
+  --checker-a: #2a2c32;
+  --checker-b: #1d1e22;
+}
+
+:root[data-theme="light"] {
+  --checker-a: #ffffff;
+  --checker-b: #dcdce1;
+}
