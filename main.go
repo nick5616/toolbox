@@ -17,6 +17,7 @@ import (
 	"toolbox/api"
 	"toolbox/core"
 	"toolbox/core/deps"
+	"toolbox/core/pdfium"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
 	"toolbox/desktop"
@@ -93,8 +94,9 @@ func run() error {
 
 	exifMod := exif.New(depSvc.Resolve)
 	defer exifMod.Close()
-	pdfMod := pdf.New(filepath.Join(paths.CacheDir, "pdfium"))
-	defer pdfMod.Close()
+	pdfRenderer := pdfium.New(filepath.Join(paths.CacheDir, "pdfium"))
+	defer pdfRenderer.Close()
+	pdfMod := pdf.New(pdfRenderer)
 	clipHistory := clipboard.New(clipboard.Config{Store: db, Settings: settings, Emitter: emitter, Dir: paths.ClipboardDir})
 	defer clipHistory.Stop()
 

@@ -13,6 +13,7 @@ import (
 	"slices"
 
 	"toolbox/core"
+	"toolbox/core/pdfium"
 )
 
 // ModuleID is the PDF Toolkit module ID (same as the Phase 1 placeholder).
@@ -27,18 +28,15 @@ func Accepts() []string { return slices.Concat([]string{".pdf"}, ImageExtensions
 // Module implements core.Module and owns the shared renderer and the
 // in-memory password store.
 type Module struct {
-	cacheDir string // <support>/cache/pdfium (wazero compilation cache)
-	state    *state // implemented by WP-PDF1
+	state *state
 }
 
-// New builds the module. cacheDir holds the WebAssembly compilation cache.
-func New(cacheDir string) *Module { return &Module{cacheDir: cacheDir, state: newState(cacheDir)} }
+// New builds the module around the app's shared renderer. The caller owns
+// the renderer and closes it at shutdown.
+func New(r *pdfium.Renderer) *Module { return &Module{state: newState(r)} }
 
 // Register adds the module to the registry.
 func Register(reg *core.Registry, m *Module) error { return reg.Register(m) }
-
-// Close releases the renderer (call at app quit).
-func (m *Module) Close() { m.state.close() }
 
 // Descriptor implements core.Module.
 func (m *Module) Descriptor() core.Descriptor {

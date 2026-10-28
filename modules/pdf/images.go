@@ -366,15 +366,21 @@ func (r *runner) pdfToImages(ctx context.Context) error {
 		removePartial(made...)
 		_ = os.Remove(folder)
 	}
+	doc, _, err := readPDF(in)
+	if err != nil {
+		cleanup()
+		return mapErr(ctx, err, r.password)
+	}
 	for i, p := range pages {
 		if err := ctx.Err(); err != nil {
 			cleanup()
 			return err
 		}
 		path := filepath.Join(folder, fmt.Sprintf("page %0*d%s", digits, p, ext))
-		err := r.m.state.r.renderDPI(ctx, in, r.password, p-1, r.opts.DPI, func(img image.Image, _ int) error {
-			return writeImage(path, img, r.opts.ImageFormat)
-		})
+		img, err := r.m.state.r.Render(ctx, doc, r.password, p, r.opts.DPI)
+		if err == nil {
+			err = writeImage(path, img, r.opts.ImageFormat)
+		}
 		if err != nil {
 			removePartial(path)
 			cleanup()

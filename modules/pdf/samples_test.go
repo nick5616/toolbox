@@ -224,7 +224,12 @@ func TestSamples(t *testing.T) {
 func firstPageMean(t *testing.T, m *Module, path string) float64 {
 	t.Helper()
 	var mean float64
-	err := m.state.r.renderDPI(context.Background(), path, "", 0, 36, func(img image.Image, _ int) error {
+	doc, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := m.state.r.Render(context.Background(), doc, "", 1, 36)
+	if err == nil {
 		b := img.Bounds()
 		var sum, n float64
 		for y := b.Min.Y; y < b.Max.Y; y++ {
@@ -235,8 +240,7 @@ func firstPageMean(t *testing.T, m *Module, path string) float64 {
 			}
 		}
 		mean = sum / n
-		return nil
-	})
+	}
 	if err != nil {
 		t.Errorf("render %s: %v", filepath.Base(path), err)
 	}
@@ -248,7 +252,12 @@ func compareFirstPage(t *testing.T, m *Module, a, b string) {
 	t.Helper()
 	var imgs [2]image.Image
 	for i, p := range []string{a, b} {
-		err := m.state.r.renderDPI(context.Background(), p, "", 0, 50, func(img image.Image, _ int) error {
+		doc, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		img, err := m.state.r.Render(context.Background(), doc, "", 1, 50)
+		if err == nil {
 			cp := image.NewRGBA(img.Bounds())
 			for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
 				for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
@@ -256,8 +265,7 @@ func compareFirstPage(t *testing.T, m *Module, a, b string) {
 				}
 			}
 			imgs[i] = cp
-			return nil
-		})
+		}
 		if err != nil {
 			t.Errorf("render %s: %v", filepath.Base(p), err)
 			return
