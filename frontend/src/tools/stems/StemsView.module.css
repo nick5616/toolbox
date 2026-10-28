@@ -83,3 +83,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--fg-subtle);
+}

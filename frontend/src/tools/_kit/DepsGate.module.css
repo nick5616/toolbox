@@ -10,3 +10,9 @@
   color: var(--fg-muted);
   user-select: all;
 }
+
+.packActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

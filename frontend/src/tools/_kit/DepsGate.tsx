@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from "react";
 import { create } from "zustand";
 import { Banner, Button, toast } from "@/components";
-import { DepState, DepsService } from "@/lib/api";
+import { DepState, DepsService, PacksService, PackState } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { isOk, useDeps } from "@/state/deps";
 import { isActive, useJobs, type JobView } from "@/state/jobs";
 import { useModules } from "@/state/modules";
+import { usePacks } from "@/state/packs";
+import { formatSize, moduleNeeds, packSizes } from "@/views/setup/packSizes";
 import styles from "./DepsGate.module.css";
 
 export const AUDIO_ENGINE_ID = "audio-engine";
@@ -88,6 +90,47 @@ async function copyHint(text: string): Promise<void> {
   } catch {
     toast({ title: "Couldn't copy to the clipboard", tone: "danger" });
   }
+}
+
+/**
+ * "Install what this tool needs" and "Install the <Pack> pack" buttons (SPEC 7.5).
+ * Hidden when no pack unlocks the module, or the pack is unsupported here.
+ */
+function PackButtons({ moduleId, requires }: { moduleId: string; requires: string[] }) {
+  const packs = usePacks((s) => s.list);
+  const [busy, setBusy] = useState<"" | "needs" | "pack">("");
+  const needs = moduleNeeds(packs, moduleId, requires);
+  const pack = needs.pack;
+  if (!pack || pack.state === PackState.PackUnsupported || pack.state === PackState.PackInstalled) return null;
+  const packDisk = packSizes(packs, [pack.id]).byPack[pack.id]?.disk ?? 0;
+
+  const run = async (kind: "needs" | "pack") => {
+    setBusy(kind);
+    try {
+      if (kind === "needs") {
+        useJobs.getState().upsert(await PacksService.InstallFor(moduleId));
+      } else {
+        const res = await PacksService.Install([pack.id], "");
+        for (const j of res.jobs ?? []) useJobs.getState().upsert(j);
+        if (res.restart) await PacksService.Relaunch();
+      }
+    } catch (e) {
+      toast({ title: toAppError(e).message, tone: "danger" });
+    } finally {
+      setBusy("");
+    }
+  };
+  const withSize = (label: string, bytes: number) => (bytes > 0 ? `${label} (${formatSize(bytes)})` : label);
+  return (
+    <div className={styles.packActions}>
+      <Button variant="primary" size="sm" icon="download" loading={busy === "needs"} disabled={busy !== ""} onClick={() => void run("needs")}>
+        {withSize("Install what this tool needs", needs.disk)}
+      </Button>
+      <Button variant="secondary" size="sm" loading={busy === "pack"} disabled={busy !== ""} onClick={() => void run("pack")}>
+        {withSize(`Install the ${pack.name} pack`, packDisk)}
+      </Button>
+    </div>
+  );
 }
 
 /** Banners for missing/outdated dependencies with install/update actions. */
@@ -228,5 +271,10 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
     }
   }
   if (banners.length === 0) return null;
-  return <div className={styles.root}>{banners}</div>;
+  return (
+    <div className={styles.root}>
+      <PackButtons moduleId={moduleId} requires={requires} />
+      {banners}
+    </div>
+  );
 }
