@@ -22,6 +22,7 @@ import { useSettings } from "@/state/settings";
 import { SettingsChat } from "./SettingsChat";
 import { SettingsClipboard } from "./SettingsClipboard";
 import { SettingsGeneral } from "./SettingsGeneral";
+import { ManagedDepActions, SettingsPacks, isManagedDep } from "./SettingsPacks";
 import { SettingsVault } from "./SettingsVault";
 import styles from "./SettingsView.module.css";
 
@@ -343,6 +344,8 @@ function DepsTable() {
                     >
                       {ok ? "Update" : "Install"}
                     </Button>
+                  ) : isManagedDep(d.id) ? (
+                    <ManagedDepActions dep={d} />
                   ) : d.id === AUDIO_ENGINE_ID ? (
                     <AudioEngineActions dep={d} />
                   ) : !ok ? (
@@ -394,6 +397,8 @@ export function SettingsView() {
     <div className={styles.scroll}>
       <section className={styles.root} aria-label="Settings">
         <h1 className={styles.title}>Settings</h1>
+
+        <SettingsPacks />
 
         <SettingsGeneral />
 

@@ -10,7 +10,7 @@ vi.mock("@/lib/api", async (orig) => {
   return {
     ...actual,
     StemsService: {
-      Defaults: async () => ({ preset: "four-fast", format: "wav" }),
+      Defaults: async () => ({ preset: "four-fast", format: "flac" }),
       Presets: async () => [
         { id: "vocals-fast", label: "Vocals + instrumental · fast", group: "", kind: "audio", ext: "", acceptsKinds: null, downloadBytes: 67e6, stems: ["Vocals", "Instrumental"], speed: "fast" },
         { id: "four-fast", label: "4 stems · fast", group: "", kind: "audio", ext: "", acceptsKinds: null, downloadBytes: 84e6, stems: ["Vocals", "Drums", "Bass", "Other"], speed: "fast" },
@@ -28,7 +28,7 @@ vi.mock("@/lib/api", async (orig) => {
 
 import { useToastStore } from "@/components/toast";
 import StemsView from "./StemsView";
-import { DEFAULT_STEMS_OPTIONS, dirname, parseStemsResult, sanitizeStemsOptions } from "./options";
+import { DEFAULT_STEMS_OPTIONS, STEMS_SIZE_HINT, dirname, parseStemsResult, sanitizeStemsOptions } from "./options";
 import { mapInputErrors } from "@/tools/_kit/enqueue";
 
 describe("stems options", () => {
@@ -47,6 +47,10 @@ describe("stems options", () => {
     ]);
     expect(dirname("C:\\o\\t\\v.wav")).toBe("C:\\o\\t");
     expect(dirname("/o/t/v.wav")).toBe("/o/t");
+  });
+
+  it("defaults to FLAC", () => {
+    expect(DEFAULT_STEMS_OPTIONS.format).toBe("flac");
   });
 
   it("maps inputs.N errors", () => {
@@ -80,6 +84,14 @@ describe("StemsView", () => {
     await waitFor(() => expect(enqueue).toHaveBeenCalledWith(["/a.mp3"], { preset: "vocals-fast", format: "flac" }));
     expect(JSON.parse(String(setState.mock.calls.at(-1)?.[1]))).toEqual({ preset: "vocals-fast", format: "flac" });
     await waitFor(() => expect(screen.queryByText("a.mp3")).toBeNull());
+  });
+
+  it("selects FLAC by default and shows the per-minute size hint", async () => {
+    render(<StemsView moduleId="stems" />);
+    const flac = await screen.findByRole("radio", { name: "flac" });
+    expect(flac.getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText(STEMS_SIZE_HINT)).toBeTruthy();
+    expect(STEMS_SIZE_HINT).toBe("WAV ≈ 10 MB per minute per stem · FLAC is lossless and usually half that · MP3 ≈ 2.4 MB per minute");
   });
 
   it("shows inputs.N validation errors on the file", async () => {

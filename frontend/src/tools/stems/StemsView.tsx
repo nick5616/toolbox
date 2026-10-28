@@ -9,7 +9,7 @@ import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import shared from "@/tools/_kit/results.module.css";
-import { DEFAULT_STEMS_OPTIONS, dirname, parseStemsResult, sanitizeStemsOptions } from "./options";
+import { DEFAULT_STEMS_OPTIONS, STEMS_SIZE_HINT, dirname, parseStemsResult, sanitizeStemsOptions } from "./options";
 import styles from "./StemsView.module.css";
 
 const MAX_GROUPS = 10;
@@ -179,6 +179,7 @@ export default function StemsView({ moduleId }: ToolViewProps) {
                 { value: StemsFormat.FormatMP3, label: "mp3" },
               ]}
             />
+            <p className={styles.hint}>{STEMS_SIZE_HINT}</p>
           </div>
         </Section>
       }

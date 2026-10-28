@@ -2,10 +2,14 @@ import { StemsFormat, StemsPreset, type StemsOptions } from "@/lib/api";
 
 export const MODULE_ID = "stems";
 
+/** Output size hint (SPEC 7.7). No track duration is available in the view, so it is the per-minute line. */
+export const STEMS_SIZE_HINT =
+  "WAV ≈ 10 MB per minute per stem · FLAC is lossless and usually half that · MP3 ≈ 2.4 MB per minute";
+
 /** Mirrors Go's DefaultOptions() (modules/stems). */
 export const DEFAULT_STEMS_OPTIONS: StemsOptions = {
   preset: StemsPreset.PresetFourFast,
-  format: StemsFormat.FormatWAV,
+  format: StemsFormat.FormatFLAC,
 };
 
 function oneOf<T extends string>(enumObj: Record<string, T>, v: unknown): T | undefined {
