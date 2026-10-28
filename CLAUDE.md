@@ -86,7 +86,9 @@ desktop/   tray, close-to-tray, login item, global hotkeys, popup window   (Wail
 core/      registry · jobs · jobcontext · errors · types · events · paths · settings
 core/proc  subprocess runner with whole-tree kill and hidden windows
 core/store SQLite (modernc.org/sqlite, no CGO): jobs, logs, outputs, tags, settings
-core/deps  external tool detection + managed installs (yt-dlp, uv, ExifTool + upscaler archives)
+core/deps  external tool detection + managed installs (yt-dlp, uv, ExifTool, upscaler, FFmpeg, Deno, llama.cpp)
+core/packs tool packs: catalog, status, install/remove, tools-folder move
+core/pdfium shared PDF page renderer (go-pdfium WebAssembly, no FS mounts)
 core/imaging  pure-Go image sizes + scaled previews (jpg/png/gif/webp/bmp/tiff; no HEIC)
 modules/   one folder per module (downloader, placeholders, …)
 sidecar/   Python "AI engine" (stems, BPM/key, MIDI, transcription, background removal, CPU upscaling, HEIC decoding) over stdio JSON lines
@@ -176,6 +178,15 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Upscaler:** `upscayl-bin` (AGPL-3.0) is only ever run as a separate process; its install (`<bin>/upscaler/`) is pinned by version + sha256 in `core/deps` (managed archive v2 with a `VERSION` file).
 - **PDF:** all PDF work stays in Go. pdfcpu must never write its config dir: `api.DisableConfigDir()` once, and always a `model.NewStatelessConfiguration()`. go-pdfium runs as WebAssembly with **no filesystem mounts** (documents are opened from bytes). Passwords are never stored in job options or the DB — only in the PDF module's in-memory secret store, referenced by `passwordRef`.
 - **Engine model downloads** (background removal, CPU upscaling) are verified against pinned sha256 values from the Go presets and live under `<support>/models/{bg,upscale}/`.
+
+## Local Chat, Vault, OCR and tool packs (Phase 5)
+
+- **The chat engine is the app's only listener.** `llama-server` binds `127.0.0.1` only, on a random port (`--port 0`), behind a random per-launch key passed with `--api-key-file` (file in `<support>/tmp`, 0600, deleted once the server is ready). The port is never sent to the UI. Ollama is opt-in, loopback URLs only, and labelled as having no access control.
+- **Vault:** the unlocked age identity lives only in Go memory; lock clears it. Adding files copies them (originals untouched). Temporary open copies live in `<support>/tmp/vault-open/` and are wiped on lock and at app start. Never log names, passphrases or keys.
+- **OCR models** are sha-verified downloads in `<models>/ocr/`; the engine is always given explicit model paths and never self-downloads.
+- **Tool packs** (`core/packs`): the catalog is frozen data with sizes measured on the pinned versions; bump a pin → update its size. Every non-hidden, non-placeholder, non-built-in module belongs to exactly one pack. Model downloads go through `core.ModelProvider`; pack installs run dep installer modules inside one job via `JobContext.Scoped`.
+- **Tools folder:** `Paths.ToolsDir` holds `bin/`, `python/`, `sidecar/`, `models/`; the DB, logs, tmp and caches stay in the support dir. It comes from `$TOOLBOX_TOOLS_DIR` or `<support>/tools-location`. Never write tool files outside `ToolsDir`.
+- **FFmpeg and Deno** are pinned managed archives with `AllowSystem`: the managed copy wins, a system copy still counts and is never "outdated".
 
 ## Conventions
 
