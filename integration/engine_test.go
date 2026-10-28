@@ -6,6 +6,9 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"math"
 	"os"
 	"path/filepath"
@@ -17,10 +20,12 @@ import (
 	"toolbox/core/deps"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
+	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
 	"toolbox/modules/midi"
 	"toolbox/modules/stems"
 	"toolbox/modules/transcribe"
+	"toolbox/modules/upscale"
 )
 
 // writeTestTrack writes a 16 s, 44.1 kHz mono WAV: a C–F–G–C progression of
@@ -123,7 +128,7 @@ func TestEndToEndAudioEngine(t *testing.T) {
 	jobs := core.NewJobs(db, db, reg, em, depSvc.Resolve, settings.Current, paths.TmpDir)
 	engine := sidecar.NewManager(paths, func() (string, error) { return depSvc.Resolve(sidecar.DepID) }, em)
 	defer engine.Stop()
-	depSvc.RegisterVirtual(deps.Spec{ID: sidecar.DepID, Name: "Audio engine", Managed: true},
+	depSvc.RegisterVirtual(deps.Spec{ID: sidecar.DepID, Name: "AI engine", Managed: true},
 		func(ctx context.Context) core.DepStatus { return sidecar.Detect(ctx, paths) })
 	// Force a real uv download: resolve uv only from the managed bin dir.
 	resolveUV := func() (string, error) {
@@ -139,6 +144,7 @@ func TestEndToEndAudioEngine(t *testing.T) {
 	for _, err := range []error{
 		stems.Register(reg, engine), bpmkey.Register(reg, engine), midi.Register(reg, engine),
 		transcribe.Register(reg, engine, paths.ModelsDir),
+		bgremove.Register(reg, engine, paths.ModelsDir), upscale.Register(reg, engine, paths.ModelsDir),
 		sidecar.RegisterSetup(reg, paths, engine, resolveUV,
 			func(ctx context.Context, job *core.JobContext) error {
 				return depSvc.InstallManagedBinary(ctx, job, deps.UVBinary())
@@ -230,6 +236,10 @@ func TestEndToEndAudioEngine(t *testing.T) {
 		t.Errorf("engine not running after jobs: %+v", s)
 	}
 
+	// Image tools on the engine (Phase 4): background removal with the fast
+	// model on a generated disc, then CPU upscaling with the fast model.
+	runImageTools(t, ctx, jobs, t.TempDir())
+
 	// Transcribe (base model, ~142 MB on first use): the synthetic track has
 	// no speech (0 or few segments must still succeed), then real speech if
 	// the dev sample is present.
@@ -295,4 +305,69 @@ func runTranscribe(t *testing.T, ctx context.Context, jobs *core.Jobs, input str
 		t.Errorf("transcribe outputs = %+v / %v", j.Outputs, res.Outputs)
 	}
 	return j
+}
+
+// runImageTools removes the background of a generated disc (fast model) and
+// upscales a small generated image 2× on the CPU (fast model).
+func runImageTools(t *testing.T, ctx context.Context, jobs *core.Jobs, dir string) {
+	t.Helper()
+	disc := filepath.Join(dir, "disc.png")
+	im := image.NewNRGBA(image.Rect(0, 0, 320, 240))
+	for y := range 240 {
+		for x := range 320 {
+			c := color.NRGBA{235, 238, 240, 255} // light backdrop
+			if dx, dy := x-160, y-120; dx*dx+dy*dy < 70*70 {
+				c = color.NRGBA{200, 40, 30, 255} // red subject
+			}
+			im.SetNRGBA(x, y, c)
+		}
+	}
+	writePNG(t, disc, im)
+
+	start := time.Now()
+	raw, _ := json.Marshal(bgremove.Options{Model: bgremove.ModelFast, Output: bgremove.OutputTransparent, CleanEdges: true, Color: "#ffffff"})
+	created, err := jobs.Submit(ctx, bgremove.ModuleID, []string{disc}, string(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	j := waitJob(t, ctx, jobs, created[0].ID)
+	var br bgremove.Result
+	if err := json.Unmarshal([]byte(j.ResultJSON), &br); err != nil || len(j.Outputs) != 1 {
+		t.Fatalf("bg-remover result %q outputs %+v: %v", j.ResultJSON, j.Outputs, err)
+	}
+	// The disc covers π·70²/(320·240) ≈ 20% of the image.
+	if br.SubjectCoverage < 0.12 || br.SubjectCoverage > 0.3 || br.Width != 320 || br.Height != 240 {
+		t.Errorf("bg-remover result = %+v", br)
+	}
+	t.Logf("bg-remover (fast) in %s: %s", time.Since(start).Round(time.Second), j.Message)
+
+	small := filepath.Join(dir, "small.png")
+	writePNG(t, small, im.SubImage(image.Rect(100, 60, 164, 108)))
+	start = time.Now()
+	raw, _ = json.Marshal(upscale.Options{Model: upscale.ModelFast, Scale: 2, Format: upscale.FormatPNG, Device: upscale.DeviceCPU})
+	created, err = jobs.Submit(ctx, upscale.ModuleID, []string{small}, string(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	j = waitJob(t, ctx, jobs, created[0].ID)
+	var ur upscale.Result
+	if err := json.Unmarshal([]byte(j.ResultJSON), &ur); err != nil || len(j.Outputs) != 1 {
+		t.Fatalf("upscale result %q outputs %+v: %v", j.ResultJSON, j.Outputs, err)
+	}
+	if ur.OutWidth != 128 || ur.OutHeight != 96 || ur.Device == "gpu" {
+		t.Errorf("upscale result = %+v", ur)
+	}
+	t.Logf("upscale (cpu, fast, 2x) in %s: %s", time.Since(start).Round(time.Second), j.Message)
+}
+
+func writePNG(t *testing.T, path string, im image.Image) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := png.Encode(f, im); err != nil {
+		t.Fatal(err)
+	}
 }
