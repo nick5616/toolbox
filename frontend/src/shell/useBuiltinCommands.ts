@@ -1,4 +1,5 @@
-import { ClipboardService, LibraryService, Theme } from "@/lib/api";
+import { ClipboardService, LibraryService, PdfAction, Theme } from "@/lib/api";
+import { usePdfIntent } from "@/tools/pdf/intent";
 import { useCommands, type Command } from "@/lib/commands";
 import { toAppError } from "@/lib/errors";
 import { toast } from "@/components";
@@ -19,7 +20,12 @@ function guard(fn: () => Promise<unknown>): () => Promise<void> {
   };
 }
 
-const setTheme = (theme: Theme) => guard(() => useSettings.getState().update({ theme }));
+function openPdf(action: PdfAction) {
+  usePdfIntent.getState().request(action);
+  useUI.getState().navigate("pdf");
+}
+
+const setTheme =(theme: Theme) => guard(() => useSettings.getState().update({ theme }));
 
 export function useBuiltinCommands(): void {
   const cmds: Command[] = [
@@ -126,6 +132,46 @@ export function useBuiltinCommands(): void {
         return useSettings.getState().settings.clipboard.enabled && c.paused;
       },
       run: guard(() => ClipboardService.Resume()),
+    },
+    {
+      id: "bg-remover.open",
+      title: "Remove background…",
+      section: "Actions",
+      icon: "wand-sparkles",
+      keywords: ["background", "cutout", "transparent"],
+      run: () => useUI.getState().navigate("bg-remover"),
+    },
+    {
+      id: "upscaler.open",
+      title: "Upscale image…",
+      section: "Actions",
+      icon: "maximize-2",
+      keywords: ["enlarge", "resolution", "super resolution"],
+      run: () => useUI.getState().navigate("upscaler"),
+    },
+    {
+      id: "pdf.merge",
+      title: "Merge PDFs…",
+      section: "Actions",
+      icon: "file-text",
+      keywords: ["combine", "join", "pdf"],
+      run: () => openPdf(PdfAction.ActionMerge),
+    },
+    {
+      id: "pdf.compress",
+      title: "Compress PDF…",
+      section: "Actions",
+      icon: "archive",
+      keywords: ["shrink", "smaller", "pdf"],
+      run: () => openPdf(PdfAction.ActionCompress),
+    },
+    {
+      id: "pdf.organize",
+      title: "Organize PDF pages…",
+      section: "Actions",
+      icon: "file-text",
+      keywords: ["reorder", "rotate", "delete pages", "pdf"],
+      run: () => openPdf(PdfAction.ActionOrganize),
     },
     {
       // Opens the clipboard tool, whose own "Clear all" asks for confirmation.
