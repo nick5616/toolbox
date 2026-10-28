@@ -24,35 +24,55 @@ import (
 // ExifToolUpdateModuleID is the hidden ExifTool install/update module.
 const ExifToolUpdateModuleID = "system-exiftool-update"
 
-// ArchiveSpec describes an app-managed tool installed from a versioned
-// archive (a folder, not a single binary).
+// ArchivePart is one downloadable archive of an ArchiveSpec.
+type ArchivePart struct {
+	Name   string                                             // "main", "models", …
+	Asset  func(goos, goarch, version string) (string, error) // asset file name
+	URL    func(asset string) string                          // download URL (may redirect)
+	SHA256 func(asset string) string                          // pinned hex; nil or "" → look up in ArchiveSpec.ChecksumsURL
+	Size   int64                                              // approximate bytes; weights the progress (0 = unknown, even split)
+}
+
+// ArchiveSpec describes an app-managed tool installed from one or more
+// versioned archives (a folder, not a single binary). SPEC §3.3.
 type ArchiveSpec struct {
 	DepID        string
-	VersionURL   string // returns the latest version as plain text
-	ChecksumsURL string // lines "SHA2-256(<asset>)= <hex>"
-	Asset        func(goos, goarch, version string) (string, error)
-	DownloadURL  func(asset string) string // may redirect (e.g. SourceForge /download)
-	InstallDir   string                    // relative to BinDir, e.g. "exiftool"
-	// Layout moves/renames the extracted files into installDir (which does
-	// not exist yet) so that the tool's executable ends up where detection
-	// looks for it.
-	Layout   func(extractedRoot, installDir string) error
-	MaxBytes int64
+	InstallDir   string // relative to BinDir, e.g. "exiftool"
+	VersionURL   string // latest version as plain text; "" when Version is pinned
+	Version      string // pinned version (no network version check)
+	ChecksumsURL string // "SHA2-256(<asset>)= <hex>" lines, for parts without a pinned SHA256
+	Parts        []ArchivePart
+	// Layout builds installDir (which does not exist yet) from the extracted
+	// parts: roots maps part name → extracted root (top folder unwrapped), so
+	// that the tool's executable ends up where detection looks for it.
+	Layout   func(roots map[string]string, installDir string) error
+	MaxBytes int64 // per part
+
+	// The hidden installer module.
+	ModuleID, ModuleName, Tagline string
 }
 
 // ExifToolArchive is the ExifTool archive spec.
 func ExifToolArchive() ArchiveSpec {
 	return ArchiveSpec{
 		DepID:        ExifTool,
+		InstallDir:   "exiftool",
 		VersionURL:   "https://exiftool.org/ver.txt",
 		ChecksumsURL: "https://exiftool.org/checksums.txt",
-		Asset:        exifToolAsset,
-		DownloadURL: func(asset string) string {
-			return "https://sourceforge.net/projects/exiftool/files/" + asset + "/download"
+		Parts: []ArchivePart{{
+			Name:  "main",
+			Asset: exifToolAsset,
+			URL: func(asset string) string {
+				return "https://sourceforge.net/projects/exiftool/files/" + asset + "/download"
+			},
+		}},
+		Layout: func(roots map[string]string, dir string) error {
+			return exifToolLayout(runtime.GOOS, roots["main"], dir)
 		},
-		InstallDir: "exiftool",
-		Layout:     func(root, dir string) error { return exifToolLayout(runtime.GOOS, root, dir) },
 		MaxBytes:   maxDownload,
+		ModuleID:   ExifToolUpdateModuleID,
+		ModuleName: "ExifTool updater",
+		Tagline:    "Install or update ExifTool",
 	}
 }
 
@@ -174,6 +194,17 @@ func findChecksum(text, asset string) string {
 	return ""
 }
 
+const versionFileName = "VERSION"
+
+// readVersionFile returns the trimmed content of <dir>/VERSION ("" if absent).
+func readVersionFile(dir string) string {
+	b, err := os.ReadFile(filepath.Join(dir, versionFileName))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
+}
+
 func (i *archiveInstaller) install(ctx context.Context, job *core.JobContext, a ArchiveSpec) error {
 	s := i.svc
 	sp, ok := s.spec(a.DepID)
@@ -181,8 +212,13 @@ func (i *archiveInstaller) install(ctx context.Context, job *core.JobContext, a 
 		return core.Errorf(core.CodeInternal, "Unknown dependency %s", a.DepID)
 	}
 	label := sp.Name
-	if a.Asset == nil || a.Layout == nil || a.DownloadURL == nil || a.InstallDir == "" {
+	if len(a.Parts) == 0 || a.Layout == nil || a.InstallDir == "" {
 		return core.Errorf(core.CodeInternal, "Incomplete install spec for %s", label)
+	}
+	for _, p := range a.Parts {
+		if p.Name == "" || p.Asset == nil || p.URL == nil {
+			return core.Errorf(core.CodeInternal, "Incomplete install spec for %s", label)
+		}
 	}
 	limit := a.MaxBytes
 	if i.maxSize > 0 {
@@ -192,44 +228,82 @@ func (i *archiveInstaller) install(ctx context.Context, job *core.JobContext, a 
 		limit = maxDownload
 	}
 
-	job.Progress(core.IndeterminateProgress, "Checking latest version")
-	job.Logf("Checking the latest %s version", label)
-	verText, err := i.fetchText(ctx, a.VersionURL)
-	if err != nil {
-		return err
+	version := strings.TrimSpace(a.Version)
+	if version == "" {
+		if a.VersionURL == "" {
+			return core.Errorf(core.CodeInternal, "Incomplete install spec for %s", label)
+		}
+		job.Progress(core.IndeterminateProgress, "Checking latest version")
+		job.Logf("Checking the latest %s version", label)
+		verText, err := i.fetchText(ctx, a.VersionURL)
+		if err != nil {
+			return err
+		}
+		version = strings.TrimSpace(verText)
+		if version == "" || strings.ContainsAny(version, " \t\r\n/\\") {
+			return core.Errorf(core.CodeToolFailed, "Couldn't read the latest %s version", label)
+		}
+		job.Logf("Latest version: %s", version)
 	}
-	version := strings.TrimSpace(verText)
-	if version == "" || strings.ContainsAny(version, " \t\r\n/\\") {
-		return core.Errorf(core.CodeToolFailed, "Couldn't read the latest %s version", label)
-	}
-	job.Logf("Latest version: %s", version)
 
 	installDir := filepath.Join(s.binDir, a.InstallDir)
 	exe := filepath.Join(installDir, i.exe(sp.Binary))
-	if isFile(exe) {
-		if cur, err := i.verify(ctx, exe); err == nil && strings.TrimSpace(cur) == version {
-			job.Logf("Installed version %s is current", version)
-			job.Progress(1, "Already up to date ("+version+")")
-			return nil
+	current := func() bool {
+		if !isFile(exe) {
+			return false
 		}
+		if readVersionFile(installDir) == version {
+			return true
+		}
+		// Installs from before VERSION files: ask the tool itself.
+		if sp.VersionFile == "" && i.verify != nil {
+			cur, err := i.verify(ctx, exe)
+			return err == nil && strings.TrimSpace(cur) == version
+		}
+		return false
+	}
+	if current() {
+		job.Logf("Installed version %s is current", version)
+		job.Progress(1, "Already up to date ("+version+")")
+		return nil
 	}
 
 	if a.DepID == ExifTool && i.goos != "windows" && !i.havePerl() {
 		return core.Errorf(core.CodeToolFailed, "ExifTool needs Perl, which isn't installed").
 			WithHint("Install ExifTool with Homebrew: brew install exiftool")
 	}
-	asset, err := a.Asset(i.goos, i.goarch, version)
-	if err != nil || asset == "" {
-		return core.Errorf(core.CodeInternal, "Unsupported platform")
+	assets := make([]string, len(a.Parts))
+	for n, p := range a.Parts {
+		asset, err := p.Asset(i.goos, i.goarch, version)
+		if err != nil || asset == "" {
+			return core.Errorf(core.CodeInternal, "Unsupported platform").WithHint(s.hint(sp))
+		}
+		assets[n] = asset
 	}
 
-	sums, err := i.fetchText(ctx, a.ChecksumsURL)
-	if err != nil {
-		return err
-	}
-	want := findChecksum(sums, asset)
-	if want == "" {
-		return core.Errorf(core.CodeToolFailed, "Checksum for %s not found", asset)
+	// Expected checksums: pinned, else from checksums.txt (fetched once).
+	wants := make([]string, len(a.Parts))
+	var sums string
+	for n, p := range a.Parts {
+		if p.SHA256 != nil {
+			wants[n] = p.SHA256(assets[n])
+		}
+		if wants[n] != "" {
+			continue
+		}
+		if a.ChecksumsURL == "" {
+			return core.Errorf(core.CodeToolFailed, "Checksum for %s not found", assets[n])
+		}
+		if sums == "" {
+			t, err := i.fetchText(ctx, a.ChecksumsURL)
+			if err != nil {
+				return err
+			}
+			sums = t
+		}
+		if wants[n] = findChecksum(sums, assets[n]); wants[n] == "" {
+			return core.Errorf(core.CodeToolFailed, "Checksum for %s not found", assets[n])
+		}
 	}
 
 	if err := os.MkdirAll(job.TempDir, 0o755); err != nil {
@@ -238,20 +312,6 @@ func (i *archiveInstaller) install(ctx context.Context, job *core.JobContext, a 
 	if err := os.MkdirAll(s.binDir, 0o755); err != nil {
 		return core.Errorf(core.CodeInternal, "Couldn't create the tools folder").WithCause(err)
 	}
-	tmp := filepath.Join(job.TempDir, asset)
-	defer os.Remove(tmp)
-	job.Logf("Downloading %s", asset)
-	got, err := i.download(ctx, a.DownloadURL(asset), tmp, job, label, limit)
-	if err != nil {
-		return err
-	}
-	job.Progress(0.96, "Verifying download")
-	if !strings.EqualFold(got, want) {
-		job.Logf("Checksum mismatch: expected %s, got %s", want, got)
-		return core.Errorf(core.CodeToolFailed, "Checksum mismatch").
-			WithHint("The download was corrupted. Try again.")
-	}
-	job.Logf("Checksum OK")
 
 	newDir, oldDir, extractDir := installDir+".new", installDir+".old", installDir+".extract"
 	// Recover from an interrupted earlier swap, then clear leftovers.
@@ -266,27 +326,82 @@ func (i *archiveInstaller) install(ctx context.Context, job *core.JobContext, a 
 	defer os.RemoveAll(extractDir)
 	defer os.RemoveAll(newDir)
 
+	// Progress weights: by size, or evenly when any size is unknown.
+	weights := make([]float64, len(a.Parts))
+	var wsum float64
+	known := true
+	for _, p := range a.Parts {
+		if p.Size <= 0 {
+			known = false
+		}
+	}
+	for n, p := range a.Parts {
+		weights[n] = 1
+		if known {
+			weights[n] = float64(p.Size)
+		}
+		wsum += weights[n]
+	}
+
+	// Download and verify every part before anything is unpacked.
+	archives := make([]string, len(a.Parts))
+	var done float64
+	for n, p := range a.Parts {
+		lo := 0.95 * done / wsum
+		done += weights[n]
+		hi := 0.95 * done / wsum
+		tmp := filepath.Join(job.TempDir, assets[n])
+		defer os.Remove(tmp)
+		job.Logf("Downloading %s", assets[n])
+		got, err := i.downloadRange(ctx, p.URL(assets[n]), tmp, job, label, limit, lo, hi)
+		if err != nil {
+			return err
+		}
+		if !strings.EqualFold(got, wants[n]) {
+			job.Logf("Checksum mismatch for %s: expected %s, got %s", assets[n], wants[n], got)
+			return core.Errorf(core.CodeToolFailed, "Checksum mismatch").
+				WithHint("The download was corrupted. Try again.")
+		}
+		archives[n] = tmp
+	}
+	job.Progress(0.96, "Verifying download")
+	job.Logf("Checksum OK")
+
 	job.Progress(0.97, "Unpacking")
-	if err := extractArchive(ctx, tmp, asset, extractDir, limit); err != nil {
-		return err
+	roots := map[string]string{}
+	for n, p := range a.Parts {
+		dest := filepath.Join(extractDir, p.Name)
+		if err := extractArchive(ctx, archives[n], assets[n], dest, limit); err != nil {
+			return err
+		}
+		roots[p.Name] = archiveRoot(dest)
 	}
 	if err := cancelled(ctx); err != nil {
 		return err
 	}
-	if err := a.Layout(extractDir, newDir); err != nil {
+	if err := a.Layout(roots, newDir); err != nil {
 		return err
 	}
 	// Verify the new install before it replaces the old one.
 	newExe := filepath.Join(newDir, i.exe(sp.Binary))
-	out, err := i.verify(ctx, newExe)
-	if err != nil {
-		if cerr := cancelled(ctx); cerr != nil {
-			return cerr
+	if sp.VersionFile != "" {
+		if !isFile(newExe) {
+			return core.Errorf(core.CodeToolFailed, "The new %s is incomplete", label)
 		}
-		return core.Errorf(core.CodeToolFailed, "The new %s didn't run", label).WithCause(err)
+	} else {
+		out, err := i.verify(ctx, newExe)
+		if err != nil {
+			if cerr := cancelled(ctx); cerr != nil {
+				return cerr
+			}
+			return core.Errorf(core.CodeToolFailed, "The new %s didn't run", label).WithCause(err)
+		}
+		if v := strings.TrimSpace(out); v != version {
+			return core.Errorf(core.CodeToolFailed, "The new %s reports version %q, expected %s", label, v, version)
+		}
 	}
-	if v := strings.TrimSpace(out); v != version {
-		return core.Errorf(core.CodeToolFailed, "The new %s reports version %q, expected %s", label, v, version)
+	if err := os.WriteFile(filepath.Join(newDir, versionFileName), []byte(version+"\n"), 0o644); err != nil {
+		return core.Errorf(core.CodeInternal, "Couldn't set up %s", label).WithCause(err)
 	}
 	if err := cancelled(ctx); err != nil {
 		return err
@@ -459,6 +574,7 @@ func RegisterExifToolUpdater(reg *core.Registry, s *Service) error {
 	return reg.Register(&archiveUpdater{svc: s, spec: ExifToolArchive()})
 }
 
+// archiveUpdater is the hidden install/update module of one ArchiveSpec.
 type archiveUpdater struct {
 	svc  *Service
 	spec ArchiveSpec
@@ -466,7 +582,7 @@ type archiveUpdater struct {
 
 func (u *archiveUpdater) Descriptor() core.Descriptor {
 	return core.Descriptor{
-		ID: ExifToolUpdateModuleID, Name: "ExifTool updater", Tagline: "Install or update ExifTool",
+		ID: u.spec.ModuleID, Name: u.spec.ModuleName, Tagline: u.spec.Tagline,
 		Icon: "refresh-cw", Category: core.CategoryUtility, Status: core.StatusReady,
 		Hidden: true, MaxConcurrent: 1,
 	}

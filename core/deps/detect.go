@@ -66,6 +66,16 @@ func isFile(p string) bool {
 // find applies the resolution order.
 func (s *Service) find(sp Spec) (string, core.DepSource) {
 	name := s.exeName(sp.Binary)
+	if sp.VersionFile != "" {
+		// Pinned archive installs only count in their own folder: the
+		// binary needs the models and DLLs installed beside it.
+		if s.binDir != "" && sp.ArchiveDir != "" {
+			if p := filepath.Join(s.binDir, sp.ArchiveDir, name); isFile(p) {
+				return p, core.SourceManaged
+			}
+		}
+		return "", core.SourceNone
+	}
 	if s.binDir != "" {
 		if sp.ArchiveDir != "" {
 			if p := filepath.Join(s.binDir, sp.ArchiveDir, name); isFile(p) {
@@ -114,6 +124,21 @@ func (s *Service) detectOne(ctx context.Context, sp Spec) core.DepStatus {
 		return st
 	}
 	st.Path, st.Source = path, src
+	if sp.VersionFile != "" {
+		// The binary only has to exist; the version is the VERSION file.
+		b, err := os.ReadFile(filepath.Join(s.binDir, sp.ArchiveDir, sp.VersionFile))
+		v := strings.TrimSpace(string(b))
+		if err != nil || v == "" {
+			st.State = core.DepOutdated
+			return st
+		}
+		st.Version = v
+		st.State = core.DepOK
+		if sp.PinnedVersion != "" && v != sp.PinnedVersion {
+			st.State = core.DepOutdated
+		}
+		return st
+	}
 	out, err := proc.Output(ctx, versionTimeout, path, sp.VersionArgs...)
 	if err != nil {
 		st.State = core.DepError
@@ -128,6 +153,9 @@ func (s *Service) detectOne(ctx context.Context, sp Spec) core.DepStatus {
 	}
 	st.State = core.DepOK
 	st.Version = v
+	if sp.PinnedVersion != "" && v != sp.PinnedVersion {
+		st.State = core.DepOutdated
+	}
 	return st
 }
 

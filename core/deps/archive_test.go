@@ -202,8 +202,8 @@ func (r *exifRelease) spec(goos string) ArchiveSpec {
 	a := ExifToolArchive()
 	a.VersionURL = r.srv.URL + "/ver.txt"
 	a.ChecksumsURL = r.srv.URL + "/checksums.txt"
-	a.DownloadURL = func(asset string) string { return r.srv.URL + "/dl/" + asset }
-	a.Layout = func(root, dir string) error { return exifToolLayout(goos, root, dir) }
+	a.Parts[0].URL = func(asset string) string { return r.srv.URL + "/dl/" + asset }
+	a.Layout = func(roots map[string]string, dir string) error { return exifToolLayout(goos, roots["main"], dir) }
 	return a
 }
 
@@ -327,7 +327,7 @@ func TestInstallArchiveUpgradeAndFailuresKeepOld(t *testing.T) {
 			r.sum = hex.EncodeToString(h[:])
 		}},
 		{"layout fails", func(_ *exifRelease, _ *archiveInstaller, a *ArchiveSpec) {
-			a.Layout = func(string, string) error { return errors.New("layout") }
+			a.Layout = func(map[string]string, string) error { return errors.New("layout") }
 		}},
 		{"size cap", func(_ *exifRelease, i *archiveInstaller, _ *ArchiveSpec) { i.maxSize = 10 }},
 	}

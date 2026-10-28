@@ -371,6 +371,11 @@ func singleSum(text string) string {
 
 // download streams url to path and returns the SHA-256 hex digest.
 func (u *updater) download(ctx context.Context, url, path string, job *core.JobContext, label string, limit int64) (string, error) {
+	return u.downloadRange(ctx, url, path, job, label, limit, 0, 0.95)
+}
+
+// downloadRange is download with the progress mapped onto [lo, hi].
+func (u *updater) downloadRange(ctx context.Context, url, path string, job *core.JobContext, label string, limit int64, lo, hi float64) (string, error) {
 	resp, cancel, err := u.get(ctx, url)
 	if err != nil {
 		return "", netErr(ctx, "Couldn't download "+label, err)
@@ -407,7 +412,7 @@ func (u *updater) download(ctx context.Context, url, path string, job *core.JobC
 				return "", core.Errorf(core.CodeInternal, "Couldn't write the download").WithCause(werr)
 			}
 			if total > 0 {
-				job.Progress(0.95*float64(n)/float64(total), fmt.Sprintf("Downloading %s (%d%%)", label, n*100/total))
+				job.Progress(lo+(hi-lo)*float64(n)/float64(total), fmt.Sprintf("Downloading %s (%d%%)", label, n*100/total))
 			} else {
 				job.Progress(core.IndeterminateProgress, "Downloading "+label)
 			}
