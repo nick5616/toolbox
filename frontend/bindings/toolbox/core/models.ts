@@ -920,6 +920,11 @@ export interface PackUnlock {
     "moduleId": string;
     "name": string;
     "icon": string;
+
+    /**
+     * component IDs this tool needs (Install what this tool needs)
+     */
+    "needs": string[] | null;
 }
 
 /**

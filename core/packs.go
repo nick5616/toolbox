@@ -60,9 +60,10 @@ type PackComponentStatus struct {
 
 // PackUnlock is a tool a pack unlocks.
 type PackUnlock struct {
-	ModuleID string `json:"moduleId"`
-	Name     string `json:"name"`
-	Icon     string `json:"icon"`
+	ModuleID string   `json:"moduleId"`
+	Name     string   `json:"name"`
+	Icon     string   `json:"icon"`
+	Needs    []string `json:"needs"` // component IDs this tool needs (Install what this tool needs)
 }
 
 // PackStatus is one pack as the UI sees it.

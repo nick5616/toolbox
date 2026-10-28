@@ -136,12 +136,16 @@ export interface ModuleNeeds {
 export function moduleNeeds(packs: readonly PackView[], moduleId: string, requires: readonly string[]): ModuleNeeds {
   const pack = packs.find((p) => p.unlocks.some((u) => u.moduleId === moduleId));
   if (!pack) return { pack, download: 0, disk: 0 };
+  // The backend lists each tool's components; fall back to the tool's deps
+  // plus the pack's models for older data.
+  const unlock = pack.unlocks.find((u) => u.moduleId === moduleId);
+  const exact = unlock?.needs && unlock.needs.length > 0 ? new Set(unlock.needs) : null;
   const wanted = new Set(requires.map((r) => DEP_TO_COMPONENT[r] ?? r));
   let download = 0;
   let disk = 0;
   for (const c of pack.components) {
     if (isPresent(c) || c.state === PackComponentState.ComponentUnsupported) continue;
-    if (wanted.has(c.id) || c.kind === PackComponentKind.ComponentModel) {
+    if (exact ? exact.has(c.id) : wanted.has(c.id) || c.kind === PackComponentKind.ComponentModel) {
       download += c.downloadBytes;
       disk += c.diskBytes;
     }

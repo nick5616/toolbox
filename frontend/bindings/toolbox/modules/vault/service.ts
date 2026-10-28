@@ -27,6 +27,7 @@ export function ChangePassphrase(old: string, $new: string): $CancellablePromise
 
 /**
  * Create makes a new vault and returns the recovery key (shown once).
+ * The vault stays locked; the UI unlocks it after the key is confirmed.
  */
 export function Create(passphrase: string): $CancellablePromise<string> {
     return $Call.ByID(1822325994, passphrase);

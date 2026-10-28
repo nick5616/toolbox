@@ -52,9 +52,10 @@ func (s *PacksService) PickToolsDir() (string, error) {
 	return s.Packs.ResolveToolsDir(dir)
 }
 
-// Observe feeds the app's deps:changed and jobs:changed events to the pack
+// ObservePacks feeds the app's deps:changed and jobs:changed events to the pack
 // service, which re-emits packs:changed. Call once after the Wails app exists.
-func (s *PacksService) Observe(app *application.App) {
+// (A plain function, not a method, so it isn't bound to the frontend.)
+func ObservePacks(app *application.App, s *PacksService) {
 	for _, name := range []string{core.EventDepsChanged, core.EventJobsChanged} {
 		app.Event.On(name, func(e *application.CustomEvent) {
 			data := e.Data

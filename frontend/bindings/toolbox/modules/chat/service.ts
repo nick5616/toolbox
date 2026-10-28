@@ -54,7 +54,7 @@ export function DeleteModel(id: string): $CancellablePromise<void> {
 }
 
 /**
- * DownloadModel queues a model download.
+ * DownloadModel queues a model download (or returns the one already queued).
  */
 export function DownloadModel(id: string): $CancellablePromise<core$0.Job> {
     return $Call.ByID(1854691707, id);

@@ -254,7 +254,7 @@ func run() error {
 	})
 	emitter.App = app
 	packsAPI.RelaunchFn = func() error { return desktop.Relaunch(app.Quit) }
-	packsAPI.Observe(app)
+	api.ObservePacks(app, packsAPI)
 
 	setupMenu(app, emitter)
 

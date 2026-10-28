@@ -45,7 +45,7 @@ export function pack(
     state,
     unsupportedReason: "",
     components,
-    unlocks: unlocks.map((m) => ({ moduleId: m, name: `${m} tool`, icon: "box" })),
+    unlocks: unlocks.map((m) => ({ moduleId: m, name: `${m} tool`, icon: "box", needs: null })),
     jobId: "",
     ...extra,
   });

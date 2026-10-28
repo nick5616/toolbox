@@ -230,7 +230,7 @@ func (s *Service) List() []core.PackStatus {
 			if !ok || d.Status == core.StatusComingSoon {
 				continue
 			}
-			ps.Unlocks = append(ps.Unlocks, core.PackUnlock{ModuleID: u.Module, Name: d.Name, Icon: d.Icon})
+			ps.Unlocks = append(ps.Unlocks, core.PackUnlock{ModuleID: u.Module, Name: d.Name, Icon: d.Icon, Needs: append([]string{}, u.Needs...)})
 		}
 		jobID, installing := active[p.ID]
 		switch {
