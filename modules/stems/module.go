@@ -18,7 +18,10 @@ import (
 const ModuleID = "stems"
 
 // Module implements core.Module.
-type Module struct{ sc sidecar.Caller }
+type Module struct {
+	sc        sidecar.Caller
+	modelsDir string // set by SetModelsDir (models.go)
+}
 
 // Register adds the module to the registry.
 func Register(reg *core.Registry, sc sidecar.Caller) error { return reg.Register(&Module{sc: sc}) }

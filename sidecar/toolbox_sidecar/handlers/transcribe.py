@@ -232,3 +232,28 @@ def run(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
         "words": words,
         "outputs": outputs,
     }
+
+
+@handler("transcribe.prefetch")
+def prefetch(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
+    """Downloads a Whisper model snapshot without transcribing (tool packs, SPEC §7.8)."""
+    repo = _str_param(params, "model")
+    model_dir = _str_param(params, "modelDir")
+    if _has_model(model_dir):
+        return {"modelDir": model_dir, "downloaded": False}
+    try:
+        ctx.stage("Downloading model")
+        os.makedirs(model_dir, exist_ok=True)
+        from huggingface_hub import snapshot_download
+
+        snapshot_download(repo, local_dir=model_dir)
+        ctx.check_cancelled()
+    except HandlerError:
+        raise
+    except Exception as e:
+        if _is_download_error(e):
+            raise HandlerError("tool_failed", f"Model download failed: {e}", "Check your connection") from e
+        raise HandlerError("tool_failed", f"Couldn't download the model: {e}", "Try again") from e
+    if not _has_model(model_dir):
+        raise HandlerError("tool_failed", "The model download was incomplete", "Try again")
+    return {"modelDir": model_dir, "downloaded": True}

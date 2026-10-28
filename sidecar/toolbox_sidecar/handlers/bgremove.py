@@ -241,3 +241,12 @@ def run(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
         "model": spec["file"],
         "output": saved,
     }
+
+
+@handler("bgremove.prefetch")
+def prefetch(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
+    """Downloads (sha256-verified) a model without running it (tool packs, SPEC §7.8)."""
+    model_dir = _str(params, "modelDir")
+    spec = validate_model_spec(params.get("model"), KINDS)
+    path = ensure_model(ctx, model_dir, spec["file"], spec["sha256"], spec["url"])
+    return {"model": spec["file"], "path": path}
