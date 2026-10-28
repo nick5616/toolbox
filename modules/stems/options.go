@@ -25,5 +25,5 @@ type Options struct {
 	Format Format `json:"format"`
 }
 
-// DefaultOptions: 4 stems, fast, WAV.
-func DefaultOptions() Options { return Options{Preset: PresetFourFast, Format: FormatWAV} }
+// DefaultOptions: 4 stems, fast, FLAC (lossless and about half the size of WAV).
+func DefaultOptions() Options { return Options{Preset: PresetFourFast, Format: FormatFLAC} }

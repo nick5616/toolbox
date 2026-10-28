@@ -325,3 +325,37 @@ func (s *DepsService) UpdateExiftool() (core.Job, error) {
 	}
 	return s.submitSystem(deps.ExifToolUpdateModuleID)
 }
+
+// InstallChatEngine queues the llama.cpp chat engine install/update (pinned).
+func (s *DepsService) InstallChatEngine() (core.Job, error) {
+	return s.submitSystem(deps.LlamaInstallModuleID)
+}
+
+// InstallFFmpeg queues the managed FFmpeg install/update (pinned).
+func (s *DepsService) InstallFFmpeg() (core.Job, error) {
+	if s.Jobs.HasActive(s.Reg.RequiringDep(deps.FFmpeg)...) {
+		return core.Job{}, core.Errorf(core.CodeConflict, "Wait for running audio and video jobs to finish")
+	}
+	return s.submitSystem(deps.FFmpegInstallModuleID)
+}
+
+// RemoveFFmpeg deletes the managed FFmpeg (a system copy then takes over).
+func (s *DepsService) RemoveFFmpeg() error {
+	return s.removeManaged(deps.FFmpeg, deps.FFmpegInstallModuleID)
+}
+
+// InstallDeno queues the managed Deno install/update (pinned).
+func (s *DepsService) InstallDeno() (core.Job, error) {
+	if s.Jobs.HasActive(s.Reg.RecommendingDep(deps.Deno)...) {
+		return core.Job{}, core.Errorf(core.CodeConflict, "Wait for running downloads to finish")
+	}
+	return s.submitSystem(deps.DenoInstallModuleID)
+}
+
+// RemoveDeno deletes the managed Deno (a system copy then takes over).
+func (s *DepsService) RemoveDeno() error { return s.removeManaged(deps.Deno, deps.DenoInstallModuleID) }
+
+// removeManaged deletes a managed archive tool's folder (PK1).
+func (s *DepsService) removeManaged(depID, installModuleID string) error {
+	return core.Errorf(core.CodeInternal, "Removing this tool isn't available yet")
+}

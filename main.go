@@ -17,21 +17,25 @@ import (
 	"toolbox/api"
 	"toolbox/core"
 	"toolbox/core/deps"
+	"toolbox/core/packs"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
 	"toolbox/desktop"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
+	"toolbox/modules/chat"
 	"toolbox/modules/clipboard"
 	"toolbox/modules/converter"
 	"toolbox/modules/downloader"
 	"toolbox/modules/exif"
 	"toolbox/modules/midi"
+	"toolbox/modules/ocr"
 	"toolbox/modules/pdf"
 	"toolbox/modules/placeholders"
 	"toolbox/modules/stems"
 	"toolbox/modules/transcribe"
 	"toolbox/modules/upscale"
+	"toolbox/modules/vault"
 )
 
 //go:embed all:frontend/dist
@@ -97,6 +101,31 @@ func run() error {
 	defer pdfMod.Close()
 	clipHistory := clipboard.New(clipboard.Config{Store: db, Settings: settings, Emitter: emitter, Dir: paths.ClipboardDir})
 	defer clipHistory.Stop()
+	libraryDir := func() string { return settings.Current().LibraryDir }
+
+	// --- Local Chat (CH1 may edit this block) ---
+	chatSvc := chat.New(chat.Config{
+		Store: db, Settings: settings, Jobs: jobs, Emitter: emitter,
+		ModelsDir: paths.ModelsDir, TmpDir: paths.TmpDir, Resolve: depSvc.Resolve, LibraryDir: libraryDir,
+	})
+	defer chatSvc.Stop()
+	// --- end Local Chat ---
+
+	// --- Vault (VA1 may edit this block) ---
+	vaultSvc := vault.New(vault.Config{
+		LibraryDir: libraryDir, OpenDir: filepath.Join(paths.TmpDir, "vault-open"),
+		Settings: settings, Jobs: jobs, Emitter: emitter,
+	})
+	defer vaultSvc.Close()
+	// --- end Vault ---
+
+	// --- Tool packs (PK1 may edit this block) ---
+	packSvc := packs.New(packs.Config{
+		Paths: paths, Reg: reg, Deps: depSvc, Jobs: jobs, Settings: settings, Emitter: emitter,
+		StopEngines: func() { engine.Stop(); chatSvc.Stop() },
+	})
+	pendingPacks := packSvc.StartupTasks()
+	// --- end Tool packs ---
 
 	for _, register := range []func() error{
 		func() error { return downloader.Register(reg, filepath.Join(paths.CacheDir, "yt-dlp")) },
@@ -110,6 +139,10 @@ func run() error {
 		func() error { return bgremove.Register(reg, engine, paths.ModelsDir) },
 		func() error { return upscale.Register(reg, engine, paths.ModelsDir) },
 		func() error { return pdf.Register(reg, pdfMod) },
+		func() error { return chat.Register(reg, chatSvc) },
+		func() error { return vault.Register(reg, vaultSvc) },
+		func() error { return ocr.Register(reg, engine, nil, paths.ModelsDir) },
+		func() error { return packs.Register(reg, packSvc) },
 		func() error { return placeholders.Register(reg) },
 		func() error { return deps.RegisterExifToolUpdater(reg, depSvc) },
 		func() error { return deps.RegisterUpscalerInstaller(reg, depSvc) },
@@ -142,8 +175,15 @@ func run() error {
 	}
 	go depSvc.Detect(ctx)
 	clipHistory.Start(ctx)
+	vaultSvc.Start(ctx)
+	if len(pendingPacks) > 0 { // a relaunch for a new tools folder: continue the install
+		if _, err := packSvc.Install(pendingPacks, ""); err != nil {
+			slog.Warn("pending pack install", "err", err)
+		}
+	}
 
 	desktopSvc := &api.DesktopService{} // Shell is set once the app exists
+	packsAPI := &api.PacksService{Packs: packSvc}
 	opts := api.Options()
 	app := application.New(application.Options{
 		Name:        "Toolbox",
@@ -167,6 +207,10 @@ func run() error {
 			application.NewServiceWithOptions(bgremove.NewService(jobs), opts),
 			application.NewServiceWithOptions(upscale.NewService(jobs), opts),
 			application.NewServiceWithOptions(pdf.NewService(jobs, pdfMod), opts),
+			application.NewServiceWithOptions(chat.NewService(chatSvc), opts),
+			application.NewServiceWithOptions(ocr.NewService(jobs), opts),
+			application.NewServiceWithOptions(vault.NewService(vaultSvc), opts),
+			application.NewServiceWithOptions(packsAPI, opts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
