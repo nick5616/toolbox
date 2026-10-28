@@ -67,7 +67,9 @@ func FFmpegArchive() ArchiveSpec {
 		Layout: func(roots map[string]string, dir string) error {
 			return ffmpegLayout(runtime.GOOS, roots, dir)
 		},
-		MaxBytes:   maxDownload,
+		// The Gyan zip unpacks to ~330 MB (three 105 MB executables); the cap
+		// bounds download and unpacked bytes per part.
+		MaxBytes:   600 << 20,
 		ModuleID:   FFmpegInstallModuleID,
 		ModuleName: "FFmpeg installer",
 		Tagline:    "Install or update FFmpeg",
