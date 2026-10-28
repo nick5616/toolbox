@@ -86,6 +86,9 @@ func (p *popup) toggle() error {
 		p.win.Hide()
 		return nil
 	}
+	// --- auto-paste (WP-D2)
+	p.s.rememberForPaste() // before we take focus
+	// --- end auto-paste ---
 	p.applyTheme()
 	if scr := p.s.o.App.Screen.GetPrimary(); scr != nil {
 		wa := scr.WorkArea
