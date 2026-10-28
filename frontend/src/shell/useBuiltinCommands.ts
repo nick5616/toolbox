@@ -1,8 +1,9 @@
-import { LibraryService, Theme } from "@/lib/api";
+import { ClipboardService, LibraryService, Theme } from "@/lib/api";
 import { useCommands, type Command } from "@/lib/commands";
 import { toAppError } from "@/lib/errors";
 import { toast } from "@/components";
 import { useDeps } from "@/state/deps";
+import { useDesktop } from "@/state/desktop";
 import { useJobs } from "@/state/jobs";
 import { useSettings } from "@/state/settings";
 import { useUI } from "@/state/ui";
@@ -96,6 +97,43 @@ export function useBuiltinCommands(): void {
         }
         useUI.getState().handOff({ moduleId: "downloader", inputs: urls });
       }),
+    },
+    {
+      id: "clipboard.open",
+      title: "Open clipboard history",
+      section: "Actions",
+      icon: "clipboard",
+      run: guard(() => ClipboardService.OpenPopup()),
+    },
+    {
+      id: "clipboard.pause",
+      title: "Pause clipboard history",
+      section: "Actions",
+      icon: "square",
+      enabled: () => {
+        const c = useDesktop.getState().clipboard;
+        return useSettings.getState().settings.clipboard.enabled && !c.paused;
+      },
+      run: guard(() => ClipboardService.Pause()),
+    },
+    {
+      id: "clipboard.resume",
+      title: "Resume clipboard history",
+      section: "Actions",
+      icon: "play",
+      enabled: () => {
+        const c = useDesktop.getState().clipboard;
+        return useSettings.getState().settings.clipboard.enabled && c.paused;
+      },
+      run: guard(() => ClipboardService.Resume()),
+    },
+    {
+      // Opens the clipboard tool, whose own "Clear all" asks for confirmation.
+      id: "clipboard.clear",
+      title: "Clear clipboard history…",
+      section: "Actions",
+      icon: "trash-2",
+      run: () => useUI.getState().navigate("clipboard"),
     },
   ];
   useCommands(cmds);

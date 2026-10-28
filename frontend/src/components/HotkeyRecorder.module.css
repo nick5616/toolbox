@@ -1,0 +1,41 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 140px;
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+  color: var(--fg);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.root:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.root:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.root:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.recording {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.prompt {
+  color: var(--accent);
+}
+
+.disabled {
+  color: var(--fg-subtle);
+}

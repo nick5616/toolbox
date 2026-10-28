@@ -19,11 +19,15 @@ import { useDeps, type DepView } from "@/state/deps";
 import { isActive, useJobs } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { useSettings } from "@/state/settings";
+import { SettingsClipboard } from "./SettingsClipboard";
+import { SettingsGeneral } from "./SettingsGeneral";
 import styles from "./SettingsView.module.css";
 
 const YTDLP_ID = "yt-dlp";
 const YTDLP_JOB_MODULE = "system-ytdlp-update";
 const UV_ID = "uv";
+const EXIFTOOL_ID = "exiftool";
+const EXIFTOOL_JOB_MODULE = "system-exiftool-update";
 const AUDIO_ENGINE_ID = "audio-engine";
 const AUDIO_ENGINE_JOB_MODULE = "system-audio-engine";
 
@@ -178,6 +182,23 @@ function DepsTable() {
   );
   const [queuing, setQueuing] = useState(false);
   const [uvQueuing, setUvQueuing] = useState(false);
+  const [exifQueuing, setExifQueuing] = useState(false);
+  const exifUpdating = useMemo(
+    () => Object.values(jobsById).some((j) => j.moduleId === EXIFTOOL_JOB_MODULE && isActive(j)),
+    [jobsById],
+  );
+
+  const updateExiftool = async () => {
+    setExifQueuing(true);
+    try {
+      useJobs.getState().upsert(await DepsService.UpdateExiftool());
+      toast({ title: "ExifTool install queued" });
+    } catch (e) {
+      fail(e);
+    } finally {
+      setExifQueuing(false);
+    }
+  };
 
   const updateUv = async () => {
     setUvQueuing(true);
@@ -279,6 +300,15 @@ function DepsTable() {
                     <Button size="sm" variant="secondary" loading={uvQueuing} onClick={() => void updateUv()}>
                       {ok ? "Update" : "Install"}
                     </Button>
+                  ) : d.id === EXIFTOOL_ID ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={exifQueuing || exifUpdating}
+                      onClick={() => void updateExiftool()}
+                    >
+                      {ok ? "Update" : "Install"}
+                    </Button>
                   ) : d.id === AUDIO_ENGINE_ID ? (
                     <AudioEngineActions dep={d} />
                   ) : !ok ? (
@@ -331,6 +361,8 @@ export function SettingsView() {
       <section className={styles.root} aria-label="Settings">
         <h1 className={styles.title}>Settings</h1>
 
+        <SettingsGeneral />
+
         <Section label="Library">
           <div className={styles.row}>
             <PathText path={settings.libraryDir} />
@@ -372,6 +404,8 @@ export function SettingsView() {
             onChange={(t) => void patch({ theme: t })}
           />
         </Section>
+
+        <SettingsClipboard />
 
         <DepsTable />
 
