@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"os"
 	"os/exec"
@@ -30,7 +31,7 @@ const (
 	// webpCompress is upscayl-bin's -c for WebP. Verified on the real binary:
 	// -c is a compression level (0 = lossless, 100 = smallest), roughly
 	// 100 - quality, so quality 90 is -c 10. It has no effect on JPEG output
-	// (always quality 100) or PNG.
+	// (always quality 100), so GPU JPEGs are re-encoded at LossyQuality.
 	webpCompress = 100 - LossyQuality
 )
 
@@ -234,6 +235,12 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 	}
 	if fi, err := os.Stat(tmp); err != nil || fi.Size() == 0 {
 		return failed(job, nil)
+	}
+	if ext == ".jpg" && out.device == "gpu" {
+		// upscayl-bin ignores -c for JPEG and always writes quality 100.
+		if err := reencodeJPEG(tmp, LossyQuality); err != nil {
+			return core.Errorf(core.CodeToolFailed, "Couldn't save the upscaled image").WithCause(err)
+		}
 	}
 	stem := fmt.Sprintf("%s (%dx)", core.StemName(input), o.Scale)
 	final := core.UniquePath(job.OutputDir, stem, ext)
@@ -487,4 +494,32 @@ func (m *Module) convertHEIC(ctx context.Context, job *core.JobContext, input st
 		return "", core.Errorf(core.CodeToolFailed, "Couldn't read this HEIC photo")
 	}
 	return out, nil
+}
+
+// reencodeJPEG rewrites a JPEG in place at the given quality.
+func reencodeJPEG(path string, quality int) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	im, err := jpeg.Decode(f)
+	f.Close()
+	if err != nil {
+		return fmt.Errorf("decode %s: %w", path, err)
+	}
+	tmp := path + ".q"
+	o, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+	if err := jpeg.Encode(o, im, &jpeg.Options{Quality: quality}); err != nil {
+		o.Close()
+		os.Remove(tmp)
+		return fmt.Errorf("encode %s: %w", path, err)
+	}
+	if err := o.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, path)
 }

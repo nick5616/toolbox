@@ -2,6 +2,8 @@ package upscale
 
 import (
 	"encoding/json"
+	"image"
+	"image/jpeg"
 	"os"
 	"path/filepath"
 	"testing"
@@ -93,5 +95,32 @@ func TestDescriptor(t *testing.T) {
 	d := (&Module{}).Descriptor()
 	if d.ID != "upscaler" || !d.SplitInputs || d.MaxConcurrent != 1 || len(d.Requires) != 1 || d.Requires[0] != "upscayl" {
 		t.Errorf("%+v", d)
+	}
+}
+
+func TestReencodeJPEG(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "x.jpg")
+	im := image.NewRGBA(image.Rect(0, 0, 64, 48))
+	for i := range im.Pix {
+		im.Pix[i] = uint8(i * 7)
+	}
+	f, err := os.Create(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jpeg.Encode(f, im, &jpeg.Options{Quality: 100}); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	before, _ := os.Stat(p)
+	if err := reencodeJPEG(p, 50); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := os.Stat(p)
+	if after.Size() >= before.Size() {
+		t.Errorf("not smaller: %d → %d", before.Size(), after.Size())
+	}
+	if _, err := os.Stat(p + ".q"); !os.IsNotExist(err) {
+		t.Error("temp file left behind")
 	}
 }
