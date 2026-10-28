@@ -36,7 +36,8 @@ const (
 
 var (
 	noGPURe = regexp.MustCompile(`(?i)invalid gpu device|vkCreateInstance failed|no vulkan|vkEnumeratePhysicalDevices`)
-	pctRe   = regexp.MustCompile(`^\s*(\d+(?:\.\d+)?)%`)
+	// The real binary ends with a bare "100.00" (no percent sign).
+	pctRe = regexp.MustCompile(`^\s*(\d+(?:\.\d+)?)(?:%|\s*$)`)
 
 	// startupNotice is how long the GPU may stay silent before the message
 	// explains that the first run is slow (shader compilation). A var for tests.
