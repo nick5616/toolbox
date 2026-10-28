@@ -9,6 +9,7 @@ export const revealLabel: string = isMac ? "Reveal in Finder" : "Show in Explore
 
 const macSymbols: Record<string, string> = {
   Mod: "⌘",
+  Super: "⌘",
   Shift: "⇧",
   Alt: "⌥",
   Ctrl: "⌃",
@@ -21,6 +22,7 @@ const macSymbols: Record<string, string> = {
 
 const pcNames: Record<string, string> = {
   Mod: "Ctrl",
+  Super: "Win",
   Enter: "Enter",
   Escape: "Esc",
   ArrowUp: "↑",
@@ -30,7 +32,9 @@ const pcNames: Record<string, string> = {
 
 /** Splits a combo like "Mod+Shift+K" into display tokens for the current OS. */
 export function comboTokens(combo: string): string[] {
-  return combo.split("+").map((part) => (isMac ? macSymbols[part] : pcNames[part]) ?? part.toUpperCase());
+  return combo
+    .split("+")
+    .map((part) => (isMac ? macSymbols[part] : pcNames[part]) ?? (part.length === 1 ? part.toUpperCase() : part));
 }
 
 /** Renders a combo for display: "⌘⇧K" on mac, "Ctrl+Shift+K" elsewhere. */

@@ -9,6 +9,8 @@ import styles from "./DepsGate.module.css";
 
 export const AUDIO_ENGINE_ID = "audio-engine";
 export const AUDIO_ENGINE_JOB_MODULE = "system-audio-engine";
+export const EXIFTOOL_ID = "exiftool";
+export const EXIFTOOL_JOB_MODULE = "system-exiftool-update";
 
 export interface DepsGateState {
   /** True while a required dependency (incl. the audio engine) isn't OK. */
@@ -43,6 +45,11 @@ export function useAudioEngineJob(): JobView | undefined {
   return useJobs((s) => Object.values(s.byId).find((j) => j.moduleId === AUDIO_ENGINE_JOB_MODULE && isActive(j)));
 }
 
+/** The active ExifTool install/update job, if any (stable reference). */
+export function useExiftoolJob(): JobView | undefined {
+  return useJobs((s) => Object.values(s.byId).find((j) => j.moduleId === EXIFTOOL_JOB_MODULE && isActive(j)));
+}
+
 async function copyHint(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
@@ -58,6 +65,7 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
   const byId = useDeps((s) => s.byId);
   const loaded = useDeps((s) => s.list.length > 0);
   const job = useAudioEngineJob();
+  const exifJob = useExiftoolJob();
   const [queuing, setQueuing] = useState(false);
 
   if (!loaded || !requires) return null;
@@ -67,6 +75,17 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
     try {
       const j = await DepsService.InstallAudioEngine();
       useJobs.getState().upsert(j);
+    } catch (e) {
+      toast({ title: toAppError(e).message, tone: "danger" });
+    } finally {
+      setQueuing(false);
+    }
+  };
+
+  const installExiftool = async () => {
+    setQueuing(true);
+    try {
+      useJobs.getState().upsert(await DepsService.UpdateExiftool());
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     } finally {
@@ -96,8 +115,25 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
           {busy && job?.message
             ? job.message
             : outdated
-              ? "Update the Python engine to keep using stem splitting, BPM & key and MIDI."
-              : "Stem splitting, BPM & key and MIDI run locally on a Python engine (about 1 GB download, 1.2 GB on disk)."}
+              ? "Update the Python engine to keep using stem splitting, BPM & key, MIDI and transcription."
+              : "Stem splitting, BPM & key, MIDI and transcription run locally on a Python engine (about 1.2 GB download, 1.4 GB on disk)."}
+        </Banner>,
+      );
+    } else if (id === EXIFTOOL_ID) {
+      const outdated = d?.state === DepState.DepOutdated;
+      const busy = queuing || !!exifJob;
+      banners.push(
+        <Banner
+          key={id}
+          tone="info"
+          title={outdated ? "ExifTool needs an update" : "ExifTool isn't installed"}
+          action={
+            <Button variant="primary" size="sm" loading={busy} onClick={() => void installExiftool()}>
+              {outdated ? "Update ExifTool" : "Install ExifTool"}
+            </Button>
+          }
+        >
+          {busy && exifJob?.message ? exifJob.message : "ExifTool reads and edits photo metadata (about 11 MB download)."}
         </Banner>,
       );
     } else if (id === "ffmpeg" || id === "ffprobe") {

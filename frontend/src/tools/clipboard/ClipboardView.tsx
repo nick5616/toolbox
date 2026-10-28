@@ -4,7 +4,6 @@ import {
   Button,
   ConfirmDialog,
   EmptyState,
-  Icon,
   IconButton,
   Kbd,
   SegmentedControl,
@@ -185,14 +184,8 @@ export default function ClipboardView(_props: ToolViewProps) {
         <span className={styles.spacer} />
         {enabled && (
           <>
-            <Button size="sm" variant="secondary" onClick={() => void togglePause()} icon={state.paused ? "play" : undefined}>
-              {state.paused ? (
-                "Resume"
-              ) : (
-                <>
-                  <Icon name="pause" size={12} /> Pause
-                </>
-              )}
+            <Button size="sm" variant="secondary" onClick={() => void togglePause()} icon={state.paused ? "play" : "pause"}>
+              {state.paused ? "Resume" : "Pause"}
             </Button>
             <Button
               size="sm"

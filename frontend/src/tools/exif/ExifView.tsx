@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Banner, Button, EmptyState, Icon, Section, Switch, cx, toast } from "@/components";
-import { DepsService, ExifAction, ExifService, JobStatus, type ExifOptions } from "@/lib/api";
-import { toAppError } from "@/lib/errors";
+import { Badge, Button, EmptyState, Icon, Section, Switch, cx } from "@/components";
+import { ExifAction, ExifService, JobStatus, type ExifOptions } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
-import { useDeps, isOk } from "@/state/deps";
-import { useJobs, useOrderedJobs } from "@/state/jobs";
+import { useOrderedJobs } from "@/state/jobs";
 import { FileToolLayout, runLabel, useDepsGate, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
@@ -17,7 +15,6 @@ import { useMetadata } from "./useMetadata";
 import styles from "./ExifView.module.css";
 
 const MAX_RESULTS = 10;
-const EXIFTOOL_ID = "exiftool";
 
 interface SavedOptions {
   keepOrientation: boolean;
@@ -28,37 +25,6 @@ function sanitize(raw: unknown, defaults: SavedOptions): SavedOptions {
     return { keepOrientation: (raw as Record<string, boolean>).keepOrientation as boolean };
   }
   return defaults;
-}
-
-function InstallBanner() {
-  const loaded = useDeps((s) => s.list.length > 0);
-  const dep = useDeps((s) => s.byId[EXIFTOOL_ID]);
-  const [busy, setBusy] = useState(false);
-  if (!loaded || isOk(dep)) return null;
-  const install = async () => {
-    setBusy(true);
-    try {
-      useJobs.getState().upsert(await DepsService.UpdateExiftool());
-      toast({ title: "ExifTool install queued" });
-    } catch (e) {
-      toast({ title: toAppError(e).message, tone: "danger" });
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Banner
-      tone="info"
-      title="ExifTool is needed to read and edit metadata"
-      action={
-        <Button size="sm" variant="primary" loading={busy} onClick={() => void install()}>
-          {dep?.state === "outdated" ? "Update ExifTool" : "Install ExifTool"}
-        </Button>
-      }
-    >
-      You can also manage it in Settings → Dependencies.
-    </Banner>
-  );
 }
 
 export default function ExifView({ moduleId }: ToolViewProps) {
@@ -130,7 +96,6 @@ export default function ExifView({ moduleId }: ToolViewProps) {
         inputErrors={inputErrors}
         options={
           <>
-            <InstallBanner />
             {paths.length > 0 && (
               <Section label="Inspector">
                 <div className={styles.panes}>

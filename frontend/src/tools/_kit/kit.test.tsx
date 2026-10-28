@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const stat = vi.fn();
 const pick = vi.fn();
 const installEngine = vi.fn();
+const updateExiftool = vi.fn();
 const writeText = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/lib/api", async (orig) => {
@@ -11,7 +12,7 @@ vi.mock("@/lib/api", async (orig) => {
   return {
     ...actual,
     FilesService: { Stat: (p: string[]) => stat(p), Pick: (m: string) => pick(m) },
-    DepsService: { InstallAudioEngine: () => installEngine() },
+    DepsService: { InstallAudioEngine: () => installEngine(), UpdateExiftool: () => updateExiftool() },
     SettingsService: { ModuleState: vi.fn().mockResolvedValue(""), SetModuleState: vi.fn().mockResolvedValue(undefined) },
   };
 });
@@ -142,6 +143,16 @@ describe("DepsGate", () => {
     render(<DepsGate moduleId="stems" />);
     expect(screen.getByText("The audio engine needs an update")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Update" })).toBeTruthy();
+  });
+
+  it("offers to install a missing ExifTool", async () => {
+    useModules.getState().setAll([mod({ id: "exif", requires: ["exiftool"] })]);
+    useDeps.getState().setAll([dep("exiftool", DepState.DepMissing)]);
+    updateExiftool.mockReset().mockResolvedValue({ id: "j1", moduleId: "system-exiftool-update", status: "queued" });
+    render(<DepsGate moduleId="exif" />);
+    expect(screen.getByText("ExifTool isn't installed")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Install ExifTool" }));
+    await waitFor(() => expect(updateExiftool).toHaveBeenCalledTimes(1));
   });
 
   it("is open when the engine is ok", () => {

@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -224,6 +225,14 @@ func run() error {
 	}
 	desktopSvc.Shell = shell
 	clipHistory.SetPopupOpener(shell.TogglePopup)
+	if os.Getenv("TOOLBOX_SHOW_POPUP") != "" { // dev aid for visual QA (no hotkey needed)
+		app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+			go func() {
+				time.Sleep(2 * time.Second)
+				_ = shell.TogglePopup()
+			}()
+		})
+	}
 	// --- end desktop shell ---
 
 	win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
