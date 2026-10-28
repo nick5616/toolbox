@@ -109,6 +109,17 @@ func run() error {
 	chatSvc := chat.New(chat.Config{
 		Store: db, Settings: settings, Jobs: jobs, Emitter: emitter,
 		ModelsDir: paths.ModelsDir, TmpDir: paths.TmpDir, Resolve: depSvc.Resolve, LibraryDir: libraryDir,
+		RegisterOutput: func(path string) error { // exported chats appear in the library
+			o, err := core.NewOutput(path, "", chat.ModuleID)
+			if err != nil {
+				return err
+			}
+			if o, err = db.UpsertOutput(context.Background(), o); err != nil {
+				return err
+			}
+			emitter.Emit(core.EventLibraryAdded, o)
+			return nil
+		},
 	})
 	defer chatSvc.Stop()
 	// --- end Local Chat ---
@@ -150,6 +161,7 @@ func run() error {
 		func() error { return placeholders.Register(reg) },
 		func() error { return deps.RegisterExifToolUpdater(reg, depSvc) },
 		func() error { return deps.RegisterUpscalerInstaller(reg, depSvc) },
+		func() error { return deps.RegisterLlamaInstaller(reg, depSvc) },
 		func() error { return deps.RegisterUpdater(reg, depSvc) },
 		func() error { return deps.RegisterUVUpdater(reg, depSvc) },
 		func() error {
