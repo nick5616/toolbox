@@ -1,0 +1,82 @@
+.root {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background-color: var(--bg-inset);
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.root:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.checker {
+  background-color: var(--checker-b);
+  background-image:
+    linear-gradient(45deg, var(--checker-a) 25%, transparent 25%, transparent 75%, var(--checker-a) 75%),
+    linear-gradient(45deg, var(--checker-a) 25%, transparent 25%, transparent 75%, var(--checker-a) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+
+.img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--fg);
+  box-shadow: 0 0 0 1px var(--bg-app);
+  pointer-events: none;
+}
+
+.handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: var(--fg);
+  color: var(--bg-app);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  line-height: 1;
+}
+
+.tag {
+  position: absolute;
+  top: var(--space-2);
+  padding: 1px var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--fg);
+  background: var(--bg-raised);
+  border-radius: var(--r-sm);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.tagBefore {
+  left: var(--space-2);
+}
+
+.tagAfter {
+  right: var(--space-2);
+}

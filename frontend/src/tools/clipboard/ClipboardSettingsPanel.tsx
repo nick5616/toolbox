@@ -3,6 +3,7 @@ import { Field, Select, Stepper, Switch, cx, type SelectOption } from "@/compone
 import type { ClipboardSettings } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { useSettings } from "@/state/settings";
+import { AutoPasteSetting } from "./AutoPasteSetting";
 import styles from "./ClipboardSettingsPanel.module.css";
 
 export interface ClipboardSettingsPanelProps {
@@ -60,6 +61,7 @@ export function ClipboardSettingsPanel({ className }: ClipboardSettingsPanelProp
           {errors.images}
         </p>
       )}
+      <AutoPasteSetting checked={clip.autoPaste} onChange={(autoPaste) => save("images", { autoPaste })} />
       <div className={styles.grid}>
         <Field label="Keep history for" error={errors.retentionDays} hint="Pinned items are never removed.">
           {(c) => (

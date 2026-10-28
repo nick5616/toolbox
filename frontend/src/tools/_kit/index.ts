@@ -4,7 +4,7 @@ export { useFileInputs } from "./useFileInputs";
 export type { FileInputs } from "./useFileInputs";
 export { FileToolLayout } from "./FileToolLayout";
 export type { FileToolLayoutProps } from "./FileToolLayout";
-export { DepsGate, useDepsGate } from "./DepsGate";
+export { DepsGate, useDepsGate, setRequiresOverride } from "./DepsGate";
 export type { DepsGateState } from "./DepsGate";
 export { ResultTable, toCsv } from "./ResultTable";
 export type { ResultColumn, ResultTableProps } from "./ResultTable";

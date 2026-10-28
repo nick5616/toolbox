@@ -22,7 +22,7 @@ export function SettingsClipboard() {
         <ClipboardSettingsPanel />
         <p className={styles.note}>
           Clipboard history stays on this computer. Copies marked sensitive by password managers are never recorded,
-          and Toolbox never pastes into other apps.
+          and Toolbox only pastes into other apps if you turn on the paste option above.
         </p>
       </div>
     </Section>
