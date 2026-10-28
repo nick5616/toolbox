@@ -34,7 +34,10 @@ import {
   Moon,
   Music,
   PanelLeft,
+  Pause,
   Piano,
+  Pin,
+  PinOff,
   Play,
   RefreshCw,
   Repeat,
@@ -104,6 +107,9 @@ const icons = {
   square: Square,
   play: Play,
   cpu: Cpu,
+  pin: Pin,
+  "pin-off": PinOff,
+  pause: Pause,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;

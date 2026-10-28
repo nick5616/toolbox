@@ -4,6 +4,7 @@ import {
   Button,
   ConfirmDialog,
   EmptyState,
+  Icon,
   IconButton,
   Kbd,
   SegmentedControl,
@@ -22,7 +23,6 @@ import type { ToolViewProps } from "@/tools";
 import { ClipRow } from "./ClipRow";
 import { ClipboardSettingsPanel } from "./ClipboardSettingsPanel";
 import { removeClips, upsertClip, type KindFilter } from "./clips";
-import { PauseGlyph } from "./icons";
 import { useClipList } from "./useClipList";
 import { useSelection } from "./useSelection";
 import styles from "./ClipboardView.module.css";
@@ -190,7 +190,7 @@ export default function ClipboardView(_props: ToolViewProps) {
                 "Resume"
               ) : (
                 <>
-                  <PauseGlyph size={12} /> Pause
+                  <Icon name="pause" size={12} /> Pause
                 </>
               )}
             </Button>

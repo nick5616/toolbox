@@ -3,7 +3,6 @@ import { Icon, IconButton, cx } from "@/components";
 import { ClipKind, type ClipItem } from "@/lib/api";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { charCount, clipLabel } from "./clips";
-import { PinGlyph, PinOffGlyph } from "./icons";
 import { useImageThumb } from "./useImageThumb";
 import styles from "./ClipRow.module.css";
 
@@ -65,7 +64,7 @@ function ClipRowImpl({ item, domId, selected, compact, index, now, onSelect, onA
           <span className={styles.preview}>{item.preview || "(whitespace)"}</span>
         )}
         <span className={styles.meta}>
-          {item.pinned && <PinGlyph size={11} className={styles.pinGlyph} />}
+          {item.pinned && <Icon name="pin" size={11} className={styles.pinGlyph} />}
           <span>{formatRelativeTime(item.lastUsedAt, now)}</span>
           <span aria-hidden="true">·</span>
           <span>{meta}</span>
@@ -84,7 +83,7 @@ function ClipRowImpl({ item, domId, selected, compact, index, now, onSelect, onA
               title={item.pinned ? "Unpin" : "Pin"}
               onClick={stop(() => onPin(item.id, !item.pinned))}
             >
-              {item.pinned ? <PinOffGlyph /> : <PinGlyph />}
+              <Icon name={item.pinned ? "pin-off" : "pin"} size={14} />
             </button>
           )}
           {onDelete && <IconButton size="sm" icon="trash-2" label="Delete" variant="danger" tabIndex={-1} onClick={stop(() => onDelete(item.id))} />}
