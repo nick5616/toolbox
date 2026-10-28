@@ -68,8 +68,8 @@ describe("SettingsView", () => {
 
   it("shows install actions for missing tools", () => {
     render(<SettingsView />);
-    expect(screen.getByRole("button", { name: "Install" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy install command" })).toBeTruthy();
+    // yt-dlp and the managed FFmpeg both get an Install action (SPEC 7.6).
+    expect(screen.getAllByRole("button", { name: "Install" })).toHaveLength(2);
   });
 
   it("changes the library dir from the dialog result", async () => {

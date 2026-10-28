@@ -1,0 +1,48 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
+  gap: var(--space-3);
+}
+
+.folder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.folderRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-md);
+  color: var(--fg);
+}
+
+.folderLabel {
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.folderPath {
+  flex: 1;
+  min-width: 0;
+}
+
+.free {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+}
+
+.actionGroup {
+  display: inline-flex;
+  gap: var(--space-2);
+}
