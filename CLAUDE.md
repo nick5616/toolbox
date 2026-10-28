@@ -58,12 +58,14 @@ On the Windows dev box, Go lives in `%LOCALAPPDATA%\Programs\go1.27.3` and Node 
 ```sh
 wails3 task dev:sandbox     # wails3 dev with support/library dirs under .dev/ (preferred)
 TOOLBOX_VIEW=settings ...   # optional: open on a view (library, settings, or a module id)
+TOOLBOX_SHOW_POPUP=1 ...    # optional: open the clipboard popup 2 s after start (visual QA)
 wails3 dev                  # dev against the real support dir and ~/Toolbox
 wails3 build                # production binary in bin/
 wails3 generate bindings -clean=true -ts -i   # regenerate frontend/bindings (architect only)
 
 go build ./... && go vet ./... && go test -race ./...   # backend checks (-race needs cgo; omit on Windows without a C toolchain)
-go test -tags integration ./integration/ ./modules/downloader/ ./modules/converter/  # real tools + network
+go test -tags integration ./integration/ ./modules/downloader/ ./modules/converter/ ./modules/exif/  # real tools + network
+TOOLBOX_ENGINE_E2E=1 go test -tags integration -run TestEndToEndAudioEngine -timeout 40m ./integration/  # fresh engine install + all engine tools
 gofmt -l .                                             # must print nothing
 cd frontend && npm run check                           # typecheck + vitest + check:any
 ```
@@ -82,9 +84,9 @@ desktop/   tray, close-to-tray, login item, global hotkeys, popup window   (Wail
 core/      registry · jobs · jobcontext · errors · types · events · paths · settings
 core/proc  subprocess runner with whole-tree kill and hidden windows
 core/store SQLite (modernc.org/sqlite, no CGO): jobs, logs, outputs, tags, settings
-core/deps  external tool detection + managed yt-dlp install/update
+core/deps  external tool detection + managed installs (yt-dlp, uv, ExifTool archive)
 modules/   one folder per module (downloader, placeholders, …)
-sidecar/   (future) Python ML sidecar over stdio JSON lines
+sidecar/   Python audio engine (stems, BPM/key, MIDI, transcription) over stdio JSON lines
 ```
 
 Rules:

@@ -78,3 +78,15 @@ Newest last. Format: date — decision — why.
 - 2026-10-27 — `MetadataView` carries `sizeBytes`, `make`, `model`, `dateTaken` and current editable `fields` in addition to the spec's fields. — The inspector header and the edit dialog need them; avoids a second call.
 - 2026-10-27 — The first-hide-to-tray toast waits until the window is visible again. — The window is hidden when the event arrives.
 - 2026-10-27 — Builders run with reduced test parallelism (`go test -p 2`, `vitest --maxWorkers=2`). — The dev machine had < 4 GB free RAM with six worktrees building at once.
+- 2026-10-27 — Tray menu refreshes by listening to Go-side Wails events (`jobs:changed`, `library:added`, `clipboard:state`, `settings:changed`, `hotkeys:status`) with a 200 ms debounce and rebuilds the whole menu from a pure model. — Simple and testable; verified in the Wails source that Go-emitted events reach Go listeners.
+- 2026-10-27 — Tray icon is a monochrome downscale of the current app icon (template variant on macOS). — There is no designed Toolbox icon yet; replace both when one exists.
+- 2026-10-27 — Clipboard self-copy echo is dropped entirely (Copy already bumps and emits); for images any change within 3 s of a Copy counts as the echo. — Windows may re-encode PNGs, so hashes can differ.
+- 2026-10-27 — Clipboard search is SQLite `LIKE` on the preview: case-insensitive for ASCII only. — Matches the spec's storage; good enough for a personal history.
+- 2026-10-27 — Popup number keys copy the nth item only while the search box is empty; Alt+digit always works. — Otherwise digits couldn't be typed into the search.
+- 2026-10-27 — Transcribe writes outputs via a temp file + hard link (no overwrite, no partial files) and numbers duplicates " (1)", " (2)" like `core.UniquePath`.
+- 2026-10-27 — EXIF reads in two passes (display values, then `-n` for decimal GPS); edits use `-E` with HTML-escaped values so multi-line descriptions survive the one-arg-per-line `-stay_open` protocol. Edit targets: Title → XMP-dc:Title; Description → IFD0:ImageDescription + XMP-dc:Description; Artist → IFD0:Artist + XMP-dc:Creator; Copyright → IFD0:Copyright + XMP-dc:Rights; Keywords → XMP-dc:Subject + IPTC:Keywords; DateTimeOriginal → ExifIFD:DateTimeOriginal.
+- 2026-10-27 — EXIF writes only jpg/jpeg/png/webp/gif/heic/tif/tiff; RAW and `.bmp` are read-only. Windows arm64 uses the 64-bit ExifTool build (no native arm64 release).
+- 2026-10-27 — `DepsService.UpdateExiftool` stops the EXIF tool's `-stay_open` ExifTool process before queueing the update. — Windows locks a running exe, so the swap failed while it was alive.
+- 2026-10-27 — ExifTool install/update lives in the shared `DepsGate` (like the audio engine) instead of a view-specific banner. — The view showed two overlapping "missing" banners.
+- 2026-10-27 — `TOOLBOX_SHOW_POPUP=1` dev aid opens the clipboard popup 2 s after start. — Visual QA without pressing the global hotkey (no keystroke injection).
+- 2026-10-27 — Kbd renders multi-letter keys as written ("Alt", "Space", "Win") instead of upper-casing them.
