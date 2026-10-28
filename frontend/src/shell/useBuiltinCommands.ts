@@ -109,7 +109,7 @@ export function useBuiltinCommands(): void {
       id: "clipboard.pause",
       title: "Pause clipboard history",
       section: "Actions",
-      icon: "square",
+      icon: "pause",
       enabled: () => {
         const c = useDesktop.getState().clipboard;
         return useSettings.getState().settings.clipboard.enabled && !c.paused;

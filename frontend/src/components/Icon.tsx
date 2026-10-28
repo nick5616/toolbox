@@ -28,6 +28,7 @@ import {
   Link as LinkIcon,
   ListFilter,
   Lock,
+  MapPin,
   Maximize2,
   MessageSquare,
   Monitor,
@@ -110,6 +111,7 @@ const icons = {
   pin: Pin,
   "pin-off": PinOff,
   pause: Pause,
+  "map-pin": MapPin,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;

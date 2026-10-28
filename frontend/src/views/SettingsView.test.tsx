@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 vi.mock("@/lib/api", async (orig) => {
@@ -55,7 +55,8 @@ describe("SettingsView", () => {
 
   it("updates concurrency from the stepper", () => {
     render(<SettingsView />);
-    fireEvent.click(screen.getByRole("button", { name: "Increase" }));
+    const jobs = screen.getByRole("region", { name: "Jobs" });
+    fireEvent.click(within(jobs).getByRole("button", { name: "Increase" }));
     expect(update).toHaveBeenCalledWith({ concurrency: 4 });
   });
 

@@ -101,7 +101,7 @@ function Loaded({ view }: { view: MetadataView }) {
 
       {view.hasLocation && view.location && (
         <div className={styles.location}>
-          <Icon name="map" size={16} />
+          <Icon name="map-pin" size={16} />
           <span className={styles.locationText}>
             Contains location: {formatCoordinates(view.location.lat, view.location.lon)}
           </span>
