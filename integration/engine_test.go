@@ -20,6 +20,7 @@ import (
 	"toolbox/modules/bpmkey"
 	"toolbox/modules/midi"
 	"toolbox/modules/stems"
+	"toolbox/modules/transcribe"
 )
 
 // writeTestTrack writes a 16 s, 44.1 kHz mono WAV: a C–F–G–C progression of
@@ -97,7 +98,7 @@ func waitJob(t *testing.T, ctx context.Context, jobs *core.Jobs, id string) core
 
 // TestEndToEndAudioEngine installs the audio engine from scratch (real uv
 // download + uv sync, ~1 GB) into a temp support dir, then runs stems,
-// BPM & key and audio-to-MIDI through the job system.
+// BPM & key, audio-to-MIDI and transcription through the job system.
 func TestEndToEndAudioEngine(t *testing.T) {
 	if os.Getenv("TOOLBOX_ENGINE_E2E") == "" {
 		t.Skip("set TOOLBOX_ENGINE_E2E=1 (downloads ~1 GB)")
@@ -137,6 +138,7 @@ func TestEndToEndAudioEngine(t *testing.T) {
 	}
 	for _, err := range []error{
 		stems.Register(reg, engine), bpmkey.Register(reg, engine), midi.Register(reg, engine),
+		transcribe.Register(reg, engine, paths.ModelsDir),
 		sidecar.RegisterSetup(reg, paths, engine, resolveUV,
 			func(ctx context.Context, job *core.JobContext) error {
 				return depSvc.InstallManagedBinary(ctx, job, deps.UVBinary())
@@ -148,7 +150,7 @@ func TestEndToEndAudioEngine(t *testing.T) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Minute)
 	defer cancel()
 	if err := jobs.Start(ctx); err != nil {
 		t.Fatal(err)
@@ -227,4 +229,70 @@ func TestEndToEndAudioEngine(t *testing.T) {
 	if s := engine.Status(); !s.Running {
 		t.Errorf("engine not running after jobs: %+v", s)
 	}
+
+	// Transcribe (base model, ~142 MB on first use): the synthetic track has
+	// no speech (0 or few segments must still succeed), then real speech if
+	// the dev sample is present.
+	topts := transcribe.Options{Model: transcribe.ModelBase, Task: transcribe.TaskTranscribe,
+		Formats: transcribe.AllFormats(), VAD: true}
+	tj := runTranscribe(t, ctx, jobs, track, topts)
+	t.Logf("transcribe (no speech): %s", tj.Message)
+	speech, _ := filepath.Abs(filepath.Join("..", ".dev", "library", "Downloads", "Me at the zoo [jNQXAC9IVRw].mp3"))
+	if _, err := os.Stat(speech); err != nil {
+		t.Logf("skipping speech transcription: %s not found", speech)
+		return
+	}
+	topts.Language = "en"
+	start = time.Now()
+	tj = runTranscribe(t, ctx, jobs, speech, topts)
+	t.Logf("transcribe (speech) in %s: %s", time.Since(start).Round(time.Second), tj.Message)
+	for _, o := range tj.Outputs {
+		b, err := os.ReadFile(o.Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch filepath.Ext(o.Path) {
+		case ".txt":
+			if !strings.Contains(strings.ToLower(string(b)), "elephant") {
+				t.Errorf("transcript doesn't mention elephants: %q", b)
+			}
+		case ".srt":
+			if !strings.HasPrefix(string(b), "1\n00:00:") || !strings.Contains(string(b), " --> ") {
+				t.Errorf("srt doesn't parse: %q", b)
+			}
+		case ".vtt":
+			if !strings.HasPrefix(string(b), "WEBVTT") {
+				t.Errorf("vtt header: %q", b)
+			}
+		case ".json":
+			var doc struct {
+				Language string `json:"language"`
+				Segments []struct {
+					Start, End float64
+					Text       string
+				} `json:"segments"`
+			}
+			if err := json.Unmarshal(b, &doc); err != nil || doc.Language != "en" || len(doc.Segments) == 0 {
+				t.Errorf("json transcript: %v %+v", err, doc)
+			}
+		}
+	}
+}
+
+func runTranscribe(t *testing.T, ctx context.Context, jobs *core.Jobs, input string, opts transcribe.Options) core.Job {
+	t.Helper()
+	raw, _ := json.Marshal(opts)
+	created, err := jobs.Submit(ctx, transcribe.ModuleID, []string{input}, string(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	j := waitJob(t, ctx, jobs, created[0].ID)
+	var res transcribe.Result
+	if err := json.Unmarshal([]byte(j.ResultJSON), &res); err != nil {
+		t.Fatalf("transcribe result %q: %v", j.ResultJSON, err)
+	}
+	if len(j.Outputs) != len(opts.Formats) || len(res.Outputs) != len(opts.Formats) {
+		t.Errorf("transcribe outputs = %+v / %v", j.Outputs, res.Outputs)
+	}
+	return j
 }
