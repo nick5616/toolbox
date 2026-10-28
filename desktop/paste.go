@@ -1,38 +1,68 @@
 package desktop
 
-import "context"
+import (
+	"context"
+	"log"
+	"time"
+
+	"toolbox/desktop/paste"
+)
 
 // Paste permission states (DesktopService.PastePermission).
 const (
-	PasteGranted     = "granted"
-	PasteDenied      = "denied"
-	PasteUnsupported = "unsupported"
+	PasteGranted     = paste.Granted
+	PasteDenied      = paste.Denied
+	PasteUnsupported = paste.Unsupported
 )
 
 // Paster restores focus to the app that was active before the popup opened
 // and sends one paste chord (Phase 4 SPEC §13.2). Implemented per OS in
-// paste_{windows,darwin,other}.go.
-//
-// CONTRACT STUB (foundation): WP-D2 implements the platform code and the
-// Shell wiring (Remember before the popup shows; PasteAfterCopy).
-type Paster interface {
-	// Remember records the currently focused window/app (ignoring our own).
-	Remember()
-	// Paste re-activates the remembered window/app, waits for modifier keys
-	// to be released, and sends Ctrl+V / Cmd+V once.
-	Paste(ctx context.Context) error
-	// Permission reports PasteGranted, PasteDenied or PasteUnsupported.
-	Permission() string
-	// RequestPermission prompts for the permission where the OS has one.
-	RequestPermission() error
+// desktop/paste.
+type Paster = paste.Paster
+
+// pasteTimeout bounds one paste attempt (modifier wait ≤ 1 s + settle).
+const pasteTimeout = 3 * time.Second
+
+// rememberForPaste records the focused window just before the popup shows.
+func (s *Shell) rememberForPaste() {
+	if s.paster != nil {
+		s.paster.Remember()
+	}
 }
 
 // PastePermission reports whether auto-paste can work here.
-func (s *Shell) PastePermission() string { return PasteUnsupported }
+func (s *Shell) PastePermission() string {
+	if s.paster == nil {
+		return PasteUnsupported
+	}
+	return s.paster.Permission()
+}
 
 // RequestPastePermission prompts for the auto-paste permission (macOS).
-func (s *Shell) RequestPastePermission() error { return nil }
+func (s *Shell) RequestPastePermission() error {
+	if s.paster == nil {
+		return nil
+	}
+	return s.paster.RequestPermission()
+}
 
-// PasteAfterCopy hides the popup and pastes into the previous app when
-// auto-paste is enabled (WP-D2). The stub only hides the popup.
-func (s *Shell) PasteAfterCopy() error { return s.HidePopup() }
+// PasteAfterCopy hides the popup and, when auto-paste is enabled and
+// permitted, pastes into the previously focused app. The paste runs in the
+// background so this returns promptly; failures are logged, never returned.
+func (s *Shell) PasteAfterCopy() error {
+	err := s.HidePopup()
+	if s.paster == nil || s.o.Settings == nil || !s.o.Settings.Current().Clipboard.AutoPaste {
+		return err
+	}
+	if s.paster.Permission() != PasteGranted {
+		return err
+	}
+	s.pasteAsync(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), pasteTimeout)
+		defer cancel()
+		if perr := s.paster.Paste(ctx); perr != nil {
+			log.Printf("auto-paste skipped: %v", perr)
+		}
+	})
+	return err
+}

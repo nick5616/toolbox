@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"toolbox/core"
+	"toolbox/desktop/paste"
 )
 
 // Clipboard is what the tray needs from Clipboard History.
@@ -38,11 +39,19 @@ type Shell struct {
 	popup *popup
 	tray  *tray
 	login loginItem
+	// --- auto-paste (WP-D2)
+	paster     Paster
+	pasteAsync func(func()) // runs the paste off the UI call; tests run it inline
+	// --- end auto-paste ---
 }
 
 // New builds the shell. Call Start before app.Run.
 func New(o Options) *Shell {
 	s := &Shell{o: o}
+	// --- auto-paste (WP-D2)
+	s.paster = paste.New()
+	s.pasteAsync = func(f func()) { go f() }
+	// --- end auto-paste ---
 	s.popup = &popup{s: s}
 	s.tray = newTray(s)
 	return s
