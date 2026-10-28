@@ -6,13 +6,14 @@ const pick = vi.fn();
 const installEngine = vi.fn();
 const updateExiftool = vi.fn();
 const writeText = vi.fn().mockResolvedValue(undefined);
+const installUpscaler = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
   return {
     ...actual,
     FilesService: { Stat: (p: string[]) => stat(p), Pick: (m: string) => pick(m) },
-    DepsService: { InstallAudioEngine: () => installEngine(), UpdateExiftool: () => updateExiftool() },
+    DepsService: { InstallAudioEngine: () => installEngine(), UpdateExiftool: () => updateExiftool(), InstallUpscaler: () => installUpscaler() },
     SettingsService: { ModuleState: vi.fn().mockResolvedValue(""), SetModuleState: vi.fn().mockResolvedValue(undefined) },
   };
 });
@@ -199,5 +200,20 @@ describe("ResultTable", () => {
     render(<ResultTable rows={[{ name: "a", n: 1 }]} columns={cols} rowKey={(r) => r.name} label="results" />);
     fireEvent.click(screen.getByRole("button", { name: "Copy row" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("a\t1"));
+  });
+});
+
+describe("DepsGate upscaler", () => {
+  it("offers to install the upscaler engine", async () => {
+
+    const spy = installUpscaler;
+    spy.mockResolvedValue({ id: "j9", moduleId: "system-upscaler-install", status: "queued", inputs: null, outputs: null });
+    useModules.getState().setAll([mod({ id: "upscaler", requires: ["upscayl"] })]);
+    useDeps.getState().setAll([dep("upscayl", DepState.DepMissing)]);
+    const { result } = renderHook(() => useDepsGate("upscaler"));
+    expect(result.current.blocked).toBe(true);
+    render(<DepsGate moduleId="upscaler" />);
+    fireEvent.click(screen.getByRole("button", { name: "Install upscaler" }));
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
   });
 });

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { create } from "zustand";
 import { Banner, Button, toast } from "@/components";
 import { DepState, DepsService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -11,6 +12,31 @@ export const AUDIO_ENGINE_ID = "audio-engine";
 export const AUDIO_ENGINE_JOB_MODULE = "system-audio-engine";
 export const EXIFTOOL_ID = "exiftool";
 export const EXIFTOOL_JOB_MODULE = "system-exiftool-update";
+
+export const UPSCAYL_ID = "upscayl";
+export const UPSCALER_JOB_MODULE = "system-upscaler-install";
+
+/**
+ * Per-module override of the descriptor's `requires` (e.g. the Upscaler needs
+ * the AI engine instead of upscayl when its Processor is CPU). Set by a view.
+ */
+export const useRequiresOverride = create<{ byModule: Record<string, string[]> }>(() => ({ byModule: {} }));
+
+export function setRequiresOverride(moduleId: string, requires: string[] | null): void {
+  useRequiresOverride.setState((s) => {
+    const next = { ...s.byModule };
+    if (requires) next[moduleId] = requires;
+    else delete next[moduleId];
+    return { byModule: next };
+  });
+}
+
+/** Effective requirements of a module (override first). */
+function useRequires(moduleId: string): string[] | undefined {
+  const base = useModules((s) => s.byId[moduleId]?.requires);
+  const override = useRequiresOverride((s) => s.byModule[moduleId]);
+  return override ?? base ?? undefined;
+}
 
 export interface DepsGateState {
   /** True while a required dependency (incl. the AI engine) isn't OK. */
@@ -29,7 +55,7 @@ function reasonFor(id: string, name: string, state: DepState | undefined): strin
 
 /** Computes whether a module can run, from its descriptor's `requires`. */
 export function useDepsGate(moduleId: string): DepsGateState {
-  const requires = useModules((s) => s.byId[moduleId]?.requires);
+  const requires = useRequires(moduleId);
   const byId = useDeps((s) => s.byId);
   const loaded = useDeps((s) => s.list.length > 0);
   if (!loaded || !requires) return { blocked: false, reason: "" };
@@ -50,6 +76,11 @@ export function useExiftoolJob(): JobView | undefined {
   return useJobs((s) => Object.values(s.byId).find((j) => j.moduleId === EXIFTOOL_JOB_MODULE && isActive(j)));
 }
 
+/** The active upscaler install/update job, if any (stable reference). */
+export function useUpscalerJob(): JobView | undefined {
+  return useJobs((s) => Object.values(s.byId).find((j) => j.moduleId === UPSCALER_JOB_MODULE && isActive(j)));
+}
+
 async function copyHint(text: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
@@ -61,11 +92,12 @@ async function copyHint(text: string): Promise<void> {
 
 /** Banners for missing/outdated dependencies with install/update actions. */
 export function DepsGate({ moduleId }: { moduleId: string }) {
-  const requires = useModules((s) => s.byId[moduleId]?.requires);
+  const requires = useRequires(moduleId);
   const byId = useDeps((s) => s.byId);
   const loaded = useDeps((s) => s.list.length > 0);
   const job = useAudioEngineJob();
   const exifJob = useExiftoolJob();
+  const upscalerJob = useUpscalerJob();
   const [queuing, setQueuing] = useState(false);
 
   if (!loaded || !requires) return null;
@@ -86,6 +118,17 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
     setQueuing(true);
     try {
       useJobs.getState().upsert(await DepsService.UpdateExiftool());
+    } catch (e) {
+      toast({ title: toAppError(e).message, tone: "danger" });
+    } finally {
+      setQueuing(false);
+    }
+  };
+
+  const installUpscaler = async () => {
+    setQueuing(true);
+    try {
+      useJobs.getState().upsert(await DepsService.InstallUpscaler());
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     } finally {
@@ -134,6 +177,25 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
           }
         >
           {busy && exifJob?.message ? exifJob.message : "ExifTool reads and edits photo metadata (about 11 MB download)."}
+        </Banner>,
+      );
+    } else if (id === UPSCAYL_ID) {
+      const outdated = d?.state === DepState.DepOutdated;
+      const busy = queuing || !!upscalerJob;
+      banners.push(
+        <Banner
+          key={id}
+          tone="info"
+          title={outdated ? "The upscaler engine needs an update" : "The upscaler engine isn't installed"}
+          action={
+            <Button variant="primary" size="sm" loading={busy} onClick={() => void installUpscaler()}>
+              {outdated ? "Update upscaler" : "Install upscaler"}
+            </Button>
+          }
+        >
+          {busy && upscalerJob?.message
+            ? upscalerJob.message
+            : "The upscaler runs on your GPU through a small separate program (about 50 MB download)."}
         </Banner>,
       );
     } else if (id === "ffmpeg" || id === "ffprobe") {

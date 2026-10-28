@@ -28,6 +28,8 @@ const YTDLP_JOB_MODULE = "system-ytdlp-update";
 const UV_ID = "uv";
 const EXIFTOOL_ID = "exiftool";
 const EXIFTOOL_JOB_MODULE = "system-exiftool-update";
+const UPSCAYL_ID = "upscayl";
+const UPSCALER_JOB_MODULE = "system-upscaler-install";
 const AUDIO_ENGINE_ID = "audio-engine";
 const AUDIO_ENGINE_JOB_MODULE = "system-audio-engine";
 
@@ -188,6 +190,24 @@ function DepsTable() {
     [jobsById],
   );
 
+  const [upscalerQueuing, setUpscalerQueuing] = useState(false);
+  const upscalerInstalling = useMemo(
+    () => Object.values(jobsById).some((j) => j.moduleId === UPSCALER_JOB_MODULE && isActive(j)),
+    [jobsById],
+  );
+
+  const installUpscaler = async () => {
+    setUpscalerQueuing(true);
+    try {
+      useJobs.getState().upsert(await DepsService.InstallUpscaler());
+      toast({ title: "Upscaler install queued" });
+    } catch (e) {
+      fail(e);
+    } finally {
+      setUpscalerQueuing(false);
+    }
+  };
+
   const updateExiftool = async () => {
     setExifQueuing(true);
     try {
@@ -273,6 +293,9 @@ function DepsTable() {
                       <PathText path={d.path} copy />
                     </div>
                   ) : null}
+                  {d.id === UPSCAYL_ID && ok && d.version ? (
+                    <div className={styles.subtle}>Pinned version {d.version}</div>
+                  ) : null}
                   {names.length > 0 ? (
                     <div className={styles.subtle}>Required by {names.join(", ")}</div>
                   ) : d.recommendedBy.length > 0 ? (
@@ -306,6 +329,15 @@ function DepsTable() {
                       variant="secondary"
                       loading={exifQueuing || exifUpdating}
                       onClick={() => void updateExiftool()}
+                    >
+                      {ok ? "Update" : "Install"}
+                    </Button>
+                  ) : d.id === UPSCAYL_ID ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={upscalerQueuing || upscalerInstalling}
+                      onClick={() => void installUpscaler()}
                     >
                       {ok ? "Update" : "Install"}
                     </Button>
