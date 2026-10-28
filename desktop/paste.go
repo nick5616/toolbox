@@ -2,7 +2,7 @@ package desktop
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"toolbox/desktop/paste"
@@ -61,7 +61,7 @@ func (s *Shell) PasteAfterCopy() error {
 		ctx, cancel := context.WithTimeout(context.Background(), pasteTimeout)
 		defer cancel()
 		if perr := s.paster.Paste(ctx); perr != nil {
-			log.Printf("auto-paste skipped: %v", perr)
+			slog.Warn("auto-paste skipped", "err", perr)
 		}
 	})
 	return err
