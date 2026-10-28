@@ -1,4 +1,4 @@
-import { ClipboardService, LibraryService, PdfAction, Theme } from "@/lib/api";
+import { ClipboardService, LibraryService, PdfAction, Theme, VaultService } from "@/lib/api";
 import { usePdfIntent } from "@/tools/pdf/intent";
 import { useCommands, type Command } from "@/lib/commands";
 import { toAppError } from "@/lib/errors";
@@ -8,6 +8,7 @@ import { useDesktop } from "@/state/desktop";
 import { useJobs } from "@/state/jobs";
 import { useSettings } from "@/state/settings";
 import { useUI } from "@/state/ui";
+import { useVaultState } from "@/tools/vault/useVaultState";
 import { extractUrls } from "./useGlobalPaste";
 
 function guard(fn: () => Promise<unknown>): () => Promise<void> {
@@ -27,7 +28,20 @@ function openPdf(action: PdfAction) {
 
 const setTheme =(theme: Theme) => guard(() => useSettings.getState().update({ theme }));
 
+/** Opens Settings and scrolls to the element with `id` once it has rendered. */
+function openSettingsSection(id: string) {
+  useUI.getState().navigate("settings");
+  let tries = 0;
+  const tick = () => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView?.({ block: "start" });
+    else if (++tries < 20) setTimeout(tick, 50);
+  };
+  setTimeout(tick, 0);
+}
+
 export function useBuiltinCommands(): void {
+  const vault = useVaultState();
   const cmds: Command[] = [
     {
       id: "shell.toggle-tray",
@@ -180,6 +194,62 @@ export function useBuiltinCommands(): void {
       section: "Actions",
       icon: "trash-2",
       run: () => useUI.getState().navigate("clipboard"),
+    },
+    {
+      id: "chat.new",
+      title: "New chat",
+      section: "Actions",
+      icon: "message-square",
+      keywords: ["llm", "conversation", "ai"],
+      run: () => useUI.getState().navigate("llm-chat"),
+    },
+    {
+      id: "chat.history",
+      title: "Open chat history",
+      section: "Actions",
+      icon: "history",
+      keywords: ["llm", "conversations"],
+      run: () => useUI.getState().navigate("llm-chat"),
+    },
+    {
+      id: "ocr.open",
+      title: "Read text from image or PDF (OCR)…",
+      section: "Actions",
+      icon: "scan-search",
+      keywords: ["ocr", "scan", "searchable", "text"],
+      run: () => useUI.getState().navigate("ocr"),
+    },
+    {
+      id: "vault.lock",
+      title: "Lock vault",
+      section: "Actions",
+      icon: "lock",
+      enabled: () => vault?.unlocked === true,
+      run: guard(() => VaultService.Lock()),
+    },
+    {
+      id: "vault.open",
+      title: "Open vault",
+      section: "Actions",
+      icon: "lock",
+      keywords: ["encrypted", "private"],
+      run: () => useUI.getState().navigate("vault"),
+    },
+    {
+      id: "packs.manage",
+      title: "Manage tool packs",
+      section: "Actions",
+      icon: "archive",
+      keywords: ["install", "download", "tools"],
+      run: () => openSettingsSection("settings-packs"),
+    },
+    {
+      id: "setup.show",
+      title: "Show setup screen",
+      section: "Actions",
+      icon: "settings",
+      keywords: ["first run", "welcome", "packs"],
+      run: () => useUI.getState().navigate("setup"),
     },
   ];
   useCommands(cmds);

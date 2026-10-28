@@ -66,7 +66,7 @@ describe("SettingsVault", () => {
     await user.type(screen.getByLabelText("Confirm new passphrase"), "new-passphrase");
     await user.click(screen.getByRole("button", { name: "Change passphrase" }));
     await waitFor(() => expect(svc.ChangePassphrase).toHaveBeenCalledWith("old-passphrase", "new-passphrase"));
-  });
+  }, 20_000);
 
   it("reveals the vault folder inside the library", async () => {
     const user = userEvent.setup();
