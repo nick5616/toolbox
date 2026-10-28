@@ -120,12 +120,10 @@ func (r *Registry) Match(paths []string) MatchResult {
 		}
 		ext := strings.ToLower(filepath.Ext(p))
 		hit := false
-		if ext != "" {
-			for _, d := range list {
-				if slices.Contains(d.Accepts.Extensions, ext) {
-					byModule[d.ID] = append(byModule[d.ID], p)
-					hit = true
-				}
+		for _, d := range list {
+			if d.Accepts.Any || (ext != "" && slices.Contains(d.Accepts.Extensions, ext)) {
+				byModule[d.ID] = append(byModule[d.ID], p)
+				hit = true
 			}
 		}
 		if !hit {
@@ -141,10 +139,19 @@ func (r *Registry) Match(paths []string) MatchResult {
 			res.Matches = append(res.Matches, ModuleMatch{Module: d, Paths: ps})
 		}
 	}
+	// Ready before coming-soon; within each, specific matches before Any-modules.
+	rank := func(d Descriptor) int {
+		r := 0
+		if d.Status != StatusReady {
+			r += 2
+		}
+		if d.Accepts.Any {
+			r++
+		}
+		return r
+	}
 	sort.SliceStable(res.Matches, func(i, j int) bool {
-		ri := res.Matches[i].Module.Status == StatusReady
-		rj := res.Matches[j].Module.Status == StatusReady
-		return ri && !rj
+		return rank(res.Matches[i].Module) < rank(res.Matches[j].Module)
 	})
 	return res
 }

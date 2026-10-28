@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -49,6 +50,10 @@ const (
 	keyStartAtLogin = "startAtLogin"
 	keyHotkeys      = "hotkeys"
 	keyClipboard    = "clipboard"
+
+	keyChat  = "chat"
+	keyVault = "vault"
+	keySetup = "setup"
 )
 
 // DefaultHotkeys returns the default global hotkeys (SPEC.md §3.2).
@@ -66,6 +71,25 @@ func HotkeyActions() []string { return []string{HotkeyClipboard, HotkeyQuickOpen
 func DefaultClipboardSettings() ClipboardSettings {
 	return ClipboardSettings{Enabled: false, Images: true, RetentionDays: 30, MaxItems: 500}
 }
+
+// DefaultChatSettings: Qwen3 4B on the GPU (SPEC.md §3.4).
+func DefaultChatSettings() ChatSettings {
+	return ChatSettings{
+		DefaultModel: "qwen3-4b", SystemPrompt: "You are a helpful assistant. Answer concisely.",
+		Temperature: 0.7, ContextSize: 8192, GPU: true,
+	}
+}
+
+// DefaultVaultSettings: auto-lock after 10 idle minutes.
+func DefaultVaultSettings() VaultSettings { return VaultSettings{AutoLockMinutes: 10} }
+
+// Chat and vault limits.
+const MaxSystemPromptChars = 4000
+
+var (
+	ChatContextSizes     = []int{4096, 8192, 16384, 32768}
+	VaultAutoLockMinutes = []int{1, 5, 10, 30, 60, 0}
+)
 
 // Clipboard history limits.
 const (
@@ -88,6 +112,7 @@ func NewSettingsService(store SettingsStore, em Emitter, defaultLibraryDir strin
 	cur := Settings{
 		LibraryDir: defaultLibraryDir, Concurrency: DefaultConcurrency, Theme: DefaultTheme,
 		KeepInTray: true, Hotkeys: DefaultHotkeys(), Clipboard: DefaultClipboardSettings(),
+		Chat: DefaultChatSettings(), Vault: DefaultVaultSettings(),
 	}
 	if err := loadSetting(ctx, store, keyLibraryDir, &cur.LibraryDir, func(v string) bool { return v != "" }); err != nil {
 		return nil, err
@@ -121,6 +146,19 @@ func NewSettingsService(store SettingsStore, em Emitter, defaultLibraryDir strin
 	if err := loadSetting(ctx, store, keyClipboard, &cur.Clipboard, func(c ClipboardSettings) bool {
 		return len(checkClipboard(c)) == 0
 	}); err != nil {
+		return nil, err
+	}
+	if err := loadSetting(ctx, store, keyChat, &cur.Chat, func(c ChatSettings) bool {
+		return len(checkChat(c)) == 0
+	}); err != nil {
+		return nil, err
+	}
+	if err := loadSetting(ctx, store, keyVault, &cur.Vault, func(v VaultSettings) bool {
+		return len(checkVault(v)) == 0
+	}); err != nil {
+		return nil, err
+	}
+	if err := loadSetting(ctx, store, keySetup, &cur.Setup, func(SetupSettings) bool { return true }); err != nil {
 		return nil, err
 	}
 	s.current = cur
@@ -217,6 +255,46 @@ func checkClipboard(c ClipboardSettings) map[string]string {
 		fields["clipboard.maxItems"] = fmt.Sprintf("Must be between %d and %d", MinClipItems, MaxClipItems)
 	}
 	return fields
+}
+
+func checkChat(c ChatSettings) map[string]string {
+	fields := map[string]string{}
+	if strings.TrimSpace(c.DefaultModel) == "" {
+		fields["chat.defaultModel"] = "Pick a model"
+	}
+	if len([]rune(c.SystemPrompt)) > MaxSystemPromptChars {
+		fields["chat.systemPrompt"] = fmt.Sprintf("Must be at most %d characters", MaxSystemPromptChars)
+	}
+	if c.Temperature < 0 || c.Temperature > 2 {
+		fields["chat.temperature"] = "Must be between 0 and 2"
+	}
+	if !slices.Contains(ChatContextSizes, c.ContextSize) {
+		fields["chat.contextSize"] = "Must be 4096, 8192, 16384 or 32768"
+	}
+	if c.OllamaURL != "" && !ValidOllamaURL(c.OllamaURL) {
+		fields["chat.ollamaURL"] = "Must be an http:// address on this computer (127.0.0.1, localhost or ::1)"
+	}
+	return fields
+}
+
+// ValidOllamaURL accepts only http:// URLs whose host is a loopback name.
+func ValidOllamaURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "http" || u.User != nil {
+		return false
+	}
+	switch u.Hostname() {
+	case "127.0.0.1", "localhost", "::1":
+		return true
+	}
+	return false
+}
+
+func checkVault(v VaultSettings) map[string]string {
+	if !slices.Contains(VaultAutoLockMinutes, v.AutoLockMinutes) {
+		return map[string]string{"vault.autoLockMinutes": "Must be 1, 5, 10, 30 or 60 minutes, or never"}
+	}
+	return map[string]string{}
 }
 
 var accelModifiers = map[string]string{
@@ -319,6 +397,23 @@ func (s *SettingsService) Update(ctx context.Context, p SettingsPatch) (Settings
 			next.Clipboard = *p.Clipboard
 		}
 	}
+	if p.Chat != nil {
+		if errs := checkChat(*p.Chat); len(errs) > 0 {
+			maps.Copy(fields, errs)
+		} else {
+			next.Chat = *p.Chat
+		}
+	}
+	if p.Vault != nil {
+		if errs := checkVault(*p.Vault); len(errs) > 0 {
+			maps.Copy(fields, errs)
+		} else {
+			next.Vault = *p.Vault
+		}
+	}
+	if p.Setup != nil {
+		next.Setup = *p.Setup
+	}
 	if len(fields) > 0 {
 		s.mu.Unlock()
 		return old.clone(), ValidationError("Some settings are invalid", fields)
@@ -357,6 +452,9 @@ func (s *SettingsService) Update(ctx context.Context, p SettingsPatch) (Settings
 		{next.StartAtLogin != old.StartAtLogin, keyStartAtLogin, next.StartAtLogin},
 		{!maps.Equal(next.Hotkeys, old.Hotkeys), keyHotkeys, next.Hotkeys},
 		{next.Clipboard != old.Clipboard, keyClipboard, next.Clipboard},
+		{next.Chat != old.Chat, keyChat, next.Chat},
+		{next.Vault != old.Vault, keyVault, next.Vault},
+		{next.Setup != old.Setup, keySetup, next.Setup},
 	} {
 		if !w.changed {
 			continue

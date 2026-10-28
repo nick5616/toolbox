@@ -86,6 +86,26 @@ func (j *JobContext) Tool(depID string) (string, error) {
 	return j.hooks.Tool(depID)
 }
 
+// Scoped returns a view of j whose Progress maps 0..1 into [from, to] of
+// the parent job (indeterminate stays indeterminate). Logs, title, outputs,
+// tools and results go to the parent. Used to run several steps (installer
+// modules, model downloads) inside one job.
+func (j *JobContext) Scoped(from, to float64) *JobContext {
+	child := *j
+	parent := j.hooks.Progress
+	child.hooks.Progress = func(pct float64, msg string) {
+		if parent == nil {
+			return
+		}
+		if pct < 0 {
+			parent(IndeterminateProgress, msg)
+			return
+		}
+		parent(from+min(max(pct, 0), 1)*(to-from), msg)
+	}
+	return &child
+}
+
 // MaxResultBytes caps a job's result JSON.
 const MaxResultBytes = 64 * 1024
 

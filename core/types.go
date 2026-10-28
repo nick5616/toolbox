@@ -152,6 +152,31 @@ type Settings struct {
 	// Wails accelerator such as "CmdOrCtrl+Alt+V"; "" = disabled.
 	Hotkeys   map[string]string `json:"hotkeys"`
 	Clipboard ClipboardSettings `json:"clipboard"`
+
+	// Phase 5 (SPEC.md §3.4)
+	Chat  ChatSettings  `json:"chat"`
+	Vault VaultSettings `json:"vault"`
+	Setup SetupSettings `json:"setup"`
+}
+
+// ChatSettings configure Local Chat.
+type ChatSettings struct {
+	DefaultModel string  `json:"defaultModel"` // catalog ID or "ollama:<name>"
+	SystemPrompt string  `json:"systemPrompt"` // ≤ 4,000 characters
+	Temperature  float64 `json:"temperature"`  // 0–2
+	ContextSize  int     `json:"contextSize"`  // 4096, 8192, 16384 or 32768
+	GPU          bool    `json:"gpu"`
+	OllamaURL    string  `json:"ollamaURL"` // "" = off; http:// on a loopback host
+}
+
+// VaultSettings configure the Vault.
+type VaultSettings struct {
+	AutoLockMinutes int `json:"autoLockMinutes"` // 1, 5, 10, 30, 60, or 0 = only on quit/manual
+}
+
+// SetupSettings track the first-run setup screen.
+type SetupSettings struct {
+	Done bool `json:"done"`
 }
 
 // ClipboardSettings configure clipboard history recording.
@@ -175,6 +200,9 @@ type SettingsPatch struct {
 	StartAtLogin *bool              `json:"startAtLogin"`
 	Hotkeys      map[string]string  `json:"hotkeys"`   // nil = unchanged; entries override, other actions keep their value
 	Clipboard    *ClipboardSettings `json:"clipboard"` // replaces the whole struct
+	Chat         *ChatSettings      `json:"chat"`      // replaces the whole struct
+	Vault        *VaultSettings     `json:"vault"`     // replaces the whole struct
+	Setup        *SetupSettings     `json:"setup"`     // replaces the whole struct
 }
 
 // DepState is the detection result for an external tool.

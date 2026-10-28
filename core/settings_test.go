@@ -42,7 +42,8 @@ func TestSettingsDefaultsAndPersistence(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Settings{LibraryDir: lib, Concurrency: DefaultConcurrency, Theme: DefaultTheme,
-		KeepInTray: true, Hotkeys: DefaultHotkeys(), Clipboard: DefaultClipboardSettings()}
+		KeepInTray: true, Hotkeys: DefaultHotkeys(), Clipboard: DefaultClipboardSettings(),
+		Chat: DefaultChatSettings(), Vault: DefaultVaultSettings()}
 	if !reflect.DeepEqual(s.Current(), want) {
 		t.Fatalf("defaults: %+v", s.Current())
 	}
@@ -345,5 +346,46 @@ func TestSettingsBeforeChangeCanAbort(t *testing.T) {
 	fail = false
 	if next, err := s.Update(context.Background(), SettingsPatch{StartAtLogin: ptr(true)}); err != nil || !next.StartAtLogin || changed != 1 {
 		t.Fatalf("second update: %+v %v", next, err)
+	}
+}
+
+func TestSettingsChatVaultSetup(t *testing.T) {
+	st := newMemStore()
+	s, err := NewSettingsService(st, NopEmitter{}, filepath.Join(t.TempDir(), "lib"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	bad := []struct {
+		name  string
+		patch SettingsPatch
+		field string
+	}{
+		{"temperature", SettingsPatch{Chat: ptr(ChatSettings{DefaultModel: "x", Temperature: 2.5, ContextSize: 8192})}, "chat.temperature"},
+		{"context", SettingsPatch{Chat: ptr(ChatSettings{DefaultModel: "x", ContextSize: 1000})}, "chat.contextSize"},
+		{"model", SettingsPatch{Chat: ptr(ChatSettings{ContextSize: 8192})}, "chat.defaultModel"},
+		{"prompt", SettingsPatch{Chat: ptr(ChatSettings{DefaultModel: "x", ContextSize: 8192, SystemPrompt: strings.Repeat("a", 4001)})}, "chat.systemPrompt"},
+		{"ollama remote", SettingsPatch{Chat: ptr(ChatSettings{DefaultModel: "x", ContextSize: 8192, OllamaURL: "http://192.168.1.5:11434"})}, "chat.ollamaURL"},
+		{"ollama https", SettingsPatch{Chat: ptr(ChatSettings{DefaultModel: "x", ContextSize: 8192, OllamaURL: "https://localhost:11434"})}, "chat.ollamaURL"},
+		{"autolock", SettingsPatch{Vault: ptr(VaultSettings{AutoLockMinutes: 7})}, "vault.autoLockMinutes"},
+	}
+	for _, tc := range bad {
+		_, err := s.Update(ctx, tc.patch)
+		var ae *AppError
+		if !errors.As(err, &ae) || ae.Fields[tc.field] == "" {
+			t.Errorf("%s: want field error %q, got %v", tc.name, tc.field, err)
+		}
+	}
+	chat := ChatSettings{DefaultModel: "ollama:llama3", SystemPrompt: "hi", Temperature: 0, ContextSize: 16384, GPU: false, OllamaURL: "http://[::1]:11434"}
+	if _, err := s.Update(ctx, SettingsPatch{Chat: &chat, Vault: ptr(VaultSettings{AutoLockMinutes: 0}), Setup: ptr(SetupSettings{Done: true})}); err != nil {
+		t.Fatal(err)
+	}
+	s2, err := NewSettingsService(st, nil, "ignored")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := s2.Current()
+	if got.Chat != chat || got.Vault.AutoLockMinutes != 0 || !got.Setup.Done {
+		t.Fatalf("not persisted: %+v %+v %+v", got.Chat, got.Vault, got.Setup)
 	}
 }

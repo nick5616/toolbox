@@ -20,6 +20,13 @@ const (
 	EventHotkeysStatus    = "hotkeys:status"     // HotkeysChanged
 	EventWindowShow       = "window:show"        // ShowView (sent when a window is shown)
 	EventHiddenToTray     = "app:hidden-to-tray" // HiddenToTray
+
+	// Phase 5
+	EventChatDelta    = "chat:delta"    // ChatDelta
+	EventChatDone     = "chat:done"     // ChatDone
+	EventChatStatus   = "chat:status"   // ChatStatus
+	EventVaultState   = "vault:state"   // VaultState
+	EventPacksChanged = "packs:changed" // PacksChanged
 )
 
 // Emitter publishes events to the UI. Core code depends on this interface,

@@ -31,6 +31,9 @@ type Accepts struct {
 	Extensions []string `json:"extensions"`
 	// URLs is true when the module takes http(s) links.
 	URLs bool `json:"urls"`
+	// Any is true when the module takes files of every type (e.g. Vault).
+	// Such modules are listed after specific matches.
+	Any bool `json:"any"`
 }
 
 // Descriptor is the serializable description of a module. The UI renders

@@ -109,7 +109,7 @@ func TestVersionRegexes(t *testing.T) {
 
 func TestCatalogShape(t *testing.T) {
 	c := Catalog()
-	if len(c) != 8 {
+	if len(c) != 9 {
 		t.Fatalf("len=%d", len(c))
 	}
 	for _, sp := range c {
@@ -126,7 +126,7 @@ func TestCatalogShape(t *testing.T) {
 	if !strings.Contains(c[0].InstallHint["windows"], "Settings → Dependencies") || !c[0].Managed {
 		t.Error("yt-dlp spec")
 	}
-	if !strings.Contains(c[2].InstallHint["windows"], "ffmpeg") {
+	if !strings.Contains(strings.ToLower(c[2].InstallHint["windows"]), "ffmpeg") {
 		t.Error("ffprobe hint")
 	}
 }
@@ -155,9 +155,38 @@ func TestResolutionOrder(t *testing.T) {
 	if p, src := s.find(sp); src != core.SourcePath || p != pp {
 		t.Fatalf("want path, got %q %q", src, p)
 	}
-	mp := fakeTool(t, bin, "ffmpeg")
+	// A loose binary in bin/ doesn't count for a pinned archive tool…
+	fakeTool(t, bin, "ffmpeg")
+	if _, src := s.find(sp); src != core.SourcePath {
+		t.Fatalf("loose managed binary used: %q", src)
+	}
+	// …its own folder does, ahead of the system copy (AllowSystem).
+	mp := fakeTool(t, filepath.Join(bin, "ffmpeg"), "ffmpeg")
 	if p, src := s.find(sp); src != core.SourceManaged || p != mp {
 		t.Fatalf("want managed, got %q %q", src, p)
+	}
+}
+
+func TestAllowSystemNeverOutdated(t *testing.T) {
+	t.Setenv("DEPS_FAKE", "1")
+	t.Setenv("DEPS_FAKE_FFMPEG", "ffmpeg version 7.0 x")
+	root := t.TempDir()
+	known := filepath.Join(root, "known")
+	fakeTool(t, known, "ffmpeg")
+	s := newSvc(t, filepath.Join(root, "bin"), nil, known)
+	sp, _ := s.spec(FFmpeg)
+	st := s.detectOne(context.Background(), sp)
+	if st.State != core.DepOK || st.Version != "7.0" || st.Source != core.SourceKnownDir {
+		t.Fatalf("system copy: %+v", st)
+	}
+	// The managed copy is pinned: a stale VERSION is outdated.
+	dir := filepath.Join(root, "bin", "ffmpeg")
+	fakeTool(t, dir, "ffmpeg")
+	if err := os.WriteFile(filepath.Join(dir, "VERSION"), []byte("8.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if st := s.detectOne(context.Background(), sp); st.State != core.DepOutdated || st.Source != core.SourceManaged {
+		t.Fatalf("managed stale copy: %+v", st)
 	}
 }
 
@@ -178,9 +207,10 @@ func TestDetectStates(t *testing.T) {
 	t.Setenv("DEPS_FAKE_FFPROBE", "fail")
 	t.Setenv("DEPS_FAKE_DENO", "hang")
 	t.Setenv("DEPS_FAKE_NODE", "v24.22.1")
-	bin := t.TempDir()
+	// FFmpeg and Deno are pinned managed archives now; these are system copies.
+	bin, sys := t.TempDir(), t.TempDir()
 	for _, n := range []string{"ffmpeg", "ffprobe", "deno", "node"} {
-		fakeTool(t, bin, n)
+		fakeTool(t, sys, n)
 	}
 	var mu sync.Mutex
 	var events []core.DepsChanged
@@ -193,19 +223,19 @@ func TestDetectStates(t *testing.T) {
 	})
 	s := New(bin, Catalog(), core.NewRegistry(), em)
 	s.lookPath = noLook
-	s.knownDirs = func() []string { return nil }
+	s.knownDirs = func() []string { return []string{sys} }
 
 	pre := s.List()
-	if len(pre) != 8 || pre[0].State != core.DepMissing || pre[0].InstallHint == "" || pre[0].RequiredBy == nil {
+	if len(pre) != 9 || pre[0].State != core.DepMissing || pre[0].InstallHint == "" || pre[0].RequiredBy == nil {
 		t.Fatalf("pre-detect list: %+v", pre[0])
 	}
 
 	// deno hang: shrink nothing; real 5s timeout applies.
 	got := s.Detect(context.Background())
-	if len(got) != 8 {
+	if len(got) != 9 {
 		t.Fatalf("len=%d", len(got))
 	}
-	if d := find(t, got, FFmpeg); d.State != core.DepOK || d.Version != "8.0" || d.Source != core.SourceManaged || d.CheckedAt == 0 {
+	if d := find(t, got, FFmpeg); d.State != core.DepOK || d.Version != "8.0" || d.Source != core.SourceKnownDir || d.CheckedAt == 0 {
 		t.Errorf("ffmpeg: %+v", d)
 	}
 	if d := find(t, got, FFprobe); d.State != core.DepError || d.Error == "" {
@@ -221,7 +251,7 @@ func TestDetectStates(t *testing.T) {
 		t.Errorf("exiftool: %+v", d)
 	}
 	mu.Lock()
-	if len(events) != 1 || len(events[0].Deps) != 8 {
+	if len(events) != 1 || len(events[0].Deps) != 9 {
 		t.Errorf("events: %d", len(events))
 	}
 	mu.Unlock()
@@ -247,7 +277,10 @@ func TestResolve(t *testing.T) {
 		t.Error("no hint")
 	}
 	// Installed after the failed check: on-demand re-detect finds it.
-	want := fakeTool(t, bin, "ffmpeg")
+	want := fakeTool(t, filepath.Join(bin, "ffmpeg"), "ffmpeg")
+	if err := os.WriteFile(filepath.Join(bin, "ffmpeg", "VERSION"), []byte(FFmpegVersion), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	got, err := s.Resolve(FFmpeg)
 	if err != nil || got != want {
 		t.Fatalf("got %q %v", got, err)

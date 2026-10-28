@@ -26,6 +26,12 @@ func init() {
 	application.RegisterEvent[core.HotkeysChanged]("hotkeys:status")
 	application.RegisterEvent[core.ShowView]("window:show")
 	application.RegisterEvent[core.HiddenToTray]("app:hidden-to-tray")
+
+	application.RegisterEvent[core.ChatDelta]("chat:delta")
+	application.RegisterEvent[core.ChatDone]("chat:done")
+	application.RegisterEvent[core.ChatStatus]("chat:status")
+	application.RegisterEvent[core.VaultState]("vault:state")
+	application.RegisterEvent[core.PacksChanged]("packs:changed")
 }
 
 // Emitter adapts the Wails event manager to core.Emitter.

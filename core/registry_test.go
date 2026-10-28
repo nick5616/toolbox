@@ -109,3 +109,16 @@ func must(t *testing.T, err error) {
 		t.Fatal(err)
 	}
 }
+
+func TestRegistryMatchAnyLast(t *testing.T) {
+	r := NewRegistry()
+	must(t, r.Register(stubModule{Descriptor{ID: "vault", Name: "Vault", Order: 1, Status: StatusReady, Accepts: Accepts{Any: true}}}))
+	must(t, r.Register(stubModule{Descriptor{ID: "pdf", Name: "PDF", Order: 50, Status: StatusReady, Accepts: Accepts{Extensions: []string{".pdf"}}}}))
+	res := r.Match([]string{"/x/a.pdf", "/x/b.bin", "/x/noext"})
+	if len(res.Matches) != 2 || res.Matches[0].Module.ID != "pdf" || res.Matches[1].Module.ID != "vault" {
+		t.Fatalf("matches = %+v", res.Matches)
+	}
+	if len(res.Matches[1].Paths) != 3 || len(res.Unmatched) != 0 {
+		t.Fatalf("vault paths = %v, unmatched = %v", res.Matches[1].Paths, res.Unmatched)
+	}
+}

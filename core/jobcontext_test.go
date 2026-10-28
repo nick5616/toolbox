@@ -85,3 +85,25 @@ func TestNewOutput(t *testing.T) {
 		t.Fatal("KindForPath wrong")
 	}
 }
+
+func TestJobContextScoped(t *testing.T) {
+	var got []float64
+	j := NewJobContext(JobContext{ID: "j"}, JobHooks{Progress: func(p float64, _ string) { got = append(got, p) }})
+	s := j.Scoped(0.5, 0.75)
+	s.Progress(0, "")
+	s.Progress(0.5, "")
+	s.Progress(2, "")
+	s.Progress(IndeterminateProgress, "")
+	want := []float64{0.5, 0.625, 0.75, IndeterminateProgress}
+	if len(got) != len(want) {
+		t.Fatalf("got %v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+	}
+	if s.ID != "j" {
+		t.Fatal("scoped context lost its ID")
+	}
+}

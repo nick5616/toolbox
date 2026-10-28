@@ -74,9 +74,12 @@ func (s *Service) find(sp Spec) (string, core.DepSource) {
 				return p, core.SourceManaged
 			}
 		}
-		return "", core.SourceNone
+		// AllowSystem tools (FFmpeg, Deno) fall back to a system copy.
+		if !sp.AllowSystem {
+			return "", core.SourceNone
+		}
 	}
-	if s.binDir != "" {
+	if s.binDir != "" && sp.VersionFile == "" {
 		if sp.ArchiveDir != "" {
 			if p := filepath.Join(s.binDir, sp.ArchiveDir, name); isFile(p) {
 				return p, core.SourceManaged
@@ -124,7 +127,7 @@ func (s *Service) detectOne(ctx context.Context, sp Spec) core.DepStatus {
 		return st
 	}
 	st.Path, st.Source = path, src
-	if sp.VersionFile != "" {
+	if sp.VersionFile != "" && src == core.SourceManaged {
 		// The binary only has to exist; the version is the VERSION file.
 		b, err := os.ReadFile(filepath.Join(s.binDir, sp.ArchiveDir, sp.VersionFile))
 		v := strings.TrimSpace(string(b))
@@ -153,7 +156,9 @@ func (s *Service) detectOne(ctx context.Context, sp Spec) core.DepStatus {
 	}
 	st.State = core.DepOK
 	st.Version = v
-	if sp.PinnedVersion != "" && v != sp.PinnedVersion {
+	// A system copy of an AllowSystem tool is never "outdated": the pin only
+	// applies to the app's own install.
+	if sp.PinnedVersion != "" && v != sp.PinnedVersion && !sp.AllowSystem {
 		st.State = core.DepOutdated
 	}
 	return st
