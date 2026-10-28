@@ -84,7 +84,7 @@ export function Sidebar() {
       <div className={cx(styles.header, isMac && styles.mac)}>
         {!collapsed && (
           <span className={styles.brand}>
-            <span className={styles.logo} style={{ maskImage: `url(${logoUrl})`, WebkitMaskImage: `url(${logoUrl})` }} aria-hidden="true" />
+            <span className={styles.logo} style={{ maskImage: `url("${logoUrl}")`, WebkitMaskImage: `url("${logoUrl}")` }} aria-hidden="true" />
             Toolbox
           </span>
         )}

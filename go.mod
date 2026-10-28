@@ -3,6 +3,7 @@ module toolbox
 go 1.27
 
 require (
+	github.com/ebitengine/purego v0.10.1
 	github.com/klippa-app/go-pdfium v1.21.4
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/pdfcpu/pdfcpu v0.16.4
@@ -18,7 +19,6 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
-	github.com/ebitengine/purego v0.10.1
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
