@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"embed"
 	"io"
 	"log"
@@ -9,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -243,7 +246,7 @@ func run() error {
 		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true},
 		Linux:   application.LinuxOptions{DisableQuitOnLastWindowClosed: true},
 		SingleInstance: &application.SingleInstanceOptions{
-			UniqueID: "dev.toolbox.app",
+			UniqueID: instanceID(paths),
 			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
 				if w := application.Get().Window.Current(); w != nil {
 					w.Restore()
@@ -323,6 +326,17 @@ func run() error {
 	})
 
 	return app.Run()
+}
+
+// instanceID is the single-instance lock name. A sandbox support dir
+// ($TOOLBOX_SUPPORT_DIR) gets its own lock, so a sandbox instance can run
+// next to the real app instead of focusing it.
+func instanceID(p core.Paths) string {
+	if os.Getenv(core.EnvSupportDir) == "" {
+		return "dev.toolbox.app"
+	}
+	sum := sha256.Sum256([]byte(strings.ToLower(filepath.Clean(p.SupportDir))))
+	return "dev.toolbox.app." + hex.EncodeToString(sum[:6])
 }
 
 // startURL honours $TOOLBOX_VIEW (dev aid: open on a given view, e.g.
