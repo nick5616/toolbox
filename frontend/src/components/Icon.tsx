@@ -1,4 +1,11 @@
 import {
+  ChevronLeft,
+  HardDrive,
+  ShieldCheck,
+  FolderPlus,
+  Pencil,
+  ScanText,
+  Plus,
   Activity,
   Archive,
   ArrowDownToLine,
@@ -120,6 +127,13 @@ const icons = {
   "grip-vertical": GripVertical,
   eye: Eye,
   "eye-off": EyeOff,
+  "chevron-left": ChevronLeft,
+  "hard-drive": HardDrive,
+  "shield-check": ShieldCheck,
+  "folder-plus": FolderPlus,
+  pencil: Pencil,
+  "scan-text": ScanText,
+  plus: Plus,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;
@@ -136,8 +150,16 @@ export interface IconProps {
   title?: string;
 }
 
-export function Icon({ name, size = 16, strokeWidth = 1.75, className, title }: IconProps) {
-  const Cmp: LucideIcon = Object.hasOwn(icons, name) ? icons[name as IconName] : Box;
+export function Icon({
+  name,
+  size = 16,
+  strokeWidth = 1.75,
+  className,
+  title,
+}: IconProps) {
+  const Cmp: LucideIcon = Object.hasOwn(icons, name)
+    ? icons[name as IconName]
+    : Box;
   return (
     <Cmp
       size={size}

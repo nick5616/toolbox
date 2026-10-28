@@ -252,7 +252,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
               <span className={styles.folderName}>{f.label}</span>
             </button>
           ))}
-          <Button size="sm" variant="ghost" icon="plus" onClick={() => { setText(""); setFolderDialog(true); }}>
+          <Button size="sm" variant="ghost" icon="folder-plus" onClick={() => { setText(""); setFolderDialog(true); }}>
             New folder
           </Button>
         </nav>
