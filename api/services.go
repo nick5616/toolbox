@@ -213,6 +213,9 @@ type DepsService struct {
 	Reg    *core.Registry
 	Engine *sidecar.Manager
 	Paths  core.Paths
+	// StopExiftool stops the EXIF tool's long-running ExifTool process so an
+	// update can replace its files (Windows locks running executables).
+	StopExiftool func()
 }
 
 // List returns cached dependency statuses.
@@ -308,6 +311,9 @@ func (s *DepsService) UpdateUv() (core.Job, error) {
 func (s *DepsService) UpdateExiftool() (core.Job, error) {
 	if s.Jobs.HasActive(s.Reg.RequiringDep(deps.ExifTool)...) {
 		return core.Job{}, core.Errorf(core.CodeConflict, "Wait for running EXIF jobs to finish")
+	}
+	if s.StopExiftool != nil && !s.Jobs.HasActive(deps.ExifToolUpdateModuleID) {
+		s.StopExiftool()
 	}
 	return s.submitSystem(deps.ExifToolUpdateModuleID)
 }

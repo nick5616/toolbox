@@ -143,7 +143,7 @@ func run() error {
 			application.NewServiceWithOptions(&api.JobsService{Jobs: jobs}, opts),
 			application.NewServiceWithOptions(&api.LibraryService{Outputs: db, Settings: settings, Paths: paths, Em: emitter}, opts),
 			application.NewServiceWithOptions(&api.SettingsService{Settings: settings, Paths: paths}, opts),
-			application.NewServiceWithOptions(&api.DepsService{Deps: depSvc, Jobs: jobs, Reg: reg, Engine: engine, Paths: paths}, opts),
+			application.NewServiceWithOptions(&api.DepsService{Deps: depSvc, Jobs: jobs, Reg: reg, Engine: engine, Paths: paths, StopExiftool: exifMod.Close}, opts),
 			application.NewServiceWithOptions(&api.FilesService{Reg: reg, Settings: settings, Paths: paths}, opts),
 			application.NewServiceWithOptions(desktopSvc, opts),
 			application.NewServiceWithOptions(downloader.NewService(jobs), opts),
