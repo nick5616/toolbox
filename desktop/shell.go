@@ -18,6 +18,16 @@ type Clipboard interface {
 	Resume() error
 }
 
+// --- vault (VA1) ---
+
+// VaultLocker is the slice of the vault the tray needs (vault.Service fits).
+type VaultLocker interface {
+	State() core.VaultState
+	Lock() error
+}
+
+// --- end vault ---
+
 // Options wire the shell to the app. All fields are required except
 // Clipboard.
 type Options struct {
@@ -28,6 +38,10 @@ type Options struct {
 	Outputs   core.OutputStore // "Recent outputs" tray submenu
 	Emitter   core.Emitter
 	Clipboard Clipboard
+	// --- vault (VA1) ---
+	// Vault is optional; the tray shows "Lock vault" while it is unlocked.
+	Vault VaultLocker
+	// --- end vault ---
 	// DarkMode reports whether the effective UI theme is dark (popup background).
 	DarkMode func() bool
 }

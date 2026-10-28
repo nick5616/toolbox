@@ -47,6 +47,7 @@ func (t *tray) start() {
 	for _, name := range []string{
 		core.EventJobsChanged, core.EventLibraryAdded, core.EventClipboardState,
 		core.EventSettingsChanged, core.EventHotkeysStatus,
+		core.EventVaultState, // --- vault (VA1) ---
 	} {
 		t.s.o.App.Event.On(name, func(*application.CustomEvent) { t.refresh() })
 	}
@@ -79,6 +80,11 @@ func (t *tray) state() trayState {
 	if o.Clipboard != nil {
 		st.Paused = o.Clipboard.State().Paused
 	}
+	// --- vault (VA1) ---
+	if o.Vault != nil {
+		st.VaultUnlocked = o.Vault.State().Unlocked
+	}
+	// --- end vault ---
 	ctx, cancel := timeoutCtx()
 	defer cancel()
 	if jobs, err := o.Jobs.List(ctx, core.JobFilter{
@@ -138,6 +144,13 @@ func (t *tray) handler(id string, st trayState) func(*application.Context) {
 				}
 			}
 			t.refresh()
+		// --- vault (VA1) ---
+		case id == itemLockVault:
+			if s.o.Vault != nil {
+				_ = s.o.Vault.Lock()
+			}
+			t.refresh()
+		// --- end vault ---
 		case id == itemSettings:
 			_ = s.ShowMain("settings")
 		case id == itemQuit:
