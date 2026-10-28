@@ -1,7 +1,7 @@
 [project]
 name = "toolbox-sidecar"
-version = "0.4.0"
-description = "Toolbox AI engine: stems, BPM & key, audio-to-MIDI, transcription, background removal and CPU upscaling over stdio JSON lines"
+version = "0.5.0"
+description = "Toolbox AI engine: stems, BPM & key, audio-to-MIDI, transcription, background removal, CPU upscaling and OCR over stdio JSON lines"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "audio-separator[cpu]==0.47.1",
@@ -19,6 +19,9 @@ dependencies = [
   "pillow>=12",            # image handlers (already pulled in by torchvision)
   "pillow-heif>=1.8",      # HEIC/HEIF input
   "spandrel>=0.4.2",       # CPU/MPS Real-ESRGAN upscaling
+  "rapidocr>=3.10.0",      # OCR engine (bundled PP-OCRv6 models)
+  "python-bidi>=0.6.12",   # Arabic text order for RapidOCR
+  "pypdf>=6",              # searchable-PDF text overlay
 ]
 
 [dependency-groups]

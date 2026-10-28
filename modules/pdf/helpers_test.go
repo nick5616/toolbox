@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"toolbox/core"
+	"toolbox/core/pdfium"
 )
 
 var (
@@ -104,9 +105,9 @@ func (r *rec) res(t *testing.T) Result {
 
 func newTestModule(t *testing.T) *Module {
 	t.Helper()
-	m := New(sharedCache(t))
-	t.Cleanup(m.Close)
-	return m
+	r := pdfium.New(sharedCache(t))
+	t.Cleanup(r.Close)
+	return New(r)
 }
 
 // runJob runs an action directly through Module.Run, bypassing the manager.

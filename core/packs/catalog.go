@@ -99,10 +99,12 @@ func Components() []ComponentSpec {
 		{
 			ID: "engine", Name: "AI engine", Href: "https://github.com/astral-sh/uv", License: "BSD/MIT/Apache",
 			Kind: core.ComponentDep, DepID: sidecar.DepID,
-			// uv + CPython + the 0.5.0 venv; updated with the build measurement.
+			// uv (31.8 MB) + CPython 3.12 (65.4 MB) + the 0.5.0 venv (1,310 MB),
+			// measured on Windows on 2026-10-28. The download is mostly the
+			// torch CPU wheel; Mac numbers use Windows until measured there.
 			Sizes: map[string]Size{
-				Windows: {Download: 1_000 * mb, Disk: 1_600 * mb},
-				MacARM:  {Download: 1_000 * mb, Disk: 1_600 * mb},
+				Windows: {Download: 1_000 * mb, Disk: 1_407_624_938},
+				MacARM:  {Download: 1_000 * mb, Disk: 1_407_624_938},
 			},
 		},
 		{

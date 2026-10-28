@@ -18,6 +18,7 @@ import (
 	"toolbox/core"
 	"toolbox/core/deps"
 	"toolbox/core/packs"
+	"toolbox/core/pdfium"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
 	"toolbox/desktop"
@@ -97,8 +98,9 @@ func run() error {
 
 	exifMod := exif.New(depSvc.Resolve)
 	defer exifMod.Close()
-	pdfMod := pdf.New(filepath.Join(paths.CacheDir, "pdfium"))
-	defer pdfMod.Close()
+	pdfRenderer := pdfium.New(filepath.Join(paths.CacheDir, "pdfium"))
+	defer pdfRenderer.Close()
+	pdfMod := pdf.New(pdfRenderer)
 	clipHistory := clipboard.New(clipboard.Config{Store: db, Settings: settings, Emitter: emitter, Dir: paths.ClipboardDir})
 	defer clipHistory.Stop()
 	libraryDir := func() string { return settings.Current().LibraryDir }
@@ -141,7 +143,7 @@ func run() error {
 		func() error { return pdf.Register(reg, pdfMod) },
 		func() error { return chat.Register(reg, chatSvc) },
 		func() error { return vault.Register(reg, vaultSvc) },
-		func() error { return ocr.Register(reg, engine, nil, paths.ModelsDir) },
+		func() error { return ocr.Register(reg, engine, pdfRenderer, paths.ModelsDir) },
 		func() error { return packs.Register(reg, packSvc) },
 		func() error { return placeholders.Register(reg) },
 		func() error { return deps.RegisterExifToolUpdater(reg, depSvc) },

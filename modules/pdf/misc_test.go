@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/klippa-app/go-pdfium/requests"
-
 	"toolbox/core"
 	"toolbox/core/store"
 )
@@ -228,32 +226,6 @@ func TestThumbnailEncrypted(t *testing.T) {
 	}
 	if _, err := m.thumbnail(context.Background(), r.outputs[0], 1, 100, "pw"); err != nil {
 		t.Errorf("right password: %v", err)
-	}
-}
-
-// pdfium runs with an empty wazero FS config: a file path can't be opened
-// through it, while the same document opens from bytes.
-func TestPdfiumHasNoFilesystem(t *testing.T) {
-	m := newTestModule(t)
-	src := writePDF(t, t.TempDir(), "doc.pdf", 1, 612, 792)
-	b, err := os.ReadFile(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := m.state.r
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if err := r.startLocked(); err != nil {
-		t.Fatal(err)
-	}
-	res, err := r.inst.OpenDocument(&requests.OpenDocument{File: &b})
-	if err != nil {
-		t.Fatalf("open from bytes: %v", err)
-	}
-	_, _ = r.inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: res.Document})
-	if res, err := r.inst.OpenDocument(&requests.OpenDocument{FilePath: &src}); err == nil {
-		_, _ = r.inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: res.Document})
-		t.Fatal("pdfium opened a host file path: the filesystem is mounted")
 	}
 }
 

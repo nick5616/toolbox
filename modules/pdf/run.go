@@ -10,19 +10,19 @@ import (
 	"strings"
 
 	"toolbox/core"
+	"toolbox/core/pdfium"
 )
 
 // state holds the renderer and the password store.
 type state struct {
-	r   *renderer
-	sec *secrets
+	r      *pdfium.Renderer
+	sec    *secrets
+	thumbs *lru
 }
 
-func newState(cacheDir string) *state {
-	return &state{r: newRenderer(cacheDir), sec: newSecrets()}
+func newState(r *pdfium.Renderer) *state {
+	return &state{r: r, sec: newSecrets(), thumbs: newLRU(thumbCacheSize)}
 }
-
-func (s *state) close() { s.r.close() }
 
 const msgSecretGone = "The password isn't kept after a restart — run this again"
 
