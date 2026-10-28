@@ -19,6 +19,7 @@ import { useDeps, type DepView } from "@/state/deps";
 import { isActive, useJobs } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { useSettings } from "@/state/settings";
+import { SettingsChat } from "./SettingsChat";
 import { SettingsClipboard } from "./SettingsClipboard";
 import { SettingsGeneral } from "./SettingsGeneral";
 import { SettingsVault } from "./SettingsVault";
@@ -439,6 +440,8 @@ export function SettingsView() {
         </Section>
 
         <SettingsClipboard />
+
+        <SettingsChat />
 
         <SettingsVault />
 

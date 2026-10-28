@@ -106,11 +106,11 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
     const my = ++seq.current;
     try {
       const fs = (await VaultService.Folders()) ?? [];
-      const wanted = folder === ALL ? [ROOT, ...fs] : [folder];
-      const lists = await Promise.all(wanted.map((f) => VaultService.List(f, search)));
+      // List("") returns every entry (all folders); the root view filters it.
+      const list = (await VaultService.List(folder === ALL ? ROOT : folder, search)) ?? [];
       if (my !== seq.current) return;
       setFolders(fs);
-      setEntries(lists.flatMap((l) => l ?? []));
+      setEntries(folder === ROOT ? list.filter((e) => e.folder === ROOT) : list);
       setLoaded(true);
     } catch (e) {
       if (my === seq.current) fail(e);
