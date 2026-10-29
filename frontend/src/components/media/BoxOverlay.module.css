@@ -1,0 +1,99 @@
+.root {
+  position: absolute;
+  pointer-events: none;
+  outline: none;
+  touch-action: none;
+}
+
+.editable {
+  pointer-events: auto;
+}
+
+.draw {
+  cursor: crosshair;
+}
+
+.box {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+.editable .box {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.on {
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.off {
+  border: 2px dashed var(--fg-muted);
+  background: transparent;
+  opacity: 0.6;
+}
+
+.selected {
+  box-shadow: var(--focus-ring);
+}
+
+.draft {
+  pointer-events: none;
+}
+
+.fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.label {
+  position: absolute;
+  top: -18px;
+  left: -2px;
+  padding: 0 var(--space-1);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.corner {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  border: 1px solid var(--bg-app);
+  border-radius: 2px;
+}
+
+.nw {
+  left: -6px;
+  top: -6px;
+  cursor: nwse-resize;
+}
+
+.ne {
+  right: -6px;
+  top: -6px;
+  cursor: nesw-resize;
+}
+
+.sw {
+  left: -6px;
+  bottom: -6px;
+  cursor: nesw-resize;
+}
+
+.se {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
+}
