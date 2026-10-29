@@ -6,19 +6,26 @@ import (
 
 	"toolbox/core"
 	"toolbox/core/packs"
+	"toolbox/modules/audiocleanup"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
 	"toolbox/modules/chat"
 	"toolbox/modules/clipboard"
 	"toolbox/modules/converter"
+	"toolbox/modules/devutils"
 	"toolbox/modules/downloader"
+	"toolbox/modules/eraser"
 	"toolbox/modules/exif"
+	"toolbox/modules/lyricvideo"
 	"toolbox/modules/midi"
 	"toolbox/modules/ocr"
 	"toolbox/modules/pdf"
 	"toolbox/modules/placeholders"
+	"toolbox/modules/redact"
 	"toolbox/modules/stems"
+	"toolbox/modules/subtitles"
 	"toolbox/modules/transcribe"
+	"toolbox/modules/trimmer"
 	"toolbox/modules/upscale"
 	"toolbox/modules/vault"
 )
@@ -44,6 +51,13 @@ func TestEveryToolIsInOnePack(t *testing.T) {
 		func() error { return vault.Register(reg, vault.New(vault.Config{})) },
 		func() error { return ocr.Register(reg, nil, nil, "") },
 		func() error { return placeholders.Register(reg) },
+		func() error { return trimmer.Register(reg, nil) },
+		func() error { _, err := subtitles.Register(reg, nil, nil, nil, ""); return err },
+		func() error { _, err := audiocleanup.Register(reg, nil, nil, "", ""); return err },
+		func() error { _, err := lyricvideo.Register(reg, nil, nil, "", ""); return err },
+		func() error { _, err := redact.Register(reg, nil, nil, "", ""); return err },
+		func() error { _, err := eraser.Register(reg, nil, "", ""); return err },
+		func() error { return devutils.Register(reg) },
 	} {
 		if err := register(); err != nil {
 			t.Fatal(err)

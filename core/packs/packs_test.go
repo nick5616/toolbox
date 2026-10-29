@@ -140,7 +140,7 @@ func newFixture(t *testing.T, goos, goarch string) *fixture {
 			t.Fatal(err)
 		}
 	}
-	for _, id := range []string{"stems", "transcribe", "bg-remover", "llm-chat"} {
+	for _, id := range []string{"stems", "transcribe", "bg-remover", "llm-chat", "audio-cleanup", "redact", "object-eraser"} {
 		if err := reg.Register(&fakeModels{w: w, id: id}); err != nil {
 			t.Fatal(err)
 		}
@@ -296,7 +296,7 @@ func TestStatusStates(t *testing.T) {
 	if ff.State != core.ComponentMissing || ff.DownloadBytes != 114_768_076 || ff.DiskBytes != 210_680_000 {
 		t.Errorf("ffmpeg %+v", ff)
 	}
-	if !slices.Equal(ff.Packs, []string{"media", "music"}) {
+	if !slices.Equal(ff.Packs, []string{"media", "music", "image", "speech"}) {
 		t.Errorf("ffmpeg packs %v", ff.Packs)
 	}
 
@@ -342,6 +342,9 @@ func TestStatusModelsUnlocksAndSharedEngine(t *testing.T) {
 		t.Errorf("speech = %s", st)
 	}
 	f.w.models["transcribe/small"] = true
+	f.w.models["audio-cleanup/voice"] = true
+	f.w.set(deps.FFmpeg, core.DepOK, core.SourceManaged)
+	f.s.cfg.Deps.Detect(context.Background())
 	if st := f.pack("speech").State; st != core.PackInstalled {
 		t.Errorf("speech = %s", st)
 	}
@@ -350,7 +353,9 @@ func TestStatusModelsUnlocksAndSharedEngine(t *testing.T) {
 	}
 	// Only registered tools are listed as unlocked.
 	speech := f.pack("speech")
-	if len(speech.Unlocks) != 1 || speech.Unlocks[0].ModuleID != "transcribe" || speech.Unlocks[0].Name != "Tool transcribe" {
+	// (the fake model providers register as tools, so audio-cleanup is listed; subtitles isn't registered)
+	if len(speech.Unlocks) != 2 || speech.Unlocks[0].ModuleID != "transcribe" || speech.Unlocks[0].Name != "Tool transcribe" ||
+		speech.Unlocks[1].ModuleID != "audio-cleanup" {
 		t.Errorf("unlocks %+v", speech.Unlocks)
 	}
 	if len(f.pack("media").Unlocks) != 0 {
@@ -389,7 +394,7 @@ func TestInstallSkipsPresentAndSharesComponents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{sidecar.DepID, "stems/four-fast"}; !slices.Equal(f.w.log, want) {
+	if want := []string{sidecar.DepID, "stems/four-fast", "stems/vocals-fast", "transcribe/small"}; !slices.Equal(f.w.log, want) {
 		t.Fatalf("install order %v, want %v (ffmpeg skipped)", f.w.log, want)
 	}
 	if p.title != "Install Music pack" {
@@ -408,7 +413,7 @@ func TestInstallSkipsPresentAndSharesComponents(t *testing.T) {
 	if _, err := f.runInstall("image"); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"bg-remover/balanced", deps.Upscayl, deps.ExifTool}; !slices.Equal(f.w.log, want) {
+	if want := []string{"bg-remover/balanced", deps.Upscayl, deps.ExifTool, "redact/faces", "redact/plates", "object-eraser/best"}; !slices.Equal(f.w.log, want) {
 		t.Errorf("second pack installed %v, want %v", f.w.log, want)
 	}
 
@@ -540,16 +545,18 @@ func TestRemovePreviewKeepsSharedAndSkipsSystem(t *testing.T) {
 	for _, id := range []string{sidecar.DepID, deps.FFmpeg, deps.Upscayl, deps.ExifTool} {
 		f.w.set(id, core.DepOK, core.SourceManaged)
 	}
-	f.w.models["stems/four-fast"] = true
-	f.w.models["bg-remover/balanced"] = true
+	for _, m := range []string{"stems/four-fast", "stems/vocals-fast", "transcribe/small", "bg-remover/balanced", "redact/faces", "redact/plates", "object-eraser/best"} {
+		f.w.models[m] = true
+	}
 	f.s.cfg.Deps.Detect(context.Background())
 
-	// Music and Image are installed and share the engine; Music also has ffmpeg.
+	// Music and Image are installed and share the engine and ffmpeg.
 	pv := f.s.RemovePreview("image")
-	if len(pv.Kept) != 1 || pv.Kept[0].Component != "AI engine" || !slices.Equal(pv.Kept[0].UsedBy, []string{"Music", "Documents"}) {
+	if len(pv.Kept) != 2 || pv.Kept[0].Component != "AI engine" || pv.Kept[1].Component != "FFmpeg" ||
+		!slices.Equal(pv.Kept[0].UsedBy, []string{"Music", "Documents"}) || !slices.Equal(pv.Kept[1].UsedBy, []string{"Music"}) {
 		t.Fatalf("kept %+v", pv.Kept)
 	}
-	want := int64(224_005_088 + 54_247_123 + 34_532_543)
+	want := int64(224_005_088 + 54_247_123 + 34_532_543 + 232_589 + 7_835_770 + 208_044_816)
 	if pv.FreedBytes != want {
 		t.Errorf("freed %d, want %d", pv.FreedBytes, want)
 	}

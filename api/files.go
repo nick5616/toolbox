@@ -65,6 +65,44 @@ func (s *FilesService) Pick(moduleID string) ([]string, error) {
 	return paths, nil
 }
 
+// PickWith shows a native file dialog filtered to extensions (lowercase,
+// leading dot; empty = any file), e.g. a background image for Lyric Video.
+// Cancelling returns an empty list.
+func (s *FilesService) PickWith(title string, extensions []string, multiple bool) ([]string, error) {
+	opts := &application.OpenFileDialogOptions{
+		CanChooseFiles:          true,
+		AllowsMultipleSelection: multiple,
+		Title:                   title,
+		ButtonText:              "Choose",
+	}
+	if len(extensions) > 0 {
+		pats := make([]string, len(extensions))
+		for i, e := range extensions {
+			pats[i] = "*" + e
+		}
+		opts.Filters = []application.FileFilter{{DisplayName: strings.Join(pats, ", "), Pattern: strings.Join(pats, ";")}}
+	}
+	d := application.Get().Dialog.OpenFileWithOptions(opts)
+	if !multiple {
+		path, err := d.PromptForSingleSelection()
+		if err != nil {
+			return nil, fmt.Errorf("file dialog: %w", err)
+		}
+		if path == "" {
+			return []string{}, nil
+		}
+		return []string{path}, nil
+	}
+	paths, err := d.PromptForMultipleSelection()
+	if err != nil {
+		return nil, fmt.Errorf("file dialog: %w", err)
+	}
+	if paths == nil {
+		paths = []string{}
+	}
+	return paths, nil
+}
+
 // errDialogCancelled is never returned by Wails (it returns empty results
 // on cancel); kept so the cancel path stays explicit.
 var errDialogCancelled = errors.New("cancelled")

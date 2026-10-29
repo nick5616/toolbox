@@ -65,3 +65,18 @@ func ValidFont(name string) bool {
 	}
 	return false
 }
+
+// VideoExtensions are the video inputs the Phase 6 tools accept.
+func VideoExtensions() []string {
+	return []string{".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp"}
+}
+
+// AudioExtensions are the audio inputs the Phase 6 tools accept.
+func AudioExtensions() []string {
+	return []string{".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".opus", ".wma", ".aiff", ".aif"}
+}
+
+// ImageExtensions are the image inputs Redact and Object Eraser accept.
+func ImageExtensions() []string {
+	return []string{".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic", ".heif"}
+}

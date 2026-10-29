@@ -19,6 +19,9 @@ const (
 	ChatMessageDone    ChatMessageStatus = "done"
 	ChatMessageStopped ChatMessageStatus = "stopped"
 	ChatMessageError   ChatMessageStatus = "error"
+	// ChatMessageStreaming is never stored: Conversation() reports it for
+	// the message the running generation is writing (SPEC.md §11 F1).
+	ChatMessageStreaming ChatMessageStatus = "streaming"
 )
 
 // ChatConversation is one stored conversation.
@@ -121,6 +124,9 @@ type ChatStatus struct {
 	Backend ChatBackend     `json:"backend"`
 	Error   string          `json:"error"`
 	Notice  string          `json:"notice"` // e.g. "The GPU ran out of memory, so answers run on the CPU"
+	// Busy is the Purpose of a running background completion
+	// (core.TextGenerator), e.g. "Translating subtitles"; "" = none.
+	Busy string `json:"busy"`
 }
 
 // VaultState is the payload of vault:state (SPEC.md §6.2).
@@ -130,4 +136,7 @@ type VaultState struct {
 	Entries         int   `json:"entries"`
 	AutoLockMinutes int   `json:"autoLockMinutes"`
 	LockAt          int64 `json:"lockAt"` // Unix ms; 0 = no timer
+	// Notice is shown once after unlock, e.g. "The vault index was restored
+	// from its backup copy" (SPEC.md §11 F3); "" = none.
+	Notice string `json:"notice"`
 }

@@ -36,6 +36,9 @@ func (s *Service) Clear(keepPinned bool) (int, error) {
 	return s.h.Clear(context.Background(), keepPinned)
 }
 
+// CopyText copies plain text to the system clipboard.
+func (s *Service) CopyText(text string) error { return s.h.CopyText(context.Background(), text) }
+
 // State reports whether the recorder is running.
 func (s *Service) State() core.ClipboardState { return s.h.State() }
 

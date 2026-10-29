@@ -1,6 +1,6 @@
 # Toolbox — Phase 6 Spec: Video Trimmer, Subtitles, Audio Cleanup, Lyric Video, Redact, Object Eraser, Dev Utilities
 
-Status: **DRAFT — awaiting review.**
+Status: **APPROVED 2026-10-28.**
 Date: 2026-10-28. Author: architect session (Opus).
 
 Phases 1–5 are shipped; their specs are archived in `docs/specs/phase-{1..5}.md`, and every contract there still holds unless changed here. "P5 §x" etc. refer to those files. The order and intent come from `docs/ROADMAP.md`.

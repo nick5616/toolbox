@@ -781,3 +781,20 @@ func TestPopupOpener(t *testing.T) {
 		t.Fatal("opener not called")
 	}
 }
+
+func TestCopyTextRecordsOnce(t *testing.T) {
+	e := newEnv(t, enabled)
+	e.start()
+	e.waitRecording()
+	if err := e.h.CopyText(context.Background(), "from a tool"); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.src.writes) != 1 || e.src.writes[0].kind != core.ClipText || string(e.src.writes[0].data) != "from a tool" {
+		t.Fatalf("writes = %+v", e.src.writes)
+	}
+	// No self-copy marker: the OS echo of the write is recorded as one item.
+	e.recordText("from a tool")
+	if items := e.list(); len(items) != 1 || items[0].Text != "from a tool" {
+		t.Fatalf("items = %+v", items)
+	}
+}

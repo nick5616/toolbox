@@ -262,6 +262,22 @@ func (h *History) Copy(ctx context.Context, id string) error {
 	return nil
 }
 
+// CopyText writes plain text to the system clipboard for the app's own Copy
+// buttons (SPEC.md §3.10). Unlike Copy it sets no self-copy marker: a copy
+// the user asked for belongs in the history, and writing one plain-text
+// format through Go means the recorder sees exactly one change.
+func (h *History) CopyText(ctx context.Context, text string) error {
+	if err := h.ensureInit(); err != nil {
+		slog.Warn("clipboard unavailable", "err", err)
+		return core.Errorf(core.CodeInternal, "Clipboard unavailable")
+	}
+	if err := h.src.Write(ctx, core.ClipText, []byte(text)); err != nil {
+		slog.Warn("clipboard write failed", "err", err)
+		return core.Errorf(core.CodeInternal, "Couldn't copy to the clipboard").WithCause(err)
+	}
+	return nil
+}
+
 // Pin pins or unpins an item; emits clipboard:added with the updated item.
 func (h *History) Pin(ctx context.Context, id string, pinned bool) (core.ClipItem, error) {
 	item, err := h.cfg.Store.SetPinned(ctx, id, pinned)

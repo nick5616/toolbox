@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -20,24 +21,32 @@ import (
 	"toolbox/api"
 	"toolbox/core"
 	"toolbox/core/deps"
+	"toolbox/core/media"
 	"toolbox/core/packs"
 	"toolbox/core/pdfium"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
 	"toolbox/desktop"
+	"toolbox/modules/audiocleanup"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
 	"toolbox/modules/chat"
 	"toolbox/modules/clipboard"
 	"toolbox/modules/converter"
+	"toolbox/modules/devutils"
 	"toolbox/modules/downloader"
+	"toolbox/modules/eraser"
 	"toolbox/modules/exif"
+	"toolbox/modules/lyricvideo"
 	"toolbox/modules/midi"
 	"toolbox/modules/ocr"
 	"toolbox/modules/pdf"
 	"toolbox/modules/placeholders"
+	"toolbox/modules/redact"
 	"toolbox/modules/stems"
+	"toolbox/modules/subtitles"
 	"toolbox/modules/transcribe"
+	"toolbox/modules/trimmer"
 	"toolbox/modules/upscale"
 	"toolbox/modules/vault"
 )
@@ -147,6 +156,40 @@ func run() error {
 	engine.SetFFmpegResolver(func() (string, error) { return depSvc.Resolve(deps.FFmpeg) })
 	// --- end Tool packs ---
 
+	// --- Phase 6 tools (architect) ---
+	mediaAPI := &api.MediaService{Paths: paths, Jobs: jobs, Resolve: depSvc.Resolve, GOOS: runtime.GOOS}
+	subtitlesMod, err := subtitles.Register(reg, engine, chatSvc, depSvc.Resolve, paths.ModelsDir)
+	if err != nil {
+		return err
+	}
+	cleanupMod, err := audiocleanup.Register(reg, engine, depSvc.Resolve, paths.ModelsDir, filepath.Join(paths.CacheDir, "cleanup-preview"))
+	if err != nil {
+		return err
+	}
+	lyricMod, err := lyricvideo.Register(reg, engine, depSvc.Resolve, paths.ModelsDir, filepath.Join(paths.CacheDir, "lyric-video"))
+	if err != nil {
+		return err
+	}
+	redactMod, err := redact.Register(reg, engine, depSvc.Resolve, paths.ModelsDir, filepath.Join(paths.CacheDir, "redact"))
+	if err != nil {
+		return err
+	}
+	eraserMod, err := eraser.Register(reg, engine, paths.ModelsDir, filepath.Join(paths.TmpDir, "eraser"))
+	if err != nil {
+		return err
+	}
+	if _, err := media.RegisterProxy(reg, media.CacheDir(paths)); err != nil {
+		return err
+	}
+	go func() { // start-up cleanup of Phase 6 caches (SPEC.md §3.9)
+		eraserMod.ClearMasks()
+		cleanupMod.PrunePreviews()
+		lyricMod.PruneCache()
+		redactMod.PruneCache()
+		media.PruneCache(media.CacheDir(paths), media.CacheLimitBytes)
+	}()
+	// --- end Phase 6 tools ---
+
 	for _, register := range []func() error{
 		func() error { return downloader.Register(reg, filepath.Join(paths.CacheDir, "yt-dlp")) },
 		func() error { return stems.Register(reg, engine) },
@@ -163,6 +206,8 @@ func run() error {
 		func() error { return vault.Register(reg, vaultSvc) },
 		func() error { return ocr.Register(reg, engine, pdfRenderer, paths.ModelsDir) },
 		func() error { return packs.Register(reg, packSvc) },
+		func() error { return trimmer.Register(reg, depSvc.Resolve) },
+		func() error { return devutils.Register(reg) },
 		func() error { return placeholders.Register(reg) },
 		func() error { return deps.RegisterExifToolUpdater(reg, depSvc) },
 		func() error { return deps.RegisterUpscalerInstaller(reg, depSvc) },
@@ -234,9 +279,19 @@ func run() error {
 			application.NewServiceWithOptions(ocr.NewService(jobs), opts),
 			application.NewServiceWithOptions(vaultAPI, opts),
 			application.NewServiceWithOptions(packsAPI, opts),
+			application.NewServiceWithOptions(mediaAPI, opts),
+			application.NewServiceWithOptions(trimmer.NewService(jobs), opts),
+			application.NewServiceWithOptions(subtitles.NewService(jobs, subtitlesMod), opts),
+			application.NewServiceWithOptions(audiocleanup.NewService(jobs, cleanupMod), opts),
+			application.NewServiceWithOptions(lyricvideo.NewService(jobs), opts),
+			application.NewServiceWithOptions(redact.NewService(jobs), opts),
+			application.NewServiceWithOptions(eraser.NewService(jobs, eraserMod), opts),
+			application.NewServiceWithOptions(devutils.NewService(jobs), opts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
+			// Local media for the players, in-process: no socket (SPEC.md §3.2).
+			Middleware: api.MediaMiddleware(mediaAPI),
 		},
 		// The app lives in the tray: closing windows never quits by itself;
 		// the desktop shell decides (KeepInTray) and quits explicitly.

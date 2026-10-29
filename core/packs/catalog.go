@@ -62,7 +62,7 @@ func PlatformKey(goos, goarch string) string {
 }
 
 // BuiltIn are module IDs that need no download (shown, never packed).
-var BuiltIn = []string{"clipboard", "pdf", "vault"}
+var BuiltIn = []string{"clipboard", "pdf", "vault", "dev-utils"}
 
 const mb = 1_000_000
 
@@ -113,14 +113,39 @@ func Components() []ComponentSpec {
 			Sizes: map[string]Size{Windows: {Download: 84_170_199, Disk: 84_170_199}, MacARM: {Download: 84_170_199, Disk: 84_170_199}},
 		},
 		{
+			ID: "stems-vocals", Name: "UVR MDX vocals", Href: "https://github.com/TRvlvr/model_repo", License: "MIT",
+			Kind: core.ComponentModel, Module: "stems", Preset: "vocals-fast",
+			Sizes: same(Size{Download: 66_759_214, Disk: 66_759_214}),
+		},
+		{
 			ID: "whisper-default", Name: "Whisper small", Href: "https://huggingface.co/Systran/faster-whisper-small", License: "MIT",
 			Kind: core.ComponentModel, Module: "transcribe", Preset: "small",
 			Sizes: map[string]Size{Windows: {Download: 486_217_556, Disk: 486_217_556}, MacARM: {Download: 486_217_556, Disk: 486_217_556}},
 		},
 		{
+			ID: "voice-denoise", Name: "DeepFilterNet3", Href: "https://github.com/Rikorose/DeepFilterNet", License: "MIT/Apache-2.0",
+			Kind: core.ComponentModel, Module: "audio-cleanup", Preset: "voice",
+			Sizes: same(Size{Download: 7_983_136, Disk: 8_587_242}),
+		},
+		{
 			ID: "bg-default", Name: "BiRefNet lite", Href: "https://github.com/ZhengPeng7/BiRefNet", License: "MIT",
 			Kind: core.ComponentModel, Module: "bg-remover", Preset: "balanced",
 			Sizes: map[string]Size{Windows: {Download: 224_005_088, Disk: 224_005_088}, MacARM: {Download: 224_005_088, Disk: 224_005_088}},
+		},
+		{
+			ID: "face-detect", Name: "YuNet face detector", Href: "https://huggingface.co/opencv/face_detection_yunet", License: "MIT",
+			Kind: core.ComponentModel, Module: "redact", Preset: "faces",
+			Sizes: same(Size{Download: 232_589, Disk: 232_589}),
+		},
+		{
+			ID: "plate-detect", Name: "YOLOv9 plate detector", Href: "https://github.com/ankandrew/open-image-models", License: "MIT (code; weights unstated)",
+			Kind: core.ComponentModel, Module: "redact", Preset: "plates",
+			Sizes: same(Size{Download: 7_835_770, Disk: 7_835_770}),
+		},
+		{
+			ID: "inpaint", Name: "LaMa inpainting", Href: "https://github.com/advimman/lama", License: "Apache-2.0",
+			Kind: core.ComponentModel, Module: "object-eraser", Preset: "best",
+			Sizes: same(Size{Download: 208_044_816, Disk: 208_044_816}),
 		},
 		{
 			ID: "upscaler", Name: "Real-ESRGAN upscaler", Href: "https://github.com/upscayl/upscayl-ncnn", License: "AGPL-3.0 (models BSD-3)",
@@ -161,38 +186,46 @@ func Catalog() []PackSpec {
 	return []PackSpec{
 		{
 			ID: "media", Name: "Media", Icon: "film",
-			Description: "Download and convert audio and video",
+			Description: "Download, convert and trim audio and video",
 			Components:  []string{"ffmpeg", "yt-dlp", "deno"},
 			Unlocks: []Unlock{
 				{Module: "downloader", Needs: []string{"ffmpeg", "yt-dlp", "deno"}},
 				{Module: "converter", Needs: []string{"ffmpeg"}},
+				{Module: "trimmer", Needs: []string{"ffmpeg"}},
 			},
 		},
 		{
 			ID: "music", Name: "Music", Icon: "audio-lines",
-			Description: "Split songs into stems, find tempo and key, turn melodies into MIDI",
-			Components:  []string{"engine", "ffmpeg", "stems-default"},
+			Description: "Split songs into stems, find tempo and key, turn melodies into MIDI, make lyric videos",
+			Components:  []string{"engine", "ffmpeg", "stems-default", "stems-vocals", "whisper-default"},
 			Unlocks: []Unlock{
 				{Module: "stems", Needs: []string{"engine", "ffmpeg", "stems-default"}},
 				{Module: "bpm-key", Needs: []string{"engine"}},
 				{Module: "audio-to-midi", Needs: []string{"engine"}},
+				{Module: "lyric-video", Needs: []string{"engine", "ffmpeg", "whisper-default", "stems-vocals"}},
 			},
 		},
 		{
 			ID: "image", Name: "Image", Icon: "wand-sparkles",
-			Description: "Cut out backgrounds, upscale photos and edit their metadata",
-			Components:  []string{"engine", "bg-default", "upscaler", "exiftool"},
+			Description: "Cut out backgrounds, upscale, erase objects, blur faces and plates, edit metadata",
+			Components:  []string{"engine", "ffmpeg", "bg-default", "upscaler", "exiftool", "face-detect", "plate-detect", "inpaint"},
 			Unlocks: []Unlock{
 				{Module: "bg-remover", Needs: []string{"engine", "bg-default"}},
 				{Module: "upscaler", Needs: []string{"upscaler"}},
 				{Module: "exif", Needs: []string{"exiftool"}},
+				{Module: "redact", Needs: []string{"engine", "ffmpeg", "face-detect", "plate-detect"}},
+				{Module: "object-eraser", Needs: []string{"engine", "inpaint"}},
 			},
 		},
 		{
 			ID: "speech", Name: "Speech", Icon: "captions",
-			Description: "Turn recordings into text, fully offline",
-			Components:  []string{"engine", "whisper-default"},
-			Unlocks:     []Unlock{{Module: "transcribe", Needs: []string{"engine", "whisper-default"}}},
+			Description: "Transcribe and subtitle recordings, clean up voices, fully offline",
+			Components:  []string{"engine", "ffmpeg", "whisper-default", "voice-denoise"},
+			Unlocks: []Unlock{
+				{Module: "transcribe", Needs: []string{"engine", "whisper-default"}},
+				{Module: "subtitles", Needs: []string{"engine", "ffmpeg", "whisper-default"}},
+				{Module: "audio-cleanup", Needs: []string{"ffmpeg", "engine", "voice-denoise"}},
+			},
 		},
 		{
 			ID: "documents", Name: "Documents", Icon: "scan-text",
