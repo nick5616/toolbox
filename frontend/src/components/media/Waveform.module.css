@@ -1,0 +1,15 @@
+.root {
+  position: relative;
+  width: 100%;
+  background: var(--bg-inset);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.seekable {
+  cursor: pointer;
+}
+
+.canvas {
+  display: block;
+}

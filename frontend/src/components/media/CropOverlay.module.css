@@ -1,0 +1,26 @@
+.root {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.window {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 9999px color-mix(in srgb, var(--bg-app) 68%, transparent);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  outline: none;
+}
+
+.window:active {
+  cursor: grabbing;
+}
+
+.window:focus-visible {
+  box-shadow:
+    0 0 0 9999px color-mix(in srgb, var(--bg-app) 68%, transparent),
+    var(--focus-ring);
+}
