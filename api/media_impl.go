@@ -267,6 +267,7 @@ func (s *MediaService) open(path string) (MediaSource, error) {
 	audioOnly := info.Video == nil
 	pp := media.ProxyPath(s.cacheDir(), path, fi.Size(), fi.ModTime().UnixNano(), audioOnly)
 	if pfi, err := os.Stat(pp); err == nil && pfi.Mode().IsRegular() {
+		_ = os.Chtimes(pp, time.Now(), time.Now()) // keep in-use previews young for the prune
 		src.URL = s.mediaURL(pp)
 		src.Proxy = true
 		return src, nil
