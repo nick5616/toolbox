@@ -25,3 +25,13 @@ def test_info():
 
 def test_warmup():
     assert HANDLERS["system.warmup"](ctx(), {}) == {}
+
+
+def test_version_matches_pyproject():
+    import tomllib
+    from pathlib import Path
+
+    import toolbox_sidecar
+
+    meta = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
+    assert toolbox_sidecar.__version__ == meta["project"]["version"]

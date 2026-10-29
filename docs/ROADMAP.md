@@ -4,8 +4,8 @@ Agreed on 2026-10-28. Each phase still gets its own spec and approval; this is o
 
 | Phase | Scope |
 |---|---|
-| 5 (done) | Local Chat, OCR, Vault, **tool packs + first-run setup** (managed FFmpeg/Deno, measured sizes, movable tools folder), FLAC stems by default. See `SPEC.md`. |
-| 6 (in progress) | New tools: Video Trimmer, Subtitles (generate, translate, burn in), Audio Cleanup (denoise + loudness), Lyric Video, Redact (face and number-plate blur), Object Eraser (inpainting), Dev Utilities. |
+| 5 (done) | Local Chat, OCR, Vault, **tool packs + first-run setup** (managed FFmpeg/Deno, measured sizes, movable tools folder), FLAC stems by default. See `docs/specs/phase-5.md`. |
+| 6 (done) | New tools: Video Trimmer, Subtitles (generate, translate, burn in), Audio Cleanup (denoise + loudness), Lyric Video, Redact (face and number-plate blur), Object Eraser (inpainting), Dev Utilities. See `SPEC.md`. |
 | 7 | **Pipelines** page: user-defined chains of tools, plus the 10 built-in templates below. |
 | 8 | Documents: Pandoc conversion (+ Typst for PDF), maybe Calibre ebook conversion; the Web Archiver placeholder. |
 | 9 (last) | LAN file transfer, LocalSend-protocol compatible. Opt-in, listens only while the Share panel is open, pairing + accept prompt. Needs an explicit amendment to the "no network listeners" app rule. |
