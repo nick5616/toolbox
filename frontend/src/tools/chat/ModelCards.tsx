@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge, Button, Meter, toast } from "@/components";
 import { ChatService, type ChatModelInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
-import { formatBytes } from "@/lib/format";
+import { formatSize } from "@/views/setup/packSizes";
 import { isActive, useJobs } from "@/state/jobs";
 import styles from "./ModelCards.module.css";
 
@@ -52,7 +52,7 @@ function ModelCard({
       <div className={styles.head}>
         <span className={styles.name}>{model.label}</span>
         {model.isDefault && <Badge tone="accent">Default</Badge>}
-        <span className={styles.size}>{formatBytes(model.bytes)}</span>
+        <span className={styles.size}>{formatSize(model.bytes)}</span>
       </div>
       <div className={styles.meta}>
         {model.license}

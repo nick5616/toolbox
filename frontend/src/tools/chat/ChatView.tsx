@@ -335,6 +335,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
           blocked={blocked}
           blockedReason={blockedReason}
           generating={generating}
+          busy={status.busy}
           onSend={send}
           onStop={stop}
         />

@@ -71,12 +71,15 @@ type Chat struct {
 	status    core.ChatStatus
 	ollamaErr string // note shown when Ollama is configured but unreachable
 	gen       *generation
+	freed     chan struct{} // closed (and reset) whenever the slot frees or a waiter leaves
+	waitingIx int           // interactive requests waiting for the slot
+	ixWait    time.Duration // how long an interactive request waits for a background one
 	idleTimer *time.Timer
 }
 
 // New returns Local Chat (no server is started until the first Send).
 func New(cfg Config) *Chat {
-	c := &Chat{cfg: cfg, tm: defaultTimings()}
+	c := &Chat{cfg: cfg, tm: defaultTimings(), ixWait: 60 * time.Second}
 	c.status = core.ChatStatus{State: core.ChatStopped}
 	c.modelURL = func(e catalogEntry) string { return e.URL() }
 	c.entries = func() []catalogEntry { return catalog }

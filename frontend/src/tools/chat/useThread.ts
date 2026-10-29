@@ -3,7 +3,7 @@ import { ChatMessageStatus, ChatRole, ChatService, type ChatDone, type ChatMessa
 import { on } from "@/lib/events";
 
 export function isStreaming(m: ChatMessage): boolean {
-  return m.role === ChatRole.ChatRoleAssistant && !m.status;
+  return m.role === ChatRole.ChatRoleAssistant && (!m.status || m.status === ChatMessageStatus.ChatMessageStreaming);
 }
 
 interface Pending {

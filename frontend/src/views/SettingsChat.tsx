@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, ConfirmDialog, Field, Section, Select, Slider, Switch, TextArea, TextField, toast } from "@/components";
 import { ChatService, type ChatModelInfo, type ChatSettings } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
-import { formatBytes } from "@/lib/format";
+import { formatSize } from "@/views/setup/packSizes";
 import { useSettings } from "@/state/settings";
 import { ModelCards } from "@/tools/chat/ModelCards";
 import styles from "./SettingsChat.module.css";
@@ -180,7 +180,7 @@ export function SettingsChat() {
               {installed.map((m) => (
                 <li key={m.id} className={styles.modelRow}>
                   <span className={styles.modelName}>{m.label}</span>
-                  <span className={styles.size}>{formatBytes(m.bytes)}</span>
+                  <span className={styles.size}>{formatSize(m.bytes)}</span>
                   <Button size="sm" variant="ghost" aria-label={`Delete ${m.label}`} onClick={() => setDeleting(m)}>
                     Delete
                   </Button>
@@ -196,7 +196,7 @@ export function SettingsChat() {
         open={deleting !== null}
         tone="danger"
         title={deleting ? `Delete ${deleting.label}?` : "Delete model?"}
-        body={deleting ? `This frees ${formatBytes(deleting.bytes)}. You can download it again later.` : undefined}
+        body={deleting ? `This frees ${formatSize(deleting.bytes)}. You can download it again later.` : undefined}
         confirmLabel="Delete"
         onConfirm={() => deleting && void remove(deleting)}
         onCancel={() => setDeleting(null)}

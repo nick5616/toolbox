@@ -151,6 +151,15 @@ func (s *Service) Conversation(id string) (ConversationView, error) {
 	if msgs == nil {
 		msgs = []core.ChatMessage{}
 	}
+	s.c.mu.Lock()
+	if g := s.c.gen; g != nil && !g.background && g.convID == id && g.msgID != "" {
+		for i := range msgs { // reopening mid-answer keeps streaming
+			if msgs[i].ID == g.msgID {
+				msgs[i].Status = core.ChatMessageStreaming
+			}
+		}
+	}
+	s.c.mu.Unlock()
 	_, trimmed := buildHistory(conv.SystemPrompt, msgs, s.c.cfg.Settings.Current().Chat.ContextSize)
 	return ConversationView{Conversation: conv, Messages: msgs, Trimmed: trimmed}, nil
 }

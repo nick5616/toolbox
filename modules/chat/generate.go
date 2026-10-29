@@ -21,31 +21,99 @@ type generation struct {
 	cancel context.CancelFunc
 	done   chan struct{}
 	ctx    context.Context
+	// background marks a TextGenerator completion; purpose is shown as
+	// chat:status Busy.
+	background bool
+	purpose    string
 }
 
 const conflictMsg = "Wait for the current answer or stop it"
 
-// reserve takes the single generation slot (conflict when it's taken).
+// reserve takes the single generation slot for an interactive request. When
+// a background completion holds it, it waits (up to ixWait) and has priority
+// over queued background requests; when an interactive answer holds it, it
+// fails at once with a conflict.
 func (c *Chat) reserve(convID string) (*generation, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.gen != nil {
-		return nil, core.Errorf(core.CodeConflict, "%s", conflictMsg)
+	return c.acquire(context.Background(), &generation{convID: convID})
+}
+
+// acquire takes the slot for g (a background g sets background/purpose).
+func (c *Chat) acquire(ctx context.Context, g *generation) (*generation, error) {
+	var timeout <-chan time.Time
+	waiting := false
+	defer func() {
+		if waiting {
+			c.mu.Lock()
+			c.waitingIx--
+			c.broadcastLocked() // a queued background request may go now
+			c.mu.Unlock()
+		}
+	}()
+	for {
+		c.mu.Lock()
+		cur := c.gen
+		switch {
+		case cur == nil && (!g.background || c.waitingIx == 0):
+			gctx, cancel := context.WithCancel(context.Background())
+			g.cancel, g.done, g.ctx = cancel, make(chan struct{}), gctx
+			c.gen = g
+			out := c.statusLocked()
+			c.mu.Unlock()
+			if g.background {
+				c.cfg.Emitter.Emit(core.EventChatStatus, out)
+			}
+			return g, nil
+		case !g.background && cur != nil && !cur.background:
+			c.mu.Unlock()
+			return nil, core.Errorf(core.CodeConflict, "%s", conflictMsg)
+		}
+		if !g.background && !waiting {
+			waiting = true
+			c.waitingIx++
+			timeout = time.After(c.ixWait)
+		}
+		if c.freed == nil {
+			c.freed = make(chan struct{})
+		}
+		ch := c.freed
+		busy := ""
+		if cur != nil {
+			busy = cur.purpose
+		}
+		c.mu.Unlock()
+		select {
+		case <-ch:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-timeout:
+			return nil, core.Errorf(core.CodeConflict, "Local Chat is busy: %s", busy)
+		}
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	g := &generation{convID: convID, cancel: cancel, done: make(chan struct{}), ctx: ctx}
-	c.gen = g
-	return g, nil
+}
+
+// broadcastLocked wakes everyone waiting for the slot (c.mu held).
+func (c *Chat) broadcastLocked() {
+	if c.freed != nil {
+		close(c.freed)
+		c.freed = nil
+	}
 }
 
 // release frees the slot (the generation goroutine, or an early failure).
 func (c *Chat) release(g *generation) {
 	g.cancel()
 	c.mu.Lock()
+	freed := false
 	if c.gen == g {
 		c.gen = nil
+		freed = true
+		c.broadcastLocked()
 	}
+	out := c.statusLocked()
 	c.mu.Unlock()
+	if freed && g.background {
+		c.cfg.Emitter.Emit(core.EventChatStatus, out)
+	}
 }
 
 // stopGeneration stops the running generation (if any) and waits until its
@@ -74,7 +142,9 @@ func (c *Chat) stopGenerationFor(match func(*generation) bool) {
 func (c *Chat) startGeneration(g *generation, conv core.ChatConversation, assistantID string, msgs []core.ChatMessage) bool {
 	st := c.cfg.Settings.Current().Chat
 	history, trimmed := buildHistory(conv.SystemPrompt, msgs, st.ContextSize)
+	c.mu.Lock()
 	g.msgID, g.model = assistantID, conv.Model
+	c.mu.Unlock()
 	go c.runGeneration(g, conv, history, st)
 	return trimmed
 }

@@ -9,13 +9,15 @@ export interface ComposerProps {
   blocked: boolean;
   blockedReason?: string;
   generating: boolean;
+  /** Purpose of a background completion using the engine ("" = none). */
+  busy?: string;
   /** Resolves true when the message was accepted (the box is then cleared). */
   onSend: (text: string) => Promise<boolean>;
   onStop: () => void;
 }
 
 /** Auto-growing composer: Enter sends, Shift+Enter adds a line, Esc or the Stop button stops. */
-export function Composer({ loading, blocked, blockedReason, generating, onSend, onStop }: ComposerProps) {
+export function Composer({ loading, blocked, blockedReason, generating, busy, onSend, onStop }: ComposerProps) {
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
   const disabled = loading || blocked;
@@ -45,6 +47,11 @@ export function Composer({ loading, blocked, blockedReason, generating, onSend, 
 
   return (
     <div className={styles.composer}>
+      {busy ? (
+        <p className={styles.busyLine} role="status">
+          Busy: {busy.toLowerCase()}…
+        </p>
+      ) : null}
       <div className={styles.composerBox}>
         <TextArea
           ref={ref}
