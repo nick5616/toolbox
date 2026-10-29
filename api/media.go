@@ -4,6 +4,7 @@ package api
 // MD1 implements the bodies (SPEC.md §3.2, §3.4).
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -28,6 +29,11 @@ type MediaService struct {
 	Jobs    *core.Jobs
 	Resolve func(depID string) (string, error) // deps.Service.Resolve
 	GOOS    string                             // runtime.GOOS; tests override
+
+	// unexported (MD1): token LRU and job hooks (nil = use Jobs).
+	tokens tokenTable
+	submit func(ctx context.Context, moduleID string, inputs []string, optionsJSON string) ([]core.Job, error)
+	list   func(ctx context.Context, f core.JobFilter) ([]core.Job, error)
 }
 
 // MediaPrefix is the URL path prefix the middleware serves.
