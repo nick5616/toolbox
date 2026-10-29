@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"toolbox/core"
+	"toolbox/core/media"
 	"toolbox/core/proc"
 )
 
@@ -45,7 +46,7 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 
 	job.SetTitle(filepath.Base(input))
 
-	tracker := &progressTracker{}
+	tracker := &media.ProgressTracker{}
 	if preset.Kind != core.KindImage {
 		out, perr := proc.Output(ctx, 15*time.Second, ffprobe,
 			"-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", input)
@@ -53,7 +54,7 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 			return fmt.Errorf("conversion cancelled: %w", ctx.Err())
 		}
 		if perr == nil {
-			tracker.duration = parseDuration(out)
+			tracker.Duration = parseDuration(out)
 		} else {
 			job.Logf("Couldn't read duration: %v", perr)
 		}
@@ -73,7 +74,7 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 		Args: args,
 		OnStdout: func(l string) {
 			mu.Lock()
-			pct, msg, changed := tracker.apply(l)
+			pct, msg, changed := tracker.Apply(l)
 			mu.Unlock()
 			if changed {
 				job.Progress(pct, msg)
