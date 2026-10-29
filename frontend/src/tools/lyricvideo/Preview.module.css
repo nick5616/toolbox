@@ -1,0 +1,124 @@
+.frame {
+  position: relative;
+  overflow: hidden;
+  container-type: size;
+  width: 100%;
+  max-height: 100%;
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.note {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  background: var(--bg-raised);
+  border-radius: var(--r-sm);
+}
+
+.cover {
+  position: absolute;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-pop);
+}
+
+.coverWide {
+  left: 5%;
+  top: 20%;
+  height: 60%;
+  aspect-ratio: 1 / 1;
+}
+
+.coverTall {
+  left: 27.5%;
+  top: 6%;
+  width: 45%;
+  aspect-ratio: 1 / 1;
+}
+
+.text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5cqmin;
+  padding: 0 6cqw;
+  text-align: center;
+  font-weight: 700;
+  font-size: 6.5cqmin;
+  text-shadow: 0 0 0.2em rgb(0 0 0 / 0.6);
+}
+
+.textWide {
+  left: 33%;
+}
+
+.textTall {
+  top: 55%;
+}
+
+.lower {
+  justify-content: flex-end;
+  padding-bottom: 14cqh;
+}
+
+.line {
+  line-height: 1.2;
+}
+
+.next {
+  font-size: 0.8em;
+  opacity: 0.55;
+  line-height: 1.2;
+}
+
+.title {
+  display: flex;
+  flex-direction: column;
+  gap: 1cqmin;
+}
+
+.titleMain {
+  font-size: 1.3em;
+}
+
+.titleSub {
+  font-size: 0.7em;
+  opacity: 0.8;
+}
+
+.viz {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 0;
+  height: 18%;
+  opacity: 0.6;
+  background-color: currentColor;
+}
+
+.vizWave {
+  clip-path: polygon(0 55%, 100% 55%, 100% 60%, 0 60%);
+}
+
+.vizBars {
+  background-image: repeating-linear-gradient(90deg, currentColor 0 6px, transparent 6px 10px);
+  background-color: transparent;
+  mask-image: linear-gradient(0deg, #000 30%, transparent);
+}
+
+.vizRaised {
+  bottom: 14%;
+}
