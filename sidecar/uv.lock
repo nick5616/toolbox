@@ -1540,7 +1540,7 @@ wheels = [
 
 [[package]]
 name = "toolbox-sidecar"
-version = "0.5.0"
+version = "0.6.0"
 source = { virtual = "." }
 dependencies = [
     { name = "audio-separator", extra = ["cpu"] },
@@ -1552,6 +1552,7 @@ dependencies = [
     { name = "mir-eval" },
     { name = "numpy" },
     { name = "onnxruntime" },
+    { name = "opencv-python-headless" },
     { name = "pillow" },
     { name = "pillow-heif" },
     { name = "pretty-midi" },
@@ -1579,6 +1580,7 @@ requires-dist = [
     { name = "mir-eval", specifier = ">=0.8" },
     { name = "numpy", specifier = ">=2.5" },
     { name = "onnxruntime", specifier = ">=1.31" },
+    { name = "opencv-python-headless", specifier = ">=5.0.0.93" },
     { name = "pillow", specifier = ">=12" },
     { name = "pillow-heif", specifier = ">=1.8" },
     { name = "pretty-midi", specifier = ">=0.2.11" },

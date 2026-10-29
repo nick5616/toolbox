@@ -1,3 +1,16 @@
 """Importing this package registers every handler."""
 
-from . import analysis, bgremove, image, midi, ocr, stems, system, transcribe, upscale  # noqa: F401
+from . import (  # noqa: F401
+    analysis,
+    bgremove,
+    denoise,
+    eraser,
+    image,
+    midi,
+    ocr,
+    redact,
+    stems,
+    system,
+    transcribe,
+    upscale,
+)

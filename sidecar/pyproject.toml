@@ -1,7 +1,7 @@
 [project]
 name = "toolbox-sidecar"
-version = "0.5.0"
-description = "Toolbox AI engine: stems, BPM & key, audio-to-MIDI, transcription, background removal, CPU upscaling and OCR over stdio JSON lines"
+version = "0.6.0"
+description = "Toolbox AI engine: stems, BPM & key, audio-to-MIDI, transcription, background removal, CPU upscaling, OCR, redaction, object removal and voice denoising over stdio JSON lines"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "audio-separator[cpu]==0.47.1",
@@ -22,6 +22,7 @@ dependencies = [
   "rapidocr>=3.10.0",      # OCR engine (bundled PP-OCRv6 models)
   "python-bidi>=0.6.12",   # Arabic text order for RapidOCR
   "pypdf>=6",              # searchable-PDF text overlay
+  "opencv-python-headless>=5.0.0.93",  # face detection (YuNet decode), image ops; already pulled in by rapidocr
 ]
 
 [dependency-groups]
