@@ -1,0 +1,106 @@
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.label {
+  flex: none;
+  width: 120px;
+  padding-top: var(--space-1);
+  font-size: var(--text-md);
+  color: var(--fg-muted);
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+.previewHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.fileName {
+  font-size: var(--text-md);
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.wave {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.waveHelp {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.outcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.summary {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+
+.stale {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--warn);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.progress {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
