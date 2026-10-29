@@ -28,11 +28,16 @@ import (
 	"toolbox/core/pdfium"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
+	"toolbox/modules/audiocleanup"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
+	"toolbox/modules/eraser"
+	"toolbox/modules/lyricvideo"
 	"toolbox/modules/midi"
 	"toolbox/modules/ocr"
+	"toolbox/modules/redact"
 	"toolbox/modules/stems"
+	"toolbox/modules/subtitles"
 	"toolbox/modules/transcribe"
 	"toolbox/modules/upscale"
 )
@@ -152,7 +157,28 @@ func TestEndToEndAudioEngine(t *testing.T) {
 		}
 		return p, nil
 	}
+	cleanupMod, err := audiocleanup.Register(reg, engine, depSvc.Resolve, paths.ModelsDir, filepath.Join(paths.CacheDir, "cleanup-preview"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	redactMod, err := redact.Register(reg, engine, depSvc.Resolve, paths.ModelsDir, filepath.Join(paths.CacheDir, "redact"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	maskDir := filepath.Join(paths.TmpDir, "eraser")
+	if _, err := eraser.Register(reg, engine, paths.ModelsDir, maskDir); err != nil {
+		t.Fatal(err)
+	}
 	for _, err := range []error{
+		// Subtitles translate needs Local Chat; the test never translates.
+		func() error {
+			_, err := subtitles.Register(reg, engine, nil, depSvc.Resolve, paths.ModelsDir)
+			return err
+		}(),
+		func() error {
+			_, err := lyricvideo.Register(reg, engine, depSvc.Resolve, paths.ModelsDir, filepath.Join(paths.CacheDir, "lyric-video"))
+			return err
+		}(),
 		stems.Register(reg, engine), bpmkey.Register(reg, engine), midi.Register(reg, engine),
 		transcribe.Register(reg, engine, paths.ModelsDir),
 		bgremove.Register(reg, engine, paths.ModelsDir), upscale.Register(reg, engine, paths.ModelsDir),
@@ -168,7 +194,7 @@ func TestEndToEndAudioEngine(t *testing.T) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Minute)
 	defer cancel()
 	if err := jobs.Start(ctx); err != nil {
 		t.Fatal(err)
@@ -263,9 +289,10 @@ func TestEndToEndAudioEngine(t *testing.T) {
 		Formats: transcribe.AllFormats(), VAD: true}
 	tj := runTranscribe(t, ctx, jobs, track, topts)
 	t.Logf("transcribe (no speech): %s", tj.Message)
-	speech, _ := filepath.Abs(filepath.Join("..", ".dev", "library", "Downloads", "Me at the zoo [jNQXAC9IVRw].mp3"))
-	if _, err := os.Stat(speech); err != nil {
-		t.Logf("skipping speech transcription: %s not found", speech)
+	speech := devPath("library", "Downloads", "Me at the zoo [jNQXAC9IVRw].mp3")
+	if speech == "" {
+		t.Logf("skipping speech transcription: dev speech sample not found")
+		runPhase6(t, ctx, jobs, depSvc, paths, cleanupMod, redactMod, maskDir, "")
 		return
 	}
 	topts.Language = "en"
@@ -303,6 +330,8 @@ func TestEndToEndAudioEngine(t *testing.T) {
 			}
 		}
 	}
+
+	runPhase6(t, ctx, jobs, depSvc, paths, cleanupMod, redactMod, maskDir, speech)
 }
 
 func runTranscribe(t *testing.T, ctx context.Context, jobs *core.Jobs, input string, opts transcribe.Options) core.Job {
