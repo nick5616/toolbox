@@ -140,3 +140,16 @@ Newest last. Format: date — decision — why.
 - 2026-10-28 — Setup screen: the disk bar sits in a fixed strip above the footer (it scrolled out of view at the default window height); pre-selection is Media on a fresh install, outdated packs otherwise; the reopened overlay's "Skip for now" just closes it. — Found in the real-app screenshot.
 - 2026-10-28 — Sandbox instances (`TOOLBOX_SUPPORT_DIR` set) get their own single-instance lock, so they run next to the real app instead of focusing it. — Needed to smoke-test while the user's own copy was running.
 - 2026-10-28 — Acceptance measurements on Windows: the Media pack (FFmpeg found on the system, so skipped) installed in 13 s with disk use equal to the catalog; Media + Image (AI engine, BiRefNet lite, upscaler, ExifTool) installed through the pack job in 2 m 48 s, measured 1.91 GB against the catalog's 1.84 GB (+3.8%, within ±10%). The engine e2e with OCR passed on a fresh install (≈4.5 min). — `integration/packs_test.go`, `TestEndToEndAudioEngine`.
+
+## Phase 6
+
+- 2026-10-28 — The Phase 6 spec was approved with "ok keep going" (as for Phase 5). — The user's approval phrase.
+- 2026-10-28 — Go packages and frontend folders drop the hyphen: `modules/{audiocleanup,lyricvideo,eraser,devutils}` and `tools/{audiocleanup,lyricvideo,eraser,devutils}`; module IDs keep the spec's `audio-cleanup`, `lyric-video`, `object-eraser`, `dev-utils`. — Go package names can't contain hyphens; matches the `bpmkey`/`bpm-key` precedent.
+- 2026-10-28 — Builders own `Validate` (in each module's `impl.go`/`run.go`); Wave 0 ships only input-extension and option-decoding checks. Modules that probe at submit get `resolve func(depID) (string, error)` in `Register`. — Keeps the frozen contract small; full validation needs each tool's logic.
+- 2026-10-28 — `ClipboardService.CopyText` writes plain text through Go **without** a self-copy marker, so a copy the user asked for is recorded once. — The marker's job is suppressing echoes of re-copied history items; a tool's Copy belongs in the history. Writing one text format from Go avoids the double recording from the webview's clipboard path.
+- 2026-10-28 — `media.ASSEscape` replaces `\`, `{` and `}` with their fullwidth look-alikes (＼ ｛ ｝). — libass has no reliable escape for braces; look-alikes can never start an override tag.
+- 2026-10-28 — Dev Utilities has no `PickFiles`; its Hash utility uses `FilesService.Pick("dev-utils")` (no filter, since it accepts no extensions). A general `FilesService.PickWith(title, extensions, multiple)` was added for pickers outside a tool's own types (Lyric Video backgrounds, Subtitles' "use a subtitle file"). — Modules can't import Wails.
+- 2026-10-28 — Palette entries for Phase 6 tools live in `tools/<dir>/commands.ts` (one per package) merged by `shell/useBuiltinCommands.ts`, instead of marked blocks in that file. — Separate files can't conflict.
+- 2026-10-28 — The vocals model for Lyric Video (`stems-vocals`, UVR-MDX-NET-Inst_HQ_3) is 66,759,214 B (GitHub release Content-Length); the engine's disk size is unchanged by 0.6.0 (OpenCV was already installed). — Measured.
+- 2026-10-28 — `core.ChatMessageStreaming` ("streaming") is a wire-only status for F1; `core.ChatStatus.Busy` and `core.VaultState.Notice` were added in Wave 0 so TG1 and FX1 don't touch `core`. — Shared wire types are foundation.
+

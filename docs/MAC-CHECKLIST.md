@@ -1,6 +1,6 @@
 # Mac verification checklist
 
-Everything from Phases 3–5 that can only be checked on the Mac (Apple Silicon). Work top to bottom; each step says what you should see. If a step fails, note its number and send the log (see the end).
+Everything from Phases 3–6 that can only be checked on the Mac (Apple Silicon). Work top to bottom; each step says what you should see. If a step fails, note its number and send the log (see the end).
 
 ## 0. Build and start
 
@@ -63,8 +63,25 @@ Everything from Phases 3–5 that can only be checked on the Mac (Apple Silicon)
 23. Check the app icon in the Dock and Finder.
     Expect: the Toolbox icon, not a generic one. If generic: `wails3 task common:generate:icons` on the Mac, rebuild.
 
+## 6. Media playback and the Phase 6 tools
+
+24. Open a 1080p MP4 in **Video Trimmer** and press Space, then drag the playhead to the middle.
+    Expect: it plays and seeks within about a second. **This is the most important Phase 6 check**: if the player stays black or never starts, note it (WKWebView refusing media from the app's own URL scheme) and continue; exports still work.
+25. Open an MKV or HEVC file in the Trimmer.
+    Expect: HEVC MP4/MOV plays directly; MKV shows "Preparing a preview copy…" and then plays.
+26. Trim 10 s in **Fast** and in **Precise** mode.
+    Expect: both outputs play in QuickTime; Precise starts on the exact frame.
+27. **Subtitles**: generate subtitles for a short Japanese or Chinese clip, then **Burn into the video**.
+    Expect: the characters render (font fallback through CoreText), not boxes.
+28. **Audio Cleanup**: Preview 10 s with Voice isolation on a noisy recording, switch Original/Cleaned while playing.
+    Expect: the switch keeps the position; the cleaned side is clearly quieter between words.
+29. **Lyric Video**: render a 9:16 preview with the karaoke fill.
+    Expect: the highlighted words sweep in time with the singing.
+30. **Redact** a group photo and **Object Eraser** a small object.
+    Expect: both finish; note how long each took.
+
 ## Logs to send back
 
 - `~/Library/Application Support/Toolbox/logs/toolbox.log` (and `toolbox.log.1` if present).
-- The numbers from steps 7, 12, 21 and 22.
+- The numbers from steps 7, 12, 21, 22 and 30, and what step 24 showed.
 - For any failed step: its number, what you saw, and a screenshot if it's visual.

@@ -90,6 +90,7 @@ core/deps  external tool detection + managed installs (yt-dlp, uv, ExifTool, ups
 core/packs tool packs: catalog, status, install/remove, tools-folder move
 core/pdfium shared PDF page renderer (go-pdfium WebAssembly, no FS mounts)
 core/imaging  pure-Go image sizes + scaled previews (jpg/png/gif/webp/bmp/tiff; no HEIC)
+core/media ffprobe probing, keyframes, webview playability, FFmpeg progress, ASS writer, fonts, preview copies
 modules/   one folder per module (downloader, placeholders, …)
 sidecar/   Python "AI engine" (stems, BPM/key, MIDI, transcription, background removal, CPU upscaling, HEIC decoding) over stdio JSON lines
 ```
@@ -187,6 +188,15 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Tool packs** (`core/packs`): the catalog is frozen data with sizes measured on the pinned versions; bump a pin → update its size. Every non-hidden, non-placeholder, non-built-in module belongs to exactly one pack. Model downloads go through `core.ModelProvider`; pack installs run dep installer modules inside one job via `JobContext.Scoped`.
 - **Tools folder:** `Paths.ToolsDir` holds `bin/`, `python/`, `sidecar/`, `models/`; the DB, logs, tmp and caches stay in the support dir. It comes from `$TOOLBOX_TOOLS_DIR` or `<support>/tools-location`. Never write tool files outside `ToolsDir`.
 - **FFmpeg and Deno** are pinned managed archives with `AllowSystem`: the managed copy wins, a system copy still counts and is never "outdated".
+
+## Media tools (Phase 6)
+
+- **Local media reaches the webview only through `/media/<token>/<name>`**, served by `api.MediaMiddleware` inside Wails' asset handler: **no socket**. Tokens are 128-bit random, held in a 512-entry in-memory LRU, and only `MediaService` creates them. Every response is capped at 4 MiB (the Windows webview buffers whole bodies); range requests answer 206. Never serve a path that didn't come through `MediaService`.
+- **Preview copies** (`media-proxy` job, `<support>/cache/media/proxy/`) exist only to play files the webview can't. Tools always read the original for outputs. The media cache is capped at 5 GB, oldest first.
+- **Rendered text** (burned-in subtitles, lyric videos) goes through `core/media` ASS files rendered by libass. Write the ASS into the job's TempDir and run FFmpeg with that as its working directory (`ass=subs.ass`), so filtergraphs never contain Windows paths. Fonts come from `media.Fonts()`.
+- **`core.TextGenerator`** (implemented by `modules/chat`) is how a tool uses the local chat model. A background completion holds the generation slot for one request at a time; interactive chat has priority. Nothing is stored as a conversation.
+- **Model files** for Redact, Object Eraser and voice denoise follow the bgremove pattern: Go pins `{file, url, sha256}`, `FetchModel` calls the engine's `<area>.prefetch`, run handlers get explicit paths and never download.
+- **Caches with pruning at start:** `cache/media` (5 GB), `cache/cleanup-preview` (1 day), `cache/lyric-video` (7 days), `cache/redact` (7 days); `tmp/eraser` masks are deleted after each job and at start.
 
 ## Conventions
 
