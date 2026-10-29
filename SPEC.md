@@ -1,1137 +1,1155 @@
-# Toolbox — Phase 6 Spec: Video Trimmer, Subtitles, Audio Cleanup, Lyric Video, Redact, Object Eraser, Dev Utilities
+# Toolbox — Phase 7 Spec: Visualizer (reactive visuals for songs, lyrics and subtitled videos)
 
-Status: **APPROVED 2026-10-28.**
-Date: 2026-10-28. Author: architect session (Opus).
+Status: **DRAFT, waiting for review.**
+Date: 2026-10-29. Author: architect session (Opus).
 
-Phases 1–5 are shipped; their specs are archived in `docs/specs/phase-{1..5}.md`, and every contract there still holds unless changed here. "P5 §x" etc. refer to those files. The order and intent come from `docs/ROADMAP.md`.
+Phases 1–6 are shipped; their specs are archived in `docs/specs/phase-{1..6}.md`, and every contract there still holds unless changed here. "P6 §x" etc. refer to those files.
+
+This phase was cut in line on 2026-10-29: Pipelines moves to Phase 8, and the later phases shift by one (`docs/ROADMAP.md`).
+
+**Where it comes from:** the user's `song-visualizer` repo (`../song-visualizer`, read only). It has:
+- **`song-visualizer/`:** 16 Canvas2D modes (waveform, geometry, tunnel, lissajous, spectrum bars, particles, radial, helix, starfield, terrain, aurora, kaleidoscope, ripples, vortex, a Guitar-Hero note highway and its reverse), 20 palettes, 4 background modes, mode cycling and switching on the beat, offline 5-band onset analysis for the highway, and MediaRecorder export.
+- **`golden-hour/`:** a party visualiser with aurora bands, rising embers, wave rings tinted blue/red by the left/right channel levels, bass and treble burst rings, a light sweep when a song starts, and palettes that drift with the time of day.
+- **`pitch-hero/`:** a background of rotating Lissajous figures, rings in the colour of the sung pitch, and drifting motes.
+
+Phase 7 keeps those ideas and their look, and rebuilds them as a GPU engine. The engine reacts to the instruments separately, to the beat and song structure, to the chords, to the words being sung or said and what they mean. It renders the same frames in the live preview and in the exported video.
 
 ---
 
 ## 0. Research findings this spec relies on
 
-Verified hands-on on this Windows machine on 2026-10-28, in `.dev/p6-research/`, except where marked *docs only*.
+Verified hands-on on 2026-10-29 on the Windows box (i7-11700K, RTX 3070, WebView2 156), in `.dev/p7-research/`, except where marked *docs only*. The full notes are in `.dev/p7-research/notes.md`. The test harness is `.dev/p7-research/harness`, a throwaway Wails v3 app built with a plain `go build`.
 
-### 0.1 FFmpeg (the pinned 9.0.2 builds from P5 §7.6)
-
-| Topic | Finding | Consequence |
-|---|---|---|
-| Filters, Windows (Gyan essentials) | `subtitles`, `ass`, `arnndn`, `afftdn`, `anlmdn`, `loudnorm`, `highpass`, `equalizer`, `showwaves`, `showfreqs`, `gblur`, `boxblur`, `drawtext`, `zscale` all present. Built with libass, libfreetype, libharfbuzz, libfribidi, fontconfig. Encoders: libx264, libx265, libvpx-vp9, aac, libmp3lame, libopus, mov_text, plus h264_nvenc/amf/qsv. | Every Phase 6 audio/video operation runs on the FFmpeg we already manage. No new binary. |
-| Filters, macOS arm64 (Martin Riedl) | The binary's configure line has `--enable-libass --enable-libfreetype --enable-libharfbuzz --enable-fontconfig --enable-libx264 --enable-libopus --enable-libmp3lame`, and the binary contains `arnndn`, `subtitles`, `drawtext` and `videotoolbox`. | Same on the Mac (checked statically; the Mac checklist runs it). |
-| Karaoke render (`.dev/p6-research/lyric/`) | An ASS file with `\kf` word timings over a `color` source plus a `showwaves` overlay, `libx264 -preset veryfast -crf 20`: **30 s of 1080p30 rendered in 3.1 s** (≈10× real time), 0.4 MB. The word fill sweeps correctly (checked on a frame). Fonts resolve through DirectWrite on Windows (`Arial` → `Arial-BoldMT`); CoreText on macOS (*docs only*). | Lyric videos and burned-in subtitles are rendered by libass from an ASS file we generate. Fonts come from a short list present on both OSes (§3.6). |
-
-### 0.2 Playing local media in the window
+### 0.1 Rendering in the webview
 
 | Topic | Finding | Consequence |
 |---|---|---|
-| Today | No tool plays audio or video; previews are images (`ImageThumb`). | Phase 6 adds a media route and a player kit (§3.2, §3.9). |
-| Wails v3 `AssetOptions.Middleware` | Runs in-process in front of the asset handler for every request the webview makes to the app origin (WebView2 `WebResourceRequested`, WKWebView scheme handler). **No socket is opened.** | Local media is served from `/media/<token>/<name>` by a middleware: no listener, so the app rule holds. |
-| Windows response writer (`internal/assetserver/webview/responsewriter_windows.go`) | Buffers the **whole response body** in a `bytes.Buffer` before handing it to WebView2. | Every media response is capped at **4 MiB** (a 206 partial response). Chromium's media stack asks for the next range by itself. |
-| Codecs (*docs only*) | WebView2 (Chromium): H.264/AAC/MP3/Opus/Vorbis/FLAC/WAV, VP8/VP9/AV1 in MP4/WebM/Ogg; no HEVC without the OS extension; MKV unreliable. WKWebView: H.264/HEVC in MP4/MOV, AAC/MP3/ALAC/FLAC/WAV; WebM VP9 on macOS 14+. | Files outside a conservative per-OS table get a **preview copy** (720p H.264 proxy, §3.3). Outputs always use the original file, never the proxy. |
+| WebGL2 in a Web Worker (`OffscreenCanvas`) | 1920×1080, RGBA16F targets, a domain-warped fBm scene plus a 2× separable bloom at half resolution plus tonemapping: **1,063 fps** render-only (ANGLE on D3D11). | The engine is WebGL2. It is the same code in the preview (main thread) and the export (worker). |
+| Canvas2D, song-visualizer style | 160 `shadowBlur` strokes, 300 particles and a line of text in a worker: **47 fps**. | No Canvas2D drawing in the engine. Glow comes from bloom, and lines and shapes are drawn with signed distances in shaders. Canvas2D is only used to rasterise text into textures. |
+| WebCodecs `VideoEncoder` (in a worker) | Supported: H.264 High 1080p (hardware and software), **1920×2160** (`avc1.640033`), 3840×2160, 1080×1920, VP9, AV1. Not supported: HEVC, and **VP9 with alpha**. | Exports are H.264. Overlays with alpha are sent as one frame twice as tall, colour on top and the alpha matte below, and FFmpeg recombines them (§7.4). |
+| Sending bytes to Go: `fetch` POST to the asset middleware | **3.2–4.2 MB/s**, whatever the body size (64 KB–8 MB), the Go read buffer or the concurrency (1–8). WebView2's request-body path is the bottleneck. | Not used for video. |
+| Sending bytes to Go: `chrome.webview.postMessage(base64)` → Wails `Options.RawMessageHandler` | **42–46 MB/s**, with messages of 64 KB–4 MB and the native `Uint8Array.prototype.toBase64`. Messages reach Go on a goroutine (Wails' 64-slot message buffer). Wails reserves the `wails:` prefix and **echoes every raw message back to the page**. | The export streams encoded video to Go as raw messages (§7.2). **No socket and no listener.** The `wails:` prefix is avoided, and the page ignores the echoes. |
+| Full pipeline | Worker GL render → `VideoEncoder` (hardware, 12 Mbps) → transfer to the main thread → base64 → postMessage → Go appends Annex-B to a file. **1080p30: 290 fps** (1,800 frames, 9.7× real time). 1920×2160 stacked: 154 fps. 1080×1920: 255 fps. Everything drains 70 ms after the last frame. | A 4-minute song exports at 1080p in under 30 s on this machine. |
+| Hidden window | The same pipeline with the window hidden (`Hidden: true`): **308 / 167 / 286 fps**. | Renders keep running while Toolbox is in the tray. The renderer lives in the main window's JS context, which exists for the app's whole life. |
+| JPEG fallback | `OffscreenCanvas.convertToBlob` JPEG at q 0.92: **34 fps**, 112 KB per frame. | Used when `VideoEncoder` can't do H.264 (§7.3). It is about real time. |
+| FFmpeg checks | Every stream decodes as H.264 High with the exact frame count. The mux `-f h264 -framerate 30 -i v.h264 -i song -c:v copy` takes 0.7 s for 60 s. Recombining stacked colour and alpha with `split → crop → alphamerge → overlay` works. | §7.4. |
+| macOS (*docs only*) | WKWebView on macOS 14+ has WebGL2 in workers (Safari 17), `VideoEncoder` with H.264 through VideoToolbox (Safari 16.4+), and WKScriptMessageHandler for raw messages. `Uint8Array.prototype.toBase64` needs Safari 18.2. | A JS base64 fallback (§7.2). The Mac checklist covers the encoder, the transport speed and text in workers. |
+
+### 0.2 Song analysis (CPU, librosa 1.0, a 180 s synthetic 120 bpm track; `.dev/p7-research/analysis_bench.py`)
+
+| Step | Time | Note |
+|---|---|---|
+| STFT, 64 mel bands, RMS, onset strength at 60 Hz | 0.93 s | |
+| Beat tracking | 1.18 s | 120.2 bpm (true: 120) |
+| Chroma (15 Hz), 24 chord templates, median filter | 1.42 s | Flickers between relatives, so chords are decided **per beat** (§5.3) |
+| Agglomerative segmentation (beat-synced MFCC + chroma) | 0.62 s | Missed the loudness jumps, so a separate **loudness-novelty** detector finds lifts and drops |
+| pYIN on the vocals (16 kHz, hop 320) | 4.1 s | YIN takes 0.33 s, but pYIN's voicing is far more reliable |
+| Demucs 4-stem (`htdemucs`, P2 §0) | about 1× real time | Already installed by the Music pack (`stems-default`) |
+
+The audio features for a 3-minute song take **about 9 s** on top of the stems. Words come from `transcribe.run` (Whisper small) on the vocals stem, as in Lyric Video.
 
 ### 0.3 What already exists and is reused
-
-| Topic | Finding | Consequence |
-|---|---|---|
-| `transcribe.run` (engine) | Writes word timestamps (`segments[].words[] {start,end,word}`) into the JSON output when `json` is among the formats. Supports `task: translate` (to English only). | Subtitles and Lyric Video call it with `formats: ["json"]` into their TempDir and do the cue/line logic in Go. |
-| `stems.run`, preset `vocals-fast` | UVR-MDX-NET-Inst_HQ_3 (≈67 MB), outputs **Vocals** + **Instrumental**. | Lyric Video isolates vocals before transcribing a song (Whisper does much worse over a full mix) and offers the instrumental as a karaoke track. |
-| OpenCV in the engine | `opencv-python-headless` is already installed (a RapidOCR dependency, P5 §0.2). | Face detection uses `cv2.FaceDetectorYN`; image ops use cv2/numpy. It becomes an explicit dependency (§3.1). |
-| Local Chat | One generation at a time (`modules/chat/generate.go`, `reserve`). llama-server supports `response_format` with a JSON schema (*docs only*). | A new `core.TextGenerator` lets other tools run one-shot prompts on the chat model (subtitle translation now, pipelines in Phase 7). |
-| Converter progress | `modules/converter/progress.go` folds `-progress pipe:1` output into progress. | Moves to `core/media` so every FFmpeg-based tool shares it. |
-
-### 0.4 Models
-
-Tested with onnxruntime 1.31.1 and numpy 2.5.4 on Python 3.12, CPU only (i7-11700K), in `.dev/p6-research/` (full notes: `.dev/p6-research/models.md`; reference scripts: `.dev/p6-research/scripts/{yunet,plates,lama2,migan2,dfn3_numpy}.py`, readable from the main checkout at `C:\Users\nickb\repos\toolbox\.dev\p6-research\`). Every size and sha256 below was computed on the downloaded file.
-
-| Use | Model, licence | Pinned URL | Bytes · sha256 | Shape and findings |
-|---|---|---|---|---|
-| **Faces** | YuNet 2023mar, MIT (code + weights) | `https://huggingface.co/opencv/face_detection_yunet/resolve/3cc26e7f1014a5ee5d74a42acee58bafc9d0a310/face_detection_yunet_2023mar.onnx` | 232,589 · `8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4` | **Input:** `input` `[1,3,640,640]` BGR 0..255, no normalisation. It runs at any size that is a multiple of 32 once the input/output dims are marked dynamic at load (patched in memory; see `yunet.py`). **Outputs:** `cls/obj/bbox/kps_{8,16,32}`, decoded as in OpenCV: score = √(cls·obj), centre `(col+b0)·s`, size `exp(b2)·s`. Then NMS 0.3. **Results:** all 7 faces of the NASA crew portrait (public domain) at 640 in 9 ms and at 1280×1024 in 78 ms. Detects faces of about 10–300 px, so **use two scales** (long side 640 and ≤ 1920) and merge them. SCRFD rejected: its weights are non-commercial. |
-| **Number plates** | open-image-models `yolo-v9-t-640-license-plates-end2end`; code MIT, **weights licence not stated** (trained with a GPL-3.0 YOLOv9 fork, not Ultralytics) | `https://github.com/ankandrew/open-image-models/releases/download/assets/yolo-v9-t-640-license-plates-end2end.onnx` | 7,835,770 · `c3c1026ca7d0585dd88084d68182dd897113712fa734ae1557ca70174440c076` | **Input:** `images` `[1,3,640,640]` RGB/255, letterboxed with grey 114, centred. **Output:** `output0` `[n,7]` = batch, x1, y1, x2, y2, class, score. NMS built in; threshold 0.25. 50–65 ms. **Results:** all plates in 4/4 test photos (CC BY-SA, Geograph), small distant plates scoring 0.31–0.38, so tile large images. The t-384 variant missed plates. Strictly permissive fallback: DEIMv2-nano (MIT card, 16 MB, 2/3 plates). The `assets` tag can be re-uploaded, so the sha check is what protects us. |
-| **Inpainting, best** | LaMa (big-lama ONNX port by Carve), Apache-2.0 | `https://huggingface.co/Carve/LaMa-ONNX/resolve/c3c0c9e468934d62e79c329e35d82dd09ff8c444/lama_fp32.onnx` | 208,044,816 · `1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6` | **Inputs:** `image` f32 `[1,3,512,512]` RGB 0..1; `mask` f32 `[1,1,512,512]`, 1 = hole. **Output:** `output` f32 **0..255**. The size is **fixed at 512**, so we crop, resize and paste back. **1.85 s per call.** Clean result on the test photo **only with the mask dilated ~10–15 px**; an undilated mask leaves a dark ghost. |
-| **Inpainting, fast** | MI-GAN pipeline v2, MIT (code + weights) | `https://huggingface.co/andraniksargsyan/migan/resolve/406830d0fa60666da0071c342ad2fbc8f30c5c64/migan_pipeline_v2.onnx` | 28,079,181 · `6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b` | **Inputs:** `image` u8 `[1,3,H,W]` RGB; `mask` u8 `[1,1,H,W]`, **255 = keep, 0 = hole** (the opposite of LaMa), binary. **Output:** `result` u8, full size. Any size (it crops and pastes back itself), about 0.8 s. Fine for small objects; it smears large ones. |
-| **Voice denoise (AI)** | DeepFilterNet3 ONNX, MIT/Apache-2.0 | `https://raw.githubusercontent.com/Rikorose/DeepFilterNet/d375b2d8309e0935d165700c91da9de862a99c31/models/DeepFilterNet3_onnx.tar.gz` | 7,983,136 · `c94d91f70911001c946e0fabb4aa9adc37045f45a03b56008cb0c8244cb63616` | The tarball holds `enc.onnx` (1,954,042 · `7c5399d3…1916`), `erb_dec.onnx` (3,292,397 · `ab669a1d…d895`) and `df_dec.onnx` (3,340,803 · `23114ce3…278a`): 8,587,242 B on disk. `pip install deepfilternet` is impossible (numpy < 2, no py3.12 wheel). **A ~70-line numpy port** (`dfn3_numpy.py`: STFT, ERB/spec features with running normalisation, 2-frame lookahead, mask and 5-tap deep filter) matches the official v0.5.6 binary (correlation 0.99998, −43.7 dB difference). About 35× real time. The models are stateless across calls, so process **30–60 s chunks with a crossfade** (whole-file needs ~2 GB per 10 min). |
-| **Denoise (FFmpeg)** | RNNoise `std.rnnn` (Xiph), BSD-3 | `https://raw.githubusercontent.com/richardpl/arnndn-models/0fda24c46d78f0207d820bb970fbe85c1971b39c/std.rnnn` | 302,903 · `6b8943dc4a9b6b24425873992a44f29c0577503276456af46a8854774faeb294` | For FFmpeg's `arnndn`. About 33× real time, 10 ms delay. Small enough to **embed in the Go binary**. |
-
-**Denoise comparison** (30 s of public-domain speech + pink noise + 60 Hz hum; SI-SDR in dB on the speech band, higher is better):
-
-| Input SNR | Noisy | arnndn `std` | DeepFilterNet3 |
-|---|---|---|---|
-| 5 dB | 9.2 | 12.3 | **14.6** |
-| 0 dB | 4.2 | 8.7 | **11.3** |
-
-DeepFilterNet3 leaves rumble below 150 Hz alone, so it's always paired with the 80 Hz high-pass.
-
-**Samples for tests** in `.dev/p6-research/samples/` (local only, never committed):
-- `STS-125_crew_portrait.jpg` (NASA, public domain);
-- two Geograph car photos (CC BY-SA 2.0);
-- `schumer_pd.ogg` (public-domain speech).
+- **Stems:** `stems.separate` with preset `four-fast` (`htdemucs`): Vocals, Drums, Bass, Other.
+- **Words:** `transcribe.run` with word timestamps (P6 §0.3).
+- **Lyrics logic:** Lyric Video's alignment (Needleman–Wunsch), LRC/SRT/VTT parsing and words-to-lines rule (P6 §7.2). These move to a shared `core/lyrics` package (§4.2).
+- **Local Chat model:** `core.TextGenerator` with JSON-schema replies (P6 §3.5) reads the mood and imagery of the words.
+- **Media route:** `MediaService.URLFor` serves the analysis files and textures to the renderer (P6 §3.2). Responses are capped at 4 MiB, so the client reads larger files in ranges (§6.2).
+- **Media kit:** `MediaPlayer`, `Timeline`, `useMediaSource` (P6 §3.11).
 
 ---
 
 ## 1. Goals
 
-1. **Video Trimmer:** cut one or more ranges out of a video or audio file. A player with frame stepping and a filmstrip timeline. A **lossless fast mode** (stream copy, cuts on keyframes) and a **precise mode** (re-encode), with optional reframing to 9:16 / 1:1 / 4:5 and a "fit under N MB" limit.
-2. **Subtitles:** generate subtitles from speech (Whisper), edit them against the video, **translate** them (Whisper to English, or Local Chat to ~30 languages), then save `.srt`/`.vtt`, **add them as a track** (lossless) or **burn them in** with a choice of styles.
-3. **Audio Cleanup:** high-pass, hum removal, noise reduction (light, strong, or AI voice isolation) and loudness normalisation to a target (podcast −16 LUFS, streaming −14, broadcast −23). It has a 10-second A/B preview and before/after loudness, for audio files and the audio of video files.
-4. **Lyric Video:** song → timed lyrics (detected from the vocals, pasted lyrics aligned to the song, or an `.lrc`/`.srt` file) → an editable lyric sheet with tap-to-sync → a rendered MP4. It offers a word-by-word karaoke fill, cover-art or colour backgrounds, an optional visualiser, 16:9 / 9:16 / 1:1, and an instrumental (karaoke) audio option.
-5. **Redact:** find faces and number plates in photos and videos, review the detections (toggle, add boxes by hand), then blur, pixelate or black them out. Metadata is removed from the output.
-6. **Object Eraser:** paint over something in a photo and it is filled in from its surroundings (inpainting, on the AI engine). You can erase again on the result.
-7. **Dev Utilities:** JSON, Base64, URL, hashes (text and files), UUID/ULID, JWT, timestamps, number bases, colours, regex, diff and text case tools. Offline and built in.
-8. **Shared foundations:** a no-socket media route, media probing, a preview-copy (proxy) job, filmstrips and waveforms, a media player kit for the UI, an ASS writer, and `core.TextGenerator`.
-9. **Phase 5 follow-ups** (§11): the small open issues from the Phase 5 summary.
+1. **Visualizer tool:** drop a song or a video and get a reactive visual video.
+   - **Song:** full-frame visuals, optionally with lyrics that react to the music.
+   - **Video:** visuals laid **over the video** (with alpha), plus optional reactive subtitles. Or the video's sound alone drives full-frame visuals.
+2. **Hear the song the way a VJ would.** One analysis pass (cached) produces:
+   - the **instruments separately** (drums split into kick, snare and hi-hats; bass; vocals; other);
+   - the **beat and bars**, the **sections** (intro, verse, chorus, drop, bridge, outro) and **lifts/drops**;
+   - the **chords and key**, and the **vocal pitch** and **held notes**;
+   - the **words** with their timings, and the **meaning** of each line: mood (valence and energy), emotion, imagery ("fire", "rain", "stars"…) and the words to emphasise.
+3. **Control what shows, when, and why:**
+   - **Presets** to start from.
+   - A **Reactions** panel: what drives what, for example "Kick → rings 80%".
+   - A **visual mix** with one fader per instrument, for words and for mood.
+   - A **Song Map** timeline that lets you choose the scene for each section.
+   - A live **"Why"** readout of what is driving the picture at the playhead.
+   - An **Advanced** layer stack where any parameter can be bound to any signal.
+4. **Beauty and variety:** a big step up from the source repo.
+   - **Light:** HDR rendering, bloom, filmic tonemapping, dithering (no banding in H.264), and SDF anti-aliasing.
+   - **Colour and motion:** palettes in OKLab, envelopes that breathe instead of flicker, and adaptive normalisation for each song.
+   - **Variety:** **31 layer types** and **20 curated presets**, covering every mode from the source repo plus new ones.
+5. **Exact, fast export:** the frames the preview shows are the frames the export writes.
+   - Speed: ≥ 4× real time at 1080p30 on the Windows box.
+   - Formats: 16:9, 9:16, 1:1 and 4:5; 720p to 2160p; 30 or 60 fps.
+   - Audio: original or instrumental.
+6. **Works with Lyric Video and Subtitles:** each gets a "Make it reactive" handoff into the Visualizer that carries the timed text (and Lyric Video's look). Subtitles cues keep word timings from generation.
 
-## 2. Non-goals (Phase 6)
+## 2. Non-goals (Phase 7)
 
-- **Chaining tools** (that is Phase 7's Pipelines). Each tool still hands off through Library → Send to.
-- **Video Trimmer:** multi-track editing, transitions, effects, titles, speed changes; "smart cut" (re-encoding only the frames around a cut); joining different files.
-- **Subtitles:** speaker labels, styling individual cues, ASS/SSA editing (`.ass` import is out; `.srt` and `.vtt` only), image subtitles (PGS/VobSub) extraction, translating with an online service.
-- **Audio Cleanup:** multitrack, manual EQ, de-essing, de-reverb, click repair.
-- **Lyric Video:** looking lyrics up online (no outbound calls), animated text effects beyond the karaoke fill and fades, multiple singers, video-clip backgrounds longer than the song's needs (they loop).
-- **Redact:** text and document redaction (PDFs, screenshots of text), licence-plate *reading*, tracking that follows a box the user drew by hand in a video (manual video boxes are fixed-position over a time range), audio bleeping.
-- **Object Eraser:** video, prompt-based generative fill, automatic object selection (click-to-select).
-- **Dev Utilities:** anything that goes on the network (HTTP client, DNS, ping), code formatting for programming languages, cron or SQL helpers.
-- New tool packs: the seven tools join existing packs (§3.8).
-
----
-
-## 3. Foundation changes (Wave 0, architect)
-
-### 3.1 Dependencies
-- **Engine:** `pyproject.toml` adds `opencv-python-headless` explicitly (no version change: pin `>=` the locked version) and bumps the version to **0.6.0**. The description gains "redaction and object removal". Run `uv lock`; no other lock entry may change.
-- **Frontend:** `yaml@2` (ISC, no dependencies) for Dev Utilities' JSON ↔ YAML.
-- **Go:** nothing new.
-
-### 3.2 Media route (`api/media.go`, middleware in `main.go`)
-- `api.MediaMiddleware(m *MediaService) application.Middleware` handles paths under `/media/` and passes everything else to `next`.
-- URLs look like `/media/<token>/<url-escaped basename>`. The token is 128 random bits (hex) and maps to an absolute path in an in-memory LRU of 512 entries, filled only by `MediaService` methods. An unknown token gives 404. The basename is only there so the browser sees an extension; it is ignored.
-- Only `GET` and `HEAD`; anything else gives 405.
-- Range handling (own code, not `http.ServeContent`, so the cap applies):
-  - `Range: bytes=a-b` / `a-` / `-n`: answer **206** with `Content-Range`. The body is at most **4 MiB** (`b` is clamped).
-  - No `Range` header: the whole file with 200 if it is ≤ 4 MiB, else a 206 for the first 4 MiB.
-  - Invalid or unsatisfiable range: 416 with `Content-Range: bytes */size`.
-  - Always `Accept-Ranges: bytes`, `Cache-Control: no-store`, and `Content-Type` from the extension (mp4, m4v, mov, webm, mkv, mp3, m4a, aac, wav, flac, ogg, opus, jpg, png; else `application/octet-stream`).
-- Files are opened per request and closed after; a file that disappeared gives 404.
-- The middleware never logs paths.
-
-### 3.3 `core/media` (new package)
-`core/media` imports `core` and `core/proc` only.
-
-```go
-// Info is the probed shape of a media file (times in ms).
-type Info struct {
-    DurationMs int64        `json:"durationMs"`
-    StartMs    int64        `json:"startMs"`   // container start_time (≠ 0 for some TS/MKV files)
-    Container  string       `json:"container"` // ffprobe format_name, first entry
-    SizeBytes  int64        `json:"sizeBytes"`
-    BitRate    int64        `json:"bitRate"`   // bit/s, 0 = unknown
-    Video      *VideoStream `json:"video"`     // nil = no video (cover art is not video)
-    Audio      []AudioStream    `json:"audio"`
-    Subtitles  []SubtitleStream `json:"subtitles"`
-    HasCover   bool              `json:"hasCover"` // attached_pic stream
-    Tags       map[string]string `json:"tags"`     // lowercased keys: title, artist, album, …
-}
-type VideoStream struct {
-    Index         int     `json:"index"`
-    Codec         string  `json:"codec"`
-    Width, Height int     `json:"width" / "height"` // display size: rotation and SAR applied
-    FPS           float64 `json:"fps"`              // avg_frame_rate; 0 = unknown
-    Rotation      int     `json:"rotation"`         // 0/90/180/270 from the display matrix
-    PixFmt        string  `json:"pixFmt"`
-}
-type AudioStream struct {
-    Index int; Codec string; Channels, SampleRate int; Language string // ISO 639-2 tag or ""
-}
-type SubtitleStream struct {
-    Index int; Codec string; Language, Title string
-    Text bool // subrip/ass/webvtt/mov_text: extractable as text
-}
-
-func Probe(ctx context.Context, ffprobe, path string) (Info, error)
-// Keyframes lists video keyframe times (ms, ascending) using
-// -skip_frame nokey -select_streams v:0 -show_entries frame=pts_time.
-func Keyframes(ctx context.Context, ffprobe, path string) ([]int64, error)
-// Playable reports whether the webview on goos can play the file directly (§0.2 table).
-func Playable(info Info, ext, goos string) bool
-```
-
-- `Probe` caches results in memory by (path, size, mtime), up to 256 entries. Errors are `AppError`s: "Couldn't read this file as audio or video" with ffprobe's last stderr line as the hint.
-- `Playable` uses a conservative table:
-  - **Windows:** containers mp4/m4v/mov/webm/ogg/mp3/m4a/wav/flac; video h264/vp8/vp9/av1; audio aac/mp3/opus/vorbis/flac/pcm.
-  - **macOS:** containers mp4/m4v/mov/mp3/m4a/wav/flac/aiff; video h264/hevc; audio aac/mp3/alac/flac/pcm.
-- **Progress:** `progressTracker` moves from `modules/converter` to `core/media` as an exported `ProgressTracker` (same behaviour, tests move too). The converter then uses it.
-- **ASS writer** (`core/media/ass.go`):
-  - `ASSDoc{PlayResX, PlayResY int; Styles []ASSStyle; Events []ASSEvent}` and `(d ASSDoc) WriteTo(w io.Writer)`.
-  - `ASSStyle` carries the V4+ style fields we use: name, font, size, primary/secondary/outline/back colours as `#RRGGBB` plus alpha, bold, border style, outline, shadow, alignment, margins.
-  - `ASSEvent{Layer int; StartMs, EndMs int64; Style, Text string}`.
-  - `ASSEscape(text)` escapes `{`, `}` and `\`, and turns newlines into `\N`.
-  - `ASSColor("#rrggbb", alpha)` gives `&HAABBGGRR`.
-  - `ASSTime(ms)` gives `H:MM:SS.cc`.
-- **Running FFmpeg with an ASS file:** tools write it as `subs.ass` in the job's TempDir and run FFmpeg with that as its working directory, referencing it relatively (`ass=subs.ass`). This avoids filtergraph escaping of Windows paths. `core/proc` gains `Cmd.Dir` if it lacks it.
-
-### 3.4 `MediaService` (bound, `api/media.go`)
-
-```go
-type MediaSource struct {
-    URL        string     `json:"url"`        // "" while a preview copy is being made
-    Info       media.Info `json:"info"`
-    Proxy      bool       `json:"proxy"`      // URL points at the preview copy
-    ProxyJobID string     `json:"proxyJobId"` // set when a preview-copy job was started or is running
-}
-func (s *MediaService) Open(path string) (MediaSource, error)
-func (s *MediaService) Keyframes(path string) ([]int64, error)
-// Filmstrip renders count (4–60) frames, height px (40–160), evenly spaced, as one
-// horizontal JPEG sprite and returns its /media URL.
-func (s *MediaService) Filmstrip(path string, count, height int) (string, error)
-// Waveform returns buckets (100–4000) peak values in 0..1 over the whole file (mono mix).
-func (s *MediaService) Waveform(path string, buckets int) ([]float32, error)
-// Frame returns a /media URL for a JPEG of the frame at ms, longest side ≤ maxDim (64–4096).
-func (s *MediaService) Frame(path string, ms int64, maxDim int) (string, error)
-// URLFor returns a /media URL for any existing file (images, outputs, cached previews).
-func (s *MediaService) URLFor(path string) (string, error)
-```
-
-- **Open:**
-  - Probes the file.
-  - If it's playable, returns its URL.
-  - If a preview copy is cached, returns that URL with `proxy: true`.
-  - If a preview-copy job for this file is queued or running, returns its ID.
-  - Otherwise submits one and returns its ID. The UI waits for the job and calls `Open` again.
-- **Preview copies** (hidden module `media-proxy`, in `api` or `core/media`, registered in `main.go`):
-  - Output: H.264 (`-preset veryfast -crf 26`, at most 720p tall, `yuv420p`), AAC 128k, `+faststart`.
-  - Keep the timeline identical: `-map 0:v:0? -map 0:a:0?` and no trimming. The proxy starts at 0, so callers subtract `Info.StartMs` the same way for both.
-  - Audio-only files (an unplayable codec such as ALAC on Windows, or AIFF) become a 192k AAC `.m4a`.
-  - Stored in `<support>/cache/media/proxy/<sha1(path|size|mtime)>.mp4`. A preview copy for a missing or changed file is never used.
-  - The cache is pruned at start and after every proxy job: oldest first, until under **5 GB**.
-  - The job title is "Preparing preview — <name>". It's cancellable, with progress through `ProgressTracker`.
-- **Filmstrip / Waveform / Frame:**
-  - Cached under `<support>/cache/media/{strip,wave,frame}/` by the same key plus parameters. That cache shares the 5 GB prune.
-  - **Filmstrip:** one FFmpeg call: `-vf fps=<count/duration>,scale=-2:<h>,tile=<count>x1 -frames:v 1`.
-  - **Waveform:** FFmpeg decodes to mono s16le at 8 kHz on a pipe; Go computes per-bucket peaks.
-  - All three take a context with a 60 s timeout. For a file without video, Filmstrip and Frame return a `validation` AppError.
-
-### 3.5 `core.TextGenerator` (`core/textgen.go`)
-
-```go
-// TextGenerator runs one-shot prompts on the local chat model. modules/chat implements it.
-type TextGenerator interface {
-    // Ready returns the model that would be used, or a dependency_missing AppError
-    // ("Download a model in Local Chat first") without starting anything.
-    Ready() (model string, err error)
-    // Complete waits (ctx-cancellable) for the chat engine's generation slot, starts the
-    // server if needed, and returns the whole reply. Nothing is stored as a conversation.
-    Complete(ctx context.Context, req CompletionRequest) (string, error)
-}
-type CompletionRequest struct {
-    System      string
-    Prompt      string
-    JSONSchema  json.RawMessage // optional; constrains the reply (llama: response_format; Ollama: format)
-    MaxTokens   int             // 0 = 2048
-    Temperature float64         // used as given (0 is valid)
-    Purpose     string          // shown in Local Chat while it runs, e.g. "Translating subtitles"
-}
-```
-
-- **Model choice:** `settings.chat.defaultModel` if it is downloaded (or an `ollama:` model while Ollama is configured). Otherwise the first downloaded catalog model in catalog order.
-- **Sharing the slot with interactive chat:**
-  - A background completion holds the generation slot for **one request only**.
-  - While it holds the slot, a user's Send waits up to 60 s for it instead of failing at once. If it is still busy after that, the existing conflict error appears, with the text "Local Chat is busy: <Purpose>".
-  - Interactive requests take priority: a waiting interactive Send is served before the next background request.
-- **Status:** `chat:status` reports `busy: <Purpose>` while a background completion runs. The Local Chat composer shows "Busy: translating subtitles…" and stays usable.
-
-### 3.6 Fonts for rendered text (`core/media/fonts.go`)
-`media.Fonts() []string` returns `Arial`, `Verdana`, `Georgia`, `Trebuchet MS`, `Impact` and `Courier New`. All six ship with both Windows and macOS. libass picks a fallback font for scripts these lack (CJK, Arabic, …) through DirectWrite or CoreText. The default is `Arial`.
-
-### 3.7 Settings, events, storage
-- No new settings keys. Tools remember their options with `SettingsService.SetModuleState`, as today.
-- No new events: proxy, preview and render work are ordinary jobs.
-- No migration.
-
-### 3.8 Tool packs (`core/packs/catalog.go`)
-New components (the sizes are filled in with measured values during Wave 0; the downloads come from §0.4):
-
-| Component | Kind | Provider (module, preset) | Packs |
-|---|---|---|---|
-| `stems-vocals` (UVR-MDX-NET-Inst_HQ_3) | model | `stems`, `vocals-fast` | Music |
-| `face-detect` (YuNet, 232,589 B) | model | `redact`, `faces` | Image |
-| `plate-detect` (YOLOv9-t plates, 7,835,770 B) | model | `redact`, `plates` | Image |
-| `inpaint` (LaMa, 208,044,816 B) | model | `object-eraser`, `best` | Image |
-| `voice-denoise` (DeepFilterNet3, 7,983,136 B download, 8,587,242 B on disk) | model | `audio-cleanup`, `voice` | Speech |
-
-MI-GAN (`object-eraser`, `fast`) isn't in a pack; it downloads on first use, like the other non-default presets. RNNoise is embedded and needs no component.
-
-**Model downloads** follow the bgremove pattern (P4):
-- Go holds `{file, url, sha256, bytes}` per preset and implements `core.ModelProvider`.
-- `FetchModel` calls an engine `<area>.prefetch` handler that does the sha-verified download into `<models>/<dir>/`.
-- The run handlers are always given explicit model paths and never download.
-
-| Preset | Directory |
-|---|---|
-| redact | `<models>/redact/` |
-| object-eraser | `<models>/eraser/` |
-| voice-denoise | `<models>/denoise/dfn3/` |
-
-The DeepFilterNet3 tarball is extracted with `tarfile` (`filter="data"`), keeping only the three `.onnx` files; it's verified by the tarball's sha and then by each file's sha.
-
-Unlocks:
-- **Media:** + `trimmer` {ffmpeg}.
-- **Speech:** + `subtitles` {engine, ffmpeg, whisper-default}, + `audio-cleanup` {ffmpeg, engine, voice-denoise}. FFmpeg and `voice-denoise` join the Speech pack's components. Audio Cleanup also works with FFmpeg alone, minus Voice isolation.
-- **Music:** + `lyric-video` {engine, ffmpeg, whisper-default, stems-vocals}. Whisper small and `stems-vocals` join the Music pack's components and are counted once with Speech (P5 §7.1).
-- **Image:** + `redact` {engine, ffmpeg, face-detect, plate-detect}, + `object-eraser` {engine, inpaint}. FFmpeg joins the Image pack.
-- **`BuiltIn`** gains `dev-utils`.
-
-The pack descriptions are updated to name the new tools. `TestEveryToolIsInOnePack` keeps passing.
-
-### 3.9 Module stubs and wiring
-- Wave 0 creates every module with its final `options.go`, descriptor, `Register`, bound service signatures, `Validate` (complete) and a `Run` that returns `core.Errorf(core.CodeInternal, "not built yet")`.
-- It registers them in `main.go` and regenerates bindings.
-- It adds tool view stubs in `frontend/src/tools/<id>/` and the `tools/index.ts` lines.
-- It adds the empty engine handler files with their `@handler` names, imported in `handlers/__init__.py`.
-
-| ID | Name | Icon (lucide) | Category | Order | Accepts | Requires | OutputSubdir |
-|---|---|---|---|---|---|---|---|
-| `trimmer` | Video Trimmer | `scissors` | media | 135 | video + audio exts (§4.1), MaxInputs 1 | ffmpeg, ffprobe | `Trimmed` |
-| `subtitles` | Subtitles | `captions` | media | 172 | video + audio + `.srt .vtt`, MaxInputs 1 | ffmpeg, ffprobe (+ engine for generate) | `Subtitles` |
-| `audio-cleanup` | Audio Cleanup | `audio-waveform` | audio | 125 | audio + video, SplitInputs, MaxInputs 50 | ffmpeg, ffprobe | `Cleaned audio` |
-| `lyric-video` | Lyric Video | `mic-vocal` | audio | 115 | audio exts, MaxInputs 1 | ffmpeg, ffprobe (+ engine for detect/align) | `Lyric videos` |
-| `redact` | Redact | `scan-face` | image | 155 | image + video exts, MaxInputs 100 (1 video) | engine, ffmpeg, ffprobe | `Redacted` |
-| `object-eraser` | Object Eraser | `eraser` | image | 145 | image exts, MaxInputs 1 | engine | `Erased` |
-| `dev-utils` | Dev Utilities | `braces` | utility | 220 | none (not matched by drops) | — | "" |
-
-- **Extension lists:**
-  - Video: `.mp4 .m4v .mov .mkv .webm .avi .ts .mts .m2ts .wmv .flv .3gp`.
-  - Audio: `.mp3 .m4a .aac .wav .flac .ogg .opus .wma .aiff .aif`.
-  - Image (Redact): `.jpg .jpeg .png .webp .bmp .tif .tiff .heic .heif`.
-  - Image (Object Eraser): the same list.
-- The icons `scissors`, `captions`, `audio-waveform`, `mic-vocal`, `scan-face`, `eraser`, `braces`, plus `play`, `pause`, `skip-back`, `skip-forward`, `repeat`, `brush`, `undo-2`, `redo-2`, `zoom-in`, `zoom-out`, `crop`, `type`, `languages`, `hash`, `clock`, `palette`, `regex`, `diff`, `key-round`, `binary`, `link`, `file-json` and `case-sensitive` are registered in `components/Icon.tsx` (P5 lesson: a missing icon silently falls back to a box).
-- **Pre-cleanup on start:** delete everything under `<support>/tmp/eraser/` and cleanup previews older than 1 day (§6, §9).
-
-### 3.10 Clipboard copy helper
-- **Go:** `ClipboardService.CopyText(text string) error` writes text through the same path Clipboard History uses for its own copies, so the self-copy marker applies and the copy isn't recorded twice.
-- **Frontend:** `lib/copy.ts` exports `copyText(text)`, which calls it, plus a toast "Copied".
-- Every Copy button added in this phase uses it, and OCR's Copy text switches to it. This fixes P5 open issue "OCR Copy text has no self-copy marker".
-
-### 3.11 Media UI kit (`frontend/src/components/media/`, built in Wave 1 by UI-M)
-These are shared by Trimmer, Subtitles, Audio Cleanup, Lyric Video and Redact. Wave 0 creates the files with their final props, types and exports, and stub bodies.
-
-- **`useMediaSource(path | null)`** returns `{status: "idle"|"loading"|"preparing"|"ready"|"error", source?: MediaSource, progress?: number, error?: AppError, retry()}`.
-  - It calls `MediaService.Open`.
-  - While a preview-copy job runs, it follows it through the jobs store ("Preparing a preview copy… 42%"), then re-opens.
-  - When the path is cleared, it cancels nothing (the job keeps its cache value).
-- **`<MediaPlayer>`** props: `{source, kind: "video"|"audio", onTime?(ms), onDuration?, overlay?: (rect: ContentRect) => ReactNode, className}`. The `ref` exposes `play() pause() toggle() seek(ms) step(frames) currentMs() playing()`.
-  - **Video:** a `<video>` with our own controls: play/pause, the time as `TimecodeInput`, frame back/forward, volume, playback speed 0.25–2×.
-  - **Audio:** cover art (Frame at 0 if `hasCover`) or a waveform, plus the same controls.
-  - **`ContentRect`** is the letterboxed rectangle of the actual picture inside the element, recomputed on resize. Overlays position against it in 0..1 coordinates.
-  - **Keys** (when the player or its tool has focus, not inside text inputs): Space play/pause; `,`/`.` one frame (at `info.video.fps`, else 1/30 s); Shift+`,`/`.` 1 s; ←/→ 5 s; Home/End.
-  - Times reported are media times minus `info.startMs`. Seeking adds it back.
-- **`<Timeline>`** props: `{durationMs, playheadMs, onSeek, filmstripUrl?, waveform?: number[], ranges?: Range[], onRangesChange?, selectedRange?, onSelectRange?, keyframes?: number[], markers?: Marker[], zoomable}`.
-  - It draws the filmstrip or waveform track, the ranges with draggable start/end handles (snapping to the playhead within 6 px), the playhead, and markers (for subtitle cues and lyric lines).
-  - Zoom: Ctrl+wheel. Horizontal scroll: wheel/Shift+wheel. A click seeks.
-  - It is keyboard-accessible: a focused handle moves one frame with ←/→ (1 s with Shift).
-- **`<BoxOverlay>`** draws boxes on a `ContentRect`: `{boxes: Box[]; onChange?; editable; drawMode}`, where `Box = {id, x, y, w, h (0..1), kind: "face"|"plate"|"manual", enabled, label?}`.
-  - A click toggles `enabled`. Drag on an empty area draws a manual box (in `drawMode`). Corner handles resize the selected box. Delete removes a manual box.
-  - Disabled boxes show dashed and dim; enabled ones show solid in the accent colour.
-- **`<CropOverlay>`**: `{aspect: number; x: number; y: number; onChange}`. A draggable window of the given aspect at full height (or full width when the target is wider than the source), with the outside dimmed.
-- **`<Waveform>`**: a canvas renderer used by Timeline and the audio player.
-- **`<ABToggle>`**: an "Original | Cleaned" segmented control that swaps the source of a player and keeps the playhead and playing state.
+- **Live input:** microphone, system audio or BlackHole capture, live party mode. The tool works on files; the preview can play full screen.
+- The source repo's **games and practice tools** (Pitch Hero scoring, MIDI Muse, the mic monitor).
+- **3D models, video textures inside scenes, or user-written shaders.** Video goes under the visuals through FFmpeg (§7.4), not into the GPU scene.
+- **Online services:** looking up lyrics, cloud sentiment, stock footage. Everything stays local.
+- **Keyframe animation by hand:** the timeline assigns scenes and palettes per section; it doesn't keyframe individual parameters.
+- **Rewriting Lyric Video or Subtitles:** their own renders (libass) stay as they are. The reactive version is made in the Visualizer through the handoff.
+- **HDR/10-bit output, ProRes, or alpha-channel video files as outputs** (overlays are composited by Toolbox).
+- Inputs longer than **60 minutes**.
 
 ---
 
-## 4. Video Trimmer (`modules/trimmer`, ID `trimmer`)
+## 3. Architecture
 
-### 4.1 Options
-```go
-type Mode string   // "fast" (stream copy) | "precise" (re-encode)
-type Join string   // "merge" (one file) | "separate" (a file per segment)
-type Aspect string // "keep" | "9:16" | "1:1" | "4:5" | "16:9"
-type Segment struct { StartMs, EndMs int64 `json:"startMs"/"endMs"` }
-type Options struct {
-    Segments    []Segment `json:"segments"`    // 1–50
-    Mode        Mode      `json:"mode"`
-    Join        Join      `json:"join"`
-    Aspect      Aspect    `json:"aspect"`
-    CropX       float64   `json:"cropX"`       // 0..1, centre of the crop window
-    CropY       float64   `json:"cropY"`
-    MaxSizeMB   int       `json:"maxSizeMB"`   // 0 = none, else 1–4000
-    MaxHeight   int       `json:"maxHeight"`   // 0 = keep, or 2160/1440/1080/720/480
-    RemoveAudio bool      `json:"removeAudio"`
-}
-// DefaultOptions: no segments (the UI fills one covering the file), fast, merge, keep, centre, no limit.
+```
+            ┌──────────────── Go ────────────────┐            ┌──────────── webview (main window) ───────────┐
+ song/video │ modules/visualizer (analyze/render) │  events    │ tools/visualizer (UI)                         │
+ ──────────▶│ core/viz  Analyzer ──▶ engine:      │──────────▶ │   ├─ live preview: viz Engine (WebGL2, main)  │
+            │           stems.separate            │            │   └─ Song Map, Reactions, Layers, Export      │
+            │           viz.analyze  (features)   │            │ viz/RenderHost (in the app shell, always on)  │
+            │           transcribe.run (words)    │  raw msgs  │   └─ render.worker: same Engine on            │
+            │           TextGenerator (meaning)   │ ◀───────── │      OffscreenCanvas → VideoEncoder (H.264)   │
+            │ core/viz  RenderBroker ──▶ FFmpeg   │ (postMsg)  │      chunks → main thread → System.invoke     │
+            │           mux / overlay composite   │            └───────────────────────────────────────────────┘
+            └─────────────────────────────────────┘
 ```
 
-**Validate:**
-- Segments are sorted, don't overlap, are each ≥ 100 ms, and lie within the probed duration.
-- `aspect ≠ keep`, `maxSizeMB > 0` or `maxHeight > 0` require `precise` ("Cropping, resizing and size limits need Precise mode").
-- A crop needs a video stream. `removeAudio` on an audio-only file is an error.
-- The size limit is checked against the total length: if the video bitrate would fall under 150 kbit/s, the error is "That's too long to fit in N MB; raise the limit or trim more".
-
-### 4.2 Run
-- **Fast:**
-  - Each segment: `ffmpeg -ss <start> -to <end> -i <in> -map 0 -c copy -avoid_negative_ts make_zero -map_metadata 0 [-an]`.
-  - Output: the input's container. `.ts`/`.mts`/`.m2ts` stay `.ts`, `.avi` and `.wmv` stay as they are, and audio files stay their type.
-  - **Merge:** segments go to TempDir, then the concat demuxer (`-f concat -safe 0 -c copy`) writes the output.
-  - Cuts land on the keyframe at or before `start`. The result's message says so when any cut moved by more than 0.5 s.
-- **Precise:**
-  - One FFmpeg run with a filter graph: `trim`/`atrim` + `setpts`/`asetpts` per segment, `concat` (or one run per segment for `separate`), then crop/scale, `libx264 -preset medium -crf 18 -pix_fmt yuv420p`, `aac -b:a 192k`, `+faststart`, MP4.
-  - Audio-only input is re-encoded to its own family: mp3 → `libmp3lame -q:a 0`, m4a/aac → aac 256k, wav → pcm_s16le, flac → flac, ogg/opus → libopus 160k, others → m4a.
-  - **Crop:** computed on display size. For a target narrower than the source: `h = H`, `w = even(H·a)`, `x = clamp(CropX·W − w/2)`. The wider case is symmetric with `CropY`.
-  - **Max size:** two-pass x264. Video bitrate = `(MB·8·1024·1024·0.97 − audio·dur) / dur`. Pass logs live in TempDir.
-- **Output names:** `<base> (trim).<ext>`, or `<base> (part N).<ext>` for separate files, made unique by the existing helper.
-- **Progress:** the sum of segment durations is the total, fed through `media.ProgressTracker`.
-- **Cancellation:** kills FFmpeg and leaves no output.
-
-### 4.3 UI (`tools/trimmer/TrimmerView.tsx`)
-**Empty state:** DropZone "Drop a video or audio file", plus Choose file.
-
-**Loaded:**
-- **Top:** `MediaPlayer`, filling the width. A `CropOverlay` appears when the aspect isn't Keep.
-- **Below it:** `Timeline` with a 30-frame filmstrip (video) or waveform (audio), the segments as ranges, and keyframes drawn as ticks in fast mode when zoomed in enough.
-- **Right panel, Segments:**
-  - Rows show `#`, start and end `TimecodeInput`, duration, and delete. Clicking a row selects it and seeks to its start.
-  - Buttons: "Set start (I)", "Set end (O)" (apply to the selected segment), and "Add segment (+)" (adds one from the playhead, 5 s long or to the end).
-  - In fast mode, a row whose start moves to an earlier keyframe shows "starts 1.4 s earlier (keyframe)".
-- **Right panel, Export:**
-  - Mode as a SegmentedControl (Fast · no quality loss / Precise · re-encode) with a one-line hint each.
-  - Join (shown when there are ≥ 2 segments).
-  - Frame: Keep / 9:16 / 1:1 / 4:5 / 16:9. Choosing one switches to Precise and shows the toast "Switched to Precise — cropping re-encodes".
-  - Size limit: None / 10 / 25 / 50 / 100 MB / Custom. Max height. Remove audio.
-- **Footer:** a summary ("2 segments · 1:23 total · ≈ 34 MB") and an "Export" primary button (Ctrl+Enter).
-  - **Estimate:** fast → source bytes × fraction kept; precise with a limit → the limit; precise without a limit → "size depends on the content".
-- **States:**
-  - Preparing a preview copy: a player placeholder with progress and the note "This format can't play in the app directly; making a preview copy. Your export uses the original."
-  - Probe error: a Banner.
-  - Job running: a progress row in the footer with Cancel.
-  - Done: the result card (`FileActions`: Open, Show in folder, Send to…).
-- Options persist through module state, but segments do not.
+- **Analysis is a Go job.** It runs the engine handlers, then writes `audio.json` + `features.bin` (the music) and `text.json` (the words and their meaning) into a cache.
+- **The engine** (`frontend/src/viz/`) is pure TypeScript + WebGL2. It turns (show, analysis, time) into a frame.
+- **Render is a Go job.** It hands a render plan to the always-mounted `RenderHost`. The host renders in a worker with the same engine and streams H.264 to Go over raw messages. Go muxes the audio, or composites the overlay onto the video, with FFmpeg.
+- **No new listener, no new binary, no new Python dependency.**
 
 ---
 
-## 5. Subtitles (`modules/subtitles`, ID `subtitles`)
+## 4. Foundation changes (Wave 0, architect)
 
-### 5.1 Options and actions
+### 4.1 Dependencies
+- **Engine:** no new packages. The version goes to **0.7.0**, and the description gains "music visualisation analysis". No lock change apart from the version.
+- **Frontend:** none. WebGL2, WebCodecs and OffscreenCanvas are built into the webview.
+- **Go:** none.
+
+### 4.2 `core/lyrics` (moved from `modules/lyricvideo`, tests move too)
 ```go
-type Action string // "generate" | "extract" | "save" | "translate" | "burn" | "embed"
-type Cue struct { StartMs, EndMs int64; Text string } // json: startMs, endMs, text; Text may contain "\n" (max 2 lines)
-type Style string  // "classic" | "boxed" | "yellow" | "minimal"
-type Options struct {
-    Action Action `json:"action"`
-    // generate
-    Model              string `json:"model"`    // "base" | "small" | "turbo" (Transcribe's presets)
-    Language           string `json:"language"` // "" auto or a Transcribe language code
-    TranslateToEnglish bool   `json:"translateToEnglish"`
-    MaxLineChars       int    `json:"maxLineChars"` // 32–60, default 42
-    MaxLines           int    `json:"maxLines"`     // 1 or 2, default 2
-    // extract
-    StreamIndex int `json:"streamIndex"`
-    // save | translate | burn | embed
-    Cues           []Cue    `json:"cues"`           // ≤ 20,000
-    Formats        []string `json:"formats"`        // save: ≥ 1 of "srt","vtt"
-    SourceLanguage string   `json:"sourceLanguage"` // translate: code or "" (unknown)
-    TargetLanguage string   `json:"targetLanguage"` // translate: code from TranslationLanguages()
-    Style          Style    `json:"style"`          // burn
-    Size           string   `json:"size"`           // burn: "s" | "m" | "l"
-    Position       string   `json:"position"`       // burn: "bottom" | "top"
-    Font           string   `json:"font"`           // burn: from media.Fonts()
-    TrackLanguage  string   `json:"trackLanguage"`  // embed: ISO 639-1 code or ""
+type Word struct { StartMs, EndMs int64; Text string }               // json: startMs, endMs, text
+type Line struct { StartMs, EndMs int64; Text string; Words []Word } // json: startMs, endMs, text, words
+
+func WordsToLines(segments [][]Word, cjk bool) []Line      // P6 §7.2 "detect" rule
+func Align(text string, recognised []Word) ([]Line, float64) // P6 §7.2 "align" (returns matched 0..1)
+func ParseFile(path string) (lines []Line, needsAlign bool, err error) // .lrc/.srt/.vtt; .txt → needsAlign
+func SpreadWords(l Line) Line                                // words by character share when none
+func WriteLRC(w io.Writer, lines []Line) error
+```
+- Lyric Video keeps its frozen `LyricLine`/`LyricWord` types and converts at the boundary. Its behaviour is unchanged, and its tests keep passing.
+
+### 4.3 `core/viz` (new package; imports `core`, `core/proc`, `core/media`, `core/lyrics`, `core/sidecar`)
+
+**Analysis types** (the full file schemas are in §5.5):
+```go
+type WordsSource string // "none" | "detect" | "align" | "file" | "given"
+type AnalyzeOptions struct {
+    Stems      bool        `json:"stems"`      // separate instruments (Demucs 4-stem)
+    Words      WordsSource `json:"words"`
+    Language   string      `json:"language"`   // "" auto or a Transcribe code
+    LyricsText string      `json:"lyricsText"` // align: ≤ 20,000 chars
+    LyricsPath string      `json:"lyricsPath"` // file: .lrc .srt .vtt .txt
+    Lines      []lyrics.Line `json:"lines"`    // given: ≤ 20,000 lines (from a handoff)
+    Meaning    bool        `json:"meaning"`    // read mood/imagery with the Local Chat model
 }
+type AnalysisRef struct {
+    Key          string          `json:"key"`          // cache folder name
+    AudioJSON    string          `json:"audioJson"`    // absolute paths
+    FeaturesPath string          `json:"featuresPath"`
+    TextJSON     string          `json:"textJson"`     // "" when Words = none
+    Instrumental string          `json:"instrumental"` // "" without stems
+    Summary      AnalysisSummary `json:"summary"`
+}
+type AnalysisSummary struct {
+    DurationMs int64    `json:"durationMs"`
+    Tempo      float64  `json:"tempo"`
+    Key        string   `json:"key"`        // "A minor"
+    Sections   []string `json:"sections"`   // labels in order
+    HasStems   bool     `json:"hasStems"`
+    HasWords   bool     `json:"hasWords"`
+    HasMeaning bool     `json:"hasMeaning"`
+    Language   string   `json:"language"`
+    Lines      int      `json:"lines"`
+    Warnings   []string `json:"warnings"`   // e.g. "No Local Chat model: mood comes from the music only"
+}
+type Analyzer struct{ /* paths, caller, textgen */ }
+func (a *Analyzer) Analyze(ctx context.Context, job *core.JobContext, input string, o AnalyzeOptions) (AnalysisRef, error)
+func (a *Analyzer) Lookup(key string) (AnalysisRef, bool)
 ```
 
-**Input** (exactly one):
-- generate, extract, burn and embed: the media file;
-- save and translate: the media or subtitle file the cues belong to, used for naming.
-
-**Validate:**
-- per action, the fields it needs;
-- cues sorted with `end > start`; text ≤ 500 chars;
-- burn and embed need a video stream; extract needs a text subtitle stream.
-
-**Service extras:**
-- `Load(path) ([]Cue, error)` parses `.srt` or `.vtt`: UTF-8 with or without a BOM, otherwise Windows-1252 fallback; VTT tags are stripped and positions ignored.
-- `TranslationLanguages() []Language` lists about 30 languages: Transcribe's list plus Bengali, Filipino, Swahili, Tamil and Urdu.
-- `Styles() []StyleInfo`.
-
-### 5.2 Generate (Go + `transcribe.run`)
-1. `job.Tool(engine)`. Call `transcribe.run` with `{path, model, language, task, formats:["json"], vad:true, outDir: TempDir}` and map progress to 0–0.9.
-2. Read the JSON. **Segment into cues** (`segment.go`, pure and table-tested):
-   - **Words** come from `segments[].words`. A segment without words becomes one cue split by characters.
-   - **Breaks are preferred, in order, at:** a sentence end (`. ? ! … 。 ？ ！`), then a pause ≥ 300 ms, then `, ; : 、 ，`, then the character limit.
-   - **Limits:**
-     - A cue holds ≤ `MaxLines` lines of ≤ `MaxLineChars` characters (CJK and Thai use 16 per line and break between characters).
-     - A cue lasts ≤ 7 s and ≥ 1 s; short cues extend into the gap, keeping ≥ 80 ms before the next cue.
-     - Reading speed: a cue over 20 chars/s extends into any gap.
-   - **Line split:** the word boundary that best balances the two lines, preferring after punctuation. Otherwise one line.
-3. Write `<base>.srt` (and `.vtt` when the user's formats include it). Result: `{language, cues, outputs}`. The UI loads the cues with `Load`.
-
-**Extract:** `ffmpeg -i in -map 0:<idx> -c:s srt out.srt`, then the same result shape.
-
-### 5.3 Save, translate
-- **Save:** writes the given cues to `<base>.srt`/`.vtt` in `Subtitles/` (unique names). The UI keeps saving to the path it got the first time in a session by passing that path as the input; overwriting is allowed only when the input path is inside the module's own output folder **and** ends in `.srt`/`.vtt`. Inputs elsewhere are never modified.
-- **Translate** (`translate.go`):
-  - `textgen.Ready()` first; a missing model fails fast with the hint and a "Open Local Chat" action.
-  - **Batching:** batches of up to 40 cues or 2,500 characters.
-  - **Prompt:**
-    - System: "You translate subtitles from {source or 'the original language'} to {target}. Translate each item; keep each one short enough to read on screen; keep line breaks (\n) where natural; keep names; never add notes."
-    - User: the JSON array of strings, preceded by the previous batch's last 3 translated lines as context.
-    - `JSONSchema`: an array of strings with `minItems = maxItems = n`. Temperature 0.2. `Purpose: "Translating subtitles"`.
-  - **Recovery:** a reply that doesn't parse or has the wrong count is retried once. After that, that batch is translated cue by cue.
-  - Timings are copied unchanged. Lines over the length limit are re-wrapped with the same line-split rule.
-  - Output: `<base>.<target>.srt`. Progress is per batch, and cancel stops between batches (and cancels the request in flight).
-
-### 5.4 Burn, embed
-- **Burn:**
-  - Write `subs.ass`:
-    - `PlayResX/Y` = the video's display size.
-    - Font size from Size: s/m/l = 4.5/5.5/6.5% of the shorter side, ×1.25 for portrait video.
-    - Margins 6% of the height. Alignment 2 (bottom) or 8 (top).
-  - **Styles:**
-
-    | Style | Text | Outline | Box |
-    |---|---|---|---|
-    | classic | white | black outline 6% of the font size | no box |
-    | boxed | white | — | BorderStyle 3, black at 55% |
-    | yellow | `#FFE14D` bold | black outline | no box |
-    | minimal | white | — | soft shadow, no box |
-
-  - Encode: `ffmpeg -i in -vf ass=subs.ass -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p`. Audio is copied when it's AAC/MP3, else AAC 192k. Output `+faststart` MP4, `<base> (subtitled).mp4`.
-- **Embed:**
-  - `ffmpeg -i in -i subs.srt -map 0 -map 1 -c copy -c:s <codec> -metadata:s:s:<n> language=<iso639-2>`, where n is the new stream.
-  - Codec by container: mp4/mov/m4v → `mov_text`; mkv → `srt`; webm → `webvtt`.
-  - Other containers are remuxed into `.mkv`, with a hint.
-  - Output `<base> (subs).<ext>`. Existing subtitle streams are kept.
-
-### 5.5 UI (`tools/subtitles/SubtitlesView.tsx`)
-The page has a stepper header: **Source → Edit → Translate → Export**. Each step is reachable once the previous one has produced cues.
-
-1. **Source.** Drop a video, an audio file, or an `.srt`/`.vtt`.
-   - For media there are three choices:
-     - "Generate from speech": model, language, the "Translate to English" switch, and line options under "More";
-     - "Use a subtitle file…";
-     - "Use the subtitles inside this video": listed per text stream with its language and title.
-   - For a subtitle file: pick a matching video (optional) to preview against.
-   - Generation shows job progress inline, with Cancel.
-2. **Edit.**
-   - **Left:** the player (video) with the current cue drawn in an HTML overlay approximating the chosen burn style, and the Timeline with cue markers.
-   - **Right: the cue list.** A windowed list for more than 200 cues. Each row has the index, start/end `TimecodeInput`, and a 2-line text area. Warnings show over 42 chars per line or 20 chars/s.
-     - The current cue is highlighted while playing; clicking a row seeks.
-     - Row menu: Split at cursor, Merge with next, Insert after, Delete.
-   - **Toolbar:**
-     - Shift all times (±ms with a stepper: "Subtitles are late by…"), Find & replace.
-     - Undo/Redo (Ctrl+Z / Ctrl+Shift+Z, 100 steps), Save (Ctrl+S → `save` job).
-     - Unsaved changes show a dot on the step and a confirm when leaving.
-3. **Translate.**
-   - The target language and the source language (prefilled from detection).
-   - The model in use, from `TextGenerator.Ready` via `subtitles.Service.TranslatorStatus()`. If none: "Download a model in Local Chat to translate" with a button.
-   - Translate → job progress → the translated cues open as a second tab in the Edit list ("Original | Spanish"). The export step uses the active tab.
-4. **Export.**
-   - Save as SRT / VTT.
-   - **Add as a track** (with the "no quality loss, the player can turn them off" note) and a track language.
-   - **Burn into the video:** style cards with a live mini preview (a still frame from `MediaService.Frame` with the HTML overlay), size, position and font.
-   - Each export is a job with the result card.
-   - Burn and embed need the source video; when the session started from a subtitle file without a video, these show "Pick the video".
-
-Nothing about the editing session is persisted except through Save.
-
----
-
-## 6. Audio Cleanup (`modules/audio-cleanup`, ID `audio-cleanup`)
-
-### 6.1 Options
+**Render types:**
 ```go
-type Denoise string  // "off" | "light" | "strong" | "voice"
-type Hum string      // "off" | "auto" | "50" | "60"
-type Loudness string // "off" | "podcast" | "streaming" | "broadcast"
-type Format string   // "same" | "wav" | "flac" | "mp3" | "m4a"
-type Options struct {
-    HighPass       bool     `json:"highPass"` // 80 Hz rumble filter
-    Hum            Hum      `json:"hum"`
-    Denoise        Denoise  `json:"denoise"`
-    Loudness       Loudness `json:"loudness"`
-    Format         Format   `json:"format"`   // ignored for video inputs (container kept)
-    Preview        bool     `json:"preview"`  // 10 s A/B excerpt instead of the whole file
-    PreviewStartMs int64    `json:"previewStartMs"`
+type RenderMode string // "opaque" | "overlay"
+type RenderPlan struct {
+    Analysis   AnalysisRef `json:"analysis"`
+    ShowJSON   string      `json:"showJson"`   // ≤ 512 KiB; validated by the renderer
+    Width      int         `json:"width"`      // even, 320..3840
+    Height     int         `json:"height"`     // even, 320..3840 (opaque) / ≤ 1440 (overlay)
+    FPS        int         `json:"fps"`        // 24 | 25 | 30 | 50 | 60
+    StartMs    int64       `json:"startMs"`
+    EndMs      int64       `json:"endMs"`
+    Mode       RenderMode  `json:"mode"`
+    CoverPath  string      `json:"coverPath"`  // optional texture (song cover art), "" = none
+    ImagePath  string      `json:"imagePath"`  // optional still background texture
+    Seed       int64       `json:"seed"`
 }
-// DefaultOptions: high-pass on, hum auto, denoise voice, loudness podcast, format same.
+type RenderBroker struct{ /* see §7.2 */ }
+// Render blocks until the renderer finishes, returning the elementary stream it wrote
+// (video.h264, or frames.mjpeg for the JPEG fallback) in job.TempDir.
+func (b *RenderBroker) Render(ctx context.Context, job *core.JobContext, plan RenderPlan) (RenderOutput, error)
+type RenderOutput struct { Path string; Codec string /* "h264" | "mjpeg" */; Frames int; Encoder string }
+// HandleRawMessage is wired to application.Options.RawMessageHandler in main.go.
+func (b *RenderBroker) HandleRawMessage(msg string, origin, topOrigin string)
 ```
 
-**Loudness targets:**
-
-| Target | Integrated | True peak | LRA |
-|---|---|---|---|
-| podcast | −16 LUFS | −1.5 dBTP | 11 |
-| streaming | −14 LUFS | −1.0 dBTP | 11 |
-| broadcast | −23 LUFS | −1.0 dBTP | 11 |
-
-### 6.2 Run (`chain.go`, pure filter construction, table-tested)
-1. Probe. A video input keeps its video stream (`-c:v copy`) and container; its audio is re-encoded (AAC 192k for MP4/MOV, Opus 160k for WebM/MKV).
-2. **Hum `auto`:** decode 30 s from the middle to mono 4 kHz PCM. Goertzel energy at 50/100/150 and 60/120/180 Hz versus the ±8 Hz neighbours. Mains frequency F is picked when its fundamental is ≥ 10 dB above the neighbours; else no hum filter. The result reports what was found.
-3. **Filter chain, in order:**
-   - `highpass=f=80` (if on);
-   - hum notches `bandreject=f=F·k:width_type=q:w=30` for k = 1..4;
-   - denoise:
-     - light = `afftdn=nr=12:nf=-50:tn=1`;
-     - strong = `arnndn=m=std.rnnn`. The model is embedded with `//go:embed` from `modules/audio-cleanup/rnnoise/std.rnnn` (plus its BSD-3 `LICENSE`), copied into TempDir, and FFmpeg runs with TempDir as its working directory;
-     - voice = DeepFilterNet3 on the engine, run as three steps:
-       - **(a)** FFmpeg applies the high-pass and hum filters and writes 48 kHz f32 WAV (channels kept) to TempDir.
-       - **(b)** `denoise.dfn3 {path, out, modelDir}` processes each channel in 30 s chunks with 1 s linear crossfades and writes WAV. It reports progress by chunk and checks cancellation between chunks. The implementation follows `dfn3_numpy.py` with no attenuation limit, in `toolbox_sidecar/dfn3.py` with `handlers/denoise.py`.
-       - **(c)** The loudness passes and encode (and the video mux) run on that WAV.
-
-       Without the engine or the model, Voice isolation shows the DepsGate. The view's default switches to Strong when the engine isn't installed. `DefaultOptions` keeps `voice`.
-   - loudness: pass 1 runs the chain + `loudnorm=I:TP:LRA:print_format=json` to `-f null`; pass 2 runs the chain + `loudnorm` with the measured values and `linear=true`, then `aresample=48000` (44100 when the input is 44.1 kHz).
-4. **Output:** `<base> (clean).<ext>`. Formats: same (WAV in → WAV out; lossy in → same codec at a high bitrate), or as chosen.
-5. **Result:** `{files: [{input, output, lufsBefore, lufsAfter, humHz}]}`. Loudness is measured by the loudnorm passes, or by a final `ebur128` pass when loudness is off.
-6. **Preview:**
-   - Excerpts 10 s from `PreviewStartMs` of the original (decoded to WAV) and the cleaned version.
-   - Both go to `<support>/cache/cleanup-preview/<jobID>-{a,b}.wav`, not the Library.
-   - Result `{previewOriginal, previewCleaned, lufsBefore, lufsAfter, humHz}`.
-   - Pruned at start (> 1 day) and when the tool view unmounts.
-
-### 6.3 UI (`tools/audio-cleanup/AudioCleanupView.tsx`)
-- FileToolLayout with the file list (batch).
-- **Options panel:** Rumble filter (switch), Hum (Auto / 50 Hz / 60 Hz / Off), Noise reduction (Off / Light / Strong / Voice isolation (AI)), each with a one-line hint: Light = gentle FFT denoise, Strong = RNNoise, Voice isolation = DeepFilterNet (best for speech; needs the AI engine). Loudness target with the numbers. Output format (hidden when every input is video).
-- **Preview card** (for the selected file):
-  - Its waveform (MediaService.Waveform). Click to set the preview start (a 10 s band is drawn).
-  - "Preview 10 s" → job → an `ABToggle` player and "−27.4 LUFS → −16.0 LUFS · hum 50 Hz removed".
-  - Changing an option marks the preview stale ("Options changed — preview again").
-- **Footer:** "Clean N files". The result table lists before/after loudness per file.
-- **Voice isolation** without its model shows the DepsGate install buttons inline.
-
----
-
-## 7. Lyric Video (`modules/lyric-video`, ID `lyric-video`)
-
-### 7.1 Options and actions
+**FFmpeg helpers:**
 ```go
-type Action string // "lyrics" | "render" | "preview" | "lrc"
-type Source string // "detect" | "align" | "file"
-type LyricWord struct { StartMs, EndMs int64; Text string }
-type LyricLine struct { StartMs, EndMs int64; Text string; Words []LyricWord } // Words may be empty
-type Look struct {
-    Background     string `json:"background"`     // "blur-cover" | "cover" | "color" | "gradient" | "image" | "video"
-    BackgroundPath string `json:"backgroundPath"` // image or video file for those backgrounds
-    Color1, Color2 string `json:"color1"/"color2"`  // #rrggbb
-    Font           string `json:"font"`           // media.Fonts()
-    TextColor      string `json:"textColor"`
-    HighlightColor string `json:"highlightColor"`
-    Karaoke        bool   `json:"karaoke"`        // word-by-word fill
-    Position       string `json:"position"`       // "center" | "lower"
-    ShowNext       bool   `json:"showNext"`       // the next line dimmed under the current one
-    Visualizer     string `json:"visualizer"`     // "none" | "wave" | "bars"
-    TitleCard      bool   `json:"titleCard"`
-    Title, Artist  string `json:"title"/"artist"`
-}
-type Options struct {
-    Action     Action      `json:"action"`
-    Source     Source      `json:"source"`     // lyrics
-    Language   string      `json:"language"`   // lyrics: "" auto or a Transcribe code
-    Text       string      `json:"text"`       // align: pasted lyrics, ≤ 20,000 chars
-    LyricsPath string      `json:"lyricsPath"` // file: .lrc, .srt, .vtt or .txt (txt = align)
-    Lines      []LyricLine `json:"lines"`      // render/preview: 1–2,000
-    Look       Look        `json:"look"`
-    Audio      string      `json:"audio"`      // "original" | "instrumental"
-    Aspect     string      `json:"aspect"`     // "16:9" | "9:16" | "1:1"
-    Height     int         `json:"height"`     // 720 | 1080 (the short side)
-    PreviewStartMs int64   `json:"previewStartMs"`
-}
+func MuxOpaque(ctx, ffmpeg string, out RenderOutput, audio string, startMs, endMs int64, fps int, dst string, onProgress func(float64)) error
+func CompositeOverlay(ctx, ffmpeg string, out RenderOutput, base string, loopBase bool, audio string, fps, w, h int, dst string, onProgress func(float64)) error
 ```
+The arguments are in §7.4. Arg construction is pure and table-tested.
 
-The input is the song.
+**Cache:** `<support>/cache/visualizer/`. It is pruned at start: folders untouched for more than 30 days, then oldest first until the total is under 3 GB.
 
-**Validate:**
-- `detect`/`align`/`instrumental` need the engine (DepsGate);
-- `file` needs `LyricsPath` to exist;
-- `image`/`video` backgrounds need `BackgroundPath`;
-- colours are `#rrggbb`;
-- lines are sorted and non-overlapping.
+### 4.4 Raw message channel (`main.go`)
+- `application.Options.RawMessageHandler` is set to call `broker.HandleRawMessage(msg, originInfo.Origin, originInfo.TopOrigin)` for messages starting with `vz1|`. Everything else is ignored (today nothing else is sent).
+- The broker accepts a message only if:
+  - its token matches an active render (128-bit random, made per render);
+  - `Origin == TopOrigin`, so it comes from the main frame;
+  - the origin is the app's own origin, captured from the first asset request (`http://wails.localhost` on Windows, `wails://wails` on macOS).
+- Anything else is dropped silently. It is counted in a debug log line, never logged with content.
 
-### 7.2 Lyrics action (Go, `lyrics.go`, `align.go`, `lrc.go`; pure parts table-tested)
-- **Vocals (detect, align):**
-  - `stems.run` preset `vocals-fast` into the cache dir `<support>/cache/lyric-video/<sha1(path|size|mtime)>/` (Vocals + Instrumental FLAC). It's reused if present; this is progress 0–0.5.
-  - Then `transcribe.run` on the vocals with `formats:["json"]`, model `small`, the language and `vad:true` (0.5–0.95).
-- **detect:** words → lines.
-  - A break happens at a Whisper segment boundary, a pause ≥ 600 ms, or > 8 words / 40 chars (16 for CJK).
-  - A line's end is its last word's end, extended to ≤ the next line's start − 100 ms and at most +1.5 s.
-- **align:** the user's text gives the lines (blank lines dropped).
-  - **Tokens:** NFKC, lowercased, punctuation stripped.
-  - **Alignment:** Needleman–Wunsch between the lyric tokens and the recognised words.
-    - Match score is `2·(1 − lev(a,b)/max(len))`, counted as a match when ≥ 0.8 (normalised similarity ≥ 0.6).
-    - Gap −1. Matched tokens take the word's times.
-  - **Unmatched runs** are interpolated between their matched neighbours in proportion to character length. Leading and trailing runs extend at 0.3 s per word.
-  - Result `matched` = matched tokens / all tokens. Under 0.4 the UI warns "Couldn't follow the song well — check the timings".
-- **file:**
-  - **LRC:** `[mm:ss.xx]` line tags (repeated tags duplicate the line), `[offset:±ms]`, and enhanced-LRC `<mm:ss.xx>` word tags.
-  - **SRT/VTT:** cues become lines.
-  - **TXT:** treated as `align`.
-  - Words are spread over each line by character share when the file has no word times. No engine is needed except for TXT.
-- The stems cache is pruned at start (folders untouched for > 7 days).
-- **Result:** `{lines, matched, hasInstrumental}`. Lines are returned through the job result (this is the one place a result carries up to about 200 KB).
-
-### 7.3 Render / preview action (`render.go`)
-- **Canvas:**
-
-  | Aspect | 1080 | 720 |
-  |---|---|---|
-  | 16:9 | 1920×1080 | 1280×720 |
-  | 9:16 | 1080×1920 | 720×1280 |
-  | 1:1 | 1080×1080 | 720×720 |
-
-  All at 30 fps.
-- **Background input:**
-  - The cover art comes from the song (`-map 0:v:0 -frames:v 1` to `cover.png`). If there's none, the background falls back to `gradient` with a hint.
-  - **blur-cover:** the cover is scaled to fill and cropped, with `gblur=sigma=40`, `eq=brightness=-0.12`.
-  - **cover:** the same blurred fill plus the sharp cover:
-    - 16:9: in the left third, 60% of the height, lyrics in the right two-thirds;
-    - 9:16 and 1:1: at the top, 45% of the width, lyrics below.
-  - **color:** a `color` source. **gradient:** a `gradients` source (vertical, Color1 → Color2).
-  - **image:** fill + crop. **video:** `-stream_loop -1`, fill + crop, muted.
-  - All looped to the song's length.
-- **Visualiser:** `showwaves` (mode `cline`) or `showfreqs` (mode `bar`, log scale) of the song, in the highlight colour at 60%, a strip of 18% of the height at the bottom (above the lyrics when Position is lower).
-- **ASS** via `core/media`:
-  - One `Lyric` style: the font, size 6.5% of the shorter side (5.5% for lines over 30 chars), bold, outline 3% of the size, shadow 0, alignment 5 (centre) or 2 (lower, margin 14%).
-  - **Karaoke** (and the line has words): `{\kf<cs>}` per word, with the gap before each word added to that word's duration. PrimaryColour = highlight, SecondaryColour = text.
-  - **Without karaoke:** text colour, with `\fad(150,150)`.
-  - **ShowNext:** a second event with the next line at 55% alpha, 80% size, one line below, during the current line.
-  - **Title card:** title (larger) and artist, from 0 to `min(3 s, firstLine − 200 ms)`, faded.
-- **Audio:** original, or the cached instrumental (made by the lyrics action, or now if missing).
-- **Encode:** `libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -r 30`, AAC 192k, `-shortest`, `+faststart`.
-- **Outputs:**
-  - `<base> (lyric video).mp4`;
-  - `<base>.lrc`, an enhanced LRC with word times when present (written by `lrc.go`).
-- **Preview:** renders 10 s from `PreviewStartMs` (the same graph with `-ss`/`-t`, the ASS times shifted) to `<support>/cache/lyric-video/preview-<jobID>.mp4`. The result is `{previewPath}`, not a Library output.
-
-### 7.4 UI (`tools/lyric-video/LyricVideoView.tsx`)
-The steps are **Song → Lyrics → Look → Render**.
-
-1. **Song.** Drop an audio file.
-   - Shows the cover (Frame) and editable Title and Artist (from tags).
-   - Audio: Original / Instrumental (karaoke) with "makes a vocals-free version on the AI engine".
-2. **Lyrics.**
-   - **Source** (SegmentedControl):
-     - "Detect from the song";
-     - "Paste lyrics" (a text area; recommended, with the hint "Paste the words and Toolbox times them to the song");
-     - "From a file" (.lrc/.srt/.vtt/.txt).
-   - Language select. "Get timings" → job progress.
-   - **The sheet:** a row per line with its start time (`TimecodeInput`), text (editable), ±0.1 s nudge buttons, and play-from-here.
-     - Edits that change a line's start shift its word times with it. Text edits re-spread the words.
-     - Toolbar: Insert line, Delete, Shift all (±ms).
-   - **Tap to sync:** plays from the start; Space stamps the current line's start and moves to the next; Backspace goes back a line; Esc ends.
-   - Low-match warning Banner.
-3. **Look.**
-   - **Left:** a live HTML preview: the background (cover blurred via CSS filter, colour or gradient), the current and next line, and a karaoke fill done with a CSS gradient clip from word times. It is driven by an audio `MediaPlayer` and shown at the chosen aspect. A note says "Preview is approximate — Render preview shows the exact result."
-   - **Right:** the aspect, the background (cards), colours (`ColorSwatchPicker`), font, text and highlight colours, Karaoke fill, Position, Show next line, Visualiser, Title card, and Quality (720p / 1080p).
-4. **Render.**
-   - "Render 10 s preview" from the current playhead → plays the exact clip in a player.
-   - "Render video" → job progress → result card (video + `.lrc`).
-
-The Look persists in module state. The lyric sheet lives in the view only. Its menu has "Export .lrc", which runs the action `"lrc"` (a fourth `Action` value): it writes only `<base>.lrc` from `Lines`, needs no engine, and ignores the look.
-
----
-
-## 8. Redact (`modules/redact`, ID `redact`)
-
-### 8.1 Options
-```go
-type Action string      // "detect" | "apply" | "auto" (detect + apply, no review)
-type Style string       // "blur" | "pixelate" | "solid"
-type Sensitivity string // "normal" | "high"
-type Box struct {       // coordinates 0..1 of the upright (EXIF-rotated / display-rotated) frame
-    ID      string  `json:"id"`
-    X, Y, W, H float64 `json:"x"/"y"/"w"/"h"`
-    Kind    string  `json:"kind"`    // "face" | "plate" | "manual"
-    Enabled bool    `json:"enabled"`
-    Score   float64 `json:"score"`
-}
-type TimedBox struct { Box; StartMs, EndMs int64 } // manual boxes in a video
-type Options struct {
-    Action        Action      `json:"action"`
-    Faces, Plates bool        `json:"faces"/"plates"`
-    Sensitivity   Sensitivity `json:"sensitivity"`
-    Style         Style       `json:"style"`
-    Strength      int         `json:"strength"`      // 1–10, default 6
-    Padding       int         `json:"padding"`       // % added around each box, 0–50, default 15
-    StripMetadata bool        `json:"stripMetadata"` // default true
-    // apply, images: input path → its boxes (only enabled ones are drawn)
-    ImageBoxes map[string][]Box `json:"imageBoxes"`
-    // apply, video
-    DetectionsPath string     `json:"detectionsPath"`
-    DisabledTracks []string   `json:"disabledTracks"`
-    ManualBoxes    []TimedBox `json:"manualBoxes"`
-}
-// DefaultOptions: faces + plates, normal, blur, 6, 15 %, strip metadata.
-```
-
-**Inputs:** 1–100 images, or exactly one video (mixing gives "Redact images and videos separately").
-
-**Validate:**
-- at least one of faces/plates for detect/auto;
-- apply needs boxes for every input (images) or `DetectionsPath` inside `<support>/cache/redact/` (video).
-
-**Thresholds** (face / plate):
-- normal: 0.6 / 0.3;
-- high: 0.45 / 0.2.
-
-**Presets** (`ModelProvider`): `faces` and `plates` (§0.4) in `<models>/redact/`. A missing model shows the DepsGate; `auto`/`detect` fetch nothing silently.
-
-### 8.2 Engine (`handlers/redact.py`, `toolbox_sidecar/redact/{detect,track,render}.py`)
-- **`redact.detect_image {path, faces, plates, sensitivity, faceModel, plateModel}`** → `{width, height, boxes}`.
-  - Loads with Pillow (HEIC through pillow-heif) and applies `exif_transpose`.
-  - **Faces:** YuNet with the in-memory dynamic-shape patch at two scales (long side 640, and min(1920, the long side)), padded to multiples of 32. Decoded as in §0.4, NMS 0.3 across scales.
-  - **Plates:** YOLOv9-t on the letterboxed whole image. Images with a long side > 1280 are also run in 2×2 tiles with 20% overlap. Merged with NMS 0.5.
-  - Boxes are returned normalised.
-- **`redact.detect_video {path, ffmpeg, faces, plates, sensitivity, faceModel, plateModel, cachePath}`**:
-  - **Decoding:** FFmpeg on a pipe (`-vf fps=min(src,15),scale=<long side 1280>`, rawvideo bgr24); frame times come from the sample rate.
-  - **Detection** on every sampled frame: faces at one scale (the 1280 frame), plates letterboxed.
-  - **Tracker** (`track.py`, pure):
-    - Greedy matching by IoU ≥ 0.3, or a centre distance < 0.5 × box diagonal.
-    - A track ends after 0.5 s without a hit; gaps up to that are linearly interpolated.
-    - Positions are smoothed with an EMA (α 0.6), and each track is extended by 200 ms at both ends.
-    - Tracks with < 3 hits are returned with `enabled: false` (likely false positives) unless their max score ≥ 0.9.
-  - **Writes** `cachePath` as JSON `{width, height, fps, tracks: [{id, kind, hits: [{ms, x, y, w, h, score}]}]}`.
-  - **Returns** `{width, height, durationMs, tracks: [{id, kind, startMs, endMs, maxScore, enabled, samples: [{ms, x, y, w, h}]}]}`, sampled every 200 ms for the UI.
-  - Progress is per frame.
-- **`redact.apply_image {path, out, boxes, style, strength, padding, stripMetadata}`**:
-  - Each enabled box grows by `padding`.
-  - Faces use an elliptical mask with a 4 px feather; plates and manual boxes are rectangles.
-  - **Styles:**
-    - blur: Gaussian, σ = (0.04 + 0.016·strength) × the box's shorter side, applied twice, so it can't be reversed in practice;
-    - pixelate: block = shorter side / (16 − strength);
-    - solid: black.
-  - Writes the same format (JPEG q95, PNG, WebP q95, TIFF → PNG, HEIC → JPEG).
-  - With `stripMetadata`, no EXIF/XMP/IPTC is written (the ICC profile is kept). Otherwise EXIF is copied minus GPS.
-- **`redact.apply_video {path, ffmpeg, out, detectionsPath, disabledTracks, manualBoxes, style, strength, padding, stripMetadata}`**:
-  - **Decoding:** full resolution on a pipe (`-fps_mode passthrough`, rawvideo bgr24, autorotated).
-  - Boxes for each frame's time are interpolated from the track hits; manual boxes apply between their times.
-  - **Encoding:** a second FFmpeg (`-f rawvideo -s WxH -r <avg fps> -i - -i <original> -map 0:v -map 1:a? -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p`). Audio is copied (AAC 192k if it can't go in MP4). `-map_metadata -1` when stripping, `+faststart`, MP4.
-  - Progress is per frame. Cancel kills both FFmpeg processes and deletes the partial output.
-- **`redact.prefetch {model: {file, url, sha256}, modelDir}`**, same contract as `bgremove.prefetch`.
-- Outputs are `<base> (redacted).<ext>`.
-- **Go:**
-  - **detect:** puts the video's cache file at `<support>/cache/redact/<jobID>.json`, sets `job.SetResult`, registers no outputs. The cache is pruned at start (> 7 days).
-  - **auto:** detect → apply, using the default `enabled` flags.
-
-### 8.3 UI (`tools/redact/RedactView.tsx`)
-- **Banner** (always visible): "Detection can miss faces and plates. Check every image or frame before sharing."
-- **Options panel:** Find faces, Find number plates, Sensitivity, Style (three small preview tiles), Strength, Padding, Remove location and camera info (on).
-
-**Images:**
-- Dropping images runs `detect` on all of them in one job.
-- **One image:** opens the review straight away.
-  - **Left:** the image (`MediaService.URLFor`, fit to the panel), with `BoxOverlay` and a live approximate effect (a canvas preview of blur/pixelate/solid inside the enabled boxes).
-  - **Right:** the detection list (kind icon, score, toggle), Add box (draw mode, `B`), and Delete.
-  - Footer: "Save redacted".
-- **Several images:** a gallery grid with a "3 faces · 1 plate" count per image. Click → review that image (with prev/next and the arrow keys). "Redact all N" applies the current boxes for every image; reviewed images are marked ✓.
-- Edits live in the view until applied.
-
-**Video:**
-- A `detect` job (progress, Cancel).
-- **Then the review:**
-  - `MediaPlayer` with `BoxOverlay` showing each enabled track's box at the current time (interpolated from samples) and the manual boxes.
-  - `Timeline` with track spans as markers.
-  - **Track list:** kind, start–end, max score, toggle; clicking seeks to its start.
-  - **Add box:** draw on the current frame → a manual box from now for 3 s, with start/end `TimecodeInput`s in the list (`I`/`O` set them to the playhead).
-- "Redact video" → apply job → a result card with a player of the output.
-
-**DepsGate** when the engine or models are missing (with the Image pack button).
-
-### 8.4 Acceptance
-- On `STS-125_crew_portrait.jpg` all 7 faces are found at Normal.
-- On the car-park photo all 3 plates are found at Normal (at High, if Normal misses a distant one, record which in DECISIONS.md).
-- Applied outputs: no pixel changes outside the padded boxes (for PNG), and `exiftool` shows no GPS or camera tags with Remove on.
-- **Video:** on a generated 10 s clip of the crew-portrait face crop moving across `testsrc2` (`overlay=x=t*120`), the redacted output has the face covered on every 10th frame checked (the face crop's mean colour isn't visible inside its known position).
-- A 1-minute 1080p30 clip: detect ≤ 90 s and apply ≤ 3 min on this machine's CPU.
-- A manual box covers exactly its time range. Cancel leaves no output.
-
----
-
-## 9. Object Eraser (`modules/object-eraser`, ID `object-eraser`)
-
-### 9.1 Options and service
-```go
-type Model string // "best" (LaMa) | "fast" (MI-GAN)
-type Options struct {
-    Model    Model  `json:"model"`
-    MaskPath string `json:"maskPath"` // set by the service; never from the UI
-}
-// DefaultOptions: best.
-```
-
-**`eraser.Service` (bound):**
-- `Defaults()`.
-- `ModelStatus() []ModelInfo` with id, label, downloadBytes, present.
-- `Erase(input string, maskPNG string, opts Options) (core.Job, error)`:
-  - `maskPNG` is base64 PNG data from the canvas: white = erase, any size with the image's aspect ratio (±1%).
-  - Go decodes and validates it: a PNG, ≤ 8192 px, not empty (otherwise "Paint over what to erase first").
-  - It writes it to `<support>/tmp/eraser/<random hex>.png` (0600), sets `MaskPath`, and submits.
-- **`Validate`** rejects a `MaskPath` outside `<support>/tmp/eraser/`.
-- **`Run`** deletes the mask file when it finishes (defer), in every outcome.
-- `<support>/tmp/eraser/` is emptied at app start.
-
-### 9.2 Engine (`handlers/eraser.py`, `toolbox_sidecar/eraser.py`)
-**`eraser.inpaint {path, mask, out, model, modelPath}`:**
-1. Load the image (`exif_transpose`, HEIC through pillow-heif; keep the ICC profile and EXIF minus orientation). Load the mask, resize nearest to the image, threshold > 127.
-2. Dilate by `round(12 × longSide / 1024)` px (min 8, max 40). Reject an empty mask. More than 35% of the image sets `warning: "Large areas may look smeared"` in the result.
-3. **best (LaMa):**
-   - Split the dilated mask into connected regions and merge regions whose crops overlap.
-   - For each region: a square crop of side `max(512, 2 × max(bbox w, h))`, centred on the bbox and shifted to stay inside the image (smaller images use the whole image padded by reflection to square).
-   - Resize to 512 (area) with the mask nearest, run, and take the output (0..255) back to the crop size (Lanczos).
-   - Composite only inside the dilated mask, feathered with a Gaussian of 3 px at crop scale.
-   - Regions run sequentially, each on the updated image. Progress is per region; cancellation is checked between regions.
-4. **fast (MI-GAN):** run the pipeline on the full image with the mask inverted (255 = keep), then composite with the same feather.
-5. Write the same format (JPEG q95, PNG, WebP q95, TIFF/BMP → PNG, HEIC → JPEG) to `<base> (erased).<ext>`.
-
-**Result:** `{regions, warning}`.
-
-**`eraser.prefetch`** follows the bgremove contract. The presets are `best` and `fast` (§0.4) in `<models>/eraser/`.
-
-### 9.3 UI (`tools/object-eraser/ObjectEraserView.tsx`)
-**Empty state:** DropZone "Drop a photo".
-
-**Editor:**
-- **Canvas:** the image (`MediaService.URLFor`) on a canvas fitted to the panel. Zoom with Ctrl+wheel or the buttons (fit, 100%); pan with Space+drag or the middle button.
-- **Mask:** painted on an offscreen canvas at the image's size, capped at 4096 px on the long side (scaled). It's shown as the accent colour at 45% over the image.
-- **Tools:**
-  - Brush (`B`) and Unpaint (`E`, or hold Alt);
-  - brush size 4–300 screen px (`[` / `]`), with the cursor drawn as a circle;
-  - Clear (`Ctrl+Backspace`), Undo/Redo per stroke (Ctrl+Z / Ctrl+Shift+Z, 50 steps);
-  - Model: Best / Fast, with sizes and download state.
-- **"Erase"** (Enter, enabled when the mask isn't empty) calls `Erase` with the mask as PNG data. A progress overlay with Cancel appears. When it's done, the canvas shows the result with a "Before / After" `CompareSlider` toggle and `FileActions`. A warning shows as a toast.
-- **"Keep erasing"** makes the output the new input (the mask is cleared); each round saves a new file.
-- Without the engine or model: DepsGate. The model-size hint: "Best · 208 MB · Fast · 28 MB".
-
-### 9.4 Acceptance
-- Erasing a person painted roughly on the crew portrait (or a lamp post on a car photo) leaves no dark ghost or visible seam at normal zoom (screenshot in the summary).
-- Pixels outside the dilated mask are byte-identical in PNG output.
-- A 12 MP photo with one object completes in < 10 s on CPU (best).
-- The mask file is gone after the job, whether it succeeded, failed or was cancelled.
-
----
-
-## 10. Dev Utilities (`modules/dev-utils`, ID `dev-utils`)
-
-### 10.1 Backend
-- A normal module whose only job is **hashing files**: `Options{Algorithms []string /* md5, sha1, sha256, sha512, crc32 */}`, inputs 1–100 files, `SplitInputs: false`.
-- It streams each file once through all the chosen hashes (`io.MultiWriter`), with progress by bytes and cancellation between 1 MiB reads.
-- Result: `{files: [{path, size, hashes: {algo: hex}}]}`. It has no outputs.
-- **Service (bound):**
-  - `Defaults()`, `Enqueue(inputs, opts)`;
-  - `HashText(text string) []HashResult` (all five algorithms, UTF-8);
-  - `FileBase64(path string) (string, error)` (≤ 10 MiB, else a validation error);
-  - `PickFiles() ([]string, error)` (multi-select through the existing dialog helper).
-
-### 10.2 UI (`tools/dev-utils/DevUtilsView.tsx`)
-- A left list of utilities (with search); the last one used is remembered in module state.
-- Each utility is its own component under `tools/dev-utils/utils/`, with pure logic in `*.logic.ts` files that are unit-tested.
-- Inputs live-update outputs (debounced 150 ms). Every output has a Copy button (§3.10).
-
-| Utility | Does |
-|---|---|
-| JSON | Format (2/4 spaces, tab), minify, sort keys, validate with `line:col` and the caret on the error, JSON ↔ YAML |
-| Base64 | Text encode/decode (UTF-8, URL-safe toggle, padding toggle); file → Base64 or data URL |
-| URL | Encode/decode a component; parse a URL into parts and an editable query table that rebuilds it |
-| Hash | Text: MD5, SHA-1, SHA-256, SHA-512, CRC32 (via `HashText`). Files: pick or drop → hash job → table; a "Compare" field highlights the matching value |
-| UUID | v4 and v7, ULID; count 1–1,000; upper/lower case; Copy all |
-| JWT | Decode header and payload (pretty JSON); `exp`/`iat`/`nbf` as local time with "expired" / "not yet valid" badges. It never verifies; the note says "Decoded locally — nothing leaves this computer" |
-| Time | Unix s/ms/µs ↔ ISO 8601 UTC, local, and relative ("in 3 hours"); a time-zone picker (`Intl`); Now |
-| Numbers | Decimal / hex / octal / binary (BigInt); bit width 8–64 with a two's-complement view |
-| Colour | Hex / RGB / HSL / OKLCH conversion with a swatch; WCAG contrast ratio of two colours with AA/AAA badges |
-| Regex | Pattern + flags, test text with highlighted matches, a groups table, a replace preview (JavaScript flavour, stated) |
-| Diff | Two texts → line diff (Myers, in TS), unified or side by side, ignore whitespace / case |
-| Text | Case conversions (camel, Pascal, snake, kebab, CONSTANT, Title, lower, UPPER), slugify, counts (chars, words, lines, UTF-8 bytes), sort / dedupe / trim lines |
-
-- **Palette commands:** "Dev Utilities: <name>" for each utility.
-
----
-
-## 11. Phase 5 follow-ups
-
-| # | Issue (P5 summary) | Fix |
+### 4.5 Events (registered in `api/events.go`, typed in the bindings)
+| Event | Payload | Direction |
 |---|---|---|
-| F1 | A conversation reopened while an answer streams shows the partial answer as finished | `ConversationView` marks the message `streaming` when it is the running generation's message; the view subscribes to its deltas |
-| F2 | OCR Copy text has no self-copy marker | §3.10 |
-| F3 | The vault index restored from `.bak` isn't shown | `VaultState.notice` ("The vault index was restored from its backup copy") shown once as a Banner after unlock |
-| F4 | Setup cards scroll slightly at the default window height | Tighten the card's vertical rhythm so the six cards fit at the default 1100×720 window with no vertical scroll |
-| F5 | The ffprobe row lacks managed actions | Settings → Dependencies shows ffprobe as "Installed with FFmpeg" with no separate buttons |
-| F6 | Chat uses GiB while packs use GB | Chat's sizes switch to the shared decimal `formatSize` |
+| `viz:render` | `{token, planUrl, jobId}` | Go → RenderHost: start a render |
+| `viz:render-ack` | `{token, bytes}` | Go → RenderHost: bytes written so far (every ≥ 4 MiB) |
+| `viz:render-cancel` | `{token}` | Go → RenderHost: stop now |
+
+### 4.6 Module stub and wiring (`modules/visualizer`, ID `visualizer`)
+| ID | Name | Icon | Category | Order | Accepts | Requires | OutputSubdir |
+|---|---|---|---|---|---|---|---|
+| `visualizer` | Visualizer | `sparkles` | audio | 110 | audio + video exts (P6 §3.9), MaxInputs 1 | engine, ffmpeg, ffprobe | `Visualizer` |
+
+- Wave 0 writes:
+  - `options.go`, `module.go` and `service.go`, with final signatures and complete `Validate`;
+  - a stub `Run`;
+  - the `main.go` wiring (`viz.NewAnalyzer`, `viz.NewRenderBroker`, the RawMessageHandler), the bindings and `lib/api.ts` re-exports;
+  - the engine handler stub `viz.analyze` in `handlers/viz.py`, imported in `handlers/__init__.py`;
+  - the frontend skeleton (§4.8).
+- New icons in `components/Icon.tsx`: `sparkles`, `layers`, `sliders-horizontal`, `wand-sparkles`, `map`, `waves`, `drum`, `guitar`, `mic`, `heart-pulse`, `maximize`, `film`, `eye`, `eye-off`, `grip-vertical`.
+
+### 4.7 Tool packs
+- **Music** pack: `+ visualizer` with Needs `{engine, ffmpeg}`.
+  - The Stems option needs `stems-default` and Words needs `whisper-default`; both are already Music components.
+  - The view shows DepsGate rows for those options only when they're switched on.
+- No new components, so the pack sizes don't change. `TestEveryToolIsInOnePack` keeps passing.
+
+### 4.8 Frontend skeleton (`frontend/src/viz/`, Wave 0 writes the contracts and a working minimum)
+```
+viz/
+  types.ts        Show, Scene, LayerConfig, Param, Mod, SignalId, PaletteId, TextStyle, PlanForWorker (final)
+  analysis.ts     loadAnalysis(urls) → Analysis; ranged fetch; sampling; cumulative sums; event lookups
+  signals.ts      SIGNALS catalogue, fallbacks without stems, pulses, envelope cache, evaluate(mod, t)
+  palette.ts      PALETTES (24), OKLab mixing, palette modes (fixed/journey/mood/chords/sections)
+  director.ts     autoTimeline(analysis, show) → TimelineEntry[]; transitions
+  engine.ts       class Engine { constructor(canvas, opts); setShow; setAnalysis; setTextures; render(tMs); dispose }
+  gl/             context, shader compile cache, targets (RGBA16F), fullscreen triangle, bloom, tonemap, dither, feedback
+  layers/         registry.ts + one file per layer type (Wave 0: `gradient` and `bars` as references)
+  text/           atlas.ts, layout.ts, TextLayer (Wave 0: interface only)
+  post/           registry.ts (Wave 0: bloom, tonemap, vignette, dither)
+  presets/        index.ts + one file per preset (Wave 0: `spectrum-classic` as the reference)
+  worker/         render.worker.ts, encoder.ts, transport.ts (Wave 0: skeleton with the message protocol)
+  RenderHost.tsx  mounted once in App.tsx (main window only, not popups)
+  lab/            VizLab.tsx: dev view behind TOOLBOX_VIZLAB=1 (§11.4)
+```
+- `tools/visualizer/VisualizerView.tsx` is a stub, with its `tools/index.ts` line.
+- `state/ui.ts` `Handoff` gains `seed?: ToolSeed` (§9.1).
+
+### 4.9 Docs
+- **CLAUDE.md:** a Phase 7 section.
+  - The raw-message render channel: no socket, token plus origin checks, the `vz1|` prefix.
+  - Engine determinism rules (§6.1).
+  - "Layers never use `Math.random`, `Date` or `performance.now`."
+  - How to add a layer and a preset.
+  - The cache.
+- **`docs/MAC-CHECKLIST.md`:** Phase 7 steps (§11.5).
+- **`docs/ROADMAP.md`:** renumbered (done with this draft).
 
 ---
 
-## 12. Bound API changes (summary)
-- **New:**
-  - `MediaService` (§3.4);
-  - `trimmer.Service` (`Defaults`, `Enqueue`);
-  - `subtitles.Service` (`Defaults`, `Enqueue`, `Load`, `TranslationLanguages`, `Styles`, `TranslatorStatus`);
-  - `audiocleanup.Service` (`Defaults`, `Enqueue`);
-  - `lyricvideo.Service` (`Defaults`, `Enqueue`, `Fonts`);
-  - `redact.Service` (§8);
-  - `eraser.Service` (§9);
-  - `devutils.Service` (§10.1).
-- **Changed:** `ClipboardService.CopyText` (§3.10); `VaultState.notice` (F3).
-- **Not bound:** `core.TextGenerator` (Go only); the `/media/` middleware.
+## 5. Song analysis
+
+### 5.1 Flow (`core/viz/analyze.go`)
+1. **Key:** `sha1(path|size|mtime)` → folder `<cache>/visualizer/<key>/`.
+   - Audio products are named by `s<0|1>` (stems off/on).
+   - Text products are named by `t-<sha1 of the words options + lines>` and `m<0|1>` (meaning off/on).
+   - Anything already there is reused, and progress jumps past that step.
+2. **Stems** (if on): `stems.separate {preset: "four-fast", format: "flac", out: <folder>/stems}`. Progress 0–0.45.
+3. **Features:** `viz.analyze {path, stems: {drums, bass, vocals, other} | null, outDir: <folder>, name: "s1"}`, then 0.45–0.6 (0–0.4 without stems). It writes `s1.json` + `s1.bin`.
+4. **Instrumental** (stems on): FFmpeg `amix=inputs=3:normalize=0` of drums, bass and other → `instrumental.flac`. Then **the stems folder is deleted**, keeping only the vocals until step 5 is done.
+5. **Words:**
+   - `detect`: `transcribe.run` on the vocals stem, or on the input if stems are off. Model `small`, `formats:["json"]`, `vad:true`, the language. Then `lyrics.WordsToLines`.
+   - `align`: the same transcription, then `lyrics.Align(text, words)`. The warning "Couldn't follow the song well — check the timings" appears below 0.4 matched.
+   - `file`: `lyrics.ParseFile`. If it `needsAlign`, align as above.
+   - `given`: the lines from the handoff; words are spread with `SpreadWords` where missing.
+   - Progress 0.6–0.85.
+6. **Emphasis (no model needed):** a word is emphasised when its mean `vocals.level` (or `mix.presence` without stems) is in the song's top 12% **and** it lasts ≥ 280 ms, or when it overlaps a held note (§5.3).
+7. **Meaning** (if on and `TextGenerator.Ready()` succeeds): §5.4. Progress 0.85–1. If no model is available, the summary warns and mood falls back to the music (§5.4).
+8. **Write `t-….json`.** Delete the vocals stem. Return the `AnalysisRef`.
+
+Cancellation is honoured between steps and inside each engine call. A failed step deletes its partial files.
+
+### 5.2 Engine handler `viz.analyze` (`handlers/viz.py` + `toolbox_sidecar/viz/{features,beats,harmony,sections,pitch}.py`)
+
+**Params:** `{path, stems: {drums, bass, vocals, other} | null, outDir, name, fps?: 60}`.
+- `fps` is 60 for inputs ≤ 20 min and 30 above. Inputs over 60 min are a validation error.
+
+**Decode:** librosa at 22,050 Hz, mono, plus left/right RMS from a stereo decode for the balance. Stems are decoded the same way.
+
+**Normalisation (per song, per channel):** percentile p5 → 0 and p98 → 1, clipped. Onset envelopes are divided by their p99. Quantised to u8.
+
+**Channels at `fps`** (`hop = round(22050/fps)`):
+
+| Group | Channels |
+|---|---|
+| mix | `level` (RMS), `onset`, `brightness` (spectral centroid, log-scaled 200 Hz–8 kHz), `balance` (0.5 = centre), 8 bands: `sub` 20–60, `bass` 60–250, `lowmid` 250–500, `mid` 500–2k, `highmid` 2–4k, `presence` 4–6k, `brilliance` 6–12k, `air` 12k+ Hz |
+| drums *(stems)* | `level`, `onset`, `kick` (onset of 20–150 Hz), `snare` (onset of 150 Hz–2.5 kHz with the kick band removed), `hats` (onset > 6 kHz) |
+| bass / vocals / other *(stems)* | `level`, `onset` |
+| vocals *(stems; from the mix's 300 Hz–4 kHz band otherwise)* | `pitch` (MIDI 40–84 → 0..1, held through unvoiced gaps ≤ 150 ms), `voiced` (0/1) |
+| vectors | `spectrum`: 64 log-spaced bins 30 Hz–16 kHz (dB, normalised per song), `wave`: 64 signed samples per frame (the mix over one frame, peak-normalised, stored as u8 with 128 = 0) |
+
+**Events** (`[ms, strength 0–255]`, peak-picked with `librosa.onset.onset_detect`, 110 ms minimum gap per channel):
+- `kick`, `snare`, `hats`, `bass`, `vocals`, `other` (stems) or their mix fallbacks: kick from `sub+bass`, snare from `mid`, hats from `brilliance`, vocals from `presence`;
+- `mix`.
+
+**Beats** (`beats.py`):
+- `librosa.beat.beat_track` on the mix onset envelope gives tempo and beat times.
+- **Downbeats:** for each phase p ∈ {0,1,2,3}, score the beats with `i % 4 == p` by kick (or sub+bass) onset strength within ±70 ms, + 0.5 × a chord change on that beat; the best phase wins. `beatsPerBar` is 4.
+
+### 5.3 Harmony, sections, pitch
+- **Chords** (`harmony.py`):
+  - `chroma_cqt` at 15 Hz is beat-synchronised (median) and matched against 24 major/minor templates by cosine.
+  - Smoothing is a Viterbi pass with self-transition 0.9 and uniform others.
+  - Equal neighbours merge. Chords shorter than 1 beat merge into the previous one. A cosine below 0.5 gives `N` (no chord).
+  - **Key:** `rank_keys` (as in `analysis.bpm_key`) on the mean chroma.
+- **Sections** (`sections.py`):
+  1. Beat-synchronised MFCC(13) + chroma(12), standardised, then `librosa.segment.agglomerative` with k = clamp(round(duration / 20 s), 4, 12).
+  2. Boundaries snap to the nearest downbeat. Segments shorter than 4 bars merge into the more similar neighbour.
+  3. **Groups:** segment mean feature vectors are clustered greedily, joining when cosine ≥ 0.9, and named A, B, C…
+  4. **Energy:** the mean `mix.level` per segment, rescaled 0..1 across the song.
+  5. **Labels**, in this order:
+     - `intro`: the first segment if energy < 0.45 and length < 30 s;
+     - `outro`: the last segment, by the same rule;
+     - `chorus`: segments of the highest-energy group that occurs ≥ 2 times;
+     - `verse`: segments of the most frequent other repeated group;
+     - `bridge`: a non-repeating segment in the second half;
+     - `drop`: a segment that starts at a drop event (below);
+     - otherwise `section`.
+  6. **Lift / drop / break events** from the 1-bar mean loudness (dB):
+     - `drop`: +6 dB vs the previous 2 bars;
+     - `lift`: a rise of ≥ 4 dB spread over the previous 2–4 bars, ending on a downbeat;
+     - `break`: −6 dB.
+- **Pitch** (`pitch.py`): pYIN on the vocals (16 kHz, fmin 65, fmax 1000, hop 320), resampled to `fps`.
+  - **Held notes:** voiced runs ≥ 600 ms with pitch within ±0.5 semitone of their median → events `held: [[startMs, endMs, midi]]`.
+
+### 5.4 Meaning (`core/viz/meaning.go`)
+- **Batches:** up to 30 lines or 2,500 characters, with the previous batch's last 3 lines as context.
+- **System prompt:**
+  > "You read song lyrics or speech and describe how each line feels, for a music visualiser. For each line give: valence from -1 (dark, sad) to 1 (bright, happy); energy from 0 (still) to 1 (intense); one emotion; up to 3 visual motifs only if the line clearly evokes them; up to 2 words from the line to emphasise. Answer only with the JSON."
+- **JSON schema:** an array of exactly n objects:
+  - `valence`: number, −1..1;
+  - `energy`: number, 0..1;
+  - `emotion`: enum of joy, love, sadness, anger, fear, calm, hope, awe;
+  - `motifs`: array ≤ 3 from the enum of fire, rain, snow, stars, ocean, flowers, hearts, city, sun, night, storm, smoke;
+  - `emphasis`: array ≤ 2 of strings.
+- **Settings:** temperature 0.2; `Purpose: "Reading the mood of the words"`.
+- **Recovery:** a reply that fails the schema or has the wrong count is retried once, then the batch goes line by line. A line that still fails gets a neutral reading (valence 0, energy 0.5, calm, no motifs).
+- **Emphasis words** must match a word of the line (NFKC, case-insensitive, punctuation stripped). Matches add to the loudness emphasis (§5.1 step 6); the rest are dropped.
+- **Mood keyframes** (written to `text.json`):
+  - One keyframe per line start: its valence, energy and emotion.
+  - It is blended 70/30 with the **musical mood** at that time: valence 0.5·(major ? 1 : −1)·0.6 + 0.4·(brightness − 0.5); energy = section energy.
+  - Between lines the mood eases towards the musical mood over 4 s.
+  - **Without meaning:** keyframes every bar from the musical mood alone, with the emotion from a lookup:
+
+    | Valence | Energy < 0.33 | 0.33–0.66 | > 0.66 |
+    |---|---|---|---|
+    | < −0.2 | sadness | fear | anger |
+    | −0.2..0.2 | calm | awe | anger |
+    | > 0.2 | calm | hope | joy |
+
+### 5.5 File schemas (version 1; written by Python (audio) and Go (text); read by `viz/analysis.ts`)
+
+**`s<0|1>.json`:**
+```json
+{ "version": 1, "durationMs": 214000, "fps": 60, "frames": 12840, "stems": true,
+  "tempo": 120.2, "beatsPerBar": 4, "beats": [512, 1011], "downbeats": [512, 2510],
+  "key": { "name": "A minor", "camelot": "8A", "minor": true },
+  "chords": [ { "startMs": 512, "endMs": 2510, "name": "Am", "root": 9, "minor": true } ],
+  "sections": [ { "startMs": 0, "endMs": 15800, "label": "intro", "group": "A", "energy": 0.21 } ],
+  "events": { "kick": [[512, 230]], "snare": [], "hats": [], "bass": [], "vocals": [], "other": [], "mix": [],
+              "lift": [], "drop": [[61000, 255]], "break": [], "held": [[70500, 72100, 64]] },
+  "blocks": [ { "id": "mix.level", "kind": "scalar", "offset": 0, "width": 1 },
+              { "id": "spectrum", "kind": "vector", "offset": 488160, "width": 64 } ],
+  "features": "s1.bin" }
+```
+
+**`s<0|1>.bin`:**
+- Blocks are back to back. A scalar block is `frames` bytes. A vector block is `frames × width` bytes, frame-major.
+- All u8 (`wave` is offset by 128).
+- A 4-minute song at 60 Hz is about 2.1 MB with stems.
+
+**`t-<hash>-m<0|1>.json`:**
+```json
+{ "version": 1, "source": "detect", "language": "en", "matched": 0.0,
+  "lines": [ { "startMs": 15800, "endMs": 19200, "text": "We were burning bright",
+               "words": [ { "startMs": 15800, "endMs": 16100, "text": "We", "emphasis": false } ],
+               "meaning": { "valence": 0.4, "energy": 0.8, "emotion": "joy", "motifs": ["fire"] } } ],
+  "mood": [ { "ms": 0, "valence": -0.1, "energy": 0.2, "emotion": "calm" } ] }
+```
+`meaning` is absent without the model.
 
 ---
 
-## 13. Test plan
+## 6. The visual engine (`frontend/src/viz/`)
 
-**Go**
-- `core/media`:
-  - `Probe` parsing on recorded ffprobe JSON fixtures: rotation from the display matrix, SAR, `start_time`, an attached picture not counted as video, text vs image subtitle codecs.
-  - `Playable` table per OS.
-  - `ProgressTracker` (moved tests).
-  - The ASS writer: escaping, colours, times, a golden file.
-  - `Keyframes` against a fake ffprobe (re-exec helper).
-- **Media route** (`api/media_test.go`, httptest against the middleware):
-  - unknown token 404; HEAD;
-  - `bytes=0-` capped at 4 MiB with the right `Content-Range`; `bytes=a-b` exact; suffix `-n`;
-  - 416; no Range on small and large files; method 405; a deleted file 404;
-  - the content types.
-- `MediaService`: the proxy decision (playable / cached / running / new) with a fake jobs submitter; cache key changes with mtime; the 5 GB prune is oldest-first; Waveform peaks from a fake FFmpeg producing a known PCM ramp.
-- `modules/chat`:
-  - `Complete` against the fake llama-server: response_format passed through, the slot taken and released per request, ctx cancel aborts;
-  - an interactive Send waits for a background completion and then runs; priority over a queued background request;
-  - `Ready` errors when nothing is downloaded.
-- `modules/trimmer`: Validate matrix; fast-mode argument building (per container, merge via concat list, `-an`); precise filter graph for 1/3 segments, crop maths for each aspect on landscape and portrait sources, two-pass bitrate maths and the "too long" error; audio-only codec families; a `Run` against a fake FFmpeg (outputs registered, names, cancel leaves nothing).
-- `modules/subtitles`:
-  - `segment.go` tables: sentence and pause breaks, char limits, CJK, min/max duration, reading speed, line balancing;
-  - SRT/VTT writers and `Load` (BOM, CRLF, 1252 fallback, VTT tags, hours > 99 min);
-  - translate batching, schema, the count-mismatch retry and per-cue fallback (fake `TextGenerator`), re-wrapping;
-  - burn ASS styles (golden); embed codec per container and the stream index;
-  - the Save overwrite rule (only own `.srt`/`.vtt` in the output folder).
-- `modules/audio-cleanup`: filter chain building per option set; loudnorm JSON parsing; Goertzel hum detection on generated 50/60 Hz tones + noise, and none on clean noise; the preview paths and pruning; video keeps `-c:v copy`.
-- `modules/lyric-video`:
-  - line building from words; alignment (exact, misheard words, missing and extra words, all unmatched, CJK);
-  - LRC parse/write (enhanced tags, offsets, repeated tags), SRT → lines;
-  - ASS for karaoke, plain, show-next and title card (golden);
-  - background filter graphs per background × aspect; the cache key.
-- `modules/redact`, `modules/object-eraser`: Validate; params passed to the fake Caller; the mask file written 0600 and deleted after Run; results decoded.
-- `modules/dev-utils`: hashes on known vectors (empty, "abc", a 3 MiB file), cancel mid-file, `FileBase64` limit.
-- `core/packs`: the new components and unlocks; `TestEveryToolIsInOnePack`; sizes non-zero.
-- **Engine e2e** (`integration/engine_test.go`), extended:
-  - `redact.detect_image` on a generated image with a pasted face crop from a CC0 sample in `.dev/p6-research/samples` (skip if absent) and a rendered plate;
-  - `eraser.inpaint` on a generated image with a painted square (the masked area changes, pixels outside the dilated mask are unchanged).
-- **Integration** (`//go:build integration`, real FFmpeg):
-  - trimmer fast + precise on a generated 10 s test clip (`testsrc2` + `sine`): durations within one frame (precise) or one GOP (fast);
-  - subtitles burn + embed (the stream exists in ffprobe);
-  - audio cleanup on pink noise + 50 Hz hum + a tone: the result measures within ±1 LU of −16;
-  - lyric video render of 5 s.
+### 6.1 Frame model and determinism
+- **`Engine.render(tMs)`** draws the frame at time tMs. Its output is a pure function of `(show, analysis, textures, size, seed, tMs)`, plus GPU feedback state for layers marked `stateful`.
+- **Rules for every layer:**
+  - No `Math.random`, `Date` or `performance.now`. Use `rng(seed, key)` (a PCG32 hash).
+  - **Motion that accumulates** (particle drift, rotation speed driven by bass, highway scroll) uses the analysis's **cumulative signals**: prefix sums of a channel, computed once at load. For example the angle is `base·t + k·(cum(bass, t) − cum(bass, t0))`, so any frame can be computed directly.
+  - **Spawned things** (particles, ripples, notes) come from events within a lookback window ≤ 8 s. Their state is closed-form in age; a damped velocity is `v0·(1 − dᵃᵍᵉ)/(1 − d)`.
+  - **Stateful layers** (feedback trails, kaleidoscope-of-feedback) read the previous frame. After a seek, the engine **warms up** by rendering the previous 1 s at the same fps without presenting. The export renders sequentially, so it never needs this.
+- **Preview/export parity:** at the same tMs, size and show, the preview and the export produce the same pixels. Stateful layers match from 1 s after a seek.
+- **Draft quality** (preview only, automatic below 45 fps for 2 s, or chosen by the user): bloom at quarter resolution and particle counts ×0.5. The export is always full quality.
 
-**Python**
-- `test_redact.py`: box decoding/NMS on synthetic outputs, the IoU tracker (linking, gap interpolation, padding, track filtering), blur/pixelate/solid only change pixels inside boxes, EXIF orientation applied, metadata stripped, cancellation.
-- `test_eraser.py`: mask region splitting and the crop/resize/paste-back maths (with a stub model that returns a constant colour), feathering stays inside the dilated mask, the ICC profile is kept.
-- `test_denoise.py`: chunking and crossfade maths (a stub model that returns unity gain reproduces the input within −60 dB), multichannel handling, cancellation between chunks; the slow test runs the real model on `schumer_pd.ogg` + noise and checks SI-SDR improves by ≥ 4 dB.
-- `test_prefetch.py` additions for the new presets (incl. the DFN3 tarball extraction keeping only the three `.onnx` files).
-- Slow tests (`TOOLBOX_SLOW=1`): the real models on the samples.
+### 6.2 Analysis loading (`analysis.ts`)
+- `loadAnalysis({audioJsonUrl, featuresUrl, textJsonUrl?})`:
+  - fetches each URL in **4 MiB ranges** until done (the media route caps responses);
+  - checks `version`, `frames` and block sizes;
+  - builds `Float32Array` views (0..1) lazily per block, and prefix sums on first use.
+- **Sampling** is linear interpolation between frames. Events are queried by binary search (`eventsBetween(id, t0, t1)`, `lastEvent(id, t)`). `sectionAt(t)`, `chordAt(t)`, `lineAt(t)` and `wordAt(t)` are O(log n).
 
-**Frontend**
-- The media kit:
-  - `useMediaSource` state machine with mocked service and jobs (playable, proxying → ready, error);
-  - Timeline range dragging and snapping, keyboard handles, zoom maths;
-  - BoxOverlay draw/toggle/resize/delete;
-  - CropOverlay clamping; ABToggle keeping the time.
-- Trimmer: I/O keys set segments, overlap prevention, the fast-mode keyframe note, the mode auto-switch with its toast, the estimate text.
-- Subtitles: editor ops (split, merge, insert, delete, shift all, find & replace, undo/redo), warnings, the step gating, the translate-unavailable state, the Original | Translation tabs.
-- Audio Cleanup: the preview stale marker, the result table.
-- Lyric Video: tap to sync (Space, Backspace, Esc), nudge shifting words, the karaoke CSS progress from word times, the low-match Banner.
-- Redact: §8 UI states. Object Eraser: §9 UI states.
-- Dev Utilities: every `*.logic.ts` (JSON errors with line:col, YAML round-trip, Base64 URL-safe/padding, URL rebuild, UUID v7 ordering/format, ULID format, JWT decode and badges, time conversions incl. ms/µs detection, number bases with BigInt and two's complement, colour conversions and contrast, regex groups, Myers diff, case conversions).
-- F1–F6 regressions.
+### 6.3 Signals (`signals.ts`)
+Every reactive parameter is driven by named signals (0..1 unless noted). The UI names are in brackets.
 
-**Manual smoke (architect, Windows, sandboxed, passive screenshots only):**
-- Trimmer on an MP4 and on an MKV (preview copy).
-- Subtitles generate → edit → translate to Spanish with Qwen3-4B (if free RAM allows) → burn and embed.
-- Audio Cleanup preview + full on a noisy voice recording.
-- Lyric Video with pasted lyrics on a CC-licensed song from `.dev/p6-research/samples` (if none is available, a generated voice clip) → render.
-- Redact on the sample photo and a short clip.
-- Object Eraser on the sample photo.
-- Dev Utilities: a quick pass of each utility.
-- Media route memory: play and seek a ≥ 1 GB file; the app's working set stays within +200 MB.
+| Signal id | [UI name] | Definition |
+|---|---|---|
+| `mix.level`, `mix.onset`, `mix.brightness`, `mix.balance` | Whole song, Hits, Brightness, Left/right | channels |
+| `mix.sub` … `mix.air` (8) | Sub, Bass band, … Air | channels |
+| `kick`, `snare`, `hats` | Kick, Snare, Hi-hats | pulse from events (τ 90 / 110 / 60 ms) × strength |
+| `drums.level`, `bass.level`, `vocals.level`, `other.level` | Drums, Bass, Vocals, Other instruments | channels |
+| `bass.onset`, `vocals.onset`, `other.onset` | … hits | pulse from events (τ 120 ms) |
+| `vocals.pitch`, `vocals.voiced`, `vocals.held` | Vocal pitch, Singing, Held note | channels / 1 during held notes, easing in and out over 150 ms |
+| `beat.pulse`, `beat.phase`, `bar.pulse`, `bar.phase` | Beat, Beat position, Bar, Bar position | pulse (τ 120 / 300 ms) / 0..1 saw |
+| `section.energy`, `section.progress`, `song.progress` | Section energy, … | from sections / 0..1 |
+| `lift.pulse`, `drop.pulse`, `break.pulse` | Build-up, Drop, Break | pulse (τ 2,000 / 1,200 / 800 ms); lift ramps up over its 2–4 bars |
+| `chord.change`, `chord.hue`, `key.minor` | Chord change, Chord colour, Minor key | pulse (τ 250 ms) / root on the circle of fifths → 0..1 / 0 or 1 |
+| `word.pulse`, `word.emphasis`, `line.progress`, `line.active` | Words, Emphasised words, Line progress, Singing a line | pulse at word starts (τ 150 ms) / pulse at emphasised words (τ 400 ms) / 0..1 / 0 or 1 |
+| `mood.valence` (−1..1 → 0..1), `mood.energy` | Mood (bright ↔ dark), Mood energy | mood keyframes, eased |
+| `lfo.slow`, `lfo.mid`, `time` | Slow drift, Sway, — | 0.03 / 0.2 Hz sine, seconds |
+
+- **Fallbacks without stems:**
+  - `drums.level` → `mix.onset` envelope; `bass.level` → `mix.bass`; `vocals.level` → `mix.presence`; `other.level` → `mix.mid`.
+  - Kick, snare and hats come from the mix events (§5.2). Presets work either way.
+- **Without words:** the word, line and mood signals that depend on lines are 0, except mood, which uses the musical mood.
+- **Modulation** (`Param`, §6.4):
+  - `value = clamp(base + Σ amountᵢ · shape(env(signalᵢ)) · mixGain(group(signalᵢ)) · reactivity, min, max)`.
+  - `env` is a one-pole attack/release envelope (default 10 ms / 180 ms), precomputed per (signal, attack, release) over the whole song and cached.
+  - Shapes: `linear`, `ease` (smoothstep), `exp` (x²), `gate` (x > 0.5).
+  - `mixGain`: the visual-mix fader of the signal's group (drums, bass, vocals, other, words, mood; default 1, range 0–2).
+  - `reactivity`: the global Reactivity slider, 0–2.
+
+### 6.4 Show format (`types.ts`; the source of truth, round-tripped as `ShowJSON`)
+```ts
+export interface Show {
+  version: 1;
+  name: string;
+  presetId: string | null;           // preset it came from
+  scenes: Scene[];                   // 1–6; variants like "calm", "main", "full"
+  timeline: { mode: "auto" | "manual"; entries: TimelineEntry[] }; // manual entries; auto computes them
+  palette: { mode: "fixed" | "journey" | "mood" | "chords" | "sections"; ids: PaletteId[] }; // ids: 1 (fixed), 2–5 (journey/sections)
+  mix: Record<"drums" | "bass" | "vocals" | "other" | "words" | "mood", number>; // 0–2
+  reactivity: number;                // 0–2
+  speed: number;                     // 0.25–2, scales time-based motion
+  text: TextStyle | null;            // null = no words on screen
+  motifs: boolean;                   // add motif layers where the words evoke them
+  post: PostConfig[];                // global post chain (after scenes)
+  controls: ReactionSlot[];          // the Reactions panel rows (§8.3)
+}
+export interface Scene { id: string; name: string; layers: LayerConfig[]; post: PostConfig[] }
+export interface LayerConfig {
+  id: string; type: LayerType; enabled: boolean;
+  blend: "normal" | "add" | "screen" | "multiply"; opacity: Param;
+  params: Record<string, Param | string | boolean>;   // numbers may be reactive
+}
+export type Param = number | { base: number; mods: Mod[] };
+export interface Mod { signal: SignalId; amount: number; shape: "linear" | "ease" | "exp" | "gate"; attackMs?: number; releaseMs?: number }
+export interface TimelineEntry { startMs: number; endMs: number; sceneId: string; transition: Transition; paletteId?: PaletteId }
+export interface Transition { kind: "cut" | "crossfade" | "flash" | "zoom" | "sweep" | "glitch"; ms: number }
+export interface ReactionSlot { label: string; target: string /* "<layerId>.<param>" or "post.<id>.<param>" */ }
+```
+- **Validation** (`validateShow`): types exist; params are within each layer's spec ranges; signals exist; ids are unique; ≤ 12 layers per scene; JSON ≤ 512 KiB. The renderer validates before rendering.
+- An invalid show fails the render with "This design couldn't be read" and the first problem as the hint.
+
+### 6.5 Rendering pipeline (`engine.ts`, `gl/`)
+1. **Scene pass:** the active timeline entry (and, during a transition, the next one) is drawn into its own HDR target (RGBA16F).
+   - Layers draw in order with their blend mode and opacity.
+   - Background-group layers are skipped in overlay mode.
+2. **Scene post chain:** the scene's `post` effects.
+3. **Transition:** `crossfade` mixes; `flash` adds white decaying over its length; `zoom` scales the outgoing scene up while the new one fades in; `sweep` is golden-hour's light band moving left → right; `glitch` is RGB-split blocks for 4 frames.
+   - Transitions start on the downbeat nearest the section boundary (±1 bar) and last `ms` (default: 1 bar for crossfade).
+4. **Text layer** (§6.8), unless the show has no text.
+5. **Global post chain:**
+   - bloom: 6-level dual-filter downsample/upsample, threshold 0.8, knee 0.5, intensity a param;
+   - chromatic aberration, film grain, vignette;
+   - **ACES-fit tonemap**;
+   - **blue-noise dither** to 8-bit (removes banding in gradients after H.264).
+6. **Output:**
+   - **opaque:** sRGB 8-bit to the canvas;
+   - **overlay:** a canvas twice as tall, with un-premultiplied colour on top and alpha as grey below. Alpha is the tonemapped coverage: `max(r,g,b)` of additive light, clamped, combined with text alpha.
+
+**Shapes:**
+- Lines, rings, bars and dots are drawn as **instanced quads with SDF fragment shaders** (analytic anti-aliasing at any resolution, round caps, soft glow falloff).
+- Particles are instanced point sprites with SDF discs, streaks, or soft sprites from a small generated atlas: ember, snowflake, raindrop streak, petal, star, heart, bokeh.
+
+### 6.6 Palettes (`palette.ts`)
+- **24 palettes**, each `{id, name, bg, colors[4], accent, glow}` as hex, converted to OKLab for every mix:
+  - the 20 from song-visualizer (cyber, fire, ice, mono, sunset, matrix, neon, galaxy, lava, ocean, toxic, vaporwave, rose, plasma, gold, arctic, candy, blood, forest, synthwave);
+  - golden-hour's four phases as `deep-night`, `dawn`, `golden`, `electric`;
+  - The palette backgrounds are made darker than the source where needed, so bloom has room.
+- **Modes:**
+  - `fixed`: one palette.
+  - `journey`: interpolates through 2–5 palettes over `song.progress` (golden hour: deep-night → dawn → golden → electric).
+  - `mood`: a palette per emotion:
+
+    | Emotion | Palette |
+    |---|---|
+    | joy | sunset |
+    | love | rose |
+    | sadness | ocean |
+    | anger | blood |
+    | fear | galaxy |
+    | calm | arctic |
+    | hope | dawn |
+    | awe | plasma |
+
+    It crossfades over 2 s at mood changes. Valence shifts lightness ±8% and energy shifts chroma ±15%.
+  - `chords`: the base palette rotated in hue so that `colors[0]` sits at the chord root's angle (circle of fifths). It eases over 400 ms per change.
+  - `sections`: one palette per section group (A, B, C…), cycling through the listed ids.
+
+### 6.7 Layer catalogue (31 types; every numeric param is reactive)
+Each layer type is a file in `layers/` exporting a `LayerDef`:
+```ts
+export interface LayerDef { type: LayerType; label: string; group: "background" | "shape" | "particles" | "accent" | "highway" | "motif";
+  stateful?: boolean; params: Record<string, ParamSpec>; create(ctx: LayerContext): LayerInstance }
+export interface LayerInstance { render(f: FrameInput, out: RenderTarget): void; resize?(w: number, h: number): void; dispose(): void }
+// FrameInput: { tMs, dtMs, params (resolved numbers/strings/bools), palette (resolved), analysis, signals, w, h, seed, quality, mode }
+```
+Common params on most layers: `intensity`, `scale`, `x`, `y`, `rotation`, `colorIndex` (0–3 or "cycle"), `glow`. "src" lists where each idea comes from: SV = song-visualizer, GH = golden-hour, PH = pitch-hero, new.
+
+| # | Type | Group | What it draws | Main params (default drivers in presets) | src |
+|---|---|---|---|---|---|
+| 1 | `gradient` | background | Slow mesh gradient of the palette (4 moving colour points) | speed, contrast, pointDrift ← mood.energy | new |
+| 2 | `nebula` | background | Domain-warped fBm clouds with star sparkle | warp ← bass.level, detail, sparkle ← hats, drift | new |
+| 3 | `aurora` | background | Curtains or bands of light; left half follows L, right half R; blue/red edge tint by channel level | bands 3–8, height ← mix.mid, tint ← mix.balance, style curtains/bands | SV, GH |
+| 4 | `ink` | background | Metaball ink in water, slow and soft (ballads, speech) | blobs 4–12, viscosity, swell ← vocals.level | new |
+| 5 | `synthgrid` | background | Horizon sun with scanlines, a perspective grid floor scrolling at tempo, spectrum mountains | gridSpeed ← beat (scroll locked to beats), sunPulse ← kick, mountains ← spectrum | new (SV terrain) |
+| 6 | `tunnel` | background | Polar tunnel of rings, a new ring per beat, twisting | ringsPerBeat, twist ← bass.level, speed ← drums.level | SV |
+| 7 | `starfield` | background | 3D stars with streaks; warp speed | speed ← drums.level, warp ← drop.pulse, density | SV |
+| 8 | `terrain` | background | Scrolling spectrogram terrain lines in perspective under a sky | rows 24–64, height ← mix.level | SV |
+| 9 | `image` | background | Cover art or the user's image: fill, slow Ken Burns, blur, breathing zoom | blur 0–40, zoom ← bass.level, kenBurns speed, darken | new (P6 cover) |
+| 10 | `kaleido` | background (stateful) | Kaleidoscope of a feedback buffer seeded by the layers beneath | segments 4–16, spin ← bar.phase, zoom ← kick | SV |
+| 11 | `bars` | shape | Spectrum bars: straight, mirrored or reflected, rounded SDF caps, peak caps that fall | count 16–128, mirror, height ← spectrum, peakFall | SV |
+| 12 | `radial` | shape | Radial bars around a centre glow | count 48–256, innerR ← kick, length ← spectrum | SV |
+| 13 | `ribbons` | shape | 3 layered waveform ribbons with thickness and soft trails | layers 1–4, amplitude ← mix.level, source spectrum/wave | SV |
+| 14 | `wavering` | shape | Noisy rings that wobble with bass; optional L/R pair tinted blue/red | radius, wobble ← bass.level, pair (GH) | GH |
+| 15 | `oscilloscope` | shape | The actual waveform as a glowing line, or an X/Y Lissajous of L/R | mode line/xy, gain, persistence | new |
+| 16 | `lissajous` | shape | Layered Lissajous curves; frequency ratio from vocal pitch | ratio ← vocals.pitch, layers 1–3, phaseDrift ← hats | SV, PH |
+| 17 | `helix` | shape | Double helix with rungs lit by the spectrum | turns, amplitude ← bass.level | SV |
+| 18 | `vortex` | shape | Lines from the centre twisting with energy | lines 24–160, twist ← bass.level | SV |
+| 19 | `geometry` | shape | Nested rotating polygons with perturbed edges, rays on hits | shapes 3–8, rays ← kick | SV |
+| 20 | `pitchribbon` | shape | A ribbon tracing the vocal melody across the screen over the last 4 s, thicker on held notes | height ← vocals.pitch, width ← vocals.level | new |
+| 21 | `embers` | particles | Rising embers and sparks that speed up with energy (bounded count) | count 20–600 ← mix.level, rise ← bass.level | GH |
+| 22 | `bursts` | particles | Particles fired from onsets, one colour per instrument, with trails | sources (kick/snare/hats/bass/vocals/other), spread, trail | SV |
+| 23 | `fireflies` | particles | Soft drifting motes that brighten with vocals | count, glow ← vocals.level | PH |
+| 24 | `ripples` | accent | Expanding rings on events | trigger (kick/snare/beat/word…), maxRadius, width | SV |
+| 25 | `shockwave` | accent | A screen-space distortion ring plus flash on drops and downbeats | trigger, strength | new |
+| 26 | `sweep` | accent | Golden-hour light band sweeping across on section starts | trigger section/drop, width | GH |
+| 27 | `lightrays` | accent | God rays from a point, pulsing | rays, length ← vocals.held, origin | new |
+| 28 | `frame` | accent | A glowing frame/border around the picture (for videos) | thickness ← beat.pulse, corners only | new |
+| 29 | `highway` | highway | Note highway: lanes = instruments (kick, snare, hats, bass, vocals by default, or 5 bands without stems), hyperbolic perspective, notes hitting the fret on time, sustains from held notes, fret flashes; `reverse` option | lanes, lookahead 1.5–4 s, reverse | SV (both GH modes) |
+| 30 | `motif` | motif | One of the 12 motifs, rendered as a particle/overlay effect while active (fire: rising flames + embers; rain: streaks + drops; snow; stars: twinkling field; ocean: wave lines at the bottom; flowers: drifting petals; hearts: soft bokeh hearts; city: bokeh lights; sun: warm rays; night: moon glow + darker grade; storm: lightning on snares; smoke: drifting fog) | motif, amount ← line.active | new |
+| 31 | `text` | (special) | The words (§6.8) | | new |
+
+**Post effects** (`post/`): `bloom`, `tonemap`, `dither`, `vignette`, `grain`, `chromatic` (RGB split ← kick, or L/R balance like GH), `feedback` (zoom/rotate/decay trails), `mirror` (kaleidoscope post), `shake` (camera shake ← kick, bounded 0–2% of the short side), `zoompulse` (← beat.pulse), `glitch` (← drop.pulse, rare blocks), `grade` (lift/gamma/gain and saturation, ← mood). Each has a `PostDef` like layers.
+
+### 6.8 Text layer (`text/`)
+- **Source:** the `text.json` lines. Without words, there is no text.
+- **TextStyle:**
+```ts
+export interface TextStyle {
+  preset: "karaoke" | "pop" | "rise" | "typewriter" | "fade" | "wave" | "subtitle" | "subtitle-boxed";
+  font: string;                     // media.Fonts() (P6 §3.6)
+  weight: 400 | 700 | 900;
+  size: number;                     // % of the short side, 3–12
+  color: string; highlight: string; // #rrggbb ("mood" allowed for highlight: from the palette's accent)
+  position: "center" | "lower" | "upper";
+  showNext: boolean;
+  uppercase: boolean;
+  outline: number;                  // 0–0.15 of size
+  glow: number;                     // 0–1 (text added to bloom input)
+  emphasis: { scale: number; glow: number; color: "highlight" | "mood"; sparks: boolean };
+  react: { signal: SignalId | null; amount: number };  // e.g. scale with vocals.level
+}
+```
+- **Animations:**
+  - `karaoke`: the word fill sweeps across each word as it is sung.
+  - `pop`: words appear at their start with a 120 ms overshoot scale.
+  - `rise`: the line slides up 3% and fades in, then out.
+  - `typewriter`: characters appear between word start and end.
+  - `fade`: plain fades.
+  - `wave`: words bob along a travelling sine while sung.
+  - `subtitle` / `subtitle-boxed`: plain readable subtitles at the bottom; boxed puts them on a black 55% box.
+- **Emphasised words** get `emphasis.scale` (default 1.25), more glow, the highlight or mood colour and, when `sparks` is on, a burst of particles at the word.
+- **Layout:**
+  - Lines wrap at 80% width (16:9) or 88% (9:16); at most 2 lines.
+  - Text keeps to the 5% title-safe area. `lower` sits at 14% from the bottom (24% in 9:16).
+  - `showNext` draws the next line at 55% alpha and 80% size below.
+  - A title card from the song tags (title and artist), when enabled in the look, shows for up to 3 s before the first line.
+- **Rasterising:**
+  - Each line is drawn once into a shared atlas texture (2048² RGBA8; a second page when full) with Canvas2D at the output resolution: R = fill, G = outline (`strokeText`), B = glow mask.
+  - Word boxes come from `measureText`.
+  - The shader draws word quads with per-word transforms and colours (karaoke progress per word).
+  - On the main thread this uses `OffscreenCanvas` (or a DOM canvas); in the worker, `OffscreenCanvas` 2D.
+  - Fonts are referenced by family name (system fonts). A font that isn't available falls back to Arial, with a warning in the render log.
+
+### 6.9 Director (`director.ts`)
+**`autoTimeline(analysis, show)`**, used when `timeline.mode = "auto"`:
+- Every section gets the scene its preset maps for its label (`preset.director.sceneFor: Record<SectionLabel, sceneId>`). The default map:
+
+  | Section | Scene |
+  |---|---|
+  | intro, outro, bridge | `calm` |
+  | verse, section | `main` |
+  | chorus, drop | `full` |
+
+  A scene id missing from the show falls back to `main`.
+- Transitions: the preset's `director.transitions[label]`. Default: crossfade, 1 bar; `drop` → flash; `chorus` after `lift` → zoom.
+- **Motifs** (when `show.motifs` is on and lines have motifs): a `motif` layer is added on top of the scene for each line's motifs, from 1 beat before the line to its end + 1 bar. At most 2 motifs at once; the newest wins.
+- `section.energy` is available to every scene as a signal, so a single scene still builds with the song.
+
+**`manual` mode:** the Song Map lets the user set the scene, palette override and transition per section (§8.3). New entries copy from auto. The manual entries are stored in the show.
+
+### 6.10 Presets (`presets/`, 20)
+Every preset is a `Show` template plus `director` rules plus its `controls` (Reactions rows). Each has a one-line description shown on its card.
+
+| # | Preset | Scenes (calm / main / full) — key layers | Palette | Best for |
+|---|---|---|---|---|
+| 1 | **Golden Hour** | aurora + wavering pair (L/R blue/red) + embers + ripples on kick + sweep on sections | journey deep-night → dawn → golden → electric | Any song; the party look |
+| 2 | **Neon Highway** | synthgrid floor + highway (instrument lanes) + bloom; full adds starfield streaks | synthwave | Dance, rock, anything with drums |
+| 3 | **Nebula** | nebula + fireflies + pitchribbon; full adds lightrays on held notes | chords (galaxy) | Ambient, ballads, cinematic |
+| 4 | **Synthwave** | synthgrid sun + terrain mountains + chromatic on snare | synthwave | Synthpop, retrowave |
+| 5 | **Spectrum Classic** | gradient + mirrored bars with peaks + reflection | fixed cyber | Clean, universal |
+| 6 | **Radial Pulse** | radial bars + centre glow on kick + ripples; full adds shockwave on downbeats | neon | EDM, hip-hop |
+| 7 | **Silk Waves** | ribbons with feedback trails + soft gradient | vaporwave | Pop, R&B |
+| 8 | **Warp Drive** | starfield warp on drums + flash on drops + shake on kick | ice | Drum & bass, energetic |
+| 9 | **Kaleido Bloom** | nebula base → kaleido + mirror post, spin on bars | plasma | Psychedelic, electronic |
+| 10 | **Ink & Water** | ink + fireflies, slow; mood grade | mood | Ballads, speech, poetry |
+| 11 | **Particle Storm** | bursts per instrument (each instrument its colour) + feedback | candy | Busy mixes; shows the stems |
+| 12 | **Aurora Curtains** | aurora curtains + snow motif-style particles | arctic | Chill, winter, piano |
+| 13 | **Tunnel Run** | tunnel rings per beat + zoompulse + glitch on drops | lava | Techno, trance |
+| 14 | **Night Terrain** | terrain + starfield sky + moon glow | galaxy | Lo-fi, chill |
+| 15 | **Oscilloscope Lab** | oscilloscope XY + lissajous + helix, phosphor green persistence | matrix | Electronic, experimental |
+| 16 | **Vortex** | vortex + geometry rays on kick + chromatic | toxic | Heavy, bass music |
+| 17 | **Lyric Stage** | image (cover, blurred, breathing) + light rays + dust fireflies + big karaoke text | mood (from cover accent) | Lyric videos |
+| 18 | **Mood Field** | gradient + motifs everywhere + mood grade; scenes follow emotion, not sections | mood | Songs with strong imagery; spoken word |
+| 19 | **Clean Captions** *(overlay)* | no background; subtitle text that pops on emphasis with mood colour; tiny sparks | mood | Talking-head videos with subtitles |
+| 20 | **Frame Pulse** *(overlay)* | frame glow on the beat + corner bursts + karaoke-style captions | neon | Music clips, reels |
+
+- Presets marked *(overlay)* are offered first when the input is a video in "Over the video" mode. All presets work in both modes; background layers are dropped in overlay mode.
+- **User presets:** "Save as my preset" stores the show in module state (`visualizer.myPresets`, ≤ 50, ≤ 512 KiB each, ≤ 4 MiB total). They can be renamed and deleted.
 
 ---
 
-## 14. Work packages
+## 7. Rendering and export
+
+### 7.1 Render job (`modules/visualizer`, actions `render` and `preview`)
+1. Validate:
+   - the analysis key exists (`Analyzer.Lookup`);
+   - ShowJSON ≤ 512 KiB;
+   - size, fps and range are within bounds;
+   - overlay mode needs a video input;
+   - `instrumental` needs stems.
+2. **Size:**
+   - **full mode:** from aspect and height; the short side is `height`:
+
+     | Aspect | Size at 1080 |
+     |---|---|
+     | 16:9 | 1920×1080 |
+     | 9:16 | 1080×1920 |
+     | 1:1 | 1080×1080 |
+     | 4:5 | 1080×1350 |
+
+     The same ratios apply at 720/1440/2160.
+   - **overlay mode:** the video's display size, scaled so the overlay height is ≤ 1440 (FFmpeg scales it back up, §7.4).
+   - **fps:** full mode uses the chosen 30/60. Overlay mode uses the video's fps rounded to 24/25/30/50/60; variable or unknown fps becomes 30.
+3. **Textures:** the cover art is extracted as in P6 §7.3 into TempDir. The image background is copied by path; the renderer loads both through `MediaService.URLFor`.
+4. **Plan:** write the plan JSON to TempDir. URLs replace paths: the analysis files, textures and the plan itself go through `URLFor`.
+5. `broker.Render(...)`. Progress 0–0.9 from the renderer's frame count; the title is "Rendering visuals — <name>".
+6. **Finish:**
+   - **full mode, no background video:** `MuxOpaque`, using the original or `instrumental.flac`.
+   - **full mode with a background video, or overlay mode:** `CompositeOverlay`. Progress 0.9–1, or 0.5–1 when compositing is the slow part.
+7. **Outputs:**
+   - `<base> (visualizer).mp4` in `Visualizer/`;
+   - **preview:** 10 s from `PreviewStartMs` at the chosen size but at most 1080p, to `<support>/cache/visualizer/preview-<jobID>.mp4`. The result is `{previewPath}`. Previews are pruned at start (more than 1 day old) and when the view unmounts.
+8. **Result:** `{outputs, previewPath, encoder, speed}`, where speed = media seconds ÷ wall seconds.
+
+### 7.2 Render broker and transport (`core/viz/broker.go`, `viz/RenderHost.tsx`, `viz/worker/*`)
+**Broker:**
+- One render at a time (a semaphore). A waiting job shows "Waiting for another render to finish".
+- `Render` creates a token, records `{jobID, tempDir, expectedBytes: 0, nextSeq: 0}`, and emits `viz:render {token, planUrl, jobId}`.
+- **Timeouts:**
+  - no `start` within 20 s → AppError "The visual renderer didn't start", hint "Show Toolbox's window and try again";
+  - no message for 30 s → "The visual renderer stopped responding".
+- **Cancel** (ctx): emits `viz:render-cancel`, waits ≤ 3 s for `cancelled`, then returns `context.Canceled` regardless. Partial files are left to TempDir cleanup.
+
+**RenderHost** (mounted once in `App.tsx` for the main window):
+- It listens for `viz:render` and starts **one** `render.worker.ts` per render, posting `{token, planUrl}`.
+- It relays worker messages to Go with `System.invoke` (Wails runtime).
+- It ignores the echoes Wails sends back (it never adds a `message` listener for them).
+- It relays `viz:render-cancel` and `viz:render-ack` to the worker.
+
+**Worker:**
+1. Fetches the plan and the analysis (§6.2) and loads the textures (`createImageBitmap(await fetch(url).blob())`).
+2. Validates the show. Builds an `Engine` on an `OffscreenCanvas` (twice as tall in overlay mode).
+3. **Picks the encoder (§7.3)**, then sends `start`.
+4. **For each frame i in [0, n):** `tMs = StartMs + i·1000/fps` → `engine.render(tMs)` → `new VideoFrame(canvas, {timestamp: i·1e6/fps})` → `encoder.encode(frame, {keyFrame: i % (2·fps) == 0})` → `frame.close()`.
+5. **Back-pressure:**
+   - The worker waits while `encodeQueueSize > 6`.
+   - It also waits while bytes sent − acked bytes > 16 MiB.
+6. **Batching:** output chunks are packed into ≤ 2 MiB batches and transferred to the main thread, which sends them in order.
+7. **Progress** every 15 frames.
+8. **Finish:** `flush()`, the last batch, then `done`. Any exception → `error` with a message; the worker then exits.
+
+**Raw message format** (pipe-separated; the base64 payload is last):
+```
+vz1|<token>|start|{"encoder":"h264-hw"|"h264-sw"|"jpeg","width":1920,"height":1080,"fps":30,"frames":6420}
+vz1|<token>|data|<seq>|<base64>          // seq 0,1,2,…; decoded ≤ 2 MiB
+vz1|<token>|progress|<frame>|<frames>
+vz1|<token>|done|{"frames":6420,"bytes":91234567}
+vz1|<token>|cancelled
+vz1|<token>|error|{"message":"…","detail":"…"}
+```
+- **Go checks:**
+  - `seq` must equal `nextSeq`; a gap or repeat → error "The renderer sent data out of order".
+  - Base64 must decode.
+  - The total must stay ≤ 8 GiB.
+  - `done.frames` must equal the planned frame count, and the byte count must match.
+- **Writes:** data is appended to `TempDir/video.h264` (or `frames.mjpeg`) by a single writer goroutine. It emits `viz:render-ack` every ≥ 4 MiB.
+- **base64:** `Uint8Array.prototype.toBase64` when present; otherwise a chunked `btoa(String.fromCharCode(...sub))` over 32 KiB slices.
+
+### 7.3 Encoder choice (`viz/worker/encoder.ts`)
+1. **H.264 High:**
+   - Codec `avc1.640028` for ≤ 1920×1088, `avc1.640033` up to 4096×2304 (stacked 1080p overlays are 1920×2160).
+   - Settings: `avc: {format: "annexb"}`, `latencyMode: "quality"`, `bitrateMode: "variable"`, and `hardwareAcceleration: "prefer-hardware"`. If `isConfigSupported` says no, retry with `"prefer-software"`.
+   - **Bitrate:**
+
+     | Output | Bitrate |
+     |---|---|
+     | 720p30 | 8 Mbps |
+     | 1080p30 | 14 Mbps |
+     | 1440p30 | 24 Mbps |
+     | 2160p30 | 45 Mbps |
+
+     60 fps is ×1.5 and overlay stacks are ×1.6. Vertical uses the same pixel-count rule.
+2. **JPEG fallback** (no H.264 encoder):
+   - `canvas.convertToBlob({type: "image/jpeg", quality: 0.92})` per frame, concatenated as MJPEG.
+   - Go transcodes with libx264 (§7.4).
+   - The render log notes "Using the slower JPEG path".
+3. No WebGL2 → error "This computer's graphics can't run the visualizer" (with the GPU string in the detail).
+
+### 7.4 FFmpeg (`core/viz/mux.go`)
+**MuxOpaque:**
+```
+ffmpeg -f h264 -framerate <fps> -i video.h264 [-ss <start> -to <end>] -i <audio>
+       -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4
+```
+- For MJPEG: `-f mjpeg -framerate <fps> -i frames.mjpeg … -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p`.
+
+**CompositeOverlay** (base = the input video, or a background video looped with `-stream_loop -1`):
+```
+ffmpeg -i <base> -f h264 -framerate <fps> -i overlay.h264 [-i <audio>]
+  -filter_complex "[1:v]split[a][b];[a]crop=iw:ih/2:0:0[c];[b]crop=iw:ih/2:0:ih/2,format=gray[m];
+                   [c][m]alphamerge,scale=<W>:<H>:flags=bicubic[ov];
+                   [0:v]fps=<fps>[bg];[bg][ov]overlay=0:0:format=auto:shortest=1,format=yuv420p[v]"
+  -map "[v]" -map <0:a:0? | 2:a> -c:v libx264 -preset medium -crf 18 -c:a copy|aac -b:a 192k -movflags +faststart out.mp4
+```
+- **Audio:** copied when it's AAC/MP3 and comes from the base; otherwise AAC 192k. In overlay mode the audio is the video's own.
+- **Size:** W×H is the base's display size (rotation applied, as in P6 §3.3), or the plan size for a looping background.
+- Progress comes from `media.ProgressTracker`.
+
+---
+
+## 8. Visualizer UI (`tools/visualizer/`)
+
+Steps: **Source → Analyze → Design → Export**.
+
+### 8.1 Source
+- **Drop an audio or video file** (or receive a handoff, §9).
+  - Audio shows the cover and tags. Video shows a still frame plus duration.
+- **Video choice:** "Over the video" (default) or "Use only its sound".
+- **Words (SegmentedControl):**
+  - "Detect from the audio";
+  - "Paste lyrics" (text area);
+  - "From a file" (.lrc/.srt/.vtt/.txt);
+  - "No words".
+  - A handoff pre-selects a fourth option, "From <Lyric Video / Subtitles>".
+  - Language select for detect and paste.
+- **Separate instruments:** a switch, on by default for audio and off for video. Hint: "Lets drums, bass, vocals and other instruments drive different visuals. Takes about as long as the song."
+- **Understand the words:** a switch, on by default when words are on and a Local Chat model is ready. Hint: "Uses your Local Chat model to read the mood and imagery of each line." Without a model it is disabled, with "Download a model in Local Chat" (button).
+- DepsGate rows appear for the engine, plus `stems-default` when stems are on and `whisper-default` when words are detect or paste.
+- Footer: **Analyze**.
+
+### 8.2 Analyze
+- Job progress with the stage list:
+  1. Separating instruments
+  2. Listening (beat, chords, sections)
+  3. Finding the words
+  4. Reading the mood
+- Steps that are cached show "✓ from earlier".
+- **The Song Map** is the result, and it stays visible in Design. Lanes, top to bottom, all sharing one time axis with zoom and a playhead:
+  - **sections** as labelled coloured blocks (intro/verse/chorus…);
+  - **beats and bars** as ticks;
+  - **drums** (kick/snare/hats dots), **bass**, **vocals** (energy plus the pitch line), **other**;
+  - **chords** as a strip with names;
+  - **mood** as a colour strip by emotion, with valence as brightness;
+  - **lyrics**: line blocks with emphasised words bold and motif icons.
+- **Summary chips:** tempo, key, sections, "4 instruments", "86 lines · English", and warnings as a Banner.
+- "Re-analyze with different options" goes back to Source and keeps the cache.
+
+### 8.3 Design
+**Left: the preview.**
+- A WebGL canvas at the export aspect (letterboxed), driven by an audio `MediaPlayer` (or the video `MediaPlayer` with the canvas as its overlay in "Over the video" mode).
+- Controls: play/pause, the Song Map below for seeking, "Full screen" (F key; Esc leaves), and a quality toggle (Auto / Full / Draft) with an fps readout.
+
+**Under the preview: "Why" (live).** Up to 4 short facts for the playhead, updated 4× per second. For example:
+> Chorus (B) · energy 0.86 · Kick → Rings 80% · "burning" → Fire motif · Mood: joy → Sunset palette
+
+They are built from the active section, the 3 strongest active mods (amount × current signal), the active motifs and the palette mode.
+
+**Right panel tabs:**
+1. **Presets:**
+   - A grid of cards with live thumbnails, one shared hidden `Engine` rendering each visible preset at 320×180 at the playhead every 500 ms.
+   - The name and one-line description; "My presets" listed first.
+   - Clicking applies the preset; the current design is kept in undo.
+2. **Look:**
+   - Palette mode and palettes (swatches);
+   - Reactivity, Speed, Intensity, Glow, Grain;
+   - **Visual mix** faders: Drums, Bass, Vocals, Other, Words, Mood;
+   - Motifs on/off;
+   - **Text:** style preset cards, font, size, colours, position, show next line, uppercase, emphasis options, "React to" signal and amount, title card.
+3. **Reactions:**
+   - The preset's `controls` rows. Each row is a label (e.g. "Rings", "Camera", "Background colour"), a driver Select of signal UI names grouped as Instruments, Rhythm, Song, Voice, Words & mood, Drift, and an amount slider (−2..2).
+   - "Add reaction" picks any reactive parameter of any layer (a two-level menu: layer → param) and adds a row.
+   - Rows show a tiny live meter of the driver.
+4. **Layers** (Advanced):
+   - The scenes as tabs (calm/main/full…).
+   - Each scene's layer stack: drag to reorder; toggle; blend; opacity; add from the catalogue grouped by kind with icons; duplicate; delete.
+   - Selecting a layer shows its params. Each numeric param has a ⚡ button that opens its mods list (signal, amount, shape, attack/release).
+   - Post effects per scene and global.
+5. **Timeline:**
+   - Director **Auto / Manual**.
+   - The Song Map's section lane becomes editable: click a section to pick its scene, palette override and transition (with a preview of the transition when played).
+   - "Reset to auto".
+
+**Undo/redo** (Ctrl+Z / Ctrl+Shift+Z, 100 steps) covers every design change.
+- The current design is kept in module state (`visualizer.lastShow`) so it survives a restart. The analysis key is kept per input path, so returning to a file reuses the analysis.
+
+### 8.4 Export
+- **Size:**
+  - Aspect (16:9 / 9:16 / 1:1 / 4:5; hidden in overlay mode, which keeps the video's shape);
+  - Quality (720p / 1080p / 1440p / 2160p — 2160p only when the encoder supports it, checked with `isConfigSupported`);
+  - FPS (30/60; overlay mode follows the video).
+- **Range:** whole song, or the selection on the Song Map (shift-drag).
+- **Audio:** Original / Instrumental (with stems).
+- **Background** (full mode): none / cover art / image… / video… (looped under the visuals; this uses the overlay composite).
+- **Buttons:**
+  - "Render 10 s preview" from the playhead → plays the clip.
+  - "Render video" → progress with fps and "×N real time", then a result card (video, Open, Show in folder, Send to).
+- If the encoder is the JPEG fallback, a note says "This computer can't encode video in the window, so rendering will be slower."
+
+---
+
+## 9. Integration with Lyric Video and Subtitles
+
+### 9.1 Handoff seed
+```ts
+// state/ui.ts
+export interface Handoff { moduleId: string; inputs: string[]; seed?: ToolSeed }
+export type ToolSeed = {
+  kind: "timed-text";
+  from: "lyric-video" | "subtitles";
+  lines: TimedLine[];                        // = lyrics.Line JSON shape
+  look?: { font: string; textColor: string; highlightColor: string; karaoke: boolean; position: "center" | "lower" };
+  overlay?: boolean;                         // subtitles on a video → "Over the video"
+};
+```
+The Visualizer reads the seed on `takeHandoff`:
+- Words become "From Lyric Video/Subtitles" (`Words: "given"` with those lines).
+- The look's font and colours prefill the text style.
+- From Lyric Video, the **Lyric Stage** preset is selected; from Subtitles, **Clean Captions**.
+
+### 9.2 Lyric Video
+- **Look step:** a new background card **"Reactive (Visualizer)"**. Choosing it replaces the right panel with a short explainer and a **"Design it in Visualizer"** button.
+- The button hands off `{inputs: [song], seed: {from: "lyric-video", lines, look}}`.
+- The card isn't a render option of Lyric Video itself: Lyric Video's render keeps its libass backgrounds.
+- The Render step for that card says "Render it from the Visualizer".
+
+### 9.3 Subtitles
+- **`Cue` gains `Words []CueWord`** (`json:"words,omitempty"`, `CueWord {startMs, endMs, text}`):
+  - Generate fills it from the Whisper words it already reads.
+  - Editing a cue's text re-spreads its words by character share. Shifting times shifts the words.
+  - Split and merge split or concatenate them.
+  - `.srt`/`.vtt` saving ignores them, and loading files leaves them empty.
+- **Export step:** a new card **"Reactive subtitles"** with "Open in Visualizer". It hands off `{inputs: [video], seed: {from: "subtitles", lines: cues as lines, overlay: true}}`. It needs the source video ("Pick the video" otherwise, as for burn-in).
+
+---
+
+## 10. Bound API changes (summary)
+- **New:** `visualizer.Service`:
+  - `Defaults() Options`
+  - `Enqueue(inputs []string, opts Options) ([]core.Job, error)`
+  - `Analysis(key string) (viz.AnalysisRef, error)`
+  - `AnalysisFor(path string, stems bool) (viz.AnalysisRef, bool)` (reuse on return)
+  - `Fonts() []string`
+  - `ChatStatus() (model string, ready bool)`
+- **`visualizer.Options`:**
+```go
+type Action string // "analyze" | "render" | "preview"
+type Mode string   // "full" | "overlay"
+type Options struct {
+    Action  Action             `json:"action"`
+    Analyze viz.AnalyzeOptions `json:"analyze"`        // analyze
+    AnalysisKey string         `json:"analysisKey"`    // render/preview
+    ShowJSON    string         `json:"showJson"`       // ≤ 512 KiB
+    Mode        Mode           `json:"mode"`
+    Aspect      string         `json:"aspect"`         // "16:9" | "9:16" | "1:1" | "4:5" (full)
+    Height      int            `json:"height"`         // 720 | 1080 | 1440 | 2160 (short side, full)
+    FPS         int            `json:"fps"`            // 30 | 60 (full)
+    StartMs     int64          `json:"startMs"`        // 0 = start
+    EndMs       int64          `json:"endMs"`          // 0 = end
+    Audio       string         `json:"audio"`          // "original" | "instrumental"
+    Background  string         `json:"background"`     // "none" | "cover" | "image" | "video" (full)
+    BackgroundPath string      `json:"backgroundPath"`
+    PreviewStartMs int64       `json:"previewStartMs"`
+    Seed        int64          `json:"seed"`
+}
+type Result struct {
+    Action      Action           `json:"action"`
+    Analysis    *viz.AnalysisRef `json:"analysis"`    // analyze
+    PreviewPath string           `json:"previewPath"` // preview
+    Outputs     []string         `json:"outputs"`     // render
+    Encoder     string           `json:"encoder"`
+    Speed       float64          `json:"speed"`
+}
+```
+- **`subtitles.Cue`** gains `Words`.
+- **`Handoff`** gains `seed`.
+- **New events:** `viz:render`, `viz:render-ack` and `viz:render-cancel` (§4.5).
+
+---
+
+## 11. Test plan
+
+### 11.1 Go
+- **`core/lyrics`:** the moved Lyric Video tests, plus `SpreadWords` and `WordsToLines` edge cases.
+- **`core/viz`:**
+  - **Broker**, with a fake raw-message source:
+    - happy path and ordering;
+    - seq gap or repeat; wrong token; wrong origin; child frame;
+    - start and idle timeouts; cancel; ack cadence;
+    - frame/byte mismatch; the 8 GiB cap.
+  - **Plan writing:** URLs, not paths.
+  - **Mux / composite** arg tables: rotation, VFR → 30, audio copy vs AAC, loop base, MJPEG.
+  - **Cache:** keys, reuse per step, prune by age and size.
+  - **Meaning:** with a fake `TextGenerator`:
+    - batching and context lines;
+    - schema retries and the line-by-line fallback;
+    - emphasis filtering;
+    - mood blending and the no-model keyframes;
+    - the emotion table.
+- **`modules/visualizer`:**
+  - `Validate` tables;
+  - `Run` analyze and render against fakes (a fake engine caller, a fake broker that writes a canned H.264);
+  - outputs and result fields.
+- **`modules/subtitles`:** words carried through generate, edit, split, merge and shift.
+- **Integration** (`-tags integration`):
+  - `MuxOpaque` and `CompositeOverlay` with a libx264 Annex-B stream generated by FFmpeg in the test as the "renderer output". The test checks:
+    - the frame count, duration and audio;
+    - the overlay alpha: a known red square with half alpha over a grey video gives the expected pixel ±3.
+
+### 11.2 Python (`sidecar/tests/test_viz.py`, generated signals like `analysis_bench.py`)
+- **Tempo** within ±1 bpm on the 120 bpm track; beat count ±2; the downbeat phase matches the kick pattern (bar-level kick accent).
+- **Chords:** a 4-chord loop (Am F C G) is ≥ 85% correct per beat; key A minor or C major in the top 2.
+- **Sections:**
+  - a boundary within ±1 bar of a +8 dB jump, labelled `drop`;
+  - the intro is detected for a quiet first 16 s;
+  - the repeated loud group is labelled `chorus`.
+- **Pitch:** a synthetic sung sine at MIDI 64 for 1 s gives a held note `[…, 64]`; unvoiced noise gives none.
+- **Features:**
+  - shapes, block offsets and the u8 range;
+  - `fps` 30 for a fake 21-minute duration (mocked length);
+  - a 61-minute input is a validation error.
+- **Stem fallbacks** produce the same channel ids without stems.
+- **Slow** (`TOOLBOX_SLOW=1`): real `htdemucs` on a 20 s mix, then `viz.analyze` with stems.
+
+### 11.3 Frontend (Vitest, jsdom, no WebGL)
+- **`analysis.ts`:** ranged fetch reassembly (a mocked 206 sequence), sampling and interpolation, prefix sums, event queries, schema version errors.
+- **`signals.ts`:** pulses (τ and strength), envelopes (attack/release on a step), fallbacks without stems or words, the modulation formula with mix gains, reactivity and clamping.
+- **`palette.ts`:** OKLab round trip; `journey` at 0, 0.5 and 1; mood crossfade timing; chord hue rotation.
+- **`director.ts`:** the auto timeline on a fixture analysis (labels → scenes, downbeat snapping, the drop flash, motif insertion and the cap of 2), and manual overrides.
+- **`types.ts`:** `validateShow` (every rule in §6.4). **Every preset validates.** Every preset only references existing layers, params and signals, and has ≥ 3 `controls`.
+- **Transport:** batching ≤ 2 MiB, seq numbering, base64 fallback equals native, back-pressure waits on acks, message format.
+- **Text layout:** wrap and safe areas at 16:9 and 9:16 with a stub `measureText`; animation timing functions.
+- **UI:**
+  - Source options and DepsGate visibility;
+  - the analyze stage list from job progress;
+  - Song Map lanes render from a fixture;
+  - Reactions add, change and remove update the show; Layers reorder and delete;
+  - undo/redo;
+  - Export option rules (2160p gating, overlay hiding aspect);
+  - handoff seeds from Lyric Video and Subtitles prefill the Source.
+- **Lyric Video / Subtitles:** the new cards hand off the right seed.
+
+### 11.4 Visual lab and checks (`viz/lab/VizLab.tsx`, `TOOLBOX_VIZLAB=1`)
+- A dev-only view (`TOOLBOX_VIEW=vizlab` with `TOOLBOX_VIZLAB=1`; otherwise the route doesn't exist):
+  1. loads a fixture analysis from `.dev/p7/fixture/` (any analysed song);
+  2. renders every preset at 5 moments (intro, verse, chorus, drop or loudest bar, outro) at 960×540;
+  3. sends PNGs over the raw channel (`vzlab|…`, accepted only with that env var) into `<support>/tmp/vizlab/<preset>-<moment>.png`;
+  4. writes `fps.json` (mean fps of 300 preview frames per preset at 1280×720) and `hash.json` (pixel hashes of 10 frames per preset).
+- Builders of layers and presets use it to see their work (they can read PNGs).
+- The architect reviews the contact sheets in Wave 3.
+- **Determinism check:** two lab runs produce the same `hash.json`.
+- **Parity check:** the lab renders frames via the export worker path (encode skipped, `readPixels` hashed) and the preview path, and compares them.
+
+### 11.5 Mac checklist (new steps)
+1. The preview renders and plays in sync.
+2. Export uses `h264-hw` (render log) at ≥ 2× real time at 1080p.
+3. Exporting with the window hidden works.
+4. Raw-message throughput: a 4-minute export finishes and `done` arrives without timeouts.
+5. Text renders in the worker with the chosen fonts; a CJK lyric falls back to a system font.
+6. The overlay composite on a 9:16 iPhone HEVC video keeps rotation and audio.
+7. The JPEG fallback path (forced with `TOOLBOX_VIZ_FORCE_JPEG=1`) still produces a correct video.
+
+---
+
+## 12. Work packages
 
 ### Wave 0: foundation (architect)
-1. Archive P5's spec (done) and update `docs/ROADMAP.md` (Phase 6 marked in progress).
-2. `core/media`: types, `Probe`, `Keyframes`, `Playable`, `ProgressTracker` (moved, converter rewired), the ASS writer, `Fonts`, with tests. `core/proc` `Dir` if missing.
-3. `core/textgen.go` (interface only). `ClipboardService.CopyText` + `lib/copy.ts`.
-4. `MediaService` signatures and the route middleware wired in `main.go` with a stub (404).
-5. Module stubs (§3.9) with final options, descriptors, `Validate` and services; `main.go` wiring; placeholders unchanged.
-6. The packs catalog (§3.8) with measured sizes for the new models; `BuiltIn += dev-utils`.
-7. Engine 0.6.0: the explicit OpenCV dep, `uv lock` (macOS arm64 wheels unchanged), handler stubs and prefetch stubs.
-8. Bindings, `lib/api.ts` re-exports, tool view stubs, the media kit stubs (§3.11 props and types), and the icons.
-9. CLAUDE.md: a Phase 6 section (the media route rule: no socket, token LRU, 4 MiB cap; preview copies never used for outputs; `TextGenerator` sharing; caches and their prune). `docs/MAC-CHECKLIST.md`: Phase 6 steps.
+1. Archive P6's spec (done); update `docs/ROADMAP.md` (done).
+2. `core/lyrics`, moved with its tests; Lyric Video converts at its boundary.
+3. `core/viz` types, the Analyzer/RenderBroker/mux signatures with stub bodies, the cache paths and prune; RawMessageHandler wiring and events in `main.go`/`api/events.go`.
+4. `modules/visualizer` stub (§4.6) with final options, `Validate` and service; packs (§4.7); engine 0.7.0 with the `viz.analyze` stub.
+5. Bindings, `lib/api.ts` re-exports, icons, the `Handoff.seed` type, the tool view stub, `RenderHost` mounted.
+6. **`viz/` working minimum:**
+   - `types.ts` (final), `validateShow`, and `analysis.ts`, `signals.ts` and `palette.ts` complete with tests;
+   - the GL core: context, targets, bloom, tonemap, dither, the overlay output;
+   - the layer and post registries;
+   - reference layers `gradient` and `bars`; the reference preset `spectrum-classic`;
+   - the engine rendering a show at a time;
+   - the worker skeleton with the message protocol and the H.264 encoder (no JPEG yet);
+   - VizLab with the PNG sink.
+   - Builders branch from a state where a preset renders end to end in the lab.
+7. **CLAUDE.md** Phase 7 section; `docs/MAC-CHECKLIST.md` Phase 7 steps.
 
 ### Wave 1 (parallel)
-
 | WP | Owns | Acceptance |
 |---|---|---|
-| **MD1 Media backend** | `api/media.go` (+ tests), the `media-proxy` module, the cache dirs and prune | §3.2, §3.4; Go tests |
-| **TG1 TextGenerator** | `modules/chat/complete.go` (+ tests), the slot-priority change in `generate.go`, `chat:status` busy text, the composer busy line in `tools/chat/**`, plus F1 and F6 | §3.5, F1, F6; Go + FE tests |
-| **TR1 Trimmer backend** | `modules/trimmer/**` (except frozen files) | §4.1–4.2; Go + integration tests |
-| **SB1 Subtitles backend** | `modules/subtitles/**` (except frozen files) | §5.1–5.4; Go + integration tests |
-| **AC1 Audio Cleanup** | `modules/audio-cleanup/**`, `tools/audio-cleanup/**`, `sidecar/.../handlers/denoise.py`, `toolbox_sidecar/dfn3.py`, `sidecar/tests/test_denoise.py` | §6; Go + FE + integration tests |
-| **LV1 Lyric Video backend** | `modules/lyric-video/**` (except frozen files) | §7.1–7.3; Go + integration tests |
-| **RD1 Redact backend** | `modules/redact/**`, `sidecar/.../handlers/redact.py`, `toolbox_sidecar/redact/**`, `sidecar/tests/test_redact.py` | §8 backend; Go + pytest (+slow) |
-| **ER1 Eraser backend** | `modules/object-eraser/**`, `sidecar/.../handlers/eraser.py`, `toolbox_sidecar/eraser.py`, `sidecar/tests/test_eraser.py` | §9 backend; Go + pytest (+slow) |
-| **DU1 Dev Utilities** | `modules/dev-utils/**`, `tools/dev-utils/**`, the palette entries for it | §10; Go + FE tests |
-| **UI-M Media kit** | `frontend/src/components/media/**` | §3.11; FE tests |
-| **FX1 P5 follow-ups** | F2 (OCR switch to `copyText`), F3, F4, F5: `tools/ocr/**` copy call, `modules/vault` notice + `tools/vault/**`, `views/setup/**`, the Settings dependency rows | §11; tests |
+| **AN1 Analysis engine** | `sidecar/.../handlers/viz.py`, `toolbox_sidecar/viz/**`, `sidecar/tests/test_viz.py` | §5.2–5.3, §5.5 audio schema; §11.2 |
+| **AN2 Analysis orchestration** | `core/viz/analyze.go`, `meaning.go`, `cache.go` (+ tests) | §5.1, §5.4, §5.5 text schema; §11.1 |
+| **RB1 Render broker + FFmpeg** | `core/viz/broker.go`, `mux.go`, `plan.go` (+ tests, integration) | §7.2 (Go side), §7.4; §11.1 |
+| **VM1 Visualizer module** | `modules/visualizer/**` (except frozen files) | §7.1, §10; Go tests against fakes |
+| **RH1 Render host + worker** | `viz/RenderHost.tsx`, `viz/worker/**` | §7.2 (web side), §7.3; transport tests; a real export from VizLab |
+| **L1 Backgrounds** | `viz/layers/{nebula,aurora,ink,synthgrid,tunnel,starfield,terrain,image,kaleido}.ts` + shaders | §6.7 #2–10; lab PNGs; ≥ 50 fps each at 720p |
+| **L2 Shapes + highway** | `viz/layers/{radial,ribbons,wavering,oscilloscope,lissajous,helix,vortex,geometry,pitchribbon,highway}.ts` (+ `bars` polish) | §6.7 #11–20, #29 |
+| **L3 Particles, accents, motifs** | `viz/layers/{embers,bursts,fireflies,ripples,shockwave,sweep,lightrays,frame,motif}.ts`, the sprite atlas generator | §6.7 #21–28, #30 |
+| **PX1 Post + transitions** | `viz/post/**` (beyond Wave 0's), transitions in `engine.ts`' transition module (`viz/transitions.ts`) | §6.5 steps 3 and 5, §6.7 post list |
+| **TX1 Text layer** | `viz/text/**` | §6.8; layout tests; lab PNGs at 16:9 and 9:16 |
+| **SB3 Subtitles words** | `modules/subtitles` Cue words + the edit operations in `tools/subtitles/**` | §9.3 (words), tests |
 
-### Wave 2 (parallel, after UI-M and each tool's backend are merged)
-
+### Wave 2 (parallel, after Wave 1 merges)
 | WP | Owns | Acceptance |
 |---|---|---|
-| **UI-TR Trimmer UI** | `tools/trimmer/**` | §4.3 |
-| **UI-SB Subtitles UI** | `tools/subtitles/**` | §5.5 |
-| **UI-LV Lyric Video UI** | `tools/lyric-video/**` | §7.4 |
-| **UI-RD Redact UI** | `tools/redact/**` | §8 UI |
-| **UI-ER Eraser UI** | `tools/object-eraser/**` | §9 UI |
+| **PR1 Presets + director** | `viz/presets/**`, `viz/director.ts` | §6.9, §6.10: 20 presets that validate; contact sheets reviewed by the architect; each ≥ 50 fps at 720p in the lab |
+| **UI-V1 Source + Analyze + Song Map** | `tools/visualizer/{SourceStep,AnalyzeStep,SongMap}*` | §8.1, §8.2 |
+| **UI-V2 Design + Export** | `tools/visualizer/{DesignStep,Preview,WhyPanel,Presets,Look,Reactions,Layers,Timeline,ExportStep}*`, `VisualizerView.tsx` | §8.3, §8.4 |
+| **IN1 Handoffs** | the Lyric Video Look card + Render note (`tools/lyric-video/**`), the Subtitles Export card (`tools/subtitles/**`), the seed reading in `tools/visualizer/useSeed.ts` | §9 |
 
-Each Wave 2 package also adds its palette entries in a marked block of `shell/useBuiltinCommands.ts` (one block per package, created empty in Wave 0, to avoid conflicts).
+Palette commands for the Visualizer (open, Analyze, Render, Render preview, Full screen) go in the marked block of `shell/useBuiltinCommands.ts` (UI-V2).
 
 ### Wave 3: integration (architect)
-Merge, regenerate bindings, run all checks, the engine e2e, the integration tests and `wails3 build`. Install the Image pack's new models in a sandbox and measure the disk use against the catalog (±10%). Then the manual smoke from §13, DECISIONS.md, and the summary.
+1. Merge, regenerate bindings, and run every check, the engine e2e (extended with `viz.analyze` on the synthetic track with stems) and `wails3 build`.
+2. VizLab contact sheets: review all 20 presets × 5 moments and send back any that look poor.
+3. Determinism and parity checks.
+4. Measurements against §13.
+5. A real song end to end (detect + meaning).
+6. A subtitled talking-head video in overlay mode.
+7. The Lyric Video and Subtitles handoffs.
+8. No listeners during a render.
+9. DECISIONS.md and the summary.
 
 ---
 
-## 15. Acceptance criteria
-1. **Media route:**
-   - Videos and audio play and seek in the app with no listening socket (checked with `netstat`: only llama-server, and only while chat runs).
-   - Responses never exceed 4 MiB. Playing a 1 GB file keeps the working set within +200 MB.
-   - Unplayable files get a preview copy automatically, and exports use the original.
-2. **Video Trimmer:**
-   - Fast mode cuts an MP4 in about a second with no re-encode, and the merge of 2 segments plays through.
-   - Precise mode is frame-accurate (± one frame).
-   - 9:16 reframing and "under 50 MB" produce a file ≤ 50 MB at 9:16.
-3. **Subtitles:**
-   - Generating from a talking-head clip gives readable cues (≤ 2 lines of ≤ 42 chars, ≤ 7 s).
-   - Edits save to `.srt`.
-   - Translation to Spanish with the local model keeps every cue's timing.
-   - Embedding adds a toggleable track without re-encoding; burning in renders the chosen style.
-4. **Audio Cleanup:**
-   - Podcast target lands within ±1 LU of −16 LUFS with true peak ≤ −1.5 dBTP.
-   - Hum auto-detects 50/60 Hz on the test signal.
-   - The preview A/B swaps without losing position.
-   - Video inputs keep their video stream bit-identical (`-c:v copy`).
-5. **Lyric Video:**
-   - Pasted lyrics align to a sung test song with lines starting within ~0.5 s of the vocals on most lines; tap-to-sync and nudge fix the rest.
-   - The render shows the karaoke fill and plays in sync. 9:16 and cover backgrounds work.
-   - The instrumental option removes the vocals.
-6. **Redact:** §8.4.
-7. **Object Eraser:** §9.4.
-8. **Dev Utilities:** every utility in §10.2 works offline; file hashes match `certutil`/`shasum` for a test file; copies don't duplicate in Clipboard History.
-9. **Packs:**
-   - Every new tool is on exactly one pack card (Dev Utilities built in).
-   - Installing the Image pack in a fresh sandbox makes Redact and Object Eraser ready; disk use is within ±10% of the cards.
-10. **Follow-ups F1–F6** are fixed.
-11. All checks are clean (`go vet`, `go test`, pytest, `npm run check`, gofmt, darwin cross-vet), the engine e2e passes, `docs/MAC-CHECKLIST.md` has the Phase 6 steps, and DECISIONS.md is updated.
+## 13. Acceptance criteria
+1. **No sockets:**
+   - A full export runs with no listening socket other than llama-server's (P5).
+   - The raw-message channel ignores wrong tokens, wrong origins and child frames (tests).
+2. **Analysis (Windows box, 4-minute song):**
+   - audio features without stems ≤ 20 s;
+   - with stems + detect + meaning ≤ 1.5× the song length plus the model's reply time;
+   - a second analysis of the same file ≤ 2 s (cache).
+   - On a real song: tempo matches a manual count (or its double or half), and the chorus is labelled on at least 2 of its occurrences.
+3. **Export speed (Windows box):**
+   - 1080p30 full ≥ 4× real time for the 3 heaviest presets (measured in the render log);
+   - 2160p30 ≥ 1× real time;
+   - a 1080p overlay over a 1080p 30 fps video ≥ 1× real time end to end (composite included).
+4. **Preview:** every preset ≥ 50 fps at 1280×720 (VizLab `fps.json`).
+5. **Exactness:**
+   - two renders of the same plan give identical pre-encode hashes (VizLab);
+   - preview and export frames match (VizLab parity, mean absolute difference ≤ 1/255);
+   - the exported video's frame count equals duration × fps, and its audio stays in sync (±1 frame at the end of a 4-minute render).
+6. **Reactivity you can see:**
+   - on the contact sheets, every preset differs visibly between verse and chorus;
+   - on a kick vs no-kick frame pair, every preset with a kick-driven control changes measurably (mean pixel difference > 2%);
+   - the "Why" readout names the drivers that are actually active.
+7. **Words:**
+   - with lyrics, karaoke text is in sync (word fill within ±1 frame of the word times);
+   - emphasised words stand out;
+   - with a chat model, the mood strip and motifs follow the lyrics on a test song (e.g. a line about fire shows the fire motif).
+8. **Video overlay:**
+   - Over a subtitled talking-head video, Clean Captions shows readable subtitles that pop on emphasis.
+   - The output keeps the video's size, rotation, fps and audio.
+9. **Handoffs:** Lyric Video and Subtitles open the Visualizer with the song or video and the timed text, and the defaults are as in §9.
+10. **Quality:** no visible banding in dark gradients after export (dither), no jagged lines (SDF), no flicker from raw signals (envelopes) — checked on the contact sheets and one exported video.
+11. **Housekeeping:**
+    - all checks are clean (`go vet`, `go test`, pytest, `npm run check`, gofmt, darwin cross-vet);
+    - the engine e2e passes;
+    - CLAUDE.md, the Mac checklist, ROADMAP and DECISIONS are updated.
 
-## 16. Risks
-- **WKWebView and range requests from a custom scheme** (macOS) aren't verified here. If AVFoundation refuses to stream from the scheme handler, the fallback is to serve the preview-copy route with the full file for files ≤ 64 MiB and otherwise show the player as unavailable with the export still working. This is on the Mac checklist as step 1.
-- **The 4 MiB cap** relies on Chromium asking for the next range itself, which is standard behaviour (*docs only*). The media-route acceptance test checks it on WebView2.
-- **Whisper on singing** is much weaker than on speech, even on isolated vocals. That's why "Paste lyrics" is the recommended source (alignment tolerates misheard words), with tap-to-sync and nudges as the fallback.
-- **Small local models translating subtitles:**
-  - Qwen3-4B is fine for major languages and weaker for low-resource ones.
-  - At ~80 tok/s, a 1-hour film (~800 cues) takes about 3–5 minutes on the GPU and much longer on CPU. The job shows progress per batch and can be cancelled.
-  - The JSON schema keeps the cue count right.
-- **Redaction is best effort.** Detectors miss small, blurred or side-on faces and odd plates. The review step is the default for single files, the UI says "Check every frame before sharing", and manual boxes cover misses.
-- **The plate detector's weights have no stated licence** (code MIT; trained with a GPL-3.0 fork). For a personal, never-distributed app this is acceptable; DEIMv2-nano (MIT, slightly less sensitive) is the drop-in fallback if that changes.
-- **Inpainting** works well for small and medium objects and poorly for large areas or structured backgrounds; the UI says so, and erasing again on the result is supported.
-- **Font fallback** for non-Latin subtitles and lyrics depends on the OS's fonts through libass. Verified on Windows for Latin only; the Mac checklist has a CJK case.
-- **Cache growth:** preview copies, filmstrips and lyric-video stems are capped and pruned (5 GB for media, 7 days for lyric-video stems).
+## 14. Risks
+- **Raw messages on macOS** (WKScriptMessageHandler) aren't measured. If they're slow, a 4-minute 1080p export (~400 MB of base64) could take minutes. Two mitigations:
+  - **Bitrate:** export bitrate scales down automatically if the measured transport rate is below 3× the stream rate. The worker measures it from acks.
+  - **Fallback:** the JPEG path doesn't help here, so the fallback is a lower bitrate with a note.
+  - Mac checklist step 4.
+- **Hardware encoder availability** varies by GPU and driver. The software H.264 path in Chromium (OpenH264) was 65 fps at 1080p here, and the JPEG path is last.
+- **Analysis quality on real music:**
+  - Beat tracking and section labels are heuristics. Labels can be wrong (the Song Map lets users reassign scenes per section, and nothing depends on a label being right).
+  - Whisper on singing is weak (P6 risk), so "Paste lyrics" stays recommended.
+- **Small local models reading mood** can be shallow or repetitive. The schema keeps replies well-formed, the blend with musical mood keeps the visuals sensible, and meaning is optional.
+- **GPU differences** (ANGLE D3D11 vs Metal) can change shader precision. Shaders use `highp` and avoid derivative-dependent tricks in the parity path; VizLab parity runs on each OS.
+- **Text in workers on macOS** (`OffscreenCanvas` 2D fonts) is *docs only*. If system fonts don't resolve there, text is rasterised on the main thread and transferred as `ImageBitmap`s to the worker (the atlas is small).
+- **Scope:** 31 layers and 20 presets is a lot of art direction for builders. VizLab contact sheets make every layer visible to its builder, and the architect reviews them before the presets are accepted. Presets can ship in fewer numbers if some don't meet the bar (logged in DECISIONS).
+- **Cache growth:** analyses are small (a few MB each), plus `instrumental.flac` per song (~30 MB). Capped at 3 GB and 30 days.
