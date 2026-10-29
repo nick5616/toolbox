@@ -33,6 +33,8 @@ const EXIFTOOL_ID = "exiftool";
 const EXIFTOOL_JOB_MODULE = "system-exiftool-update";
 const UPSCAYL_ID = "upscayl";
 const UPSCALER_JOB_MODULE = "system-upscaler-install";
+/** ffprobe ships in the same managed archive as ffmpeg, so it has no actions of its own. */
+const FFPROBE_ID = "ffprobe";
 const AUDIO_ENGINE_ID = "audio-engine";
 const AUDIO_ENGINE_JOB_MODULE = "system-audio-engine";
 
@@ -344,6 +346,8 @@ function DepsTable() {
                     >
                       {ok ? "Update" : "Install"}
                     </Button>
+                  ) : d.id === FFPROBE_ID ? (
+                    <span className={styles.subtle}>Installed with FFmpeg</span>
                   ) : isManagedDep(d.id) ? (
                     <ManagedDepActions dep={d} />
                   ) : d.id === AUDIO_ENGINE_ID ? (

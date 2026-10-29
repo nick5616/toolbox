@@ -72,6 +72,14 @@ describe("SettingsView", () => {
     expect(screen.getAllByRole("button", { name: "Install" })).toHaveLength(2);
   });
 
+  it("shows ffprobe as installed with FFmpeg and without buttons", () => {
+    useDeps.getState().setAll([dep("ffprobe", "ffprobe", DepState.DepMissing)]);
+    render(<SettingsView />);
+    const row = screen.getByText("ffprobe").closest("tr") as HTMLElement;
+    expect(within(row).getByText("Installed with FFmpeg")).toBeTruthy();
+    expect(within(row).queryAllByRole("button")).toHaveLength(0);
+  });
+
   it("changes the library dir from the dialog result", async () => {
     render(<SettingsView />);
     fireEvent.click(screen.getByRole("button", { name: "Change…" }));

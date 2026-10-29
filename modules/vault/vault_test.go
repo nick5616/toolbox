@@ -360,8 +360,19 @@ func TestIndexBakFallback(t *testing.T) {
 	if es, _ := f.v.list("", ""); len(es) != 1 { // .bak is the version before the last add
 		t.Fatalf("entries from bak = %d", len(es))
 	}
-	if f.v.notice == "" {
-		t.Fatal("no bak notice")
+	f.mu.Lock()
+	var carried bool
+	for _, st := range f.states {
+		if st.Notice == "The vault index was restored from its backup copy" {
+			carried = true
+		}
+	}
+	f.mu.Unlock()
+	if !carried {
+		t.Fatal("no vault:state carried the bak notice")
+	}
+	if f.v.state().Notice != "" {
+		t.Fatal("notice should be delivered once")
 	}
 	f.v.lock()
 	_ = os.WriteFile(filepath.Join(dir, fileIndexBak), []byte("garbage"), 0o600)

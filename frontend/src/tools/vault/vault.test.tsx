@@ -116,6 +116,20 @@ describe("Vault unlock", () => {
   });
 });
 
+describe("Vault notice", () => {
+  it("shows the backup notice once after unlock and keeps it until dismissed", async () => {
+    const user = userEvent.setup();
+    render(<VaultView moduleId="vault" />);
+    await screen.findByLabelText("Passphrase");
+    act(() => listeners.cb?.({ ...base, unlocked: true, notice: "The vault index was restored from its backup copy" }));
+    expect(await screen.findByText("The vault index was restored from its backup copy")).toBeTruthy();
+    act(() => listeners.cb?.({ ...base, unlocked: true, entries: 1, notice: "" }));
+    expect(screen.getByText("The vault index was restored from its backup copy")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText("The vault index was restored from its backup copy")).toBeNull();
+  });
+});
+
 describe("Vault unlocked", () => {
   it("counts down to auto-lock", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });

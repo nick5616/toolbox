@@ -44,7 +44,7 @@ func (v *Vault) stateLocked() core.VaultState {
 		dir = v.vaultDir()
 	}
 	_, err := os.Stat(filepath.Join(dir, fileMeta))
-	st := core.VaultState{Exists: err == nil, AutoLockMinutes: v.autoLockMinutes()}
+	st := core.VaultState{Exists: err == nil, AutoLockMinutes: v.autoLockMinutes(), Notice: v.notice}
 	if v.idx != nil {
 		st.Unlocked = true
 		st.Entries = len(v.idx.Entries)
@@ -276,6 +276,11 @@ func (v *Vault) unlock(secret string) error {
 		slog.Warn("vault index restored from backup copy")
 	}
 	v.emitState()
+	// The notice is delivered once: the state emitted above carried it; later
+	// states (and State()) don't. The view latches it until dismissed.
+	v.mu.Lock()
+	v.notice = ""
+	v.mu.Unlock()
 	return nil
 }
 

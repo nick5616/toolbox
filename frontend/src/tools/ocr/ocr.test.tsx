@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const enqueue = vi.hoisted(() => vi.fn());
 const reveal = vi.hoisted(() => vi.fn(async () => undefined));
+const copyTextMock = vi.hoisted(() => vi.fn(async (_text: string) => true));
+vi.mock("@/lib/copy", () => ({ copyText: (t: string) => copyTextMock(t) }));
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -75,8 +77,7 @@ describe("OcrView", () => {
 
   it("renders an image result with a text preview and copies it", async () => {
     const user = userEvent.setup();
-    const writeText = vi.fn(async () => undefined);
-    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const writeText = copyTextMock;
     useJobs.getState().upsert({
       id: "j1",
       moduleId: "ocr",

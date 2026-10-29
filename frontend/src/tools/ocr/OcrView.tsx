@@ -9,6 +9,7 @@ import {
   OcrService,
   type OcrLanguageInfo,
 } from "@/lib/api";
+import { copyText } from "@/lib/copy";
 import { toAppError } from "@/lib/errors";
 import { revealLabel } from "@/lib/platform";
 import { useOrderedJobs } from "@/state/jobs";
@@ -23,14 +24,8 @@ const MAX_RESULTS = 24;
 function ResultCard({ item }: { item: OcrResultItem }) {
   const textFile = item.files.find((f) => f.path.toLowerCase().endsWith(".txt")) ?? item.files[0];
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(item.preview);
-      toast({ title: "Text copied", tone: "success" });
-    } catch (e) {
-      toast({ title: toAppError(e).message, tone: "danger" });
-    }
-  };
+  // copyText goes through Go (self-copy marker) and shows its own toast.
+  const copy = () => void copyText(item.preview);
   const saveAs = () => {
     if (!textFile) return;
     const p = textFile.id ? LibraryService.Reveal(textFile.id) : LibraryService.RevealPath(textFile.path);
