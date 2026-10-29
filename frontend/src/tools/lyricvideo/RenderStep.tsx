@@ -13,7 +13,6 @@ export interface RenderStepProps {
   onPreviewStart: (ms: number) => void;
   blocker: string;
   engineBlocked: boolean;
-  engineReason: string;
   /** Instrumental audio will be made on the engine if it isn't cached. */
   instrumental: boolean;
   /** Missing background file / cover warnings. */
@@ -49,7 +48,6 @@ export function RenderStep(p: RenderStepProps) {
       {p.blocker && <Banner tone="danger" title={p.blocker} />}
       {p.warning && <Banner tone="warn" title={p.warning} />}
       {p.instrumental && <DepsGate moduleId={p.moduleId} />}
-      {p.instrumental && p.engineBlocked && <div className={styles.muted}>{p.engineReason}</div>}
 
       <Section label="Preview">
         <div className={styles.form}>

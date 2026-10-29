@@ -22,7 +22,6 @@ export interface LyricsStepProps {
   gen: JobRun;
   /** True when the AI engine is needed and missing. */
   engineBlocked: boolean;
-  engineReason: string;
   onGetTimings: () => void;
   /** The lyric player (rendered by the view so its ref and time are shared). */
   player: ReactNode;
@@ -131,7 +130,6 @@ export function LyricsStep(p: LyricsStepProps) {
             <Button icon="wand-sparkles" onClick={p.onGetTimings} loading={p.gen.busy} disabled={!canGet}>
               Get timings
             </Button>
-            {p.engineBlocked && <span className={styles.muted}>{p.engineReason}</span>}
           </div>
           <RunStatus run={p.gen} runningLabel="Timing the lyrics…" showResult={false} />
         </div>

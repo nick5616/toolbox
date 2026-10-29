@@ -420,7 +420,6 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
             onPickLyricsFile={() => void onPickLyricsFile()}
             gen={gen}
             engineBlocked={engineBlocked}
-            engineReason={gate.reason}
             onGetTimings={onGetTimings}
             player={playerNode}
             durationMs={durationMs}
@@ -488,7 +487,6 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
             onPreviewStart={setPreviewStartMs}
             blocker={blocker}
             engineBlocked={engineBlocked}
-            engineReason={gate.reason}
             instrumental={prefs.audio === "instrumental"}
             warning={renderWarning}
             preview={preview}
