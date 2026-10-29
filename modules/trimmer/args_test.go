@@ -143,7 +143,7 @@ func TestPreciseArgs(t *testing.T) {
 	s.Kbps, s.Pass, s.PassLog = 5000, 1, "log"
 	p1 := strings.Join(s.args(), " ")
 	if !strings.Contains(p1, "-b:v 5000k") || !strings.Contains(p1, "-pass 1 -passlogfile log") ||
-		!strings.HasSuffix(p1, "-an -f null -") || strings.Contains(p1, "-crf") {
+		!strings.HasSuffix(p1, "-f null -") || strings.Contains(p1, "-crf") {
 		t.Errorf("pass1 = %s", p1)
 	}
 	s.Pass = 2

@@ -237,9 +237,6 @@ func (p preciseSpec) args() []string {
 			a = append(a, "-pass", strconv.Itoa(p.Pass), "-passlogfile", p.PassLog)
 		}
 	}
-	if p.Pass == 1 {
-		return append(a, "-an", "-f", "null", "-")
-	}
 	if p.ALabel != "" {
 		a = append(a, "-map", p.ALabel)
 		if p.VLabel != "" {
@@ -247,6 +244,10 @@ func (p preciseSpec) args() []string {
 		} else {
 			a = append(a, p.AudioOnlyCodecs...)
 		}
+	}
+	if p.Pass == 1 {
+		// Audio stays mapped (with a cheap codec) so no filtergraph output dangles.
+		return append(a, "-f", "null", "-")
 	}
 	a = append(a, "-map_metadata", "0")
 	if p.VLabel != "" {
