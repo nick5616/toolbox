@@ -145,6 +145,8 @@ def chunk_spans(length: int, chunk: int, fade: int) -> list[tuple[int, int]]:
     if length <= chunk:
         return [(0, length)]
     spans: list[tuple[int, int]] = []
+    if fade * 2 > chunk:
+        raise ValueError("chunk must be at least twice the crossfade")
     start = 0
     step = chunk - fade
     while True:
@@ -164,14 +166,16 @@ def process_channel(
     x: np.ndarray,
     fn: Callable[[np.ndarray], np.ndarray],
     *,
-    chunk: int = CHUNK_SECONDS * SR,
-    fade: int = FADE_SECONDS * SR,
+    chunk: int | None = None,
+    fade: int | None = None,
     on_chunk: Callable[[], None] | None = None,
 ) -> np.ndarray:
     """Applies fn chunk by chunk and joins the pieces with linear crossfades.
 
     on_chunk is called before each chunk (progress / cancellation hook).
     """
+    chunk = CHUNK_SECONDS * SR if chunk is None else chunk
+    fade = FADE_SECONDS * SR if fade is None else fade
     spans = chunk_spans(len(x), chunk, fade)
     out = np.zeros(len(x), np.float32)
     ramp = np.linspace(0, 1, fade, endpoint=False, dtype=np.float32) + 1 / (2 * fade)

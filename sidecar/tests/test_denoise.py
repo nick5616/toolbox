@@ -53,6 +53,11 @@ def test_unity_model_reproduces_input(length):
         assert len(calls) > 1
 
 
+def test_chunk_spans_rejects_fade_longer_than_half_chunk():
+    with pytest.raises(ValueError):
+        dfn3.chunk_spans(1000, 100, 60)
+
+
 def test_process_channel_hooks_each_chunk():
     n = []
     dfn3.process_channel(np.zeros(10_000, np.float32), lambda c: c, chunk=3000, fade=500, on_chunk=lambda: n.append(1))
@@ -89,8 +94,8 @@ def test_enhance_file_rejects_wrong_rate(tmp_path):
 def test_enhance_file_cancels_between_chunks(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(dfn3, "enhance", lambda x, s: (calls.append(1), x)[1])
-    monkeypatch.setattr(dfn3, "CHUNK_SECONDS", 1)
-    src = _write_wav(tmp_path / "in.wav", np.zeros((SR * 4, 1), np.float32))
+    monkeypatch.setattr(dfn3, "CHUNK_SECONDS", 2)
+    src = _write_wav(tmp_path / "in.wav", np.zeros((SR * 8, 1), np.float32))
     dst = str(tmp_path / "out.wav")
 
     def check():
