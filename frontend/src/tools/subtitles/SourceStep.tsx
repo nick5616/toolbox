@@ -41,6 +41,11 @@ export function SourceStep(p: SourceStepProps) {
   if (!p.mediaPath && p.cueCount === 0) {
     return (
       <div className={styles.sourceEmpty}>
+        {p.loadError && (
+          <Banner tone="danger" title="Couldn't read the subtitles">
+            {p.loadError}
+          </Banner>
+        )}
         <DropZone
           id="tool-drop:subtitles"
           icon="captions"
