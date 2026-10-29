@@ -1,0 +1,434 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  box-sizing: border-box;
+}
+
+.steps {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.step:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.step:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.step:disabled {
+  color: var(--fg-faint);
+  cursor: default;
+}
+
+.stepOn {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.stepNum {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+}
+
+.stepOn .stepNum {
+  color: var(--accent-fg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.stepSep {
+  color: var(--fg-faint);
+  margin-left: var(--space-2);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+  display: inline-block;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sourceEmpty {
+  max-width: 640px;
+  margin: var(--space-8) auto;
+  width: 100%;
+}
+
+.songBody,
+.lyricsBody,
+.renderBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 860px;
+  width: 100%;
+}
+
+.songCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+.cover {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 88px;
+  height: 88px;
+  overflow: hidden;
+  color: var(--fg-subtle);
+  background: var(--bg-inset);
+  border-radius: var(--r-md);
+}
+
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.songInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.fileName {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.form > * {
+  max-width: 100%;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.fieldLabel {
+  min-width: 120px;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.hint,
+.muted {
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+}
+
+.warnText {
+  font-size: var(--text-sm);
+  color: var(--warn);
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-start;
+  padding-bottom: var(--space-5);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* ---- lyric sheet ---- */
+
+.sheetTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.shiftGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: var(--space-2);
+}
+
+.shiftField {
+  width: 72px;
+}
+
+.tapBar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+}
+
+.emptySheet {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--fg-subtle);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+}
+
+.sheet {
+  max-height: 420px;
+  overflow-y: auto;
+  margin-top: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-panel);
+}
+
+.sheetRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid transparent;
+}
+
+.rowActive {
+  background: var(--bg-hover);
+}
+
+.rowSelected {
+  background: var(--bg-active);
+}
+
+.rowTap {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.rowSuspect {
+  border-left-color: var(--warn);
+}
+
+.rowNum {
+  width: 28px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  text-align: right;
+}
+
+.time {
+  width: 92px;
+  flex-shrink: 0;
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- look ---- */
+
+.lookBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.lookLeft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  position: sticky;
+  top: 0;
+  min-width: 0;
+}
+
+.previewBox {
+  display: flex;
+  justify-content: center;
+  max-height: 60vh;
+}
+
+.previewBox > * {
+  max-width: 100%;
+}
+
+.lookRight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.bgGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.bgCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.bgCard:hover {
+  background: var(--bg-hover);
+}
+
+.bgCard:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.bgCardOn {
+  color: var(--fg);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ---- render ---- */
+
+.clip {
+  width: 100%;
+  max-width: 640px;
+}
+
+.runBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.runHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+}
+
+.runMsg {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.resultCard {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--ok-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.resultHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  color: var(--ok);
+}
+
+.resultList {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+
+.resultRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.resultName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+}
