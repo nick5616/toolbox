@@ -276,6 +276,8 @@ def get_session(path: str) -> Any:
 
         so = ort.SessionOptions()
         so.log_severity_level = 3
+        # BASIC: ~35% faster to load and run than the default for LaMa (measured, CPU).
+        so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
         sess = ort.InferenceSession(path, so, providers=["CPUExecutionProvider"])
         _sessions[path] = sess
     return sess

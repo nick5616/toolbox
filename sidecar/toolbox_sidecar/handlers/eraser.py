@@ -50,7 +50,7 @@ def inpaint(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
     warning = eng.WARNING_LARGE if float(dilated.mean()) > eng.LARGE_MASK_FRACTION else ""
     ctx.check_cancelled()
 
-    ctx.stage("Loading model")
+    ctx.stage("Loading model (the first run takes a while)")
     try:
         run = eng.lama_runner(model_path) if model == "best" else eng.migan_runner(model_path)
     except Exception as e:
