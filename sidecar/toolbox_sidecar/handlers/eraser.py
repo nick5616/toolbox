@@ -83,6 +83,7 @@ def inpaint(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
     ctx.stage("Saving")
     base = os.path.splitext(os.path.basename(path))[0] + " (erased)"
     saved = save_unique(out_im, os.path.abspath(out_dir), base, ext.lstrip("."), fmt, **kwargs)
+    ctx.output(saved)
     return {"regions": regions, "warning": warning, "output": saved}
 
 
