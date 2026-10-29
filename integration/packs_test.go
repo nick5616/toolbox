@@ -19,13 +19,19 @@ import (
 	"toolbox/modules/bgremove"
 	"toolbox/modules/converter"
 	"toolbox/modules/downloader"
+	"toolbox/modules/eraser"
 	"toolbox/modules/exif"
+	"toolbox/modules/redact"
+	"toolbox/modules/trimmer"
 	"toolbox/modules/upscale"
 )
 
+// registerErr drops the module a Register call returns.
+func registerErr[T any](_ T, err error) error { return err }
+
 // TestPackInstall installs the Media pack (and, with TOOLBOX_PACKS_FULL=1,
-// the Image pack: AI engine + background model + upscaler + ExifTool, about
-// 1.7 GB) through the real pack job, the way the setup screen does, then
+// the Image pack: AI engine + background model + upscaler + ExifTool + face,
+// plate and inpainting models, about 1.9 GB) through the real pack job, the way the setup screen does, then
 // checks the pack reports installed and the disk use matches the catalog
 // within ±10% (SPEC.md §12.4).
 func TestPackInstall(t *testing.T) {
@@ -59,6 +65,9 @@ func TestPackInstall(t *testing.T) {
 		downloader.Register(reg, filepath.Join(paths.CacheDir, "yt-dlp")), converter.Register(reg),
 		exif.Register(reg, exifMod),
 		bgremove.Register(reg, engine, paths.ModelsDir), upscale.Register(reg, engine, paths.ModelsDir),
+		trimmer.Register(reg, depSvc.Resolve),
+		registerErr(redact.Register(reg, engine, depSvc.Resolve, paths.ModelsDir, filepath.Join(paths.CacheDir, "redact"))),
+		registerErr(eraser.Register(reg, engine, paths.ModelsDir, filepath.Join(paths.TmpDir, "eraser"))),
 		deps.RegisterUpdater(reg, depSvc), deps.RegisterExifToolUpdater(reg, depSvc),
 		deps.RegisterUpscalerInstaller(reg, depSvc), deps.RegisterFFmpegInstaller(reg, depSvc),
 		deps.RegisterDenoInstaller(reg, depSvc), deps.RegisterUVUpdater(reg, depSvc),

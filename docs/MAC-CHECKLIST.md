@@ -77,8 +77,8 @@ Everything from Phases 3–6 that can only be checked on the Mac (Apple Silicon)
     Expect: the switch keeps the position; the cleaned side is clearly quieter between words.
 29. **Lyric Video**: render a 9:16 preview with the karaoke fill.
     Expect: the highlighted words sweep in time with the singing.
-30. **Redact** a group photo and **Object Eraser** a small object.
-    Expect: both finish; note how long each took.
+30. **Redact** a group photo and a 1-minute 1080p video (faces and plates on), and **Object Eraser** a small object on a large photo with **Best**, twice.
+    Expect: all finish. Note the video's "Finding faces and plates" time (Windows: 78 s, target ≤ 90 s) and both erase times (Windows: the first includes a 20–45 s model load; the second ≈ 4 s for 12 MP, target < 10 s).
 
 ## Logs to send back
 
