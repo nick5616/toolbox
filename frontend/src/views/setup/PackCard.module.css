@@ -1,3 +1,8 @@
+/*
+ * Height budget (F4): at the default 1100x720 window the six cards must fit
+ * without vertical scroll above the fixed disk bar and footer, so the page
+ * padding/gaps and the card's vertical rhythm use the small spacing tokens.
+ */
 .card {
   position: relative;
   flex: 0 0 252px;
@@ -65,8 +70,8 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   min-width: 0;
 }
 
@@ -154,12 +159,12 @@
 .body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex: 1;
 }
 
 .label {
-  margin-bottom: 6px;
+  margin-bottom: var(--space-1);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: var(--text-xs-lh);
@@ -260,7 +265,7 @@
   margin-top: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .desc {
