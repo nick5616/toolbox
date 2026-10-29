@@ -229,7 +229,7 @@ func TestPreviewAndFallbacks(t *testing.T) {
 	}
 }
 
-func TestLRCAction(t *testing.T) {
+func TestLRCActionReal(t *testing.T) {
 	f := newFixture(t)
 	o := DefaultOptions()
 	o.Action = ActionLRC
