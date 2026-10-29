@@ -24,6 +24,13 @@ export const toolViews: Record<string, LazyExoticComponent<ComponentType<ToolVie
   "llm-chat": lazy(() => import("./chat/ChatView")),
   ocr: lazy(() => import("./ocr/OcrView")),
   vault: lazy(() => import("./vault/VaultView")),
+  trimmer: lazy(() => import("./trimmer/TrimmerView")),
+  subtitles: lazy(() => import("./subtitles/SubtitlesView")),
+  "audio-cleanup": lazy(() => import("./audiocleanup/AudioCleanupView")),
+  "lyric-video": lazy(() => import("./lyricvideo/LyricVideoView")),
+  redact: lazy(() => import("./redact/RedactView")),
+  "object-eraser": lazy(() => import("./eraser/ObjectEraserView")),
+  "dev-utils": lazy(() => import("./devutils/DevUtilsView")),
 };
 
 /**

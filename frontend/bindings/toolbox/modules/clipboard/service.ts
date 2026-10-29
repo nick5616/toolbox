@@ -32,6 +32,13 @@ export function Copy(id: string): $CancellablePromise<void> {
 }
 
 /**
+ * CopyText copies plain text to the system clipboard.
+ */
+export function CopyText(text: string): $CancellablePromise<void> {
+    return $Call.ByID(2713232438, text);
+}
+
+/**
  * Delete removes items (and their image files).
  */
 export function Delete(ids: string[] | null): $CancellablePromise<void> {

@@ -48,6 +48,15 @@ export function Pick(moduleID: string): $CancellablePromise<string[] | null> {
 }
 
 /**
+ * PickWith shows a native file dialog filtered to extensions (lowercase,
+ * leading dot; empty = any file), e.g. a background image for Lyric Video.
+ * Cancelling returns an empty list.
+ */
+export function PickWith(title: string, extensions: string[] | null, multiple: boolean): $CancellablePromise<string[] | null> {
+    return $Call.ByID(42524512, title, extensions, multiple);
+}
+
+/**
  * ReadText returns up to maxBytes (≤ 256 KB; ≤ 0 means 256 KB) of a text
  * file inside the library or the app's support folder, cut at a UTF-8
  * boundary.

@@ -6,6 +6,7 @@ import * as DesktopService from "./desktopservice.js";
 import * as FilesService from "./filesservice.js";
 import * as JobsService from "./jobsservice.js";
 import * as LibraryService from "./libraryservice.js";
+import * as MediaService from "./mediaservice.js";
 import * as ModulesService from "./modulesservice.js";
 import * as PacksService from "./packsservice.js";
 import * as SettingsService from "./settingsservice.js";
@@ -15,7 +16,12 @@ export {
     FilesService,
     JobsService,
     LibraryService,
+    MediaService,
     ModulesService,
     PacksService,
     SettingsService
 };
+
+export type {
+    MediaSource
+} from "./models.js";

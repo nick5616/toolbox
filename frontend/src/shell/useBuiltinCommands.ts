@@ -10,6 +10,13 @@ import { useSettings } from "@/state/settings";
 import { useUI } from "@/state/ui";
 import { useVaultState } from "@/tools/vault/useVaultState";
 import { extractUrls } from "./useGlobalPaste";
+import { trimmerCommands } from "@/tools/trimmer/commands";
+import { subtitlesCommands } from "@/tools/subtitles/commands";
+import { audiocleanupCommands } from "@/tools/audiocleanup/commands";
+import { lyricvideoCommands } from "@/tools/lyricvideo/commands";
+import { redactCommands } from "@/tools/redact/commands";
+import { eraserCommands } from "@/tools/eraser/commands";
+import { devutilsCommands } from "@/tools/devutils/commands";
 
 function guard(fn: () => Promise<unknown>): () => Promise<void> {
   return async () => {
@@ -251,6 +258,14 @@ export function useBuiltinCommands(): void {
       keywords: ["first run", "welcome", "packs"],
       run: () => useUI.getState().navigate("setup"),
     },
+    // Phase 6 tools: each package owns its tools/<id>/commands.ts.
+    ...trimmerCommands(),
+    ...subtitlesCommands(),
+    ...audiocleanupCommands(),
+    ...lyricvideoCommands(),
+    ...redactCommands(),
+    ...eraserCommands(),
+    ...devutilsCommands(),
   ];
   useCommands(cmds);
 }

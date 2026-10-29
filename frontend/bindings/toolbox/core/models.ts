@@ -139,6 +139,12 @@ export enum ChatMessageStatus {
     ChatMessageDone = "done",
     ChatMessageStopped = "stopped",
     ChatMessageError = "error",
+
+    /**
+     * ChatMessageStreaming is never stored: Conversation() reports it for
+     * the message the running generation is writing (SPEC.md §11 F1).
+     */
+    ChatMessageStreaming = "streaming",
 };
 
 /**
@@ -225,6 +231,12 @@ export interface ChatStatus {
      * e.g. "The GPU ran out of memory, so answers run on the CPU"
      */
     "notice": string;
+
+    /**
+     * Busy is the Purpose of a running background completion
+     * (core.TextGenerator), e.g. "Translating subtitles"; "" = none.
+     */
+    "busy": string;
 }
 
 /**
@@ -1105,4 +1117,10 @@ export interface VaultState {
      * Unix ms; 0 = no timer
      */
     "lockAt": number;
+
+    /**
+     * Notice is shown once after unlock, e.g. "The vault index was restored
+     * from its backup copy" (SPEC.md §11 F3); "" = none.
+     */
+    "notice": string;
 }

@@ -25,7 +25,7 @@ import { isStreaming, useThread, type BeginOptions } from "./useThread";
 import styles from "./Chat.module.css";
 
 export const LLAMA_RUNTIME_ID = "llama-runtime";
-const EMPTY_STATUS: ChatStatus = { state: ChatServerState.ChatStopped, model: "", backend: ChatBackend.$zero, error: "", notice: "" };
+const EMPTY_STATUS: ChatStatus = { state: ChatServerState.ChatStopped, model: "", backend: ChatBackend.$zero, error: "", notice: "", busy: "" };
 
 function backendLabel(b: ChatBackend): string {
   if (b === ChatBackend.ChatBackendGPU) return "GPU";

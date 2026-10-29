@@ -8,6 +8,7 @@ export {
   FilesService,
   JobsService,
   LibraryService,
+  MediaService,
   ModulesService,
   PacksService,
   SettingsService,
@@ -27,6 +28,13 @@ export * as PdfService from "@bindings/modules/pdf/service";
 export * as ChatService from "@bindings/modules/chat/service";
 export * as OcrService from "@bindings/modules/ocr/service";
 export * as VaultService from "@bindings/modules/vault/service";
+export * as TrimmerService from "@bindings/modules/trimmer/service";
+export * as SubtitlesService from "@bindings/modules/subtitles/service";
+export * as AudioCleanupService from "@bindings/modules/audiocleanup/service";
+export * as LyricVideoService from "@bindings/modules/lyricvideo/service";
+export * as RedactService from "@bindings/modules/redact/service";
+export * as EraserService from "@bindings/modules/eraser/service";
+export * as DevUtilsService from "@bindings/modules/devutils/service";
 
 export {
   Category,
@@ -160,3 +168,69 @@ export type { ConversationView, ModelInfo as ChatModelInfo, SendResult as ChatSe
 export { ImageOutput as OcrImageOutput, Language as OcrLanguage, PDFOutput as OcrPdfOutput } from "@bindings/modules/ocr/models";
 export type { LanguageInfo as OcrLanguageInfo, Options as OcrOptions, Result as OcrResult } from "@bindings/modules/ocr/models";
 export type { Entry as VaultEntry } from "@bindings/modules/vault/models";
+
+// Phase 6
+export type { MediaSource } from "@bindings/api/models";
+export type {
+  AudioStream as MediaAudioStream,
+  Info as MediaInfo,
+  SubtitleStream as MediaSubtitleStream,
+  VideoStream as MediaVideoStream,
+} from "@bindings/core/media/models";
+export { Aspect as TrimAspect, Join as TrimJoin, Mode as TrimMode } from "@bindings/modules/trimmer/models";
+export type { Options as TrimmerOptions, Result as TrimmerResult, Segment as TrimSegment } from "@bindings/modules/trimmer/models";
+export { Action as SubtitlesAction, Style as SubtitleStyle } from "@bindings/modules/subtitles/models";
+export type {
+  Cue,
+  Language as SubtitleLanguage,
+  Options as SubtitlesOptions,
+  Result as SubtitlesResult,
+  StyleInfo as SubtitleStyleInfo,
+  TranslatorStatus,
+} from "@bindings/modules/subtitles/models";
+export {
+  Denoise as CleanupDenoise,
+  Format as CleanupFormat,
+  Hum as CleanupHum,
+  Loudness as CleanupLoudness,
+} from "@bindings/modules/audiocleanup/models";
+export type {
+  FileResult as CleanupFileResult,
+  Options as AudioCleanupOptions,
+  Result as AudioCleanupResult,
+} from "@bindings/modules/audiocleanup/models";
+export { Action as LyricAction, Source as LyricSource } from "@bindings/modules/lyricvideo/models";
+export type {
+  Look as LyricLook,
+  LyricLine,
+  LyricWord,
+  Options as LyricVideoOptions,
+  Result as LyricVideoResult,
+} from "@bindings/modules/lyricvideo/models";
+export {
+  Action as RedactAction,
+  Sensitivity as RedactSensitivity,
+  Style as RedactStyle,
+} from "@bindings/modules/redact/models";
+export type {
+  Box as RedactBox,
+  ImageDetections,
+  Options as RedactOptions,
+  Result as RedactResult,
+  TimedBox,
+  Track as RedactTrack,
+  TrackSample,
+  VideoDetections,
+} from "@bindings/modules/redact/models";
+export { Model as EraserModel } from "@bindings/modules/eraser/models";
+export type {
+  ModelInfo as EraserModelInfo,
+  Options as EraserOptions,
+  Result as EraserResult,
+} from "@bindings/modules/eraser/models";
+export type {
+  FileHashes,
+  HashResult,
+  Options as DevUtilsOptions,
+  Result as DevUtilsResult,
+} from "@bindings/modules/devutils/models";
