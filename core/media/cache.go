@@ -61,8 +61,12 @@ func pruneCache(cacheDir string, limit int64) {
 		if err != nil {
 			return nil
 		}
-		files = append(files, entry{p, fi.Size(), fi.ModTime().UnixNano()})
 		total += fi.Size()
+		// A recent .part file belongs to a running job: count it, never delete it.
+		if strings.Contains(d.Name(), ".part-") && time.Since(fi.ModTime()) < time.Hour {
+			return nil
+		}
+		files = append(files, entry{p, fi.Size(), fi.ModTime().UnixNano()})
 		return nil
 	})
 	if err != nil {
