@@ -86,10 +86,20 @@ type openAIChunk struct {
 // the content deltas to onDelta. Cancelling ctx closes the request, which
 // stops generation on the server.
 func streamOpenAI(ctx context.Context, base, key string, msgs []wireMsg, temp float64, onDelta func(string)) (streamStats, error) {
-	body, _ := json.Marshal(map[string]any{
+	return streamOpenAIExtra(ctx, base, key, msgs, temp, nil, onDelta)
+}
+
+// streamOpenAIExtra is streamOpenAI with extra top-level request fields
+// (max_tokens, response_format).
+func streamOpenAIExtra(ctx context.Context, base, key string, msgs []wireMsg, temp float64, extra map[string]any, onDelta func(string)) (streamStats, error) {
+	payload := map[string]any{
 		"model": "local", "messages": msgs, "stream": true, "temperature": temp,
 		"stream_options": map[string]any{"include_usage": true},
-	})
+	}
+	for k, v := range extra {
+		payload[k] = v
+	}
+	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/v1/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return streamStats{}, err

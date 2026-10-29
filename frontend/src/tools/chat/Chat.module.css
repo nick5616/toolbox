@@ -277,8 +277,16 @@
 }
 
 /* ---- composer ---- */
+.busyLine {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: var(--text-sm, 0.8125rem);
+  color: var(--fg-subtle);
+}
+
 .composer {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--space-2);
   width: 100%;

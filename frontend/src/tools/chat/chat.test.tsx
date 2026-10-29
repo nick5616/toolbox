@@ -194,6 +194,17 @@ describe("Composer keys", () => {
     emit("chat:status", { state: ChatServerState.ChatReady, model: "", backend: ChatBackend.ChatBackendGPU, error: "", notice: "" });
     await waitFor(() => expect(box.disabled).toBe(false));
   });
+
+  it("shows a busy line for a background completion and keeps the composer usable", async () => {
+    svc.Status.mockResolvedValue({ state: ChatServerState.ChatReady, model: "", backend: ChatBackend.ChatBackendGPU, error: "", notice: "" });
+    render(<ChatView moduleId="llm-chat" />);
+    const box = (await screen.findByRole("textbox", { name: "Message" })) as HTMLTextAreaElement;
+    emit("chat:status", { state: ChatServerState.ChatReady, model: "", backend: ChatBackend.ChatBackendGPU, error: "", notice: "", busy: "Translating subtitles" });
+    expect(await screen.findByText("Busy: translating subtitles\u2026")).toBeTruthy();
+    expect(box.disabled).toBe(false);
+    emit("chat:status", { state: ChatServerState.ChatReady, model: "", backend: ChatBackend.ChatBackendGPU, error: "", notice: "", busy: "" });
+    await waitFor(() => expect(screen.queryByText(/^Busy:/)).toBeNull());
+  });
 });
 
 describe("streaming", () => {

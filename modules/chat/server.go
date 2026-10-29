@@ -423,6 +423,10 @@ func (c *Chat) setStatus(s core.ChatStatus) {
 
 func (c *Chat) statusLocked() core.ChatStatus {
 	out := c.status
+	out.Busy = ""
+	if c.gen != nil && c.gen.background {
+		out.Busy = c.gen.purpose
+	}
 	if out.Notice == "" {
 		out.Notice = c.ollamaErr
 	}
