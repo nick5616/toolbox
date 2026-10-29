@@ -656,3 +656,29 @@ def test_real_video_face_moving_across_testsrc2_is_covered(cap, models, tmp_path
         assert after[inner].mean() < 30 < before[inner].mean(), i
         checked += 1
     assert checked >= 6
+
+
+@needs_ffmpeg
+def test_detect_video_runs_plates_on_every_other_sampled_frame(cap, tmp_path, monkeypatch):
+    from toolbox_sidecar.redact import video
+
+    clip = tmp_path / "c.mp4"
+    subprocess.run([FFMPEG, "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=30:duration=2",
+                    "-pix_fmt", "yuv420p", str(clip)], check=True)
+    calls = {"face": 0, "plate": 0}
+
+    def faces(*_a, **_k):
+        calls["face"] += 1
+        return []
+
+    def plates(*_a, **_k):
+        calls["plate"] += 1
+        return []
+
+    monkeypatch.setattr(detect, "session", lambda *_a, **_k: object())
+    monkeypatch.setattr(detect, "detect_faces", faces)
+    monkeypatch.setattr(detect, "detect_plates", plates)
+    video.detect_video(cap.ctx, ffmpeg=FFMPEG, path=str(clip), faces=True, plates=True, sensitivity="normal",
+                       face_model="f.onnx", plate_model="p.onnx", cache_path=str(tmp_path / "d.json"))
+    assert 29 <= calls["face"] <= 31  # sampled at the 15 fps cap
+    assert calls["plate"] == (calls["face"] + 1) // 2

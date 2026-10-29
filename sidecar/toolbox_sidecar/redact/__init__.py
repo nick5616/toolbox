@@ -12,3 +12,5 @@ THRESHOLDS = {"normal": (0.6, 0.3), "high": (0.45, 0.2)}
 MAX_DETECT_FPS = 15.0
 #: Video detection frames are scaled to this long side.
 DETECT_LONG_SIDE = 1280
+#: Video plate detection (the slower model) runs at most this often, in ms.
+PLATE_EVERY_MS = 140.0

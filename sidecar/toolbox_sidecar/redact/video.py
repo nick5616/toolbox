@@ -18,7 +18,7 @@ from typing import Any
 import numpy as np
 
 from ..registry import Context, HandlerError
-from . import DETECT_LONG_SIDE, MAX_DETECT_FPS, THRESHOLDS, detect, render, track
+from . import DETECT_LONG_SIDE, MAX_DETECT_FPS, PLATE_EVERY_MS, THRESHOLDS, detect, render, track
 
 MP4_AUDIO = {"aac", "mp3", "mp2", "ac3", "eac3", "alac", "opus"}
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
@@ -171,12 +171,16 @@ def detect_video(
             for b in detect.detect_plates(psess, rgb, plate_thr, tile=False)
         ]
 
+    # Plates (the slower model) at most every PLATE_EVERY_MS (every other frame
+    # at the 15 fps cap): the tracker links across gaps up to END_GAP_MS and
+    # apply interpolates between hits.
+    plate_stride = max(1, int(PLATE_EVERY_MS // frame_ms))
     ctx.stage("Finding faces and plates")
     try:
         for idx, bgr in enumerate(_read_frames(proc, w, h)):
             ctx.check_cancelled()
             dets = find_faces(bgr) if fsess is not None else []
-            if psess is not None:
+            if psess is not None and idx % plate_stride == 0:
                 dets += find_plates(bgr)
             frames.append((round(idx * frame_ms), dets))
             ctx.progress(min(0.99, (idx + 1) / expected), f"Frame {idx + 1} of about {expected}")
