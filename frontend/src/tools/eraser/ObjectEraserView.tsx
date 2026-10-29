@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Banner, Button, CompareSlider, DropZone, IconButton, Meter, SegmentedControl, Slider, cx, toast } from "@/components";
-import { EraserModel, EraserService, JobsService, MediaService, type EraserModelInfo } from "@/lib/api";
+import { EraserModel, EraserService, FilesService, JobsService, MediaService, type EraserModelInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { useShortcut } from "@/lib/shortcuts";
@@ -29,7 +29,7 @@ import {
   type StrokeCtx,
   type View,
 } from "./mask";
-import { DEFAULT_SETTINGS, canPaintOn, modelHint, sanitizeSettings } from "./options";
+import { DEFAULT_SETTINGS, canPaintOn, modelHint, needsThumb, sanitizeSettings } from "./options";
 import styles from "./ObjectEraserView.module.css";
 
 type Tool = "brush" | "unpaint";
@@ -131,11 +131,11 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
     setView(FIT_VIEW);
     if (!path) return;
     if (!canPaintOn(path)) {
-      setLoadError("This photo format can't be shown for painting. Convert it to JPG or PNG first.");
+      setLoadError("HEIC photos can't be shown for painting. Convert it to JPG or PNG first.");
       return;
     }
     let cancelled = false;
-    MediaService.URLFor(path)
+    (needsThumb(path) ? FilesService.ImageThumb(path, 1600) : MediaService.URLFor(path))
       .then((url) => !cancelled && setImg({ url, w: 0, h: 0 }))
       .catch((e) => !cancelled && setLoadError(toAppError(e).message));
     return () => {

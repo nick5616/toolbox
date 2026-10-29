@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({
   erase: vi.fn(),
   cancel: vi.fn(async (_id: string) => undefined),
   urlFor: vi.fn(async (p: string) => `/media/t/${p.split("/").pop()}`),
+  thumb: vi.fn(async (_p: string, _max: number) => "data:image/jpeg;base64,AAAA"),
   pick: { paths: ["/photo.jpg"] as string[] },
   setState: vi.fn(async (..._a: unknown[]) => undefined),
 }));
@@ -26,6 +27,7 @@ vi.mock("@/lib/api", async (orig) => {
     JobsService: { Cancel: (id: string) => h.cancel(id) },
     FilesService: {
       Pick: async () => h.pick.paths,
+      ImageThumb: (p: string, max: number) => h.thumb(p, max),
       Stat: async (p: string[]) => p.map((path) => ({ path, name: path.split("/").pop(), sizeBytes: 1000, exists: true, isDir: false, kind: "image" })),
     },
     LibraryService: { Reveal: async () => undefined, RevealPath: async () => undefined, Open: async () => undefined },
@@ -209,6 +211,14 @@ describe("ObjectEraserView", () => {
   it("explains that HEIC photos can't be painted on", async () => {
     await load("/photo.heic");
     expect(await screen.findByText(/can't be shown for painting/)).toBeTruthy();
+    expect(h.urlFor).not.toHaveBeenCalled();
+  });
+
+  it("shows TIFF photos through a Go-decoded preview", async () => {
+    await load("/scan.tiff");
+    const img = (await screen.findByAltText("Photo to edit")) as HTMLImageElement;
+    expect(img.src).toContain("data:image/jpeg");
+    expect(h.thumb).toHaveBeenCalledWith("/scan.tiff", 1600);
     expect(h.urlFor).not.toHaveBeenCalled();
   });
 

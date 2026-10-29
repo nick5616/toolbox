@@ -17,7 +17,7 @@ import {
   zoomAround,
   type Stroke,
 } from "./mask";
-import { modelHint, sanitizeSettings, DEFAULT_SETTINGS, canPaintOn } from "./options";
+import { modelHint, sanitizeSettings, DEFAULT_SETTINGS, canPaintOn, needsThumb } from "./options";
 
 const brush = (n = 0): Stroke => ({ kind: "brush", size: 10, points: [{ x: n, y: n }] });
 
@@ -167,9 +167,11 @@ describe("options", () => {
     ).toBe("Best · 200 MB · Fast · 30 MB");
   });
 
-  it("only paints on webview-displayable formats", () => {
+  it("paints on webview formats and TIFF (via a Go preview), not HEIC", () => {
     expect(canPaintOn("/a/b.JPG")).toBe(true);
     expect(canPaintOn("/a/b.heic")).toBe(false);
-    expect(canPaintOn("/a/b.tiff")).toBe(false);
+    expect(canPaintOn("/a/b.tiff")).toBe(true);
+    expect(needsThumb("/a/b.TIF")).toBe(true);
+    expect(needsThumb("/a/b.png")).toBe(false);
   });
 });
