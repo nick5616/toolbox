@@ -25,6 +25,8 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
+    // user-event flows take ~2 s alone and exceed the 5 s default under a full parallel run
+    testTimeout: 15000,
     css: { modules: { classNameStrategy: "non-scoped" } },
   },
 });
