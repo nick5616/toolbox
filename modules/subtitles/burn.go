@@ -70,7 +70,7 @@ func buildASS(cues []Cue, o Options, w, h int) media.ASSDoc {
 func burnArgs(input, out string, audioCodec string) []string {
 	args := []string{"-hide_banner", "-nostdin", "-y", "-i", input,
 		"-vf", "ass=subs.ass",
-		"-map", "0:v:0", "-map", "0:a:0?",
+		"-map", "0:v:0", "-map", "0:a?",
 		"-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p"}
 	if audioCodec == "aac" || audioCodec == "mp3" {
 		args = append(args, "-c:a", "copy")
@@ -108,9 +108,14 @@ func (m *Module) runBurn(ctx context.Context, job *core.JobContext, o Options) e
 	if werr != nil {
 		return fmt.Errorf("write subs.ass: %w", werr)
 	}
+	// Copy audio only when every track is already AAC or MP3.
 	audio := ""
-	if len(info.Audio) > 0 {
-		audio = info.Audio[0].Codec
+	for i, a := range info.Audio {
+		if i == 0 {
+			audio = a.Codec
+		} else if a.Codec != audio {
+			audio = "mixed"
+		}
 	}
 	tmp := filepath.Join(job.TempDir, "burn.mp4")
 	if err := runFFmpeg(ctx, job, ffmpeg, job.TempDir, burnArgs(input, tmp, audio), float64(info.DurationMs)/1000, "Burning in subtitles"); err != nil {

@@ -167,6 +167,20 @@ func segmentTokens(seg rawSegment) []token {
 	return explode(toks)
 }
 
+// linesFit reports whether text wraps into ≤ maxLines lines of ≤ lineLen.
+func linesFit(text string, lineLen, maxLines int) bool {
+	lines := strings.Split(wrapLines(text, lineLen, maxLines), "\n")
+	if len(lines) > max(maxLines, 1) {
+		return false
+	}
+	for _, l := range lines {
+		if runeLen(l) > lineLen {
+			return false
+		}
+	}
+	return true
+}
+
 // splitTokens groups tokens into cues' worth of tokens.
 func splitTokens(toks []token, lineLen, maxLines int) [][]token {
 	capacity := lineLen * max(maxLines, 1)
@@ -175,7 +189,8 @@ func splitTokens(toks []token, lineLen, maxLines int) [][]token {
 		if j-i <= 1 {
 			return true
 		}
-		return runeLen(joinTokens(toks[i:j])) <= capacity && toks[j-1].end-toks[i].start <= maxCueMs
+		text := joinTokens(toks[i:j])
+		return runeLen(text) <= capacity && toks[j-1].end-toks[i].start <= maxCueMs && linesFit(text, lineLen, maxLines)
 	}
 	var out [][]token
 	for i := 0; i < n; {
@@ -207,7 +222,7 @@ func splitTokens(toks []token, lineLen, maxLines int) [][]token {
 // pickBreak chooses where to end a cue that starts at i and can reach j.
 func pickBreak(toks []token, i, j, capacity int) int {
 	lo := i + 1
-	for lo < j && runeLen(joinTokens(toks[i:lo])) < capacity*4/10 {
+	for lo < j && runeLen(joinTokens(toks[i:lo])) < capacity*25/100 {
 		lo++
 	}
 	best, bestClass := j, 0

@@ -112,7 +112,7 @@ var cp1252High = [32]rune{
 // decodeText turns file bytes into a string: UTF-8 (BOM stripped), else
 // Windows-1252.
 func decodeText(b []byte) string {
-	b = []byte(strings.TrimPrefix(string(b), "﻿"))
+	b = []byte(strings.TrimPrefix(string(b), bomStr))
 	if utf8.Valid(b) {
 		return string(b)
 	}
@@ -129,7 +129,7 @@ func decodeText(b []byte) string {
 
 // parseCues parses SubRip or WebVTT text.
 func parseCues(text string) []Cue {
-	text = normalizeNewlines(strings.TrimPrefix(text, "﻿"))
+	text = normalizeNewlines(strings.TrimPrefix(text, bomStr))
 	vtt := strings.HasPrefix(text, "WEBVTT")
 	cues := []Cue{}
 	for _, block := range strings.Split(text, "\n\n") {
@@ -189,3 +189,6 @@ func load(path string) ([]Cue, error) {
 	}
 	return parseCues(decodeText(b)), nil
 }
+
+// bomStr is the UTF-8 byte order mark.
+const bomStr = "\uFEFF"
