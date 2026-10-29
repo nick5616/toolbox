@@ -125,8 +125,9 @@ func (c *Chat) stopGeneration() {
 func (c *Chat) stopGenerationFor(match func(*generation) bool) {
 	c.mu.Lock()
 	g := c.gen
+	ok := g != nil && match(g)
 	c.mu.Unlock()
-	if g == nil || !match(g) {
+	if !ok {
 		return
 	}
 	g.cancel()
