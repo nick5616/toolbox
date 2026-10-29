@@ -157,18 +157,27 @@ def detect_video(
     err = tempfile.TemporaryFile()
     proc = _popen(cmd, stdout=subprocess.PIPE, stderr=err, bufsize=0)
     frames: list[tuple[int, list[tuple[str, float, float, float, float, float]]]] = []
+
+    def find_faces(bgr: np.ndarray) -> list[tuple[str, float, float, float, float, float]]:
+        return [
+            ("face", b[0] / w, b[1] / h, (b[2] - b[0]) / w, (b[3] - b[1]) / h, b[4])
+            for b in detect.detect_faces(fsess, bgr, face_thr, (max(w, h),))
+        ]
+
+    def find_plates(bgr: np.ndarray) -> list[tuple[str, float, float, float, float, float]]:
+        rgb = np.ascontiguousarray(bgr[..., ::-1])
+        return [
+            ("plate", b[0] / w, b[1] / h, (b[2] - b[0]) / w, (b[3] - b[1]) / h, b[4])
+            for b in detect.detect_plates(psess, rgb, plate_thr, tile=False)
+        ]
+
     ctx.stage("Finding faces and plates")
     try:
         for idx, bgr in enumerate(_read_frames(proc, w, h)):
             ctx.check_cancelled()
-            dets: list[tuple[str, float, float, float, float, float]] = []
-            if fsess is not None:
-                for b in detect.detect_faces(fsess, bgr, face_thr, (max(w, h),)):
-                    dets.append(("face", b[0] / w, b[1] / h, (b[2] - b[0]) / w, (b[3] - b[1]) / h, b[4]))
+            dets = find_faces(bgr) if fsess is not None else []
             if psess is not None:
-                rgb = np.ascontiguousarray(bgr[..., ::-1])
-                for b in detect.detect_plates(psess, rgb, plate_thr, tile=False):
-                    dets.append(("plate", b[0] / w, b[1] / h, (b[2] - b[0]) / w, (b[3] - b[1]) / h, b[4]))
+                dets += find_plates(bgr)
             frames.append((round(idx * frame_ms), dets))
             ctx.progress(min(0.99, (idx + 1) / expected), f"Frame {idx + 1} of about {expected}")
         proc.wait(timeout=30)

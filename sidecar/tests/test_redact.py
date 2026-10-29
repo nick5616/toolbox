@@ -261,6 +261,18 @@ def test_solid_is_black_blur_and_pixelate_destroy_detail():
     assert (tile == tile[0, 0]).all()  # one flat colour per block
 
 
+def test_big_blur_is_fast_and_still_destroys_detail():
+    import time
+
+    src = noise(1080, 1920)
+    region = render.region_for({"x": 0.2, "y": 0.2, "w": 0.5, "h": 0.5}, "plate", 15, 1920, 1080)
+    x0, y0, x1, y1, _ = region
+    t = time.time()
+    out = render.apply_regions(src.copy(), [region], "blur", 10)
+    assert time.time() - t < 1.0  # a full-size sigma-60 Gaussian takes ~1 s per frame
+    assert out[y0:y1, x0:x1].std() < 10
+
+
 def test_face_ellipse_leaves_the_box_corners_alone():
     src = noise()
     region = render.region_for({"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5}, "face", 0, 160, 120)

@@ -60,8 +60,16 @@ def _effect(roi: np.ndarray, style: str, strength: int) -> np.ndarray:
         out = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
         return out.reshape(roi.shape)
     sigma = max(0.8, blur_sigma(strength, short))
-    out = cv2.GaussianBlur(roi, (0, 0), sigma, borderType=cv2.BORDER_REPLICATE)
-    return cv2.GaussianBlur(out, (0, 0), sigma, borderType=cv2.BORDER_REPLICATE)  # twice: not reversible
+    # A big Gaussian is slow at full size and needs no detail anyway: blur a
+    # reduced copy (sigma ~4 px there) and scale it back up.
+    k = max(1, int(sigma / 4))
+    src = roi if k == 1 else cv2.resize(roi, (max(1, w // k), max(1, h // k)), interpolation=cv2.INTER_AREA)
+    s = sigma / k
+    out = cv2.GaussianBlur(src, (0, 0), s, borderType=cv2.BORDER_REPLICATE)
+    out = cv2.GaussianBlur(out, (0, 0), s, borderType=cv2.BORDER_REPLICATE)  # twice: not reversible
+    if k > 1:
+        out = cv2.resize(out, (w, h), interpolation=cv2.INTER_LINEAR)
+    return out.reshape(roi.shape)
 
 
 def _ellipse_mask(h: int, w: int) -> np.ndarray:
