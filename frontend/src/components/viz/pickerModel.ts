@@ -38,27 +38,14 @@ export function fixedPaletteId(show: Show): PaletteId | null {
   return show.palette.mode === "fixed" && show.palette.ids.length === 1 ? (show.palette.ids[0] ?? null) : null;
 }
 
-/** Saved designs from the Visualizer's module state (read only; tolerant of shape). */
-export function readMyDesigns(stateJson: string): ThumbItem[] {
-  if (!stateJson) return [];
-  let state: unknown;
-  try {
-    state = JSON.parse(stateJson);
-  } catch {
-    return [];
-  }
-  const list = (state as { myPresets?: unknown } | null)?.myPresets;
-  if (!Array.isArray(list)) return [];
+/** Saved designs (VisualizerService.Designs) as cards; invalid ones are skipped. */
+export function readMyDesigns(list: ReadonlyArray<{ id: string; name: string; showJson: string }> | null): ThumbItem[] {
   const out: ThumbItem[] = [];
-  for (const raw of list as unknown[]) {
-    if (typeof raw !== "object" || raw === null) continue;
-    const e = raw as { id?: unknown; name?: unknown; show?: unknown; showJson?: unknown };
-    const input = typeof e.showJson === "string" ? safeParse(e.showJson) : e.show;
-    const r = validateShow(input);
+  for (const e of list ?? []) {
+    const r = validateShow(safeParse(e.showJson));
     if (!r.ok) continue;
-    const name = typeof e.name === "string" && e.name ? e.name : r.show.name || "My design";
-    const id = typeof e.id === "string" && e.id ? `mine:${e.id}` : `mine:${name}`;
-    out.push({ id, name, description: "Saved in the Visualizer", show: r.show, kind: "mine" });
+    const name = e.name || r.show.name || "My design";
+    out.push({ id: `mine:${e.id || name}`, name, description: "Saved in the Visualizer", show: r.show, kind: "mine" });
   }
   return out;
 }

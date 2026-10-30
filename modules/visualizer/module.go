@@ -30,6 +30,7 @@ type Module struct {
 	resolve    func(depID string) (string, error)
 	modelsDir  string // the mood reader lives in <modelsDir>/mood/
 	previewDir string // <support>/cache/visualizer (previews)
+	designs    designStore
 }
 
 var _ core.ModelProvider = (*Module)(nil)

@@ -12,7 +12,7 @@ import { Meter } from "@/components/Meter";
 import { Slider } from "@/components/Slider";
 import { Switch } from "@/components/Switch";
 import { cx } from "@/components/cx";
-import { SettingsService, VisualizerService, type TimedLine, type VisualsSpec } from "@/lib/api";
+import { VisualizerService, type TimedLine, type VisualsSpec } from "@/lib/api";
 import type { Show } from "@/viz/types";
 import { PresetThumbs, type ThumbItem } from "./PresetThumbs";
 import {
@@ -63,8 +63,8 @@ export function VisualsPicker({ inputPath, lines, value, onChange, mode, aspect,
       .then((ok) => alive && setMoodReady(Boolean(ok)))
       .catch(() => undefined)
       .finally(() => alive && setMoodChecked(true));
-    SettingsService.ModuleState("visualizer")
-      .then((s) => alive && setMine(readMyDesigns(s)))
+    VisualizerService.Designs()
+      .then((l) => alive && setMine(readMyDesigns(l)))
       .catch(() => undefined);
     return () => {
       alive = false;

@@ -13,6 +13,7 @@ export {
 
 export type {
     ChatStatus,
+    Design,
     Options,
     Result
 } from "./models.js";

@@ -39,6 +39,16 @@ export interface ChatStatus {
 }
 
 /**
+ * Design is one saved design.
+ */
+export interface Design {
+    "id": string;
+    "name": string;
+    "showJson": string;
+    "updatedMs": number;
+}
+
+/**
  * Mode is full-frame visuals or visuals over the input video.
  */
 export enum Mode {

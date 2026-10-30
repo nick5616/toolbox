@@ -238,6 +238,7 @@ export type {
 export { Action as VisualizerAction, Mode as VisualizerMode } from "@bindings/modules/visualizer/models";
 export type {
   ChatStatus as VisualizerChatStatus,
+  Design as VisualizerDesign,
   Options as VisualizerOptions,
   Result as VisualizerResult,
 } from "@bindings/modules/visualizer/models";

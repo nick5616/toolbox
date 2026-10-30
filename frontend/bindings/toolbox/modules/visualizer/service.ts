@@ -50,6 +50,20 @@ export function Defaults(): $CancellablePromise<$models.Options> {
 }
 
 /**
+ * DeleteDesign removes a saved design.
+ */
+export function DeleteDesign(id: string): $CancellablePromise<void> {
+    return $Call.ByID(1244282653, id);
+}
+
+/**
+ * Designs lists the saved designs, newest first.
+ */
+export function Designs(): $CancellablePromise<$models.Design[] | null> {
+    return $Call.ByID(1822657611);
+}
+
+/**
  * Enqueue queues one job.
  */
 export function Enqueue(paths: string[] | null, opts: $models.Options): $CancellablePromise<core$0.Job[] | null> {
@@ -71,9 +85,23 @@ export function MoodReaderReady(): $CancellablePromise<boolean> {
 }
 
 /**
+ * RenameDesign renames a saved design.
+ */
+export function RenameDesign(id: string, name: string): $CancellablePromise<void> {
+    return $Call.ByID(68385384, id, name);
+}
+
+/**
  * ResultShape exists so the binding generator emits Result; it returns the
  * zero value.
  */
 export function ResultShape(): $CancellablePromise<$models.Result> {
     return $Call.ByID(4239786686);
+}
+
+/**
+ * SaveDesign adds a design (empty id) or updates one; it returns the stored design.
+ */
+export function SaveDesign(d: $models.Design): $CancellablePromise<$models.Design> {
+    return $Call.ByID(3914307259, d);
 }

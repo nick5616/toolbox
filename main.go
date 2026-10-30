@@ -196,6 +196,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	visualizerMod.SetDesignsFile(filepath.Join(paths.SupportDir, "visualizer", "designs.json"))
 	lyricMod.SetVisuals(vizAnalyzer, vizBroker)
 	subtitlesMod.SetVisuals(vizAnalyzer, vizBroker)
 	// --- end Phase 7 ---

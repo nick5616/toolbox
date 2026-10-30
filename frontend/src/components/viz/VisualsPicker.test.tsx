@@ -7,7 +7,7 @@ const h = vi.hoisted(() => ({
   analysisFor: vi.fn(),
   enqueue: vi.fn(),
   moodReady: { value: false },
-  moduleState: { value: "" },
+  designs: { value: [] as Array<{ id: string; name: string; showJson: string; updatedMs: number }> },
 }));
 
 vi.mock("@/lib/api", async (orig) => {
@@ -19,10 +19,10 @@ vi.mock("@/lib/api", async (orig) => {
       Defaults: async () => ({ action: "", analyze: {} }),
       Enqueue: (...a: unknown[]) => h.enqueue(...a),
       MoodReaderReady: async () => h.moodReady.value,
+      Designs: async () => h.designs.value,
     },
     MediaService: { URLFor: async (p: string) => `/media/t/${p}` },
     JobsService: { Cancel: async () => undefined },
-    SettingsService: { ModuleState: async () => h.moduleState.value, SetModuleState: async () => undefined },
   };
 });
 
@@ -91,7 +91,7 @@ beforeEach(() => {
   HTMLCanvasElement.prototype.getContext = (() => null) as never;
   useJobs.setState({ byId: {} });
   h.moodReady.value = false;
-  h.moduleState.value = "";
+  h.designs.value = [];
   h.analysisFor.mockResolvedValue([REF, true]);
 });
 
@@ -166,7 +166,7 @@ describe("VisualsPicker", () => {
   });
 
   it("lists saved designs first, read from the Visualizer's state", async () => {
-    h.moduleState.value = JSON.stringify({ myPresets: [{ id: "x1", name: "Neon night", show: showFromPreset(preset) }] });
+    h.designs.value = [{ id: "x1", name: "Neon night", showJson: JSON.stringify(showFromPreset(preset)), updatedMs: 0 }];
     render(<Harness initial={null} onChange={() => undefined} />);
     const mine = await screen.findByRole("button", { name: "Neon night" });
     const cards = screen.getAllByRole("button", { pressed: false }).filter((b) => b.getAttribute("aria-pressed") !== null);

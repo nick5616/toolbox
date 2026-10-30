@@ -208,6 +208,7 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **VizLab:** `TOOLBOX_VIZLAB=1 TOOLBOX_VIEW=vizlab bin/toolbox.exe` (with the sandbox env vars) renders every preset at five moments into `<support>/tmp/vizlab/*.png`, plus `fps.json` and `hash.json`. `TOOLBOX_VIZLAB_ONLY=<preset>` limits it to one preset; `TOOLBOX_VIZLAB_LAYER=<type>` renders one layer type with its defaults; `TOOLBOX_VIZLAB_KEY=<analysis key>` uses a real analysis instead of the synthetic fixture; `TOOLBOX_VIZLAB_ARGS=<query>` passes extra lab parameters. `TOOLBOX_VIZ_FORCE_JPEG=1` adds `vizjpeg=1` to the main window URL so renders take the JPEG path; `TOOLBOX_VIZ_FIXTURE=1` adds `vizfixture=1` so the Visualizer can use the synthetic analysis (dev only).
 - **Shared lyrics logic** lives in `core/lyrics` (Lyric Video's `LyricLine`/`LyricWord` are aliases of it).
 - **Caches:** `cache/visualizer/<file key>/` holds analyses (`s<0|1>.json` + `.bin`, `t-….json`, `instrumental.flac`), pruned at start after 30 days or above 3 GB. Previews (`cache/visualizer/preview-*.mp4`) are pruned after a day.
+- **Saved designs** are a JSON file, `<support>/visualizer/designs.json` (≤ 50 designs), behind `VisualizerService.Designs/SaveDesign/RenameDesign/DeleteDesign`.
 - **The mood reader** (`<models>/mood/`) is a pinned, sha-verified download (Music and Speech packs): the arm64 file on Apple Silicon, the avx2 file elsewhere.
 
 ## Conventions
