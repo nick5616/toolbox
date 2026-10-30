@@ -37,8 +37,9 @@ func validateBurnCanvas(o Options) map[string]string {
 	case "", "visualizer", "color":
 	case "image":
 		fi, err := os.Stat(o.BackgroundPath)
+		ext := strings.ToLower(filepath.Ext(o.BackgroundPath))
 		if o.BackgroundPath == "" || err != nil || !fi.Mode().IsRegular() ||
-			!slices.Contains(media.ImageExtensions(), strings.ToLower(filepath.Ext(o.BackgroundPath))) {
+			!slices.Contains(media.ImageExtensions(), ext) || ext == ".heic" || ext == ".heif" { // FFmpeg can't read HEIC
 			f["backgroundPath"] = "Choose a background image"
 		}
 	default:
