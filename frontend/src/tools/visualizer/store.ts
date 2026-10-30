@@ -1,0 +1,75 @@
+/**
+ * The Visualizer view's state (SPEC.md §8). CONTRACT (foundation): UI-V2 owns
+ * this file and may add fields; UI-V1 reads and writes the fields below.
+ */
+import { create } from "zustand";
+import type { AnalysisRef, AnalyzeOptions, TimedLine } from "@/lib/api";
+import type { Analysis } from "@/viz/analysis";
+import type { Show } from "@/viz/types";
+
+export type VisualizerStep = "source" | "analyze" | "design" | "export";
+
+export interface VisualizerState {
+  step: VisualizerStep;
+  /** The song or video being worked on. */
+  input: string | null;
+  isVideo: boolean;
+  /** "overlay" = visuals over the video; "full" = full-frame visuals. */
+  mode: "full" | "overlay";
+  /** The analyze options chosen on the Source step. */
+  analyze: AnalyzeOptions;
+  /** Where handed-over timed text came from (SPEC.md §9.5). */
+  seedFrom: "lyric-video" | "subtitles" | null;
+  seedLines: TimedLine[] | null;
+  /** The finished analysis (ref from Go, loaded files). */
+  ref: AnalysisRef | null;
+  analysis: Analysis | null;
+  /** The design being edited (UI-V2). */
+  show: Show | null;
+
+  setStep(step: VisualizerStep): void;
+  setInput(input: string | null, isVideo: boolean): void;
+  setMode(mode: "full" | "overlay"): void;
+  setAnalyze(patch: Partial<AnalyzeOptions>): void;
+  setSeed(from: "lyric-video" | "subtitles" | null, lines: TimedLine[] | null): void;
+  setAnalysis(ref: AnalysisRef | null, analysis: Analysis | null): void;
+  setShow(show: Show | null): void;
+  reset(): void;
+}
+
+export const DEFAULT_ANALYZE: AnalyzeOptions = {
+  stems: true,
+  saveStems: false,
+  words: "none" as AnalyzeOptions["words"],
+  language: "",
+  lyricsText: "",
+  lyricsPath: "",
+  lines: [],
+  mood: true,
+  deepRead: false,
+};
+
+const initial = {
+  step: "source" as VisualizerStep,
+  input: null,
+  isVideo: false,
+  mode: "full" as const,
+  analyze: DEFAULT_ANALYZE,
+  seedFrom: null,
+  seedLines: null,
+  ref: null,
+  analysis: null,
+  show: null,
+};
+
+export const useVisualizer = create<VisualizerState>((set) => ({
+  ...initial,
+  setStep: (step) => set({ step }),
+  setInput: (input, isVideo) => set({ input, isVideo, mode: isVideo ? "overlay" : "full", ref: null, analysis: null, analyze: { ...DEFAULT_ANALYZE, stems: !isVideo } }),
+  setMode: (mode) => set({ mode }),
+  setAnalyze: (patch) => set((s) => ({ analyze: { ...s.analyze, ...patch } })),
+  setSeed: (seedFrom, seedLines) => set({ seedFrom, seedLines }),
+  setAnalysis: (ref, analysis) => set({ ref, analysis }),
+  setShow: (show) => set({ show }),
+  reset: () => set(initial),
+}));
