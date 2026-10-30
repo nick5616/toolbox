@@ -1,7 +1,6 @@
 package visualizer
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -154,11 +153,3 @@ func (m *Module) validate(inputs []string, options json.RawMessage) error {
 	}
 	return m.validateOptions(inputs, o)
 }
-
-// run is VM1's (SPEC.md §5.1, §7.1). Stub: not built yet.
-func (m *Module) run(ctx context.Context, job *core.JobContext) error {
-	return core.Errorf(core.CodeInternal, "not built yet")
-}
-
-// prunePreviews is VM1's. Stub.
-func (m *Module) prunePreviews() {}
