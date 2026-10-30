@@ -4,7 +4,7 @@
  * second of the spectrum, so any frame can be drawn on its own.
  */
 import { QuadBatch, SHADE_ROUND_BOX } from "../gl/quads";
-import { mixLinear } from "../palette";
+import { buildRamp, catmull, clamp, rampAt } from "./l2util";
 import { registerLayer } from "./registry";
 
 const PEAK_LOOKBACK = 10; // samples, 100 ms apart
@@ -28,18 +28,25 @@ registerLayer({
   create(ctx) {
     const batch = new QuadBatch(ctx.gl, SHADE_ROUND_BOX, 512);
     const spec = new Float32Array(64);
+    const prev = new Float32Array(64);
     const past = new Float32Array(64);
+    const col: [number, number, number] = [0, 0, 0];
     return {
       render(f) {
         const n = Math.round(f.params.count as number);
         const layout = f.params.layout as string;
+        const kick = f.signals.value("kick", f.tMs);
         const maxH = (f.params.height as number) * f.h * (layout === "up" ? 0.9 : 0.45);
         const baseY = (1 - (f.params.y as number)) * f.h;
         const slot = f.w / n;
         const bw = slot * (f.params.width as number);
-        const bright = f.params.brightness as number;
+        const bright = (f.params.brightness as number) * (1 + 0.18 * kick);
         const glowPx = (f.params.glow as number) * Math.min(f.w, f.h) * 0.006;
+        const ramp = buildRamp(f.palette, "cycle", 32);
+        // a touch of temporal smoothing keeps bars from flickering between frames
         f.analysis.vector("spectrum", f.tMs, spec);
+        f.analysis.vector("spectrum", f.tMs - 35, prev);
+        for (let i = 0; i < 64; i++) spec[i] = (spec[i] as number) * 0.7 + (prev[i] as number) * 0.3;
         batch.begin();
         const fall = f.params.peakFall as number;
         const peakVals = new Float32Array(n);
@@ -48,32 +55,39 @@ registerLayer({
             const dt = k * 0.1;
             f.analysis.vector("spectrum", f.tMs - dt * 1000, past);
             for (let i = 0; i < n; i++) {
-              const v = (past[Math.floor((i / n) * 64)] ?? 0) - fall * dt * dt;
-              if (v > (peakVals[i] ?? 0)) peakVals[i] = v;
+              const v = catmull(past, (i / Math.max(1, n - 1)) * 63) - fall * dt * dt;
+              if (v > (peakVals[i] as number)) peakVals[i] = v;
             }
           }
         }
+        const a = f.opacity;
+        const acc = f.palette.accent;
         for (let i = 0; i < n; i++) {
-          const v = spec[Math.floor((i / n) * 64)] ?? 0;
-          const col = mixLinear(f.palette.colors[(Math.floor((i / n) * 4) % 4) as 0 | 1 | 2 | 3], f.palette.colors[((Math.floor((i / n) * 4) + 1) % 4) as 0 | 1 | 2 | 3], ((i / n) * 4) % 1);
+          const v = clamp(catmull(spec, (i / Math.max(1, n - 1)) * 63));
+          rampAt(ramp, i / n, col);
           const hh = Math.max(1.5, (v * maxH) / 2);
           const cx = slot * (i + 0.5);
-          const a = f.opacity;
-          const r = col[0] * bright;
-          const g = col[1] * bright;
-          const b = col[2] * bright;
+          const g = bright * (0.6 + 0.5 * v);
+          const r = col[0] * g;
+          const gg = col[1] * g;
+          const b = col[2] * g;
+          const hot = 1 + 0.9 * v;
+          const tip = Math.min(hh, Math.max(bw * 0.5, hh * 0.22));
           if (layout === "mirror") {
-            batch.push(cx, baseY, bw / 2, hh, r, g, b, a, 0, bw / 2);
+            batch.push(cx, baseY, bw / 2, hh, r, gg, b, a, 0, bw / 2);
+            batch.push(cx, baseY - hh + tip, bw / 2, tip, r * hot, gg * hot, b * hot, a * 0.8, 0, bw / 2);
+            batch.push(cx, baseY + hh - tip, bw / 2, tip, r * hot, gg * hot, b * hot, a * 0.8, 0, bw / 2);
           } else {
-            batch.push(cx, baseY - hh, bw / 2, hh, r, g, b, a, 0, bw / 2);
-            if (layout === "reflect") batch.push(cx, baseY + hh * 0.5, bw / 2, hh * 0.5, r * 0.25, g * 0.25, b * 0.25, a * 0.5, 0, bw / 2);
+            batch.push(cx, baseY - hh, bw / 2, hh, r, gg, b, a, 0, bw / 2);
+            batch.push(cx, baseY - 2 * hh + tip, bw / 2, tip, r * hot, gg * hot, b * hot, a * 0.8, 0, bw / 2);
+            if (layout === "reflect") batch.push(cx, baseY + hh * 0.5, bw / 2, hh * 0.5, r * 0.25, gg * 0.25, b * 0.25, a * 0.5, 0, bw / 2);
           }
-          const pk = Math.max(v, peakVals[i] ?? 0);
+          const pk = Math.max(v, peakVals[i] as number);
           if (f.params.peaks && pk > v + 0.01) {
             const py = layout === "mirror" ? (pk * maxH) / 2 : pk * maxH;
             const capH = Math.max(1.5, f.h * 0.004);
-            batch.push(cx, baseY - py - capH, bw / 2, capH, f.palette.accent[0] * bright, f.palette.accent[1] * bright, f.palette.accent[2] * bright, a, 0, capH);
-            if (layout === "mirror") batch.push(cx, baseY + py + capH, bw / 2, capH, f.palette.accent[0] * bright, f.palette.accent[1] * bright, f.palette.accent[2] * bright, a, 0, capH);
+            batch.push(cx, baseY - py - capH, bw / 2, capH, acc[0] * bright, acc[1] * bright, acc[2] * bright, a, 0, capH);
+            if (layout === "mirror") batch.push(cx, baseY + py + capH, bw / 2, capH, acc[0] * bright, acc[1] * bright, acc[2] * bright, a, 0, capH);
           }
         }
         batch.draw(f.w, f.h, glowPx * 3, (p) => p.f1("u_glow", glowPx));
