@@ -108,8 +108,8 @@ export function PresetsTab({ show, onChange, analysis, mode, aspect, playheadMs,
           const applied = applyTemplate(item.show, { mode, engineText, keepText: show.text });
           onChange({ ...applied, name: item.name, presetId: item.kind === "preset" ? item.id : null });
         }}
-        onRename={(item, n) => void rename(item.id.replace(/^mine:/, ""), n)}
-        onDelete={(item) => void remove(item.id.replace(/^mine:/, ""))}
+        onRename={(item, n) => item.kind === "mine" && void rename(item.id.replace(/^mine:/, ""), n)}
+        onDelete={(item) => item.kind === "mine" && void remove(item.id.replace(/^mine:/, ""))}
       />
       {PRESETS.length === 0 && <p className={styles.hint}>No presets are available yet.</p>}
     </div>

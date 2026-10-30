@@ -9,12 +9,11 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { Icon, Spinner, cx } from "@/components";
 import { SettingsService, type AnalysisRef } from "@/lib/api";
-import { useModuleOptions } from "@/tools/_kit";
 import { buildFixture } from "@/viz/fixture";
 import { validateShow } from "@/viz/validate";
 import type { Show } from "@/viz/types";
 import type { ToolViewProps } from "../index";
-import { MAX_STATE_BYTES } from "./designer/myPresets";
+import { MAX_STATE_BYTES, patchVizState, readVizState } from "./vizState";
 import { DEFAULT_EXPORT, sanitizeExport, type ExportPrefs } from "./exportPrefs";
 import { useSeed } from "./useSeed";
 import { useVisualizer, type VisualizerStep } from "./store";
@@ -64,6 +63,31 @@ function fixtureRef(durationMs: number): AnalysisRef {
   };
 }
 
+/** The view's remembered options, merged into the shared "visualizer" module state (other keys are left alone). */
+function usePrefs(): [Prefs, (next: Prefs | ((p: Prefs) => Prefs)) => void] {
+  const [prefs, setState] = useState<Prefs>(DEFAULT_PREFS);
+  const dirty = useRef(false);
+  useEffect(() => {
+    let off = false;
+    void readVizState().then((st) => {
+      if (!off && !dirty.current) setState(sanitizePrefs(st, DEFAULT_PREFS));
+    });
+    return () => {
+      off = true;
+    };
+  }, []);
+  useEffect(() => {
+    if (!dirty.current) return;
+    const t = setTimeout(() => void patchVizState({ analysisKeys: prefs.analysisKeys, export: prefs.export }), 300);
+    return () => clearTimeout(t);
+  }, [prefs]);
+  const set = useCallback((next: Prefs | ((p: Prefs) => Prefs)) => {
+    dirty.current = true;
+    setState(next);
+  }, []);
+  return [prefs, set];
+}
+
 function Loading() {
   return (
     <div className={styles.loading}>
@@ -73,7 +97,7 @@ function Loading() {
 }
 
 export default function VisualizerView({ moduleId }: ToolViewProps) {
-  const [prefs, setPrefs] = useModuleOptions(moduleId, DEFAULT_PREFS, sanitizePrefs);
+  const [prefs, setPrefs] = usePrefs();
   const step = useVisualizer((s) => s.step);
   const input = useVisualizer((s) => s.input);
   const ref = useVisualizer((s) => s.ref);
