@@ -238,7 +238,7 @@ export function LyricsStep(p: LyricsStepProps) {
 
       <div className={styles.footer}>
         <Button onClick={p.onContinue} disabled={!hasRows || !!p.blocker || p.tapping}>
-          Continue to Look
+          Continue to Visuals
         </Button>
       </div>
     </div>

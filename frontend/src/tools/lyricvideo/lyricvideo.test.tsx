@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,44 @@ const h = vi.hoisted(() => ({
   playerMs: { value: 0 },
   played: { value: false },
   emitTime: { current: null as ((ms: number) => void) | null },
+  analysis: { current: null as unknown as Record<string, unknown> },
+  analysisCalls: [] as Array<{ path: string | null; opts: { auto: boolean; analyze: Record<string, unknown> } }>,
+  pickDesign: { current: null as ((v: unknown) => void) | null },
+}));
+
+vi.mock("@/components/viz/useVisualsAnalysis", () => ({
+  fixtureFlag: () => false,
+  useVisualsAnalysis: (path: string | null, opts: { auto: boolean; analyze: Record<string, unknown> }) => {
+    h.analysisCalls.push({ path, opts });
+    return h.analysis.current;
+  },
+}));
+
+vi.mock("@/components/viz", () => ({
+  VisualsPicker: (p: { value: unknown; onChange: (v: unknown) => void; lines: unknown[] | null; mode: string }) => {
+    h.pickDesign.current = p.onChange;
+    return <div data-testid="picker" data-lines={p.lines?.length ?? 0} data-mode={p.mode} />;
+  },
+  VisualsCanvas: () => <div data-testid="visuals-canvas" />,
+}));
+
+vi.mock("@/tools/visualizer/designer/VisualDesigner", () => ({
+  VisualDesigner: (p: {
+    show: { name: string };
+    onChange: (s: unknown) => void;
+    aspect: number;
+    player: unknown;
+    text: { overlay: (rect: unknown, ms: number) => React.ReactNode };
+    tabs?: string[];
+  }) => (
+    <div data-testid="designer" data-aspect={p.aspect} data-player={String(p.player)} data-tabs={(p.tabs ?? []).join(",")}>
+      <span data-testid="designer-name">{p.show.name}</span>
+      <button type="button" onClick={() => p.onChange({ ...p.show, name: "Edited", reactivity: 1.5 })}>
+        Edit design
+      </button>
+      <div data-testid="designer-text">{p.text.overlay({ left: 0, top: 0, width: 100, height: 100 }, 1500)}</div>
+    </div>
+  ),
 }));
 
 vi.mock("@/lib/api", async (orig) => {
@@ -21,6 +59,8 @@ vi.mock("@/lib/api", async (orig) => {
       Fonts: async () => ["Arial", "Georgia"],
     },
     TranscribeService: { Languages: async () => [{ code: "en", name: "English" }] },
+    VisualizerService: { MoodReaderReady: async () => true },
+    PacksService: { InstallFor: async () => undefined },
     MediaService: {
       Open: (...a: unknown[]) => h.open(...a),
       Frame: async () => "/media/t/cover.jpg",
@@ -66,12 +106,38 @@ vi.mock("@/components/media", async (orig) => {
   };
 });
 
-import { DepSource, DepState, JobStatus, type DepStatus, type Job } from "@/lib/api";
+import { DepSource, DepState, JobStatus, PackComponentKind, PackComponentState, PackState, type DepStatus, type Job } from "@/lib/api";
 import { useDeps } from "@/state/deps";
 import { useJobs } from "@/state/jobs";
 import { useModules } from "@/state/modules";
+import { usePacks } from "@/state/packs";
 import { useUI } from "@/state/ui";
+import { PRESETS, showFromPreset } from "@/viz/presets";
 import LyricVideoView from "./LyricVideoView";
+import { resetSession } from "./session";
+
+const PRESET = PRESETS[0]!;
+const PRESET_JSON = JSON.stringify(showFromPreset(PRESET));
+
+function analysisState(over: Record<string, unknown> = {}) {
+  return {
+    status: "ready",
+    progress: 0,
+    stage: "",
+    ref: { key: "k", instrumental: "", summary: { tempo: 120, key: "A minor", hasStems: false } },
+    analysis: { fixture: true },
+    error: null,
+    start: vi.fn(),
+    cancel: vi.fn(),
+    ...over,
+  };
+}
+
+function setPacks(state: PackComponentState) {
+  const comp = { id: "stems-default", name: "Demucs", state, kind: PackComponentKind.ComponentModel };
+  const p = { id: "music", name: "Music", state: PackState.PackMissing, components: [comp], unlocks: [] };
+  usePacks.setState({ list: [p], byId: { music: p }, loaded: true } as unknown as Parameters<typeof usePacks.setState>[0]);
+}
 
 const SONG = {
   url: "/media/t/song.mp3",
@@ -181,6 +247,11 @@ describe("LyricVideoView", () => {
     h.open.mockResolvedValue(SONG);
     h.playerMs.value = 0;
     h.played.value = false;
+    resetSession();
+    h.analysis.current = analysisState();
+    h.analysisCalls.length = 0;
+    h.pickDesign.current = null;
+    setPacks(PackComponentState.ComponentInstalled);
     useJobs.setState({ byId: {} });
     useUI.setState({ handoff: null, view: "lyric-video" });
     useDeps.getState().setAll([]);
@@ -306,7 +377,7 @@ describe("LyricVideoView", () => {
     await waitFor(() => expect(h.enqueue).toHaveBeenCalled());
     finish("g1", { action: "lyrics", lines: [], matched: 0, hasInstrumental: false });
     expect(await screen.findByText("No lyrics were found")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Continue to Look" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Continue to Visuals" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("nudges a line by 0.1 s (words included) and undoes it", async () => {
@@ -331,7 +402,7 @@ describe("LyricVideoView", () => {
     await user.type(start, "0:02{Enter}");
     expect(startOf(3)).toBe("0:02.000");
     expect(screen.getByText(/Line 3 starts before the line above it/)).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Continue to Look" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Continue to Visuals" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("inserts, deletes and shifts all lines", async () => {
@@ -439,10 +510,214 @@ describe("LyricVideoView", () => {
     await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(2));
   });
 
+  describe("visuals", () => {
+    async function toVisuals(user: User) {
+      await withLines(user);
+      await user.click(screen.getByRole("button", { name: "Continue to Visuals" }));
+      await screen.findByRole("radiogroup", { name: "Visuals" });
+    }
+    const lastCall = () => h.analysisCalls.at(-1);
+    const lastSaved = () => JSON.parse((h.setState.mock.calls.at(-1) as [string, string])[1]) as {
+      visualsMode: string;
+      look: { background: string; visuals: { showJson: string; stems: boolean } };
+    };
+
+    it("has the steps Song, Lyrics, Visuals, Look, Render", async () => {
+      const user = userEvent.setup();
+      await toVisuals(user);
+      const names = within(screen.getByRole("navigation", { name: "Steps" }))
+        .getAllByRole("button")
+        .map((b) => b.textContent?.replace(/^\d+/, ""));
+      expect(names).toEqual(["Song", "Lyrics", "Visuals", "Look", "Render"]);
+      expect(screen.getByRole("button", { name: /Visuals/, current: "step" })).toBeTruthy();
+    });
+
+    it("starts the analysis by itself on entering the step, with the sheet as the words", async () => {
+      const user = userEvent.setup();
+      await withLines(user);
+      // Before the step the song isn't being analysed.
+      expect(h.analysisCalls.every((c) => c.path === null || !c.opts.auto)).toBe(true);
+      await user.click(screen.getByRole("button", { name: "Continue to Visuals" }));
+      await waitFor(() => expect(lastCall()?.opts.auto).toBe(true));
+      const c = lastCall();
+      expect(c?.path).toBe("/in/song.mp3");
+      expect(c?.opts.analyze).toMatchObject({ words: "given", mood: true, stems: true, saveStems: false });
+      const lines = c?.opts.analyze.lines as Array<{ text: string }>;
+      expect(lines.map((l) => l.text)).toEqual(["hello big world", "second line", "third"]);
+    });
+
+    it("shows the listening progress and an error with Try again", async () => {
+      const user = userEvent.setup();
+      h.analysis.current = analysisState({ status: "running", progress: 0.4, stage: "Separating the instruments", analysis: null });
+      await toVisuals(user);
+      expect(screen.getByText(/Listening to the song… 40%/)).toBeTruthy();
+      expect(screen.getByText("Separating the instruments")).toBeTruthy();
+      expect(screen.queryByTestId("picker")).toBeNull();
+    });
+
+    it("offers the instrument model when it isn't downloaded and analyses without stems", async () => {
+      const user = userEvent.setup();
+      setPacks(PackComponentState.ComponentMissing);
+      await toVisuals(user);
+      expect(screen.getByText("The instrument separation model isn't downloaded")).toBeTruthy();
+      expect(screen.getByRole("switch", { name: /Separate instruments/ }).getAttribute("aria-checked")).toBe("false");
+      await waitFor(() => expect(lastCall()?.opts.analyze.stems).toBe(false));
+    });
+
+    it("switches Quick, Full designer and Classic, and remembers the choice", async () => {
+      const user = userEvent.setup();
+      await toVisuals(user);
+      // Quick: the picker, in background mode, with the sheet as its lines.
+      expect(screen.getByTestId("picker").getAttribute("data-mode")).toBe("background");
+      expect(screen.getByTestId("picker").getAttribute("data-lines")).toBe("3");
+      expect(screen.getByTestId("design-label").textContent).toBe("Design: Classic");
+      act(() => h.pickDesign.current?.({ showJson: PRESET_JSON, stems: true, useWords: true }));
+      expect(screen.getByTestId("design-label").textContent).toContain(PRESET.name);
+      await waitFor(() => expect(lastSaved()).toMatchObject({ visualsMode: "quick", look: { background: "visualizer" } }));
+
+      // Full designer: the embedded designer, aspect locked, the tool's own words over it.
+      await user.click(screen.getByRole("radio", { name: "Full designer" }));
+      const designer = await screen.findByTestId("designer");
+      expect(designer.getAttribute("data-aspect")).toBe(String(16 / 9));
+      expect(designer.getAttribute("data-player")).toBe("null");
+      expect(designer.getAttribute("data-tabs")).toBe("presets,look,reactions,layers,timeline");
+      expect(within(screen.getByTestId("designer-text")).getByTestId("preview-line").textContent).toBe("hello big world");
+      await user.click(screen.getByRole("button", { name: "Edit design" }));
+      await waitFor(() => expect(screen.getByTestId("design-label").textContent).toContain("Custom design"));
+      await waitFor(() => expect(lastSaved()).toMatchObject({ visualsMode: "designer", look: { background: "visualizer" } }));
+      expect(JSON.parse(lastSaved().look.visuals.showJson)).toMatchObject({ name: "Edited", reactivity: 1.5 });
+      await user.click(screen.getByRole("button", { name: "Undo" }));
+      await waitFor(() => expect(screen.getByTestId("designer-name").textContent).toBe(PRESET.name));
+
+      // Classic: no visuals background.
+      await user.click(screen.getByRole("radio", { name: "Classic background" }));
+      expect(screen.getByTestId("design-label").textContent).toBe("Design: Classic");
+      expect(screen.queryByTestId("designer")).toBeNull();
+      await waitFor(() => expect(lastSaved()).toMatchObject({ visualsMode: "classic", look: { background: "blur-cover" } }));
+      // The chosen design is kept for coming back.
+      expect(lastSaved().look.visuals.showJson).not.toBe("");
+      await user.click(screen.getByRole("radio", { name: "Quick" }));
+      expect(screen.getByTestId("design-label").textContent).toContain(PRESET.name);
+    });
+
+    it("the full designer starts from a design of its own when none is chosen", async () => {
+      const user = userEvent.setup();
+      await toVisuals(user);
+      await user.click(screen.getByRole("radio", { name: "Full designer" }));
+      await screen.findByTestId("designer");
+      await waitFor(() => expect(lastSaved()).toMatchObject({ visualsMode: "designer", look: { background: "visualizer" } }));
+      expect(lastSaved().look.visuals.showJson).not.toBe("");
+    });
+
+    it("sends saveStems with the analysis and runs the separation again when ticked late", async () => {
+      const user = userEvent.setup();
+      await toVisuals(user);
+      const box = screen.getByRole("checkbox", { name: "Also save the stems to the Library" }) as HTMLInputElement;
+      expect(box.checked).toBe(false);
+      expect(lastCall()?.opts.analyze.saveStems).toBe(false);
+      await user.click(box);
+      await waitFor(() => expect(lastCall()?.opts.analyze).toMatchObject({ stems: true, saveStems: true }));
+      await waitFor(() => expect((h.analysis.current.start as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1));
+    });
+
+    it("hands the sheet and its look to the Visualizer", async () => {
+      const user = userEvent.setup();
+      await toVisuals(user);
+      await user.click(screen.getByRole("button", { name: "Make the whole video in Visualizer" }));
+      const handoff = useUI.getState().handoff;
+      expect(handoff).toMatchObject({
+        moduleId: "visualizer",
+        inputs: ["/in/song.mp3"],
+        seed: {
+          kind: "timed-text",
+          from: "lyric-video",
+          look: { font: "Arial", textColor: "#ffffff", highlightColor: "#ffd166", karaoke: true, position: "center" },
+        },
+      });
+      expect(handoff?.seed?.lines.map((l) => l.text)).toEqual(["hello big world", "second line", "third"]);
+      expect(useUI.getState().view).toBe("visualizer");
+    });
+
+    it("the Song step's Instrumental uses the 4-stem mix once the analysis has one", async () => {
+      const user = userEvent.setup();
+      await toVisuals(user);
+      h.analysis.current = analysisState({ ref: { key: "k", instrumental: "/cache/instrumental.flac", summary: { tempo: 90, key: "", hasStems: true } } });
+      await user.click(screen.getByRole("radio", { name: "Classic background" })); // re-renders the view
+      const steps = within(screen.getByRole("navigation", { name: "Steps" }));
+      await user.click(steps.getByRole("button", { name: /Song/ }));
+      await user.click(screen.getByRole("radio", { name: "Instrumental (karaoke)" }));
+      expect(screen.getByText(/already made for this song/)).toBeTruthy();
+    });
+
+    it("keeps the song and the sheet when the tool is closed and opened again", async () => {
+      const user = userEvent.setup();
+      const first = render(<LyricVideoView moduleId="lyric-video" />);
+      first.unmount();
+      await withLines(user);
+      cleanup();
+      render(<LyricVideoView moduleId="lyric-video" />);
+      expect(await screen.findByText("song.mp3")).toBeTruthy();
+      expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("Fireflies");
+      await user.click(within(screen.getByRole("navigation", { name: "Steps" })).getByRole("button", { name: /Lyrics/ }));
+      expect(((await screen.findByLabelText("Line 3 text")) as HTMLInputElement).value).toBe("third");
+    });
+
+    describe("on the Look step", () => {
+      async function toVisualLook(user: User) {
+        await toVisuals(user);
+        act(() => h.pickDesign.current?.({ showJson: PRESET_JSON, stems: true, useWords: true }));
+        await user.click(screen.getByRole("button", { name: "Continue to Look" }));
+        await screen.findByTestId("lyric-preview");
+      }
+
+      it("shows Visuals: <design>, a Change link, the live canvas, and hides the strip option", async () => {
+        const user = userEvent.setup();
+        await toVisualLook(user);
+        expect(screen.getByTestId("visuals-label").textContent).toBe(`Visuals: ${PRESET.name}`);
+        expect(screen.getByTestId("visuals-canvas")).toBeTruthy();
+        expect(screen.queryByRole("radio", { name: "Blurred cover" })).toBeNull();
+        expect(screen.queryByRole("radiogroup", { name: "Visualiser" })).toBeNull();
+        expect(screen.queryByTestId("preview-visualizer")).toBeNull();
+        // The text options and the approximate note stay; the HTML lyrics are over the canvas.
+        expect(screen.getByLabelText("Font")).toBeTruthy();
+        expect(screen.getByText(/Preview is approximate/)).toBeTruthy();
+        act(() => h.emitTime.current?.(1750));
+        expect((await screen.findByTestId("preview-line")).textContent).toBe("hello big world");
+        await user.click(screen.getByRole("button", { name: "Change" }));
+        expect(await screen.findByRole("radiogroup", { name: "Visuals" })).toBeTruthy();
+      });
+
+      it("submits the visuals background with the render", async () => {
+        const user = userEvent.setup();
+        await toVisualLook(user);
+        await user.click(screen.getByRole("button", { name: "Continue to Render" }));
+        h.enqueue.mockResolvedValue([job({ id: "r1" })]);
+        await user.click(screen.getByRole("button", { name: "Render video" }));
+        await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(2));
+        const o = h.enqueue.mock.calls[1]?.[1] as { action: string; look: { background: string; visuals: { showJson: string; stems: boolean; useWords: boolean } } };
+        expect(o.action).toBe("render");
+        expect(o.look.background).toBe("visualizer");
+        expect(o.look.visuals).toMatchObject({ showJson: PRESET_JSON, stems: true, useWords: true });
+      });
+
+      it("blocks rendering when the visuals background has no design", async () => {
+        const user = userEvent.setup();
+        await toVisuals(user);
+        await user.click(screen.getByRole("radio", { name: "Full designer" }));
+        await screen.findByTestId("designer");
+        await user.click(screen.getByRole("radio", { name: "Classic background" }));
+        await user.click(screen.getByRole("button", { name: "Continue to Look" }));
+        await screen.findByTestId("lyric-preview");
+        expect(screen.queryByTestId("visuals-label")).toBeNull();
+      });
+    });
+  });
+
   describe("look and render", () => {
     async function toLook(user: User) {
       await withLines(user);
-      await user.click(screen.getByRole("button", { name: "Continue to Look" }));
+      await user.click(screen.getByRole("button", { name: "Continue to Visuals" }));
+      await user.click(await screen.findByRole("button", { name: "Continue to Look" }));
       await screen.findByTestId("lyric-preview");
     }
 
