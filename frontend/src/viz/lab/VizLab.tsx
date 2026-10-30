@@ -16,6 +16,8 @@ import { layerDef } from "../layers/registry";
 import { PRESETS, showFromPreset, type Preset } from "../presets";
 import type { LayerType, Show, TextPreset, TextStyle } from "../types";
 import { toBase64 } from "../worker/transport";
+import { runE2E } from "./e2e";
+import RenderHost from "../RenderHost";
 import { runParity } from "./parity";
 
 function send(name: string, bytes: Uint8Array): void {
@@ -124,6 +126,14 @@ export default function VizLab() {
     const say = (s: string) => setLog((l) => [...l, s]);
     const q = new URLSearchParams(window.location.search);
     let stop = false;
+    if (q.get("e2e")) {
+      // --- E2E MODE (architect) ---
+      void runE2E(q, say, (name, v) => sendJSON(name, v)).then(() => sendJSON("done.json", { e2e: true, at: new Date().toISOString() }));
+      return () => {
+        stop = true;
+      };
+      // --- end E2E MODE ---
+    }
     (async () => {
       let a: Analysis;
       let urls: { audioJsonUrl: string; featuresUrl: string; textJsonUrl: string } | null = null; // parity: the worker loads the same analysis
@@ -217,6 +227,7 @@ export default function VizLab() {
   }, []);
   return (
     <div style={{ padding: 16, fontFamily: "monospace", fontSize: 12 }}>
+      <RenderHost />
       <canvas ref={ref} style={{ width: 480, height: 270 }} />
       <pre>{log.join("\n")}</pre>
     </div>
