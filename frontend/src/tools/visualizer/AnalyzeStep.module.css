@@ -1,0 +1,93 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 1100px;
+  width: 100%;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.warnings {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 560px;
+  padding: var(--space-4);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+  color: var(--fg-muted);
+}
+
+.stage[data-state="active"] {
+  color: var(--fg);
+}
+
+.stage[data-state="done"],
+.stage[data-state="cached"] {
+  color: var(--ok);
+}
+
+.stage[data-state="failed"] {
+  color: var(--danger);
+}
+
+.stageLabel {
+  flex: 1;
+}
+
+.stageState {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  margin: 0 3px;
+  border-radius: 50%;
+  background: var(--fg-faint);
+}
+
+.msg {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
