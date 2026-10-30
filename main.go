@@ -319,7 +319,7 @@ func run() error {
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
-		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true},
+		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true, WebviewUserDataPath: sandboxWebviewDir(paths)},
 		// The Visualizer streams rendered video over raw messages: no socket
 		// (SPEC.md §4.4). The broker checks the token and the origin.
 		RawMessageHandler: func(_ application.Window, msg string, origin *application.OriginInfo) {
@@ -424,6 +424,16 @@ func instanceID(p core.Paths) string {
 
 // startURL honours $TOOLBOX_VIEW (dev aid: open on a given view, e.g.
 // "settings" or a module ID) via the frontend's ?view= parameter.
+// sandboxWebviewDir keeps WebView2's profile inside a sandbox support dir
+// (TOOLBOX_SUPPORT_DIR) so dev and test runs never share or create profiles
+// in %APPDATA%. "" = Wails' default for the real app.
+func sandboxWebviewDir(p core.Paths) string {
+	if os.Getenv(core.EnvSupportDir) == "" {
+		return ""
+	}
+	return filepath.Join(p.SupportDir, "webview2")
+}
+
 func startURL() string {
 	if os.Getenv("TOOLBOX_VIZLAB") == "1" && os.Getenv("TOOLBOX_VIEW") == "vizlab" { // dev-only lab (SPEC.md §11.4)
 		q := "/?window=vizlab"
