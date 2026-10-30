@@ -6,6 +6,14 @@ import { create } from "zustand";
 import type { AnalysisRef, AnalyzeOptions, TimedLine } from "@/lib/api";
 import type { Analysis } from "@/viz/analysis";
 import type { Show } from "@/viz/types";
+import type { ToolSeed } from "@/state/ui";
+
+/** What a `timed-text` handoff carries beyond the lines (SPEC.md §9.4, §9.5). */
+export interface SeedLook {
+  from: "lyric-video" | "subtitles";
+  look: ToolSeed["look"] | null;
+  overlay: boolean;
+}
 
 export type VisualizerStep = "source" | "analyze" | "design" | "export";
 
@@ -26,6 +34,12 @@ export interface VisualizerState {
   analysis: Analysis | null;
   /** The design being edited (UI-V2). */
   show: Show | null;
+  /** The Song Map selection used as the Export range (UI-V2). */
+  selection: { startMs: number; endMs: number } | null;
+  /** The render seed of this session: the same design renders the same frames (UI-V2). */
+  renderSeed: number;
+  /** Look details handed over with timed text; applied once by the Design step (UI-V2). */
+  seedLook: SeedLook | null;
 
   setStep(step: VisualizerStep): void;
   setInput(input: string | null, isVideo: boolean): void;
@@ -34,6 +48,9 @@ export interface VisualizerState {
   setSeed(from: "lyric-video" | "subtitles" | null, lines: TimedLine[] | null): void;
   setAnalysis(ref: AnalysisRef | null, analysis: Analysis | null): void;
   setShow(show: Show | null): void;
+  setSelection(selection: { startMs: number; endMs: number } | null): void;
+  setRenderSeed(seed: number): void;
+  setSeedLook(look: SeedLook | null): void;
   reset(): void;
 }
 
@@ -60,16 +77,22 @@ const initial = {
   ref: null,
   analysis: null,
   show: null,
+  selection: null,
+  renderSeed: 1,
+  seedLook: null,
 };
 
 export const useVisualizer = create<VisualizerState>((set) => ({
   ...initial,
   setStep: (step) => set({ step }),
-  setInput: (input, isVideo) => set({ input, isVideo, mode: isVideo ? "overlay" : "full", ref: null, analysis: null, analyze: { ...DEFAULT_ANALYZE, stems: !isVideo } }),
+  setInput: (input, isVideo) => set({ input, isVideo, mode: isVideo ? "overlay" : "full", ref: null, analysis: null, selection: null, analyze: { ...DEFAULT_ANALYZE, stems: !isVideo } }),
   setMode: (mode) => set({ mode }),
   setAnalyze: (patch) => set((s) => ({ analyze: { ...s.analyze, ...patch } })),
   setSeed: (seedFrom, seedLines) => set({ seedFrom, seedLines }),
   setAnalysis: (ref, analysis) => set({ ref, analysis }),
   setShow: (show) => set({ show }),
+  setSelection: (selection) => set({ selection }),
+  setRenderSeed: (renderSeed) => set({ renderSeed }),
+  setSeedLook: (seedLook) => set({ seedLook }),
   reset: () => set(initial),
 }));
