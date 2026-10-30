@@ -1,6 +1,8 @@
 # Toolbox — Phase 7 Spec: Visualizer (reactive visuals for songs, lyrics and subtitled videos)
 
-Status: **DRAFT r2, waiting for review.** r2 (2026-10-30) adds a local mood reader instead of relying on Local Chat (§0.3, §5.4), and Visualizer backgrounds inside Lyric Video and Subtitles (§9).
+Status: **APPROVED 2026-10-30** (r3).
+- r2 added a local mood reader instead of relying on Local Chat (§0.3, §5.4), and Visualizer backgrounds inside Lyric Video and Subtitles (§9).
+- r3 makes the visuals a step of Lyric Video's wizard: a quick picker, or the full designer embedded in place, with instrument separation and saving the stems (§9.2). Subtitles' "Make a video" gets the same choice (§9.3). The round trip to the Visualizer is replaced by the embedded designer (§9.4).
 Date: 2026-10-29. Author: architect session (Opus).
 
 Phases 1–6 are shipped; their specs are archived in `docs/specs/phase-{1..6}.md`, and every contract there still holds unless changed here. "P6 §x" etc. refer to those files.
@@ -109,7 +111,9 @@ How the anchor method works:
    - Formats: 16:9, 9:16, 1:1 and 4:5; 720p to 2160p; 30 or 60 fps.
    - Audio: original or instrumental.
 6. **Visuals as a background in the video-making tools** (§9):
-   - **Lyric Video** (with lyrics) and **Subtitles' "burn into a video"** (without lyrics) get a **Visualizer background** option. You pick a preset from live thumbnails that react to your own file, or one of your saved designs, with one click. "Customize in Visualizer…" opens the full designer and brings the design back.
+   - **Lyric Video** (with lyrics) gets a **Visuals step** in its wizard. **Subtitles' "burn into a video"** (without lyrics) gets the same choice:
+     - **Quick:** a preset or saved design, picked from live thumbnails that react to your own file;
+     - **Full designer:** the Visualizer's designer embedded in place, with instrument separation (and saving the stems) and the tool's own words as input.
    - Those tools keep drawing their own text on top. The visuals react to the music and to the tool's own words and their mood.
    - Subtitles can now make a video from an **audio file** (a captioned audiogram for podcasts and voice notes), with visuals, a colour or an image behind the subtitles.
    - Both tools can also hand the timed text to the Visualizer to make the whole video there, with reactive words. Subtitles cues keep word timings from generation.
@@ -182,6 +186,7 @@ func WriteLRC(w io.Writer, lines []Line) error
 type WordsSource string // "none" | "detect" | "align" | "file" | "given"
 type AnalyzeOptions struct {
     Stems      bool        `json:"stems"`      // separate instruments (Demucs 4-stem)
+    SaveStems  bool        `json:"saveStems"`  // also write the 4 stems to the Library (§9.7)
     Words      WordsSource `json:"words"`
     Language   string      `json:"language"`   // "" auto or a Transcribe code
     LyricsText string      `json:"lyricsText"` // align: ≤ 20,000 chars
@@ -905,6 +910,7 @@ Steps: **Source → Analyze → Design → Export**.
   - A handoff pre-selects a fourth option, "From <Lyric Video / Subtitles>".
   - Language select for detect and paste.
 - **Separate instruments:** a switch, on by default for audio and off for video. Hint: "Lets drums, bass, vocals and other instruments drive different visuals. Takes about as long as the song."
+  - Under it, **"Also save the stems to the Library"** (off by default; §9.7).
 - **Read the mood of the words:** a switch, on by default when words are on. Hint: "A small local model reads how each line feels and what it pictures (fire, rain, stars…), in any language."
   - Under it, **"Deeper reading with Local Chat"** (off by default; disabled with "Download a model in Local Chat" when none is ready). Hint: "Slower, picks the words to emphasise and catches subtler lines."
 - DepsGate rows appear for:
@@ -986,11 +992,12 @@ They are built from the active section, the 3 strongest active mods (amount × c
 
 ## 9. Visuals in Lyric Video and Subtitles
 
-My reading of "the video form, both the one with lyrics and the one without":
-- **with lyrics** is Lyric Video;
-- **without** is Subtitles' "burn into a video", which now also works from an audio file.
-
-Both get a **Visualizer background**. It has to be easy: pick a card, see it move to your own song, render.
+- **With lyrics:** Lyric Video's wizard gets a **Visuals step**.
+- **Without:** Subtitles' "burn into a video", which now also works from an audio file, gets a **Visuals** choice.
+- In both, the user picks either:
+  - **Quick:** a card that moves to your own song, then render;
+  - **Full designer:** everything the Visualizer can do, embedded in the step, fed by the tool's own lyrics or cues and by the separated instruments.
+- The tool keeps drawing its own words on top.
 
 ### 9.1 `VisualsPicker` (`frontend/src/components/viz/VisualsPicker.tsx`, shared)
 ```ts
@@ -1002,7 +1009,6 @@ interface VisualsPickerProps {
   mode: "background" | "overlay";    // overlay = over a video (background layers dropped)
   aspect: number;                    // the tool's output aspect, for the thumbnails
   playheadMs?: number;               // the tool's player position, if it has one
-  returnTo: { moduleId: "lyric-video" | "subtitles"; label: string };
 }
 ```
 **What it shows, top to bottom:**
@@ -1020,7 +1026,7 @@ interface VisualsPickerProps {
 4. **Two switches:**
    - "Separate instruments", with the hint "richer reactions; takes about as long as the song". It re-analyses.
    - "React to the words" (`useWords`, shown when `lines` exist, on by default).
-5. **"Customize in Visualizer…"**, a secondary button (round trip in §9.4).
+5. **"Open the full designer"**, a secondary button. It switches the step to the embedded designer (§9.4), keeping the selection.
 
 **Around it:**
 - The picker never renders text: the tool draws its own words.
@@ -1030,16 +1036,28 @@ interface VisualsPickerProps {
 - **`Look`:**
   - `Background` gains `"visualizer"`.
   - `Look` gains `Visuals viz.VisualsSpec` (`json:"visuals"`).
-  - The default stays `blur-cover`.
+  - The default stays `blur-cover` until the user picks visuals.
+- **Wizard steps: Song → Lyrics → Visuals → Look → Render.** The new Visuals step sits between Lyrics and Look.
+- **Visuals step:**
+  - **Top: "Instruments" panel.**
+    - "Separate instruments (drums, bass, vocals, other)" switch: on by default when `stems-default` is installed; DepsGate otherwise.
+    - "Also save the stems to the Library" checkbox (off by default): the 4 FLAC stems go to `Stems/<song>/`, named as the Stems tool names them (`AnalyzeOptions.SaveStems`, §9.7).
+    - The separation and the listening start by themselves when the step opens. It is one `visualizer` analyze job with the lyric sheet as `given` words and the mood reader on, cached, with progress inline.
+    - When separation is done, the Song Map's instrument lanes appear. The Song step's Audio choice (Original / Instrumental) then uses the 4-stem instrumental when there is one.
+  - **A SegmentedControl:**
+    - **Quick:** the `VisualsPicker`.
+    - **Full designer:** the embedded `VisualDesigner` (§9.4), with the Song Map, Presets, Look (colours and motion), Reactions, Layers, Timeline and the Why readout. The words are drawn as Lyric Video's own preview text over the designer's canvas.
+    - **Classic background:** no visuals; the Look step shows the P6 backgrounds.
+  - The step's footer shows the chosen design ("Golden Hour", "Custom design" or "Classic") and Next.
 - **Look step:**
-  - The background cards gain **"Visualizer"**, shown first with a small animated badge. Choosing it shows the `VisualsPicker` in place of the background-specific options (`mode: "background"`, the lyric sheet's lines, the Look preview's playhead).
+  - With visuals, the background area shows "Visuals: <design>" with a "Change" link back to the Visuals step. Text options are unchanged.
   - The live preview's background becomes `VisualsCanvas` under the existing HTML lyrics. The "approximate" note stays; Render preview is exact.
-  - The old `Visualiser` strip option (wave/bars) is hidden while the background is Visualizer.
+  - The old `Visualiser` strip option (wave/bars) is hidden with visuals.
 - **Render / preview** (`render.go`), with `Background == "visualizer"`:
   1. `viz.RenderVisuals(…, mode "opaque", w×h of the canvas, 30 fps, lines = the sheet when UseWords)`. Progress 0–0.6, or 0–0.8 for preview. Preview renders only the 10 s range.
   2. The FFmpeg graph takes `-f h264 -framerate 30 -i visuals.h264` as its background input instead of the cover/colour source. The ASS lyrics, title card and audio (original or instrumental) are unchanged. Progress 0.6–1.
   - Validate: `"visualizer"` needs `Visuals.ShowJSON` (≤ 512 KiB).
-- **"Make the whole video in Visualizer"**, a link under the picker: hands off `{inputs: [song], seed: {kind: "timed-text", from: "lyric-video", lines, look}}` for reactive karaoke words (§9.5).
+- **"Make the whole video in Visualizer"**, a link in the Visuals step: hands off `{inputs: [song], seed: {kind: "timed-text", from: "lyric-video", lines, look}}` for reactive karaoke words drawn by the engine (§9.5).
 
 ### 9.3 Subtitles
 - **`Cue` gains `Words []CueWord`** (`json:"words,omitempty"`, `CueWord {startMs, endMs, text}`):
@@ -1062,31 +1080,46 @@ interface VisualsPickerProps {
 - **Burn onto a video with visuals** (optional): with `Visuals` set, `RenderVisuals(overlay, the video's size, its fps, lines = cues)` → `CompositeOverlay` with the ASS burned in **after** the overlay, so subtitles stay on top and readable.
 - **Export step:**
   - The Burn card gains a **"Visuals"** row.
-  - For a video: "None" (default) or "Add visuals over the video" → `VisualsPicker` in `overlay` mode.
-  - For audio: the burn card is now enabled and titled **"Make a video"**, with Canvas, Quality and Background: **Visualizer (default)** / colour / image. Visualizer shows the picker in `background` mode.
+  - **For a video:** "None" (default) or "Add visuals over the video". The latter shows Quick (`VisualsPicker`, `overlay` mode) and "Open the full designer".
+  - **For audio:** the burn card is now enabled and titled **"Make a video"**, with Canvas, Quality and Background: **Visualizer (default)** / colour / image.
+    - Visualizer shows the "Separate instruments" switch (off by default here; speech rarely needs it), Quick (`VisualsPicker`, `background` mode) and "Open the full designer".
+  - **"Open the full designer"** opens the embedded `VisualDesigner` in a full-height sheet over the Subtitles view. The cues are its `given` words and are drawn as the burn-style preview text. "Done" closes the sheet and keeps the design; Esc asks to discard changes.
   - The burn style's mini preview draws the cue over `VisualsCanvas` (or the colour or image) at the current time.
 - **"Make it fully reactive in Visualizer"**, a link: hands off `{inputs: [file], seed: {kind: "timed-text", from: "subtitles", lines: cues, overlay: <is video>}}`.
 
-### 9.4 Customize round trip
+### 9.4 The embedded designer (`tools/visualizer/designer/VisualDesigner.tsx`)
+The Visualizer's Design step (§8.3) is built as one component, so Lyric Video and Subtitles can embed it.
+```ts
+interface VisualDesignerProps {
+  inputPath: string;
+  analysis: Analysis;                 // loaded by the host (useVisualsAnalysis)
+  show: Show;
+  onChange(show: Show): void;         // every edit; the host owns undo (useShowHistory, exported too)
+  aspect: number;                     // locked when the host fixes the output shape
+  mode: "full" | "overlay";
+  player: MediaPlayerHandle | null;   // the host's player drives time; null = the designer's own audio player
+  text: "engine" | { overlay: (rect: ContentRect, timeMs: number) => ReactNode }; // engine text (Visualizer) or the host's preview text
+  tabs?: Array<"presets" | "look" | "reactions" | "layers" | "timeline">;          // default: all
+  onSavePreset?(show: Show): void;    // "Save as my preset" (writes visualizer.myPresets)
+}
+```
+- **Inside the Visualizer:** `text: "engine"` and the Look tab includes the text section.
+- **Inside Lyric Video and Subtitles:** the host's overlay draws its words, and the Look tab hides the text section. Shows passed to `RenderVisuals` always have `text: null`.
+- **Shared hooks** (`tools/visualizer/designer/`):
+  - `useVisualsAnalysis(path, {stems, saveStems, lines, mood})`: looks up `AnalysisFor`, submits the analyze job when needed, follows its progress, and loads the files;
+  - `useShowHistory(initial)`: undo and redo, 100 steps.
+- **State:** the hosts keep their design in their own options and module state, and their sheets and cues in their view stores. Nothing is handed between tools.
+
+**The handoff seed** (only for sending timed text to the Visualizer, §9.5):
 ```ts
 // state/ui.ts
 export interface Handoff { moduleId: string; inputs: string[]; seed?: ToolSeed }
-export type ToolSeed =
-  | { kind: "timed-text"; from: "lyric-video" | "subtitles"; lines: TimedLine[];
-      look?: { font: string; textColor: string; highlightColor: string; karaoke: boolean; position: "center" | "lower" };
-      overlay?: boolean }
-  | { kind: "design-for"; returnTo: "lyric-video" | "subtitles"; returnLabel: string;
-      showJson: string | null; lines: TimedLine[] | null; mode: "background" | "overlay"; aspect: string; stems: boolean }
-  | { kind: "design"; showJson: string };          // returning to the tool
+export type ToolSeed = {
+  kind: "timed-text"; from: "lyric-video" | "subtitles"; lines: TimedLine[];
+  look?: { font: string; textColor: string; highlightColor: string; karaoke: boolean; position: "center" | "lower" };
+  overlay?: boolean;
+};
 ```
-- **"Customize in Visualizer…"** hands off `design-for`.
-  - The Visualizer opens on **Design** with the file, the analysis (reused from the picker's), the current design (or the selected preset), the tool's lines as `given` words, and the aspect locked to the tool's.
-  - The preview shows no text; a dim note says "<Lyric Video> adds the words on top".
-- **A banner** shows across the top: "Designing visuals for Lyric Video", with **"Use in Lyric Video"** (primary) and **"Cancel"**.
-  - "Use" hands off `{moduleId: returnTo, inputs: [file], seed: {kind: "design", showJson}}`. The tool selects it as a "Custom design" card, keeps it in its options (module state), and returns to the step it came from.
-  - "Cancel" goes back without changes.
-  - Export is hidden in this mode, and "Save as my preset" stays available.
-- The tools keep their own state across the round trip: the Lyric Video sheet and the Subtitles cues live in their view stores, not just component state. The packages that own those views make this so, and test it.
 
 ### 9.5 Timed text into the Visualizer
 The Visualizer reads a `timed-text` seed on `takeHandoff`:
@@ -1099,6 +1132,11 @@ The Visualizer reads a `timed-text` seed on `takeHandoff`:
 - When it is set, FFmpeg runs with TempDir as its working directory (P6 §3.3).
 - `,ass=subs.ass` is appended to the final video chain (after `overlay` in the composite).
 - `MuxOpaque` then re-encodes (`libx264 -preset medium -crf 18 -pix_fmt yuv420p`) instead of copying.
+
+### 9.7 Saving stems from an analysis
+- `viz.AnalyzeOptions` gains `SaveStems bool` (`json:"saveStems"`), which only applies with `Stems`.
+- After separation, the analyze job copies the 4 FLAC stems into the Library as outputs under `Stems/<base>/`, named `<base> - <Stem>.flac` as `stems.separate` names them in the Stems tool (P2 §6). It does this before deleting its own copies.
+- If the analysis is cached and the stems were already deleted, separation runs again (the features are reused).
 
 ---
 
@@ -1178,6 +1216,7 @@ type Result struct {
   - `Validate` tables;
   - `Run` analyze and render against fakes (a fake engine caller, a fake broker that writes a canned H.264);
   - outputs and result fields.
+- **`core/viz` SaveStems:** stems are copied as outputs with Stems-tool names before deletion; on a cached analysis without stems, separation runs again.
 - **`core/viz.RenderVisuals`:** with fakes. The show's text is forced to null, progress maps into [p0, p1], the analysis is reused when cached, and lines are passed as `given` words.
 - **`modules/subtitles`:**
   - words carried through generate, edit, split, merge and shift;
@@ -1225,20 +1264,25 @@ type Result struct {
   - Reactions add, change and remove update the show; Layers reorder and delete;
   - undo/redo;
   - Export option rules (2160p gating, overlay hiding aspect);
-  - handoff seeds prefill the Source (`timed-text`) or open Design in round-trip mode (`design-for`), with the banner, Use and Cancel.
+  - the `timed-text` seed prefills the Source;
+  - `VisualDesigner` works with the host's text overlay and a locked aspect, hides the text section, and never puts text into the show it emits;
+  - `useVisualsAnalysis` reuses a cached analysis, submits one with `saveStems` when asked, and reports progress.
 - **`VisualsPicker`:**
   - it starts an analysis only when `AnalysisFor` misses, and shows its progress;
   - selecting a card calls `onChange` with that preset's show;
   - Intensity and Colours edit the show;
-  - Customize hands off `design-for`; a returning `design` seed selects "Custom design".
+  - "Open the full designer" keeps the selection.
 - **Lyric Video:**
-  - the Visualizer card shows the picker and hides the old strip option;
-  - the sheet survives the round trip;
+  - the wizard has the Visuals step;
+  - analysis starts on entering it, with the sheet as words;
+  - Quick, Full designer and Classic switch correctly and persist;
+  - "Also save the stems" sets `saveStems`;
+  - Look shows "Visuals: <design>" and hides the strip option;
   - the "whole video" link hands off `timed-text`.
 - **Subtitles:**
   - an audio input enables "Make a video" with Visualizer as the default background;
   - a video input shows the Visuals row with None as the default;
-  - the cues survive the round trip.
+  - the designer sheet keeps the design on Done and asks before discarding on Esc.
 
 ### 11.4 Visual lab and checks (`viz/lab/VizLab.tsx`, `TOOLBOX_VIZLAB=1`)
 - A dev-only view (`TOOLBOX_VIEW=vizlab` with `TOOLBOX_VIZLAB=1`; otherwise the route doesn't exist):
@@ -1306,21 +1350,26 @@ type Result struct {
 |---|---|---|
 | **PR1 Presets + director** | `viz/presets/**`, `viz/director.ts` | §6.9, §6.10: 20 presets that validate; contact sheets reviewed by the architect; each ≥ 50 fps at 720p in the lab |
 | **UI-V1 Source + Analyze + Song Map** | `tools/visualizer/{SourceStep,AnalyzeStep,SongMap}*` | §8.1, §8.2 |
-| **UI-V2 Design + Export** | `tools/visualizer/{DesignStep,Preview,WhyPanel,Presets,Look,Reactions,Layers,Timeline,ExportStep,RoundTripBanner,useSeed}*`, `VisualizerView.tsx` | §8.3, §8.4, §9.4 (Visualizer side), §9.5 |
+| **UI-V2 Design + Export** | `tools/visualizer/designer/**` (`VisualDesigner`, `useVisualsAnalysis`, `useShowHistory`, Preview, WhyPanel, the tabs), `tools/visualizer/{DesignStep,ExportStep,useSeed}*`, `VisualizerView.tsx` | §8.3, §8.4, §9.4, §9.5 |
 | **VP1 Visuals picker** | `frontend/src/components/viz/**` (`VisualsPicker`, `VisualsCanvas`, the shared `PresetThumbs` thumbnail engine that UI-V2's Presets tab also uses) | §9.1; FE tests |
-| **LV3 Lyric Video visuals** | `modules/lyricvideo` (`Look.Visuals`, the render/preview graph) + `tools/lyric-video/**` (card, picker, preview background, the "whole video" link, sheet store) | §9.2; Go + FE tests; a real render |
-| **SB4 Subtitles visuals** | `modules/subtitles` (audio burn, overlay burn) + `tools/subtitles/**` (Make a video, Visuals row, round trip, the reactive link) | §9.3; Go + FE + integration tests |
+
 
 Palette commands for the Visualizer (open, Analyze, Render, Render preview, Full screen) go in the marked block of `shell/useBuiltinCommands.ts` (UI-V2).
 
-### Wave 3: integration (architect)
+### Wave 3 (parallel, after UI-V2 and VP1 merge)
+| WP | Owns | Acceptance |
+|---|---|---|
+| **LV3 Lyric Video visuals** | `modules/lyricvideo` (`Look.Visuals`, the render/preview graph) + `tools/lyric-video/**` (the Visuals step with Instruments panel, Quick / Full designer / Classic, the Look summary, the preview background, the "whole video" link) | §9.2; Go + FE tests; a real render |
+| **SB4 Subtitles visuals** | `modules/subtitles` (audio burn, overlay burn) + `tools/subtitles/**` (Make a video, the Visuals row, the designer sheet, the reactive link) | §9.3; Go + FE + integration tests |
+
+### Wave 4: integration (architect)
 1. Merge, regenerate bindings, and run every check, the engine e2e (extended with `viz.analyze` on the synthetic track with stems) and `wails3 build`.
 2. VizLab contact sheets: review all 20 presets × 5 moments and send back any that look poor.
 3. Determinism and parity checks.
 4. Measurements against §13.
 5. A real song end to end (detect + mood reader; then with Deeper reading).
 6. A subtitled talking-head video in overlay mode.
-7. A Lyric Video with a Visualizer background, including a Customize round trip.
+7. A Lyric Video through the Visuals step: once Quick, once with the full designer, stems on and saved.
 8. A podcast-style audio file → Subtitles "Make a video" with a Visualizer background.
 9. The `timed-text` handoffs.
 10. No listeners during a render.
@@ -1359,9 +1408,9 @@ Palette commands for the Visualizer (open, Analyze, Render, Render preview, Full
    - Over a subtitled talking-head video, Clean Captions shows readable subtitles that pop on emphasis.
    - The output keeps the video's size, rotation, fps and audio.
 9. **Visuals in the other tools:**
-   - In Lyric Video, choosing the Visualizer background and a preset takes ≤ 3 clicks and ~10 s of listening, and the preview moves to the song.
+   - In Lyric Video's Visuals step, a Quick choice takes ≤ 2 clicks after ~10 s of listening (more with stems), and the preview moves to the song.
    - The render has the visuals under the libass lyrics.
-   - "Customize in Visualizer…" round-trips with the sheet intact.
+   - The Visuals step's full designer edits the design with the lyrics shown, and the stems can be saved from it.
    - Subtitles makes a captioned video from an audio file with a Visualizer background, and adds overlay visuals under the subtitles of a video.
    - The `timed-text` handoffs open the Visualizer with the defaults of §9.5.
 10. **Quality:** no visible banding in dark gradients after export (dither), no jagged lines (SDF), no flicker from raw signals (envelopes) — checked on the contact sheets and one exported video.
