@@ -45,7 +45,7 @@ export function readMyDesigns(list: ReadonlyArray<{ id: string; name: string; sh
     const r = validateShow(safeParse(e.showJson));
     if (!r.ok) continue;
     const name = e.name || r.show.name || "My design";
-    out.push({ id: `mine:${e.id || name}`, name, description: "Saved in the Visualizer", show: r.show, kind: "mine" });
+    out.push({ id: `mine:${e.id || name}`, name, description: "Saved in the Visualizer", show: { ...r.show, text: null }, kind: "mine" });
   }
   return out;
 }
@@ -60,7 +60,8 @@ function safeParse(s: string): unknown {
 
 /** Preset cards; in overlay mode the overlay presets come first. */
 export function presetItems(mode: "background" | "overlay"): ThumbItem[] {
-  const items: ThumbItem[] = PRESETS.map((p) => ({ id: p.id, name: p.name, description: p.description, show: showFromPreset(p), kind: "preset" as const }));
+  // The host tool draws its own words, so the picker's designs never carry text.
+  const items: ThumbItem[] = PRESETS.map((p) => ({ id: p.id, name: p.name, description: p.description, show: { ...showFromPreset(p), text: null }, kind: "preset" as const }));
   if (mode !== "overlay") return items;
   const first = new Set(PRESETS.filter((p) => p.overlayFirst).map((p) => p.id));
   return [...items.filter((i) => first.has(i.id)), ...items.filter((i) => !first.has(i.id))];

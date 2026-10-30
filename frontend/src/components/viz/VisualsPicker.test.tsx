@@ -133,7 +133,7 @@ describe("VisualsPicker", () => {
     await userEvent.click(await screen.findByRole("button", { name: preset.name }));
     expect(onChange).toHaveBeenCalledTimes(1);
     const spec = onChange.mock.calls[0]?.[0] as VisualsSpec;
-    expect(JSON.parse(spec.showJson)).toEqual(showFromPreset(preset));
+    expect(JSON.parse(spec.showJson)).toEqual({ ...showFromPreset(preset), text: null }); // the host draws the words
     expect(spec.stems).toBe(false);
     expect(spec.useWords).toBe(true);
   });
