@@ -458,6 +458,9 @@ func startURL() string {
 	if os.Getenv("TOOLBOX_VIZ_FORCE_JPEG") == "1" { // test the renderer's JPEG path (Mac checklist)
 		q.Set("vizjpeg", "1")
 	}
+	if os.Getenv("TOOLBOX_VIZ_FIXTURE") == "1" { // dev: the Visualizer uses the synthetic analysis
+		q.Set("vizfixture", "1")
+	}
 	if len(q) == 0 {
 		return "/"
 	}
