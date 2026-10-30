@@ -5,6 +5,15 @@
 import "./gradient";
 import "./bars";
 // --- L1 backgrounds ---
+import "./nebula";
+import "./aurora";
+import "./ink";
+import "./synthgrid";
+import "./tunnel";
+import "./starfield";
+import "./terrain";
+import "./image";
+import "./kaleido";
 // --- end L1 ---
 // --- L2 shapes + highway ---
 // --- end L2 ---
