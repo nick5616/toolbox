@@ -12,7 +12,9 @@ import { MediaService, VisualizerService } from "@/lib/api";
 import { loadAnalysis, type Analysis } from "../analysis";
 import { Engine } from "../engine";
 import { buildFixture } from "../fixture";
-import { PRESETS, showFromPreset } from "../presets";
+import { layerDef } from "../layers/registry";
+import { PRESETS, showFromPreset, type Preset } from "../presets";
+import type { LayerType, Show } from "../types";
 import { toBase64 } from "../worker/transport";
 
 function send(name: string, bytes: Uint8Array): void {
@@ -24,6 +26,26 @@ function fnv(bytes: Uint8Array): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < bytes.length; i += 7) h = Math.imul(h ^ (bytes[i] ?? 0), 16777619);
   return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+/**
+ * A show with one layer (default params) over a dim gradient in every scene,
+ * for checking a single layer type (`TOOLBOX_VIZLAB_LAYER=<type>`).
+ */
+export function singleLayerShow(type: LayerType): Show {
+  const base = showFromPreset(PRESETS[0] as Preset);
+  const def = layerDef(type);
+  for (const sc of base.scenes) {
+    const bg = sc.layers.find((l) => l.type === "gradient");
+    sc.layers = [
+      ...(bg && def?.group !== "background" ? [bg] : []),
+      { id: "lab", type, enabled: true, blend: def?.group === "background" ? "normal" : "add", opacity: 1, params: {} },
+    ];
+  }
+  base.controls = [];
+  base.name = `Layer: ${type}`;
+  base.presetId = null;
+  return base;
 }
 
 /** The five moments of a song: intro, verse, chorus, drop (or loudest bar), outro. */
@@ -79,7 +101,10 @@ export default function VizLab() {
       }
       const canvas = ref.current as HTMLCanvasElement;
       const only = q.get("only");
-      const presets = PRESETS.filter((p) => !only || p.id === only);
+      const layer = q.get("layer") as LayerType | null;
+      const presets: Preset[] = layer
+        ? [{ id: `layer-${layer}`, name: layer, description: "", bestFor: "", show: singleLayerShow(layer) }]
+        : PRESETS.filter((p) => !only || p.id === only);
       const fps: Record<string, number> = {};
       const hashes: Record<string, string[]> = {};
       for (const p of presets) {

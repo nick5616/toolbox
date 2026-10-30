@@ -443,6 +443,9 @@ func startURL() string {
 		if p := os.Getenv("TOOLBOX_VIZLAB_ONLY"); p != "" {
 			q += "&only=" + url.QueryEscape(p)
 		}
+		if l := os.Getenv("TOOLBOX_VIZLAB_LAYER"); l != "" {
+			q += "&layer=" + url.QueryEscape(l)
+		}
 		return q
 	}
 	if v := os.Getenv("TOOLBOX_VIEW"); v != "" {
