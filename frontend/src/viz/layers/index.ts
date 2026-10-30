@@ -9,6 +9,14 @@ import "./bars";
 // --- L2 shapes + highway ---
 // --- end L2 ---
 // --- L3 particles, accents, motifs ---
+import "./embers";
+import "./bursts";
+import "./fireflies";
+import "./ripples";
+import "./shockwave";
+import "./sweep";
+import "./lightrays";
+import "./frame";
 // --- end L3 ---
 
 export { layerDef, layerDefs, registerLayer } from "./registry";
