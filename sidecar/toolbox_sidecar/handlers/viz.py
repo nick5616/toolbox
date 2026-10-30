@@ -15,7 +15,9 @@ from ..registry import Context, HandlerError, handler
 @handler("viz.analyze")
 def analyze(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
     """Features, beats, harmony, sections and pitch → <outDir>/<name>.json + .bin."""
-    raise HandlerError("internal", "not built yet")
+    from ..viz import pipeline
+
+    return pipeline.run(ctx, params)
 
 
 # --- AN3: mood reader -------------------------------------------------------
