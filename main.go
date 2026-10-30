@@ -446,12 +446,22 @@ func startURL() string {
 		if l := os.Getenv("TOOLBOX_VIZLAB_LAYER"); l != "" {
 			q += "&layer=" + url.QueryEscape(l)
 		}
+		if extra, err := url.ParseQuery(os.Getenv("TOOLBOX_VIZLAB_ARGS")); err == nil && len(extra) > 0 {
+			q += "&" + extra.Encode() // more lab modes, e.g. "text=karaoke"
+		}
 		return q
 	}
+	q := url.Values{}
 	if v := os.Getenv("TOOLBOX_VIEW"); v != "" {
-		return "/?view=" + url.QueryEscape(v)
+		q.Set("view", v)
 	}
-	return "/"
+	if os.Getenv("TOOLBOX_VIZ_FORCE_JPEG") == "1" { // test the renderer's JPEG path (Mac checklist)
+		q.Set("vizjpeg", "1")
+	}
+	if len(q) == 0 {
+		return "/"
+	}
+	return "/?" + q.Encode()
 }
 
 // setupLogging writes slog output to the support log file (rotated at 5 MB)
