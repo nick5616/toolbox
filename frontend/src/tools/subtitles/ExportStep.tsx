@@ -1,16 +1,23 @@
-import { useEffect, useRef, useState } from "react";
-import { Banner, Button, Section, SegmentedControl, Select, cx } from "@/components";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Banner, Button, ColorSwatchPicker, PathText, Section, SegmentedControl, Select, cx, toast } from "@/components";
 import type { MediaSourceState } from "@/components/media";
-import { MediaService, type SubtitleLanguage, type SubtitleStyleInfo } from "@/lib/api";
+import { VisualsCanvas, VisualsPicker } from "@/components/viz";
+import { parseShow } from "@/components/viz/pickerModel";
+import { FilesService, MediaService, type SubtitleLanguage, type SubtitleStyleInfo, type TimedLine, type VisualsSpec } from "@/lib/api";
+import { toAppError } from "@/lib/errors";
+import type { Analysis } from "@/viz/analysis";
+import type { Show } from "@/viz/types";
 import type { EditorTab } from "./editor";
 import { TabBar } from "./EditStep";
 import { CueOverlay } from "./CueOverlay";
-import { POSITION_CHOICES, SIZE_CHOICES, type Prefs } from "./options";
+import { BACKGROUND_CHOICES, CANVAS_CHOICES, POSITION_CHOICES, QUALITY_CHOICES, SIZE_CHOICES, canvasAspect, type Prefs } from "./options";
 import { RunStatus } from "./RunStatus";
 import type { JobRun } from "./useJobRun";
+import { useCachedAnalysis, useImageThumb } from "./visuals";
 import styles from "./SubtitlesView.module.css";
 
 const SAMPLE = "The quick brown fox\njumps over the lazy dog";
+const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".bmp"];
 
 function useStill(path: string | null, ms: number, enabled: boolean): string | null {
   const [url, setUrl] = useState<string | null>(null);
@@ -30,10 +37,36 @@ function useStill(path: string | null, ms: number, enabled: boolean): string | n
   return url;
 }
 
+interface BackdropArgs {
+  audio: boolean;
+  background: string;
+  color: string;
+  image: string | null;
+  show: Show | null;
+  analysis: Analysis | null;
+  timeMs: number;
+  aspect: number;
+}
+
+/** What the style previews draw under the cue: visuals, a colour or an image (SPEC.md 9.3). */
+function burnBackdrop(a: BackdropArgs): ReactNode {
+  if (a.audio && a.background === "color") return <div className={styles.layer} style={{ background: a.color }} />;
+  if (a.audio && a.background === "image") {
+    return <div className={styles.layer}>{a.image && <img src={a.image} alt="" className={styles.layerImg} />}</div>;
+  }
+  if (!a.show) return null;
+  return (
+    <div className={styles.layer}>
+      <VisualsCanvas show={a.show} analysis={a.analysis} timeMs={a.timeMs} aspect={a.aspect} mode={a.audio ? "opaque" : "overlay"} />
+    </div>
+  );
+}
+
 function StyleCard({
   info,
   selected,
   still,
+  backdrop,
   aspect,
   text,
   prefs,
@@ -42,6 +75,8 @@ function StyleCard({
   info: SubtitleStyleInfo;
   selected: boolean;
   still: string | null;
+  /** Drawn between the still and the text. */
+  backdrop?: ReactNode;
   aspect: number;
   text: string;
   prefs: Prefs;
@@ -63,6 +98,7 @@ function StyleCard({
     <button type="button" role="radio" aria-checked={selected} className={cx(styles.styleCard, selected && styles.styleOn)} onClick={onSelect}>
       <span ref={box} className={styles.still} style={{ aspectRatio: String(aspect) }}>
         {still && <img src={still} alt="" className={styles.stillImg} />}
+        {backdrop}
         <CueOverlay
           rect={{ left: 0, top: 0, width: size.w, height: size.h }}
           text={text}
@@ -100,13 +136,28 @@ export interface ExportStepProps {
   onBurn: () => void;
   onEmbed: () => void;
   onPickMedia: () => void;
+  /** The burn's visuals (SPEC.md 9.3): the background for audio, an optional overlay for video. */
+  visuals: VisualsSpec | null;
+  onVisuals: (v: VisualsSpec) => void;
+  /** Video only: "Add visuals over the video". */
+  addVisuals: boolean;
+  onAddVisuals: (on: boolean) => void;
+  /** The cues as timed lines (words included). */
+  lines: TimedLine[];
+  onOpenDesigner: () => void;
+  onOpenInVisualizer: () => void;
 }
 
 /** Step 4: save files, add a track, or burn into the picture. */
 export function ExportStep(p: ExportStepProps) {
   const info = p.media.source?.info;
   const hasVideo = !!info?.video;
-  const aspect = info?.video && info.video.height > 0 ? info.video.width / info.video.height : 16 / 9;
+  const isAudio = p.media.status === "ready" && !hasVideo;
+  const aspect = isAudio
+    ? canvasAspect(p.prefs.canvas)
+    : info?.video && info.video.height > 0
+      ? info.video.width / info.video.height
+      : 16 / 9;
   const still = useStill(p.mediaPath, p.playheadMs, hasVideo);
   const formats = p.prefs.formats;
   const toggleFormat = (f: string) =>
@@ -115,11 +166,48 @@ export function ExportStep(p: ExportStepProps) {
       const next = has ? o.formats.filter((x) => x !== f) : [...o.formats, f];
       return next.length === 0 ? o : { ...o, formats: next };
     });
-  const needVideo = p.mediaPath === null || (p.media.status === "ready" && !hasVideo);
+  const needVideo = p.mediaPath === null || isAudio; // a track needs a picture to ride with
   const anyBusy = p.save.busy || p.burn.busy || p.embed.busy;
   const fontOptions = Array.from(new Set([p.prefs.font, ...p.fonts])).map((f) => ({ value: f, label: f }));
   const langOptions = [{ value: "", label: "Not set" }, ...p.languages.map((l) => ({ value: l.code, label: l.name }))];
   const text = p.sampleText || SAMPLE;
+
+  const visualized = isAudio ? p.prefs.background === "visualizer" : p.addVisuals;
+  const show = visualized ? parseShow(p.visuals?.showJson) : null;
+  const analysis = useCachedAnalysis(p.mediaPath, p.visuals?.stems ?? false, show !== null);
+  const imageThumb = useImageThumb(p.prefs.backgroundPath, isAudio && p.prefs.background === "image");
+  const backdrop = burnBackdrop({ audio: isAudio, background: p.prefs.background, color: p.prefs.backgroundColor, image: imageThumb, show, analysis, timeMs: p.playheadMs, aspect });
+  const needsImage = isAudio && p.prefs.background === "image" && !p.prefs.backgroundPath;
+  const pickImage = async () => {
+    try {
+      const paths = (await FilesService.PickWith("Choose a background image", IMAGE_EXTS, false)) ?? [];
+      const first = paths[0];
+      if (first) p.setPrefs((o) => ({ ...o, backgroundPath: first }));
+    } catch (e) {
+      toast({ title: toAppError(e).message, tone: "danger" });
+    }
+  };
+
+  const visualsPicker = (mode: "background" | "overlay") =>
+    p.mediaPath && p.visuals ? (
+      <div className={styles.visualsBox}>
+        <VisualsPicker
+          inputPath={p.mediaPath}
+          lines={p.lines}
+          value={p.visuals}
+          onChange={p.onVisuals}
+          mode={mode}
+          aspect={aspect}
+          playheadMs={p.playheadMs}
+          onOpenDesigner={p.onOpenDesigner}
+        />
+        <div>
+          <Button variant="ghost" icon="sparkles" onClick={p.onOpenInVisualizer}>
+            Make it fully reactive in Visualizer
+          </Button>
+        </div>
+      </div>
+    ) : null;
 
   return (
     <div className={styles.sourceBody}>
@@ -188,11 +276,11 @@ export function ExportStep(p: ExportStepProps) {
         </div>
       </Section>
 
-      <Section label="Burn into the video">
+      <Section label={isAudio ? "Make a video" : "Burn into the video"}>
         <div className={styles.form}>
-          {needVideo ? (
+          {p.mediaPath === null ? (
             <>
-              <div className={styles.muted}>Burning draws the text into the picture. It needs the video.</div>
+              <div className={styles.muted}>Burning draws the text into the picture. It needs the video, or an audio file to make a video from.</div>
               <div>
                 <Button variant="secondary" icon="film" onClick={p.onPickMedia}>
                   Pick the video
@@ -201,6 +289,62 @@ export function ExportStep(p: ExportStepProps) {
             </>
           ) : (
             <>
+              {isAudio && (
+                <>
+                  <div className={styles.muted}>Makes a video from the audio, with the subtitles drawn on a background.</div>
+                  <div className={styles.inlineFields}>
+                    <div className={styles.field}>
+                      <span className={styles.fieldLabel}>Canvas</span>
+                      <SegmentedControl aria-label="Canvas" value={p.prefs.canvas} options={CANVAS_CHOICES} onChange={(canvas) => p.setPrefs((o) => ({ ...o, canvas }))} />
+                    </div>
+                    <div className={styles.field}>
+                      <span className={styles.fieldLabel}>Quality</span>
+                      <SegmentedControl
+                        aria-label="Quality"
+                        value={String(p.prefs.canvasHeight)}
+                        options={QUALITY_CHOICES}
+                        onChange={(v) => p.setPrefs((o) => ({ ...o, canvasHeight: Number(v) }))}
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <span className={styles.fieldLabel}>Background</span>
+                      <SegmentedControl
+                        aria-label="Background"
+                        value={p.prefs.background}
+                        options={BACKGROUND_CHOICES}
+                        onChange={(background) => p.setPrefs((o) => ({ ...o, background }))}
+                      />
+                    </div>
+                  </div>
+                  {p.prefs.background === "color" && (
+                    <ColorSwatchPicker aria-label="Background colour" value={p.prefs.backgroundColor} onChange={(backgroundColor) => p.setPrefs((o) => ({ ...o, backgroundColor }))} />
+                  )}
+                  {p.prefs.background === "image" && (
+                    <div className={styles.field}>
+                      <Button variant="secondary" icon="image" onClick={() => void pickImage()}>
+                        {p.prefs.backgroundPath ? "Change the image" : "Choose an image"}
+                      </Button>
+                      {p.prefs.backgroundPath && <PathText path={p.prefs.backgroundPath} />}
+                    </div>
+                  )}
+                  {p.prefs.background === "visualizer" && visualsPicker("background")}
+                </>
+              )}
+              {!isAudio && (
+                <div className={styles.field}>
+                  <span className={styles.fieldLabel}>Visuals</span>
+                  <SegmentedControl
+                    aria-label="Visuals"
+                    value={p.addVisuals ? "add" : "none"}
+                    options={[
+                      { value: "none", label: "None" },
+                      { value: "add", label: "Add visuals over the video" },
+                    ]}
+                    onChange={(v) => p.onAddVisuals(v === "add")}
+                  />
+                </div>
+              )}
+              {!isAudio && p.addVisuals && visualsPicker("overlay")}
               <div role="radiogroup" aria-label="Style" className={styles.styleCards}>
                 {p.styleInfos.map((s) => (
                   <StyleCard
@@ -208,6 +352,7 @@ export function ExportStep(p: ExportStepProps) {
                     info={s}
                     selected={p.prefs.style === s.id}
                     still={still}
+                    backdrop={backdrop}
                     aspect={aspect}
                     text={text}
                     prefs={p.prefs}
@@ -240,13 +385,18 @@ export function ExportStep(p: ExportStepProps) {
                 </label>
               </div>
               <div>
-                <Button icon="film" loading={p.burn.busy} disabled={p.blocker !== null || p.cueCount === 0 || anyBusy || p.media.status === "error"} onClick={p.onBurn}>
-                  Burn into the video
+                <Button
+                  icon="film"
+                  loading={p.burn.busy}
+                  disabled={p.blocker !== null || p.cueCount === 0 || anyBusy || p.media.status === "error" || needsImage || (visualized && !p.visuals)}
+                  onClick={p.onBurn}
+                >
+                  {isAudio ? "Make a video" : "Burn into the video"}
                 </Button>
               </div>
             </>
           )}
-          <RunStatus run={p.burn} runningLabel="Burning subtitles…" doneLabel="Video ready" />
+          <RunStatus run={p.burn} runningLabel={isAudio ? "Making the video…" : "Burning subtitles…"} doneLabel="Video ready" />
         </div>
       </Section>
     </div>

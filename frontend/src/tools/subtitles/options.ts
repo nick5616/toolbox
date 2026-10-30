@@ -14,6 +14,12 @@ export interface Prefs {
   position: string;
   font: string;
   trackLanguage: string;
+  /** Make a video from audio (SPEC.md 9.3). */
+  canvas: string;
+  canvasHeight: number;
+  background: string;
+  backgroundColor: string;
+  backgroundPath: string;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -29,6 +35,11 @@ export const DEFAULT_PREFS: Prefs = {
   position: "bottom",
   font: "Arial",
   trackLanguage: "",
+  canvas: "16:9",
+  canvasHeight: 1080,
+  background: "visualizer",
+  backgroundColor: "#11131a",
+  backgroundPath: "",
 };
 
 const MODELS = ["base", "small", "turbo"];
@@ -56,6 +67,11 @@ export function sanitizePrefs(saved: unknown, d: Prefs): Prefs {
     position: ["bottom", "top"].includes(str(s.position, "")) ? str(s.position, d.position) : d.position,
     font: str(s.font, d.font) || d.font,
     trackLanguage: str(s.trackLanguage, d.trackLanguage),
+    canvas: CANVAS_CHOICES.some((c) => c.value === s.canvas) ? str(s.canvas, d.canvas) : d.canvas,
+    canvasHeight: s.canvasHeight === 720 || s.canvasHeight === 1080 ? s.canvasHeight : d.canvasHeight,
+    background: BACKGROUND_CHOICES.some((c) => c.value === s.background) ? str(s.background, d.background) : d.background,
+    backgroundColor: /^#[0-9a-fA-F]{6}$/.test(str(s.backgroundColor, "")) ? str(s.backgroundColor, d.backgroundColor) : d.backgroundColor,
+    backgroundPath: str(s.backgroundPath, d.backgroundPath),
   };
 }
 
@@ -78,11 +94,11 @@ export function buildOptions(action: SubtitlesAction, prefs: Prefs, extra: Parti
     position: prefs.position,
     font: prefs.font,
     trackLanguage: prefs.trackLanguage,
-    canvas: "16:9",
-    canvasHeight: 1080,
-    background: "visualizer",
-    backgroundColor: "#11131a",
-    backgroundPath: "",
+    canvas: prefs.canvas,
+    canvasHeight: prefs.canvasHeight,
+    background: prefs.background,
+    backgroundColor: prefs.backgroundColor,
+    backgroundPath: prefs.backgroundPath,
     visuals: null,
     ...extra,
   } as SubtitlesOptions;
@@ -109,6 +125,28 @@ export const MODEL_CHOICES = [
   { value: "small", label: "Small (balanced)" },
   { value: "turbo", label: "Turbo (best)" },
 ];
+
+export const CANVAS_CHOICES = [
+  { value: "16:9", label: "16:9" },
+  { value: "9:16", label: "9:16" },
+  { value: "1:1", label: "1:1" },
+];
+
+export const QUALITY_CHOICES = [
+  { value: "720", label: "720p" },
+  { value: "1080", label: "1080p" },
+];
+
+export const BACKGROUND_CHOICES = [
+  { value: "visualizer", label: "Visualizer" },
+  { value: "color", label: "Colour" },
+  { value: "image", label: "Image" },
+];
+
+/** Canvas shape as width / height. */
+export function canvasAspect(canvas: string): number {
+  return canvas === "9:16" ? 9 / 16 : canvas === "1:1" ? 1 : 16 / 9;
+}
 
 export const SIZE_CHOICES = [
   { value: "s", label: "Small" },

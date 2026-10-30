@@ -107,7 +107,9 @@ func installFakes(t *testing.T, info media.Info) *burnFakes {
 	t.Helper()
 	f := &burnFakes{}
 	oldProbe, oldRender, oldMux, oldComp, oldRun := probeFn, renderVisualsFn, muxFn, compositeFn, runFFmpegFn
-	t.Cleanup(func() { probeFn, renderVisualsFn, muxFn, compositeFn, runFFmpegFn = oldProbe, oldRender, oldMux, oldComp, oldRun })
+	t.Cleanup(func() {
+		probeFn, renderVisualsFn, muxFn, compositeFn, runFFmpegFn = oldProbe, oldRender, oldMux, oldComp, oldRun
+	})
 	probeFn = func(context.Context, string, string) (media.Info, error) { return info, nil }
 	renderVisualsFn = func(_ context.Context, job *core.JobContext, _ *viz.Analyzer, _ *viz.RenderBroker, input string,
 		spec viz.VisualsSpec, lines []lyrics.Line, w, h, fps int, mode viz.RenderMode, rng viz.Range, p0, p1 float64) (viz.RenderOutput, error) {
