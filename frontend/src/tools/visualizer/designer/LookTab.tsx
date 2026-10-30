@@ -3,11 +3,9 @@ import { useEffect, useState } from "react";
 import { ColorSwatchPicker, Section, SegmentedControl, Select, Slider, Switch, TextField, cx } from "@/components";
 import { VisualizerService } from "@/lib/api";
 import { PALETTES } from "@/viz/palette";
-import { SIGNALS } from "@/viz/signals";
-import type { PaletteMode, Show, SignalId, TextStyle } from "@/viz/types";
+import type { PaletteMode, SignalId, TextStyle } from "@/viz/types";
 import { MIX_GROUPS } from "@/viz/types";
 import {
-  defaultTextStyle,
   getGlow,
   getGrain,
   getIntensity,
@@ -208,5 +206,3 @@ export function LookTab({ show, onChange, engineText }: LookTabProps) {
     </div>
   );
 }
-
-export { defaultTextStyle, SIGNALS };

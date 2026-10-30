@@ -38,6 +38,8 @@ export interface VisualizerState {
   selection: { startMs: number; endMs: number } | null;
   /** The render seed of this session: the same design renders the same frames (UI-V2). */
   renderSeed: number;
+  /** The designer playhead, for "Render 10 s preview" (UI-V2). */
+  playheadMs: number;
   /** Look details handed over with timed text; applied once by the Design step (UI-V2). */
   seedLook: SeedLook | null;
 
@@ -50,6 +52,7 @@ export interface VisualizerState {
   setShow(show: Show | null): void;
   setSelection(selection: { startMs: number; endMs: number } | null): void;
   setRenderSeed(seed: number): void;
+  setPlayheadMs(ms: number): void;
   setSeedLook(look: SeedLook | null): void;
   reset(): void;
 }
@@ -79,6 +82,7 @@ const initial = {
   show: null,
   selection: null,
   renderSeed: 1,
+  playheadMs: 0,
   seedLook: null,
 };
 
@@ -93,6 +97,7 @@ export const useVisualizer = create<VisualizerState>((set) => ({
   setShow: (show) => set({ show }),
   setSelection: (selection) => set({ selection }),
   setRenderSeed: (renderSeed) => set({ renderSeed }),
+  setPlayheadMs: (playheadMs) => set({ playheadMs }),
   setSeedLook: (seedLook) => set({ seedLook }),
   reset: () => set(initial),
 }));

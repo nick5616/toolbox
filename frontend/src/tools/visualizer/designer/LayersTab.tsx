@@ -1,9 +1,9 @@
 /** Layers (SPEC.md §8.3, Advanced): scenes, the layer stack, params with reactions, and post effects. */
 import { useEffect, useMemo, useState } from "react";
-import { Button, Icon, IconButton, SegmentedControl, Select, Slider, cx } from "@/components";
+import { Button, Icon, IconButton, SegmentedControl, Select, cx } from "@/components";
 import { layerDef, layerDefs, type LayerDef } from "@/viz/layers/registry";
 import { postDef, postDefs } from "@/viz/post/registry";
-import type { Blend, LayerConfig, PostConfig, PostType, Show } from "@/viz/types";
+import type { Blend, LayerConfig, Param, PostConfig, PostType, Show } from "@/viz/types";
 import { MAX_LAYERS_PER_SCENE } from "@/viz/types";
 import { ParamEditor } from "./controls";
 import {
@@ -218,7 +218,7 @@ export function LayersTab({ show, onChange }: TabProps) {
             <span className={styles.paramLabel}>Blend</span>
             <Select size="sm" aria-label="Blend" value={sel.blend} onChange={(b) => onChange(setLayerBlend(show, scene.id, sel.id, b))} options={BLENDS} />
           </label>
-          <ParamEditor spec={{ kind: "number", label: "Opacity", min: 0, max: 1, default: 1 }} value={sel.opacity} onChange={(v) => onChange(setLayerOpacity(show, scene.id, sel.id, v as number))} />
+          <ParamEditor spec={{ kind: "number", label: "Opacity", min: 0, max: 1, default: 1 }} value={sel.opacity} onChange={(v) => onChange(setLayerOpacity(show, scene.id, sel.id, v as Param))} />
           {Object.entries(selDef.params).map(([k, spec]) => (
             <ParamEditor key={k} spec={spec} value={sel.params[k]} onChange={(v) => onChange(setLayerParam(show, scene.id, sel.id, k, v))} />
           ))}

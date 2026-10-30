@@ -90,6 +90,10 @@ export function VisualDesigner({ inputPath, analysis, show, onChange, aspect, mo
     [player],
   );
 
+  useEffect(() => {
+    useVisualizer.getState().setPlayheadMs(liveMs);
+  }, [liveMs]);
+
   useShortcut("f", () => toggleFs.current?.());
 
   const problem = useMemo(() => {
