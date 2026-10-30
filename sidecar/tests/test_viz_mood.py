@@ -88,22 +88,25 @@ def test_model_fingerprint_changes_with_content(tmp_path):
 
 def test_cache_file_naming(tmp_path):
     d = str(tmp_path)
-    assert mood.cache_file(d, "k") == os.path.join(d, "anchors-k.npy")
-    assert mood.cache_file(os.path.join(d, "whatever.npy"), "k") == os.path.join(d, "anchors-k.npy")
+    assert mood.cache_file(d) == os.path.join(d, "anchors.npy")
+    f = os.path.join(d, "anchors.npy")
+    assert mood.cache_file(f) == f
 
 
 def test_anchor_embeddings_cached(tmp_path):
     a = mood.Anchors.load()
-    path = str(tmp_path / "sub" / "anchors-x.npy")
+    path = str(tmp_path / "sub" / "anchors.npy")
     enc = FakeEncoder()
-    first = mood.anchor_embeddings(a, enc, path)
+    first = mood.anchor_embeddings(a, enc, path, "k1")
     assert os.path.isfile(path) and len(enc.calls) == 1
-    second = mood.anchor_embeddings(a, enc, path)
+    second = mood.anchor_embeddings(a, enc, path, "k1")
     assert len(enc.calls) == 1  # served from the cache
     assert np.allclose(first, second)
-    Path(path).write_bytes(b"garbage")  # a corrupt cache is recomputed
-    mood.anchor_embeddings(a, enc, path)
+    mood.anchor_embeddings(a, enc, path, "k2")  # a different key recomputes
     assert len(enc.calls) == 2
+    Path(path).write_bytes(b"garbage")  # a corrupt cache is recomputed
+    mood.anchor_embeddings(a, enc, path, "k2")
+    assert len(enc.calls) == 3
 
 
 # -- reading --------------------------------------------------------------------
@@ -202,11 +205,11 @@ def test_run_frees_encoder_and_writes_cache(tmp_path):
         made.append(e)
         return e
 
-    cache = str(tmp_path / "cache")
+    cache = str(tmp_path / "cache" / "anchors.npy")
     out = mood.run(["x y z", "♪"], str(model), "tok.json", cache, encoder_factory=factory)
     assert len(out) == 2 and made[0].closed
-    files = glob.glob(os.path.join(cache, "anchors-*.npy"))
-    assert len(files) == 1 and re.fullmatch(r"anchors-[0-9a-f]{40}\.npy", os.path.basename(files[0]))
+    assert os.path.isfile(cache)
+    assert re.fullmatch(r"[0-9a-f]{40}", Path(cache + ".key").read_text())
     mood.run(["x y z"], str(model), "tok.json", cache, encoder_factory=factory)
     assert len(made[1].calls) == 1  # anchors came from the cache: only the line is encoded
 

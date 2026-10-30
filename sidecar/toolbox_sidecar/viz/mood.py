@@ -158,29 +158,38 @@ def cache_key(anchors_raw: bytes, fingerprint: str) -> str:
     return h.hexdigest()
 
 
-def cache_file(cache_path: str, key: str) -> str:
-    """<dir>/anchors-<key>.npy. cache_path may be a directory or a .npy file in one."""
-    base = os.path.dirname(cache_path) if cache_path.lower().endswith(".npy") else cache_path
-    return os.path.join(base, f"anchors-{key}.npy")
+def cache_file(cache_path: str) -> str:
+    """The .npy file holding the anchor embeddings; a directory gets anchors.npy inside it."""
+    if cache_path.lower().endswith(".npy"):
+        return cache_path
+    return os.path.join(cache_path, "anchors.npy")
 
 
-def anchor_embeddings(anchors: Anchors, encoder: Encoder, path: str | None) -> np.ndarray:
-    """Embeddings of every anchor phrase, from the cache file when it is valid."""
+def anchor_embeddings(anchors: Anchors, encoder: Encoder, path: str | None, key: str = "") -> np.ndarray:
+    """Embeddings of every anchor phrase.
+
+    Cached in `path` (.npy) with `key` in `<path>.key`; a missing, unreadable or
+    mismatching cache is recomputed and rewritten.
+    """
     n = len(anchors.phrases)
     if path and os.path.isfile(path):
         try:
+            with open(path + ".key", encoding="ascii") as f:
+                same = f.read().strip() == key
             arr = np.load(path)
-            if arr.ndim == 2 and arr.shape[0] == n:
+            if same and arr.ndim == 2 and arr.shape[0] == n:
                 return arr.astype(np.float32)
         except (OSError, ValueError):
             pass
     emb = np.asarray(encoder(anchors.phrases), dtype=np.float32)
     if path:
         try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
             tmp = path + ".tmp.npy"
             np.save(tmp, emb)
             os.replace(tmp, path)
+            with open(path + ".key", "w", encoding="ascii") as f:
+                f.write(key)
         except OSError:
             pass
     return emb
@@ -278,10 +287,9 @@ def run(
     anchors = Anchors.load()
     enc = encoder_factory(model_path, tokenizer_path)
     try:
-        path = None
-        if cache_path:
-            path = cache_file(cache_path, cache_key(anchors.raw, model_fingerprint(model_path)))
-        emb = anchor_embeddings(anchors, enc, path)
+        path = cache_file(cache_path) if cache_path else None
+        key = cache_key(anchors.raw, model_fingerprint(model_path)) if path else ""
+        emb = anchor_embeddings(anchors, enc, path, key)
         return read_lines(lines, enc, anchors, emb, progress)
     finally:
         close = getattr(enc, "close", None)
