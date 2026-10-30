@@ -89,10 +89,11 @@ vec4 shade(vec2 p, vec2 h, vec4 color, vec4 extra) {
   } else if (kind < 4.5) {
     vec2 u = p / h;
     float x = u.x;
-    float w = 0.9 * pow(max(sin(3.14159265 * (x * 0.5 + 0.5)), 0.0), 0.65);
-    float d = (abs(u.y) - w) * h.y;
+    float tt = pow(clamp(x * 0.5 + 0.5, 0.0, 1.0), 0.8);
+    float w = 0.95 * pow(max(sin(3.14159265 * tt), 0.0), 0.6);
+    float d = max((abs(u.y) - w) * h.y, (abs(x) - 1.0) * h.x);
     float edge = smoothstep(0.35, 1.0, abs(u.y) / max(w, 0.02));
-    c *= mix(1.1, 0.72, smoothstep(-1.0, 0.7, x)) * (1.0 + 0.45 * edge);
+    c *= mix(0.95, 0.62, smoothstep(-1.0, 0.7, x)) * (1.0 + 0.22 * edge);
     c += vec3(1.0) * extra.w * 0.35 * smoothstep(0.1, 0.0, abs(u.y + 0.25 * w) ) * smoothstep(-0.4, 0.5, x);
     a = aaFill(d);
   } else if (kind < 5.5) {

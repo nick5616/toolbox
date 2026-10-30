@@ -17,6 +17,7 @@ import "./shockwave";
 import "./sweep";
 import "./lightrays";
 import "./frame";
+import "./motif";
 // --- end L3 ---
 
 export { layerDef, layerDefs, registerLayer } from "./registry";
