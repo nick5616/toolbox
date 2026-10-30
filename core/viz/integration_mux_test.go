@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func near(got, want, tol int) bool { return got >= want-tol && got <= want+tol }
+func pixelNear(got, want, tol int) bool { return got >= want-tol && got <= want+tol }
 
 const testASS = "[Script Info]\nScriptType: v4.00+\nPlayResX: 128\nPlayResY: 72\n\n[V4+ Styles]\n" +
 	"Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n" +
@@ -99,7 +99,7 @@ func TestMuxAndCompositeIntegration(t *testing.T) {
 		}
 		// 50% red over grey 100: R about 178, G and B about 50.
 		px := pixel(t, ffmpeg, dst, 128, 72)
-		if !near(px[0], 178, 3) || !near(px[1], 50, 3) || !near(px[2], 50, 3) {
+		if !pixelNear(px[0], 178, 3) || !pixelNear(px[1], 50, 3) || !pixelNear(px[2], 50, 3) {
 			t.Errorf("blended pixel %v, want about [178 50 50]", px)
 		}
 	}

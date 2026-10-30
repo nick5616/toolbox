@@ -139,7 +139,7 @@ func MuxOpaque(ctx context.Context, ffmpeg string, out RenderOutput, audio strin
 		return core.Errorf(core.CodeInternal, "Missing frame rate for the video")
 	}
 	args := muxOpaqueArgs(out, audio, startMs, endMs, fps, ass, dst)
-	return runFFmpeg(ctx, ffmpeg, args, workDir(out, ass), float64(out.Frames)/float64(fps), "Finishing the video", onProgress)
+	return runFFmpegTracked(ctx, ffmpeg, args, workDir(out, ass), float64(out.Frames)/float64(fps), "Finishing the video", onProgress)
 }
 
 // CompositeOverlay recombines a double-height colour/alpha stream, scales it
@@ -151,7 +151,7 @@ func CompositeOverlay(ctx context.Context, ffmpeg string, out RenderOutput, base
 	}
 	copyAudio := audio == "" && baseAudioCopyable(ctx, ffmpeg, base)
 	args := compositeArgs(out, base, loopBase, audio, fps, w, h, ass, dst, copyAudio)
-	return runFFmpeg(ctx, ffmpeg, args, workDir(out, ass), float64(out.Frames)/float64(fps), "Compositing", onProgress)
+	return runFFmpegTracked(ctx, ffmpeg, args, workDir(out, ass), float64(out.Frames)/float64(fps), "Compositing", onProgress)
 }
 
 // workDir is the TempDir (where the stream and the ASS file live) when text
@@ -163,7 +163,7 @@ func workDir(out RenderOutput, ass string) string {
 	return filepath.Dir(out.Path)
 }
 
-func runFFmpeg(ctx context.Context, ffmpeg string, args []string, dir string, duration float64, label string, onProgress func(float64)) error {
+func runFFmpegTracked(ctx context.Context, ffmpeg string, args []string, dir string, duration float64, label string, onProgress func(float64)) error {
 	tracker := &media.ProgressTracker{Duration: duration, Label: label}
 	var (
 		mu         sync.Mutex
