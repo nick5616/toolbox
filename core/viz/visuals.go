@@ -18,11 +18,15 @@ var renderVia = func(ctx context.Context, b *RenderBroker, job *core.JobContext,
 // analysisShare is the part of a RenderVisuals range given to the analysis.
 const analysisShare = 0.45
 
+// Range is a part of the input to render (ms); EndMs 0 means to the end.
+type Range struct {
+	StartMs, EndMs int64
+}
+
 // RenderVisuals analyses input (cached), then renders spec's design without
-// text at w×h/fps (SPEC.md §4.3). Progress is mapped into [p0, p1]. The whole
-// input is rendered (StartMs 0, EndMs the song's length).
+// text at w×h/fps over rng (SPEC.md §4.3). Progress is mapped into [p0, p1].
 func RenderVisuals(ctx context.Context, job *core.JobContext, a *Analyzer, b *RenderBroker,
-	input string, spec VisualsSpec, lines []lyrics.Line, w, h, fps int, mode RenderMode, p0, p1 float64) (RenderOutput, error) {
+	input string, spec VisualsSpec, lines []lyrics.Line, w, h, fps int, mode RenderMode, rng Range, p0, p1 float64) (RenderOutput, error) {
 	show, err := showWithoutText(spec.ShowJSON)
 	if err != nil {
 		return RenderOutput{}, err
@@ -39,10 +43,16 @@ func RenderVisuals(ctx context.Context, job *core.JobContext, a *Analyzer, b *Re
 	if err := ctx.Err(); err != nil {
 		return RenderOutput{}, err
 	}
+	if rng.EndMs <= 0 || rng.EndMs > ref.Summary.DurationMs {
+		rng.EndMs = ref.Summary.DurationMs
+	}
+	if rng.StartMs < 0 || rng.StartMs >= rng.EndMs {
+		return RenderOutput{}, core.ValidationError("The range is empty", map[string]string{"range": "The range is empty"})
+	}
 	sum := sha1.Sum([]byte(ref.Key))
 	plan := RenderPlan{
 		Analysis: ref, ShowJSON: show, Width: w, Height: h, FPS: fps,
-		EndMs: ref.Summary.DurationMs, Mode: mode,
+		StartMs: rng.StartMs, EndMs: rng.EndMs, Mode: mode,
 		Seed: int64(binary.BigEndian.Uint64(sum[:8]) >> 12),
 	}
 	return renderVia(ctx, b, job.Scoped(mid, p1), plan)

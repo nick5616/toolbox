@@ -257,8 +257,9 @@ type VisualsSpec struct {
 // RenderVisuals analyses the input (cached), then renders the design without text
 // (show.text forced to null) at w×h/fps. Mode "opaque" (a background) or "overlay"
 // (over a video). Progress is mapped into [p0, p1].
+type Range struct{ StartMs, EndMs int64 } // EndMs 0 = to the end
 func RenderVisuals(ctx context.Context, job *core.JobContext, a *Analyzer, b *RenderBroker,
-    input string, spec VisualsSpec, lines []lyrics.Line, w, h, fps int, mode RenderMode, p0, p1 float64) (RenderOutput, error)
+    input string, spec VisualsSpec, lines []lyrics.Line, w, h, fps int, mode RenderMode, rng Range, p0, p1 float64) (RenderOutput, error)
 ```
 
 **FFmpeg helpers:**

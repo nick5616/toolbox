@@ -33,7 +33,7 @@ func TestRenderVisuals(t *testing.T) {
 	lines := []lyrics.Line{{StartMs: 1000, EndMs: 3000, Text: "hello world"}}
 	spec := VisualsSpec{ShowJSON: `{"version":1,"layers":[{"id":"a"}],"text":{"font":"x"},"seed":3}`, UseWords: true}
 
-	out, err := RenderVisuals(context.Background(), job, a, nil, song, spec, lines, 1280, 720, 30, ModeOpaque, 0.2, 0.8)
+	out, err := RenderVisuals(context.Background(), job, a, nil, song, spec, lines, 1280, 720, 30, ModeOpaque, Range{}, 0.2, 0.8)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,8 +72,11 @@ func TestRenderVisuals(t *testing.T) {
 
 	// The analysis is reused on the next call.
 	eng.reset()
-	if _, err := RenderVisuals(context.Background(), newJob(t, &jobRec{}), a, nil, song, spec, lines, 640, 360, 24, ModeOverlay, 0, 1); err != nil {
+	if _, err := RenderVisuals(context.Background(), newJob(t, &jobRec{}), a, nil, song, spec, lines, 640, 360, 24, ModeOverlay, Range{StartMs: 1000, EndMs: 3000}, 0, 1); err != nil {
 		t.Fatal(err)
+	}
+	if plans[1].StartMs != 1000 || plans[1].EndMs != 3000 {
+		t.Errorf("range = %d..%d, want 1000..3000", plans[1].StartMs, plans[1].EndMs)
 	}
 	if len(eng.calls) != 0 || plans[1].Mode != ModeOverlay || plans[1].Analysis.Key != p.Analysis.Key || plans[1].Seed != p.Seed {
 		t.Errorf("calls=%v plan=%+v", eng.calls, plans[1])
@@ -82,7 +85,7 @@ func TestRenderVisuals(t *testing.T) {
 	// Without UseWords or with stems the options differ.
 	spec2 := VisualsSpec{ShowJSON: `{"version":1}`, Stems: true}
 	fakeFFmpeg(t)
-	if _, err := RenderVisuals(context.Background(), newJob(t, &jobRec{}), a, nil, song, spec2, lines, 640, 360, 24, ModeOpaque, 0, 1); err != nil {
+	if _, err := RenderVisuals(context.Background(), newJob(t, &jobRec{}), a, nil, song, spec2, lines, 640, 360, 24, ModeOpaque, Range{}, 0, 1); err != nil {
 		t.Fatal(err)
 	}
 	last := plans[len(plans)-1]
@@ -96,7 +99,7 @@ func TestRenderVisualsBadShow(t *testing.T) {
 	var plans []RenderPlan
 	fakeRender(t, &plans, 1)
 	for _, show := range []string{"", "not json", "[1]", "null"} {
-		_, err := RenderVisuals(context.Background(), newJob(t, &jobRec{}), a, nil, song, VisualsSpec{ShowJSON: show}, nil, 640, 360, 30, ModeOpaque, 0, 1)
+		_, err := RenderVisuals(context.Background(), newJob(t, &jobRec{}), a, nil, song, VisualsSpec{ShowJSON: show}, nil, 640, 360, 30, ModeOpaque, Range{}, 0, 1)
 		var ae *core.AppError
 		if !errors.As(err, &ae) || ae.Code != core.CodeValidation {
 			t.Errorf("show %q: err = %v", show, err)
