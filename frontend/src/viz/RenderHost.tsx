@@ -14,7 +14,7 @@ interface Active {
   sender: Sender;
 }
 
-export function startRender(token: string, planUrl: string, invoke: (msg: string) => void, active: Map<string, Active>): void {
+export function startRender(token: string, planUrl: string, invoke: (msg: string) => void, active: Map<string, Active>, forceJpeg = false): void {
   const worker = new Worker(new URL("./worker/render.worker.ts", import.meta.url), { type: "module" });
   const sender = new Sender(token, invoke);
   const entry: Active = { token, worker, sender };
@@ -24,6 +24,7 @@ export function startRender(token: string, planUrl: string, invoke: (msg: string
     active.delete(token);
   };
   worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
+    if (!active.has(token)) return; // the render already ended
     const m = e.data;
     switch (m.type) {
       case "start":
@@ -50,10 +51,11 @@ export function startRender(token: string, planUrl: string, invoke: (msg: string
     }
   };
   worker.onerror = (e) => {
+    if (!active.has(token)) return;
     sender.error("The visual renderer failed", e.message);
     finish();
   };
-  const msg: HostMessage = { type: "render", token, planUrl };
+  const msg: HostMessage = { type: "render", token, planUrl, forceJpeg };
   worker.postMessage(msg);
 }
 
@@ -62,7 +64,7 @@ export default function RenderHost() {
     const active = new Map<string, Active>();
     const invoke = (msg: string) => System.invoke(msg);
     const offs = [
-      on("viz:render", (d) => startRender(d.token, d.planUrl, invoke, active)),
+      on("viz:render", (d) => startRender(d.token, d.planUrl, invoke, active, new URLSearchParams(location.search).get("vizjpeg") === "1")),
       on("viz:render-cancel", (d) => active.get(d.token)?.worker.postMessage({ type: "cancel" } satisfies HostMessage)),
       on("viz:render-ack", (d) => active.get(d.token)?.worker.postMessage({ type: "ack", bytes: d.bytes } satisfies HostMessage)),
     ];
