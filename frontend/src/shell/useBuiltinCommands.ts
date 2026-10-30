@@ -17,6 +17,9 @@ import { lyricvideoCommands } from "@/tools/lyricvideo/commands";
 import { redactCommands } from "@/tools/redact/commands";
 import { eraserCommands } from "@/tools/eraser/commands";
 import { devutilsCommands } from "@/tools/devutils/commands";
+// --- Visualizer (Phase 7) ---
+import { visualizerCommands } from "@/tools/visualizer/commands";
+// --- end Visualizer ---
 
 function guard(fn: () => Promise<unknown>): () => Promise<void> {
   return async () => {
@@ -266,6 +269,9 @@ export function useBuiltinCommands(): void {
     ...redactCommands(),
     ...eraserCommands(),
     ...devutilsCommands(),
+    // --- Visualizer (Phase 7) ---
+    ...visualizerCommands(),
+    // --- end Visualizer ---
   ];
   useCommands(cmds);
 }
