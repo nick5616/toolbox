@@ -1,4 +1,5 @@
 /** Spectrum Classic (SPEC.md §6.10 #5): the reference preset. */
+import { director, text } from "./kit";
 import type { Preset } from "./types";
 
 export const spectrumClassic: Preset = {
@@ -44,8 +45,9 @@ export const spectrumClassic: Preset = {
     mix: { drums: 1, bass: 1, vocals: 1, other: 1, words: 1, mood: 1 },
     reactivity: 1,
     speed: 1,
-    text: null,
+    text: text("pop", { size: 6, position: "lower", glow: 0.4 }),
     motifs: false,
+    director: director(),
     post: [
       { id: "bloom", type: "bloom", enabled: true, params: { intensity: { base: 0.55, mods: [{ signal: "drop.pulse", amount: 0.2, shape: "linear" }] }, threshold: 0.9 } },
       { id: "vignette", type: "vignette", enabled: true, params: { amount: 0.35 } },
