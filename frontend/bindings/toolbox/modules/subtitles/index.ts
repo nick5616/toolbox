@@ -13,6 +13,7 @@ export {
 
 export type {
     Cue,
+    CueWord,
     Language,
     Options,
     Result,

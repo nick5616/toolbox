@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -45,8 +46,17 @@ func (b *RenderBroker) SetAppOrigins(origins ...string) {
 	}
 }
 
+// originOf reduces a source (WebView2 reports the full page URL) to scheme://host.
+func originOf(s string) string {
+	u, err := url.Parse(s)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return strings.TrimRight(s, "/")
+	}
+	return u.Scheme + "://" + u.Host
+}
+
 func (b *RenderBroker) originOK(origin, topOrigin string) bool {
-	origin, topOrigin = strings.TrimRight(origin, "/"), strings.TrimRight(topOrigin, "/")
+	origin, topOrigin = originOf(origin), originOf(topOrigin)
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return origin == topOrigin && b.origins[origin]

@@ -425,6 +425,16 @@ func instanceID(p core.Paths) string {
 // startURL honours $TOOLBOX_VIEW (dev aid: open on a given view, e.g.
 // "settings" or a module ID) via the frontend's ?view= parameter.
 func startURL() string {
+	if os.Getenv("TOOLBOX_VIZLAB") == "1" && os.Getenv("TOOLBOX_VIEW") == "vizlab" { // dev-only lab (SPEC.md §11.4)
+		q := "/?window=vizlab"
+		if k := os.Getenv("TOOLBOX_VIZLAB_KEY"); k != "" {
+			q += "&key=" + url.QueryEscape(k)
+		}
+		if p := os.Getenv("TOOLBOX_VIZLAB_ONLY"); p != "" {
+			q += "&only=" + url.QueryEscape(p)
+		}
+		return q
+	}
 	if v := os.Getenv("TOOLBOX_VIEW"); v != "" {
 		return "/?view=" + url.QueryEscape(v)
 	}

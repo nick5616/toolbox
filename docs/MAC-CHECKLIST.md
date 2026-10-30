@@ -80,8 +80,25 @@ Everything from Phases 3–6 that can only be checked on the Mac (Apple Silicon)
 30. **Redact** a group photo and a 1-minute 1080p video (faces and plates on), and **Object Eraser** a small object on a large photo with **Best**, twice.
     Expect: all finish. Note the video's "Finding faces and plates" time (Windows: 78 s, target ≤ 90 s) and both erase times (Windows: the first includes a 20–45 s model load; the second ≈ 4 s for 12 MP, target < 10 s).
 
+## 7. Visualizer (Phase 7)
+
+31. **Visualizer**: analyze a song with Separate instruments on, then play the Design preview.
+    Expect: the visuals move with the music and stay in sync with the audio.
+32. Render the whole song at 1080p.
+    Expect: the render log says `h264-hw`; note the "×N real time" (target ≥ 2×).
+33. Start another render and hide the window to the tray until it finishes.
+    Expect: it finishes; the video plays in QuickTime.
+34. Render a 4-minute song at 1080p and note the time from "Rendering visuals" to done.
+    Expect: no "renderer stopped responding" error (this measures the raw-message transport on macOS).
+35. Add pasted lyrics (one line in Japanese) and use the **Lyric Stage** preset.
+    Expect: the words render in the chosen font; the Japanese line falls back to a system font, not boxes.
+36. **Over the video**: an iPhone 9:16 HEVC clip with **Clean Captions**.
+    Expect: the output keeps the rotation, size and sound.
+37. Quit, then start Toolbox from Terminal with `TOOLBOX_VIZ_FORCE_JPEG=1` and render 10 s.
+    Expect: the render log says `jpeg` and the clip plays.
+
 ## Logs to send back
 
 - `~/Library/Application Support/Toolbox/logs/toolbox.log` (and `toolbox.log.1` if present).
-- The numbers from steps 7, 12, 21, 22 and 30, and what step 24 showed.
+- The numbers from steps 7, 12, 21, 22, 30, 32 and 34, and what step 24 showed.
 - For any failed step: its number, what you saw, and a screenshot if it's visual.

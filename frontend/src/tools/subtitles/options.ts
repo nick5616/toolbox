@@ -78,8 +78,14 @@ export function buildOptions(action: SubtitlesAction, prefs: Prefs, extra: Parti
     position: prefs.position,
     font: prefs.font,
     trackLanguage: prefs.trackLanguage,
+    canvas: "16:9",
+    canvasHeight: 1080,
+    background: "visualizer",
+    backgroundColor: "#11131a",
+    backgroundPath: "",
+    visuals: null,
     ...extra,
-  };
+  } as SubtitlesOptions;
 }
 
 export function parseResult(json: string): SubtitlesResult | null {

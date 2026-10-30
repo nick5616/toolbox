@@ -109,6 +109,21 @@ export const SettingsChanged = "settings:changed";
 export const VaultState = "vault:state";
 
 /**
+ * Name of the custom event "viz:render".
+ */
+export const VizRender = "viz:render";
+
+/**
+ * Name of the custom event "viz:render-ack".
+ */
+export const VizRenderAck = "viz:render-ack";
+
+/**
+ * Name of the custom event "viz:render-cancel".
+ */
+export const VizRenderCancel = "viz:render-cancel";
+
+/**
  * Name of the custom event "window:show".
  */
 export const WindowShow = "window:show";

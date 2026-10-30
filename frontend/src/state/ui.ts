@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { FilesDropped } from "@/lib/api";
+import type { FilesDropped, TimedLine } from "@/lib/api";
 
 /** View ids: "library", "settings", "setup" (the setup overlay), or a module id. */
 export type ViewId = string;
@@ -7,6 +7,17 @@ export type ViewId = string;
 export interface Handoff {
   moduleId: string;
   inputs: string[];
+  /** Extra data for the target tool (SPEC.md §9.4): timed text for the Visualizer. */
+  seed?: ToolSeed;
+}
+
+/** Timed text handed to the Visualizer from Lyric Video or Subtitles (SPEC.md §9.5). */
+export interface ToolSeed {
+  kind: "timed-text";
+  from: "lyric-video" | "subtitles";
+  lines: TimedLine[];
+  look?: { font: string; textColor: string; highlightColor: string; karaoke: boolean; position: "center" | "lower" };
+  overlay?: boolean;
 }
 
 interface UIState {

@@ -34,6 +34,7 @@ export * as AudioCleanupService from "@bindings/modules/audiocleanup/service";
 export * as LyricVideoService from "@bindings/modules/lyricvideo/service";
 export * as RedactService from "@bindings/modules/redact/service";
 export * as EraserService from "@bindings/modules/eraser/service";
+export * as VisualizerService from "@bindings/modules/visualizer/service";
 export * as DevUtilsService from "@bindings/modules/devutils/service";
 
 export {
@@ -203,10 +204,10 @@ export { Action as LyricAction, Source as LyricSource } from "@bindings/modules/
 export type {
   Look as LyricLook,
   LyricLine,
-  LyricWord,
   Options as LyricVideoOptions,
   Result as LyricVideoResult,
 } from "@bindings/modules/lyricvideo/models";
+export type { Line as TimedLine, Word as LyricWord } from "@bindings/core/lyrics/models";
 export {
   Action as RedactAction,
   Sensitivity as RedactSensitivity,
@@ -234,3 +235,20 @@ export type {
   Options as DevUtilsOptions,
   Result as DevUtilsResult,
 } from "@bindings/modules/devutils/models";
+export { Action as VisualizerAction, Mode as VisualizerMode } from "@bindings/modules/visualizer/models";
+export type {
+  ChatStatus as VisualizerChatStatus,
+  Options as VisualizerOptions,
+  Result as VisualizerResult,
+} from "@bindings/modules/visualizer/models";
+export { WordsSource } from "@bindings/core/viz/models";
+export type {
+  AnalysisRef,
+  AnalysisSummary,
+  AnalyzeOptions,
+  RenderAck,
+  RenderCancel,
+  RenderStart,
+  VisualsSpec,
+} from "@bindings/core/viz/models";
+export type { CueWord } from "@bindings/modules/subtitles/models";

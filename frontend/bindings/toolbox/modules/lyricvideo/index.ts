@@ -14,7 +14,6 @@ export {
 export type {
     Look,
     LyricLine,
-    LyricWord,
     Options,
     Result
 } from "./models.js";

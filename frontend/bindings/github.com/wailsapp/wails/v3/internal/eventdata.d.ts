@@ -8,6 +8,9 @@ import type { Events } from "@wailsio/runtime";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import type * as core$0 from "../../../../../toolbox/core/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import type * as viz$0 from "../../../../../toolbox/core/viz/models.js";
 
 declare module "@wailsio/runtime" {
     namespace Events {
@@ -32,6 +35,9 @@ declare module "@wailsio/runtime" {
             "packs:changed": core$0.PacksChanged;
             "settings:changed": core$0.Settings;
             "vault:state": core$0.VaultState;
+            "viz:render": viz$0.RenderStart;
+            "viz:render-ack": viz$0.RenderAck;
+            "viz:render-cancel": viz$0.RenderCancel;
             "window:show": core$0.ShowView;
         }
     }

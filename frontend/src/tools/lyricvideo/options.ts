@@ -6,6 +6,7 @@ import {
   type LyricLook,
   type LyricVideoOptions,
   type LyricVideoResult,
+  type VisualsSpec,
 } from "@/lib/api";
 
 /** The look that is remembered (never the title/artist: those belong to a song). */
@@ -34,6 +35,7 @@ export const DEFAULT_LOOK: RememberedLook = {
   showNext: true,
   visualizer: "none",
   titleCard: true,
+  visuals: { showJson: "", stems: true, useWords: true },
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -60,6 +62,11 @@ function str(v: unknown, fallback: string): string {
 function bool(v: unknown, fallback: boolean): boolean {
   return typeof v === "boolean" ? v : fallback;
 }
+function sanitizeVisuals(v: unknown, d: VisualsSpec): VisualsSpec {
+  if (typeof v !== "object" || v === null) return d;
+  const o = v as Record<string, unknown>;
+  return { showJson: str(o.showJson, d.showJson), stems: bool(o.stems, d.stems), useWords: bool(o.useWords, d.useWords) };
+}
 
 export function sanitizePrefs(saved: unknown, d: Prefs): Prefs {
   if (typeof saved !== "object" || saved === null) return d;
@@ -80,6 +87,7 @@ export function sanitizePrefs(saved: unknown, d: Prefs): Prefs {
       showNext: bool(l.showNext, dl.showNext),
       visualizer: pick(l.visualizer, ["none", "wave", "bars"], dl.visualizer),
       titleCard: bool(l.titleCard, dl.titleCard),
+      visuals: sanitizeVisuals(l.visuals, dl.visuals),
     },
     aspect: pick(s.aspect, ASPECTS, d.aspect),
     height: s.height === 720 || s.height === 1080 ? s.height : d.height,

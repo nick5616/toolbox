@@ -198,6 +198,18 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Model files** for Redact, Object Eraser and voice denoise follow the bgremove pattern: Go pins `{file, url, sha256}`, `FetchModel` calls the engine's `<area>.prefetch`, run handlers get explicit paths and never download.
 - **Caches with pruning at start:** `cache/media` (5 GB), `cache/cleanup-preview` (1 day), `cache/lyric-video` (7 days), `cache/redact` (7 days); `tmp/eraser` masks are deleted after each job and at start.
 
+## Visualizer (Phase 7)
+
+- **Rendered video reaches Go over raw messages, never a socket.** The export worker (`frontend/src/viz/worker/`) renders with the same `Engine` as the preview, encodes H.264 with WebCodecs, and the main thread sends `vz1|<token>|<kind>|…` strings with `System.invoke`. `core/viz.RenderBroker` (wired to `application.Options.RawMessageHandler`) accepts a message only with an active render's token from the app's own origin. WebView2 reports the full page URL as the origin, so it is reduced to scheme://host. Don't send video through `fetch` POSTs (WebView2 caps request bodies at ~4 MB/s).
+- **Engine determinism** (`frontend/src/viz/`): a frame is a function of (show, analysis, size, seed, time). Layers never use `Math.random`, `Date` or `performance.now`. Use `ctx.rng(key)`, cumulative signals (`analysis.cum`) for accumulated motion, and events in a lookback ≤ 8 s for spawned things. A layer reading the previous frame sets `stateful: true`, and the engine warms it up for 1 s after a seek.
+- **Mod amounts are fractions of a parameter's range** (max − min), so the same amount means the same thing on every parameter.
+- **How to add a layer:** a file in `viz/layers/` that calls `registerLayer({type, label, group, icon, params, create})`, plus its type in `LAYER_TYPES` (`viz/types.ts`) and an import in `viz/layers/index.ts`. Draw premultiplied colour multiplied by `f.opacity`. Use `QuadBatch` (`viz/gl/quads.ts`) for SDF shapes and `GLSL_COMMON`/`GLSL_PALETTE` (`viz/gl/glsl.ts`) in shaders. Check it in VizLab.
+- **How to add a preset:** a file in `viz/presets/` exporting a `Preset`, listed in `viz/presets/index.ts`. It must pass `validateShow` and have ≥ 3 `controls`.
+- **VizLab:** `TOOLBOX_VIZLAB=1 TOOLBOX_VIEW=vizlab bin/toolbox.exe` (with the sandbox env vars) renders every preset at five moments into `<support>/tmp/vizlab/*.png`, plus `fps.json` and `hash.json`. `TOOLBOX_VIZLAB_ONLY=<preset>` limits it; `TOOLBOX_VIZLAB_KEY=<analysis key>` uses a real analysis instead of the synthetic fixture.
+- **Shared lyrics logic** lives in `core/lyrics` (Lyric Video's `LyricLine`/`LyricWord` are aliases of it).
+- **Caches:** `cache/visualizer/<file key>/` holds analyses (`s<0|1>.json` + `.bin`, `t-….json`, `instrumental.flac`), pruned at start after 30 days or above 3 GB. Previews (`cache/visualizer/preview-*.mp4`) are pruned after a day.
+- **The mood reader** (`<models>/mood/`) is a pinned, sha-verified download (Music and Speech packs): the arm64 file on Apple Silicon, the avx2 file elsewhere.
+
 ## Conventions
 
 - **Go**: idiomatic, context-aware, wrapped errors, stdlib `testing` only (no testify), table tests, `t.TempDir()` for files. No goroutine leaks: everything stops on ctx cancel.
