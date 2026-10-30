@@ -118,6 +118,12 @@ func Components() []ComponentSpec {
 			Sizes: same(Size{Download: 66_759_214, Disk: 66_759_214}),
 		},
 		{
+			// Model + tokenizer, sizes from the pinned files (SPEC.md §0.3).
+			ID: "mood-reader", Name: "Mood reader", Href: "https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", License: "Apache-2.0",
+			Kind: core.ComponentModel, Module: "visualizer", Preset: "mood",
+			Sizes: map[string]Size{Windows: {Download: 127_535_388, Disk: 127_535_388}, MacARM: {Download: 127_493_916, Disk: 127_493_916}},
+		},
+		{
 			ID: "whisper-default", Name: "Whisper small", Href: "https://huggingface.co/Systran/faster-whisper-small", License: "MIT",
 			Kind: core.ComponentModel, Module: "transcribe", Preset: "small",
 			Sizes: map[string]Size{Windows: {Download: 486_217_556, Disk: 486_217_556}, MacARM: {Download: 486_217_556, Disk: 486_217_556}},
@@ -196,13 +202,14 @@ func Catalog() []PackSpec {
 		},
 		{
 			ID: "music", Name: "Music", Icon: "audio-lines",
-			Description: "Split songs into stems, find tempo and key, turn melodies into MIDI, make lyric videos",
-			Components:  []string{"engine", "ffmpeg", "stems-default", "stems-vocals", "whisper-default"},
+			Description: "Split songs into stems, find tempo and key, turn melodies into MIDI, make lyric videos and reactive visuals",
+			Components:  []string{"engine", "ffmpeg", "stems-default", "stems-vocals", "whisper-default", "mood-reader"},
 			Unlocks: []Unlock{
 				{Module: "stems", Needs: []string{"engine", "ffmpeg", "stems-default"}},
 				{Module: "bpm-key", Needs: []string{"engine"}},
 				{Module: "audio-to-midi", Needs: []string{"engine"}},
 				{Module: "lyric-video", Needs: []string{"engine", "ffmpeg", "whisper-default", "stems-vocals"}},
+				{Module: "visualizer", Needs: []string{"engine", "ffmpeg"}},
 			},
 		},
 		{
@@ -220,7 +227,7 @@ func Catalog() []PackSpec {
 		{
 			ID: "speech", Name: "Speech", Icon: "captions",
 			Description: "Transcribe and subtitle recordings, clean up voices, fully offline",
-			Components:  []string{"engine", "ffmpeg", "whisper-default", "voice-denoise"},
+			Components:  []string{"engine", "ffmpeg", "whisper-default", "voice-denoise", "mood-reader"},
 			Unlocks: []Unlock{
 				{Module: "transcribe", Needs: []string{"engine", "whisper-default"}},
 				{Module: "subtitles", Needs: []string{"engine", "ffmpeg", "whisper-default"}},

@@ -55,7 +55,7 @@ func realJob(t *testing.T, r *recorder, ffmpeg, ffprobe, input string, o Options
 	})
 }
 
-var testCues = []Cue{{0, 1200, "Hello there"}, {1500, 2800, "Second line\nof text"}}
+var testCues = []Cue{{StartMs: 0, EndMs: 1200, Text: "Hello there"}, {StartMs: 1500, EndMs: 2800, Text: "Second line\nof text"}}
 
 func TestEmbedBurnExtract(t *testing.T) {
 	ffmpeg, ffprobe := findTools(t)

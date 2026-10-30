@@ -36,15 +36,15 @@ func TestParseCues(t *testing.T) {
 		want []Cue
 	}{
 		{"srt crlf", "1\r\n00:00:01,000 --> 00:00:02,500\r\nHi\r\nthere\r\n\r\n2\r\n00:00:03,000 --> 00:00:04,000\r\nBye\r\n",
-			[]Cue{{1000, 2500, "Hi\nthere"}, {3000, 4000, "Bye"}}},
-		{"bom", bomStr + "1\n00:00:01,000 --> 00:00:02,000\nX\n", []Cue{{1000, 2000, "X"}}},
+			[]Cue{{StartMs: 1000, EndMs: 2500, Text: "Hi\nthere"}, {StartMs: 3000, EndMs: 4000, Text: "Bye"}}},
+		{"bom", bomStr + "1\n00:00:01,000 --> 00:00:02,000\nX\n", []Cue{{StartMs: 1000, EndMs: 2000, Text: "X"}}},
 		{"vtt tags and settings", "WEBVTT\n\nNOTE hi\n\nintro\n00:01.000 --> 00:02.000 align:start position:10%\n<v Bob><i>Hello</i> &amp; <c.yellow>you</c>\n",
-			[]Cue{{1000, 2000, "Hello & you"}}},
-		{"hours over 99 minutes", "1\n100:00:01,000 --> 100:00:02,000\nLong\n", []Cue{{360_001_000, 360_002_000, "Long"}}},
-		{"hours over 99 minutes vtt", "WEBVTT\n\n120:30:00.500 --> 120:30:01.000\nLong\n", []Cue{{433_800_500, 433_801_000, "Long"}}},
+			[]Cue{{StartMs: 1000, EndMs: 2000, Text: "Hello & you"}}},
+		{"hours over 99 minutes", "1\n100:00:01,000 --> 100:00:02,000\nLong\n", []Cue{{StartMs: 360_001_000, EndMs: 360_002_000, Text: "Long"}}},
+		{"hours over 99 minutes vtt", "WEBVTT\n\n120:30:00.500 --> 120:30:01.000\nLong\n", []Cue{{StartMs: 433_800_500, EndMs: 433_801_000, Text: "Long"}}},
 		{"bad and unordered", "1\n00:00:05,000 --> 00:00:06,000\nB\n\n2\n00:00:09,000 --> 00:00:08,000\nbad\n\n3\n00:00:01,000 --> 00:00:02,000\nA\n",
-			[]Cue{{1000, 2000, "A"}, {5000, 6000, "B"}}},
-		{"short fraction", "1\n00:00:01,5 --> 00:00:02,25\nX\n", []Cue{{1500, 2250, "X"}}},
+			[]Cue{{StartMs: 1000, EndMs: 2000, Text: "A"}, {StartMs: 5000, EndMs: 6000, Text: "B"}}},
+		{"short fraction", "1\n00:00:01,5 --> 00:00:02,25\nX\n", []Cue{{StartMs: 1500, EndMs: 2250, Text: "X"}}},
 		{"empty", "", []Cue{}},
 	}
 	for _, tt := range tests {
@@ -89,7 +89,7 @@ func TestLoad(t *testing.T) {
 }
 
 func TestRoundTrip(t *testing.T) {
-	cues := []Cue{{0, 1200, "one\ntwo"}, {1300, 2000, "three"}}
+	cues := []Cue{{StartMs: 0, EndMs: 1200, Text: "one\ntwo"}, {StartMs: 1300, EndMs: 2000, Text: "three"}}
 	for name, f := range map[string]func([]Cue) string{"srt": formatSRT, "vtt": formatVTT} {
 		if got := parseCues(f(cues)); !reflect.DeepEqual(got, cues) {
 			t.Errorf("%s: got %+v", name, got)

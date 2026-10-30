@@ -95,7 +95,10 @@ func (m *Module) runBurn(ctx context.Context, job *core.JobContext, o Options) e
 		return err
 	}
 	if info.Video == nil {
-		return core.ValidationError("Burning in needs a video file", nil)
+		return core.ValidationError("Burning in needs a video file", nil) // SB4: audio → a video (SPEC.md §9.3)
+	}
+	if o.Visuals != nil { // SB4: visuals over the video
+		return core.Errorf(core.CodeInternal, "not built yet")
 	}
 	f, err := os.Create(filepath.Join(job.TempDir, "subs.ass"))
 	if err != nil {

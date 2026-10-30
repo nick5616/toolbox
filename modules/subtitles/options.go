@@ -1,5 +1,7 @@
 package subtitles
 
+import "toolbox/core/viz"
+
 // Action is what one Subtitles job does (SPEC.md §5.1).
 type Action string
 
@@ -22,11 +24,20 @@ const (
 	StyleMinimal Style = "minimal"
 )
 
-// Cue is one subtitle. Text may contain "\n" (at most 2 lines).
-type Cue struct {
+// CueWord is one timed word of a cue (from generation).
+type CueWord struct {
 	StartMs int64  `json:"startMs"`
 	EndMs   int64  `json:"endMs"`
 	Text    string `json:"text"`
+}
+
+// Cue is one subtitle. Text may contain "\n" (at most 2 lines). Words are
+// set by generate and kept through edits; .srt/.vtt files have none.
+type Cue struct {
+	StartMs int64     `json:"startMs"`
+	EndMs   int64     `json:"endMs"`
+	Text    string    `json:"text"`
+	Words   []CueWord `json:"words,omitempty"`
 }
 
 // Options are Subtitles' per-submission options. Each action reads only
@@ -51,6 +62,15 @@ type Options struct {
 	Position       string   `json:"position"`       // burn: "bottom" | "top"
 	Font           string   `json:"font"`           // burn: from media.Fonts()
 	TrackLanguage  string   `json:"trackLanguage"`  // embed: ISO 639-1 code or ""
+	// burn from an audio file (SPEC.md §9.3)
+	Canvas          string `json:"canvas"`          // "16:9" | "9:16" | "1:1"
+	CanvasHeight    int    `json:"canvasHeight"`    // 720 | 1080 (short side)
+	Background      string `json:"background"`      // "visualizer" | "color" | "image"
+	BackgroundColor string `json:"backgroundColor"` // #rrggbb
+	BackgroundPath  string `json:"backgroundPath"`  // image
+	// Visuals: audio input, the background design; video input, optional
+	// visuals over the video (nil = none).
+	Visuals *viz.VisualsSpec `json:"visuals"`
 }
 
 // DefaultOptions: generate with Whisper small, auto language, 42 × 2 lines,
@@ -60,6 +80,7 @@ func DefaultOptions() Options {
 		Action: ActionGenerate, Model: "small", MaxLineChars: 42, MaxLines: 2,
 		Cues: []Cue{}, Formats: []string{"srt"},
 		Style: StyleClassic, Size: "m", Position: "bottom", Font: "Arial",
+		Canvas: "16:9", CanvasHeight: 1080, Background: "visualizer", BackgroundColor: "#11131a",
 	}
 }
 

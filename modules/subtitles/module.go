@@ -13,6 +13,7 @@ import (
 	"toolbox/core"
 	"toolbox/core/media"
 	"toolbox/core/sidecar"
+	"toolbox/core/viz"
 )
 
 // ModuleID is the Subtitles module ID.
@@ -24,6 +25,8 @@ type Module struct {
 	tg        core.TextGenerator                 // translate
 	resolve   func(depID string) (string, error) // ffmpeg/ffprobe for Validate
 	modelsDir string                             // Whisper models in <modelsDir>/whisper/
+	an        *viz.Analyzer                      // visual backgrounds (SPEC.md 9.3)
+	br        *viz.RenderBroker
 }
 
 // Register adds the module to the registry.
@@ -31,6 +34,9 @@ func Register(reg *core.Registry, sc sidecar.Caller, tg core.TextGenerator, reso
 	m := &Module{sc: sc, tg: tg, resolve: resolve, modelsDir: modelsDir}
 	return m, reg.Register(m)
 }
+
+// SetVisuals gives the module the Visualizer analyzer and render broker.
+func (m *Module) SetVisuals(an *viz.Analyzer, br *viz.RenderBroker) { m.an, m.br = an, br }
 
 // Accepts lists the input extensions.
 func Accepts() []string {

@@ -1,7 +1,7 @@
 [project]
 name = "toolbox-sidecar"
-version = "0.6.0"
-description = "Toolbox AI engine: stems, BPM & key, audio-to-MIDI, transcription, background removal, CPU upscaling, OCR, redaction, object removal and voice denoising over stdio JSON lines"
+version = "0.7.0"
+description = "Toolbox AI engine: stems, BPM & key, audio-to-MIDI, transcription, background removal, CPU upscaling, OCR, redaction, object removal, voice denoising and music visualisation analysis over stdio JSON lines"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "audio-separator[cpu]==0.47.1",

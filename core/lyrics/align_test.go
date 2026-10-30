@@ -1,4 +1,4 @@
-package lyricvideo
+package lyrics
 
 import (
 	"fmt"
@@ -30,25 +30,25 @@ func TestSimilarity(t *testing.T) {
 }
 
 func TestSplitAndJoinWords(t *testing.T) {
-	if got := splitWords("Hello  world"); len(got) != 2 {
+	if got := SplitWords("Hello  world"); len(got) != 2 {
 		t.Errorf("latin = %v", got)
 	}
-	got := splitWords("我爱 you 日本語です")
+	got := SplitWords("我爱 you 日本語です")
 	want := []string{"我", "爱", "you", "日", "本", "語", "で", "す"}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		// "です" is kana: each kana on its own is the documented behaviour
 		t.Errorf("cjk = %v, want %v", got, want)
 	}
-	if j := joinWords([]string{"我", "爱", "you", "now"}); j != "我爱you now" {
+	if j := JoinWords([]string{"我", "爱", "you", "now"}); j != "我爱you now" {
 		t.Errorf("join = %q", j)
 	}
 }
 
-func rw(start, end int64, text string) recWord { return recWord{start, end, text} }
+func rw(start, end int64, text string) Word { return Word{start, end, text} }
 
 // words builds recognised words at 500 ms each with a 100 ms gap, starting at t0.
-func words(t0 int64, texts ...string) []recWord {
-	var out []recWord
+func words(t0 int64, texts ...string) []Word {
+	var out []Word
 	t := t0
 	for _, x := range texts {
 		out = append(out, rw(t, t+400, x))
@@ -60,7 +60,7 @@ func words(t0 int64, texts ...string) []recWord {
 func TestAlignExact(t *testing.T) {
 	rec := words(1000, "hello", "darkness", "my", "old", "friend", "ive", "come", "to", "talk", "with", "you", "again")
 	text := "Hello darkness, my old friend\n\nI've come to talk with you again\n"
-	lines, matched := AlignLyrics(text, rec)
+	lines, matched := Align(text, rec)
 	if matched != 1 {
 		t.Fatalf("matched = %v", matched)
 	}
@@ -86,7 +86,7 @@ func TestAlignTolerance(t *testing.T) {
 	// Whisper mishears "darkness" and drops "old"; adds a stray word.
 	rec := words(0, "hello", "darkest", "my", "friend", "uh", "ive", "come", "to", "talk")
 	text := "Hello darkness my old friend\nI've come to talk"
-	lines, matched := AlignLyrics(text, rec)
+	lines, matched := Align(text, rec)
 	if len(lines) != 2 {
 		t.Fatalf("lines = %d", len(lines))
 	}
@@ -108,7 +108,7 @@ func TestAlignTolerance(t *testing.T) {
 
 func TestAlignLeadingTrailingAndNothing(t *testing.T) {
 	rec := words(5000, "middle", "words")
-	lines, matched := AlignLyrics("intro one two\nmiddle words\nout one", rec)
+	lines, matched := Align("intro one two\nmiddle words\nout one", rec)
 	if len(lines) != 3 {
 		t.Fatalf("lines = %d", len(lines))
 	}
@@ -126,36 +126,36 @@ func TestAlignLeadingTrailingAndNothing(t *testing.T) {
 	assertMonotonic(t, lines)
 
 	// Nothing recognised: spread at 300 ms per word from 0.
-	lines, matched = AlignLyrics("a b c", nil)
+	lines, matched = Align("a b c", nil)
 	if matched != 0 || len(lines) != 1 || lines[0].StartMs != 0 || lines[0].Words[2].EndMs != 900 {
 		t.Errorf("no words: %v %+v", matched, lines)
 	}
 	// Nothing matches: the words are spread over the recognised span.
-	lines, matched = AlignLyrics("zzz yyy", words(1000, "qqq", "www"))
+	lines, matched = Align("zzz yyy", words(1000, "qqq", "www"))
 	if matched != 0 || lines[0].StartMs != 1000 || lines[0].Words[1].EndMs != 1900 {
 		t.Errorf("no match: %v %+v", matched, lines[0])
 	}
 	// Empty text.
-	if lines, m := AlignLyrics("  \n\n", rec); len(lines) != 0 || m != 0 {
+	if lines, m := Align("  \n\n", rec); len(lines) != 0 || m != 0 {
 		t.Errorf("empty text: %v %v", lines, m)
 	}
 }
 
 func TestAlignRepeatedChorusStaysInOrder(t *testing.T) {
 	chorus := []string{"la", "la", "land"}
-	var rec []recWord
+	var rec []Word
 	rec = append(rec, words(0, chorus...)...)
 	rec = append(rec, words(10000, "verse", "two")...)
 	rec = append(rec, words(20000, chorus...)...)
 	text := "la la land\nverse two\nla la land"
-	lines, matched := AlignLyrics(text, rec)
+	lines, matched := Align(text, rec)
 	if matched != 1 || lines[0].StartMs != 0 || lines[1].StartMs != 10000 || lines[2].StartMs != 20000 {
 		t.Fatalf("matched %v, lines %+v", matched, lines)
 	}
 }
 
 func TestAlignPunctuationOnlyChunk(t *testing.T) {
-	lines, matched := AlignLyrics("hello - world", words(0, "hello", "world"))
+	lines, matched := Align("hello - world", words(0, "hello", "world"))
 	if matched != 1 || len(lines[0].Words) != 3 || lines[0].Words[1].Text != "-" {
 		t.Fatalf("matched %v, %+v", matched, lines[0])
 	}
@@ -164,19 +164,19 @@ func TestAlignPunctuationOnlyChunk(t *testing.T) {
 
 func TestAlignHugeInputFallsBack(t *testing.T) {
 	var sb strings.Builder
-	var rec []recWord
+	var rec []Word
 	for i := 0; i < 4500; i++ {
 		fmt.Fprintf(&sb, "word%d ", i)
 		rec = append(rec, rw(int64(i)*100, int64(i)*100+80, fmt.Sprintf("word%d", i)))
 	}
-	lines, matched := AlignLyrics(sb.String(), rec) // 4500x4500 > the DP cap
+	lines, matched := Align(sb.String(), rec) // 4500x4500 > the DP cap
 	if matched != 0 || len(lines) != 1 || len(lines[0].Words) != 4500 {
 		t.Fatalf("matched %v, %d lines", matched, len(lines))
 	}
 	assertMonotonic(t, lines)
 }
 
-func assertMonotonic(t *testing.T, lines []LyricLine) {
+func assertMonotonic(t *testing.T, lines []Line) {
 	t.Helper()
 	prev := int64(0)
 	for i, l := range lines {
@@ -200,10 +200,10 @@ func assertMonotonic(t *testing.T, lines []LyricLine) {
 
 func TestDetectLines(t *testing.T) {
 	t.Run("breaks at segments, pauses and length", func(t *testing.T) {
-		segs := []recSegment{
-			{Words: []recWord{rw(0, 400, " one"), rw(500, 900, "two"), rw(1000, 1400, "three")}},
+		segs := []Segment{
+			{Words: []Word{rw(0, 400, " one"), rw(500, 900, "two"), rw(1000, 1400, "three")}},
 			// pause of 700 ms inside a segment
-			{Words: []recWord{rw(5000, 5400, "four"), rw(6100, 6500, "five")}},
+			{Words: []Word{rw(5000, 5400, "four"), rw(6100, 6500, "five")}},
 		}
 		lines := DetectLines(segs)
 		var texts []string
@@ -223,34 +223,34 @@ func TestDetectLines(t *testing.T) {
 		assertMonotonic(t, lines)
 	})
 	t.Run("more than 8 words splits", func(t *testing.T) {
-		var ws []recWord
+		var ws []Word
 		for i := 0; i < 10; i++ {
 			ws = append(ws, rw(int64(i)*300, int64(i)*300+250, "a"))
 		}
-		lines := DetectLines([]recSegment{{Words: ws}})
+		lines := DetectLines([]Segment{{Words: ws}})
 		if len(lines) != 2 || len(lines[0].Words) != 8 || len(lines[1].Words) != 2 {
 			t.Fatalf("lines = %+v", lines)
 		}
 	})
 	t.Run("more than 40 characters splits", func(t *testing.T) {
 		long := "extraordinarily"
-		lines := DetectLines([]recSegment{{Words: []recWord{rw(0, 200, long), rw(250, 450, long), rw(500, 700, long), rw(750, 950, long)}}})
+		lines := DetectLines([]Segment{{Words: []Word{rw(0, 200, long), rw(250, 450, long), rw(500, 700, long), rw(750, 950, long)}}})
 		if len(lines) != 2 || lines[0].Text != long+" "+long {
 			t.Fatalf("lines = %+v", lines)
 		}
 	})
 	t.Run("CJK splits at 16 characters, no word limit", func(t *testing.T) {
-		var ws []recWord
+		var ws []Word
 		for i := 0; i < 20; i++ {
 			ws = append(ws, rw(int64(i)*200, int64(i)*200+150, "字"))
 		}
-		lines := DetectLines([]recSegment{{Words: ws}})
+		lines := DetectLines([]Segment{{Words: ws}})
 		if len(lines) != 2 || len(lines[0].Words) != 16 || strings.Contains(lines[0].Text, " ") {
 			t.Fatalf("lines = %d, first has %d words, %q", len(lines), len(lines[0].Words), lines[0].Text)
 		}
 	})
 	t.Run("a segment without words becomes a spread line", func(t *testing.T) {
-		lines := DetectLines([]recSegment{{StartMs: 1000, EndMs: 3000, Text: "hello there"}})
+		lines := DetectLines([]Segment{{StartMs: 1000, EndMs: 3000, Text: "hello there"}})
 		if len(lines) != 1 || len(lines[0].Words) != 2 || lines[0].Words[0].StartMs != 1000 {
 			t.Fatalf("lines = %+v", lines)
 		}
@@ -263,13 +263,13 @@ func TestDetectLines(t *testing.T) {
 }
 
 func TestSpreadWords(t *testing.T) {
-	l := LyricLine{StartMs: 1000, EndMs: 2000, Text: "aa bbbb"}
-	spreadWords(&l)
-	if len(l.Words) != 2 || l.Words[0] != (LyricWord{1000, 1333, "aa"}) || l.Words[1] != (LyricWord{1333, 2000, "bbbb"}) {
+	l := Line{StartMs: 1000, EndMs: 2000, Text: "aa bbbb"}
+	SpreadWords(&l)
+	if len(l.Words) != 2 || l.Words[0] != (Word{1000, 1333, "aa"}) || l.Words[1] != (Word{1333, 2000, "bbbb"}) {
 		t.Fatalf("words = %+v", l.Words)
 	}
-	empty := LyricLine{Text: "  "}
-	spreadWords(&empty)
+	empty := Line{Text: "  "}
+	SpreadWords(&empty)
 	if empty.Words == nil || len(empty.Words) != 0 {
 		t.Errorf("empty = %#v", empty.Words)
 	}

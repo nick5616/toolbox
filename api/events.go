@@ -4,6 +4,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"toolbox/core"
+	"toolbox/core/viz"
 )
 
 // Typed event registration. The binding generator reads these calls and
@@ -32,6 +33,10 @@ func init() {
 	application.RegisterEvent[core.ChatStatus]("chat:status")
 	application.RegisterEvent[core.VaultState]("vault:state")
 	application.RegisterEvent[core.PacksChanged]("packs:changed")
+
+	application.RegisterEvent[viz.RenderStart]("viz:render")
+	application.RegisterEvent[viz.RenderAck]("viz:render-ack")
+	application.RegisterEvent[viz.RenderCancel]("viz:render-cancel")
 }
 
 // Emitter adapts the Wails event manager to core.Emitter.

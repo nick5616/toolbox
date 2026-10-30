@@ -384,7 +384,7 @@ func TestEngineEventsMapToJob(t *testing.T) {
 func TestLRCAction(t *testing.T) {
 	o := DefaultOptions()
 	o.Action = ActionLRC
-	o.Lines = []LyricLine{{StartMs: 1000, EndMs: 2000, Text: "Hi there", Words: []LyricWord{{1000, 1500, "Hi"}, {1500, 2000, "there"}}}}
+	o.Lines = []LyricLine{{StartMs: 1000, EndMs: 2000, Text: "Hi there", Words: []LyricWord{{StartMs: 1000, EndMs: 1500, Text: "Hi"}, {StartMs: 1500, EndMs: 2000, Text: "there"}}}}
 	o.Look.Title = "Title"
 	h := newHarness(t, o)
 	h.noTool[sidecar.DepID] = true

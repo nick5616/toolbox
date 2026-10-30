@@ -12,6 +12,7 @@ import (
 	"toolbox/core"
 	"toolbox/core/media"
 	"toolbox/core/sidecar"
+	"toolbox/core/viz"
 )
 
 const maxLyricsChars = 20_000
@@ -36,7 +37,12 @@ func validateOptions(o Options) error {
 		fields["action"] = "Choose lyrics, render, preview or lrc"
 	}
 	l := o.Look
-	oneOf("look.background", l.Background, "blur-cover", "cover", "color", "gradient", "image", "video")
+	oneOf("look.background", l.Background, "blur-cover", "cover", "color", "gradient", "image", "video", "visualizer")
+	if l.Background == "visualizer" && (o.Action == ActionRender || o.Action == ActionPreview) {
+		if s := strings.TrimSpace(l.Visuals.ShowJSON); s == "" || len(s) > viz.MaxShowBytes || !json.Valid([]byte(s)) {
+			fields["look.visuals"] = "Choose a visual design"
+		}
+	}
 	oneOf("look.position", l.Position, "center", "lower")
 	oneOf("look.visualizer", l.Visualizer, "none", "wave", "bars")
 	oneOf("audio", o.Audio, "original", "instrumental")

@@ -15,7 +15,7 @@ import (
 // Explicit globs (not directories) so __init__.py is included and
 // __pycache__ never is.
 //
-//go:embed pyproject.toml uv.lock .python-version toolbox_sidecar/*.py toolbox_sidecar/handlers/*.py toolbox_sidecar/redact/*.py
+//go:embed pyproject.toml uv.lock .python-version toolbox_sidecar/*.py toolbox_sidecar/handlers/*.py toolbox_sidecar/redact/*.py toolbox_sidecar/viz/*.py toolbox_sidecar/viz/*.json
 var FS embed.FS
 
 var (

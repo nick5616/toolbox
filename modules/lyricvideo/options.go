@@ -1,5 +1,10 @@
 package lyricvideo
 
+import (
+	"toolbox/core/lyrics"
+	"toolbox/core/viz"
+)
+
 // Action is what one Lyric Video job does (SPEC.md §7.1).
 type Action string
 
@@ -19,24 +24,15 @@ const (
 	SourceFile   Source = "file"   // .lrc/.srt/.vtt (.txt = align)
 )
 
-// LyricWord is one timed word.
-type LyricWord struct {
-	StartMs int64  `json:"startMs"`
-	EndMs   int64  `json:"endMs"`
-	Text    string `json:"text"`
-}
-
-// LyricLine is one timed line; Words may be empty.
-type LyricLine struct {
-	StartMs int64       `json:"startMs"`
-	EndMs   int64       `json:"endMs"`
-	Text    string      `json:"text"`
-	Words   []LyricWord `json:"words"`
-}
+// LyricWord and LyricLine are the shared timed-lyrics types (core/lyrics).
+type (
+	LyricWord = lyrics.Word
+	LyricLine = lyrics.Line
+)
 
 // Look is how the video looks.
 type Look struct {
-	Background     string `json:"background"`     // "blur-cover" | "cover" | "color" | "gradient" | "image" | "video"
+	Background     string `json:"background"`     // "blur-cover" | "cover" | "color" | "gradient" | "image" | "video" | "visualizer"
 	BackgroundPath string `json:"backgroundPath"` // image or video file for those backgrounds
 	Color1         string `json:"color1"`         // #rrggbb
 	Color2         string `json:"color2"`
@@ -50,6 +46,9 @@ type Look struct {
 	TitleCard      bool   `json:"titleCard"`
 	Title          string `json:"title"`
 	Artist         string `json:"artist"`
+	// Visuals is the Visualizer design used when Background is "visualizer"
+	// (SPEC.md §9.2).
+	Visuals viz.VisualsSpec `json:"visuals"`
 }
 
 // Options are Lyric Video's per-submission options. The input is the song.

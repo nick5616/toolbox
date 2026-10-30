@@ -146,6 +146,7 @@ func validateOptions(o Options) error {
 		if o.Font != "" && !slices.Contains(media.Fonts(), o.Font) {
 			f["font"] = "Choose a listed font"
 		}
+		mergeFields(f, validateBurnCanvas(o))
 	case ActionEmbed:
 		mergeFields(f, validateCues(o.Cues))
 		if o.TrackLanguage != "" {
@@ -202,7 +203,7 @@ func (m *Module) validate(inputs []string, options json.RawMessage) error {
 func checkStreams(o Options, info media.Info) error {
 	switch o.Action {
 	case ActionBurn, ActionEmbed:
-		if info.Video == nil {
+		if info.Video == nil && (o.Action == ActionEmbed || !burnsAudio(o)) {
 			return core.ValidationError("This needs a video file", map[string]string{"inputs.0": "No video stream found"})
 		}
 	case ActionExtract:

@@ -13,6 +13,7 @@ import (
 	"toolbox/core"
 	"toolbox/core/media"
 	"toolbox/core/sidecar"
+	"toolbox/core/viz"
 )
 
 // ModuleID is Lyric Video's module ID.
@@ -22,8 +23,10 @@ const ModuleID = "lyric-video"
 type Module struct {
 	sc        sidecar.Caller // stems.run, transcribe.run
 	resolve   func(depID string) (string, error)
-	modelsDir string // Whisper models in <modelsDir>/whisper/
-	cacheDir  string // <support>/cache/lyric-video
+	modelsDir string            // Whisper models in <modelsDir>/whisper/
+	cacheDir  string            // <support>/cache/lyric-video
+	an        *viz.Analyzer     // visual backgrounds (SPEC.md §9.2)
+	br        *viz.RenderBroker //
 }
 
 // Register adds the module to the registry.
@@ -57,6 +60,9 @@ func (m *Module) Validate(inputs []string, options json.RawMessage) error {
 
 // Run implements core.Module.
 func (m *Module) Run(ctx context.Context, job *core.JobContext) error { return m.run(ctx, job) }
+
+// SetVisuals gives the module the Visualizer's analyzer and render broker.
+func (m *Module) SetVisuals(an *viz.Analyzer, br *viz.RenderBroker) { m.an, m.br = an, br }
 
 // PruneCache deletes cached stems folders untouched for 7 days and stale
 // previews (called at start).

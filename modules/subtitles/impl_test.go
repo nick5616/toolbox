@@ -98,7 +98,7 @@ func opts(mod func(*Options)) Options {
 }
 
 func TestValidateOptions(t *testing.T) {
-	ok := []Cue{{0, 1000, "a"}, {1000, 2000, "b"}}
+	ok := []Cue{{StartMs: 0, EndMs: 1000, Text: "a"}, {StartMs: 1000, EndMs: 2000, Text: "b"}}
 	tests := []struct {
 		name    string
 		o       Options
@@ -115,11 +115,14 @@ func TestValidateOptions(t *testing.T) {
 		{"save no formats", opts(func(o *Options) { o.Action = ActionSave; o.Cues = ok; o.Formats = nil }), "formats"},
 		{"save dup format", opts(func(o *Options) { o.Action = ActionSave; o.Cues = ok; o.Formats = []string{"srt", "srt"} }), "formats"},
 		{"save no cues", opts(func(o *Options) { o.Action = ActionSave }), "cues"},
-		{"save bad order", opts(func(o *Options) { o.Action = ActionSave; o.Cues = []Cue{{1000, 2000, "a"}, {0, 500, "b"}} }), "cues"},
-		{"save end before start", opts(func(o *Options) { o.Action = ActionSave; o.Cues = []Cue{{1000, 1000, "a"}} }), "cues"},
+		{"save bad order", opts(func(o *Options) {
+			o.Action = ActionSave
+			o.Cues = []Cue{{StartMs: 1000, EndMs: 2000, Text: "a"}, {StartMs: 0, EndMs: 500, Text: "b"}}
+		}), "cues"},
+		{"save end before start", opts(func(o *Options) { o.Action = ActionSave; o.Cues = []Cue{{StartMs: 1000, EndMs: 1000, Text: "a"}} }), "cues"},
 		{"save long text", opts(func(o *Options) {
 			o.Action = ActionSave
-			o.Cues = []Cue{{0, 1000, strings.Repeat("x", 501)}}
+			o.Cues = []Cue{{StartMs: 0, EndMs: 1000, Text: strings.Repeat("x", 501)}}
 		}), "cues"},
 		{"save too many", opts(func(o *Options) { o.Action = ActionSave; o.Cues = make([]Cue, 20001) }), "cues"},
 		{"translate ok", opts(func(o *Options) { o.Action = ActionTranslate; o.Cues = ok; o.TargetLanguage = "es" }), ""},
@@ -161,7 +164,11 @@ func TestValidateInputs(t *testing.T) {
 	srt := writeFile(t, dir, "a.srt", "x")
 	m := &Module{}
 	raw := func(o Options) json.RawMessage { b, _ := json.Marshal(o); return b }
-	save := opts(func(o *Options) { o.Action = ActionSave; o.Cues = []Cue{{0, 1000, "a"}}; o.Formats = []string{"srt"} })
+	save := opts(func(o *Options) {
+		o.Action = ActionSave
+		o.Cues = []Cue{{StartMs: 0, EndMs: 1000, Text: "a"}}
+		o.Formats = []string{"srt"}
+	})
 	if err := m.Validate([]string{srt}, raw(save)); err != nil {
 		t.Errorf("save on srt: %v", err)
 	}
@@ -234,7 +241,7 @@ func TestCanOverwrite(t *testing.T) {
 }
 
 func TestRunSave(t *testing.T) {
-	cues := []Cue{{0, 1000, "one"}, {1500, 2500, "two"}}
+	cues := []Cue{{StartMs: 0, EndMs: 1000, Text: "one"}, {StartMs: 1500, EndMs: 2500, Text: "two"}}
 	t.Run("new files get unique names", func(t *testing.T) {
 		r := &recorder{}
 		in := writeFile(t, t.TempDir(), "talk.mp4", "x")
@@ -379,7 +386,7 @@ func TestRunGenerateErrors(t *testing.T) {
 }
 
 func TestRunTranslate(t *testing.T) {
-	cues := []Cue{{0, 1000, "hello"}, {1500, 2500, "bye"}}
+	cues := []Cue{{StartMs: 0, EndMs: 1000, Text: "hello"}, {StartMs: 1500, EndMs: 2500, Text: "bye"}}
 	in := writeFile(t, t.TempDir(), "talk.srt", "x")
 	o := opts(func(o *Options) {
 		o.Action = ActionTranslate

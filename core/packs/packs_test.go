@@ -140,7 +140,7 @@ func newFixture(t *testing.T, goos, goarch string) *fixture {
 			t.Fatal(err)
 		}
 	}
-	for _, id := range []string{"stems", "transcribe", "bg-remover", "llm-chat", "audio-cleanup", "redact", "object-eraser"} {
+	for _, id := range []string{"stems", "transcribe", "bg-remover", "llm-chat", "audio-cleanup", "redact", "object-eraser", "visualizer"} {
 		if err := reg.Register(&fakeModels{w: w, id: id}); err != nil {
 			t.Fatal(err)
 		}
@@ -343,6 +343,7 @@ func TestStatusModelsUnlocksAndSharedEngine(t *testing.T) {
 	}
 	f.w.models["transcribe/small"] = true
 	f.w.models["audio-cleanup/voice"] = true
+	f.w.models["visualizer/mood"] = true
 	f.w.set(deps.FFmpeg, core.DepOK, core.SourceManaged)
 	f.s.cfg.Deps.Detect(context.Background())
 	if st := f.pack("speech").State; st != core.PackInstalled {
@@ -394,7 +395,7 @@ func TestInstallSkipsPresentAndSharesComponents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{sidecar.DepID, "stems/four-fast", "stems/vocals-fast", "transcribe/small"}; !slices.Equal(f.w.log, want) {
+	if want := []string{sidecar.DepID, "stems/four-fast", "stems/vocals-fast", "transcribe/small", "visualizer/mood"}; !slices.Equal(f.w.log, want) {
 		t.Fatalf("install order %v, want %v (ffmpeg skipped)", f.w.log, want)
 	}
 	if p.title != "Install Music pack" {
@@ -545,7 +546,7 @@ func TestRemovePreviewKeepsSharedAndSkipsSystem(t *testing.T) {
 	for _, id := range []string{sidecar.DepID, deps.FFmpeg, deps.Upscayl, deps.ExifTool} {
 		f.w.set(id, core.DepOK, core.SourceManaged)
 	}
-	for _, m := range []string{"stems/four-fast", "stems/vocals-fast", "transcribe/small", "bg-remover/balanced", "redact/faces", "redact/plates", "object-eraser/best"} {
+	for _, m := range []string{"stems/four-fast", "stems/vocals-fast", "transcribe/small", "bg-remover/balanced", "redact/faces", "redact/plates", "object-eraser/best", "visualizer/mood"} {
 		f.w.models[m] = true
 	}
 	f.s.cfg.Deps.Detect(context.Background())

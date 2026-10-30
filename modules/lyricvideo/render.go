@@ -211,6 +211,9 @@ func extractCover(ctx context.Context, ffmpeg, song, dir string) (string, error)
 // runRender is the "render" and "preview" actions.
 func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options) error {
 	o = normalize(o)
+	if o.Look.Background == "visualizer" { // LV3 (SPEC.md §9.2)
+		return core.Errorf(core.CodeInternal, "not built yet")
+	}
 	song := job.Inputs[0]
 	preview := o.Action == ActionPreview
 	job.SetTitle(filepath.Base(song))

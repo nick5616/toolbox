@@ -15,7 +15,7 @@ func assOptions() Options {
 	o.Look.TitleCard = false
 	o.Lines = []LyricLine{
 		{StartMs: 1000, EndMs: 4000, Text: "Hello big world", Words: []LyricWord{
-			{1000, 1600, "Hello"}, {1800, 2500, "big"}, {2500, 4000, "world"},
+			{StartMs: 1000, EndMs: 1600, Text: "Hello"}, {StartMs: 1800, EndMs: 2500, Text: "big"}, {StartMs: 2500, EndMs: 4000, Text: "world"},
 		}},
 		{StartMs: 5000, EndMs: 7000, Text: "Second {line}", Words: []LyricWord{}},
 	}
@@ -66,13 +66,13 @@ func TestBuildASSKaraokeGolden(t *testing.T) {
 }
 
 func TestKaraokeTextSumsToTheLine(t *testing.T) {
-	words := []LyricWord{{1000, 1333, "a"}, {1333, 1999, "b"}, {1999, 3001, "c"}}
+	words := []LyricWord{{StartMs: 1000, EndMs: 1333, Text: "a"}, {StartMs: 1333, EndMs: 1999, Text: "b"}, {StartMs: 1999, EndMs: 3001, Text: "c"}}
 	got := karaokeText(words, 1000)
 	if got != `{\kf33}a {\kf67}b {\kf100}c` && got != `{\kf33}a {\kf67}b {\kf101}c` {
 		t.Errorf("got %s", got)
 	}
 	// Words that ended before the visible start (a preview cut) get 0.
-	got = karaokeText([]LyricWord{{0, 500, "x"}, {500, 2000, "y"}}, 1000)
+	got = karaokeText([]LyricWord{{StartMs: 0, EndMs: 500, Text: "x"}, {StartMs: 500, EndMs: 2000, Text: "y"}}, 1000)
 	if got != `{\kf0}x {\kf100}y` {
 		t.Errorf("cut = %s", got)
 	}

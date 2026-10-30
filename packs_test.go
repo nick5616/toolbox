@@ -6,6 +6,7 @@ import (
 
 	"toolbox/core"
 	"toolbox/core/packs"
+	"toolbox/core/viz"
 	"toolbox/modules/audiocleanup"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
@@ -28,6 +29,7 @@ import (
 	"toolbox/modules/trimmer"
 	"toolbox/modules/upscale"
 	"toolbox/modules/vault"
+	"toolbox/modules/visualizer"
 )
 
 // TestEveryToolIsInOnePack registers every user-facing module the way main.go
@@ -58,6 +60,10 @@ func TestEveryToolIsInOnePack(t *testing.T) {
 		func() error { _, err := redact.Register(reg, nil, nil, "", ""); return err },
 		func() error { _, err := eraser.Register(reg, nil, "", ""); return err },
 		func() error { return devutils.Register(reg) },
+		func() error {
+			_, err := visualizer.Register(reg, viz.NewAnalyzer("", "", nil, nil), nil, nil, nil, nil, "", "")
+			return err
+		},
 	} {
 		if err := register(); err != nil {
 			t.Fatal(err)

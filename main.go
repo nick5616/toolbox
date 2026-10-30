@@ -26,6 +26,7 @@ import (
 	"toolbox/core/pdfium"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
+	"toolbox/core/viz"
 	"toolbox/desktop"
 	"toolbox/modules/audiocleanup"
 	"toolbox/modules/bgremove"
@@ -49,6 +50,7 @@ import (
 	"toolbox/modules/trimmer"
 	"toolbox/modules/upscale"
 	"toolbox/modules/vault"
+	"toolbox/modules/visualizer"
 )
 
 //go:embed all:frontend/dist
@@ -181,12 +183,30 @@ func run() error {
 	if _, err := media.RegisterProxy(reg, media.CacheDir(paths)); err != nil {
 		return err
 	}
+	// --- Phase 7 Visualizer (architect) ---
+	vizLabDir := ""
+	if os.Getenv("TOOLBOX_VIZLAB") == "1" {
+		vizLabDir = filepath.Join(paths.TmpDir, "vizlab")
+	}
+	vizAnalyzer := viz.NewAnalyzer(filepath.Join(paths.CacheDir, "visualizer"), paths.ModelsDir, engine, chatSvc)
+	vizBroker := viz.NewRenderBroker(emitter, mediaAPI.URLFor, vizLabDir)
+	vizBroker.SetAppOrigins("http://wails.localhost", "wails://wails")
+	visualizerMod, err := visualizer.Register(reg, vizAnalyzer, vizBroker, engine, chatSvc, depSvc.Resolve,
+		paths.ModelsDir, filepath.Join(paths.CacheDir, "visualizer"))
+	if err != nil {
+		return err
+	}
+	lyricMod.SetVisuals(vizAnalyzer, vizBroker)
+	subtitlesMod.SetVisuals(vizAnalyzer, vizBroker)
+	// --- end Phase 7 ---
 	go func() { // start-up cleanup of Phase 6 caches (SPEC.md §3.9)
 		eraserMod.ClearMasks()
 		cleanupMod.PrunePreviews()
 		lyricMod.PruneCache()
 		redactMod.PruneCache()
 		media.PruneCache(media.CacheDir(paths), media.CacheLimitBytes)
+		vizAnalyzer.Prune()
+		visualizerMod.PrunePreviews()
 	}()
 	// --- end Phase 6 tools ---
 
@@ -287,6 +307,7 @@ func run() error {
 			application.NewServiceWithOptions(redact.NewService(jobs), opts),
 			application.NewServiceWithOptions(eraser.NewService(jobs, eraserMod), opts),
 			application.NewServiceWithOptions(devutils.NewService(jobs), opts),
+			application.NewServiceWithOptions(visualizer.NewService(jobs, visualizerMod), opts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -299,7 +320,14 @@ func run() error {
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true},
-		Linux:   application.LinuxOptions{DisableQuitOnLastWindowClosed: true},
+		// The Visualizer streams rendered video over raw messages: no socket
+		// (SPEC.md §4.4). The broker checks the token and the origin.
+		RawMessageHandler: func(_ application.Window, msg string, origin *application.OriginInfo) {
+			if origin != nil {
+				vizBroker.HandleRawMessage(msg, origin.Origin, origin.TopOrigin)
+			}
+		},
+		Linux: application.LinuxOptions{DisableQuitOnLastWindowClosed: true},
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID: instanceID(paths),
 			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
