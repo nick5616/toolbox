@@ -28,6 +28,15 @@ import "./pitchribbon";
 import "./highway";
 // --- end L2 ---
 // --- L3 particles, accents, motifs ---
+import "./embers";
+import "./bursts";
+import "./fireflies";
+import "./ripples";
+import "./shockwave";
+import "./sweep";
+import "./lightrays";
+import "./frame";
+import "./motif";
 // --- end L3 ---
 
 export { layerDef, layerDefs, registerLayer } from "./registry";
