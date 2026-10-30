@@ -56,7 +56,7 @@ import { seededShow } from "./useSeed";
 import { useVisualizer } from "./store";
 
 const analysis = buildFixture({ durationMs: 30_000 });
-const base = (): Show => showFromPreset(PRESETS[0]!);
+const base = (): Show => showFromPreset(presetById("spectrum-classic")!);
 const latest: { current: ShowHistory | null } = { current: null };
 
 function Harness({ initial = base(), text = "engine" as "engine" | { overlay: (r: unknown, t: number) => ReactNode }, tabs }: { initial?: Show; text?: "engine" | { overlay: (r: unknown, t: number) => ReactNode }; tabs?: Array<"presets" | "look" | "reactions" | "layers" | "timeline"> }) {
@@ -223,7 +223,7 @@ describe("Text in the designer", () => {
     expect(show().reactivity).toBeCloseTo(1.5);
     expect(show().text).toBeNull();
     await openTab("Presets");
-    await userEvent.click(screen.getByRole("button", { name: /^card / }));
+    await userEvent.click(screen.getByRole("button", { name: "card Spectrum Classic" }));
     expect(show().text).toBeNull();
   });
 
