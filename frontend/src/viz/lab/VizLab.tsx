@@ -209,6 +209,7 @@ export default function VizLab() {
         for (let i = 0; i < 10; i++) {
           engine.render(a.durationMs * (0.05 + i * 0.09));
           (hashes[p.id] as string[]).push(fnv(engine.readPixels()));
+          if (q.get("hashpng") === "1") send(`hash-${p.id}-${i}.png`, await pngOf(canvas));
         }
         engine.dispose();
         say(`${p.id}: ${fps[p.id]} fps`);
