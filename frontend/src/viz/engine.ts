@@ -4,7 +4,7 @@
  * OffscreenCanvas), so both produce the same pixels.
  */
 import type { Analysis } from "./analysis";
-import { activeAt, timelineFor } from "./director";
+import { activeAt, motifsAt, timelineFor } from "./director";
 import { createContext, Fullscreen, gpuName, Target, uploadImage, type AnyCanvas } from "./gl/core";
 import { Output, type OutputParams } from "./gl/output";
 import "./layers";
@@ -295,6 +295,23 @@ export class Engine {
       tg.cur.bind();
       this.setBlend(l.blend);
       inst.render(this.frameInput(tMs, this.resolveParams(def.params, l.params, tMs, mc), opacity, palette));
+    }
+    if (this.analysis && show.motifs) {
+      const mdef = layerDef("motif");
+      if (mdef) {
+        for (const mo of motifsAt(this.analysis, show, tMs)) {
+          const key = `motif/${mo.layer.id}`;
+          let inst = this.instances.get(key);
+          if (!inst) {
+            inst = mdef.create(this.layerContext());
+            this.instances.set(key, inst);
+          }
+          const opacity = evalParam(mo.layer.opacity, 0, 1, tMs, mc);
+          tg.cur.bind();
+          this.setBlend(mo.layer.blend);
+          inst.render(this.frameInput(tMs, this.resolveParams(mdef.params, mo.layer.params, tMs, mc), opacity, palette));
+        }
+      }
     }
     this.currentScene = null;
     return this.runPosts(scene.post, tg.cur, tMs, palette, mc, `scene:${scene.id}`);
