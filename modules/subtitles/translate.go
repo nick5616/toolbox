@@ -154,6 +154,8 @@ func translateCues(ctx context.Context, tg core.TextGenerator, cues []Cue, sourc
 			if text == "" {
 				text = c.Text
 			}
+			// Words are deliberately dropped: the text changed, so the source
+			// words no longer describe it.
 			out[br[0]+k] = Cue{StartMs: c.StartMs, EndMs: c.EndMs, Text: rewrap(text, lineLen)}
 		}
 		prev = prev[:0]
