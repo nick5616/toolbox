@@ -32,6 +32,7 @@ type rawSegment struct {
 type token struct {
 	start, end int64
 	text       string // raw, may carry a leading space
+	fromWord   bool   // a real engine word (not interpolated from segment text)
 }
 
 func isCJK(r rune) bool {
@@ -115,7 +116,7 @@ func explode(in []token) []token {
 			if i == 0 {
 				txt = lead + txt
 			}
-			out = append(out, token{start: s, end: e, text: txt})
+			out = append(out, token{start: s, end: e, text: txt, fromWord: t.fromWord})
 		}
 	}
 	return out
@@ -130,7 +131,7 @@ func segmentTokens(seg rawSegment) []token {
 			continue
 		}
 		e := max(w.EndMs, w.StartMs)
-		toks = append(toks, token{start: w.StartMs, end: e, text: w.Text})
+		toks = append(toks, token{start: w.StartMs, end: e, text: w.Text, fromWord: true})
 	}
 	if len(toks) == 0 {
 		text := strings.TrimSpace(seg.Text)
@@ -314,6 +315,20 @@ func rewrap(text string, lineLen int) string {
 	return wrapLines(strings.Join(lines, " "), lineLen, 2)
 }
 
+// cueWords returns the timed words of a cue's tokens (CJK words are one
+// character each). Cues made from segments without engine words get none.
+func cueWords(group []token) []CueWord {
+	var out []CueWord
+	for _, t := range group {
+		text := strings.TrimSpace(t.text)
+		if !t.fromWord || text == "" {
+			return nil
+		}
+		out = append(out, CueWord{StartMs: t.start, EndMs: t.end, Text: text})
+	}
+	return out
+}
+
 // buildCues turns engine segments into subtitle cues.
 func buildCues(segs []rawSegment, maxLineChars, maxLines int) []Cue {
 	if maxLineChars <= 0 {
@@ -341,6 +356,7 @@ func buildCues(segs []rawSegment, maxLineChars, maxLines int) []Cue {
 				StartMs: group[0].start,
 				EndMs:   max(group[len(group)-1].end, group[0].start+1),
 				Text:    wrapLines(text, lineLen, maxLines),
+				Words:   cueWords(group),
 			})
 		}
 	}

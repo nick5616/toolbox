@@ -1,4 +1,5 @@
-import type { Cue } from "@/lib/api";
+import type { Cue, CueWord } from "@/lib/api";
+import { moveWords, spreadWords, splitWordsAt } from "./words";
 
 /** A cue with a stable id for list keys and undo. Times are timeline ms. */
 export interface CueRow {
@@ -6,6 +7,8 @@ export interface CueRow {
   startMs: number;
   endMs: number;
   text: string;
+  /** Timed words from generation; absent for loaded .srt/.vtt files and inserted cues. */
+  words?: CueWord[];
 }
 
 export const MAX_LINE_CHARS = 42;
@@ -25,11 +28,19 @@ export function newCueId(): string {
 }
 
 export function toRows(cues: readonly Cue[] | null | undefined): CueRow[] {
-  return (cues ?? []).map((c) => ({ id: newCueId(), startMs: c.startMs, endMs: c.endMs, text: c.text }));
+  return (cues ?? []).map((c) => {
+    const row: CueRow = { id: newCueId(), startMs: c.startMs, endMs: c.endMs, text: c.text };
+    if (c.words && c.words.length > 0) row.words = c.words.map((w) => ({ ...w }));
+    return row;
+  });
 }
 
 export function toCues(rows: readonly CueRow[]): Cue[] {
-  return rows.map((r) => ({ startMs: r.startMs, endMs: r.endMs, text: r.text }));
+  return rows.map((r) => {
+    const cue: Cue = { startMs: r.startMs, endMs: r.endMs, text: r.text };
+    if (r.words && r.words.length > 0) cue.words = r.words;
+    return cue;
+  });
 }
 
 /** A cheap fingerprint used to tell whether the rows differ from what was saved. */
@@ -173,7 +184,24 @@ export function defaultSplitCaret(text: string): number {
 // ---- Edits (pure; every function returns a new array) ----
 
 export function updateCue(rows: readonly CueRow[], id: string, patch: Partial<Omit<CueRow, "id">>): CueRow[] {
-  return rows.map((r) => (r.id === id ? { ...r, ...patch } : r));
+  return rows.map((r) => (r.id === id ? applyPatch(r, patch) : r));
+}
+
+/**
+ * Applies a patch keeping the words consistent: a text change re-spreads the
+ * words over the cue by character share; a time change moves them with the cue.
+ */
+function applyPatch(r: CueRow, patch: Partial<Omit<CueRow, "id">>): CueRow {
+  const next: CueRow = { ...r, ...patch };
+  if (patch.words !== undefined || !r.words || r.words.length === 0) return next;
+  if (patch.text !== undefined && patch.text !== r.text) {
+    const spread = spreadWords(next.text, next.startMs, next.endMs);
+    if (spread.length > 0) next.words = spread;
+    else delete next.words;
+  } else if (next.startMs !== r.startMs || next.endMs !== r.endMs) {
+    next.words = moveWords(r.words, r.startMs, r.endMs, next.startMs, next.endMs);
+  }
+  return next;
 }
 
 /**
@@ -194,6 +222,10 @@ export function splitCue(rows: readonly CueRow[], index: number, caret: number, 
   at = Math.min(r.endMs - 1, Math.max(r.startMs + 1, at));
   const a: CueRow = { ...r, endMs: at, text: left };
   const b: CueRow = { id: newCueId(), startMs: at, endMs: r.endMs, text: right };
+  const [wa, wb] = splitWordsAt(r.words, at, a, b);
+  delete a.words;
+  if (wa) a.words = wa;
+  if (wb) b.words = wb;
   return [...rows.slice(0, index), a, b, ...rows.slice(index + 1)];
 }
 
@@ -208,6 +240,15 @@ export function mergeWithNext(rows: readonly CueRow[], index: number, maxLine: n
     endMs: Math.max(a.endMs, b.endMs),
     text: wrapText(`${a.text} ${b.text}`, maxLine),
   };
+  delete merged.words;
+  const wa = a.words && a.words.length > 0 ? a.words : undefined;
+  const wb = b.words && b.words.length > 0 ? b.words : undefined;
+  if (wa || wb) {
+    // A side without words is spread from its text so the concatenation covers the whole cue.
+    const left = wa ?? spreadWords(a.text, a.startMs, a.endMs);
+    const right = wb ?? spreadWords(b.text, b.startMs, b.endMs);
+    merged.words = [...left, ...right];
+  }
   return [...rows.slice(0, index), merged, ...rows.slice(index + 2)];
 }
 
@@ -231,7 +272,9 @@ export function shiftAll(rows: readonly CueRow[], deltaMs: number): CueRow[] {
   return rows.map((r) => {
     const startMs = Math.max(0, r.startMs + deltaMs);
     const endMs = Math.max(startMs + 1, r.endMs + deltaMs);
-    return { ...r, startMs, endMs };
+    const out: CueRow = { ...r, startMs, endMs };
+    if (r.words && r.words.length > 0) out.words = moveWords(r.words, r.startMs, r.endMs, startMs, endMs);
+    return out;
   });
 }
 
@@ -261,7 +304,7 @@ export function findReplace(
       count++;
       return replacement;
     });
-    return text === r.text ? r : { ...r, text };
+    return text === r.text ? r : applyPatch(r, { text });
   });
   return { rows: out, count };
 }
