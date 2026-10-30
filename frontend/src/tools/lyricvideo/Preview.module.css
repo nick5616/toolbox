@@ -122,3 +122,10 @@
 .vizRaised {
   bottom: 14%;
 }
+
+.overlayFrame {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  overflow: hidden;
+}

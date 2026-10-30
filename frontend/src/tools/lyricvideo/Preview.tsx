@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { LyricLook } from "@/lib/api";
 import { cx } from "@/components";
 import { karaokeProgress, lineAt, type Row } from "./logic";
@@ -13,6 +13,8 @@ export interface PreviewProps {
   coverUrl?: string | undefined;
   /** URL of the chosen background image. */
   imageUrl?: string | undefined;
+  /** Replaces the backdrop (the live visuals canvas for a visuals background). */
+  backdropNode?: ReactNode;
 }
 
 const RATIOS: Record<string, string> = { "16:9": "16 / 9", "9:16": "9 / 16", "1:1": "1 / 1" };
@@ -26,16 +28,11 @@ export function titleCardVisible(look: LyricLook, rows: Row[], ms: number): bool
 }
 
 /** The HTML approximation of the rendered video (SPEC.md §7.4). */
-export function Preview({ look, aspect, rows, ms, coverUrl, imageUrl }: PreviewProps) {
-  const cur = lineAt(rows, ms);
-  const row = cur >= 0 ? rows[cur] : undefined;
-  const next = cur >= 0 ? rows[cur + 1] : undefined;
-  const progress = row ? karaokeProgress(row, ms) : 0;
-  const pct = Math.round(progress * 1000) / 10;
+export function Preview({ look, aspect, rows, ms, coverUrl, imageUrl, backdropNode }: PreviewProps) {
   const bg = look.background;
   const fallbackGradient = `linear-gradient(180deg, ${look.color1}, ${look.color2})`;
   const hasCover = !!coverUrl;
-  const sharpCover = bg === "cover" && hasCover;
+  const sharpCover = !backdropNode && bg === "cover" && hasCover;
   const wide = aspect === "16:9";
 
   let backdrop: CSSProperties = { background: fallbackGradient };
@@ -50,6 +47,34 @@ export function Preview({ look, aspect, rows, ms, coverUrl, imageUrl }: PreviewP
       transform: "scale(1.15)",
     };
 
+  return (
+    <div className={styles.frame} style={{ aspectRatio: RATIOS[aspect] ?? "16 / 9" }} data-testid="lyric-preview" data-aspect={aspect}>
+      {backdropNode ? <div className={styles.backdrop}>{backdropNode}</div> : <div className={styles.backdrop} style={backdrop} />}
+      {bg === "video" && <div className={styles.note}>Video background (see Render preview)</div>}
+      {sharpCover && <img className={cx(styles.cover, wide ? styles.coverWide : styles.coverTall)} src={coverUrl} alt="" />}
+      {look.visualizer !== "none" && !backdropNode && (
+        <div
+          className={cx(styles.viz, look.visualizer === "bars" ? styles.vizBars : styles.vizWave, look.position === "lower" && styles.vizRaised)}
+          style={{ color: look.highlightColor }}
+          data-testid="preview-visualizer"
+        />
+      )}
+      <LyricText look={look} rows={rows} ms={ms} offset={sharpCover ? (wide ? "wide" : "tall") : undefined} />
+    </div>
+  );
+}
+
+/**
+ * The words of the preview (title card, current line with karaoke fill, next
+ * line). It fills the nearest sized container: the preview frame, or the
+ * designer's canvas via `LyricOverlay`.
+ */
+export function LyricText({ look, rows, ms, offset }: { look: LyricLook; rows: Row[]; ms: number; offset?: "wide" | "tall" | undefined }) {
+  const cur = lineAt(rows, ms);
+  const row = cur >= 0 ? rows[cur] : undefined;
+  const next = cur >= 0 ? rows[cur + 1] : undefined;
+  const progress = row ? karaokeProgress(row, ms) : 0;
+  const pct = Math.round(progress * 1000) / 10;
   const textStyle: CSSProperties = {
     fontFamily: `"${look.font}", sans-serif`,
     color: look.textColor,
@@ -63,41 +88,37 @@ export function Preview({ look, aspect, rows, ms, coverUrl, imageUrl }: PreviewP
       }
     : {};
   const showTitle = titleCardVisible(look, rows, ms);
-
   return (
-    <div className={styles.frame} style={{ aspectRatio: RATIOS[aspect] ?? "16 / 9" }} data-testid="lyric-preview" data-aspect={aspect}>
-      <div className={styles.backdrop} style={backdrop} />
-      {bg === "video" && <div className={styles.note}>Video background (see Render preview)</div>}
-      {sharpCover && <img className={cx(styles.cover, wide ? styles.coverWide : styles.coverTall)} src={coverUrl} alt="" />}
-      {look.visualizer !== "none" && (
-        <div
-          className={cx(styles.viz, look.visualizer === "bars" ? styles.vizBars : styles.vizWave, look.position === "lower" && styles.vizRaised)}
-          style={{ color: look.highlightColor }}
-          data-testid="preview-visualizer"
-        />
+    <div
+      className={cx(styles.text, look.position === "lower" && styles.lower, offset === "wide" && styles.textWide, offset === "tall" && styles.textTall)}
+      style={textStyle}
+    >
+      {showTitle ? (
+        <div className={styles.title} data-testid="preview-title">
+          <div className={styles.titleMain}>{look.title}</div>
+          {look.artist && <div className={styles.titleSub}>{look.artist}</div>}
+        </div>
+      ) : (
+        row && (
+          <div className={styles.line} data-testid="preview-line" data-progress={pct}>
+            <span style={fillStyle}>{row.text}</span>
+          </div>
+        )
       )}
-      <div
-        className={cx(styles.text, look.position === "lower" && styles.lower, sharpCover && (wide ? styles.textWide : styles.textTall))}
-        style={textStyle}
-      >
-        {showTitle ? (
-          <div className={styles.title} data-testid="preview-title">
-            <div className={styles.titleMain}>{look.title}</div>
-            {look.artist && <div className={styles.titleSub}>{look.artist}</div>}
-          </div>
-        ) : (
-          row && (
-            <div className={styles.line} data-testid="preview-line" data-progress={pct}>
-              <span style={fillStyle}>{row.text}</span>
-            </div>
-          )
-        )}
-        {!showTitle && look.showNext && next && (
-          <div className={styles.next} data-testid="preview-next">
-            {next.text}
-          </div>
-        )}
-      </div>
+      {!showTitle && look.showNext && next && (
+        <div className={styles.next} data-testid="preview-next">
+          {next.text}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The lyric text drawn over the designer's canvas (the designer sizes the layer). */
+export function LyricOverlay(p: { look: LyricLook; rows: Row[]; ms: number }) {
+  return (
+    <div className={styles.overlayFrame}>
+      <LyricText {...p} />
     </div>
   );
 }

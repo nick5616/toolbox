@@ -20,7 +20,12 @@ export interface Prefs {
   audio: string;
   source: LyricSource;
   language: string;
+  /** Which way the Visuals step is shown (remembered). */
+  visualsMode: VisualsMode;
 }
+
+export type VisualsMode = "quick" | "designer" | "classic";
+export const VISUALS_MODES: readonly VisualsMode[] = ["quick", "designer", "classic"];
 
 export const DEFAULT_LOOK: RememberedLook = {
   background: "blur-cover",
@@ -45,9 +50,11 @@ export const DEFAULT_PREFS: Prefs = {
   audio: "original",
   source: LyricSource.SourceAlign,
   language: "",
+  visualsMode: "quick",
 };
 
 export const BACKGROUNDS = ["blur-cover", "cover", "color", "gradient", "image", "video"] as const;
+const SAVED_BACKGROUNDS = [...BACKGROUNDS, "visualizer"] as const;
 export const ASPECTS = ["16:9", "9:16", "1:1"] as const;
 
 function pick(v: unknown, allowed: readonly string[], fallback: string): string {
@@ -73,9 +80,12 @@ export function sanitizePrefs(saved: unknown, d: Prefs): Prefs {
   const s = saved as Record<string, unknown>;
   const l = (typeof s.look === "object" && s.look !== null ? s.look : {}) as Record<string, unknown>;
   const dl = d.look;
+  const visuals = sanitizeVisuals(l.visuals, dl.visuals);
+  let background = pick(l.background, SAVED_BACKGROUNDS, dl.background);
+  if (background === "visualizer" && visuals.showJson === "") background = dl.background; // nothing chosen yet
   return {
     look: {
-      background: pick(l.background, BACKGROUNDS, dl.background),
+      background,
       backgroundPath: str(l.backgroundPath, dl.backgroundPath),
       color1: hex(l.color1, dl.color1),
       color2: hex(l.color2, dl.color2),
@@ -87,13 +97,14 @@ export function sanitizePrefs(saved: unknown, d: Prefs): Prefs {
       showNext: bool(l.showNext, dl.showNext),
       visualizer: pick(l.visualizer, ["none", "wave", "bars"], dl.visualizer),
       titleCard: bool(l.titleCard, dl.titleCard),
-      visuals: sanitizeVisuals(l.visuals, dl.visuals),
+      visuals,
     },
     aspect: pick(s.aspect, ASPECTS, d.aspect),
     height: s.height === 720 || s.height === 1080 ? s.height : d.height,
     audio: pick(s.audio, ["original", "instrumental"], d.audio),
     source: pick(s.source, ["detect", "align", "file"], d.source) as LyricSource,
     language: str(s.language, d.language),
+    visualsMode: pick(s.visualsMode, VISUALS_MODES, d.visualsMode) as VisualsMode,
   };
 }
 

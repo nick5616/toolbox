@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import { Banner, Button, ColorSwatchPicker, Icon, Section, SegmentedControl, Select, Switch, cx } from "@/components";
+import { VisualsCanvas } from "@/components/viz";
+import type { Analysis } from "@/viz/analysis";
 import { basename, type Row } from "./logic";
 import { ASPECTS, type Prefs, type RememberedLook, type SongMeta } from "./options";
 import { Preview } from "./Preview";
+import { aspectNumber, designLabel, previewShow } from "./visuals";
 import styles from "./LyricVideoView.module.css";
 
 export interface LookStepProps {
@@ -16,6 +19,10 @@ export interface LookStepProps {
   imageUrl: string | undefined;
   hasCover: boolean;
   player: ReactNode;
+  /** The loaded analysis of the song, for the visuals background. */
+  analysis: Analysis | null;
+  /** Back to the Visuals step. */
+  onChangeVisuals: () => void;
   onPickBackground: (kind: "image" | "video") => void;
   onContinue: () => void;
 }
@@ -36,6 +43,8 @@ export function LookStep(p: LookStepProps) {
   const setLook = (patch: Partial<RememberedLook>) => setPrefs((o) => ({ ...o, look: { ...o.look, ...patch } }));
   const fontOptions = (p.fonts.includes(look.font) ? p.fonts : [look.font, ...p.fonts]).map((f) => ({ value: f, label: f }));
   const needsCover = (look.background === "blur-cover" || look.background === "cover") && !p.hasCover;
+  const visuals = look.background === "visualizer";
+  const show = visuals ? previewShow(look.visuals) : null;
   const needsFile = (look.background === "image" || look.background === "video") && !look.backgroundPath;
 
   return (
@@ -49,6 +58,11 @@ export function LookStep(p: LookStepProps) {
             ms={p.playheadMs}
             coverUrl={p.coverUrl}
             imageUrl={p.imageUrl}
+            backdropNode={
+              visuals && show && p.analysis ? (
+                <VisualsCanvas show={show} analysis={p.analysis} timeMs={p.playheadMs} aspect={aspectNumber(prefs.aspect)} mode="opaque" cover={p.coverUrl ?? null} />
+              ) : undefined
+            }
           />
         </div>
         <div className={styles.hint}>Preview is approximate — Render preview shows the exact result.</div>
@@ -77,21 +91,31 @@ export function LookStep(p: LookStepProps) {
         </Section>
 
         <Section label="Background">
-          <div className={styles.bgGrid} role="radiogroup" aria-label="Background">
-            {BACKGROUND_CARDS.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                role="radio"
-                aria-checked={look.background === c.id}
-                className={cx(styles.bgCard, look.background === c.id && styles.bgCardOn)}
-                onClick={() => setLook({ background: c.id })}
-              >
-                <Icon name={c.icon} size={16} />
-                {c.label}
-              </button>
-            ))}
-          </div>
+          {visuals && (
+            <div className={styles.buttonRow}>
+              <span data-testid="visuals-label">Visuals: {designLabel(look)}</span>
+              <Button size="sm" variant="ghost" onClick={p.onChangeVisuals}>
+                Change
+              </Button>
+            </div>
+          )}
+          {!visuals && (
+            <div className={styles.bgGrid} role="radiogroup" aria-label="Background">
+              {BACKGROUND_CARDS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={look.background === c.id}
+                  className={cx(styles.bgCard, look.background === c.id && styles.bgCardOn)}
+                  onClick={() => setLook({ background: c.id })}
+                >
+                  <Icon name={c.icon} size={16} />
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          )}
           {needsCover && (
             <Banner tone="info" title="This song has no cover art">
               The video falls back to a gradient.
@@ -155,19 +179,21 @@ export function LookStep(p: LookStepProps) {
 
         <Section label="Extras">
           <div className={styles.form}>
-            <div className={styles.field}>
-              <span className={styles.fieldLabel}>Visualiser</span>
-              <SegmentedControl
-                aria-label="Visualiser"
-                value={look.visualizer}
-                options={[
-                  { value: "none", label: "None" },
-                  { value: "wave", label: "Wave" },
-                  { value: "bars", label: "Bars" },
-                ]}
-                onChange={(visualizer) => setLook({ visualizer })}
-              />
-            </div>
+            {!visuals && (
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Visualiser</span>
+                <SegmentedControl
+                  aria-label="Visualiser"
+                  value={look.visualizer}
+                  options={[
+                    { value: "none", label: "None" },
+                    { value: "wave", label: "Wave" },
+                    { value: "bars", label: "Bars" },
+                  ]}
+                  onChange={(visualizer) => setLook({ visualizer })}
+                />
+              </div>
+            )}
             <Switch checked={look.titleCard} onChange={(titleCard) => setLook({ titleCard })} label="Title card" />
           </div>
         </Section>

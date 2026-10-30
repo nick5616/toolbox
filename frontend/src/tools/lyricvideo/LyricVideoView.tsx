@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog, Icon, cx, toast } from "@/components";
 import { MediaPlayer, useMediaSource, type MediaPlayerHandle } from "@/components/media";
+import { fixtureFlag, useVisualsAnalysis } from "@/components/viz/useVisualsAnalysis";
 import {
   FilesService,
   LyricAction,
@@ -8,21 +9,21 @@ import {
   LyricVideoService,
   MediaService,
   TranscribeService,
+  VisualizerService,
   type Language,
 } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { useShortcut } from "@/lib/shortcuts";
 import { useModules } from "@/state/modules";
+import { usePacks } from "@/state/packs";
 import { useUI } from "@/state/ui";
 import { setRequiresOverride, useDepsGate, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import {
   deleteRow,
   documentIssues,
-  editorReducer,
   insertAfter,
   latestStarted,
-  newHistory,
   nudgeLine,
   setLineStart,
   setLineText,
@@ -40,32 +41,46 @@ import { IMAGE_EXTS, LYRIC_EXTS, VIDEO_EXTS, DEFAULT_PREFS, buildOptions, lyrics
 import { LookStep } from "./LookStep";
 import { LyricsStep } from "./LyricsStep";
 import { RenderStep } from "./RenderStep";
+import { dispatchSheet, useSession, useSessionField } from "./session";
 import { SongStep } from "./SongStep";
 import { useJobRun } from "./useJobRun";
+import { VisualsStep } from "./VisualsStep";
+import { componentInstalled, STEMS_MODEL, stepAnalyzeOptions, visualizerSeed } from "./visuals";
 import styles from "./LyricVideoView.module.css";
 
-type Step = "song" | "lyrics" | "look" | "render";
+type Step = "song" | "lyrics" | "visuals" | "look" | "render";
 const STEPS: Array<{ id: Step; label: string }> = [
   { id: "song", label: "Song" },
   { id: "lyrics", label: "Lyrics" },
+  { id: "visuals", label: "Visuals" },
   { id: "look", label: "Look" },
   { id: "render", label: "Render" },
 ];
 
-const EMPTY_HISTORY = newHistory<Row[]>([]);
+/** Dev only (`?vizfixture=1`): a sample sheet so the Visuals step opens without a song. */
+const FIXTURE_SONG = "C:\\fixture\\song.mp3";
+const FIXTURE_LINES: Row[] = [
+  { id: "f1", startMs: 2000, endMs: 6000, text: "Hold the light a little longer", words: [] },
+  { id: "f2", startMs: 6500, endMs: 10500, text: "Let the morning find us here", words: [] },
+  { id: "f3", startMs: 11000, endMs: 15000, text: "Every colour in the sky", words: [] },
+];
 
 export default function LyricVideoView({ moduleId }: ToolViewProps) {
   const [prefs, setPrefs] = useModuleOptions(moduleId, DEFAULT_PREFS, sanitizePrefs);
-  const [step, setStep] = useState<Step>("song");
-  const [songPath, setSongPath] = useState<string | null>(null);
-  const [meta, setMeta] = useState({ title: "", artist: "" });
-  const [text, setText] = useState("");
-  const [lyricsPath, setLyricsPath] = useState("");
-  const [history, dispatch] = useReducer(editorReducer, EMPTY_HISTORY);
+  const fixture = useMemo(() => fixtureFlag(), []);
+  const [step, setStep] = useState<Step>(fixture ? "visuals" : "song");
+  // The song, its tags and the lyric sheet survive leaving the tool (session store).
+  const [songPath, setSongPath] = useSessionField("songPath");
+  const [meta, setMeta] = useSessionField("meta");
+  const [text, setText] = useSessionField("text");
+  const [lyricsPath, setLyricsPath] = useSessionField("lyricsPath");
+  const history = useSession((s) => s.history);
+  const dispatch = dispatchSheet;
   const [selectedId, setSelectedId] = useState("");
-  const [matched, setMatched] = useState<number | null>(null);
-  const [noLyrics, setNoLyrics] = useState(false);
-  const [hasInstrumental, setHasInstrumental] = useState(false);
+  const [matched, setMatched] = useSessionField("matched");
+  const [noLyrics, setNoLyrics] = useSessionField("noLyrics");
+  const [hasInstrumental, setHasInstrumental] = useSessionField("hasInstrumental");
+  const [saveStems, setSaveStems] = useSessionField("saveStems");
   const [playheadMs, setPlayheadMs] = useState(0);
   const [tapIndex, setTapIndex] = useState(-1);
   const [previewStartMs, setPreviewStartMs] = useState(0);
@@ -112,7 +127,8 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
     };
   }, [songPath, mediaReady, hasCover]);
 
-  const metaFor = useRef("");
+  // A remembered session keeps its (possibly edited) title and artist.
+  const metaFor = useRef(useSession.getState().meta.title !== "" ? useSession.getState().songPath : "");
   useEffect(() => {
     if (!songPath || !info || metaFor.current === songPath) return;
     metaFor.current = songPath;
@@ -130,14 +146,46 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
   }, [look.background, look.backgroundPath]);
 
   // ---- the AI engine gate: only the runs that need it require it ----
+  const visualsOn = prefs.look.background === "visualizer";
   const engineRequired =
-    (step === "lyrics" && lyricsNeedEngine(prefs.source, lyricsPath)) || ((step === "render" || step === "song") && prefs.audio === "instrumental");
+    (step === "lyrics" && lyricsNeedEngine(prefs.source, lyricsPath)) ||
+    (step === "visuals" && prefs.visualsMode !== "classic") ||
+    ((step === "render" || step === "song") && prefs.audio === "instrumental");
   useEffect(() => {
     setRequiresOverride(moduleId, engineRequired ? ["ffmpeg", "ffprobe", "audio-engine"] : null);
   }, [moduleId, engineRequired]);
   useEffect(() => () => setRequiresOverride(moduleId, null), [moduleId]);
   const gate = useDepsGate(moduleId);
   const engineBlocked = engineRequired && gate.blocked;
+
+  // ---- visuals: the listening (one analyze job with the sheet as given words) ----
+  const packs = usePacks((s) => s.list);
+  const stemsInstalled = componentInstalled(packs, STEMS_MODEL);
+  const [moodChecked, setMoodChecked] = useState(false);
+  const [moodReady, setMoodReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    VisualizerService.MoodReaderReady()
+      .then((ok) => alive && setMoodReady(Boolean(ok)))
+      .catch(() => undefined)
+      .finally(() => alive && setMoodChecked(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const lines = useMemo(() => toLines(rows), [rows]);
+  const stemsOn = look.visuals.stems && stemsInstalled;
+  const analyze = useMemo(
+    () => stepAnalyzeOptions({ stems: stemsOn, saveStems, useWords: look.visuals.useWords, lines, moodReady }),
+    [stemsOn, saveStems, look.visuals.useWords, lines, moodReady],
+  );
+  const onVisualsStep = step === "visuals" && prefs.visualsMode !== "classic";
+  const listeningPath = songPath && (onVisualsStep || (step === "look" && visualsOn)) ? songPath : null;
+  const listening = useVisualsAnalysis(listeningPath, { analyze, auto: onVisualsStep && moodChecked && !engineBlocked });
+  const instrumentalRef = listening.ref?.instrumental;
+  useEffect(() => {
+    if (instrumentalRef) setHasInstrumental(true);
+  }, [instrumentalRef, setHasInstrumental]);
 
   // ---- jobs ----
   const gen = useJobRun((job) => {
@@ -185,6 +233,7 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
         setMatched(null);
         setNoLyrics(false);
         setHasInstrumental(false);
+        setSaveStems(false);
         setPlayheadMs(0);
         setTapIndex(-1);
         setPreviewPath("");
@@ -333,19 +382,23 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
   const lookBlocker =
     (look.background === "image" || look.background === "video") && !look.backgroundPath
       ? "Choose a background file on the Look step, or pick another background."
-      : "";
+      : look.background === "visualizer" && look.visuals.showJson === ""
+        ? "Choose a design on the Visuals step, or pick a classic background."
+        : "";
   const blocker = issues.blocker || lookBlocker;
+  // Renders separate instruments only when the model is there.
+  const jobPrefs = useMemo(() => ({ ...prefs, look: { ...prefs.look, visuals: { ...prefs.look.visuals, stems: stemsOn } } }), [prefs, stemsOn]);
   const onPreview = () => {
     if (!songPath || blocker) return;
     setPreviewPath("");
     void preview.start(
       [songPath],
-      buildOptions(LyricAction.ActionPreview, prefs, meta, { lines: toLines(rows), previewStartMs: Math.round(previewStartMs) }),
+      buildOptions(LyricAction.ActionPreview, jobPrefs, meta, { lines: toLines(rows), previewStartMs: Math.round(previewStartMs) }),
     );
   };
   const onRender = () => {
     if (!songPath || blocker) return;
-    void render.start([songPath], buildOptions(LyricAction.ActionRender, prefs, meta, { lines: toLines(rows) }));
+    void render.start([songPath], buildOptions(LyricAction.ActionRender, jobPrefs, meta, { lines: toLines(rows) }));
   };
 
   // ---- the shared player ----
@@ -368,6 +421,19 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
   const tapLine = tapping ? (rows[tapIndex]?.text ?? "") : "";
   const hasLines = rows.length > 0;
   const reachable = (s: Step) => s === "song" || (!!songPath && (s === "lyrics" || hasLines));
+
+  // Dev only: `?vizfixture=1` starts on the Visuals step with a sample sheet.
+  useEffect(() => {
+    if (!fixture || useSession.getState().songPath) return;
+    setSongPath(FIXTURE_SONG);
+    setMeta({ title: "Golden Hour", artist: "Fixture" });
+    dispatch({ type: "reset", rows: FIXTURE_LINES });
+  }, [fixture, setSongPath, setMeta, dispatch]);
+
+  const onMakeInVisualizer = () => {
+    if (!songPath) return;
+    useUI.getState().handOff({ moduleId: "visualizer", inputs: [songPath], seed: visualizerSeed(lines, look) });
+  };
   const renderWarning = look.background === "blur-cover" || look.background === "cover" ? (hasCover ? "" : "This song has no cover art, so the background falls back to a gradient.") : "";
 
   return (
@@ -457,6 +523,24 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
             onTapEnd={endTap}
             lrc={lrc}
             onExportLrc={onExportLrc}
+            onContinue={() => setStep("visuals")}
+          />
+        )}
+        {step === "visuals" && songPath && (
+          <VisualsStep
+            moduleId={moduleId}
+            songPath={songPath}
+            prefs={prefs}
+            setPrefs={setPrefs}
+            lines={lines}
+            rows={rows}
+            meta={meta}
+            listening={listening}
+            stemsInstalled={stemsInstalled}
+            saveStems={saveStems}
+            onSaveStems={setSaveStems}
+            engineBlocked={engineBlocked}
+            onMakeInVisualizer={onMakeInVisualizer}
             onContinue={() => setStep("look")}
           />
         )}
@@ -472,6 +556,8 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
             imageUrl={imageUrl}
             hasCover={hasCover}
             player={playerNode}
+            analysis={listening.analysis}
+            onChangeVisuals={() => setStep("visuals")}
             onPickBackground={(k) => void onPickBackground(k)}
             onContinue={() => {
               setPreviewStartMs(Math.max(0, Math.round(playheadMs)));
