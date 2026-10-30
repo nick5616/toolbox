@@ -3,6 +3,7 @@ import { ConfirmDialog, Icon, cx, toast } from "@/components";
 import { useMediaSource, type MediaPlayerHandle } from "@/components/media";
 import {
   FilesService,
+  type VisualsSpec,
   LyricVideoService,
   MediaService,
   SubtitlesAction,
@@ -19,6 +20,9 @@ import type { JobView } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
 import { useModuleOptions } from "@/tools/_kit";
+import { DesignerSheet } from "./DesignerSheet";
+import { canvasAspect } from "./options";
+import { cuesToLines, defaultVisuals, handoffSeed } from "./visuals";
 import type { ToolViewProps } from "@/tools";
 import type { RowAction } from "./CueList";
 import { EditStep } from "./EditStep";
@@ -177,6 +181,16 @@ export default function SubtitlesView({ moduleId }: ToolViewProps) {
   const burn = useJobRun();
   const embed = useJobRun();
 
+  // ---- visuals for the burn (SPEC.md 9.3) ----
+  const [addVisuals, setAddVisuals] = useState(false);
+  const [designerOpen, setDesignerOpen] = useState(false);
+  const [chosen, setChosen] = useState<VisualsSpec | null>(null);
+  const visualsMode = isVideo ? "overlay" : "background";
+  const visuals = useMemo(() => chosen ?? defaultVisuals(visualsMode), [chosen, visualsMode]);
+  useEffect(() => setChosen(null), [visualsMode, mediaPath]); // a design belongs to one kind of input
+  const burnsVisuals = isVideo ? addVisuals : prefs.background === "visualizer";
+  const cueLines = useMemo(() => cuesToLines(rows), [rows]);
+
   // ---- sources ----
   const guard = useCallback(
     (run: () => void) => {
@@ -312,7 +326,14 @@ export default function SubtitlesView({ moduleId }: ToolViewProps) {
 
   const onBurn = () => {
     if (!mediaPath || !tab || blocker) return;
-    void burn.start([mediaPath], buildOptions(SubtitlesAction.ActionBurn, prefs, { cues: toCues(rows) }));
+    void burn.start(
+      [mediaPath],
+      buildOptions(SubtitlesAction.ActionBurn, prefs, { cues: toCues(rows), visuals: burnsVisuals ? visuals : null }),
+    );
+  };
+  const onOpenInVisualizer = () => {
+    if (!mediaPath) return;
+    useUI.getState().handOff({ moduleId: "visualizer", inputs: [mediaPath], seed: handoffSeed(cueLines, isVideo, prefs) });
   };
   const onEmbed = () => {
     if (!mediaPath || !tab || blocker) return;
@@ -517,9 +538,33 @@ export default function SubtitlesView({ moduleId }: ToolViewProps) {
             onBurn={onBurn}
             onEmbed={onEmbed}
             onPickMedia={() => void onPickMedia()}
+            visuals={visuals}
+            onVisuals={setChosen}
+            addVisuals={addVisuals}
+            onAddVisuals={setAddVisuals}
+            lines={cueLines}
+            onOpenDesigner={() => setDesignerOpen(true)}
+            onOpenInVisualizer={onOpenInVisualizer}
           />
         )}
       </div>
+
+      {designerOpen && mediaPath && visuals && (
+        <DesignerSheet
+          inputPath={mediaPath}
+          rows={rows}
+          lines={cueLines}
+          value={visuals}
+          mode={visualsMode}
+          aspect={isVideo ? (media.source?.info.video ? media.source.info.video.width / Math.max(1, media.source.info.video.height) : 16 / 9) : canvasAspect(prefs.canvas)}
+          prefs={prefs}
+          onDone={(spec) => {
+            setChosen(spec);
+            setDesignerOpen(false);
+          }}
+          onClose={() => setDesignerOpen(false)}
+        />
+      )}
 
       <ConfirmDialog
         open={confirm !== null}

@@ -2,13 +2,22 @@ package subtitles
 
 import (
 	"context"
-	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 
 	"toolbox/core"
 	"toolbox/core/media"
+	"toolbox/core/viz"
+)
+
+// Seams: tests replace these so burns run without FFmpeg, the engine or the
+// webview renderer.
+var (
+	probeFn         = media.Probe
+	renderVisualsFn = viz.RenderVisuals
+	muxFn           = viz.MuxOpaque
+	compositeFn     = viz.CompositeOverlay
+	runFFmpegFn     = runFFmpeg
 )
 
 // buildASS builds the burn-in script for a video of display size w×h.
@@ -90,26 +99,21 @@ func (m *Module) runBurn(ctx context.Context, job *core.JobContext, o Options) e
 	if err != nil {
 		return err
 	}
-	info, err := media.Probe(ctx, ffprobe, input)
+	info, err := probeFn(ctx, ffprobe, input)
 	if err != nil {
 		return err
 	}
 	if info.Video == nil {
-		return core.ValidationError("Burning in needs a video file", nil) // SB4: audio → a video (SPEC.md §9.3)
+		if !burnsAudio(o) {
+			return core.ValidationError("Choose a background for the video", map[string]string{"background": "Choose a background"})
+		}
+		return m.runBurnAudio(ctx, job, o, ffmpeg, info)
 	}
-	if o.Visuals != nil { // SB4: visuals over the video
-		return core.Errorf(core.CodeInternal, "not built yet")
+	if o.Visuals != nil {
+		return m.runBurnOverlay(ctx, job, o, ffmpeg, info)
 	}
-	f, err := os.Create(filepath.Join(job.TempDir, "subs.ass"))
-	if err != nil {
-		return fmt.Errorf("create subs.ass: %w", err)
-	}
-	_, werr := buildASS(o.Cues, o, info.Video.Width, info.Video.Height).WriteTo(f)
-	if cerr := f.Close(); werr == nil {
-		werr = cerr
-	}
-	if werr != nil {
-		return fmt.Errorf("write subs.ass: %w", werr)
+	if err := writeASS(job.TempDir, o, info.Video.Width, info.Video.Height); err != nil {
+		return err
 	}
 	// Copy audio only when every track is already AAC or MP3.
 	audio := ""
@@ -121,7 +125,7 @@ func (m *Module) runBurn(ctx context.Context, job *core.JobContext, o Options) e
 		}
 	}
 	tmp := filepath.Join(job.TempDir, "burn.mp4")
-	if err := runFFmpeg(ctx, job, ffmpeg, job.TempDir, burnArgs(input, tmp, audio), float64(info.DurationMs)/1000, "Burning in subtitles"); err != nil {
+	if err := runFFmpegFn(ctx, job, ffmpeg, job.TempDir, burnArgs(input, tmp, audio), float64(info.DurationMs)/1000, "Burning in subtitles"); err != nil {
 		return err
 	}
 	final := core.UniquePath(job.OutputDir, core.StemName(input)+" (subtitled)", ".mp4")
