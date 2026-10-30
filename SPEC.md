@@ -1,6 +1,6 @@
 # Toolbox — Phase 7 Spec: Visualizer (reactive visuals for songs, lyrics and subtitled videos)
 
-Status: **DRAFT, waiting for review.**
+Status: **DRAFT r2, waiting for review.** r2 (2026-10-30) adds a local mood reader instead of relying on Local Chat (§0.3, §5.4), and Visualizer backgrounds inside Lyric Video and Subtitles (§9).
 Date: 2026-10-29. Author: architect session (Opus).
 
 Phases 1–6 are shipped; their specs are archived in `docs/specs/phase-{1..6}.md`, and every contract there still holds unless changed here. "P6 §x" etc. refer to those files.
@@ -48,11 +48,35 @@ Verified hands-on on 2026-10-29 on the Windows box (i7-11700K, RTX 3070, WebView
 
 The audio features for a 3-minute song take **about 9 s** on top of the stems. Words come from `transcribe.run` (Whisper small) on the vocals stem, as in Lyric Video.
 
-### 0.3 What already exists and is reused
+### 0.3 Reading the words without a chat model (`.dev/p7-research/nlp/`)
+I tested on 34 lines written for the test: 28 English and 6 in Spanish, French, German, Portuguese and Japanese. Each line has an expected emotion out of 8 (joy, love, sadness, anger, fear, calm, hope, awe) and expected imagery out of 12 motifs. The models ran on CPU with onnxruntime 1.31.1 and `tokenizers` 0.23.3, **both already in the engine**.
+
+| Approach | Model, licence, size | Emotion (en / other) | Motifs (precision / recall) | Speed |
+|---|---|---|---|---|
+| Emotion classifier (GoEmotions, 28 labels mapped to 8) | `SamLowe/roberta-base-go_emotions-onnx` int8, MIT, 125 MB | 0.57 / 0.00 (English only; poetic lines come out "neutral") | — | 6 ms/line |
+| Zero-shot NLI (20 hypotheses per line) | `MoritzLaurer/multilingual-MiniLMv2-L6-mnli-xnli`, MIT, 428 MB | 0.21 (nearly everything "fear") | 0.67 / 0.57 | 34 ms/line |
+| Multilingual embeddings + written anchor phrases | `intfloat/multilingual-e5-small` int8, MIT, 118 MB | 0.68 / 1.00 | 0.62 / 0.46 | 1.3 ms/line |
+| **Multilingual embeddings + written anchor phrases** | **`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`**, Apache-2.0, **118 MB** (uint8) | **0.86 / 0.67** | **0.86 / 0.64** | **1.5 ms/line** |
+
+How the anchor method works:
+- Each emotion has 8 short English example phrases and each motif has 3; none of them are test lines.
+- A line's emotion score is the mean cosine of its 3 nearest anchors for that emotion.
+- A motif counts when its best anchor's cosine is ≥ 0.54.
+- Because the model is multilingual, English anchors also work for other languages.
+
+**Chosen:** the paraphrase-multilingual MiniLM model as the **mood reader**. It's small, fast, multilingual, and one model gives both the emotion and the imagery. The arm64-quantised file gives the same answers: embeddings agree to within cosine 0.984, and it scores 0.89 on English. The **Local Chat model is optional** on top, as a "deeper reading" that also picks the words to emphasise.
+
+| File | URL (revision `e8f8c211226b894fcb81acc59f3b34ba3efd5f42` of `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`) | Bytes · sha256 |
+|---|---|---|
+| model (Windows / Intel) | `…/resolve/<rev>/onnx/model_quint8_avx2.onnx` | 118,453,870 · `98a01d88b7de996cdea58c32ca71208c09968d143798814b2ea09d3439dc334f` |
+| model (macOS arm64) | `…/resolve/<rev>/onnx/model_qint8_arm64.onnx` | 118,412,398 · `783fea82d71a58179b830a4dbd2d58447e640609e98eedf9ffa12622d375a672` |
+| tokenizer | `…/resolve/<rev>/tokenizer.json` | 9,081,518 · `2c3387be76557bd40970cec13153b3bbf80407865484b209e655e5e4729076b8` |
+
+### 0.4 What already exists and is reused
 - **Stems:** `stems.separate` with preset `four-fast` (`htdemucs`): Vocals, Drums, Bass, Other.
 - **Words:** `transcribe.run` with word timestamps (P6 §0.3).
 - **Lyrics logic:** Lyric Video's alignment (Needleman–Wunsch), LRC/SRT/VTT parsing and words-to-lines rule (P6 §7.2). These move to a shared `core/lyrics` package (§4.2).
-- **Local Chat model:** `core.TextGenerator` with JSON-schema replies (P6 §3.5) reads the mood and imagery of the words.
+- **Local Chat model:** optionally, `core.TextGenerator` with JSON-schema replies (P6 §3.5) gives a deeper reading of the words (§5.4).
 - **Media route:** `MediaService.URLFor` serves the analysis files and textures to the renderer (P6 §3.2). Responses are capped at 4 MiB, so the client reads larger files in ranges (§6.2).
 - **Media kit:** `MediaPlayer`, `Timeline`, `useMediaSource` (P6 §3.11).
 
@@ -68,6 +92,7 @@ The audio features for a 3-minute song take **about 9 s** on top of the stems. W
    - the **beat and bars**, the **sections** (intro, verse, chorus, drop, bridge, outro) and **lifts/drops**;
    - the **chords and key**, and the **vocal pitch** and **held notes**;
    - the **words** with their timings, and the **meaning** of each line: mood (valence and energy), emotion, imagery ("fire", "rain", "stars"…) and the words to emphasise.
+   - The meaning comes from a small local **mood reader** model (118 MB, any language, about 2 ms per line). The Local Chat model can optionally give a deeper reading.
 3. **Control what shows, when, and why:**
    - **Presets** to start from.
    - A **Reactions** panel: what drives what, for example "Kick → rings 80%".
@@ -83,7 +108,11 @@ The audio features for a 3-minute song take **about 9 s** on top of the stems. W
    - Speed: ≥ 4× real time at 1080p30 on the Windows box.
    - Formats: 16:9, 9:16, 1:1 and 4:5; 720p to 2160p; 30 or 60 fps.
    - Audio: original or instrumental.
-6. **Works with Lyric Video and Subtitles:** each gets a "Make it reactive" handoff into the Visualizer that carries the timed text (and Lyric Video's look). Subtitles cues keep word timings from generation.
+6. **Visuals as a background in the video-making tools** (§9):
+   - **Lyric Video** (with lyrics) and **Subtitles' "burn into a video"** (without lyrics) get a **Visualizer background** option. You pick a preset from live thumbnails that react to your own file, or one of your saved designs, with one click. "Customize in Visualizer…" opens the full designer and brings the design back.
+   - Those tools keep drawing their own text on top. The visuals react to the music and to the tool's own words and their mood.
+   - Subtitles can now make a video from an **audio file** (a captioned audiogram for podcasts and voice notes), with visuals, a colour or an image behind the subtitles.
+   - Both tools can also hand the timed text to the Visualizer to make the whole video there, with reactive words. Subtitles cues keep word timings from generation.
 
 ## 2. Non-goals (Phase 7)
 
@@ -92,7 +121,7 @@ The audio features for a 3-minute song take **about 9 s** on top of the stems. W
 - **3D models, video textures inside scenes, or user-written shaders.** Video goes under the visuals through FFmpeg (§7.4), not into the GPU scene.
 - **Online services:** looking up lyrics, cloud sentiment, stock footage. Everything stays local.
 - **Keyframe animation by hand:** the timeline assigns scenes and palettes per section; it doesn't keyframe individual parameters.
-- **Rewriting Lyric Video or Subtitles:** their own renders (libass) stay as they are. The reactive version is made in the Visualizer through the handoff.
+- **Rewriting Lyric Video's or Subtitles' text rendering:** they keep libass text on top. The Visualizer supplies their backgrounds (§9). Reactive *words* (karaoke pop, emphasis glow…) are made in the Visualizer itself.
 - **HDR/10-bit output, ProRes, or alpha-channel video files as outputs** (overlays are composited by Toolbox).
 - Inputs longer than **60 minutes**.
 
@@ -103,12 +132,14 @@ The audio features for a 3-minute song take **about 9 s** on top of the stems. W
 ```
             ┌──────────────── Go ────────────────┐            ┌──────────── webview (main window) ───────────┐
  song/video │ modules/visualizer (analyze/render) │  events    │ tools/visualizer (UI)                         │
- ──────────▶│ core/viz  Analyzer ──▶ engine:      │──────────▶ │   ├─ live preview: viz Engine (WebGL2, main)  │
-            │           stems.separate            │            │   └─ Song Map, Reactions, Layers, Export      │
+ ──────────▶│ lyric-video / subtitles (backgrounds)│──────────▶ │   ├─ live preview: viz Engine (WebGL2, main)  │
+            │ core/viz  Analyzer ──▶ engine:      │            │   └─ Song Map, Reactions, Layers, Export      │
+            │           stems.separate            │            │ components/viz/VisualsPicker (LV, Subtitles)  │
             │           viz.analyze  (features)   │            │ viz/RenderHost (in the app shell, always on)  │
             │           transcribe.run (words)    │  raw msgs  │   └─ render.worker: same Engine on            │
-            │           TextGenerator (meaning)   │ ◀───────── │      OffscreenCanvas → VideoEncoder (H.264)   │
-            │ core/viz  RenderBroker ──▶ FFmpeg   │ (postMsg)  │      chunks → main thread → System.invoke     │
+            │           viz.mood (mood reader)    │ ◀───────── │      OffscreenCanvas → VideoEncoder (H.264)   │
+            │           TextGenerator (optional)  │ (postMsg)  │                                               │
+            │ core/viz  RenderBroker ──▶ FFmpeg   │            │      chunks → main thread → System.invoke     │
             │           mux / overlay composite   │            └───────────────────────────────────────────────┘
             └─────────────────────────────────────┘
 ```
@@ -116,14 +147,18 @@ The audio features for a 3-minute song take **about 9 s** on top of the stems. W
 - **Analysis is a Go job.** It runs the engine handlers, then writes `audio.json` + `features.bin` (the music) and `text.json` (the words and their meaning) into a cache.
 - **The engine** (`frontend/src/viz/`) is pure TypeScript + WebGL2. It turns (show, analysis, time) into a frame.
 - **Render is a Go job.** It hands a render plan to the always-mounted `RenderHost`. The host renders in a worker with the same engine and streams H.264 to Go over raw messages. Go muxes the audio, or composites the overlay onto the video, with FFmpeg.
-- **No new listener, no new binary, no new Python dependency.**
+- **Lyric Video and Subtitles** call the same `core/viz` render for their backgrounds and burn their own text on top in their FFmpeg pass.
+- **No new listener, no new binary, no new Python dependency.** There is one new model download: the mood reader, 127 MB.
 
 ---
 
 ## 4. Foundation changes (Wave 0, architect)
 
 ### 4.1 Dependencies
-- **Engine:** no new packages. The version goes to **0.7.0**, and the description gains "music visualisation analysis". No lock change apart from the version.
+- **Engine:** no new packages. `onnxruntime` and `tokenizers` are already locked; the mood reader uses them. The version goes to **0.7.0**, and the description gains "music visualisation analysis". No lock change apart from the version.
+- **Model:** the mood reader (§0.3).
+  - It's pinned in Go as `{file, url, sha256, bytes}` per OS (the arm64 file on darwin/arm64, the avx2 file elsewhere) plus the tokenizer.
+  - It's fetched through the `visualizer` module's `core.ModelProvider` (preset `mood`) into `<models>/mood/`, following the bgremove pattern. The handlers get explicit paths and never download.
 - **Frontend:** none. WebGL2, WebCodecs and OffscreenCanvas are built into the webview.
 - **Go:** none.
 
@@ -152,7 +187,8 @@ type AnalyzeOptions struct {
     LyricsText string      `json:"lyricsText"` // align: ≤ 20,000 chars
     LyricsPath string      `json:"lyricsPath"` // file: .lrc .srt .vtt .txt
     Lines      []lyrics.Line `json:"lines"`    // given: ≤ 20,000 lines (from a handoff)
-    Meaning    bool        `json:"meaning"`    // read mood/imagery with the Local Chat model
+    Mood       bool        `json:"mood"`       // read mood/imagery with the mood reader (default on with words)
+    DeepRead   bool        `json:"deepRead"`   // also ask the Local Chat model (default off)
 }
 type AnalysisRef struct {
     Key          string          `json:"key"`          // cache folder name
@@ -172,7 +208,8 @@ type AnalysisSummary struct {
     HasMeaning bool     `json:"hasMeaning"`
     Language   string   `json:"language"`
     Lines      int      `json:"lines"`
-    Warnings   []string `json:"warnings"`   // e.g. "No Local Chat model: mood comes from the music only"
+    MoodSource string   `json:"moodSource"` // "music" | "reader" | "reader+chat"
+    Warnings   []string `json:"warnings"`   // e.g. "Mood reader not installed: mood comes from the music only"
 }
 type Analyzer struct{ /* paths, caller, textgen */ }
 func (a *Analyzer) Analyze(ctx context.Context, job *core.JobContext, input string, o AnalyzeOptions) (AnalysisRef, error)
@@ -204,10 +241,26 @@ type RenderOutput struct { Path string; Codec string /* "h264" | "mjpeg" */; Fra
 func (b *RenderBroker) HandleRawMessage(msg string, origin, topOrigin string)
 ```
 
+**Visual backgrounds for other tools** (used by Lyric Video and Subtitles, §9):
+```go
+// VisualsSpec is a design chosen in a VisualsPicker.
+type VisualsSpec struct {
+    ShowJSON string `json:"showJson"` // a preset or saved design (≤ 512 KiB)
+    Stems    bool   `json:"stems"`    // separate instruments for the analysis
+    UseWords bool   `json:"useWords"` // feed the tool's own timed text into the analysis (word pulses, mood)
+}
+// RenderVisuals analyses the input (cached), then renders the design without text
+// (show.text forced to null) at w×h/fps. Mode "opaque" (a background) or "overlay"
+// (over a video). Progress is mapped into [p0, p1].
+func RenderVisuals(ctx context.Context, job *core.JobContext, a *Analyzer, b *RenderBroker,
+    input string, spec VisualsSpec, lines []lyrics.Line, w, h, fps int, mode RenderMode, p0, p1 float64) (RenderOutput, error)
+```
+
 **FFmpeg helpers:**
 ```go
-func MuxOpaque(ctx, ffmpeg string, out RenderOutput, audio string, startMs, endMs int64, fps int, dst string, onProgress func(float64)) error
-func CompositeOverlay(ctx, ffmpeg string, out RenderOutput, base string, loopBase bool, audio string, fps, w, h int, dst string, onProgress func(float64)) error
+func MuxOpaque(ctx, ffmpeg string, out RenderOutput, audio string, startMs, endMs int64, fps int, ass, dst string, onProgress func(float64)) error
+func CompositeOverlay(ctx, ffmpeg string, out RenderOutput, base string, loopBase bool, audio string, fps, w, h int, ass, dst string, onProgress func(float64)) error
+// ass: "" or a subtitle file name in the job's TempDir, burned in last (§9.6).
 ```
 The arguments are in §7.4. Arg construction is pure and table-tested.
 
@@ -237,15 +290,19 @@ The arguments are in §7.4. Arg construction is pure and table-tested.
   - `options.go`, `module.go` and `service.go`, with final signatures and complete `Validate`;
   - a stub `Run`;
   - the `main.go` wiring (`viz.NewAnalyzer`, `viz.NewRenderBroker`, the RawMessageHandler), the bindings and `lib/api.ts` re-exports;
-  - the engine handler stub `viz.analyze` in `handlers/viz.py`, imported in `handlers/__init__.py`;
+  - the engine handler stubs `viz.analyze`, `viz.mood` and `viz.prefetch` in `handlers/viz.py`, imported in `handlers/__init__.py`;
+  - the mood reader's model pins and the `ModelProvider` stub in `modules/visualizer/models.go`;
   - the frontend skeleton (§4.8).
 - New icons in `components/Icon.tsx`: `sparkles`, `layers`, `sliders-horizontal`, `wand-sparkles`, `map`, `waves`, `drum`, `guitar`, `mic`, `heart-pulse`, `maximize`, `film`, `eye`, `eye-off`, `grip-vertical`.
 
 ### 4.7 Tool packs
+- **New component** `mood-reader` (model, module `visualizer`, preset `mood`, Apache-2.0).
+  - Size: 127,535,388 B download and disk on Windows (model + tokenizer), 127,493,916 B on macOS. The catalog stores the larger figure.
+  - It joins the **Music** and **Speech** packs (counted once, P5 §7.1).
 - **Music** pack: `+ visualizer` with Needs `{engine, ffmpeg}`.
-  - The Stems option needs `stems-default` and Words needs `whisper-default`; both are already Music components.
-  - The view shows DepsGate rows for those options only when they're switched on.
-- No new components, so the pack sizes don't change. `TestEveryToolIsInOnePack` keeps passing.
+  - The Stems option needs `stems-default`; Words needs `whisper-default`; mood needs `mood-reader`. All three are Music components.
+  - The views show DepsGate rows for those options only when they're switched on.
+- The Music and Speech pack sizes grow by the mood reader. `TestEveryToolIsInOnePack` keeps passing.
 
 ### 4.8 Frontend skeleton (`frontend/src/viz/`, Wave 0 writes the contracts and a working minimum)
 ```
@@ -285,7 +342,7 @@ viz/
 ### 5.1 Flow (`core/viz/analyze.go`)
 1. **Key:** `sha1(path|size|mtime)` → folder `<cache>/visualizer/<key>/`.
    - Audio products are named by `s<0|1>` (stems off/on).
-   - Text products are named by `t-<sha1 of the words options + lines>` and `m<0|1>` (meaning off/on).
+   - Text products are named by `t-<sha1 of the words options + lines>` and the mood source (`m0` music only, `m1` reader, `m2` reader + chat).
    - Anything already there is reused, and progress jumps past that step.
 2. **Stems** (if on): `stems.separate {preset: "four-fast", format: "flac", out: <folder>/stems}`. Progress 0–0.45.
 3. **Features:** `viz.analyze {path, stems: {drums, bass, vocals, other} | null, outDir: <folder>, name: "s1"}`, then 0.45–0.6 (0–0.4 without stems). It writes `s1.json` + `s1.bin`.
@@ -297,7 +354,10 @@ viz/
    - `given`: the lines from the handoff; words are spread with `SpreadWords` where missing.
    - Progress 0.6–0.85.
 6. **Emphasis (no model needed):** a word is emphasised when its mean `vocals.level` (or `mix.presence` without stems) is in the song's top 12% **and** it lasts ≥ 280 ms, or when it overlaps a held note (§5.3).
-7. **Meaning** (if on and `TextGenerator.Ready()` succeeds): §5.4. Progress 0.85–1. If no model is available, the summary warns and mood falls back to the music (§5.4).
+7. **Mood** (§5.4), progress 0.85–1:
+   - If `Mood` is on and the mood reader is installed: `viz.mood`.
+   - Then, if `DeepRead` is on and `TextGenerator.Ready()` succeeds: the chat reading, which refines the reader's result.
+   - A missing reader or chat model adds a warning, and mood falls back to the music (§5.4).
 8. **Write `t-….json`.** Delete the vocals stem. Return the `AnalysisRef`.
 
 Cancellation is honoured between steps and inside each engine call. A failed step deletes its partial files.
@@ -355,7 +415,38 @@ Cancellation is honoured between steps and inside each engine call. A failed ste
 - **Pitch** (`pitch.py`): pYIN on the vocals (16 kHz, fmin 65, fmax 1000, hop 320), resampled to `fps`.
   - **Held notes:** voiced runs ≥ 600 ms with pitch within ±0.5 semitone of their median → events `held: [[startMs, endMs, midi]]`.
 
-### 5.4 Meaning (`core/viz/meaning.go`)
+### 5.4 Meaning
+
+**The mood reader** (engine `viz.mood`, `toolbox_sidecar/viz/mood.py`; the default, no chat model needed):
+- **Params:** `{lines: [text…] (≤ 20,000), modelPath, tokenizerPath, anchorsCachePath}`.
+- **Encoding:**
+  - The `tokenizers` tokenizer truncates at 128 tokens; `onnxruntime` (CPU, 2 intra-op threads) runs batches of 64.
+  - Mean pooling over the attention mask, then L2-normalisation.
+- **Anchors** (`toolbox_sidecar/viz/anchors.json`, shipped with the engine):
+  - 8 English phrases per emotion and 3 per motif, from `.dev/p7-research/nlp/embed.py` (AN3 may extend them; ≤ 12 per emotion, ≤ 6 per motif).
+  - Their embeddings are computed on first use and cached in `<models>/mood/anchors-<sha1(anchors.json + model sha)>.npy`.
+- **Per line:**
+  - **Emotion scores:** for each emotion, the mean cosine of the line's 3 nearest anchors. The emotion is the argmax.
+  - **Confidence:** the margin between the best and second emotion, scaled to 0..1 (margin ÷ 0.1, clipped). A confidence below 0.2 is recorded as a weak reading.
+  - **Valence and energy:** the softmax of the scores (temperature 0.03) weights this table:
+
+    | Emotion | Valence | Energy |
+    |---|---|---|
+    | joy | 0.8 | 0.8 |
+    | love | 0.7 | 0.4 |
+    | sadness | −0.7 | 0.25 |
+    | anger | −0.6 | 0.9 |
+    | fear | −0.6 | 0.7 |
+    | calm | 0.3 | 0.15 |
+    | hope | 0.6 | 0.5 |
+    | awe | 0.5 | 0.6 |
+
+  - **Motifs:** a motif counts when its best anchor cosine is ≥ 0.54 (AN3 tunes one threshold per motif on the test set, §11.2). At most the top 3 are kept.
+- **Result:** `{lines: [{emotion, confidence, valence, energy, motifs, scores: {emotion: cos}}]}`.
+- **Speed:** about 2 ms per line on CPU (§0.3); the model loads in about 1 s and is dropped when the call ends.
+- Lines with no letters ("♪", "(instrumental)") get a neutral reading: calm, confidence 0.
+
+**Deeper reading with Local Chat** (optional, off by default; `core/viz/meaning.go`):
 - **Batches:** up to 30 lines or 2,500 characters, with the previous batch's last 3 lines as context.
 - **System prompt:**
   > "You read song lyrics or speech and describe how each line feels, for a music visualiser. For each line give: valence from -1 (dark, sad) to 1 (bright, happy); energy from 0 (still) to 1 (intense); one emotion; up to 3 visual motifs only if the line clearly evokes them; up to 2 words from the line to emphasise. Answer only with the JSON."
@@ -368,11 +459,16 @@ Cancellation is honoured between steps and inside each engine call. A failed ste
 - **Settings:** temperature 0.2; `Purpose: "Reading the mood of the words"`.
 - **Recovery:** a reply that fails the schema or has the wrong count is retried once, then the batch goes line by line. A line that still fails gets a neutral reading (valence 0, energy 0.5, calm, no motifs).
 - **Emphasis words** must match a word of the line (NFKC, case-insensitive, punctuation stripped). Matches add to the loudness emphasis (§5.1 step 6); the rest are dropped.
-- **Mood keyframes** (written to `text.json`):
-  - One keyframe per line start: its valence, energy and emotion.
-  - It is blended 70/30 with the **musical mood** at that time: valence 0.5·(major ? 1 : −1)·0.6 + 0.4·(brightness − 0.5); energy = section energy.
-  - Between lines the mood eases towards the musical mood over 4 s.
-  - **Without meaning:** keyframes every bar from the musical mood alone, with the emotion from a lookup:
+- **Merging with the reader:**
+  - Where the reader's confidence is < 0.5, the chat's emotion, valence and energy replace the reader's. Otherwise valence and energy are averaged, and the emotion stays the reader's.
+  - Motifs are the union, best-scored first, at most 3.
+- The chat reading can be used without the reader. If the mood reader isn't installed, the chat result is used alone.
+
+**Mood keyframes** (written to `text.json`; the same for every source):
+- One keyframe per line start: its valence, energy and emotion. A weak reading (confidence < 0.2) counts at half weight.
+- It is blended 70/30 with the **musical mood** at that time: valence 0.5·(major ? 1 : −1)·0.6 + 0.4·(brightness − 0.5); energy = section energy.
+- Between lines the mood eases towards the musical mood over 4 s.
+- **Without a reading** (mood off, no words, or no models): keyframes every bar from the musical mood alone, with the emotion from a lookup:
 
     | Valence | Energy < 0.33 | 0.33–0.66 | > 0.66 |
     |---|---|---|---|
@@ -401,15 +497,15 @@ Cancellation is honoured between steps and inside each engine call. A failed ste
 - All u8 (`wave` is offset by 128).
 - A 4-minute song at 60 Hz is about 2.1 MB with stems.
 
-**`t-<hash>-m<0|1>.json`:**
+**`t-<hash>-m<0|1|2>.json`:**
 ```json
-{ "version": 1, "source": "detect", "language": "en", "matched": 0.0,
+{ "version": 1, "source": "detect", "language": "en", "matched": 0.0, "moodSource": "reader",
   "lines": [ { "startMs": 15800, "endMs": 19200, "text": "We were burning bright",
                "words": [ { "startMs": 15800, "endMs": 16100, "text": "We", "emphasis": false } ],
-               "meaning": { "valence": 0.4, "energy": 0.8, "emotion": "joy", "motifs": ["fire"] } } ],
+               "meaning": { "valence": 0.4, "energy": 0.8, "emotion": "joy", "confidence": 0.62, "motifs": ["fire"] } } ],
   "mood": [ { "ms": 0, "valence": -0.1, "energy": 0.2, "emotion": "calm" } ] }
 ```
-`meaning` is absent without the model.
+`meaning` is absent with `m0`.
 
 ---
 
@@ -809,8 +905,13 @@ Steps: **Source → Analyze → Design → Export**.
   - A handoff pre-selects a fourth option, "From <Lyric Video / Subtitles>".
   - Language select for detect and paste.
 - **Separate instruments:** a switch, on by default for audio and off for video. Hint: "Lets drums, bass, vocals and other instruments drive different visuals. Takes about as long as the song."
-- **Understand the words:** a switch, on by default when words are on and a Local Chat model is ready. Hint: "Uses your Local Chat model to read the mood and imagery of each line." Without a model it is disabled, with "Download a model in Local Chat" (button).
-- DepsGate rows appear for the engine, plus `stems-default` when stems are on and `whisper-default` when words are detect or paste.
+- **Read the mood of the words:** a switch, on by default when words are on. Hint: "A small local model reads how each line feels and what it pictures (fire, rain, stars…), in any language."
+  - Under it, **"Deeper reading with Local Chat"** (off by default; disabled with "Download a model in Local Chat" when none is ready). Hint: "Slower, picks the words to emphasise and catches subtler lines."
+- DepsGate rows appear for:
+  - the engine;
+  - `stems-default` when stems are on;
+  - `whisper-default` when words are detect or paste;
+  - `mood-reader` when mood is on.
 - Footer: **Analyze**.
 
 ### 8.2 Analyze
@@ -842,7 +943,7 @@ They are built from the active section, the 3 strongest active mods (amount × c
 
 **Right panel tabs:**
 1. **Presets:**
-   - A grid of cards with live thumbnails, one shared hidden `Engine` rendering each visible preset at 320×180 at the playhead every 500 ms.
+   - A grid of cards with live thumbnails from `PresetThumbs` (`components/viz/`, shared with the `VisualsPicker`, §9.1): one hidden `Engine` renders each visible preset at 320×180 at the playhead every 500 ms.
    - The name and one-line description; "My presets" listed first.
    - Clicking applies the preset; the current design is kept in undo.
 2. **Look:**
@@ -883,30 +984,62 @@ They are built from the active section, the 3 strongest active mods (amount × c
 
 ---
 
-## 9. Integration with Lyric Video and Subtitles
+## 9. Visuals in Lyric Video and Subtitles
 
-### 9.1 Handoff seed
+My reading of "the video form, both the one with lyrics and the one without":
+- **with lyrics** is Lyric Video;
+- **without** is Subtitles' "burn into a video", which now also works from an audio file.
+
+Both get a **Visualizer background**. It has to be easy: pick a card, see it move to your own song, render.
+
+### 9.1 `VisualsPicker` (`frontend/src/components/viz/VisualsPicker.tsx`, shared)
 ```ts
-// state/ui.ts
-export interface Handoff { moduleId: string; inputs: string[]; seed?: ToolSeed }
-export type ToolSeed = {
-  kind: "timed-text";
-  from: "lyric-video" | "subtitles";
-  lines: TimedLine[];                        // = lyrics.Line JSON shape
-  look?: { font: string; textColor: string; highlightColor: string; karaoke: boolean; position: "center" | "lower" };
-  overlay?: boolean;                         // subtitles on a video → "Over the video"
-};
+interface VisualsPickerProps {
+  inputPath: string;                 // the song / audio / video the tool works on
+  lines: TimedLine[] | null;         // the tool's timed text (lyrics or cues), for word reactions and mood
+  value: VisualsSpec | null;         // { showJson, stems, useWords } (= core/viz.VisualsSpec)
+  onChange(v: VisualsSpec): void;
+  mode: "background" | "overlay";    // overlay = over a video (background layers dropped)
+  aspect: number;                    // the tool's output aspect, for the thumbnails
+  playheadMs?: number;               // the tool's player position, if it has one
+  returnTo: { moduleId: "lyric-video" | "subtitles"; label: string };
+}
 ```
-The Visualizer reads the seed on `takeHandoff`:
-- Words become "From Lyric Video/Subtitles" (`Words: "given"` with those lines).
-- The look's font and colours prefill the text style.
-- From Lyric Video, the **Lyric Stage** preset is selected; from Subtitles, **Clean Captions**.
+**What it shows, top to bottom:**
+1. **Listening (only when needed).**
+   - `VisualizerService.AnalysisFor(path, stems)` is checked first.
+   - If there is no analysis yet, it submits a `visualizer` analyze job by itself: stems as chosen (off by default), words `given` from `lines` when `useWords`, mood on when the reader is installed.
+   - Inline progress shows "Listening to the song… 40%" (about 10 s without stems). The cards show still previews until it finishes.
+2. **Cards:**
+   - "My designs" (saved in the Visualizer), then the 20 presets. In `overlay` mode the overlay presets come first.
+   - Each card is a **live thumbnail reacting to this file**, rendered by the shared thumbnail engine (§8.3), at the tool's playhead or, without a player, looping the loudest 8 s.
+   - A click selects the card.
+3. **Two simple controls:**
+   - **Intensity** (`show.reactivity`, 0–2);
+   - **Colours**: "Design's own" or one of 8 palette swatches, which sets `palette = {mode: "fixed"}`.
+4. **Two switches:**
+   - "Separate instruments", with the hint "richer reactions; takes about as long as the song". It re-analyses.
+   - "React to the words" (`useWords`, shown when `lines` exist, on by default).
+5. **"Customize in Visualizer…"**, a secondary button (round trip in §9.4).
+
+**Around it:**
+- The picker never renders text: the tool draws its own words.
+- `VisualsCanvas` (same folder) is the live background for the tools' previews: `{spec, analysis, timeMs, aspect}` → a WebGL canvas with one shared `Engine`.
 
 ### 9.2 Lyric Video
-- **Look step:** a new background card **"Reactive (Visualizer)"**. Choosing it replaces the right panel with a short explainer and a **"Design it in Visualizer"** button.
-- The button hands off `{inputs: [song], seed: {from: "lyric-video", lines, look}}`.
-- The card isn't a render option of Lyric Video itself: Lyric Video's render keeps its libass backgrounds.
-- The Render step for that card says "Render it from the Visualizer".
+- **`Look`:**
+  - `Background` gains `"visualizer"`.
+  - `Look` gains `Visuals viz.VisualsSpec` (`json:"visuals"`).
+  - The default stays `blur-cover`.
+- **Look step:**
+  - The background cards gain **"Visualizer"**, shown first with a small animated badge. Choosing it shows the `VisualsPicker` in place of the background-specific options (`mode: "background"`, the lyric sheet's lines, the Look preview's playhead).
+  - The live preview's background becomes `VisualsCanvas` under the existing HTML lyrics. The "approximate" note stays; Render preview is exact.
+  - The old `Visualiser` strip option (wave/bars) is hidden while the background is Visualizer.
+- **Render / preview** (`render.go`), with `Background == "visualizer"`:
+  1. `viz.RenderVisuals(…, mode "opaque", w×h of the canvas, 30 fps, lines = the sheet when UseWords)`. Progress 0–0.6, or 0–0.8 for preview. Preview renders only the 10 s range.
+  2. The FFmpeg graph takes `-f h264 -framerate 30 -i visuals.h264` as its background input instead of the cover/colour source. The ASS lyrics, title card and audio (original or instrumental) are unchanged. Progress 0.6–1.
+  - Validate: `"visualizer"` needs `Visuals.ShowJSON` (≤ 512 KiB).
+- **"Make the whole video in Visualizer"**, a link under the picker: hands off `{inputs: [song], seed: {kind: "timed-text", from: "lyric-video", lines, look}}` for reactive karaoke words (§9.5).
 
 ### 9.3 Subtitles
 - **`Cue` gains `Words []CueWord`** (`json:"words,omitempty"`, `CueWord {startMs, endMs, text}`):
@@ -914,7 +1047,58 @@ The Visualizer reads the seed on `takeHandoff`:
   - Editing a cue's text re-spreads its words by character share. Shifting times shifts the words.
   - Split and merge split or concatenate them.
   - `.srt`/`.vtt` saving ignores them, and loading files leaves them empty.
-- **Export step:** a new card **"Reactive subtitles"** with "Open in Visualizer". It hands off `{inputs: [video], seed: {from: "subtitles", lines: cues as lines, overlay: true}}`. It needs the source video ("Pick the video" otherwise, as for burn-in).
+- **Burn from an audio file** (new; today burn needs a video). New options:
+  ```go
+  Canvas          string           `json:"canvas"`          // burn, audio input: "16:9" | "9:16" | "1:1"
+  CanvasHeight    int              `json:"canvasHeight"`    // 720 | 1080 (short side)
+  Background      string           `json:"background"`      // burn, audio input: "visualizer" | "color" | "image"
+  BackgroundColor string           `json:"backgroundColor"` // #rrggbb
+  BackgroundPath  string           `json:"backgroundPath"`  // image
+  Visuals         *viz.VisualsSpec `json:"visuals"`         // audio: the background design; video: optional overlay visuals
+  ```
+  - Visualizer background: `RenderVisuals(opaque, canvas size, 30 fps, lines = cues)` → `MuxOpaque` with the ASS burned in (§9.6) and the input's audio.
+  - Colour: a `color` source. Image: fill + crop.
+  - The output is `<base> (subtitled).mp4`, with the font size rules of P6 §5.4 applied to the canvas.
+- **Burn onto a video with visuals** (optional): with `Visuals` set, `RenderVisuals(overlay, the video's size, its fps, lines = cues)` → `CompositeOverlay` with the ASS burned in **after** the overlay, so subtitles stay on top and readable.
+- **Export step:**
+  - The Burn card gains a **"Visuals"** row.
+  - For a video: "None" (default) or "Add visuals over the video" → `VisualsPicker` in `overlay` mode.
+  - For audio: the burn card is now enabled and titled **"Make a video"**, with Canvas, Quality and Background: **Visualizer (default)** / colour / image. Visualizer shows the picker in `background` mode.
+  - The burn style's mini preview draws the cue over `VisualsCanvas` (or the colour or image) at the current time.
+- **"Make it fully reactive in Visualizer"**, a link: hands off `{inputs: [file], seed: {kind: "timed-text", from: "subtitles", lines: cues, overlay: <is video>}}`.
+
+### 9.4 Customize round trip
+```ts
+// state/ui.ts
+export interface Handoff { moduleId: string; inputs: string[]; seed?: ToolSeed }
+export type ToolSeed =
+  | { kind: "timed-text"; from: "lyric-video" | "subtitles"; lines: TimedLine[];
+      look?: { font: string; textColor: string; highlightColor: string; karaoke: boolean; position: "center" | "lower" };
+      overlay?: boolean }
+  | { kind: "design-for"; returnTo: "lyric-video" | "subtitles"; returnLabel: string;
+      showJson: string | null; lines: TimedLine[] | null; mode: "background" | "overlay"; aspect: string; stems: boolean }
+  | { kind: "design"; showJson: string };          // returning to the tool
+```
+- **"Customize in Visualizer…"** hands off `design-for`.
+  - The Visualizer opens on **Design** with the file, the analysis (reused from the picker's), the current design (or the selected preset), the tool's lines as `given` words, and the aspect locked to the tool's.
+  - The preview shows no text; a dim note says "<Lyric Video> adds the words on top".
+- **A banner** shows across the top: "Designing visuals for Lyric Video", with **"Use in Lyric Video"** (primary) and **"Cancel"**.
+  - "Use" hands off `{moduleId: returnTo, inputs: [file], seed: {kind: "design", showJson}}`. The tool selects it as a "Custom design" card, keeps it in its options (module state), and returns to the step it came from.
+  - "Cancel" goes back without changes.
+  - Export is hidden in this mode, and "Save as my preset" stays available.
+- The tools keep their own state across the round trip: the Lyric Video sheet and the Subtitles cues live in their view stores, not just component state. The packages that own those views make this so, and test it.
+
+### 9.5 Timed text into the Visualizer
+The Visualizer reads a `timed-text` seed on `takeHandoff`:
+- Words become "From Lyric Video/Subtitles" (`Words: "given"` with those lines).
+- The look's font and colours prefill the text style.
+- From Lyric Video, the **Lyric Stage** preset is selected; from Subtitles, **Clean Captions**, in "Over the video" mode when `overlay`.
+
+### 9.6 FFmpeg helpers with burned text
+`MuxOpaque` and `CompositeOverlay` (§7.4) take an optional `ass string`, a file name in the job's TempDir.
+- When it is set, FFmpeg runs with TempDir as its working directory (P6 §3.3).
+- `,ass=subs.ass` is appended to the final video chain (after `overlay` in the composite).
+- `MuxOpaque` then re-encodes (`libx264 -preset medium -crf 18 -pix_fmt yuv420p`) instead of copying.
 
 ---
 
@@ -956,8 +1140,13 @@ type Result struct {
     Speed       float64          `json:"speed"`
 }
 ```
-- **`subtitles.Cue`** gains `Words`.
-- **`Handoff`** gains `seed`.
+- **`visualizer.Module`** implements `core.ModelProvider` (preset `mood`).
+- **`lyricvideo.Look`:** `Background` gains `"visualizer"` and a new `Visuals viz.VisualsSpec` field.
+- **`subtitles`:**
+  - `Cue` gains `Words`.
+  - `Options` gains `Canvas`, `CanvasHeight`, `Background`, `BackgroundColor`, `BackgroundPath` and `Visuals`.
+  - `Validate` allows burn on an audio input when a background is set.
+- **`Handoff`** gains `seed` (§9.4).
 - **New events:** `viz:render`, `viz:render-ack` and `viz:render-cancel` (§4.5).
 
 ---
@@ -975,7 +1164,11 @@ type Result struct {
   - **Plan writing:** URLs, not paths.
   - **Mux / composite** arg tables: rotation, VFR → 30, audio copy vs AAC, loop base, MJPEG.
   - **Cache:** keys, reuse per step, prune by age and size.
-  - **Meaning:** with a fake `TextGenerator`:
+  - **Mood:**
+    - the reader result is mapped into `text.json`;
+    - a missing reader → music mood plus a warning;
+    - with a fake `TextGenerator`, the chat merge rules (confidence < 0.5 replaces; the motif union capped at 3).
+  - **Deeper reading:** with a fake `TextGenerator`:
     - batching and context lines;
     - schema retries and the line-by-line fallback;
     - emphasis filtering;
@@ -985,7 +1178,13 @@ type Result struct {
   - `Validate` tables;
   - `Run` analyze and render against fakes (a fake engine caller, a fake broker that writes a canned H.264);
   - outputs and result fields.
-- **`modules/subtitles`:** words carried through generate, edit, split, merge and shift.
+- **`core/viz.RenderVisuals`:** with fakes. The show's text is forced to null, progress maps into [p0, p1], the analysis is reused when cached, and lines are passed as `given` words.
+- **`modules/subtitles`:**
+  - words carried through generate, edit, split, merge and shift;
+  - burn from audio: Validate (canvas and background rules), and the argument graph for visualizer, colour and image backgrounds;
+  - burn on video with `Visuals`: overlay then ASS.
+- **`modules/lyricvideo`:** the `visualizer` background replaces the background input in the graph; preview renders only its 10 s range; Validate needs `Visuals.ShowJSON`.
+- **`modules/visualizer`:** `ModelPresent`/`FetchModel` for `mood`, with the OS-specific file chosen by `runtime.GOOS/GOARCH`.
 - **Integration** (`-tags integration`):
   - `MuxOpaque` and `CompositeOverlay` with a libx264 Annex-B stream generated by FFmpeg in the test as the "renderer output". The test checks:
     - the frame count, duration and audio;
@@ -1004,6 +1203,11 @@ type Result struct {
   - `fps` 30 for a fake 21-minute duration (mocked length);
   - a 61-minute input is a validation error.
 - **Stem fallbacks** produce the same channel ids without stems.
+- **Mood reader** (`test_viz_mood.py`):
+  - The labelled set `tests/data/mood_lines.json` has ≥ 120 lines written for the tests, ≥ 25 of them non-English across ≥ 5 languages, with an emotion and motifs for each. The 34 lines of `.dev/p7-research/nlp/bench.py` are a seed, and none of them may be an anchor.
+  - The test runs only when the model is present (`TOOLBOX_SLOW=1` downloads it).
+  - Targets: emotion accuracy ≥ 0.75 overall and ≥ 0.6 on non-English; motif precision ≥ 0.8 with recall ≥ 0.5.
+  - Unit tests without the model use a fake encoder: pooling and normalisation, the anchor cache key, the valence/energy softmax table, empty and symbol-only lines.
 - **Slow** (`TOOLBOX_SLOW=1`): real `htdemucs` on a 20 s mix, then `viz.analyze` with stems.
 
 ### 11.3 Frontend (Vitest, jsdom, no WebGL)
@@ -1021,8 +1225,20 @@ type Result struct {
   - Reactions add, change and remove update the show; Layers reorder and delete;
   - undo/redo;
   - Export option rules (2160p gating, overlay hiding aspect);
-  - handoff seeds from Lyric Video and Subtitles prefill the Source.
-- **Lyric Video / Subtitles:** the new cards hand off the right seed.
+  - handoff seeds prefill the Source (`timed-text`) or open Design in round-trip mode (`design-for`), with the banner, Use and Cancel.
+- **`VisualsPicker`:**
+  - it starts an analysis only when `AnalysisFor` misses, and shows its progress;
+  - selecting a card calls `onChange` with that preset's show;
+  - Intensity and Colours edit the show;
+  - Customize hands off `design-for`; a returning `design` seed selects "Custom design".
+- **Lyric Video:**
+  - the Visualizer card shows the picker and hides the old strip option;
+  - the sheet survives the round trip;
+  - the "whole video" link hands off `timed-text`.
+- **Subtitles:**
+  - an audio input enables "Make a video" with Visualizer as the default background;
+  - a video input shows the Visuals row with None as the default;
+  - the cues survive the round trip.
 
 ### 11.4 Visual lab and checks (`viz/lab/VizLab.tsx`, `TOOLBOX_VIZLAB=1`)
 - A dev-only view (`TOOLBOX_VIEW=vizlab` with `TOOLBOX_VIZLAB=1`; otherwise the route doesn't exist):
@@ -1052,7 +1268,11 @@ type Result struct {
 1. Archive P6's spec (done); update `docs/ROADMAP.md` (done).
 2. `core/lyrics`, moved with its tests; Lyric Video converts at its boundary.
 3. `core/viz` types, the Analyzer/RenderBroker/mux signatures with stub bodies, the cache paths and prune; RawMessageHandler wiring and events in `main.go`/`api/events.go`.
-4. `modules/visualizer` stub (§4.6) with final options, `Validate` and service; packs (§4.7); engine 0.7.0 with the `viz.analyze` stub.
+4. `modules/visualizer` stub (§4.6) with final options, `Validate` and service, plus the mood reader's pins and `ModelProvider` stub.
+   - Packs (§4.7): the `mood-reader` component with its measured size.
+   - Engine 0.7.0 with the `viz.analyze`, `viz.mood` and `viz.prefetch` stubs.
+   - The new option fields of Lyric Video (`Look.Visuals`) and Subtitles (§9.3), with `Validate`.
+   - `core/viz.VisualsSpec` and the `RenderVisuals` signature.
 5. Bindings, `lib/api.ts` re-exports, icons, the `Handoff.seed` type, the tool view stub, `RenderHost` mounted.
 6. **`viz/` working minimum:**
    - `types.ts` (final), `validateShow`, and `analysis.ts`, `signals.ts` and `palette.ts` complete with tests;
@@ -1069,7 +1289,8 @@ type Result struct {
 | WP | Owns | Acceptance |
 |---|---|---|
 | **AN1 Analysis engine** | `sidecar/.../handlers/viz.py`, `toolbox_sidecar/viz/**`, `sidecar/tests/test_viz.py` | §5.2–5.3, §5.5 audio schema; §11.2 |
-| **AN2 Analysis orchestration** | `core/viz/analyze.go`, `meaning.go`, `cache.go` (+ tests) | §5.1, §5.4, §5.5 text schema; §11.1 |
+| **AN2 Analysis orchestration** | `core/viz/analyze.go`, `meaning.go`, `cache.go`, `visuals.go` (`RenderVisuals`) (+ tests) | §4.3 visuals, §5.1, §5.4 merge rules, §5.5 text schema; §11.1 |
+| **AN3 Mood reader** | `toolbox_sidecar/viz/mood.py`, `anchors.json`, the `viz.mood`/`viz.prefetch` parts of `handlers/viz.py` (AN1 owns the rest of that file; a marked block), `sidecar/tests/test_viz_mood.py`, `tests/data/mood_lines.json` | §5.4 reader; §11.2 targets |
 | **RB1 Render broker + FFmpeg** | `core/viz/broker.go`, `mux.go`, `plan.go` (+ tests, integration) | §7.2 (Go side), §7.4; §11.1 |
 | **VM1 Visualizer module** | `modules/visualizer/**` (except frozen files) | §7.1, §10; Go tests against fakes |
 | **RH1 Render host + worker** | `viz/RenderHost.tsx`, `viz/worker/**` | §7.2 (web side), §7.3; transport tests; a real export from VizLab |
@@ -1078,15 +1299,17 @@ type Result struct {
 | **L3 Particles, accents, motifs** | `viz/layers/{embers,bursts,fireflies,ripples,shockwave,sweep,lightrays,frame,motif}.ts`, the sprite atlas generator | §6.7 #21–28, #30 |
 | **PX1 Post + transitions** | `viz/post/**` (beyond Wave 0's), transitions in `engine.ts`' transition module (`viz/transitions.ts`) | §6.5 steps 3 and 5, §6.7 post list |
 | **TX1 Text layer** | `viz/text/**` | §6.8; layout tests; lab PNGs at 16:9 and 9:16 |
-| **SB3 Subtitles words** | `modules/subtitles` Cue words + the edit operations in `tools/subtitles/**` | §9.3 (words), tests |
+| **SB3 Subtitles words** | `modules/subtitles` Cue words + the edit operations in `tools/subtitles/**` | §9.3 (words), tests. SB4 builds on it in Wave 2 |
 
-### Wave 2 (parallel, after Wave 1 merges)
+### Wave 2 (parallel, after Wave 1 merges; VP1 also needs PR1's preset list, so it starts with the reference preset and picks up the rest when PR1 merges)
 | WP | Owns | Acceptance |
 |---|---|---|
 | **PR1 Presets + director** | `viz/presets/**`, `viz/director.ts` | §6.9, §6.10: 20 presets that validate; contact sheets reviewed by the architect; each ≥ 50 fps at 720p in the lab |
 | **UI-V1 Source + Analyze + Song Map** | `tools/visualizer/{SourceStep,AnalyzeStep,SongMap}*` | §8.1, §8.2 |
-| **UI-V2 Design + Export** | `tools/visualizer/{DesignStep,Preview,WhyPanel,Presets,Look,Reactions,Layers,Timeline,ExportStep}*`, `VisualizerView.tsx` | §8.3, §8.4 |
-| **IN1 Handoffs** | the Lyric Video Look card + Render note (`tools/lyric-video/**`), the Subtitles Export card (`tools/subtitles/**`), the seed reading in `tools/visualizer/useSeed.ts` | §9 |
+| **UI-V2 Design + Export** | `tools/visualizer/{DesignStep,Preview,WhyPanel,Presets,Look,Reactions,Layers,Timeline,ExportStep,RoundTripBanner,useSeed}*`, `VisualizerView.tsx` | §8.3, §8.4, §9.4 (Visualizer side), §9.5 |
+| **VP1 Visuals picker** | `frontend/src/components/viz/**` (`VisualsPicker`, `VisualsCanvas`, the shared `PresetThumbs` thumbnail engine that UI-V2's Presets tab also uses) | §9.1; FE tests |
+| **LV3 Lyric Video visuals** | `modules/lyricvideo` (`Look.Visuals`, the render/preview graph) + `tools/lyric-video/**` (card, picker, preview background, the "whole video" link, sheet store) | §9.2; Go + FE tests; a real render |
+| **SB4 Subtitles visuals** | `modules/subtitles` (audio burn, overlay burn) + `tools/subtitles/**` (Make a video, Visuals row, round trip, the reactive link) | §9.3; Go + FE + integration tests |
 
 Palette commands for the Visualizer (open, Analyze, Render, Render preview, Full screen) go in the marked block of `shell/useBuiltinCommands.ts` (UI-V2).
 
@@ -1095,11 +1318,14 @@ Palette commands for the Visualizer (open, Analyze, Render, Render preview, Full
 2. VizLab contact sheets: review all 20 presets × 5 moments and send back any that look poor.
 3. Determinism and parity checks.
 4. Measurements against §13.
-5. A real song end to end (detect + meaning).
+5. A real song end to end (detect + mood reader; then with Deeper reading).
 6. A subtitled talking-head video in overlay mode.
-7. The Lyric Video and Subtitles handoffs.
-8. No listeners during a render.
-9. DECISIONS.md and the summary.
+7. A Lyric Video with a Visualizer background, including a Customize round trip.
+8. A podcast-style audio file → Subtitles "Make a video" with a Visualizer background.
+9. The `timed-text` handoffs.
+10. No listeners during a render.
+11. The mood-reader download in a fresh sandbox (Music pack): disk use within ±10% of the card.
+12. DECISIONS.md and the summary.
 
 ---
 
@@ -1109,7 +1335,7 @@ Palette commands for the Visualizer (open, Analyze, Render, Render preview, Full
    - The raw-message channel ignores wrong tokens, wrong origins and child frames (tests).
 2. **Analysis (Windows box, 4-minute song):**
    - audio features without stems ≤ 20 s;
-   - with stems + detect + meaning ≤ 1.5× the song length plus the model's reply time;
+   - with stems + detect + mood reader ≤ 1.5× the song length (Deeper reading adds the chat model's reply time);
    - a second analysis of the same file ≤ 2 s (cache).
    - On a real song: tempo matches a manual count (or its double or half), and the chorus is labelled on at least 2 of its occurrences.
 3. **Export speed (Windows box):**
@@ -1128,11 +1354,16 @@ Palette commands for the Visualizer (open, Analyze, Render, Render preview, Full
 7. **Words:**
    - with lyrics, karaoke text is in sync (word fill within ±1 frame of the word times);
    - emphasised words stand out;
-   - with a chat model, the mood strip and motifs follow the lyrics on a test song (e.g. a line about fire shows the fire motif).
+   - with the mood reader alone, the mood strip and motifs follow the lyrics on a test song (e.g. a line about fire shows the fire motif); the mood-reader targets in §11.2 pass.
 8. **Video overlay:**
    - Over a subtitled talking-head video, Clean Captions shows readable subtitles that pop on emphasis.
    - The output keeps the video's size, rotation, fps and audio.
-9. **Handoffs:** Lyric Video and Subtitles open the Visualizer with the song or video and the timed text, and the defaults are as in §9.
+9. **Visuals in the other tools:**
+   - In Lyric Video, choosing the Visualizer background and a preset takes ≤ 3 clicks and ~10 s of listening, and the preview moves to the song.
+   - The render has the visuals under the libass lyrics.
+   - "Customize in Visualizer…" round-trips with the sheet intact.
+   - Subtitles makes a captioned video from an audio file with a Visualizer background, and adds overlay visuals under the subtitles of a video.
+   - The `timed-text` handoffs open the Visualizer with the defaults of §9.5.
 10. **Quality:** no visible banding in dark gradients after export (dither), no jagged lines (SDF), no flicker from raw signals (envelopes) — checked on the contact sheets and one exported video.
 11. **Housekeeping:**
     - all checks are clean (`go vet`, `go test`, pytest, `npm run check`, gofmt, darwin cross-vet);
@@ -1148,7 +1379,7 @@ Palette commands for the Visualizer (open, Analyze, Render, Render preview, Full
 - **Analysis quality on real music:**
   - Beat tracking and section labels are heuristics. Labels can be wrong (the Song Map lets users reassign scenes per section, and nothing depends on a label being right).
   - Whisper on singing is weak (P6 risk), so "Paste lyrics" stays recommended.
-- **Small local models reading mood** can be shallow or repetitive. The schema keeps replies well-formed, the blend with musical mood keeps the visuals sensible, and meaning is optional.
+- **The mood reader is approximate.** It scored 0.86 on English test lines and 4 of 6 on other languages in research, and lines that only hint at a feeling come out weak. Weak readings count half, mood always blends with the musical mood, the "Why" readout shows what it read, and Deeper reading (Local Chat) is there for subtler lyrics. Imagery has a high threshold, so a wrong motif is rarer than a missed one.
 - **GPU differences** (ANGLE D3D11 vs Metal) can change shader precision. Shaders use `highp` and avoid derivative-dependent tricks in the parity path; VizLab parity runs on each OS.
 - **Text in workers on macOS** (`OffscreenCanvas` 2D fonts) is *docs only*. If system fonts don't resolve there, text is rasterised on the main thread and transferred as `ImageBitmap`s to the worker (the atlas is small).
 - **Scope:** 31 layers and 20 presets is a lot of art direction for builders. VizLab contact sheets make every layer visible to its builder, and the architect reviews them before the presets are accepted. Presets can ship in fewer numbers if some don't meet the bar (logged in DECISIONS).
