@@ -16,6 +16,7 @@ import { layerDef } from "../layers/registry";
 import { PRESETS, showFromPreset, type Preset } from "../presets";
 import type { LayerType, Show } from "../types";
 import { toBase64 } from "../worker/transport";
+import { runParity } from "./parity";
 
 function send(name: string, bytes: Uint8Array): void {
   System.invoke(`vzlab|${name}|${toBase64(bytes)}`);
@@ -86,20 +87,40 @@ export default function VizLab() {
     let stop = false;
     (async () => {
       let a: Analysis;
+      let urls: { audioJsonUrl: string; featuresUrl: string; textJsonUrl: string } | null = null; // parity: the worker loads the same analysis
       const key = q.get("key");
       if (key) {
         const r = await VisualizerService.Analysis(key);
-        a = await loadAnalysis({
+        urls = {
           audioJsonUrl: await MediaService.URLFor(r.audioJson),
           featuresUrl: await MediaService.URLFor(r.featuresPath),
-          textJsonUrl: r.textJson ? await MediaService.URLFor(r.textJson) : undefined,
-        });
+          textJsonUrl: r.textJson ? await MediaService.URLFor(r.textJson) : "",
+        };
+        a = await loadAnalysis({ ...urls, textJsonUrl: urls.textJsonUrl || undefined });
         say(`analysis ${key}`);
       } else {
         a = buildFixture({ durationMs: 60_000 });
         say("synthetic fixture (60 s)");
       }
       const canvas = ref.current as HTMLCanvasElement;
+      // --- parity mode (SPEC.md 11.4): ?parity=1 --------------------------------
+      if (q.get("parity") === "1") {
+        const all = PRESETS.filter((p) => !q.get("only") || p.id === q.get("only"));
+        const report = await runParity({
+          presets: all,
+          analysis: a,
+          analysisUrls: urls,
+          fixtureMs: 60_000,
+          canvas,
+          timesFor: (an) => moments(an).filter((_, i) => i % 2 === 0).map(([, t]) => t),
+          say,
+        });
+        sendJSON("parity.json", report);
+        sendJSON("done.json", { parity: report.ok, presets: all.length, at: new Date().toISOString() });
+        say(report.ok ? "parity ok" : "parity FAILED");
+        return;
+      }
+      // --- end parity mode ---------------------------------------------------
       const only = q.get("only");
       const layer = q.get("layer") as LayerType | null;
       const presets: Preset[] = layer

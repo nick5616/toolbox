@@ -16,6 +16,18 @@ export interface StartInfo {
   frames: number;
 }
 
+export interface ParityRequest {
+  showJson: string;
+  /** null = the synthetic fixture of `fixtureMs`. */
+  analysis: { audioJsonUrl: string; featuresUrl: string; textJsonUrl: string } | null;
+  fixtureMs: number;
+  width: number;
+  height: number;
+  seed: number;
+  fps: number;
+  timesMs: number[];
+}
+
 /** Worker → main thread. */
 export type WorkerMessage =
   | { type: "start"; info: StartInfo }
@@ -23,10 +35,57 @@ export type WorkerMessage =
   | { type: "progress"; frame: number; frames: number }
   | { type: "done"; frames: number; bytes: number }
   | { type: "cancelled" }
-  | { type: "error"; message: string; detail: string };
+  | { type: "error"; message: string; detail: string }
+  | { type: "parity-result"; frames: ArrayBuffer[] };
 
 /** Main thread → worker. */
-export type HostMessage = { type: "render"; token: string; planUrl: string } | { type: "cancel" } | { type: "ack"; bytes: number };
+export type HostMessage =
+  | { type: "render"; token: string; planUrl: string; forceJpeg?: boolean }
+  | { type: "parity"; req: ParityRequest }
+  | { type: "cancel" }
+  | { type: "ack"; bytes: number };
+
+/** A user-facing render failure: `message` for the job, `detail` for the log. */
+export class RenderError extends Error {
+  constructor(
+    message: string,
+    readonly detail = "",
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * Back-pressure on the bytes in flight (SPEC.md 7.2): the worker may be at
+ * most `limit` bytes ahead of what Go has acknowledged.
+ */
+export class FlowControl {
+  sent = 0;
+  acked = 0;
+  cancelled = false;
+  private waiters: Array<() => void> = [];
+
+  constructor(private readonly limit = MAX_IN_FLIGHT) {}
+
+  addSent(n: number): void {
+    this.sent += n;
+  }
+  ack(bytes: number): void {
+    this.acked = Math.max(this.acked, bytes);
+    this.wake();
+  }
+  cancel(): void {
+    this.cancelled = true;
+    this.wake();
+  }
+  private wake(): void {
+    for (const w of this.waiters.splice(0)) w();
+  }
+  /** Resolves when sent - acked is within the limit, or on cancel. */
+  async waitWindow(): Promise<void> {
+    while (this.sent - this.acked > this.limit && !this.cancelled) await new Promise<void>((r) => this.waiters.push(r));
+  }
+}
 
 /** base64 of bytes: native when available, else chunked btoa. */
 export function toBase64(u8: Uint8Array): string {
