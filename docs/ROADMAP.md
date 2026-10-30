@@ -6,7 +6,7 @@ Agreed on 2026-10-28; the Visualizer was cut in line as Phase 7 on 2026-10-29. E
 |---|---|
 | 5 (done) | Local Chat, OCR, Vault, **tool packs + first-run setup** (managed FFmpeg/Deno, measured sizes, movable tools folder), FLAC stems by default. See `docs/specs/phase-5.md`. |
 | 6 (done) | New tools: Video Trimmer, Subtitles (generate, translate, burn in), Audio Cleanup (denoise + loudness), Lyric Video, Redact (face and number-plate blur), Object Eraser (inpainting), Dev Utilities. See `docs/specs/phase-6.md`. |
-| 7 | **Visualizer**: reactive visuals for songs, lyrics and subtitled videos, built from the `song-visualizer` repo's ideas on a GPU engine; reacts to separated instruments, beat and sections, chords, words and their mood. See `SPEC.md`. |
+| 7 (done) | **Visualizer**: reactive visuals for songs, lyrics and subtitled videos, built from the `song-visualizer` repo's ideas on a GPU engine; reacts to separated instruments, beat and sections, chords, words and their mood. See `SPEC.md`. |
 | 8 | **Pipelines** page: user-defined chains of tools, plus the built-in templates below. |
 | 9 | Documents: Pandoc conversion (+ Typst for PDF), maybe Calibre ebook conversion; the Web Archiver placeholder. |
 | 10 (last) | LAN file transfer, LocalSend-protocol compatible. Opt-in, listens only while the Share panel is open, pairing + accept prompt. Needs an explicit amendment to the "no network listeners" app rule. |
