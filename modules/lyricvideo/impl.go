@@ -136,7 +136,7 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 		return m.runLyrics(ctx, job, o)
 	default:
 		if o.Audio == "instrumental" {
-			if _, inst := m.cachedStems(job.Inputs[0]); inst == "" {
+			if m.bestInstrumental(job.Inputs[0]) == "" {
 				if _, err := job.Tool(sidecar.DepID); err != nil {
 					return err
 				}

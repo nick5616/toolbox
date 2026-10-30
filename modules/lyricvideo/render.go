@@ -15,11 +15,18 @@ import (
 	"toolbox/core"
 	"toolbox/core/media"
 	"toolbox/core/proc"
+	"toolbox/core/viz"
 )
 
 const (
 	previewMs = 10_000
 	fps       = 30
+)
+
+// Seams for tests.
+var (
+	renderVisuals = viz.RenderVisuals
+	probeMedia    = media.Probe
 )
 
 // normalize fills defaults for empty look fields and fixes the sheet's
@@ -76,6 +83,8 @@ type renderPlan struct {
 	OutName   string
 	BgKind    string // effective background after fallbacks
 	GradColor [2]string
+	// Visuals is the rendered background stream for BgKind "visualizer".
+	Visuals viz.RenderOutput
 }
 
 // effectiveBackground applies the "no cover art" fallback.
@@ -116,14 +125,16 @@ func (p renderPlan) filterGraph() (graph, out string) {
 		)
 	case "image", "video":
 		parts = append(parts, fmt.Sprintf("[1:v]%s,setsar=1,fps=%d,format=yuv420p[bg]", fillCrop(w, h), fps))
+	case "visualizer":
+		parts = append(parts, fmt.Sprintf("[1:v]setsar=1,fps=%d,format=yuv420p[bg]", fps))
 	default: // color, gradient
 		parts = append(parts, "[1:v]setsar=1,format=yuv420p[bg]")
 	}
-	if v := p.O.Look.Visualizer; v == "wave" || v == "bars" {
+	if p.hasStrip() {
 		parts = append(parts, "[0:a]asplit=2[aout][avis]")
 		colors := ffColor(p.O.Look.HighlightColor) + "@0.6"
 		size := fmt.Sprintf("%dx%d", p.Lay.W, p.Lay.VisH)
-		if v == "wave" {
+		if p.O.Look.Visualizer == "wave" {
 			parts = append(parts, fmt.Sprintf("[avis]showwaves=s=%s:mode=cline:colors=%s:r=%d,format=yuva420p[vis]", size, colors, fps))
 		} else {
 			parts = append(parts, fmt.Sprintf("[avis]showfreqs=s=%s:mode=bar:fscale=log:colors=%s:rate=%d,format=yuva420p[vis]", size, colors, fps))
@@ -135,9 +146,16 @@ func (p renderPlan) filterGraph() (graph, out string) {
 	return strings.Join(parts, ";"), "[v]"
 }
 
+// hasStrip reports whether the wave/bars strip is drawn. It is hidden with a
+// visuals background (SPEC.md §9.2).
+func (p renderPlan) hasStrip() bool {
+	v := p.O.Look.Visualizer
+	return (v == "wave" || v == "bars") && p.BgKind != "visualizer"
+}
+
 // audioMap is the -map value for the song audio.
 func (p renderPlan) audioMap() string {
-	if v := p.O.Look.Visualizer; v == "wave" || v == "bars" {
+	if p.hasStrip() {
 		return "[aout]"
 	}
 	return "0:a"
@@ -165,6 +183,12 @@ func (p renderPlan) args() []string {
 		a = append(a, "-loop", "1", "-framerate", fmt.Sprint(fps), "-t", d, "-i", p.BgPath)
 	case "video":
 		a = append(a, "-stream_loop", "-1", "-t", d, "-i", p.BgPath)
+	case "visualizer":
+		f := "h264"
+		if p.Visuals.Codec == "mjpeg" {
+			f = "mjpeg"
+		}
+		a = append(a, "-f", f, "-framerate", fmt.Sprint(fps), "-i", p.Visuals.Path)
 	}
 	graph, vout := p.filterGraph()
 	a = append(a, "-filter_complex", graph, "-map", vout, "-map", p.audioMap(),
@@ -211,8 +235,9 @@ func extractCover(ctx context.Context, ffmpeg, song, dir string) (string, error)
 // runRender is the "render" and "preview" actions.
 func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options) error {
 	o = normalize(o)
-	if o.Look.Background == "visualizer" { // LV3 (SPEC.md §9.2)
-		return core.Errorf(core.CodeInternal, "not built yet")
+	visual := o.Look.Background == "visualizer"
+	if visual && (m.an == nil || m.br == nil) {
+		return core.Errorf(core.CodeInternal, "Visual backgrounds aren't available")
 	}
 	song := job.Inputs[0]
 	preview := o.Action == ActionPreview
@@ -230,17 +255,18 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options)
 	audio := song
 	from := 0.0
 	if o.Audio == "instrumental" {
-		_, inst := m.cachedStems(song)
+		inst := m.bestInstrumental(song)
 		if inst == "" {
 			var err error
 			_, inst, err = m.ensureStems(ctx, job.Scoped(0, 0.3), song)
 			if err != nil {
 				return err
 			}
+			from = 0.3
 		}
-		audio, from = inst, 0.3
+		audio = inst
 	}
-	info, err := media.Probe(ctx, ffprobe, audio)
+	info, err := probeMedia(ctx, ffprobe, audio)
 	if err != nil {
 		return err
 	}
@@ -270,6 +296,10 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options)
 		}
 	}
 	kind, fell := effectiveBackground(o.Look, hasCover)
+	if visual {
+		kind, fell = "visualizer", false
+		o.Look.Visualizer = "none" // the wave/bars strip is hidden with visuals
+	}
 	if fell {
 		job.Logf("This song has no cover art, so the background is a gradient. Pick a colour, image or video background to change it.")
 		job.Log(core.StreamStderr, "No cover art: using a gradient background")
@@ -280,6 +310,19 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options)
 	plan.O = o
 	w, h := canvasSize(o.Aspect, o.Height)
 	plan.Lay = computeLayout(o, w, h)
+
+	if visual {
+		to := 0.6
+		if preview {
+			to = 0.8
+		}
+		out, err := m.renderBackground(ctx, job, o, song, plan, from, to)
+		if err != nil {
+			return err
+		}
+		plan.Visuals = out
+		from = to
+	}
 
 	if err := plan.writeASS(job.TempDir); err != nil {
 		return core.Errorf(core.CodeInternal, "Couldn't write the lyrics script").WithCause(err)
@@ -357,10 +400,38 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options)
 		}
 		res.Outputs = append(res.Outputs, lrc)
 	}
-	_, inst := m.cachedStems(song)
-	res.HasInstrumental = inst != ""
+	res.HasInstrumental = m.bestInstrumental(song) != ""
 	job.Progress(1, "Saved "+filepath.Base(video))
 	return job.SetResult(res)
+}
+
+// bestInstrumental is the instrumental to use for song: the Visualizer's
+// 4-stem mix when its analysis has one, else Lyric Video's own 2-stem cache.
+func (m *Module) bestInstrumental(song string) string {
+	if m.an != nil {
+		if key, err := viz.FileKey(song); err == nil {
+			if p := filepath.Join(m.an.CacheDir(), key, "instrumental.flac"); fileExists(p) {
+				return p
+			}
+		}
+	}
+	_, inst := m.cachedStems(song)
+	return inst
+}
+
+// renderBackground renders the visuals stream for the plan's time range
+// (SPEC.md §9.2): 30 fps, opaque, at the canvas size, progress p0 to p1.
+func (m *Module) renderBackground(ctx context.Context, job *core.JobContext, o Options, song string, plan renderPlan, p0, p1 float64) (viz.RenderOutput, error) {
+	w, h := canvasSize(o.Aspect, o.Height)
+	var lines []LyricLine
+	if o.Look.Visuals.UseWords {
+		lines = o.Lines
+	}
+	var rng viz.Range
+	if plan.isPreview() {
+		rng = viz.Range{StartMs: plan.StartMs, EndMs: plan.StartMs + plan.DurMs}
+	}
+	return renderVisuals(ctx, job, m.an, m.br, song, o.Look.Visuals, lines, w, h, fps, viz.ModeOpaque, rng, p0, p1)
 }
 
 // writeLRCFile writes <base>.lrc into the library and registers it.
