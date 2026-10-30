@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -395,5 +396,29 @@ func TestInstrumentalArgs(t *testing.T) {
 	want := []string{"-hide_banner", "-nostdin", "-y", "-i", "d", "-i", "b", "-i", "o", "-filter_complex", "amix=inputs=3:normalize=0", "-c:a", "flac", "out.flac"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("args = %v", got)
+	}
+}
+
+func TestAnalyzeVideoExtractsAudio(t *testing.T) {
+	eng := newFakeEngine(t)
+	a, song := fakeSong(t, eng, nil)
+	video := strings.TrimSuffix(song, ".mp3") + ".mp4"
+	if err := os.Rename(song, video); err != nil {
+		t.Fatal(err)
+	}
+	ff := fakeFFmpeg(t)
+	job := newJob(t, &jobRec{tools: map[string]string{"ffmpeg": "ffmpeg", sidecar.DepID: "engine"}})
+	if _, err := a.Analyze(context.Background(), job, video, AnalyzeOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*ff) != 1 || !slices.Contains((*ff)[0], "-vn") {
+		t.Fatalf("ffmpeg calls = %v", *ff)
+	}
+	path, _ := eng.params["viz.analyze"]["path"].(string)
+	if !strings.HasSuffix(path, "audio-s0.wav") {
+		t.Errorf("engine got %q, want the extracted WAV", path)
+	}
+	if fileOK(path) {
+		t.Error("the extracted WAV should be removed after the analysis")
 	}
 }

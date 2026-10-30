@@ -132,6 +132,44 @@ type analysis struct {
 	stems   string // <folder>/stems
 	created []string
 	paths   map[string]string // lower-case stem name -> path
+	audio   string            // what the engine decodes: the input, or a WAV extracted from it
+}
+
+// engineReads lists the formats the engine's decoder (libsndfile) opens
+// directly; everything else (video, m4a, aac, opus, wma…) is extracted first.
+var engineReads = map[string]bool{".wav": true, ".flac": true, ".mp3": true, ".ogg": true, ".aiff": true, ".aif": true}
+
+// engineAudio returns a path the engine can decode, extracting the input's
+// first audio stream to a temporary WAV in the analysis folder when needed
+// (44.1 kHz stereo for stem separation, else 32 kHz mono). The WAV is removed
+// when the analysis ends.
+func (r *analysis) engineAudio(ctx context.Context) (string, error) {
+	if r.audio != "" {
+		return r.audio, nil
+	}
+	if engineReads[strings.ToLower(filepath.Ext(r.input))] {
+		r.audio = r.input
+		return r.audio, nil
+	}
+	ffmpeg, err := r.job.Tool("ffmpeg")
+	if err != nil {
+		return "", err
+	}
+	out := filepath.Join(r.folder, fmt.Sprintf("audio-s%d.wav", b2i(r.o.Stems)))
+	rate, ch := "32000", "1"
+	if r.o.Stems {
+		rate, ch = "44100", "2"
+	}
+	args := []string{"-hide_banner", "-nostdin", "-y", "-i", r.input, "-vn", "-map", "0:a:0", "-ac", ch, "-ar", rate, "-c:a", "pcm_s16le", out}
+	if err := runFFmpeg(ctx, ffmpeg, args); err != nil {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		return "", core.Errorf(core.CodeToolFailed, "Couldn't read the sound of this file").WithHint("Does it have an audio track?").WithCause(err)
+	}
+	r.created = append(r.created, out)
+	r.audio = out
+	return out, nil
 }
 
 func (r *analysis) audioJSON() string {
@@ -215,6 +253,9 @@ func (a *Analyzer) analyze(ctx context.Context, job *core.JobContext, input stri
 	_ = os.Chtimes(r.folder, now, now)
 	defer func() {
 		_ = os.RemoveAll(r.stems)
+		if r.audio != "" && r.audio != r.input {
+			_ = os.Remove(r.audio) // the extracted WAV is only needed during the run
+		}
 		if err != nil {
 			r.cleanup()
 		}
@@ -365,8 +406,12 @@ func (r *analysis) separate(ctx context.Context, job *core.JobContext) error {
 	if err := os.MkdirAll(r.stems, 0o755); err != nil {
 		return core.Errorf(core.CodeInternal, "Couldn't create the stems folder").WithCause(err)
 	}
+	audio, err := r.engineAudio(ctx)
+	if err != nil {
+		return err
+	}
 	params := map[string]any{
-		"input": r.input, "outputDir": r.stems, "model": "htdemucs.yaml", // the four-fast preset
+		"input": audio, "outputDir": r.stems, "model": "htdemucs.yaml", // the four-fast preset
 		"outputFormat": "flac", "baseName": core.StemName(r.input),
 	}
 	raw, err := r.a.sc.Call(ctx, "stems.separate", params, engineEvents(job))
@@ -403,7 +448,11 @@ func (r *analysis) features(ctx context.Context, job *core.JobContext) error {
 		stems = map[string]string{"drums": r.paths["drums"], "bass": r.paths["bass"], "vocals": r.paths["vocals"], "other": r.paths["other"]}
 	}
 	name := fmt.Sprintf("s%d", b2i(r.o.Stems))
-	params := map[string]any{"path": r.input, "stems": stems, "outDir": r.folder, "name": name}
+	audio, err := r.engineAudio(ctx)
+	if err != nil {
+		return err
+	}
+	params := map[string]any{"path": audio, "stems": stems, "outDir": r.folder, "name": name}
 	r.remember(r.audioJSON())
 	r.remember(r.audioBin())
 	if _, err := r.a.sc.Call(ctx, "viz.analyze", params, engineEvents(job)); err != nil {
@@ -603,7 +652,10 @@ func (r *analysis) words(ctx context.Context, plan wordsPlan, info *featureInfo)
 	r.job.Progress(0.6, "Reading the words")
 	lines := plan.lines
 	if plan.transcribe {
-		src := r.input
+		src, err := r.engineAudio(ctx)
+		if err != nil {
+			return nil, err
+		}
 		if r.o.Stems {
 			src = r.paths["vocals"]
 		}
