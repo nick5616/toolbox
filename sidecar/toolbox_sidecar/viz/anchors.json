@@ -1,5 +1,198 @@
 {
-  "version": 1,
-  "emotions": {},
-  "motifs": {}
+ "version": 1,
+ "defaultThreshold": 0.54,
+ "thresholds": {
+  "fire": 0.6,
+  "rain": 0.64,
+  "snow": 0.57,
+  "stars": 0.66,
+  "ocean": 0.67,
+  "flowers": 0.59,
+  "hearts": 0.6,
+  "city": 0.67,
+  "sun": 0.65,
+  "night": 0.57,
+  "storm": 0.6,
+  "smoke": 0.62
+ },
+ "emotions": {
+  "joy": [
+   "I feel so happy I could shout",
+   "we're having the best time of our lives",
+   "laughing and dancing all night long",
+   "this party is amazing",
+   "I'm on top of the world",
+   "celebrate, everybody jump",
+   "pure happiness and fun",
+   "good vibes only"
+  ],
+  "love": [
+   "I love you with all my heart",
+   "kiss me and hold me close",
+   "you are my everything, darling",
+   "I can't stop thinking about you",
+   "falling in love with you",
+   "your touch makes me melt",
+   "be mine forever, baby",
+   "my sweetheart, my lover"
+  ],
+  "sadness": [
+   "I miss you so much it hurts",
+   "crying alone in my room",
+   "you left and never came back",
+   "my heart is broken",
+   "everything feels empty without you",
+   "grief and tears tonight",
+   "lonely and lost",
+   "I'm sorry it's over"
+  ],
+  "anger": [
+   "I hate what you did to me",
+   "I'm furious, get out of my face",
+   "you betrayed me, I'm done",
+   "I'm so mad I could break something",
+   "rage burning inside me",
+   "don't you dare lie to me again",
+   "fight back and scream",
+   "I won't forgive you"
+  ],
+  "fear": [
+   "I'm scared of what's out there",
+   "something is hunting me in the dark",
+   "terrified and shaking",
+   "run, they're coming for us",
+   "a nightmare I can't wake from",
+   "danger everywhere, nowhere to hide",
+   "my heart is pounding with fear",
+   "creeping shadows haunt me"
+  ],
+  "calm": [
+   "peaceful and quiet, let it be",
+   "relax and breathe slowly",
+   "a gentle easy afternoon",
+   "everything is still and serene",
+   "rest now, take it slow",
+   "soft and soothing",
+   "drifting gently, no hurry",
+   "tranquil moment of peace"
+  ],
+  "hope": [
+   "things will get better someday",
+   "never give up, keep going",
+   "a new beginning is coming",
+   "I believe we can make it",
+   "the future is bright",
+   "rise up again after the fall",
+   "don't lose faith",
+   "there's light at the end of the tunnel"
+  ],
+  "awe": [
+   "the universe is so vast and beautiful",
+   "breathtaking view, I'm speechless",
+   "wonder at the infinite sky",
+   "something majestic and divine",
+   "how incredible it all is",
+   "staring at the cosmos in amazement",
+   "the grandeur of nature",
+   "miraculous and magnificent"
+  ]
+ },
+ "motifs": {
+  "fire": [
+   "flames and fire burning",
+   "the fire is blazing",
+   "sparks and embers",
+   "a roaring bonfire",
+   "burning",
+   "set everything ablaze"
+  ],
+  "rain": [
+   "rain falling down",
+   "raindrops on the window",
+   "pouring rain",
+   "a gray drizzle",
+   "rainy day",
+   "wet streets in the rain"
+  ],
+  "snow": [
+   "snow falling in winter",
+   "snowflakes and ice",
+   "frozen white winter",
+   "a snowy mountain",
+   "cold snow everywhere",
+   "a blanket of snow"
+  ],
+  "stars": [
+   "stars shining in the sky",
+   "galaxies and outer space",
+   "the milky way",
+   "a sky full of stars",
+   "constellations",
+   "the cosmos"
+  ],
+  "ocean": [
+   "the ocean and waves",
+   "the sea and the shore",
+   "deep blue water",
+   "a boat on the sea",
+   "waves crashing on the beach",
+   "the tide"
+  ],
+  "flowers": [
+   "flowers blooming",
+   "roses and petals",
+   "a garden of blossoms",
+   "a bouquet of tulips",
+   "daisies in a spring meadow",
+   "the scent of lavender"
+  ],
+  "hearts": [
+   "my heart beating",
+   "heartbeat",
+   "hearts",
+   "my pulse racing",
+   "two hearts together",
+   "a pounding heart in my chest"
+  ],
+  "city": [
+   "the city streets",
+   "neon lights downtown",
+   "skyscrapers and traffic",
+   "an urban skyline",
+   "crowded streets and taxis",
+   "a busy metropolis"
+  ],
+  "sun": [
+   "the sun is shining",
+   "sunrise and dawn",
+   "bright daylight",
+   "golden sunlight",
+   "a summer sunset",
+   "morning sun"
+  ],
+  "night": [
+   "in the dark of night",
+   "midnight darkness",
+   "the moon at night",
+   "a moonlit night",
+   "late at night",
+   "the black of night"
+  ],
+  "storm": [
+   "thunder and lightning storm",
+   "a raging storm",
+   "hurricane winds",
+   "dark storm clouds",
+   "a violent tempest",
+   "thunder rolls"
+  ],
+  "smoke": [
+   "smoke and fog",
+   "mist and haze",
+   "smoke rising",
+   "thick fog",
+   "clouds of smoke",
+   "a misty morning"
+  ]
+ }
 }
