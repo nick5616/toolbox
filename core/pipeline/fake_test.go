@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"toolbox/core"
 )
@@ -24,6 +26,45 @@ type fakeOpts struct {
 	Ext      string            `json:"ext"`      // made files' extension (default ".txt")
 	Template string            `json:"template"` // a {vars} field (checked by Describe)
 	Expanded string            `json:"expanded"` // set by Prepare: Template expanded (written into each file)
+
+	Hold         string `json:"hold"`         // Run blocks until gate(Hold) is released
+	FailFlag     string `json:"failFlag"`     // Run fails (with Fail or "flagged") while this file exists
+	PrepFail     string `json:"prepFail"`     // PrepareStep fails with this message ...
+	PrepFailFlag string `json:"prepFailFlag"` // ... while this file exists (always when empty)
+	NoJob        bool   `json:"noJob"`        // PrepareStep returns zero jobs
+	NoOutput     bool   `json:"noOutput"`     // Run succeeds without making files
+	FailOn       string `json:"failOn"`       // Run fails when an input's name contains this (while FailFlag exists, if set)
+}
+
+var (
+	gateMu sync.Mutex
+	gates  = map[string]chan struct{}{}
+)
+
+// gate returns the channel Run waits on for options.Hold == key.
+func gate(key string) chan struct{} {
+	gateMu.Lock()
+	defer gateMu.Unlock()
+	if gates[key] == nil {
+		gates[key] = make(chan struct{})
+	}
+	return gates[key]
+}
+
+// newGate makes key closed-state fresh (tests may run more than once).
+func newGate(key string) {
+	gateMu.Lock()
+	gates[key] = make(chan struct{})
+	gateMu.Unlock()
+}
+
+func release(key string) {
+	ch := gate(key)
+	select {
+	case <-ch:
+	default:
+		close(ch)
+	}
 }
 
 // fakeStep is a Chainable module for runner tests. It accepts .txt and .wav.
@@ -32,11 +73,21 @@ type fakeOpts struct {
 type fakeStep struct {
 	id    string
 	split bool
+
+	accepts  []string // overrides the accepted extensions
+	requires []string // descriptor Requires
+
+	cur, peak atomic.Int32 // running Run calls now / at most
+	started   atomic.Int32 // Run calls ever started
 }
 
 func (f *fakeStep) Descriptor() core.Descriptor {
-	return core.Descriptor{ID: f.id, Name: "Fake " + f.id, Icon: "box", Category: core.CategoryUtility,
-		Status: core.StatusReady, Accepts: core.Accepts{Extensions: []string{".txt", ".wav"}}, OutputSubdir: f.id, SplitInputs: f.split}
+	exts := []string{".txt", ".wav"}
+	if len(f.accepts) > 0 {
+		exts = f.accepts
+	}
+	return core.Descriptor{ID: f.id, Name: "Fake " + f.id, Icon: "box", Category: core.CategoryUtility, Requires: f.requires,
+		Status: core.StatusReady, Accepts: core.Accepts{Extensions: exts}, OutputSubdir: f.id, SplitInputs: f.split}
 }
 
 func (f *fakeStep) Validate(inputs []string, options json.RawMessage) error {
@@ -49,8 +100,45 @@ func (f *fakeStep) Run(ctx context.Context, job *core.JobContext) error {
 	if err != nil {
 		return err
 	}
-	if o.Fail != "" {
+	n0 := f.cur.Add(1)
+	f.started.Add(1)
+	defer f.cur.Add(-1)
+	for {
+		p := f.peak.Load()
+		if n0 <= p || f.peak.CompareAndSwap(p, n0) {
+			break
+		}
+	}
+	if o.Hold != "" {
+		select {
+		case <-gate(o.Hold):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	if o.FailOn != "" {
+		for _, in := range job.Inputs {
+			if strings.Contains(filepath.Base(in), o.FailOn) {
+				if _, err := os.Stat(o.FailFlag); o.FailFlag == "" || err == nil {
+					return core.ValidationError("bad input", nil)
+				}
+			}
+		}
+	}
+	if o.FailFlag != "" && o.FailOn == "" {
+		if _, err := os.Stat(o.FailFlag); err == nil {
+			msg := o.Fail
+			if msg == "" {
+				msg = "flagged"
+			}
+			return core.ValidationError(msg, nil)
+		}
+	}
+	if o.Fail != "" && o.FailFlag == "" && o.FailOn == "" {
 		return core.ValidationError(o.Fail, nil)
+	}
+	if o.NoOutput {
+		return nil
 	}
 	n := o.Make
 	if n == 0 {
@@ -128,7 +216,21 @@ func (f *fakeStep) PrepareStep(ctx context.Context, req core.StepRequest) ([]cor
 	if o.Secret && req.Secrets["pw"] == "" {
 		return nil, core.ValidationError("Needs a password", nil)
 	}
+	if o.PrepFail != "" {
+		if o.PrepFailFlag == "" {
+			return nil, core.ValidationError(o.PrepFail, nil)
+		}
+		if _, err := os.Stat(o.PrepFailFlag); err == nil {
+			return nil, core.ValidationError(o.PrepFail, nil)
+		}
+	}
+	if o.NoJob {
+		return nil, nil
+	}
 	o.Expanded, _ = core.ExpandVars(o.Template, req.Item.Vars)
+	for k, v := range o.Vars {
+		o.Vars[k], _ = core.ExpandVars(v, req.Item.Vars)
+	}
 	items := []core.StepItem{req.Item}
 	if o.Together {
 		items = req.Items
@@ -161,7 +263,9 @@ func (f *fakeStep) StepOutputs(job core.Job) (core.StepResult, error) {
 		res.Files = append(res.Files, rf)
 	}
 	for k, v := range o.Vars {
-		res.Vars[k] = v
+		if v != "<unset>" {
+			res.Vars[k] = v
+		}
 	}
 	return res, nil
 }
