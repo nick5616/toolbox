@@ -1,0 +1,253 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.expanded {
+  border-color: var(--line-strong);
+}
+
+.hasProblems {
+  border-color: var(--danger);
+}
+
+.dragging {
+  opacity: 0.6;
+  box-shadow: var(--shadow-pop);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+}
+
+.handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-subtle);
+  cursor: grab;
+  touch-action: none;
+}
+
+.handle:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.handle:focus-visible,
+.toggle:focus-visible,
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--row-h);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  background: var(--bg-hover);
+}
+
+.number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--bg-inset);
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.icon {
+  flex-shrink: 0;
+  color: var(--fg-muted);
+}
+
+.name {
+  flex-shrink: 0;
+  font-size: var(--text-md);
+  line-height: var(--text-md-lh);
+  font-weight: 500;
+}
+
+.summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--fg-subtle);
+}
+
+.moves {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.problems {
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-2) calc(var(--space-3) + 28px);
+  list-style: none;
+  color: var(--danger);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.only {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.onlyLabel {
+  margin-right: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+.chip {
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--bg-hover);
+}
+
+.chipOn {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+.muted {
+  color: var(--fg-subtle);
+  font-size: var(--text-sm);
+}
+
+.how {
+  display: flex;
+}
+
+.help {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
+.warning {
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--text-sm);
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.unknown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.keep {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.footer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}

@@ -1,0 +1,145 @@
+.root {
+  display: inline-flex;
+}
+
+.between {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: var(--space-3);
+}
+
+.endButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.endButton:hover,
+.open .endButton {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.endButton:focus-visible,
+.betweenButton:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.betweenButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--bg-raised);
+  color: var(--fg-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+
+/* Shown while hovering the gap, or when focused / open. */
+.between:hover .betweenButton,
+.betweenButton:focus-visible,
+.open .betweenButton {
+  opacity: 1;
+}
+
+.panel {
+  position: fixed;
+  z-index: 90;
+  width: 340px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--bg-raised);
+  border: 1px solid var(--pop-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+}
+
+.list {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.groupLabel {
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover,
+.item:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+
+.dim {
+  opacity: 0.55;
+}
+
+.itemIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--fg-muted);
+}
+
+.itemText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.itemName {
+  font-size: var(--text-md);
+  line-height: var(--text-md-lh);
+}
+
+.itemDesc {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--fg-muted);
+}
+
+.none {
+  padding: var(--space-3);
+  text-align: center;
+  color: var(--fg-subtle);
+  font-size: var(--text-sm);
+}
