@@ -1,0 +1,44 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+}
+
+.label {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.pair {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.note {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.note code {
+  font-family: var(--font-mono);
+}
