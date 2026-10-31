@@ -1,7 +1,6 @@
 package pipelines
 
 import (
-	"context"
 	"encoding/json"
 
 	"toolbox/core"
@@ -43,54 +42,4 @@ func (m *Module) builtins() []builtinType {
 type step struct {
 	m      *Module
 	action Action
-}
-
-// StepDefaults implements core.Chainable.
-func (s *step) StepDefaults() any {
-	switch s.action {
-	case ActionRename:
-		return DefaultRename()
-	case ActionChat:
-		return DefaultChat()
-	case ActionTable:
-		return DefaultTable()
-	case ActionZip:
-		return DefaultZip()
-	default:
-		return DefaultCopy()
-	}
-}
-
-// DescribeStep implements core.Chainable. Wave 0: static info only.
-func (s *step) DescribeStep(options json.RawMessage) (core.StepInfo, error) {
-	anyFile := core.Accepts{Extensions: []string{}, Any: true}
-	switch s.action {
-	case ActionRename:
-		return core.StepInfo{Accepts: anyFile, Produces: []core.StepProduct{{Many: true}}, Templates: []string{"/template"}, Summary: "Rename files"}, nil
-	case ActionChat:
-		return core.StepInfo{Accepts: core.Accepts{Extensions: textExts}, NoFiles: true,
-			Produces:  []core.StepProduct{{Role: "text", Label: "Text", Kind: core.KindDocument, Exts: []string{".md", ".txt"}}},
-			Vars:      []core.StepVar{{Name: "reply", Label: "Chat reply"}},
-			Templates: []string{"/prompt", "/system", "/outputName"}, Summary: "Ask Local Chat"}, nil
-	case ActionTable:
-		return core.StepInfo{Accepts: core.Accepts{Extensions: []string{}}, NoFiles: true, Together: true,
-			Produces: []core.StepProduct{{Role: "table", Label: "Table", Kind: core.KindDocument, Exts: []string{".csv"}}},
-			Summary:  "Make a table"}, nil
-	case ActionZip:
-		return core.StepInfo{Accepts: anyFile, Together: true,
-			Produces:  []core.StepProduct{{Role: "zip", Label: "Zip", Kind: core.KindOther, Exts: []string{".zip"}}},
-			Templates: []string{"/name"}, Summary: "Zip"}, nil
-	default:
-		return core.StepInfo{Accepts: anyFile, Produces: []core.StepProduct{{Many: true}}, Templates: []string{"/subfolder"}, Summary: "Copy to folder"}, nil
-	}
-}
-
-// PrepareStep implements core.Chainable.
-func (s *step) PrepareStep(ctx context.Context, req core.StepRequest) ([]core.StepJob, error) {
-	return nil, core.NotImplemented("Pipeline steps") // WP-BI1
-}
-
-// StepOutputs implements core.Chainable.
-func (s *step) StepOutputs(job core.Job) (core.StepResult, error) {
-	return core.StepResult{}, core.NotImplemented("Pipeline steps") // WP-BI1
 }

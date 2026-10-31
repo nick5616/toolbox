@@ -30,6 +30,10 @@ type RenameOp struct {
 	Name string `json:"name"` // new base name, no extension
 	Move bool   `json:"move"` // true: a file this run made (renamed in place); false: copied into Pipelines/<name>/
 	Role string `json:"role"` // carried through
+
+	// Job-side additions (BI1): what the result reports for the file.
+	RoleLabel string `json:"roleLabel"`
+	OutputID  string `json:"outputId"` // Move: the Library record to repoint
 }
 
 type ChatJob struct {
@@ -42,6 +46,7 @@ type ChatJob struct {
 	Format      string            `json:"format"`     // write: "md" | "txt"
 	SaveJSON    bool              `json:"saveJson"`   // extract: also write <name>.json
 	Temperature float64           `json:"temperature"`
+	Label       string            `json:"label"` // shown in Local Chat as "Pipeline · <label>"
 }
 
 type ChatField struct {
@@ -62,8 +67,18 @@ type ZipJob struct {
 }
 
 type CopyJob struct {
-	Folder string   `json:"folder"` // absolute, chosen by the user
+	Folder string   `json:"folder"` // absolute destination (the chosen folder plus the expanded subfolder)
 	Files  []string `json:"files"`
+	// Carry (BI1) describes Files one by one (same order) for the result;
+	// copies are not Library outputs, so the step's files stay the originals.
+	Carry []CarriedFile `json:"carry"`
+}
+
+// CarriedFile is what a job result reports for a file it passed on.
+type CarriedFile struct {
+	Role      string `json:"role"`
+	RoleLabel string `json:"roleLabel"`
+	OutputID  string `json:"outputId"`
 }
 
 // StepOptions are what the user edits, one struct per built-in type.

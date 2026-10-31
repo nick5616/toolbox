@@ -23,25 +23,11 @@ const (
 	TplMusicVideo    = "music-video"
 )
 
-// Templates returns the built-in templates in gallery order. Wave 0: IDs and
-// names only; WP-BI1 fills in blurbs, packs and steps.
+// Templates returns the built-in templates in gallery order (SPEC.md §10).
 func Templates() []core.PipelineTemplate {
-	mk := func(id, name, icon string) core.PipelineTemplate {
-		return core.PipelineTemplate{ID: id, Icon: icon, Packs: []string{},
-			Pipeline: core.Pipeline{Name: name, TemplateID: id, Steps: []core.PipelineStep{}}}
-	}
 	return []core.PipelineTemplate{
-		mk(TplSocialClip, "Clip for social", "smartphone"),
-		mk(TplPodcast, "Podcast", "mic"),
-		mk(TplSampling, "Sampling", "audio-waveform"),
-		mk(TplKaraoke, "Karaoke", "mic-vocal"),
-		mk(TplProductPhotos, "Product photos", "shopping-bag"),
-		mk(TplPaperArchive, "Paper to archive", "archive"),
-		mk(TplForeignVideo, "Foreign-language video", "languages"),
-		mk(TplReceipts, "Receipts", "receipt"),
-		mk(TplLecture, "Lecture", "graduation-cap"),
-		mk(TplBeforeSharing, "Before sharing", "shield"),
-		mk(TplMusicVideo, "Music video", "clapperboard"),
+		socialClip(), podcast(), sampling(), karaoke(), productPhotos(), paperArchive(),
+		foreignVideo(), receipts(), lecture(), beforeSharing(), musicVideo(),
 	}
 }
 
@@ -73,6 +59,8 @@ func FromTemplate(id string, existing []core.PipelineEntry) (core.Pipeline, erro
 				s.From = nid
 			}
 			s.Filter.Roles = append([]string{}, s.Filter.Roles...)
+			s.Filter.Kinds = append([]core.OutputKind{}, s.Filter.Kinds...)
+			s.Filter.Exts = append([]string{}, s.Filter.Exts...)
 			steps[i] = s
 		}
 		p.Steps = steps
