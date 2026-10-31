@@ -17,6 +17,10 @@ import { viewTitle } from "./nav";
 import { useBuiltinCommands } from "./useBuiltinCommands";
 import { useGlobalPaste } from "./useGlobalPaste";
 import { useJobToasts } from "./useJobToasts";
+// --- pipelines ---
+import { PipelineBanner } from "./PipelineBanner";
+import { usePipelineNotices } from "./usePipelineNotices";
+// --- end pipelines ---
 import { useShellShortcuts } from "./useShellShortcuts";
 import styles from "./Shell.module.css";
 
@@ -46,6 +50,9 @@ export function Shell() {
   useShellShortcuts();
   useGlobalPaste();
   useJobToasts();
+  // --- pipelines ---
+  usePipelineNotices();
+  // --- end pipelines ---
 
   return (
     <div id="app-root" className={cx(styles.root, collapsed && styles.collapsed)} data-file-drop-target>
@@ -59,6 +66,9 @@ export function Shell() {
           </Button>
         </header>
         <ToolsFolderBanner />
+        {/* --- pipelines --- */}
+        <PipelineBanner view={view === "setup" ? returnView : view} />
+        {/* --- end pipelines --- */}
         <main className={styles.view}>
           <ViewRouter view={view === "setup" ? returnView : view} />
         </main>

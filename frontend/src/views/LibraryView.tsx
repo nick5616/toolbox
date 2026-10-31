@@ -8,6 +8,11 @@ import { useShortcut } from "@/lib/shortcuts";
 import { useLibrary, type OutputView } from "@/state/library";
 import { useUI } from "@/state/ui";
 import { isReady, useModules } from "@/state/modules";
+// --- pipelines ---
+import { usePipelines } from "@/state/pipelines";
+import { inputAccepted } from "@/tools/pipelines/RunSheetModel";
+import { openPipelineRunSheet } from "@/shell/dropRouting";
+// --- end pipelines ---
 import styles from "./LibraryView.module.css";
 
 const kindIcon: Record<string, string> = {
@@ -24,9 +29,9 @@ function fail(e: unknown): void {
 }
 
 /** Ready modules that accept `path`, as menu items that hand the file off. */
-async function sendToItems(path: string): Promise<MenuItem[]> {
+export async function sendToItems(path: string): Promise<MenuItem[]> {
   const res = await ModulesService.Match([path]);
-  return (res.matches ?? [])
+  const tools: MenuItem[] = (res.matches ?? [])
     .filter((m) => isReady(m.module))
     .map((m) => ({
       id: m.module.id,
@@ -34,6 +39,18 @@ async function sendToItems(path: string): Promise<MenuItem[]> {
       icon: m.module.icon,
       onSelect: () => useUI.getState().handOff({ moduleId: m.module.id, inputs: [path] }),
     }));
+  // --- pipelines ---
+  const pipelines: MenuItem[] = usePipelines
+    .getState()
+    .entries.filter((e) => inputAccepted(e.check.accepts, path))
+    .map((e) => ({
+      id: `pipeline:${e.pipeline.id}`,
+      label: `Pipeline: ${e.pipeline.name}`,
+      icon: "workflow",
+      onSelect: () => openPipelineRunSheet(e.pipeline.id, [path]),
+    }));
+  return pipelines.length > 0 ? [...tools, ...pipelines] : tools;
+  // --- end pipelines ---
 }
 
 export function LibraryView() {

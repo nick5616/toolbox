@@ -83,3 +83,25 @@
 .errorHint {
   color: var(--fg-muted);
 }
+
+/* --- pipelines --- */
+.runChip {
+  flex: none;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.runChip:hover {
+  border-color: var(--accent);
+}
+/* --- end pipelines --- */

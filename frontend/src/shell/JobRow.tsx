@@ -8,6 +8,9 @@ import { Icon, IconButton, Meter, StatusChip, toast, cx, type ChipStatus } from 
 import { isActive, useJobs, type JobView } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
+// --- pipelines ---
+import { usePipelines } from "@/state/pipelines";
+// --- end pipelines ---
 import { LogPanel } from "./LogPanel";
 import styles from "./JobRow.module.css";
 
@@ -39,6 +42,10 @@ export function JobRow({ job, compact = false }: JobRowProps) {
   const running = job.status === JobStatus.JobRunning;
   const now = useNow(running);
 
+  // --- pipelines ---
+  const pipelineRun = usePipelines((st) => (job.pipelineRunId ? st.runs[job.pipelineRunId] : undefined));
+  // --- end pipelines ---
+
   const status = job.status as ChipStatus;
   const title = job.title || job.inputs[0] || job.id;
   const firstOutput = job.outputs[0];
@@ -65,6 +72,25 @@ export function JobRow({ job, compact = false }: JobRowProps) {
         <span className={styles.title} title={title}>
           {title}
         </span>
+        {/* --- pipelines --- */}
+        {job.pipelineRunId && (
+          <button
+            type="button"
+            className={styles.runChip}
+            title="Show this pipeline run"
+            onClick={() => {
+              useUI.getState().navigate("pipelines");
+              usePipelines.getState().showRun(job.pipelineRunId);
+            }}
+          >
+            {`⛓ ${pipelineRun?.name || "Pipeline"}${
+              pipelineRun && pipelineRun.steps.length > 0
+                ? ` · ${pipelineRun.steps.findIndex((x) => x.id === job.pipelineStepId) + 1}/${pipelineRun.steps.length}`
+                : ""
+            }`}
+          </button>
+        )}
+        {/* --- end pipelines --- */}
         <StatusChip status={status} />
         <Meter className={styles.meter} value={job.progress} status={status} size="sm" label={`Progress: ${title}`} />
         <span className={styles.message} title={message}>

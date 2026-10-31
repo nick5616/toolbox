@@ -1,5 +1,10 @@
 import { isReady } from "@/state/modules";
 import { useUI } from "@/state/ui";
+// --- pipelines ---
+import { usePipelines } from "@/state/pipelines";
+import { inputAccepted } from "@/tools/pipelines/RunSheetModel";
+import { openPipelineRunSheet } from "./dropRouting";
+// --- end pipelines ---
 import { Badge, Button, Icon } from "@/components";
 import styles from "./DropOverlay.module.css";
 
@@ -49,6 +54,13 @@ function DropContent({
   const matches = drop.result.matches ?? [];
   const unmatched = drop.result.unmatched ?? [];
   const first = paths.slice(0, 3).map(baseName);
+  // --- pipelines ---
+  const entries = usePipelines((s) => s.entries);
+  const setDrop = useUI((s) => s.setDrop);
+  const pipelineMatches = entries
+    .map((e) => ({ entry: e, paths: paths.filter((p) => inputAccepted(e.check.accepts, p)) }))
+    .filter((m) => m.paths.length > 0);
+  // --- end pipelines ---
   return (
     <>
       <div className={styles.head}>
@@ -60,9 +72,9 @@ function DropContent({
           {paths.length > 3 ? `, +${paths.length - 3} more` : ""}
         </div>
       </div>
-      {matches.length === 0 ? (
+      {matches.length === 0 && pipelineMatches.length === 0 ? (
         <div className={styles.none}>No tool accepts these files yet.</div>
-      ) : (
+      ) : matches.length === 0 ? null : (
         <ul className={styles.matches}>
           {matches.map((m) => {
             const ready = isReady(m.module);
@@ -91,6 +103,35 @@ function DropContent({
           })}
         </ul>
       )}
+      {/* --- pipelines --- */}
+      {pipelineMatches.length > 0 && (
+        <>
+          <div className={styles.count}>Pipelines</div>
+          <ul className={styles.matches} aria-label="Pipelines">
+            {pipelineMatches.map((m) => (
+              <li key={m.entry.pipeline.id} className={styles.match}>
+                <Icon name="workflow" size={16} />
+                <div className={styles.matchText}>
+                  <div className={styles.matchName}>{m.entry.pipeline.name}</div>
+                  <div className={styles.matchFiles}>{m.paths.map(baseName).join(", ")}</div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  aria-label={`Run ${m.entry.pipeline.name}`}
+                  onClick={() => {
+                    setDrop(null);
+                    openPipelineRunSheet(m.entry.pipeline.id, m.paths);
+                  }}
+                >
+                  Run
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {/* --- end pipelines --- */}
       {unmatched.length > 0 && <div className={styles.unsupported}>Unsupported: {unmatched.map(baseName).join(", ")}</div>}
       <div className={styles.foot}>
         <Button size="sm" variant="ghost" onClick={onClose}>

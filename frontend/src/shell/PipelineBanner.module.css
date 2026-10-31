@@ -1,0 +1,31 @@
+.bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 32px;
+  padding: var(--space-1) var(--space-4);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--accent);
+  font-size: var(--text-sm);
+}
+
+.icon {
+  flex: none;
+  color: var(--accent);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+}

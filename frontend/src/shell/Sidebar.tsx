@@ -5,6 +5,9 @@ import { Badge, Icon, IconButton, Tooltip, cx } from "@/components";
 import { useDeps } from "@/state/deps";
 import { useJobs, isActive } from "@/state/jobs";
 import { useUI } from "@/state/ui";
+// --- pipelines ---
+import { isRunActive, useNeedsYou, usePipelines } from "@/state/pipelines";
+// --- end pipelines ---
 import { PIPELINES_ITEM, RECENT_ITEM, SETTINGS_ITEM, useNavGroups, type NavItem } from "./nav";
 import logoUrl from "@/assets/logo.svg";
 import styles from "./Sidebar.module.css";
@@ -15,10 +18,12 @@ interface ItemProps {
   active: boolean;
   dot?: "warn" | "danger" | null;
   running?: boolean;
+  /** Pipelines: number of steps waiting for the user. */
+  badge?: number;
   onClick: () => void;
 }
 
-function SidebarItem({ item, collapsed, active, dot, running, onClick }: ItemProps) {
+function SidebarItem({ item, collapsed, active, dot, running, badge, onClick }: ItemProps) {
   const btn = (
     <button
       type="button"
@@ -30,6 +35,11 @@ function SidebarItem({ item, collapsed, active, dot, running, onClick }: ItemPro
       <Icon name={item.icon} size={16} />
       {!collapsed && <span className={styles.label}>{item.label}</span>}
       {!collapsed && item.soon && <Badge>SOON</Badge>}
+      {!collapsed && badge ? (
+        <span className={styles.badge} aria-label={`${badge} waiting for you`}>
+          {badge}
+        </span>
+      ) : null}
       {running && <span className={styles.running} title="Running" data-testid="running-indicator" />}
       {dot && <span className={cx(styles.dot, styles[dot])} data-testid={`dot-${dot}`} />}
     </button>
@@ -67,14 +77,20 @@ export function Sidebar() {
     return null;
   }, [deps]);
 
-  const item = (it: NavItem, dot?: "warn" | "danger" | null) => (
+  // --- pipelines ---
+  const needsYou = useNeedsYou().length;
+  const pipelinesRunning = usePipelines((st) => Object.values(st.runs).some(isRunActive));
+  // --- end pipelines ---
+
+  const item = (it: NavItem, dot?: "warn" | "danger" | null, extra?: { badge?: number; running?: boolean }) => (
     <SidebarItem
       key={it.id}
       item={it}
       collapsed={collapsed}
       active={view === it.id}
       dot={dot}
-      running={runningModules.has(it.id)}
+      running={extra?.running ?? runningModules.has(it.id)}
+      badge={extra?.badge}
       onClick={() => navigate(it.id)}
     />
   );
@@ -102,7 +118,7 @@ export function Sidebar() {
         <Section label="Library" collapsed={collapsed}>
           {item(RECENT_ITEM)}
           {/* --- pipelines item (UI2 adds the "needs you" badge) --- */}
-          {item(PIPELINES_ITEM)}
+          {item(PIPELINES_ITEM, null, { badge: needsYou, running: pipelinesRunning })}
           {/* --- end pipelines item --- */}
         </Section>
         <Section label="Tools" collapsed={collapsed}>

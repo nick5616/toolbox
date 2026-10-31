@@ -20,6 +20,10 @@ import { devutilsCommands } from "@/tools/devutils/commands";
 // --- Visualizer (Phase 7) ---
 import { visualizerCommands } from "@/tools/visualizer/commands";
 // --- end Visualizer ---
+// --- pipelines ---
+import { usePipelines } from "@/state/pipelines";
+import { pipelinesCommands } from "./pipelinesCommands";
+// --- end pipelines ---
 
 function guard(fn: () => Promise<unknown>): () => Promise<void> {
   return async () => {
@@ -52,6 +56,9 @@ function openSettingsSection(id: string) {
 
 export function useBuiltinCommands(): void {
   const vault = useVaultState();
+  // --- pipelines ---
+  const pipelineEntries = usePipelines((s) => s.entries);
+  // --- end pipelines ---
   const cmds: Command[] = [
     {
       id: "shell.toggle-tray",
@@ -272,6 +279,9 @@ export function useBuiltinCommands(): void {
     // --- Visualizer (Phase 7) ---
     ...visualizerCommands(),
     // --- end Visualizer ---
+    // --- pipelines ---
+    ...pipelinesCommands(pipelineEntries),
+    // --- end pipelines ---
   ];
   useCommands(cmds);
 }
