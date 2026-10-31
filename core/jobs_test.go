@@ -947,3 +947,83 @@ func TestSubmitRejectsJobLessModules(t *testing.T) {
 		t.Fatalf("jobs created: %v", jobs)
 	}
 }
+
+func TestSubmitForTagObserve(t *testing.T) {
+	var fail atomic.Bool
+	fail.Store(true)
+	m := mod("a", func(ctx context.Context, jc *JobContext) error {
+		if fail.Load() {
+			return ValidationError("nope", nil)
+		}
+		return nil
+	})
+	e := setup(t, 2, m)
+	var mu sync.Mutex
+	seen := map[string][]Job{}
+	stop := e.m.Observe(func(j Job) {
+		mu.Lock()
+		seen[j.ID] = append(seen[j.ID], j)
+		mu.Unlock()
+	})
+	e.start(t)
+	tag := PipelineTag{RunID: "run1", StepID: "s1"}
+	jobs, err := e.m.SubmitFor(context.Background(), "a", []string{"x"}, "", tag)
+	must(t, err)
+	j := jobs[0]
+	if j.PipelineRunID != "run1" || j.PipelineStepID != "s1" {
+		t.Fatalf("tag missing: %+v", j)
+	}
+	failed := e.em.waitStatus(t, j.ID, JobFailed)
+	if failed.PipelineRunID != "run1" {
+		t.Fatalf("tag lost: %+v", failed)
+	}
+	fail.Store(false)
+	r, err := e.m.Retry(context.Background(), j.ID)
+	must(t, err)
+	if r.PipelineRunID != "run1" || r.PipelineStepID != "s1" {
+		t.Fatalf("retry lost tag: %+v", r)
+	}
+	e.em.waitStatus(t, j.ID, JobDone)
+
+	mu.Lock()
+	var statuses []JobStatus
+	for _, s := range seen[j.ID] {
+		statuses = append(statuses, s.Status)
+	}
+	mu.Unlock()
+	for _, want := range []JobStatus{JobQueued, JobRunning, JobFailed, JobDone} {
+		if !slices.Contains(statuses, want) {
+			t.Fatalf("observer missed %s: %v", want, statuses)
+		}
+	}
+	listed, err := e.m.List(context.Background(), JobFilter{PipelineRunID: "run1"})
+	must(t, err)
+	if len(listed) != 1 || listed[0].ID != j.ID {
+		t.Fatalf("filter: %+v", listed)
+	}
+
+	// Tag a finished, untagged job (adoption).
+	plain := e.submit(t, "a", "y")[0]
+	e.em.waitStatus(t, plain.ID, JobDone)
+	must(t, e.m.Tag(plain.ID, PipelineTag{RunID: "run2", StepID: "s9"}))
+	got, err := e.m.Get(context.Background(), plain.ID)
+	must(t, err)
+	if got.PipelineRunID != "run2" || got.PipelineStepID != "s9" {
+		t.Fatalf("Tag: %+v", got)
+	}
+	if err := e.m.Tag("nope", tag); !IsCode(err, CodeNotFound) {
+		t.Fatalf("Tag unknown: %v", err)
+	}
+
+	stop()
+	mu.Lock()
+	n := len(seen)
+	mu.Unlock()
+	last := e.submit(t, "a", "z")[0]
+	e.em.waitStatus(t, last.ID, JobDone)
+	mu.Lock()
+	defer mu.Unlock()
+	if len(seen) != n {
+		t.Fatal("observer called after stop")
+	}
+}

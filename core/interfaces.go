@@ -29,6 +29,39 @@ type OutputStore interface {
 	// ListOutputs computes Missing via os.Stat.
 	ListOutputs(ctx context.Context, q OutputQuery) (OutputPage, error)
 	DeleteOutput(ctx context.Context, id string) error
+	// MoveOutput points an output at newPath (after the file was renamed),
+	// updating its name and keeping its ID and tags.
+	MoveOutput(ctx context.Context, id, newPath string) (Output, error)
+}
+
+// PipelineStore persists pipelines, their runs and watch-folder state
+// (SPEC.md §9.1).
+type PipelineStore interface {
+	ListPipelines(ctx context.Context) ([]Pipeline, error)
+	// PutPipeline inserts or replaces p.
+	PutPipeline(ctx context.Context, p Pipeline) error
+	// DeletePipeline also deletes its watch_seen rows.
+	DeletePipeline(ctx context.Context, id string) error
+	// PutRun inserts or replaces a run; stateJSON is its full JSON state.
+	PutRun(ctx context.Context, run PipelineRun, stateJSON string) error
+	// GetRun returns an *AppError with CodeNotFound for unknown IDs.
+	GetRun(ctx context.Context, id string) (stateJSON string, err error)
+	// ListRuns returns state JSONs, newest first.
+	ListRuns(ctx context.Context, f RunFilter) ([]string, error)
+	DeleteRuns(ctx context.Context, ids []string) error
+	// PruneRuns deletes finished runs beyond the newest keepFinished and
+	// returns their IDs.
+	PruneRuns(ctx context.Context, keepFinished int) ([]string, error)
+	SeenFiles(ctx context.Context, pipelineID string) (map[string]SeenFile, error)
+	MarkSeen(ctx context.Context, pipelineID string, files []SeenFile) error
+	ForgetSeen(ctx context.Context, pipelineID string, paths []string) error
+}
+
+// SeenFile is a watch-folder file already handled (or baselined).
+type SeenFile struct {
+	Path  string
+	Size  int64
+	MTime int64 // Unix ms
 }
 
 // ClipStore persists clipboard history (SPEC.md §3.3). Listing returns pinned

@@ -16,5 +16,6 @@ export {
 export type {
     FileResult,
     Options,
-    Result
+    Result,
+    StepOptions
 } from "./models.js";

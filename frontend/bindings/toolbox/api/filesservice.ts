@@ -48,6 +48,14 @@ export function Pick(moduleID: string): $CancellablePromise<string[] | null> {
 }
 
 /**
+ * PickFolder shows a native folder dialog (watch folders, Copy to folder).
+ * Cancelling returns "".
+ */
+export function PickFolder(title: string): $CancellablePromise<string> {
+    return $Call.ByID(3612696940, title);
+}
+
+/**
  * PickWith shows a native file dialog filtered to extensions (lowercase,
  * leading dot; empty = any file), e.g. a background image for Lyric Video.
  * Cancelling returns an empty list.

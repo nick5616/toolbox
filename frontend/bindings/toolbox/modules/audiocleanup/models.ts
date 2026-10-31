@@ -137,3 +137,15 @@ export interface Result {
     "lufsAfter": number;
     "humHz": number;
 }
+
+/**
+ * StepOptions are Audio Cleanup's pipeline step options (Options without the
+ * preview fields).
+ */
+export interface StepOptions {
+    "highPass": boolean;
+    "hum": Hum;
+    "denoise": Denoise;
+    "loudness": Loudness;
+    "format": Format;
+}

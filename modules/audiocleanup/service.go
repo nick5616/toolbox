@@ -39,3 +39,6 @@ func (s *Service) DiscardPreviews() { s.m.prunePreviewsAll() }
 // ResultShape exists so the binding generator emits Result; it returns the
 // zero value.
 func (s *Service) ResultShape() Result { return Result{} }
+
+// StepShape returns the pipeline step options (bindings only; SPEC.md §6).
+func (s *Service) StepShape() StepOptions { return DefaultStepOptions() }

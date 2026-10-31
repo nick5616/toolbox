@@ -20,7 +20,8 @@ const (
 	// --- vault (VA1) ---
 	itemLockVault = "lock-vault"
 	// --- end vault ---
-	itemSep = "-"
+	itemPipelines = "pipelines"
+	itemSep       = "-"
 )
 
 const maxRecent = 5
@@ -36,6 +37,8 @@ type trayState struct {
 	// --- vault (VA1) ---
 	VaultUnlocked bool
 	// --- end vault ---
+	NeedYou     int    // pipeline steps waiting for the user
+	NeedYouName string // the first such run's name
 }
 
 // trayItem is one row of the tray menu.
@@ -58,7 +61,15 @@ func trayModel(s trayState) []trayItem {
 	if hint := displayAccelerator(s.ClipboardHotkey, s.Mac); hint != "" {
 		clip += "  " + hint
 	}
-	m := []trayItem{item(itemOpen, "Open Toolbox"), item(itemClipboard, clip)}
+	m := []trayItem{}
+	if s.NeedYou > 0 {
+		label := fmt.Sprintf("%d pipeline steps need you", s.NeedYou)
+		if s.NeedYou == 1 && s.NeedYouName != "" {
+			label = s.NeedYouName + " needs you"
+		}
+		m = append(m, item(itemPipelines, label), trayItem{ID: itemSep, Separator: true})
+	}
+	m = append(m, item(itemOpen, "Open Toolbox"), item(itemClipboard, clip))
 	if s.ClipboardEnabled {
 		p := item(itemPause, "Pause clipboard history")
 		p.Checkbox = true

@@ -5,7 +5,7 @@ import { Badge, Icon, IconButton, Tooltip, cx } from "@/components";
 import { useDeps } from "@/state/deps";
 import { useJobs, isActive } from "@/state/jobs";
 import { useUI } from "@/state/ui";
-import { RECENT_ITEM, SETTINGS_ITEM, useNavGroups, type NavItem } from "./nav";
+import { PIPELINES_ITEM, RECENT_ITEM, SETTINGS_ITEM, useNavGroups, type NavItem } from "./nav";
 import logoUrl from "@/assets/logo.svg";
 import styles from "./Sidebar.module.css";
 
@@ -101,6 +101,9 @@ export function Sidebar() {
       <div className={styles.scroll}>
         <Section label="Library" collapsed={collapsed}>
           {item(RECENT_ITEM)}
+          {/* --- pipelines item (UI2 adds the "needs you" badge) --- */}
+          {item(PIPELINES_ITEM)}
+          {/* --- end pipelines item --- */}
         </Section>
         <Section label="Tools" collapsed={collapsed}>
           {tools.map((t) => item(t))}

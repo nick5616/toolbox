@@ -18,7 +18,7 @@ function job(id: string, status: JobStatus, progress = 0, extra: Partial<Job> = 
   return {
     id, moduleId: "media-proxy", title: id, status, progress, message: "", inputs: null, optionsJson: "{}",
     errorCode: ErrorCode.$zero, error: "", errorHint: "", attempt: 1, cancelRequested: false,
-    createdAt: 1, startedAt: 0, finishedAt: 0, outputs: null, resultJson: "", ...extra,
+    createdAt: 1, startedAt: 0, finishedAt: 0, outputs: null, resultJson: "", pipelineRunId: "", pipelineStepId: "", ...extra,
   };
 }
 

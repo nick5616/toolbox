@@ -17,6 +17,7 @@ export type {
     Language,
     Options,
     Result,
+    StepOptions,
     StyleInfo,
     TranslatorStatus
 } from "./models.js";

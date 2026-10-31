@@ -59,6 +59,13 @@ export function ResultShape(): $CancellablePromise<$models.Result> {
 }
 
 /**
+ * StepShape returns the pipeline step options (bindings only; SPEC.md §6).
+ */
+export function StepShape(): $CancellablePromise<$models.StepOptions> {
+    return $Call.ByID(1087572815);
+}
+
+/**
  * Thumbnail renders one page (1-based) as a JPEG data URL, width 80..1200 px.
  */
 export function Thumbnail(path: string, page: number, width: number, password: string): $CancellablePromise<string> {

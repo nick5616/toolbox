@@ -111,3 +111,60 @@ export interface Segment {
     "startMs": number;
     "endMs": number;
 }
+
+/**
+ * StepKeep says which part of each file a Trimmer step keeps.
+ */
+export enum StepKeep {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KeepWhole = "whole",
+
+    /**
+     * the first Seconds
+     */
+    KeepFirst = "first",
+
+    /**
+     * the last Seconds
+     */
+    KeepLast = "last",
+
+    /**
+     * From–To
+     */
+    KeepRange = "range",
+};
+
+/**
+ * StepOptions are the Trimmer's pipeline step options: the part to keep is
+ * resolved per file at run time.
+ */
+export interface StepOptions {
+    "keep": StepKeep;
+
+    /**
+     * first/last: 1–36,000
+     */
+    "seconds": number;
+
+    /**
+     * range: timecode, "" = start
+     */
+    "from": string;
+
+    /**
+     * range: timecode, "" = end
+     */
+    "to": string;
+    "mode": Mode;
+    "aspect": Aspect;
+    "cropX": number;
+    "cropY": number;
+    "maxSizeMB": number;
+    "maxHeight": number;
+    "removeAudio": boolean;
+}

@@ -15,6 +15,7 @@ import { useDeps } from "./deps";
 import { useJobs } from "./jobs";
 import { useLibrary } from "./library";
 import { useModules } from "./modules";
+import { usePipelines } from "./pipelines";
 import { useSettings } from "./settings";
 import { useUI } from "./ui";
 
@@ -35,8 +36,14 @@ export function subscribeAll(): void {
     on("app:files-dropped", routeFilesDropped),
     on("app:navigate", (n) => {
       if (n.target === "palette") useUI.getState().setPaletteOpen(true);
-      else useUI.getState().navigate(n.target);
+      else if (n.target === "pipelines-runs") {
+        usePipelines.getState().setTab("runs");
+        useUI.getState().navigate("pipelines");
+      } else useUI.getState().navigate(n.target);
     }),
+    on("pipelines:changed", (p) => usePipelines.getState().setEntries(p.pipelines ?? [])),
+    on("pipelines:run", (r) => usePipelines.getState().upsertRun(r)),
+    on("pipelines:runs-removed", (p) => usePipelines.getState().removeRuns(p.ids ?? [])),
     ...subscribeDesktop(),
     on("app:hidden-to-tray", () => notifyHiddenToTray()),
   ];
@@ -82,11 +89,12 @@ export async function bootstrap(): Promise<void> {
     SettingsService.Get(),
     SettingsService.AppInfo(),
     ModulesService.List(),
-    JobsService.List({ moduleId: "", statuses: [], limit: 200 }),
+    JobsService.List({ moduleId: "", statuses: [], limit: 200, pipelineRunId: "" }),
     DepsService.List(),
     LibraryService.Recent({ moduleId: "", search: "", limit: 100, cursor: "" }),
     ClipboardService.State(),
     DesktopService.HotkeyStatus(),
+    usePipelines.getState().load(),
   ]);
   useSettings.getState().set(settings);
   useSettings.getState().setAppInfo(appInfo);

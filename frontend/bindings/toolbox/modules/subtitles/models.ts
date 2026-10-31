@@ -43,6 +43,11 @@ export enum Action {
      * cues added as a subtitle track
      */
     ActionEmbed = "embed",
+
+    /**
+     * generate → translate → save/burn/embed in one job (pipelines, SPEC.md §6.4)
+     */
+    ActionAuto = "auto",
 };
 
 /**
@@ -187,6 +192,17 @@ export interface Options {
      * visuals over the video (nil = none).
      */
     "visuals": viz$0.VisualsSpec | null;
+
+    /**
+     * auto (SPEC.md §6.4): Formats are the files to save (may be empty).
+     * "none" | "burn" | "embed"
+     */
+    "video": string;
+
+    /**
+     * burn: 0 = no limit, else 1–4000
+     */
+    "maxSizeMB": number;
 }
 
 /**
@@ -201,6 +217,57 @@ export interface Result {
     "language": string;
     "cues": number;
     "outputs": string[] | null;
+}
+
+/**
+ * StepOptions are Subtitles' pipeline step options; steps use the "auto"
+ * action (generate, translate, then save, burn or embed in one job).
+ */
+export interface StepOptions {
+    "model": string;
+    "language": string;
+
+    /**
+     * Whisper's own translation
+     */
+    "translateToEnglish": boolean;
+
+    /**
+     * "" = keep; else via Local Chat
+     */
+    "targetLanguage": string;
+    "maxLineChars": number;
+    "maxLines": number;
+
+    /**
+     * "srt", "vtt" (0–2)
+     */
+    "save": string[] | null;
+
+    /**
+     * "none" | "burn" | "embed"
+     */
+    "video": string;
+    "style": Style;
+    "size": string;
+    "position": string;
+    "font": string;
+    "trackLanguage": string;
+    "maxSizeMB": number;
+
+    /**
+     * audio input + burn
+     */
+    "canvas": string;
+    "canvasHeight": number;
+
+    /**
+     * "color" | "image" | "visualizer"
+     */
+    "background": string;
+    "backgroundColor": string;
+    "backgroundPath": string;
+    "visuals": viz$0.VisualsSpec | null;
 }
 
 /**

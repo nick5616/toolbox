@@ -253,3 +253,52 @@ export type {
   VisualsSpec,
 } from "@bindings/core/viz/models";
 export type { CueWord } from "@bindings/modules/subtitles/models";
+
+// --- Phase 8: Pipelines ---
+export * as PipelinesService from "@bindings/modules/pipelines/service";
+export { CellStatus, RunStatus, WaitKind } from "@bindings/core/models";
+export type {
+  ContinueRequest,
+  Pipeline,
+  PipelineCheck,
+  PipelineEntry,
+  PipelineRun,
+  PipelineStep,
+  PipelineTemplate,
+  PipelinesChanged,
+  RunBrief,
+  RunCell,
+  RunFile,
+  RunFilter,
+  RunItem,
+  RunRequest,
+  RunsRemoved,
+  SecretAsk,
+  StepCheck,
+  StepFilter,
+  StepInfo,
+  StepProduct,
+  StepSecret,
+  StepType,
+  StepVar,
+  WatchConfig,
+  WatchState,
+} from "@bindings/core/models";
+export type {
+  ChatField as PipelineChatField,
+  ChatStep as PipelineChatStep,
+  CopyStep as PipelineCopyStep,
+  RenameStep as PipelineRenameStep,
+  TableColumn as PipelineTableColumn,
+  TableStep as PipelineTableStep,
+  ZipStep as PipelineZipStep,
+} from "@bindings/modules/pipelines/models";
+export { StepKeep as TrimStepKeep } from "@bindings/modules/trimmer/models";
+export type { StepOptions as TrimmerStepOptions } from "@bindings/modules/trimmer/models";
+export type { StepOptions as SubtitlesStepOptions } from "@bindings/modules/subtitles/models";
+export type { StepOptions as AudioCleanupStepOptions } from "@bindings/modules/audiocleanup/models";
+export type { StepOptions as LyricVideoStepOptions } from "@bindings/modules/lyricvideo/models";
+export type { StepOptions as VisualizerStepOptions } from "@bindings/modules/visualizer/models";
+export type { StepOptions as RedactStepOptions } from "@bindings/modules/redact/models";
+export type { StepOptions as PdfStepOptions } from "@bindings/modules/pdf/models";
+export type { StepOptions as VaultStepOptions } from "@bindings/modules/vault/models";

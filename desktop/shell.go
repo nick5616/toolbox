@@ -6,6 +6,7 @@ package desktop
 import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"sync"
 
 	"toolbox/core"
 	"toolbox/desktop/paste"
@@ -57,6 +58,32 @@ type Shell struct {
 	paster     Paster
 	pasteAsync func(func()) // runs the paste off the UI call; tests run it inline
 	// --- end auto-paste ---
+	// --- pipelines (Phase 8) ---
+	needMu      sync.Mutex
+	needYou     int
+	needYouName string
+	// --- end pipelines ---
+}
+
+// NavigatePipelineRuns is the navigate target that opens Pipelines → Runs.
+const NavigatePipelineRuns = "pipelines-runs"
+
+// SetPipelinesNeedYou updates the tray's "needs you" item (SPEC.md §11.7):
+// total waiting pipeline steps and the first such run's name.
+func (s *Shell) SetPipelinesNeedYou(total int, firstRunName string) {
+	s.needMu.Lock()
+	changed := s.needYou != total || s.needYouName != firstRunName
+	s.needYou, s.needYouName = total, firstRunName
+	s.needMu.Unlock()
+	if changed && s.tray != nil {
+		s.tray.refresh()
+	}
+}
+
+func (s *Shell) pipelinesNeedYou() (int, string) {
+	s.needMu.Lock()
+	defer s.needMu.Unlock()
+	return s.needYou, s.needYouName
 }
 
 // New builds the shell. Call Start before app.Run.

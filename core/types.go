@@ -41,6 +41,10 @@ type Job struct {
 	Outputs         []Output  `json:"outputs"`
 	// ResultJSON is module-specific result data (e.g. BPM & key); "" if none.
 	ResultJSON string `json:"resultJson"`
+	// PipelineRunID/PipelineStepID tag jobs run by (or adopted into) a
+	// pipeline run (SPEC.md §9.2); "" for ordinary jobs.
+	PipelineRunID  string `json:"pipelineRunId"`
+	PipelineStepID string `json:"pipelineStepId"`
 }
 
 // JobFilter selects jobs, newest first.
@@ -48,6 +52,8 @@ type JobFilter struct {
 	ModuleID string      `json:"moduleId"`
 	Statuses []JobStatus `json:"statuses"`
 	Limit    int         `json:"limit"` // default 100, max 500
+	// PipelineRunID selects the jobs of one pipeline run ("" = any).
+	PipelineRunID string `json:"pipelineRunId"`
 }
 
 // JobProgress is the payload of jobs:progress.

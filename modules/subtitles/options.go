@@ -12,6 +12,14 @@ const (
 	ActionTranslate Action = "translate" // cues → translated .srt (Local Chat)
 	ActionBurn      Action = "burn"      // cues drawn into the video
 	ActionEmbed     Action = "embed"     // cues added as a subtitle track
+	ActionAuto      Action = "auto"      // generate → translate → save/burn/embed in one job (pipelines, SPEC.md §6.4)
+)
+
+// Video is what an auto job does with the video.
+const (
+	VideoNone  = "none"
+	VideoBurn  = "burn"
+	VideoEmbed = "embed"
 )
 
 // Style is a burn-in look.
@@ -71,6 +79,9 @@ type Options struct {
 	// Visuals: audio input, the background design; video input, optional
 	// visuals over the video (nil = none).
 	Visuals *viz.VisualsSpec `json:"visuals"`
+	// auto (SPEC.md §6.4): Formats are the files to save (may be empty).
+	Video     string `json:"video"`     // "none" | "burn" | "embed"
+	MaxSizeMB int    `json:"maxSizeMB"` // burn: 0 = no limit, else 1–4000
 }
 
 // DefaultOptions: generate with Whisper small, auto language, 42 × 2 lines,

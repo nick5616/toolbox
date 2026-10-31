@@ -52,6 +52,41 @@ export enum Category {
     CategoryUtility = "utility",
 };
 
+export enum CellStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    CellPending = "pending",
+    CellPreparing = "preparing",
+    CellRunning = "running",
+
+    /**
+     * Wait says why
+     */
+    CellWaiting = "waiting",
+    CellDone = "done",
+    CellFailed = "failed",
+    CellCancelled = "cancelled",
+    CellSkipped = "skipped",
+
+    /**
+     * an earlier cell failed or was cancelled
+     */
+    CellBlocked = "blocked",
+
+    /**
+     * gathered into a merged item at this together step
+     */
+    CellMerged = "merged",
+
+    /**
+     * not applicable (merged items before their merge; items after it)
+     */
+    CellNone = "none",
+};
+
 /**
  * ChatBackend says where answers come from.
  */
@@ -366,6 +401,23 @@ export interface ClipsRemoved {
     "ids": string[] | null;
 }
 
+export interface ContinueRequest {
+    "runId": string;
+    "item": number;
+    "stepId": string;
+
+    /**
+     * Keep lists the paths to carry on (check: a subset of the inputs; manual:
+     * a subset of the adopted files). nil = all.
+     */
+    "keep": string[] | null;
+
+    /**
+     * PassThrough (manual): continue with the step's inputs unchanged.
+     */
+    "passThrough": boolean;
+}
+
 /**
  * DepSource says where a tool was found.
  */
@@ -505,6 +557,11 @@ export enum ErrorCode {
     CodeCancelled = "cancelled",
     CodeInterrupted = "interrupted",
     CodeNotImplemented = "not_implemented",
+
+    /**
+     * a pipeline step must wait for a condition (SPEC.md §8.6)
+     */
+    CodeWaiting = "waiting",
     CodeInternal = "internal",
 };
 
@@ -595,6 +652,13 @@ export interface Job {
      * ResultJSON is module-specific result data (e.g. BPM & key); "" if none.
      */
     "resultJson": string;
+
+    /**
+     * PipelineRunID/PipelineStepID tag jobs run by (or adopted into) a
+     * pipeline run (SPEC.md §9.2); "" for ordinary jobs.
+     */
+    "pipelineRunId": string;
+    "pipelineStepId": string;
 }
 
 /**
@@ -608,6 +672,11 @@ export interface JobFilter {
      * default 100, max 500
      */
     "limit": number;
+
+    /**
+     * PipelineRunID selects the jobs of one pipeline run ("" = any).
+     */
+    "pipelineRunId": string;
 }
 
 /**
@@ -947,6 +1016,198 @@ export interface PacksChanged {
 }
 
 /**
+ * Pipeline is a saved chain of steps.
+ */
+export interface Pipeline {
+    /**
+     * ULID; "" when unsaved
+     */
+    "id": string;
+
+    /**
+     * 1–80 chars, unique ignoring case
+     */
+    "name": string;
+
+    /**
+     * ≤ 300 chars
+     */
+    "description": string;
+
+    /**
+     * the template it came from ("" = blank)
+     */
+    "templateId": string;
+
+    /**
+     * 1–30
+     */
+    "steps": PipelineStep[] | null;
+    "watch": WatchConfig;
+    "createdAt": number;
+    "updatedAt": number;
+}
+
+/**
+ * PipelineCheck is Describe's answer for a whole pipeline.
+ */
+export interface PipelineCheck {
+    /**
+     * same order as the pipeline's
+     */
+    "steps": StepCheck[] | null;
+
+    /**
+     * what a run takes: the union over steps with From "input"
+     */
+    "accepts": Accepts;
+
+    /**
+     * pipeline-level: name, no steps, too many steps, watch folder
+     */
+    "problems": string[] | null;
+
+    /**
+     * asked for at Start
+     */
+    "secrets": SecretAsk[] | null;
+
+    /**
+     * dep IDs not installed (descriptor Requires of its modules)
+     */
+    "missing": string[] | null;
+
+    /**
+     * no problems anywhere and nothing missing
+     */
+    "ready": boolean;
+}
+
+/**
+ * PipelineEntry is a pipeline as listed (pipelines:changed carries all of them).
+ */
+export interface PipelineEntry {
+    "pipeline": Pipeline;
+    "check": PipelineCheck;
+    "watch": WatchState;
+    "lastRun": RunBrief | null;
+}
+
+export interface PipelineRun {
+    "id": string;
+    "pipelineId": string;
+
+    /**
+     * the pipeline's name at start
+     */
+    "name": string;
+
+    /**
+     * snapshot
+     */
+    "steps": PipelineStep[] | null;
+    "status": RunStatus;
+
+    /**
+     * "manual" | "watch"
+     */
+    "trigger": string;
+    "inputs": string[] | null;
+    "items": RunItem[] | null;
+
+    /**
+     * cells waiting with WaitManual or WaitCheck
+     */
+    "needsYou": number;
+
+    /**
+     * run-level, e.g. a failed preflight
+     */
+    "error": string;
+
+    /**
+     * temporary files were deleted
+     */
+    "cleaned": boolean;
+    "createdAt": number;
+    "finishedAt": number;
+}
+
+/**
+ * PipelineStep is one step of a pipeline.
+ */
+export interface PipelineStep {
+    /**
+     * 8 chars [a-z0-9], unique in the pipeline; not "input"/"none"
+     */
+    "id": string;
+
+    /**
+     * StepType.ID
+     */
+    "type": string;
+
+    /**
+     * optional title (≤ 60); "" = the type's name
+     */
+    "label": string;
+
+    /**
+     * the type's step options; "{}" for manual and check steps
+     */
+    "optionsJson": string;
+
+    /**
+     * "input" | "none" | an earlier step's ID
+     */
+    "from": string;
+    "filter": StepFilter;
+
+    /**
+     * "I'll do this step myself"
+     */
+    "manual": boolean;
+
+    /**
+     * manual: continue when an adopted job finishes with files
+     */
+    "autoContinue": boolean;
+
+    /**
+     * keep this step's files in the Library after the run
+     */
+    "keep": boolean;
+
+    /**
+     * manual/check: shown on the "needs you" card (≤ 200)
+     */
+    "note": string;
+}
+
+export interface PipelineTemplate {
+    "id": string;
+
+    /**
+     * one sentence
+     */
+    "blurb": string;
+    "icon": string;
+
+    /**
+     * pack IDs it needs (for the "needs" chip)
+     */
+    "packs": string[] | null;
+    "pipeline": Pipeline;
+}
+
+/**
+ * PipelinesChanged is the payload of pipelines:changed.
+ */
+export interface PipelinesChanged {
+    "pipelines": PipelineEntry[] | null;
+}
+
+/**
  * PresetInfo describes a module preset for the UI. Fields that don't apply to
  * a module are zero.
  */
@@ -968,6 +1229,177 @@ export interface PresetInfo {
      * "fast" | "best"
      */
     "speed": string;
+}
+
+export interface RunBrief {
+    "id": string;
+    "status": RunStatus;
+    "createdAt": number;
+}
+
+export interface RunCell {
+    "stepId": string;
+    "status": CellStatus;
+
+    /**
+     * when waiting
+     */
+    "wait": WaitKind;
+    "jobIds": string[] | null;
+
+    /**
+     * what it was given
+     */
+    "inputs": RunFile[] | null;
+
+    /**
+     * what it made (check: what was kept)
+     */
+    "files": RunFile[] | null;
+    "message": string;
+    "errorCode": ErrorCode;
+    "error": string;
+    "errorHint": string;
+    "startedAt": number;
+    "finishedAt": number;
+}
+
+export interface RunFile {
+    "path": string;
+    "name": string;
+    "kind": OutputKind;
+    "role": string;
+    "roleLabel": string;
+
+    /**
+     * "" when not a Library output (a run input, a link)
+     */
+    "outputId": string;
+
+    /**
+     * deleted when the run is cleaned up
+     */
+    "temporary": boolean;
+
+    /**
+     * computed when a run is read
+     */
+    "missing": boolean;
+}
+
+export interface RunFilter {
+    /**
+     * "" = all
+     */
+    "pipelineId": string;
+    "activeOnly": boolean;
+
+    /**
+     * default 50, max 200
+     */
+    "limit": number;
+}
+
+export interface RunItem {
+    /**
+     * 0-based; merged items take the next free index
+     */
+    "index": number;
+
+    /**
+     * input name, the download title, or "All 12 files"
+     */
+    "label": string;
+
+    /**
+     * "" for merged items
+     */
+    "input": string;
+
+    /**
+     * merged item: the items it gathers
+     */
+    "merged": number[] | null;
+
+    /**
+     * merged item: the together step that made it
+     */
+    "mergedAt": string;
+
+    /**
+     * one per step, same order
+     */
+    "cells": RunCell[] | null;
+
+    /**
+     * previews: ≤ 300 chars each
+     */
+    "vars": { [_ in string]?: string } | null;
+}
+
+export interface RunRequest {
+    "pipelineId": string;
+
+    /**
+     * paths or http(s) links; 1–200
+     */
+    "inputs": string[] | null;
+
+    /**
+     * "<stepId>.<key>" → value
+     */
+    "secrets": { [_ in string]?: string } | null;
+}
+
+export enum RunStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    RunRunning = "running",
+
+    /**
+     * at least one cell needs the user
+     */
+    RunWaiting = "waiting",
+
+    /**
+     * every item succeeded
+     */
+    RunDone = "done",
+
+    /**
+     * some items failed, cancelled or blocked
+     */
+    RunPartial = "partial",
+
+    /**
+     * no item succeeded
+     */
+    RunFailed = "failed",
+
+    /**
+     * the user cancelled the run
+     */
+    RunCancelled = "cancelled",
+};
+
+/**
+ * RunsRemoved is the payload of pipelines:runs-removed.
+ */
+export interface RunsRemoved {
+    "ids": string[] | null;
+}
+
+export interface SecretAsk {
+    "stepId": string;
+    "key": string;
+
+    /**
+     * "Step 3 · PDF password"
+     */
+    "label": string;
 }
 
 /**
@@ -1058,6 +1490,166 @@ export interface Size {
     "h": number;
 }
 
+export interface StepCheck {
+    "stepId": string;
+
+    /**
+     * Produces resolved: no "same as input" left (§8.8)
+     */
+    "info": StepInfo;
+
+    /**
+     * block running
+     */
+    "problems": string[] | null;
+
+    /**
+     * variables this step can use: built-ins + earlier steps'
+     */
+    "vars": StepVar[] | null;
+}
+
+/**
+ * StepFilter narrows the files a step reads. Empty fields match anything;
+ * all set fields must match.
+ */
+export interface StepFilter {
+    "roles": string[] | null;
+    "kinds": OutputKind[] | null;
+
+    /**
+     * lowercase with the dot
+     */
+    "exts": string[] | null;
+
+    /**
+     * case-insensitive substring of the file name
+     */
+    "name": string;
+}
+
+/**
+ * StepInfo is what a step does with given options (core.Chainable.DescribeStep).
+ */
+export interface StepInfo {
+    "accepts": Accepts;
+    "produces": StepProduct[] | null;
+    "vars": StepVar[] | null;
+    "together": boolean;
+
+    /**
+     * may run with From "none" or zero files
+     */
+    "noFiles": boolean;
+
+    /**
+     * asked for when a run starts; never stored
+     */
+    "secrets": StepSecret[] | null;
+
+    /**
+     * JSON pointers of option strings that take {vars}
+     */
+    "templates": string[] | null;
+
+    /**
+     * e.g. "Download a model in Local Chat first"
+     */
+    "warnings": string[] | null;
+
+    /**
+     * one line, e.g. "MP4 · H.264 · ≤ 1080p"
+     */
+    "summary": string;
+}
+
+/**
+ * StepProduct is one kind of file a step makes.
+ */
+export interface StepProduct {
+    /**
+     * stable: "vocals", "video", "subtitles"; "" = the main file
+     */
+    "role": string;
+
+    /**
+     * "Vocals"
+     */
+    "label": string;
+
+    /**
+     * "" = same as its input
+     */
+    "kind": OutputKind;
+
+    /**
+     * nil = same as its input
+     */
+    "exts": string[] | null;
+
+    /**
+     * may make several of this per item
+     */
+    "many": boolean;
+}
+
+export interface StepSecret {
+    /**
+     * unique within the step
+     */
+    "key": string;
+
+    /**
+     * "PDF password"
+     */
+    "label": string;
+}
+
+/**
+ * StepType is an entry of the step catalogue.
+ */
+export interface StepType {
+    /**
+     * module ID, or "pipelines.<action>", or "pipelines.check"
+     */
+    "id": string;
+
+    /**
+     * the module whose jobs it runs ("" for check)
+     */
+    "moduleId": string;
+    "name": string;
+    "icon": string;
+    "category": Category;
+
+    /**
+     * one sentence for the Add-step menu
+     */
+    "description": string;
+
+    /**
+     * can run automatically
+     */
+    "auto": boolean;
+
+    /**
+     * can be done by hand in its tool
+     */
+    "manual": boolean;
+    "builtin": boolean;
+
+    /**
+     * the widest it reads, over all options
+     */
+    "accepts": Accepts;
+    "defaultsJson": string;
+}
+
+export interface StepVar {
+    "name": string;
+    "label": string;
+}
+
 /**
  * Theme is the UI colour scheme preference.
  */
@@ -1123,4 +1715,50 @@ export interface VaultState {
      * from its backup copy" (SPEC.md §11 F3); "" = none.
      */
     "notice": string;
+}
+
+export enum WaitKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * do this step in its tool
+     */
+    WaitManual = "manual",
+
+    /**
+     * look at the files
+     */
+    WaitCheck = "check",
+
+    /**
+     * e.g. "Unlock the Vault to continue"; retried every 5 s
+     */
+    WaitCondition = "condition",
+};
+
+/**
+ * WatchConfig is a pipeline's watch folder.
+ */
+export interface WatchConfig {
+    "enabled": boolean;
+
+    /**
+     * absolute
+     */
+    "folder": string;
+}
+
+export interface WatchState {
+    /**
+     * enabled and polling
+     */
+    "active": boolean;
+
+    /**
+     * "" = fine; else why it's paused ("Fix the problems in step 2")
+     */
+    "message": string;
 }

@@ -119,6 +119,20 @@ export enum Sensitivity {
 };
 
 /**
+ * StepOptions are Redact's pipeline step options; steps always use the
+ * "auto" action.
+ */
+export interface StepOptions {
+    "faces": boolean;
+    "plates": boolean;
+    "sensitivity": Sensitivity;
+    "style": Style;
+    "strength": number;
+    "padding": number;
+    "stripMetadata": boolean;
+}
+
+/**
  * Style is how a box is hidden.
  */
 export enum Style {

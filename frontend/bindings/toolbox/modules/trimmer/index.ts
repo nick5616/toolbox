@@ -9,11 +9,13 @@ export {
 export {
     Aspect,
     Join,
-    Mode
+    Mode,
+    StepKeep
 } from "./models.js";
 
 export type {
     Options,
     Result,
-    Segment
+    Segment,
+    StepOptions
 } from "./models.js";

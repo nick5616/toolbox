@@ -24,6 +24,7 @@ import (
 	"toolbox/core/media"
 	"toolbox/core/packs"
 	"toolbox/core/pdfium"
+	"toolbox/core/pipeline"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
 	"toolbox/core/viz"
@@ -42,6 +43,7 @@ import (
 	"toolbox/modules/midi"
 	"toolbox/modules/ocr"
 	"toolbox/modules/pdf"
+	"toolbox/modules/pipelines"
 	"toolbox/modules/placeholders"
 	"toolbox/modules/redact"
 	"toolbox/modules/stems"
@@ -251,6 +253,19 @@ func run() error {
 		}
 	}
 
+	// --- Phase 8 Pipelines (architect) ---
+	runner := pipeline.New(pipeline.Config{
+		Store: db, Outputs: db, Jobs: jobs, Reg: reg, Em: emitter,
+		Tools: depSvc.Resolve, Settings: settings.Current,
+	})
+	defer runner.Stop()
+	if _, err := pipelines.Register(reg, pipelines.Config{
+		Runner: runner, Chat: chatSvc, Outputs: db, Emitter: emitter, LibraryDir: libraryDir,
+	}); err != nil {
+		return err
+	}
+	// --- end Phase 8 ---
+
 	settings.OnChange(func(old, new core.Settings) {
 		if old.Concurrency != new.Concurrency {
 			jobs.SetConcurrency(new.Concurrency)
@@ -260,6 +275,9 @@ func run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := jobs.Start(ctx); err != nil {
+		return err
+	}
+	if err := runner.Start(ctx); err != nil {
 		return err
 	}
 	go depSvc.Detect(ctx)
@@ -309,6 +327,7 @@ func run() error {
 			application.NewServiceWithOptions(eraser.NewService(jobs, eraserMod), opts),
 			application.NewServiceWithOptions(devutils.NewService(jobs), opts),
 			application.NewServiceWithOptions(visualizer.NewService(jobs, visualizerMod), opts),
+			application.NewServiceWithOptions(pipelines.NewService(runner), opts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -389,6 +408,7 @@ func run() error {
 		return err
 	}
 	desktopSvc.Shell = shell
+	runner.OnNeedsYou(shell.SetPipelinesNeedYou)
 	clipHistory.SetPopupOpener(shell.TogglePopup)
 	if os.Getenv("TOOLBOX_SHOW_POPUP") != "" { // dev aid for visual QA (no hotkey needed)
 		app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {

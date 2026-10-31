@@ -54,7 +54,7 @@ const REF: AnalysisRef = {
 function job(over: Partial<Job>): Job {
   return {
     id: "j1", moduleId: "visualizer", title: "t", status: "running" as Job["status"], progress: 0, message: "", inputs: ["C:/song.mp3"], optionsJson: "", errorCode: "" as Job["errorCode"],
-    error: "", errorHint: "", attempt: 1, cancelRequested: false, createdAt: 1, startedAt: 1, finishedAt: 0, outputs: [], resultJson: "", ...over,
+    error: "", errorHint: "", attempt: 1, cancelRequested: false, createdAt: 1, startedAt: 1, finishedAt: 0, outputs: [], resultJson: "", pipelineRunId: "", pipelineStepId: "", ...over,
   };
 }
 

@@ -34,6 +34,10 @@ func init() {
 	application.RegisterEvent[core.VaultState]("vault:state")
 	application.RegisterEvent[core.PacksChanged]("packs:changed")
 
+	application.RegisterEvent[core.PipelinesChanged]("pipelines:changed")
+	application.RegisterEvent[core.PipelineRun]("pipelines:run")
+	application.RegisterEvent[core.RunsRemoved]("pipelines:runs-removed")
+
 	application.RegisterEvent[viz.RenderStart]("viz:render")
 	application.RegisterEvent[viz.RenderAck]("viz:render-ack")
 	application.RegisterEvent[viz.RenderCancel]("viz:render-cancel")

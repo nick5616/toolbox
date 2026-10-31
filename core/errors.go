@@ -18,6 +18,7 @@ const (
 	CodeCancelled         ErrorCode = "cancelled"
 	CodeInterrupted       ErrorCode = "interrupted"
 	CodeNotImplemented    ErrorCode = "not_implemented"
+	CodeWaiting           ErrorCode = "waiting" // a pipeline step must wait for a condition (SPEC.md §8.6)
 	CodeInternal          ErrorCode = "internal"
 )
 
@@ -74,6 +75,12 @@ func ErrDependencyMissing(depID, hint string) *AppError {
 // NotImplemented is returned by contract stubs until their work package lands.
 func NotImplemented(what string) *AppError {
 	return Errorf(CodeNotImplemented, "%s isn't implemented yet", what)
+}
+
+// ErrWaiting is returned by core.Chainable.PrepareStep when a condition must
+// clear first (e.g. the Vault is locked). The pipeline runner retries it.
+func ErrWaiting(message, hint string) *AppError {
+	return &AppError{Code: CodeWaiting, Message: message, Hint: hint}
 }
 
 // AsAppError returns err as an *AppError, wrapping unknown errors as

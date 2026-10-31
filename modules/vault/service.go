@@ -86,3 +86,6 @@ func (v *Vault) enqueue(action string, inputs []string, o Options) ([]core.Job, 
 	}
 	return jobs, nil
 }
+
+// StepShape returns the pipeline step options (bindings only; SPEC.md §6).
+func (s *Service) StepShape() StepOptions { return StepOptions{} }

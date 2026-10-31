@@ -15,5 +15,6 @@ export type {
     Look,
     LyricLine,
     Options,
-    Result
+    Result,
+    StepOptions
 } from "./models.js";

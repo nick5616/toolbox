@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -196,6 +197,18 @@ func (d *DB) ListOutputs(ctx context.Context, q core.OutputQuery) (core.OutputPa
 		page.NextCursor = encodeCursor(last.CreatedAt, last.ID)
 	}
 	return page, nil
+}
+
+// MoveOutput implements core.OutputStore.
+func (d *DB) MoveOutput(ctx context.Context, id, newPath string) (core.Output, error) {
+	res, err := d.sql.ExecContext(ctx, `UPDATE outputs SET path = ?, name = ? WHERE id = ?`, newPath, filepath.Base(newPath), id)
+	if err != nil {
+		return core.Output{}, fmt.Errorf("move output %s: %w", id, err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return core.Output{}, core.Errorf(core.CodeNotFound, "Output not found")
+	}
+	return d.GetOutput(ctx, id)
 }
 
 func (d *DB) DeleteOutput(ctx context.Context, id string) error {

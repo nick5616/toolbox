@@ -43,6 +43,9 @@ func (c *Chat) pickModel() (string, error) {
 // Ready implements core.TextGenerator.
 func (c *Chat) Ready() (string, error) { return c.pickModel() }
 
+// ContextTokens implements core.TextGenerator.
+func (c *Chat) ContextTokens() int { return c.cfg.Settings.Current().Chat.ContextSize }
+
 // Complete implements core.TextGenerator.
 func (c *Chat) Complete(ctx context.Context, req core.CompletionRequest) (string, error) {
 	model, err := c.pickModel()

@@ -88,6 +88,7 @@ core/proc  subprocess runner with whole-tree kill and hidden windows
 core/store SQLite (modernc.org/sqlite, no CGO): jobs, logs, outputs, tags, settings
 core/deps  external tool detection + managed installs (yt-dlp, uv, ExifTool, upscaler, FFmpeg, Deno, llama.cpp)
 core/packs tool packs: catalog, status, install/remove, tools-folder move
+core/pipeline Runner: pipelines, runs (items × steps), manual/check pauses, watch folders
 core/pdfium shared PDF page renderer (go-pdfium WebAssembly, no FS mounts)
 core/imaging  pure-Go image sizes + scaled previews (jpg/png/gif/webp/bmp/tiff; no HEIC)
 core/media ffprobe probing, keyframes, webview playability, FFmpeg progress, ASS writer, fonts, preview copies
@@ -210,6 +211,21 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Caches:** `cache/visualizer/<file key>/` holds analyses (`s<0|1>.json` + `.bin`, `t-….json`, `instrumental.flac`), pruned at start after 30 days or above 3 GB. Previews (`cache/visualizer/preview-*.mp4`) are pruned after a day.
 - **Saved designs** are a JSON file, `<support>/visualizer/designs.json` (≤ 50 designs), behind `VisualizerService.Designs/SaveDesign/RenameDesign/DeleteDesign`.
 - **The mood reader** (`<models>/mood/`) is a pinned, sha-verified download (Music and Speech packs): the arm64 file on Apple Silicon, the avx2 file elsewhere.
+
+## Pipelines (Phase 8)
+
+- **A run isn't a job.** The `core/pipeline` Runner is one event loop that submits tagged jobs (`Jobs.SubmitFor`, `Job.PipelineRunID/PipelineStepID`) and follows them with `Jobs.Observe`. Never block in an observer. Pipelines, runs and watch-folder state live in `pipelines`, `pipeline_runs` and `pipeline_watch_seen` (migration 0005).
+- **How to make a module a pipeline step:** implement `core.Chainable` in `modules/<id>/pipeline.go`:
+  - `StepDefaults`;
+  - `DescribeStep`: Accepts, Produces with stable roles, Vars, Summary, and `Templates` (JSON pointers of option fields that take `{vars}`);
+  - `PrepareStep`: grouping into jobs; expand `{vars}` with `core.ExpandVars(tpl, item.Vars, core.FileVars(file))`; return `core.ErrWaiting(...)` to wait for a condition;
+  - `StepOutputs`: files with roles, and variables;
+  - then add a `StepShape()` service method if its step options are a new type, and its `StepUI` to a `frontend/src/pipelines/steps/*.tsx` group.
+- **Manual steps** ("I'll do this myself") need nothing from a module: the runner adopts untagged jobs of that module whose inputs include the waiting files.
+- **Built-in steps** (rename, chat, table, zip, copy) are actions of the `pipelines` job module; Check is the runner's own. Built-in files go to `<library>/Pipelines/<pipeline name>/`.
+- **Secrets** (PDF passwords) are asked at run start, live only in Runner memory and the PDF module's secret store, and are never in the DB or job options (only a `passwordRef`).
+- **Temporary files:** clean-up only deletes the run's own registered outputs inside the Library, never inputs, and only when a run ends `done` or the user asks.
+- **Variables:** `{name}` syntax, `[a-z][a-z0-9_]{0,31}`; `core.ExpandVars` and `frontend/src/pipelines/vars.ts` share the vectors in `core/testdata/vars.json`.
 
 ## Conventions
 

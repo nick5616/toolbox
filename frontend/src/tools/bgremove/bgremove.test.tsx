@@ -97,6 +97,8 @@ describe("BgRemoveView", () => {
       errorCode: ErrorCode.$zero,
       error: "",
       errorHint: "",
+      pipelineRunId: "",
+      pipelineStepId: "",
       attempt: 1,
       cancelRequested: false,
       createdAt: 1,

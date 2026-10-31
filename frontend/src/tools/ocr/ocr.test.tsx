@@ -90,6 +90,8 @@ describe("OcrView", () => {
       errorCode: ErrorCode.$zero,
       error: "",
       errorHint: "",
+      pipelineRunId: "",
+      pipelineStepId: "",
       attempt: 1,
       cancelRequested: false,
       createdAt: 1,

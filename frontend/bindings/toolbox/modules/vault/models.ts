@@ -20,3 +20,11 @@ export interface Entry {
     "modTime": number;
     "addedAt": number;
 }
+
+/**
+ * StepOptions are the Vault's pipeline step options: add the files to Folder
+ * ({vars} allowed; "" = the root).
+ */
+export interface StepOptions {
+    "folder": string;
+}

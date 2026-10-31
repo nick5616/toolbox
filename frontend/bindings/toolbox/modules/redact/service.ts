@@ -39,3 +39,10 @@ export function Enqueue(paths: string[] | null, opts: $models.Options): $Cancell
 export function ResultShape(): $CancellablePromise<$models.Result> {
     return $Call.ByID(1386940639);
 }
+
+/**
+ * StepShape returns the pipeline step options (bindings only; SPEC.md §6).
+ */
+export function StepShape(): $CancellablePromise<$models.StepOptions> {
+    return $Call.ByID(1077129658);
+}

@@ -7,5 +7,6 @@ export {
 };
 
 export type {
-    Entry
+    Entry,
+    StepOptions
 } from "./models.js";

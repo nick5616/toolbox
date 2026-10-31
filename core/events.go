@@ -27,6 +27,11 @@ const (
 	EventChatStatus   = "chat:status"   // ChatStatus
 	EventVaultState   = "vault:state"   // VaultState
 	EventPacksChanged = "packs:changed" // PacksChanged
+
+	// Phase 8
+	EventPipelinesChanged     = "pipelines:changed"      // PipelinesChanged
+	EventPipelinesRun         = "pipelines:run"          // PipelineRun (throttled ≤ 1/250ms/run)
+	EventPipelinesRunsRemoved = "pipelines:runs-removed" // RunsRemoved
 )
 
 // Emitter publishes events to the UI. Core code depends on this interface,

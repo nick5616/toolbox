@@ -1,0 +1,14 @@
+{
+  "vars": { "name": "Song - Bass", "bpm": "128", "key": "A minor", "empty": "", "x_1": "ok" },
+  "cases": [
+    { "tpl": "{name} · {bpm} BPM · {key}", "out": "Song - Bass · 128 BPM · A minor", "missing": [], "used": ["name", "bpm", "key"] },
+    { "tpl": "plain text", "out": "plain text", "missing": [], "used": [] },
+    { "tpl": "{{literal}} and {{{bpm}}}", "out": "{literal} and {128}", "missing": [], "used": ["bpm"] },
+    { "tpl": "{nope} {bpm} {nope}", "out": " 128 ", "missing": ["nope"], "used": ["nope", "bpm"] },
+    { "tpl": "{Bad} {1x} { name } {}", "out": "{Bad} {1x} { name } {}", "missing": [], "used": [] },
+    { "tpl": "{empty}|{x_1}", "out": "|ok", "missing": [], "used": ["empty", "x_1"] },
+    { "tpl": "unclosed {name", "out": "unclosed {name", "missing": [], "used": [] },
+    { "tpl": "a}b", "out": "a}b", "missing": [], "used": [] },
+    { "tpl": "{name}{name}", "out": "Song - BassSong - Bass", "missing": [], "used": ["name"] }
+  ]
+}

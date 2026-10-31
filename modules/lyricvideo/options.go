@@ -13,6 +13,7 @@ const (
 	ActionRender  Action = "render"  // the whole video + .lrc
 	ActionPreview Action = "preview" // a 10 s render into the cache
 	ActionLRC     Action = "lrc"     // only write <base>.lrc from Lines
+	ActionAuto    Action = "auto"    // detect lyrics, then render (pipelines, SPEC.md §6.4)
 )
 
 // Source is where timed lyrics come from.

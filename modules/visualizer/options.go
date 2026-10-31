@@ -9,6 +9,7 @@ const (
 	ActionAnalyze Action = "analyze" // song analysis into the cache
 	ActionRender  Action = "render"  // the video into the Library
 	ActionPreview Action = "preview" // a 10 s render into the cache
+	ActionAuto    Action = "auto"    // analyze, then render (pipelines, SPEC.md §6.4)
 )
 
 // Mode is full-frame visuals or visuals over the input video.

@@ -33,6 +33,9 @@ declare module "@wailsio/runtime" {
             "library:added": core$0.Output;
             "library:removed": core$0.OutputsRemoved;
             "packs:changed": core$0.PacksChanged;
+            "pipelines:changed": core$0.PipelinesChanged;
+            "pipelines:run": core$0.PipelineRun;
+            "pipelines:runs-removed": core$0.RunsRemoved;
             "settings:changed": core$0.Settings;
             "vault:state": core$0.VaultState;
             "viz:render": viz$0.RenderStart;

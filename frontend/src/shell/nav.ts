@@ -10,6 +10,7 @@ export interface NavItem {
 }
 
 export const RECENT_ITEM: NavItem = { id: "library", label: "Recent", icon: "history" };
+export const PIPELINES_ITEM: NavItem = { id: "pipelines", label: "Pipelines", icon: "workflow" };
 export const SETTINGS_ITEM: NavItem = { id: "settings", label: "Settings", icon: "settings" };
 
 function toItem(m: ModuleView): NavItem {
@@ -33,9 +34,10 @@ export function useNavGroups(): NavGroups {
   const modules = useVisibleModules();
   const comingSoonOpen = useUI((s) => s.comingSoonOpen);
   return useMemo(() => {
-    const tools = modules.filter(isReady).map(toItem);
+    // Pipelines is its own item under Recent, not a tool (SPEC.md §11.1).
+    const tools = modules.filter((m) => isReady(m) && m.id !== PIPELINES_ITEM.id).map(toItem);
     const soon = modules.filter((m) => !isReady(m)).map(toItem);
-    return { tools, soon, ordered: [RECENT_ITEM, ...tools, ...(comingSoonOpen ? soon : [])] };
+    return { tools, soon, ordered: [RECENT_ITEM, PIPELINES_ITEM, ...tools, ...(comingSoonOpen ? soon : [])] };
   }, [modules, comingSoonOpen]);
 }
 
@@ -43,6 +45,7 @@ export function useNavGroups(): NavGroups {
 export function viewTitle(view: string, byId: Record<string, ModuleView>): string {
   if (view === "library") return "Recent";
   if (view === "settings") return "Settings";
+  if (view === "pipelines") return "Pipelines";
   if (view === "gallery") return "Component gallery";
   return byId[view]?.name ?? view;
 }

@@ -99,6 +99,21 @@ export const LibraryRemoved = "library:removed";
 export const PacksChanged = "packs:changed";
 
 /**
+ * Name of the custom event "pipelines:changed".
+ */
+export const PipelinesChanged = "pipelines:changed";
+
+/**
+ * Name of the custom event "pipelines:run".
+ */
+export const PipelinesRun = "pipelines:run";
+
+/**
+ * Name of the custom event "pipelines:runs-removed".
+ */
+export const PipelinesRunsRemoved = "pipelines:runs-removed";
+
+/**
  * Name of the custom event "settings:changed".
  */
 export const SettingsChanged = "settings:changed";

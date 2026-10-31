@@ -32,6 +32,7 @@ export const toolViews: Record<string, LazyExoticComponent<ComponentType<ToolVie
   "object-eraser": lazy(() => import("./eraser/ObjectEraserView")),
   "dev-utils": lazy(() => import("./devutils/DevUtilsView")),
   visualizer: lazy(() => import("./visualizer/VisualizerView")),
+  pipelines: lazy(() => import("./pipelines/PipelinesView")),
 };
 
 /**

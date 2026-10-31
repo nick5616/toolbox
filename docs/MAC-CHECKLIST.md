@@ -97,6 +97,17 @@ Everything from Phases 3–6 that can only be checked on the Mac (Apple Silicon)
 37. Quit, then start Toolbox from Terminal with `TOOLBOX_VIZ_FORCE_JPEG=1` and render 10 s.
     Expect: the render log says `jpeg` and the clip plays.
 
+## 8. Pipelines (Phase 8)
+
+38. Make a pipeline from the **Product photos** template, turn on **Watch a folder** on a new folder, then copy 3 photos into it from Finder.
+    Expect: one run starts with all 3 once they finish copying; the WebP files appear in the Library.
+39. Run **Clip for social** on a link.
+    Expect: the Trimmer opens with the video and a "waiting" bar on top. Export a part: the run carries on by itself.
+40. Start a pipeline with a Check step, hide the window to the tray, and wait.
+    Expect: the tray menu shows "<name> needs you"; clicking it opens Pipelines → Runs.
+41. Run **Music video** on a song and hide the window to the tray.
+    Expect: the run finishes; the video plays.
+
 ## Logs to send back
 
 - `~/Library/Application Support/Toolbox/logs/toolbox.log` (and `toolbox.log.1` if present).

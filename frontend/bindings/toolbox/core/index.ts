@@ -3,6 +3,7 @@
 
 export {
     Category,
+    CellStatus,
     ChatBackend,
     ChatMessageStatus,
     ChatRole,
@@ -18,7 +19,9 @@ export {
     PackComponentKind,
     PackComponentState,
     PackState,
-    Theme
+    RunStatus,
+    Theme,
+    WaitKind
 } from "./models.js";
 
 export type {
@@ -38,6 +41,7 @@ export type {
     ClipboardSettings,
     ClipboardState,
     ClipsRemoved,
+    ContinueRequest,
     DepStatus,
     DepsChanged,
     Descriptor,
@@ -67,13 +71,37 @@ export type {
     PackStatus,
     PackUnlock,
     PacksChanged,
+    Pipeline,
+    PipelineCheck,
+    PipelineEntry,
+    PipelineRun,
+    PipelineStep,
+    PipelineTemplate,
+    PipelinesChanged,
     PresetInfo,
+    RunBrief,
+    RunCell,
+    RunFile,
+    RunFilter,
+    RunItem,
+    RunRequest,
+    RunsRemoved,
+    SecretAsk,
     Settings,
     SettingsPatch,
     SetupSettings,
     ShowView,
     Size,
+    StepCheck,
+    StepFilter,
+    StepInfo,
+    StepProduct,
+    StepSecret,
+    StepType,
+    StepVar,
     ToolsDirInfo,
     VaultSettings,
-    VaultState
+    VaultState,
+    WatchConfig,
+    WatchState
 } from "./models.js";

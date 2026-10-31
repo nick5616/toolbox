@@ -103,6 +103,22 @@ func (s *FilesService) PickWith(title string, extensions []string, multiple bool
 	return paths, nil
 }
 
+// PickFolder shows a native folder dialog (watch folders, Copy to folder).
+// Cancelling returns "".
+func (s *FilesService) PickFolder(title string) (string, error) {
+	path, err := application.Get().Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{
+		CanChooseDirectories: true,
+		CanChooseFiles:       false,
+		CanCreateDirectories: true,
+		Title:                title,
+		ButtonText:           "Choose",
+	}).PromptForSingleSelection()
+	if err != nil {
+		return "", fmt.Errorf("folder dialog: %w", err)
+	}
+	return path, nil
+}
+
 // errDialogCancelled is never returned by Wails (it returns empty results
 // on cancel); kept so the cancel path stays explicit.
 var errDialogCancelled = errors.New("cancelled")

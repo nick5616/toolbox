@@ -15,5 +15,6 @@ export type {
     ChatStatus,
     Design,
     Options,
-    Result
+    Result,
+    StepOptions
 } from "./models.js";

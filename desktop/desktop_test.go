@@ -167,6 +167,16 @@ func TestTrayModel(t *testing.T) {
 		t.Fatalf("empty recent = %+v", r)
 	}
 
+	if find(m, itemPipelines) != nil {
+		t.Fatal("pipelines item shown with nothing waiting")
+	}
+	if p := trayModel(trayState{NeedYou: 1, NeedYouName: "Clip for social"}); p[0].ID != itemPipelines || p[0].Label != "Clip for social needs you" {
+		t.Fatalf("needs you = %+v", p[0])
+	}
+	if p := find(trayModel(trayState{NeedYou: 3, NeedYouName: "X"}), itemPipelines); p.Label != "3 pipeline steps need you" {
+		t.Fatalf("needs you (3) = %+v", p)
+	}
+
 	got := ids(m)
 	want := []string{itemOpen, itemClipboard, itemSep, itemRecent, itemSep, itemSettings, itemQuit}
 	if !reflect.DeepEqual(got, want) {

@@ -18,6 +18,7 @@ type fakeTG struct {
 	readyErr error
 }
 
+func (f *fakeTG) ContextTokens() int     { return 8192 }
 func (f *fakeTG) Ready() (string, error) { return "fake-model", f.readyErr }
 func (f *fakeTG) Complete(ctx context.Context, req core.CompletionRequest) (string, error) {
 	if err := ctx.Err(); err != nil {

@@ -15,5 +15,6 @@ export type {
     Options,
     PageEdit,
     PageSize,
-    Result
+    Result,
+    StepOptions
 } from "./models.js";

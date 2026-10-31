@@ -17,6 +17,7 @@ export type {
     ImageDetections,
     Options,
     Result,
+    StepOptions,
     TimedBox,
     Track,
     TrackSample,

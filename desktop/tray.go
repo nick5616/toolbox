@@ -85,6 +85,7 @@ func (t *tray) state() trayState {
 		st.VaultUnlocked = o.Vault.State().Unlocked
 	}
 	// --- end vault ---
+	st.NeedYou, st.NeedYouName = t.s.pipelinesNeedYou()
 	ctx, cancel := timeoutCtx()
 	defer cancel()
 	if jobs, err := o.Jobs.List(ctx, core.JobFilter{
@@ -151,6 +152,8 @@ func (t *tray) handler(id string, st trayState) func(*application.Context) {
 			}
 			t.refresh()
 		// --- end vault ---
+		case id == itemPipelines:
+			_ = s.ShowMain(NavigatePipelineRuns)
 		case id == itemSettings:
 			_ = s.ShowMain("settings")
 		case id == itemQuit:

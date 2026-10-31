@@ -42,6 +42,10 @@ type Jobs struct {
 	rootCancel  context.CancelFunc
 	lastCreated int64
 	wg          sync.WaitGroup
+
+	obsMu     sync.Mutex
+	observers map[int]func(Job)
+	obsNext   int
 }
 
 // activeJob is the live state of a queued or running job. job is guarded by
@@ -121,7 +125,7 @@ func (m *Jobs) Start(ctx context.Context) error {
 		if err := m.store.UpdateJob(ctx, j); err != nil {
 			return fmt.Errorf("mark job interrupted: %w", err)
 		}
-		m.em.Emit(EventJobsChanged, snap(j))
+		m.changed(snap(j))
 	}
 	queued, err := m.store.ListJobs(ctx, JobFilter{Statuses: []JobStatus{JobQueued}, Limit: 500})
 	if err != nil {
@@ -183,8 +187,75 @@ func (m *Jobs) Shutdown(timeout time.Duration) error {
 	return err
 }
 
+// PipelineTag marks jobs that belong to a pipeline run (SPEC.md §9.2).
+type PipelineTag struct{ RunID, StepID string }
+
+// changed emits a persisted snapshot and passes it to the observers.
+func (m *Jobs) changed(j Job) {
+	m.em.Emit(EventJobsChanged, j)
+	m.obsMu.Lock()
+	fns := make([]func(Job), 0, len(m.observers))
+	for _, fn := range m.observers {
+		fns = append(fns, fn)
+	}
+	m.obsMu.Unlock()
+	for _, fn := range fns {
+		fn(j)
+	}
+}
+
+// Observe calls fn with every job snapshot after it is persisted (submit,
+// start, title/output/result updates, finish, retry, cancel, tag); throttled
+// progress isn't included. fn must not block. The returned function removes
+// the observer.
+func (m *Jobs) Observe(fn func(Job)) (stop func()) {
+	m.obsMu.Lock()
+	defer m.obsMu.Unlock()
+	if m.observers == nil {
+		m.observers = map[int]func(Job){}
+	}
+	id := m.obsNext
+	m.obsNext++
+	m.observers[id] = fn
+	return func() {
+		m.obsMu.Lock()
+		delete(m.observers, id)
+		m.obsMu.Unlock()
+	}
+}
+
+// Tag sets the pipeline tag of an active or finished job (manual-step
+// adoption).
+func (m *Jobs) Tag(id string, tag PipelineTag) error {
+	m.mu.Lock()
+	aj, ok := m.active[id]
+	if ok {
+		aj.job.PipelineRunID, aj.job.PipelineStepID = tag.RunID, tag.StepID
+	}
+	m.mu.Unlock()
+	if ok {
+		m.publish(aj)
+		return nil
+	}
+	j, err := m.store.GetJob(context.Background(), id)
+	if err != nil {
+		return err
+	}
+	j.PipelineRunID, j.PipelineStepID = tag.RunID, tag.StepID
+	if err := m.store.UpdateJob(context.Background(), j); err != nil {
+		return err
+	}
+	m.changed(snap(j))
+	return nil
+}
+
 // Submit validates and enqueues work for a module.
 func (m *Jobs) Submit(ctx context.Context, moduleID string, inputs []string, optionsJSON string) ([]Job, error) {
+	return m.SubmitFor(ctx, moduleID, inputs, optionsJSON, PipelineTag{})
+}
+
+// SubmitFor is Submit with a pipeline tag on every job it creates.
+func (m *Jobs) SubmitFor(ctx context.Context, moduleID string, inputs []string, optionsJSON string, tag PipelineTag) ([]Job, error) {
 	desc, ok := m.reg.Descriptor(moduleID)
 	if !ok {
 		return nil, Errorf(CodeNotFound, "Unknown module %q", moduleID)
@@ -242,7 +313,7 @@ func (m *Jobs) Submit(ctx context.Context, moduleID string, inputs []string, opt
 		jobs[i] = Job{
 			ID: NewID(), ModuleID: moduleID, Title: title, Status: JobQueued,
 			Inputs: g, OptionsJSON: optionsJSON, Attempt: 1, CreatedAt: created,
-			Outputs: []Output{},
+			Outputs: []Output{}, PipelineRunID: tag.RunID, PipelineStepID: tag.StepID,
 		}
 	}
 	m.mu.Unlock()
@@ -269,7 +340,7 @@ func (m *Jobs) Submit(ctx context.Context, moduleID string, inputs []string, opt
 	sortQueue(m.queue)
 	m.mu.Unlock()
 	for _, j := range jobs {
-		m.em.Emit(EventJobsChanged, snap(j))
+		m.changed(snap(j))
 	}
 	m.kick()
 	out := make([]Job, len(jobs))
@@ -329,7 +400,7 @@ func (m *Jobs) publish(aj *activeJob) {
 	if err := m.store.UpdateJob(context.Background(), s); err != nil {
 		slog.Error("persist job", "job", s.ID, "err", err)
 	}
-	m.em.Emit(EventJobsChanged, s)
+	m.changed(s)
 }
 
 func (m *Jobs) update(aj *activeJob, fn func(j *Job)) {
@@ -609,7 +680,7 @@ func (m *Jobs) Retry(ctx context.Context, id string) (Job, error) {
 	s := snap(j)
 	m.mu.Unlock()
 	m.em.Emit(EventJobsLog, JobLogBatch{ID: id, Lines: []LogLine{line}})
-	m.em.Emit(EventJobsChanged, s)
+	m.changed(s)
 	m.kick()
 	return s, nil
 }

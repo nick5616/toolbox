@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"sync"
 	"testing"
@@ -71,6 +72,9 @@ func (d *memDB) ListJobs(_ context.Context, f JobFilter) ([]Job, error) {
 	defer d.mu.Unlock()
 	out := []Job{}
 	for _, j := range d.jobs {
+		if f.PipelineRunID != "" && j.PipelineRunID != f.PipelineRunID {
+			continue
+		}
 		if f.ModuleID != "" && j.ModuleID != f.ModuleID {
 			continue
 		}
@@ -172,6 +176,18 @@ func (d *memDB) DeleteOutput(_ context.Context, id string) error {
 	defer d.mu.Unlock()
 	delete(d.outputs, id)
 	return nil
+}
+
+func (d *memDB) MoveOutput(_ context.Context, id, newPath string) (Output, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	o, ok := d.outputs[id]
+	if !ok {
+		return Output{}, Errorf(CodeNotFound, "output not found")
+	}
+	o.Path, o.Name = newPath, filepath.Base(newPath)
+	d.outputs[id] = o
+	return o, nil
 }
 
 func (d *memDB) logCount(id string) int {

@@ -48,6 +48,13 @@ export function ResultShape(): $CancellablePromise<$models.Result> {
 }
 
 /**
+ * StepShape returns the pipeline step options (bindings only; SPEC.md §6).
+ */
+export function StepShape(): $CancellablePromise<$models.StepOptions> {
+    return $Call.ByID(3465522848);
+}
+
+/**
  * Styles lists the burn-in styles in UI order.
  */
 export function Styles(): $CancellablePromise<$models.StyleInfo[] | null> {

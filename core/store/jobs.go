@@ -12,7 +12,8 @@ import (
 )
 
 const jobCols = `id, module_id, title, status, progress, message, inputs, options,
-	error_code, error, error_hint, attempt, created_at, started_at, finished_at, result`
+	error_code, error, error_hint, attempt, created_at, started_at, finished_at, result,
+	pipeline_run_id, pipeline_step_id`
 
 func encodeInputs(in []string) (string, error) {
 	if in == nil {
@@ -37,9 +38,10 @@ func (d *DB) InsertJob(ctx context.Context, j core.Job) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.sql.ExecContext(ctx, `INSERT INTO jobs (`+jobCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	_, err = d.sql.ExecContext(ctx, `INSERT INTO jobs (`+jobCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		j.ID, j.ModuleID, j.Title, string(j.Status), j.Progress, j.Message, inputs, optionsOrEmpty(j.OptionsJSON),
-		string(j.ErrorCode), j.Error, j.ErrorHint, j.Attempt, j.CreatedAt, j.StartedAt, j.FinishedAt, j.ResultJSON)
+		string(j.ErrorCode), j.Error, j.ErrorHint, j.Attempt, j.CreatedAt, j.StartedAt, j.FinishedAt, j.ResultJSON,
+		j.PipelineRunID, j.PipelineStepID)
 	if err != nil {
 		return fmt.Errorf("insert job %s: %w", j.ID, err)
 	}
@@ -52,10 +54,10 @@ func (d *DB) UpdateJob(ctx context.Context, j core.Job) error {
 		return err
 	}
 	res, err := d.sql.ExecContext(ctx, `UPDATE jobs SET module_id=?, title=?, status=?, progress=?, message=?,
-		inputs=?, options=?, error_code=?, error=?, error_hint=?, attempt=?, created_at=?, started_at=?, finished_at=?, result=?
-		WHERE id=?`,
+		inputs=?, options=?, error_code=?, error=?, error_hint=?, attempt=?, created_at=?, started_at=?, finished_at=?, result=?,
+		pipeline_run_id=?, pipeline_step_id=? WHERE id=?`,
 		j.ModuleID, j.Title, string(j.Status), j.Progress, j.Message, inputs, optionsOrEmpty(j.OptionsJSON),
-		string(j.ErrorCode), j.Error, j.ErrorHint, j.Attempt, j.CreatedAt, j.StartedAt, j.FinishedAt, j.ResultJSON, j.ID)
+		string(j.ErrorCode), j.Error, j.ErrorHint, j.Attempt, j.CreatedAt, j.StartedAt, j.FinishedAt, j.ResultJSON, j.PipelineRunID, j.PipelineStepID, j.ID)
 	if err != nil {
 		return fmt.Errorf("update job %s: %w", j.ID, err)
 	}
@@ -90,6 +92,10 @@ func (d *DB) ListJobs(ctx context.Context, f core.JobFilter) ([]core.Job, error)
 		where = append(where, "module_id = ?")
 		args = append(args, f.ModuleID)
 	}
+	if f.PipelineRunID != "" {
+		where = append(where, "pipeline_run_id = ?")
+		args = append(args, f.PipelineRunID)
+	}
 	if len(f.Statuses) > 0 {
 		ph := make([]string, len(f.Statuses))
 		for i, s := range f.Statuses {
@@ -118,7 +124,8 @@ func (d *DB) queryJobs(ctx context.Context, q string, args ...any) ([]core.Job, 
 		var j core.Job
 		var status, errCode, inputs string
 		if err := rows.Scan(&j.ID, &j.ModuleID, &j.Title, &status, &j.Progress, &j.Message, &inputs, &j.OptionsJSON,
-			&errCode, &j.Error, &j.ErrorHint, &j.Attempt, &j.CreatedAt, &j.StartedAt, &j.FinishedAt, &j.ResultJSON); err != nil {
+			&errCode, &j.Error, &j.ErrorHint, &j.Attempt, &j.CreatedAt, &j.StartedAt, &j.FinishedAt, &j.ResultJSON,
+			&j.PipelineRunID, &j.PipelineStepID); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("scan job: %w", err)
 		}

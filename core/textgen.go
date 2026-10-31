@@ -17,6 +17,9 @@ type TextGenerator interface {
 	// Nothing is stored as a conversation. A background completion holds
 	// the slot for one request only; interactive chat has priority.
 	Complete(ctx context.Context, req CompletionRequest) (string, error)
+	// ContextTokens is the model's context window (Settings.Chat.ContextSize);
+	// callers size long prompts against it (SPEC.md §7.3).
+	ContextTokens() int
 }
 
 // CompletionRequest is one prompt for TextGenerator.Complete.

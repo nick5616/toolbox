@@ -158,3 +158,24 @@ export interface Result {
     "imagesRecompressed": number;
     "bookmarksDropped": boolean;
 }
+
+/**
+ * StepOptions are PDF Toolkit's pipeline step options. Organize and range
+ * splits need one specific document, so they aren't offered.
+ */
+export interface StepOptions {
+    /**
+     * merge | split | compress | images-to-pdf | pdf-to-images | protect | unlock
+     */
+    "action": Action;
+
+    /**
+     * split: pages per file, ≥ 1
+     */
+    "every": number;
+    "level": string;
+    "pageSize": string;
+    "margin": string;
+    "imageFormat": string;
+    "dpi": number;
+}

@@ -28,6 +28,11 @@ export enum Action {
      * a 10 s render into the cache
      */
     ActionPreview = "preview",
+
+    /**
+     * analyze, then render (pipelines, SPEC.md §6.4)
+     */
+    ActionAuto = "auto",
 };
 
 /**
@@ -148,4 +153,56 @@ export interface Result {
      * media seconds per wall second
      */
     "speed": number;
+}
+
+/**
+ * StepOptions are the Visualizer's pipeline step options; steps use the
+ * "auto" action (analyze, then render).
+ */
+export interface StepOptions {
+    /**
+     * the preset it came from ("" = a saved design); a label only
+     */
+    "presetId": string;
+
+    /**
+     * shown in the summary
+     */
+    "designName": string;
+
+    /**
+     * required, ≤ 512 KiB
+     */
+    "showJson": string;
+
+    /**
+     * full | overlay (overlay needs a video input)
+     */
+    "mode": Mode;
+    "aspect": string;
+    "height": number;
+    "fps": number;
+
+    /**
+     * "original" | "instrumental" (needs Stems)
+     */
+    "audio": string;
+
+    /**
+     * "none" | "cover"
+     */
+    "background": string;
+    "stems": boolean;
+    "saveStems": boolean;
+
+    /**
+     * "none" | "detect"
+     */
+    "words": string;
+
+    /**
+     * words: "" = auto
+     */
+    "language": string;
+    "mood": boolean;
 }

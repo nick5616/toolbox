@@ -118,6 +118,13 @@ export function State(): $CancellablePromise<core$0.VaultState> {
 }
 
 /**
+ * StepShape returns the pipeline step options (bindings only; SPEC.md §6).
+ */
+export function StepShape(): $CancellablePromise<$models.StepOptions> {
+    return $Call.ByID(4208480049);
+}
+
+/**
  * Unlock accepts the passphrase or an AGE-SECRET-KEY-1… recovery key.
  */
 export function Unlock(secret: string): $CancellablePromise<void> {

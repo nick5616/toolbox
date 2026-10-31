@@ -43,3 +43,6 @@ func (s *Service) Enqueue(paths []string, opts Options, password string, newPass
 // ResultShape exists so the binding generator emits the Result type for the
 // frontend; it returns the zero value.
 func (s *Service) ResultShape() Result { return Result{} }
+
+// StepShape returns the pipeline step options (bindings only; SPEC.md §6).
+func (s *Service) StepShape() StepOptions { return DefaultStepOptions() }

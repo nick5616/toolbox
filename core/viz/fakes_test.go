@@ -140,6 +140,8 @@ type fakeChat struct {
 	reply    func(req core.CompletionRequest, n int) (string, error)
 }
 
+func (f *fakeChat) ContextTokens() int { return 8192 }
+
 func (f *fakeChat) Ready() (string, error) {
 	if f.readyErr != nil {
 		return "", f.readyErr

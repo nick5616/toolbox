@@ -36,6 +36,11 @@ export enum Action {
      * only write <base>.lrc from Lines
      */
     ActionLRC = "lrc",
+
+    /**
+     * detect lyrics, then render (pipelines, SPEC.md §6.4)
+     */
+    ActionAuto = "auto",
 };
 
 /**
@@ -205,3 +210,28 @@ export enum Source {
      */
     SourceFile = "file",
 };
+
+/**
+ * StepOptions are Lyric Video's pipeline step options; steps use the "auto"
+ * action (detect the lyrics, then render). Look.Title and Look.Artist take
+ * {vars}.
+ */
+export interface StepOptions {
+    "language": string;
+    "look": Look;
+
+    /**
+     * "original" | "instrumental"
+     */
+    "audio": string;
+
+    /**
+     * "16:9" | "9:16" | "1:1"
+     */
+    "aspect": string;
+
+    /**
+     * 720 | 1080
+     */
+    "height": number;
+}

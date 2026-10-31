@@ -105,3 +105,10 @@ export function ResultShape(): $CancellablePromise<$models.Result> {
 export function SaveDesign(d: $models.Design): $CancellablePromise<$models.Design> {
     return $Call.ByID(3914307259, d);
 }
+
+/**
+ * StepShape returns the pipeline step options (bindings only; SPEC.md §6).
+ */
+export function StepShape(): $CancellablePromise<$models.StepOptions> {
+    return $Call.ByID(601641587);
+}
