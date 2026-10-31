@@ -39,7 +39,9 @@ func TestBuildArgsScale(t *testing.T) {
 		{"mp4-h265", HeightKeep, false},
 		{"mp4-h264", "", false},
 		{"mp3-320", Height720, false}, // audio ignores height
-		{"png", Height720, false},     // images ignore height
+		{"png", Height720, true},      // images scale down too
+		{"jpeg", Height480, true},
+		{"webp", HeightKeep, false},
 	}
 	for _, tt := range tests {
 		got := buildArgs(Options{Preset: tt.preset, MaxHeight: tt.height}, "i", "o")

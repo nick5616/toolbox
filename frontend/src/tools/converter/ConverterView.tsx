@@ -53,7 +53,7 @@ export default function ConverterView({ moduleId }: ToolViewProps) {
   }, []);
 
   const preset = presets.find((p) => p.id === opts.preset);
-  const isVideo = preset?.kind === OutputKind.KindVideo;
+  const hasHeight = preset?.kind === OutputKind.KindVideo || preset?.kind === OutputKind.KindImage;
   const kindErrors = useMemo(() => incompatibleInputs(inputs.files, preset), [inputs.files, preset]);
   const inputErrors = useMemo(() => ({ ...submitErrors, ...kindErrors }), [submitErrors, kindErrors]);
   const compatible = inputs.files.filter((f) => !kindErrors[f.path]);
@@ -92,7 +92,7 @@ export default function ConverterView({ moduleId }: ToolViewProps) {
                 />
               )}
             </Field>
-            {isVideo && (
+            {hasHeight && (
               <Field label="Max height">
                 {(c) => (
                   <Select id={c.id} value={opts.maxHeight} options={HEIGHTS} onChange={(maxHeight) => setOpts((o) => ({ ...o, maxHeight }))} />
