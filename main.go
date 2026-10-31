@@ -257,6 +257,7 @@ func run() error {
 	runner := pipeline.New(pipeline.Config{
 		Store: db, Outputs: db, Jobs: jobs, Reg: reg, Em: emitter,
 		Tools: depSvc.Resolve, Settings: settings.Current,
+		ProtectedDirs: []string{paths.SupportDir, paths.ToolsDir},
 	})
 	defer runner.Stop()
 	if _, err := pipelines.Register(reg, pipelines.Config{
