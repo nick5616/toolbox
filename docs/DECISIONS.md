@@ -203,3 +203,10 @@ Newest last. Format: date — decision — why.
 - 2026-10-30 — Lyric Video: the Visuals step's analysis lives in the view so Look reuses it; Classic keeps the chosen design for switching back; the Song step's instrumental prefers the Visualizer's 4-stem instrumental over Lyric Video's 2-stem cache; the lyric sheet moved into a session store (LV3).
 - 2026-10-30 — Subtitles: the chosen visual design lives in view state (not module state, which is capped at 64 KB); switching between audio and video input resets it; style-card previews poll `AnalysisFor` and never submit their own analysis (SB4).
 - 2026-10-30 — Presets: `showNext` defaults off (the next line overlapped two-line captions); feedback trails sit in scene post chains so captions stay sharp; motifs are drawn by the engine from `director.motifsAt` (PR1).
+
+## Phase 8 (SPEC.md approved 2026-10-31)
+
+- 2026-10-31 — `TextGenerator.ContextTokens()` returns `Settings.Chat.ContextSize` for both llama-server and Ollama (the spec said 8192 for Ollama). — Chat already passes that context size to Ollama requests, so it is the real window there too.
+- 2026-10-31 — Wave 0 added `frontend/src/pipelines/visualizerDesigns.ts` (`presetShowJson`, `fillVisualizerDesigns`) as a frozen helper. — The template gallery (UI1) and the Visualizer step editor (AD2) are built in parallel and both need the same preset → ShowJSON rule.
+- 2026-10-31 — The tray's "needs you" item navigates with the target `pipelines-runs`, which the frontend maps to Pipelines → Runs. — `app:navigate` carries one string; this avoids a second event.
+- 2026-10-31 — The `pipelines` module has Order 0, an empty Accepts, and is filtered out of the sidebar's Tools group (it's the "Pipelines" item under Recent). The runner never offers it as a step. — It runs only the built-in steps' jobs.
