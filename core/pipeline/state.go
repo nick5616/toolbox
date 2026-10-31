@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"context"
-	"net/url"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -334,13 +333,4 @@ func fitVars(vars map[string]string) {
 		}
 		vars[big] = truncBytes(vars[big], cut)
 	}
-}
-
-// hostOf is used in short link labels.
-func hostOf(u string) string {
-	p, err := url.Parse(u)
-	if err != nil {
-		return u
-	}
-	return p.Host
 }

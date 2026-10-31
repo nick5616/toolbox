@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
-	"strings"
 
 	"toolbox/core"
 )
@@ -547,9 +546,4 @@ func (l *loop) retryCell(rs *runState, ii, si int) {
 	c.Status = core.CellPending
 	l.invalidatePrepare(rs, ii, si)
 	l.unblockAfter(rs, ii, si)
-}
-
-// describeItem is a short text for logs.
-func describeItem(rs *runState, ii int) string {
-	return fmt.Sprintf("%s item %d", strings.TrimSpace(rs.r.Name), ii+1)
 }

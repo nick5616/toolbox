@@ -70,6 +70,7 @@ func must(t *testing.T, err error) {
 // modules. The Runner is built (and started) with start().
 func newEnv(t *testing.T, conc int, mods ...core.Module) *env {
 	t.Helper()
+	t.Parallel() // every env is independent (own DB, library and gates)
 	e := &env{t: t, em: &recEm{}, reg: core.NewRegistry(), lib: t.TempDir(), in: t.TempDir(), conc: conc,
 		dbDir: t.TempDir(), tools: func(string) (string, error) { return "/bin/x", nil }}
 	db, err := store.Open(filepath.Join(e.dbDir, "t.db"))
