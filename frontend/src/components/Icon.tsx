@@ -150,6 +150,7 @@ import {
   ArrowUp,
   ArrowDown,
   Loader,
+  Ellipsis,
 } from "lucide-react";
 
 /** Static map: only these icons end up in the bundle. */
@@ -305,6 +306,7 @@ const icons = {
   "arrow-up": ArrowUp,
   "arrow-down": ArrowDown,
   loader: Loader,
+  ellipsis: Ellipsis,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;

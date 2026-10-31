@@ -256,11 +256,11 @@ describe("PipelineEditor", () => {
   });
 
   it("renders the fallback and the Go summary for a step type without an editor", () => {
-    seed(pipeline("p1", [step(A, "stems")]), {
+    seed(pipeline("p1", [step(A, "fixture-tool")]), {
       check: check([stepCheck(A, { info: { ...stepCheck(A).info, summary: "Four stems · FLAC" } })]),
     });
     render(<PipelineEditor />);
-    fireEvent.click(screen.getByRole("button", { expanded: false, name: /Stem Splitter/ }));
+    fireEvent.click(screen.getByRole("button", { expanded: false, name: /Fixture Tool/ }));
     expect(screen.getByText("This step can't be edited here")).toBeTruthy();
     expect(screen.getAllByText("Four stems · FLAC").length).toBeGreaterThan(0);
   });

@@ -39,6 +39,8 @@ export const CATALOG: StepType[] = [
   stepType("subtitles", "Subtitles", { manual: true, accepts: acc([".mp4", ".mp3"]), icon: "captions" }),
   stepType("pdf", "PDF Toolkit", { manual: true, category: Category.CategoryDocument, accepts: acc([".pdf"]), icon: "file-text" }),
   stepType("object-eraser", "Object Eraser", { auto: false, manual: true, category: Category.CategoryImage, accepts: acc([".png", ".jpg"]), icon: "eraser" }),
+  // No step editor is registered for this one (the fallback).
+  stepType("fixture-tool", "Fixture Tool", { accepts: acc([".mp3"]), icon: "box" }),
   stepType("visualizer", "Visualizer", { manual: true, accepts: acc([".mp3", ".flac"]), icon: "audio-waveform", defaultsJson: '{"presetId":"golden-hour","showJson":""}' }),
 ];
 

@@ -331,7 +331,7 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
           </Tooltip>
           <MenuButton
             label="Pipeline actions"
-            icon="chevron-down"
+            icon="ellipsis"
             variant="ghost"
             items={() => [
               { id: "duplicate", label: "Duplicate", icon: "copy", onSelect: () => void duplicatePipeline() },
