@@ -20,7 +20,7 @@ func buildArgs(opts Options, input, tmpOut string) []string {
 		args = append(args, "-map_metadata", "-1")
 	}
 	args = append(args, p.Args...)
-	if p.Kind == core.KindVideo && opts.MaxHeight != "" && opts.MaxHeight != HeightKeep {
+	if (p.Kind == core.KindVideo || p.Kind == core.KindImage) && opts.MaxHeight != "" && opts.MaxHeight != HeightKeep {
 		// The comma inside min() must be escaped for the filtergraph parser;
 		// no shell is involved, so this is one literal argument.
 		args = append(args, "-vf", fmt.Sprintf(`scale=-2:min(ih\,%s)`, opts.MaxHeight))
