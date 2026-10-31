@@ -285,6 +285,7 @@ func TestConditionWaitRetryNow(t *testing.T) {
 }
 
 func TestCancelRun(t *testing.T) {
+	newGate("never")
 	a := &fakeStep{id: "a", split: true}
 	e := newEnv(t, 2, a, &fakeStep{id: "b", split: true})
 	e.start()

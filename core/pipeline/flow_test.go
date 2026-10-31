@@ -49,6 +49,7 @@ func TestLinearThreeByThree(t *testing.T) {
 }
 
 func TestInFlightCap(t *testing.T) {
+	newGate("cap")
 	a := &fakeStep{id: "a", split: true}
 	e := newEnv(t, 4, a)
 	e.start()
@@ -76,6 +77,7 @@ func TestInFlightCap(t *testing.T) {
 }
 
 func TestCapIsAtLeastTwo(t *testing.T) {
+	newGate("cap2")
 	a := &fakeStep{id: "a", split: true}
 	e := newEnv(t, 1, a)
 	e.start()

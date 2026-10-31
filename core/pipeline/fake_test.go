@@ -51,7 +51,21 @@ func gate(key string) chan struct{} {
 	return gates[key]
 }
 
-func release(key string) { close(gate(key)) }
+// newGate makes key closed-state fresh (tests may run more than once).
+func newGate(key string) {
+	gateMu.Lock()
+	gates[key] = make(chan struct{})
+	gateMu.Unlock()
+}
+
+func release(key string) {
+	ch := gate(key)
+	select {
+	case <-ch:
+	default:
+		close(ch)
+	}
+}
 
 // fakeStep is a Chainable module for runner tests. It accepts .txt and .wav.
 // With split, Submit makes one job per input (like most tools); register a
@@ -60,13 +74,20 @@ type fakeStep struct {
 	id    string
 	split bool
 
+	accepts  []string // overrides the accepted extensions
+	requires []string // descriptor Requires
+
 	cur, peak atomic.Int32 // running Run calls now / at most
 	started   atomic.Int32 // Run calls ever started
 }
 
 func (f *fakeStep) Descriptor() core.Descriptor {
-	return core.Descriptor{ID: f.id, Name: "Fake " + f.id, Icon: "box", Category: core.CategoryUtility,
-		Status: core.StatusReady, Accepts: core.Accepts{Extensions: []string{".txt", ".wav"}}, OutputSubdir: f.id, SplitInputs: f.split}
+	exts := []string{".txt", ".wav"}
+	if len(f.accepts) > 0 {
+		exts = f.accepts
+	}
+	return core.Descriptor{ID: f.id, Name: "Fake " + f.id, Icon: "box", Category: core.CategoryUtility, Requires: f.requires,
+		Status: core.StatusReady, Accepts: core.Accepts{Extensions: exts}, OutputSubdir: f.id, SplitInputs: f.split}
 }
 
 func (f *fakeStep) Validate(inputs []string, options json.RawMessage) error {

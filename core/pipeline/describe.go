@@ -47,6 +47,11 @@ func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck {
 	ids := map[string]int{}
 	stepProblems := false
 	optionsBytes := 0
+	for i, s := range p.Steps {
+		if _, dup := ids[s.ID]; !dup && s.ID != "" {
+			ids[s.ID] = i
+		}
+	}
 
 	for i, s := range p.Steps {
 		optionsBytes += len(s.OptionsJSON)
@@ -100,9 +105,6 @@ func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck {
 			info.Accepts.Extensions = []string{}
 		}
 		infos[i] = info
-		if s.ID != "" {
-			ids[s.ID] = i
-		}
 
 		// Variables this step may use: built-ins + earlier steps'.
 		vars := append([]core.StepVar{}, builtinVarList...)
