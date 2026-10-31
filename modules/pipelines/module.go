@@ -2,15 +2,10 @@
 // built-in steps (rename, chat, table, zip, copy) that run as its jobs
 // (SPEC.md §7, §9.3). The runner itself is core/pipeline.
 //
-// CONTRACT STUB (Wave 0): options.go, the descriptor, Register's signature
-// and service.go are final. WP-BI1 implements Validate/Run, the adapters in
-// steps.go and the templates.
+// Validate and Run are in run.go; the step adapters in steps.go.
 package pipelines
 
 import (
-	"context"
-	"encoding/json"
-
 	"toolbox/core"
 	"toolbox/core/pipeline"
 )
@@ -60,18 +55,4 @@ func (m *Module) Descriptor() core.Descriptor {
 		Accepts:      core.Accepts{Extensions: []string{}},
 		OutputSubdir: "Pipelines", Order: 0,
 	}
-}
-
-// Validate implements core.Module.
-func (m *Module) Validate(inputs []string, options json.RawMessage) error {
-	_, err := core.DecodeOptionsJSON[Options](options)
-	if err != nil {
-		return err
-	}
-	return core.NotImplemented("Pipeline steps") // WP-BI1
-}
-
-// Run implements core.Module.
-func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
-	return core.NotImplemented("Pipeline steps") // WP-BI1
 }
