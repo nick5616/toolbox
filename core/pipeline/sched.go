@@ -529,6 +529,9 @@ func (l *loop) submit(rs *runState, ii, si int, sjobs []core.StepJob) {
 	step := rs.r.Steps[si]
 	sr := rs.steps[si]
 	c := &rs.r.Items[ii].Cells[si]
+	if c.Status == core.CellWaiting { // a cleared condition: drop its text
+		c.Message = ""
+	}
 	c.Wait, c.Error, c.ErrorCode, c.ErrorHint = "", "", "", ""
 	if len(sjobs) == 0 {
 		files := cloneFiles(c.Inputs)

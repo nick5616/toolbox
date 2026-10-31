@@ -16,7 +16,7 @@ func (l *loop) cleanup(rs *runState) int {
 	lib := l.r.cfg.Settings().LibraryDir
 	rs.r.Cleaned = true
 	l.touch(rs)
-	if lib == "" || l.r.cfg.Outputs == nil {
+	if lib == "" || l.r.cfg.Outputs == nil || l.r.cfg.Jobs == nil {
 		return 0
 	}
 	// Outputs of this run's jobs, by ID, with their current paths.
@@ -24,7 +24,8 @@ func (l *loop) cleanup(rs *runState) int {
 	for _, it := range rs.r.Items {
 		for _, c := range it.Cells {
 			for _, id := range c.JobIDs {
-				if j, ok := l.job(id); ok {
+				// Fresh records: a rename moved files since the cached snapshot.
+				if j, err := l.r.cfg.Jobs.Get(context.Background(), id); err == nil {
 					for _, o := range j.Outputs {
 						own[o.ID] = o
 					}

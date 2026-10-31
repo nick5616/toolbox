@@ -73,6 +73,9 @@ func (l *loop) shutdown() {
 		if !rs.persistDue.IsZero() || rs.touched {
 			l.persist(rs)
 		}
+		if !rs.emitDue.IsZero() {
+			l.emit(rs)
+		}
 	}
 }
 
@@ -174,17 +177,13 @@ func (l *loop) recompute(rs *runState) {
 	if r.Status == old && rs.lastStatus != "" {
 		return
 	}
-	first := rs.lastStatus == ""
 	rs.lastStatus = r.Status
 	if isTerminalRun(r.Status) {
 		if r.Status == core.RunDone && !r.Cleaned {
 			n := l.cleanup(rs)
 			slog.Debug("pipelines: run cleaned up", "run", r.ID, "files", n)
 		}
-		l.persist(rs)
-		l.emit(rs)
-	} else if !first {
-		l.emit(rs)
+		l.persist(rs) // terminal transitions are saved at once; the event follows the throttle
 	}
 	if l.r.setLastRun(r.PipelineID, core.RunBrief{ID: r.ID, Status: r.Status, CreatedAt: r.CreatedAt}) {
 		l.r.emitPipelines()
