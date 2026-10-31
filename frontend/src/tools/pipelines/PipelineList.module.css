@@ -1,0 +1,175 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.card:hover {
+  border-color: var(--line-strong);
+}
+
+.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Wails marks the card under a dragged file with this class. */
+.card:global(.file-drop-target-active) {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.main:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.ready {
+  background: var(--ok);
+}
+
+.problems {
+  background: var(--danger);
+}
+
+.missing {
+  background: var(--warn);
+}
+
+.icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  color: var(--fg-muted);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+}
+
+.watch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--accent);
+}
+
+.run {
+  margin: var(--space-2) var(--space-2) 0 0;
+  flex-shrink: 0;
+}
+
+.hint {
+  margin: 0;
+  text-align: center;
+  color: var(--fg-subtle);
+  font-size: var(--text-sm);
+}
+
+.quick {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.quickCard {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-panel);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quickCard:hover {
+  border-color: var(--line-strong);
+  background: var(--bg-hover);
+}
+
+.quickCard:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.quickIcon {
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+.quickText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.muted {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
