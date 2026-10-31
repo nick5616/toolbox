@@ -1,1436 +1,1709 @@
-# Toolbox — Phase 7 Spec: Visualizer (reactive visuals for songs, lyrics and subtitled videos)
+# Toolbox — Phase 8 Spec: Pipelines (chains of tools, run on a drop)
 
-Status: **APPROVED 2026-10-30** (r3).
-- r2 added a local mood reader instead of relying on Local Chat (§0.3, §5.4), and Visualizer backgrounds inside Lyric Video and Subtitles (§9).
-- r3 makes the visuals a step of Lyric Video's wizard: a quick picker, or the full designer embedded in place, with instrument separation and saving the stems (§9.2). Subtitles' "Make a video" gets the same choice (§9.3). The round trip to the Visualizer is replaced by the embedded designer (§9.4).
-Date: 2026-10-29. Author: architect session (Opus).
+Status: **APPROVED 2026-10-31** (r1).
+Date: 2026-10-31. Author: architect session (Opus).
 
-Phases 1–6 are shipped; their specs are archived in `docs/specs/phase-{1..6}.md`, and every contract there still holds unless changed here. "P6 §x" etc. refer to those files.
-
-This phase was cut in line on 2026-10-29: Pipelines moves to Phase 8, and the later phases shift by one (`docs/ROADMAP.md`).
-
-**Where it comes from:** the user's `song-visualizer` repo (`../song-visualizer`, read only). It has:
-- **`song-visualizer/`:** 16 Canvas2D modes (waveform, geometry, tunnel, lissajous, spectrum bars, particles, radial, helix, starfield, terrain, aurora, kaleidoscope, ripples, vortex, a Guitar-Hero note highway and its reverse), 20 palettes, 4 background modes, mode cycling and switching on the beat, offline 5-band onset analysis for the highway, and MediaRecorder export.
-- **`golden-hour/`:** a party visualiser with aurora bands, rising embers, wave rings tinted blue/red by the left/right channel levels, bass and treble burst rings, a light sweep when a song starts, and palettes that drift with the time of day.
-- **`pitch-hero/`:** a background of rotating Lissajous figures, rings in the colour of the sung pitch, and drifting motes.
-
-Phase 7 keeps those ideas and their look, and rebuilds them as a GPU engine. The engine reacts to the instruments separately, to the beat and song structure, to the chords, to the words being sung or said and what they mean. It renders the same frames in the live preview and in the exported video.
+Phases 1–7 are shipped; their specs are archived in `docs/specs/phase-{1..7}.md`, and every contract there still holds unless changed here. "P7 §x" etc. refer to those files. The intended model is in `docs/ROADMAP.md` ("Pipelines (Phase 8)"); this spec makes it concrete.
 
 ---
 
-## 0. Research findings this spec relies on
+## 0. What exists and what this builds on
 
-Verified hands-on on 2026-10-29 on the Windows box (i7-11700K, RTX 3070, WebView2 156), in `.dev/p7-research/`, except where marked *docs only*. The full notes are in `.dev/p7-research/notes.md`. The test harness is `.dev/p7-research/harness`, a throwaway Wails v3 app built with a plain `go build`.
+Surveyed on 2026-10-31 (every module's options, outputs, results and views).
 
-### 0.1 Rendering in the webview
+### 0.1 The job system already does most of the work
+- Every tool is a `core.Module`, and its work is a `Job` submitted through `Jobs.Submit(moduleID, inputs, optionsJSON)`.
+  - Jobs have cancel, retry (same ID), logs, progress and Library outputs.
+  - The job manager enforces the global and per-module concurrency limits.
+- `Descriptor.Accepts` says what a tool reads (extensions, URLs, any).
+- **Nothing declares what a tool makes.** Outputs are registered with `job.Output(path)` as they appear, and their kind comes from the extension (`core.KindForPath`). Data results (`ResultJSON`) are module-specific.
+- Option decoding is strict (`DisallowUnknownFields`). stems, midi and transcribe don't fill in missing fields, so `{}` is invalid for them.
+- `Submit` validates every input at once and splits per input only for `SplitInputs` modules. PDF Toolkit groups per input in its own service (`enqueue.go`), not in core.
 
-| Topic | Finding | Consequence |
+### 0.2 Which tools can run unattended today
+
+| Module (ID) | Unattended? | What blocks it, and the fix in this phase |
 |---|---|---|
-| WebGL2 in a Web Worker (`OffscreenCanvas`) | 1920×1080, RGBA16F targets, a domain-warped fBm scene plus a 2× separable bloom at half resolution plus tonemapping: **1,063 fps** render-only (ANGLE on D3D11). | The engine is WebGL2. It is the same code in the preview (main thread) and the export (worker). |
-| Canvas2D, song-visualizer style | 160 `shadowBlur` strokes, 300 particles and a line of text in a worker: **47 fps**. | No Canvas2D drawing in the engine. Glow comes from bloom, and lines and shapes are drawn with signed distances in shaders. Canvas2D is only used to rasterise text into textures. |
-| WebCodecs `VideoEncoder` (in a worker) | Supported: H.264 High 1080p (hardware and software), **1920×2160** (`avc1.640033`), 3840×2160, 1080×1920, VP9, AV1. Not supported: HEVC, and **VP9 with alpha**. | Exports are H.264. Overlays with alpha are sent as one frame twice as tall, colour on top and the alpha matte below, and FFmpeg recombines them (§7.4). |
-| Sending bytes to Go: `fetch` POST to the asset middleware | **3.2–4.2 MB/s**, whatever the body size (64 KB–8 MB), the Go read buffer or the concurrency (1–8). WebView2's request-body path is the bottleneck. | Not used for video. |
-| Sending bytes to Go: `chrome.webview.postMessage(base64)` → Wails `Options.RawMessageHandler` | **42–46 MB/s**, with messages of 64 KB–4 MB and the native `Uint8Array.prototype.toBase64`. Messages reach Go on a goroutine (Wails' 64-slot message buffer). Wails reserves the `wails:` prefix and **echoes every raw message back to the page**. | The export streams encoded video to Go as raw messages (§7.2). **No socket and no listener.** The `wails:` prefix is avoided, and the page ignores the echoes. |
-| Full pipeline | Worker GL render → `VideoEncoder` (hardware, 12 Mbps) → transfer to the main thread → base64 → postMessage → Go appends Annex-B to a file. **1080p30: 290 fps** (1,800 frames, 9.7× real time). 1920×2160 stacked: 154 fps. 1080×1920: 255 fps. Everything drains 70 ms after the last frame. | A 4-minute song exports at 1080p in under 30 s on this machine. |
-| Hidden window | The same pipeline with the window hidden (`Hidden: true`): **308 / 167 / 286 fps**. | Renders keep running while Toolbox is in the tray. The renderer lives in the main window's JS context, which exists for the app's whole life. |
-| JPEG fallback | `OffscreenCanvas.convertToBlob` JPEG at q 0.92: **34 fps**, 112 KB per frame. | Used when `VideoEncoder` can't do H.264 (§7.3). It is about real time. |
-| FFmpeg checks | Every stream decodes as H.264 High with the exact frame count. The mux `-f h264 -framerate 30 -i v.h264 -i song -c:v copy` takes 0.7 s for 60 s. Recombining stacked colour and alpha with `split → crop → alphamerge → overlay` works. | §7.4. |
-| macOS (*docs only*) | WKWebView on macOS 14+ has WebGL2 in workers (Safari 17), `VideoEncoder` with H.264 through VideoToolbox (Safari 16.4+), and WKScriptMessageHandler for raw messages. `Uint8Array.prototype.toBase64` needs Safari 18.2. | A JS base64 fallback (§7.2). The Mac checklist covers the encoder, the transport speed and text in workers. |
+| Downloader `downloader` | yes (1 file, or N for a playlist) | — |
+| Converter `converter` | yes | Images ignore `MaxHeight` → fixed (§6.3) |
+| Video Trimmer `trimmer` | **no** | `Segments` are absolute times checked against one file → a step form with "whole / first / last / range" resolved at run time (§6.3) |
+| Subtitles `subtitles` | only generate/extract | burn/embed take cues inline and the media as input → new action `auto` (§6.4) |
+| Audio Cleanup `audio-cleanup` | yes (Preview off) | — |
+| Lyric Video `lyric-video` | **no** | render needs `Lines` from a prior `lyrics` result → new action `auto` (§6.4) |
+| Visualizer `visualizer` | **no** | render needs an `AnalysisKey` and a `ShowJSON` → new action `auto` (§6.4) |
+| Redact `redact` | yes, with action `auto` | — |
+| Stem Splitter `stems` | yes | — |
+| BPM & Key `bpm-key` | yes (no files, data only) | — |
+| Audio → MIDI `audio-to-midi` | yes | — |
+| Transcribe `transcribe` | yes | The transcript text is only in the files |
+| OCR `ocr` | yes | Encrypted PDFs are refused |
+| PDF Toolkit `pdf` | partly | Passwords live only in an in-memory store; organize/ranges are per-document → asked at run start; organize excluded (§6.3) |
+| Vault `vault` | only "add", only while unlocked | → the step waits for an unlock (§6.3) |
+| Background Remover `bg-remover`, Upscaler `upscaler`, EXIF `exif` | yes (EXIF: strip, or a fixed edit) | Upscaler validates input size (fails the cell if too big) |
+| Object Eraser `object-eraser` | **no** (a mask painted per photo) | manual steps only |
+| Local Chat `llm-chat`, Clipboard `clipboard` | job-less | Chat is used through `core.TextGenerator` by a built-in step (§7) |
+| Dev Utilities `dev-utils` | accepts nothing | not a step |
 
-### 0.2 Song analysis (CPU, librosa 1.0, a 180 s synthetic 120 bpm track; `.dev/p7-research/analysis_bench.py`)
-
-| Step | Time | Note |
-|---|---|---|
-| STFT, 64 mel bands, RMS, onset strength at 60 Hz | 0.93 s | |
-| Beat tracking | 1.18 s | 120.2 bpm (true: 120) |
-| Chroma (15 Hz), 24 chord templates, median filter | 1.42 s | Flickers between relatives, so chords are decided **per beat** (§5.3) |
-| Agglomerative segmentation (beat-synced MFCC + chroma) | 0.62 s | Missed the loudness jumps, so a separate **loudness-novelty** detector finds lifts and drops |
-| pYIN on the vocals (16 kHz, hop 320) | 4.1 s | YIN takes 0.33 s, but pYIN's voicing is far more reliable |
-| Demucs 4-stem (`htdemucs`, P2 §0) | about 1× real time | Already installed by the Music pack (`stems-default`) |
-
-The audio features for a 3-minute song take **about 9 s** on top of the stems. Words come from `transcribe.run` (Whisper small) on the vocals stem, as in Lyric Video.
-
-### 0.3 Reading the words without a chat model (`.dev/p7-research/nlp/`)
-I tested on 34 lines written for the test: 28 English and 6 in Spanish, French, German, Portuguese and Japanese. Each line has an expected emotion out of 8 (joy, love, sadness, anger, fear, calm, hope, awe) and expected imagery out of 12 motifs. The models ran on CPU with onnxruntime 1.31.1 and `tokenizers` 0.23.3, **both already in the engine**.
-
-| Approach | Model, licence, size | Emotion (en / other) | Motifs (precision / recall) | Speed |
-|---|---|---|---|---|
-| Emotion classifier (GoEmotions, 28 labels mapped to 8) | `SamLowe/roberta-base-go_emotions-onnx` int8, MIT, 125 MB | 0.57 / 0.00 (English only; poetic lines come out "neutral") | — | 6 ms/line |
-| Zero-shot NLI (20 hypotheses per line) | `MoritzLaurer/multilingual-MiniLMv2-L6-mnli-xnli`, MIT, 428 MB | 0.21 (nearly everything "fear") | 0.67 / 0.57 | 34 ms/line |
-| Multilingual embeddings + written anchor phrases | `intfloat/multilingual-e5-small` int8, MIT, 118 MB | 0.68 / 1.00 | 0.62 / 0.46 | 1.3 ms/line |
-| **Multilingual embeddings + written anchor phrases** | **`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`**, Apache-2.0, **118 MB** (uint8) | **0.86 / 0.67** | **0.86 / 0.64** | **1.5 ms/line** |
-
-How the anchor method works:
-- Each emotion has 8 short English example phrases and each motif has 3; none of them are test lines.
-- A line's emotion score is the mean cosine of its 3 nearest anchors for that emotion.
-- A motif counts when its best anchor's cosine is ≥ 0.54.
-- Because the model is multilingual, English anchors also work for other languages.
-
-**Chosen:** the paraphrase-multilingual MiniLM model as the **mood reader**. It's small, fast, multilingual, and one model gives both the emotion and the imagery. The arm64-quantised file gives the same answers: embeddings agree to within cosine 0.984, and it scores 0.89 on English. The **Local Chat model is optional** on top, as a "deeper reading" that also picks the words to emphasise.
-
-| File | URL (revision `e8f8c211226b894fcb81acc59f3b34ba3efd5f42` of `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`) | Bytes · sha256 |
-|---|---|---|
-| model (Windows / Intel) | `…/resolve/<rev>/onnx/model_quint8_avx2.onnx` | 118,453,870 · `98a01d88b7de996cdea58c32ca71208c09968d143798814b2ea09d3439dc334f` |
-| model (macOS arm64) | `…/resolve/<rev>/onnx/model_qint8_arm64.onnx` | 118,412,398 · `783fea82d71a58179b830a4dbd2d58447e640609e98eedf9ffa12622d375a672` |
-| tokenizer | `…/resolve/<rev>/tokenizer.json` | 9,081,518 · `2c3387be76557bd40970cec13153b3bbf80407865484b209e655e5e4729076b8` |
-
-### 0.4 What already exists and is reused
-- **Stems:** `stems.separate` with preset `four-fast` (`htdemucs`): Vocals, Drums, Bass, Other.
-- **Words:** `transcribe.run` with word timestamps (P6 §0.3).
-- **Lyrics logic:** Lyric Video's alignment (Needleman–Wunsch), LRC/SRT/VTT parsing and words-to-lines rule (P6 §7.2). These move to a shared `core/lyrics` package (§4.2).
-- **Local Chat model:** optionally, `core.TextGenerator` with JSON-schema replies (P6 §3.5) gives a deeper reading of the words (§5.4).
-- **Media route:** `MediaService.URLFor` serves the analysis files and textures to the renderer (P6 §3.2). Responses are capped at 4 MiB, so the client reads larger files in ranges (§6.2).
-- **Media kit:** `MediaPlayer`, `Timeline`, `useMediaSource` (P6 §3.11).
+### 0.3 Things reused
+- **`core.TextGenerator`** (Local Chat) for the built-in chat step. It has no chunking; the step chunks long text itself (§7.3).
+- **`core.UniquePath`** for every new file name.
+- **`useModuleOptions`**, the `options.ts` `DEFAULT_*`/`sanitize*` helpers of each tool, and the two self-contained option panels (Downloader's `OptionsPanel`, Redact's `OptionsPanel`) in the step editors.
+- **`useUI().handOff`** to open a tool with files for a manual step, and the drop routing (`app:files-dropped` with a `targetId`).
+- **The toast with an action** (`toast({action})`) for "needs you" notices.
 
 ---
 
 ## 1. Goals
 
-1. **Visualizer tool:** drop a song or a video and get a reactive visual video.
-   - **Song:** full-frame visuals, optionally with lyrics that react to the music.
-   - **Video:** visuals laid **over the video** (with alpha), plus optional reactive subtitles. Or the video's sound alone drives full-frame visuals.
-2. **Hear the song the way a VJ would.** One analysis pass (cached) produces:
-   - the **instruments separately** (drums split into kick, snare and hi-hats; bass; vocals; other);
-   - the **beat and bars**, the **sections** (intro, verse, chorus, drop, bridge, outro) and **lifts/drops**;
-   - the **chords and key**, and the **vocal pitch** and **held notes**;
-   - the **words** with their timings, and the **meaning** of each line: mood (valence and energy), emotion, imagery ("fire", "rain", "stars"…) and the words to emphasise.
-   - The meaning comes from a small local **mood reader** model (118 MB, any language, about 2 ms per line). The Local Chat model can optionally give a deeper reading.
-3. **Control what shows, when, and why:**
-   - **Presets** to start from.
-   - A **Reactions** panel: what drives what, for example "Kick → rings 80%".
-   - A **visual mix** with one fader per instrument, for words and for mood.
-   - A **Song Map** timeline that lets you choose the scene for each section.
-   - A live **"Why"** readout of what is driving the picture at the playhead.
-   - An **Advanced** layer stack where any parameter can be bound to any signal.
-4. **Beauty and variety:** a big step up from the source repo.
-   - **Light:** HDR rendering, bloom, filmic tonemapping, dithering (no banding in H.264), and SDF anti-aliasing.
-   - **Colour and motion:** palettes in OKLab, envelopes that breathe instead of flicker, and adaptive normalisation for each song.
-   - **Variety:** **31 layer types** and **20 curated presets**, covering every mode from the source repo plus new ones.
-5. **Exact, fast export:** the frames the preview shows are the frames the export writes.
-   - Speed: ≥ 4× real time at 1080p30 on the Windows box.
-   - Formats: 16:9, 9:16, 1:1 and 4:5; 720p to 2160p; 30 or 60 fps.
-   - Audio: original or instrumental.
-6. **Visuals as a background in the video-making tools** (§9):
-   - **Lyric Video** (with lyrics) gets a **Visuals step** in its wizard. **Subtitles' "burn into a video"** (without lyrics) gets the same choice:
-     - **Quick:** a preset or saved design, picked from live thumbnails that react to your own file;
-     - **Full designer:** the Visualizer's designer embedded in place, with instrument separation (and saving the stems) and the tool's own words as input.
-   - Those tools keep drawing their own text on top. The visuals react to the music and to the tool's own words and their mood.
-   - Subtitles can now make a video from an **audio file** (a captioned audiogram for podcasts and voice notes), with visuals, a colour or an image behind the subtitles.
-   - Both tools can also hand the timed text to the Visualizer to make the whole video there, with reactive words. Subtitles cues keep word timings from generation.
+1. **A Pipelines page** (top of the sidebar, under Recent):
+   - make, edit, duplicate and delete pipelines;
+   - start one from a **built-in template** (11, §10);
+   - run one;
+   - watch its runs.
+2. **A pipeline is an ordered list of steps.** Each step is:
+   - a **tool with its own options** (the tool's own fields, in a step editor);
+   - or a **built-in step**: Rename files, Ask Local Chat, Make a table, Zip, Copy to folder, Check.
+3. **Data flows between steps:**
+   - **Fan-out:** a step that makes several files feeds the next step one file at a time.
+   - **Filters:** "bass stem only", "videos only", "*.srt".
+   - **Fan-in:** a "together" step gathers every file of the run (merge into one PDF, one CSV of receipts, one zip).
+   - **Any earlier step:** a step can read from any earlier step, not only the previous one. That gives branching without a node graph.
+4. **Data results become variables:**
+   - `{bpm}`, `{key}`, `{title}`, `{transcript}`, `{text}` and the chat's own fields;
+   - usable in file names, chat prompts, table columns, lyric titles and EXIF fields.
+5. **"I'll do this step myself":**
+   - the run pauses and opens that tool with the file loaded;
+   - it picks up what you make there, and continues (on its own if you like).
+   - A **Check** step pauses so you can look at the files and drop any you don't want.
+6. **Triggers:**
+   - the Run button;
+   - drop files on a pipeline;
+   - the global drop chooser;
+   - Library → Send to;
+   - the command palette;
+   - an optional **watch folder**.
+7. **Every step is an ordinary job.** It shows in the job tray with a pipeline chip, can be cancelled and retried (a retried job resumes its run), keeps its logs, and puts its files in the Library. In-between files can be cleaned up when a run finishes.
 
-## 2. Non-goals (Phase 7)
+## 2. Non-goals (Phase 8)
 
-- **Live input:** microphone, system audio or BlackHole capture, live party mode. The tool works on files; the preview can play full screen.
-- The source repo's **games and practice tools** (Pitch Hero scoring, MIDI Muse, the mic monitor).
-- **3D models, video textures inside scenes, or user-written shaders.** Video goes under the visuals through FFmpeg (§7.4), not into the GPU scene.
-- **Online services:** looking up lyrics, cloud sentiment, stock footage. Everything stays local.
-- **Keyframe animation by hand:** the timeline assigns scenes and palettes per section; it doesn't keyframe individual parameters.
-- **Rewriting Lyric Video's or Subtitles' text rendering:** they keep libass text on top. The Visualizer supplies their backgrounds (§9). Reactive *words* (karaoke pop, emphasis glow…) are made in the Visualizer itself.
-- **HDR/10-bit output, ProRes, or alpha-channel video files as outputs** (overlays are composited by Toolbox).
-- Inputs longer than **60 minutes**.
+- A **node-graph editor**, loops, conditions ("if BPM > 120"), or steps with two inputs. A step has one source, and branching comes from choosing an earlier step.
+- **Scheduled runs** (cron) and runs while Toolbox is closed. Watch folders work while Toolbox runs, including from the tray.
+- **OS notifications.** The tray menu, a sidebar badge and toasts say when a run needs you (§11.7).
+- **Markdown → PDF.** That is Phase 9 (Pandoc + Typst). The Lecture template writes Markdown for now; Phase 9 adds the PDF step.
+- **Sharing or importing pipelines** as files.
+- **Per-step options in manual steps.** A manual step uses the tool's own UI and its last-used options.
+- Object Eraser, PDF organize, and hand-edited cues/lyrics/boxes as **automatic** steps. They stay available as manual steps.
 
 ---
 
 ## 3. Architecture
 
 ```
-            ┌──────────────── Go ────────────────┐            ┌──────────── webview (main window) ───────────┐
- song/video │ modules/visualizer (analyze/render) │  events    │ tools/visualizer (UI)                         │
- ──────────▶│ lyric-video / subtitles (backgrounds)│──────────▶ │   ├─ live preview: viz Engine (WebGL2, main)  │
-            │ core/viz  Analyzer ──▶ engine:      │            │   └─ Song Map, Reactions, Layers, Export      │
-            │           stems.separate            │            │ components/viz/VisualsPicker (LV, Subtitles)  │
-            │           viz.analyze  (features)   │            │ viz/RenderHost (in the app shell, always on)  │
-            │           transcribe.run (words)    │  raw msgs  │   └─ render.worker: same Engine on            │
-            │           viz.mood (mood reader)    │ ◀───────── │      OffscreenCanvas → VideoEncoder (H.264)   │
-            │           TextGenerator (optional)  │ (postMsg)  │                                               │
-            │ core/viz  RenderBroker ──▶ FFmpeg   │            │      chunks → main thread → System.invoke     │
-            │           mux / overlay composite   │            └───────────────────────────────────────────────┘
-            └─────────────────────────────────────┘
+                        ┌──────────────────────── Go ─────────────────────────────┐
+ Run / drop / Send to → │ modules/pipelines  Service (bound) ─┐                   │
+ palette / watch folder │   built-in steps: rename, chat,     │                   │
+                        │   table, zip, copy (a job module)   ▼                   │
+                        │ core/pipeline  Runner ──────────▶ core.Jobs.SubmitFor   │
+                        │   event loop · items × steps       (tagged run/step)    │
+                        │   adapters: core.Chainable ◀── modules/<id>/pipeline.go │
+                        │   Observe(job) ◀──────────────── core.Jobs (every job)  │
+                        │   watch folders (poll 5 s)                              │
+                        │ core/store  pipelines · pipeline_runs · watch_seen      │
+                        └───────────────┬─────────────────────────────────────────┘
+                     pipelines:changed  │ pipelines:run (throttled)
+                        ┌───────────────▼─────────── webview ─────────────────────┐
+                        │ tools/pipelines: list, editor, step editors, runs       │
+                        │ shell: "needs you" banner over tool views, job chips,   │
+                        │        drop chooser + Library Send to + palette         │
+                        └─────────────────────────────────────────────────────────┘
 ```
 
-- **Analysis is a Go job.** It runs the engine handlers, then writes `audio.json` + `features.bin` (the music) and `text.json` (the words and their meaning) into a cache.
-- **The engine** (`frontend/src/viz/`) is pure TypeScript + WebGL2. It turns (show, analysis, time) into a frame.
-- **Render is a Go job.** It hands a render plan to the always-mounted `RenderHost`. The host renders in a worker with the same engine and streams H.264 to Go over raw messages. Go muxes the audio, or composites the overlay onto the video, with FFmpeg.
-- **Lyric Video and Subtitles** call the same `core/viz` render for their backgrounds and burn their own text on top in their FFmpeg pass.
-- **No new listener, no new binary, no new Python dependency.** There is one new model download: the mood reader, 127 MB.
+- **A run isn't a job.** It never holds a concurrency slot (a parent job waiting on children would deadlock at concurrency 1). The **Runner** is a single event loop in Go. It submits ordinary jobs tagged with the run and step IDs, and reacts to their updates through a new `Jobs.Observe` hook.
+- **Tools describe themselves as steps** through an optional interface, `core.Chainable`, implemented in a new `pipeline.go` in each module. It covers:
+  - what the step accepts and makes, including output **roles** like "bass";
+  - how to turn files into job submissions;
+  - how to read the outputs and variables back from a finished job.
+- **Built-in steps** (rename, chat, table, zip, copy) are actions of a new job module, `pipelines`, so they are ordinary jobs too. The Check step is handled by the Runner alone.
+- **No new listener, no new binary, no new dependency, no new model.**
 
 ---
 
-## 4. Foundation changes (Wave 0, architect)
+## 4. The model
 
-### 4.1 Dependencies
-- **Engine:** no new packages. `onnxruntime` and `tokenizers` are already locked; the mood reader uses them. The version goes to **0.7.0**, and the description gains "music visualisation analysis". No lock change apart from the version.
-- **Model:** the mood reader (§0.3).
-  - It's pinned in Go as `{file, url, sha256, bytes}` per OS (the arm64 file on darwin/arm64, the avx2 file elsewhere) plus the tokenizer.
-  - It's fetched through the `visualizer` module's `core.ModelProvider` (preset `mood`) into `<models>/mood/`, following the bgremove pattern. The handlers get explicit paths and never download.
-- **Frontend:** none. WebGL2, WebCodecs and OffscreenCanvas are built into the webview.
-- **Go:** none.
+### 4.1 Terms
+- **Pipeline:** a name plus 1–30 **steps** and an optional watch folder.
+- **Step:**
+  - a **type**: a tool (module ID) or a built-in (`pipelines.rename` … `pipelines.check`);
+  - its **options** (JSON in that type's step-options shape, §6);
+  - a **source** (`From`): the run's inputs, an earlier step, or nothing;
+  - a **filter**;
+  - three flags: **Manual** ("I'll do this myself"), **AutoContinue** and **Keep** ("keep its files in the Library").
+- **Run:** one execution of a pipeline on a list of inputs (files or links). It holds a snapshot of the steps, so editing the pipeline never changes a run in progress.
+- **Item:** one input of a run. Each item moves through the steps on its own; that is the fan-out.
+- **Cell:** one item at one step. It has a status, its jobs, the files it was given, the files it made, and the variables it produced.
+- **Together step:** a step that runs once over every item, e.g. merge PDFs, table, zip. It is decided by the step type and its options (`StepInfo.Together`).
+- **Merged item:** created by the first together step. It gathers the items that reached it healthy, and the run continues on it from that step.
 
-### 4.2 `core/lyrics` (moved from `modules/lyricvideo`, tests move too)
-```go
-type Word struct { StartMs, EndMs int64; Text string }               // json: startMs, endMs, text
-type Line struct { StartMs, EndMs int64; Text string; Words []Word } // json: startMs, endMs, text, words
+### 4.2 Rules
+1. **Steps run in order within an item.** A cell is ready when every earlier cell of its item is finished. That keeps variables deterministic: step 4 sees step 3's `{bpm}`. Throughput comes from several items moving at once.
+2. **Input files for a cell:**
+   - `From: "input"`: the item's own input. A link becomes a `RunFile` with kind `other` and the URL as both path and name.
+   - `From: "<step id>"`: that step's cell's `Files`. For a merged item, a step before the merge means the union, in item order, of the merged items' cells.
+   - `From: "none"`: no files, only for step types with `NoFiles` (chat, table).
+3. **Filtering.** The filter applies first, then the step's `Accepts`. Files dropped by either are noted in the cell message ("2 files skipped: not images").
+   - Zero files left (and not `NoFiles`) → the cell is **skipped** ("Nothing for this step"). That isn't a failure.
+   - A later cell that reads only from a skipped cell gets no files and skips too.
+4. **A failed or cancelled cell stops its item.** Every later cell becomes **blocked**. Retrying the job (or the run) un-blocks them.
+5. **Together steps:**
+   - The step runs when every non-merged item has finished all its earlier cells.
+   - Healthy items (no failed, cancelled or blocked cells) are merged; the others are left out.
+   - Zero healthy items → the together cell is blocked for every item.
+   - An item that finishes later, after a retry, stops at the together step with `skipped` ("Finished after the files were gathered").
+6. **Manual steps** pause the item: the cell is `waiting` and the run shows "Needs you" (§8.4).
+7. **Check steps** pause the item until you keep some or all of its files (§8.5).
+8. **Variables accumulate per item**, in step order, and later values win. A merged item starts with only the run's built-in variables. A together step sees every merged item's variables (so a table can have one row per item).
 
-func WordsToLines(segments [][]Word, cjk bool) []Line      // P6 §7.2 "detect" rule
-func Align(text string, recognised []Word) ([]Line, float64) // P6 §7.2 "align" (returns matched 0..1)
-func ParseFile(path string) (lines []Line, needsAlign bool, err error) // .lrc/.srt/.vtt; .txt → needsAlign
-func SpreadWords(l Line) Line                                // words by character share when none
-func WriteLRC(w io.Writer, lines []Line) error
-```
-- Lyric Video keeps its frozen `LyricLine`/`LyricWord` types and converts at the boundary. Its behaviour is unchanged, and its tests keep passing.
+### 4.3 Variables
+- Syntax: `{name}`. Names match `[a-z][a-z0-9_]{0,31}`. `{{` and `}}` are literal braces.
+- **Built-ins** (always defined):
 
-### 4.3 `core/viz` (new package; imports `core`, `core/proc`, `core/media`, `core/lyrics`, `core/sidecar`)
-
-**Analysis types** (the full file schemas are in §5.5):
-```go
-type WordsSource string // "none" | "detect" | "align" | "file" | "given"
-type AnalyzeOptions struct {
-    Stems      bool        `json:"stems"`      // separate instruments (Demucs 4-stem)
-    SaveStems  bool        `json:"saveStems"`  // also write the 4 stems to the Library (§9.7)
-    Words      WordsSource `json:"words"`
-    Language   string      `json:"language"`   // "" auto or a Transcribe code
-    LyricsText string      `json:"lyricsText"` // align: ≤ 20,000 chars
-    LyricsPath string      `json:"lyricsPath"` // file: .lrc .srt .vtt .txt
-    Lines      []lyrics.Line `json:"lines"`    // given: ≤ 20,000 lines (from a handoff)
-    Mood       bool        `json:"mood"`       // read mood/imagery with the mood reader (default on with words)
-    DeepRead   bool        `json:"deepRead"`   // also ask the Local Chat model (default off)
-}
-type AnalysisRef struct {
-    Key          string          `json:"key"`          // cache folder name
-    AudioJSON    string          `json:"audioJson"`    // absolute paths
-    FeaturesPath string          `json:"featuresPath"`
-    TextJSON     string          `json:"textJson"`     // "" when Words = none
-    Instrumental string          `json:"instrumental"` // "" without stems
-    Summary      AnalysisSummary `json:"summary"`
-}
-type AnalysisSummary struct {
-    DurationMs int64    `json:"durationMs"`
-    Tempo      float64  `json:"tempo"`
-    Key        string   `json:"key"`        // "A minor"
-    Sections   []string `json:"sections"`   // labels in order
-    HasStems   bool     `json:"hasStems"`
-    HasWords   bool     `json:"hasWords"`
-    HasMeaning bool     `json:"hasMeaning"`
-    Language   string   `json:"language"`
-    Lines      int      `json:"lines"`
-    MoodSource string   `json:"moodSource"` // "music" | "reader" | "reader+chat"
-    Warnings   []string `json:"warnings"`   // e.g. "Mood reader not installed: mood comes from the music only"
-}
-type Analyzer struct{ /* paths, caller, textgen */ }
-func (a *Analyzer) Analyze(ctx context.Context, job *core.JobContext, input string, o AnalyzeOptions) (AnalysisRef, error)
-func (a *Analyzer) Lookup(key string) (AnalysisRef, bool)
-```
-
-**Render types:**
-```go
-type RenderMode string // "opaque" | "overlay"
-type RenderPlan struct {
-    Analysis   AnalysisRef `json:"analysis"`
-    ShowJSON   string      `json:"showJson"`   // ≤ 512 KiB; validated by the renderer
-    Width      int         `json:"width"`      // even, 320..3840
-    Height     int         `json:"height"`     // even, 320..3840 (opaque) / ≤ 1440 (overlay)
-    FPS        int         `json:"fps"`        // 24 | 25 | 30 | 50 | 60
-    StartMs    int64       `json:"startMs"`
-    EndMs      int64       `json:"endMs"`
-    Mode       RenderMode  `json:"mode"`
-    CoverPath  string      `json:"coverPath"`  // optional texture (song cover art), "" = none
-    ImagePath  string      `json:"imagePath"`  // optional still background texture
-    Seed       int64       `json:"seed"`
-}
-type RenderBroker struct{ /* see §7.2 */ }
-// Render blocks until the renderer finishes, returning the elementary stream it wrote
-// (video.h264, or frames.mjpeg for the JPEG fallback) in job.TempDir.
-func (b *RenderBroker) Render(ctx context.Context, job *core.JobContext, plan RenderPlan) (RenderOutput, error)
-type RenderOutput struct { Path string; Codec string /* "h264" | "mjpeg" */; Frames int; Encoder string }
-// HandleRawMessage is wired to application.Options.RawMessageHandler in main.go.
-func (b *RenderBroker) HandleRawMessage(msg string, origin, topOrigin string)
-```
-
-**Visual backgrounds for other tools** (used by Lyric Video and Subtitles, §9):
-```go
-// VisualsSpec is a design chosen in a VisualsPicker.
-type VisualsSpec struct {
-    ShowJSON string `json:"showJson"` // a preset or saved design (≤ 512 KiB)
-    Stems    bool   `json:"stems"`    // separate instruments for the analysis
-    UseWords bool   `json:"useWords"` // feed the tool's own timed text into the analysis (word pulses, mood)
-}
-// RenderVisuals analyses the input (cached), then renders the design without text
-// (show.text forced to null) at w×h/fps. Mode "opaque" (a background) or "overlay"
-// (over a video). Progress is mapped into [p0, p1].
-type Range struct{ StartMs, EndMs int64 } // EndMs 0 = to the end
-func RenderVisuals(ctx context.Context, job *core.JobContext, a *Analyzer, b *RenderBroker,
-    input string, spec VisualsSpec, lines []lyrics.Line, w, h, fps int, mode RenderMode, rng Range, p0, p1 float64) (RenderOutput, error)
-```
-
-**FFmpeg helpers:**
-```go
-func MuxOpaque(ctx, ffmpeg string, out RenderOutput, audio string, startMs, endMs int64, fps int, ass, dst string, onProgress func(float64)) error
-func CompositeOverlay(ctx, ffmpeg string, out RenderOutput, base string, loopBase bool, audio string, fps, w, h int, ass, dst string, onProgress func(float64)) error
-// ass: "" or a subtitle file name in the job's TempDir, burned in last (§9.6).
-```
-The arguments are in §7.4. Arg construction is pure and table-tested.
-
-**Cache:** `<support>/cache/visualizer/`. It is pruned at start: folders untouched for more than 30 days, then oldest first until the total is under 3 GB.
-
-### 4.4 Raw message channel (`main.go`)
-- `application.Options.RawMessageHandler` is set to call `broker.HandleRawMessage(msg, originInfo.Origin, originInfo.TopOrigin)` for messages starting with `vz1|`. Everything else is ignored (today nothing else is sent).
-- The broker accepts a message only if:
-  - its token matches an active render (128-bit random, made per render);
-  - `Origin == TopOrigin`, so it comes from the main frame;
-  - the origin is the app's own origin, captured from the first asset request (`http://wails.localhost` on Windows, `wails://wails` on macOS).
-- Anything else is dropped silently. It is counted in a debug log line, never logged with content.
-
-### 4.5 Events (registered in `api/events.go`, typed in the bindings)
-| Event | Payload | Direction |
-|---|---|---|
-| `viz:render` | `{token, planUrl, jobId}` | Go → RenderHost: start a render |
-| `viz:render-ack` | `{token, bytes}` | Go → RenderHost: bytes written so far (every ≥ 4 MiB) |
-| `viz:render-cancel` | `{token}` | Go → RenderHost: stop now |
-
-### 4.6 Module stub and wiring (`modules/visualizer`, ID `visualizer`)
-| ID | Name | Icon | Category | Order | Accepts | Requires | OutputSubdir |
-|---|---|---|---|---|---|---|---|
-| `visualizer` | Visualizer | `sparkles` | audio | 110 | audio + video exts (P6 §3.9), MaxInputs 1 | engine, ffmpeg, ffprobe | `Visualizer` |
-
-- Wave 0 writes:
-  - `options.go`, `module.go` and `service.go`, with final signatures and complete `Validate`;
-  - a stub `Run`;
-  - the `main.go` wiring (`viz.NewAnalyzer`, `viz.NewRenderBroker`, the RawMessageHandler), the bindings and `lib/api.ts` re-exports;
-  - the engine handler stubs `viz.analyze`, `viz.mood` and `viz.prefetch` in `handlers/viz.py`, imported in `handlers/__init__.py`;
-  - the mood reader's model pins and the `ModelProvider` stub in `modules/visualizer/models.go`;
-  - the frontend skeleton (§4.8).
-- New icons in `components/Icon.tsx`: `sparkles`, `layers`, `sliders-horizontal`, `wand-sparkles`, `map`, `waves`, `drum`, `guitar`, `mic`, `heart-pulse`, `maximize`, `film`, `eye`, `eye-off`, `grip-vertical`.
-
-### 4.7 Tool packs
-- **New component** `mood-reader` (model, module `visualizer`, preset `mood`, Apache-2.0).
-  - Size: 127,535,388 B download and disk on Windows (model + tokenizer), 127,493,916 B on macOS. The catalog stores the larger figure.
-  - It joins the **Music** and **Speech** packs (counted once, P5 §7.1).
-- **Music** pack: `+ visualizer` with Needs `{engine, ffmpeg}`.
-  - The Stems option needs `stems-default`; Words needs `whisper-default`; mood needs `mood-reader`. All three are Music components.
-  - The views show DepsGate rows for those options only when they're switched on.
-- The Music and Speech pack sizes grow by the mood reader. `TestEveryToolIsInOnePack` keeps passing.
-
-### 4.8 Frontend skeleton (`frontend/src/viz/`, Wave 0 writes the contracts and a working minimum)
-```
-viz/
-  types.ts        Show, Scene, LayerConfig, Param, Mod, SignalId, PaletteId, TextStyle, PlanForWorker (final)
-  analysis.ts     loadAnalysis(urls) → Analysis; ranged fetch; sampling; cumulative sums; event lookups
-  signals.ts      SIGNALS catalogue, fallbacks without stems, pulses, envelope cache, evaluate(mod, t)
-  palette.ts      PALETTES (24), OKLab mixing, palette modes (fixed/journey/mood/chords/sections)
-  director.ts     autoTimeline(analysis, show) → TimelineEntry[]; transitions
-  engine.ts       class Engine { constructor(canvas, opts); setShow; setAnalysis; setTextures; render(tMs); dispose }
-  gl/             context, shader compile cache, targets (RGBA16F), fullscreen triangle, bloom, tonemap, dither, feedback
-  layers/         registry.ts + one file per layer type (Wave 0: `gradient` and `bars` as references)
-  text/           atlas.ts, layout.ts, TextLayer (Wave 0: interface only)
-  post/           registry.ts (Wave 0: bloom, tonemap, vignette, dither)
-  presets/        index.ts + one file per preset (Wave 0: `spectrum-classic` as the reference)
-  worker/         render.worker.ts, encoder.ts, transport.ts (Wave 0: skeleton with the message protocol)
-  RenderHost.tsx  mounted once in App.tsx (main window only, not popups)
-  lab/            VizLab.tsx: dev view behind TOOLBOX_VIZLAB=1 (§11.4)
-```
-- `tools/visualizer/VisualizerView.tsx` is a stub, with its `tools/index.ts` line.
-- `state/ui.ts` `Handoff` gains `seed?: ToolSeed` (§9.1).
-
-### 4.9 Docs
-- **CLAUDE.md:** a Phase 7 section.
-  - The raw-message render channel: no socket, token plus origin checks, the `vz1|` prefix.
-  - Engine determinism rules (§6.1).
-  - "Layers never use `Math.random`, `Date` or `performance.now`."
-  - How to add a layer and a preset.
-  - The cache.
-- **`docs/MAC-CHECKLIST.md`:** Phase 7 steps (§11.5).
-- **`docs/ROADMAP.md`:** renumbered (done with this draft).
-
----
-
-## 5. Song analysis
-
-### 5.1 Flow (`core/viz/analyze.go`)
-1. **Key:** `sha1(path|size|mtime)` → folder `<cache>/visualizer/<key>/`.
-   - Audio products are named by `s<0|1>` (stems off/on).
-   - Text products are named by `t-<sha1 of the words options + lines>` and the mood source (`m0` music only, `m1` reader, `m2` reader + chat).
-   - Anything already there is reused, and progress jumps past that step.
-2. **Stems** (if on): `stems.separate {preset: "four-fast", format: "flac", out: <folder>/stems}`. Progress 0–0.45.
-3. **Features:** `viz.analyze {path, stems: {drums, bass, vocals, other} | null, outDir: <folder>, name: "s1"}`, then 0.45–0.6 (0–0.4 without stems). It writes `s1.json` + `s1.bin`.
-4. **Instrumental** (stems on): FFmpeg `amix=inputs=3:normalize=0` of drums, bass and other → `instrumental.flac`. Then **the stems folder is deleted**, keeping only the vocals until step 5 is done.
-5. **Words:**
-   - `detect`: `transcribe.run` on the vocals stem, or on the input if stems are off. Model `small`, `formats:["json"]`, `vad:true`, the language. Then `lyrics.WordsToLines`.
-   - `align`: the same transcription, then `lyrics.Align(text, words)`. The warning "Couldn't follow the song well — check the timings" appears below 0.4 matched.
-   - `file`: `lyrics.ParseFile`. If it `needsAlign`, align as above.
-   - `given`: the lines from the handoff; words are spread with `SpreadWords` where missing.
-   - Progress 0.6–0.85.
-6. **Emphasis (no model needed):** a word is emphasised when its mean `vocals.level` (or `mix.presence` without stems) is in the song's top 12% **and** it lasts ≥ 280 ms, or when it overlaps a held note (§5.3).
-7. **Mood** (§5.4), progress 0.85–1:
-   - If `Mood` is on and the mood reader is installed: `viz.mood`.
-   - Then, if `DeepRead` is on and `TextGenerator.Ready()` succeeds: the chat reading, which refines the reader's result.
-   - A missing reader or chat model adds a warning, and mood falls back to the music (§5.4).
-8. **Write `t-….json`.** Delete the vocals stem. Return the `AnalysisRef`.
-
-Cancellation is honoured between steps and inside each engine call. A failed step deletes its partial files.
-
-### 5.2 Engine handler `viz.analyze` (`handlers/viz.py` + `toolbox_sidecar/viz/{features,beats,harmony,sections,pitch}.py`)
-
-**Params:** `{path, stems: {drums, bass, vocals, other} | null, outDir, name, fps?: 60}`.
-- `fps` is 60 for inputs ≤ 20 min and 30 above. Inputs over 60 min are a validation error.
-
-**Decode:** librosa at 22,050 Hz, mono, plus left/right RMS from a stereo decode for the balance. Stems are decoded the same way.
-
-**Normalisation (per song, per channel):** percentile p5 → 0 and p98 → 1, clipped. Onset envelopes are divided by their p99. Quantised to u8.
-
-**Channels at `fps`** (`hop = round(22050/fps)`):
-
-| Group | Channels |
+| Variable | Value |
 |---|---|
-| mix | `level` (RMS), `onset`, `brightness` (spectral centroid, log-scaled 200 Hz–8 kHz), `balance` (0.5 = centre), 8 bands: `sub` 20–60, `bass` 60–250, `lowmid` 250–500, `mid` 500–2k, `highmid` 2–4k, `presence` 4–6k, `brilliance` 6–12k, `air` 12k+ Hz |
-| drums *(stems)* | `level`, `onset`, `kick` (onset of 20–150 Hz), `snare` (onset of 150 Hz–2.5 kHz with the kick band removed), `hats` (onset > 6 kHz) |
-| bass / vocals / other *(stems)* | `level`, `onset` |
-| vocals *(stems; from the mix's 300 Hz–4 kHz band otherwise)* | `pitch` (MIDI 40–84 → 0..1, held through unvoiced gaps ≤ 150 ms), `voiced` (0/1) |
-| vectors | `spectrum`: 64 log-spaced bins 30 Hz–16 kHz (dB, normalised per song), `wave`: 64 signed samples per frame (the mix over one frame, peak-normalised, stored as u8 with 128 = 0) |
+| `{item}` | the item's label without its extension (the downloaded title for links) |
+| `{name}` | per file: the current file's name without extension; elsewhere, same as `{item}` |
+| `{ext}` | per file: its extension, without the dot |
+| `{role}` | per file: its role label, e.g. "Bass" ("" if none) |
+| `{n}` | the item's number, from 1 |
+| `{date}` | the run's start date, `YYYY-MM-DD` |
+| `{time}` | the run's start time, `HH-MM` |
+| `{pipeline}` | the pipeline's name |
 
-**Events** (`[ms, strength 0–255]`, peak-picked with `librosa.onset.onset_detect`, 110 ms minimum gap per channel):
-- `kick`, `snare`, `hats`, `bass`, `vocals`, `other` (stems) or their mix fallbacks: kick from `sub+bass`, snare from `mid`, hats from `brilliance`, vocals from `presence`;
-- `mix`.
+- **Step variables:**
 
-**Beats** (`beats.py`):
-- `librosa.beat.beat_track` on the mix onset envelope gives tempo and beat times.
-- **Downbeats:** for each phase p ∈ {0,1,2,3}, score the beats with `i % 4 == p` by kick (or sub+bass) onset strength within ±70 ms, + 0.5 × a chord change on that beat; the best phase wins. `beatsPerBar` is 4.
+| Step | Variables |
+|---|---|
+| downloader | `title` (the media title), `url` |
+| bpm-key | `bpm` (rounded, "128"), `bpm_exact` ("127.9"), `key` ("A minor"), `key_short` ("Am"), `camelot` ("8A") |
+| transcribe | `transcript` (plain text), `transcript_timed` (one `[h:mm:ss] text` line per segment; needs `srt`, `vtt` or `json`), `language` |
+| ocr | `text` (needs a `.txt` output) |
+| subtitles (auto) | `subtitles` (the cue text, one cue per line), `language` |
+| audio-to-midi | `notes` |
+| pipelines.chat | write mode: `reply`; extract mode: one variable per field |
 
-### 5.3 Harmony, sections, pitch
-- **Chords** (`harmony.py`):
-  - `chroma_cqt` at 15 Hz is beat-synchronised (median) and matched against 24 major/minor templates by cosine.
-  - Smoothing is a Viterbi pass with self-transition 0.9 and uniform others.
-  - Equal neighbours merge. Chords shorter than 1 beat merge into the previous one. A cosine below 0.5 gives `N` (no chord).
-  - **Key:** `rank_keys` (as in `analysis.bpm_key`) on the mean chroma.
-- **Sections** (`sections.py`):
-  1. Beat-synchronised MFCC(13) + chroma(12), standardised, then `librosa.segment.agglomerative` with k = clamp(round(duration / 20 s), 4, 12).
-  2. Boundaries snap to the nearest downbeat. Segments shorter than 4 bars merge into the more similar neighbour.
-  3. **Groups:** segment mean feature vectors are clustered greedily, joining when cosine ≥ 0.9, and named A, B, C…
-  4. **Energy:** the mean `mix.level` per segment, rescaled 0..1 across the song.
-  5. **Labels**, in this order:
-     - `intro`: the first segment if energy < 0.45 and length < 30 s;
-     - `outro`: the last segment, by the same rule;
-     - `chorus`: segments of the highest-energy group that occurs ≥ 2 times;
-     - `verse`: segments of the most frequent other repeated group;
-     - `bridge`: a non-repeating segment in the second half;
-     - `drop`: a segment that starts at a drop event (below);
-     - otherwise `section`.
-  6. **Lift / drop / break events** from the 1-bar mean loudness (dB):
-     - `drop`: +6 dB vs the previous 2 bars;
-     - `lift`: a rise of ≥ 4 dB spread over the previous 2–4 bars, ending on a downbeat;
-     - `break`: −6 dB.
-- **Pitch** (`pitch.py`): pYIN on the vocals (16 kHz, fmin 65, fmax 1000, hop 320), resampled to `fps`.
-  - **Held notes:** voiced runs ≥ 600 ms with pitch within ±0.5 semitone of their median → events `held: [[startMs, endMs, midi]]`.
-
-### 5.4 Meaning
-
-**The mood reader** (engine `viz.mood`, `toolbox_sidecar/viz/mood.py`; the default, no chat model needed):
-- **Params:** `{lines: [text…] (≤ 20,000), modelPath, tokenizerPath, anchorsCachePath}`.
-- **Encoding:**
-  - The `tokenizers` tokenizer truncates at 128 tokens; `onnxruntime` (CPU, 2 intra-op threads) runs batches of 64.
-  - Mean pooling over the attention mask, then L2-normalisation.
-- **Anchors** (`toolbox_sidecar/viz/anchors.json`, shipped with the engine):
-  - 8 English phrases per emotion and 3 per motif, from `.dev/p7-research/nlp/embed.py` (AN3 may extend them; ≤ 12 per emotion, ≤ 6 per motif).
-  - Their embeddings are computed on first use and cached in `<models>/mood/anchors-<sha1(anchors.json + model sha)>.npy`.
-- **Per line:**
-  - **Emotion scores:** for each emotion, the mean cosine of the line's 3 nearest anchors. The emotion is the argmax.
-  - **Confidence:** the margin between the best and second emotion, scaled to 0..1 (margin ÷ 0.1, clipped). A confidence below 0.2 is recorded as a weak reading.
-  - **Valence and energy:** the softmax of the scores (temperature 0.03) weights this table:
-
-    | Emotion | Valence | Energy |
-    |---|---|---|
-    | joy | 0.8 | 0.8 |
-    | love | 0.7 | 0.4 |
-    | sadness | −0.7 | 0.25 |
-    | anger | −0.6 | 0.9 |
-    | fear | −0.6 | 0.7 |
-    | calm | 0.3 | 0.15 |
-    | hope | 0.6 | 0.5 |
-    | awe | 0.5 | 0.6 |
-
-  - **Motifs:** a motif counts when its best anchor cosine is ≥ 0.54 (AN3 tunes one threshold per motif on the test set, §11.2). At most the top 3 are kept.
-- **Result:** `{lines: [{emotion, confidence, valence, energy, motifs, scores: {emotion: cos}}]}`.
-- **Speed:** about 2 ms per line on CPU (§0.3); the model loads in about 1 s and is dropped when the call ends.
-- Lines with no letters ("♪", "(instrumental)") get a neutral reading: calm, confidence 0.
-
-**Deeper reading with Local Chat** (optional, off by default; `core/viz/meaning.go`):
-- **Batches:** up to 30 lines or 2,500 characters, with the previous batch's last 3 lines as context.
-- **System prompt:**
-  > "You read song lyrics or speech and describe how each line feels, for a music visualiser. For each line give: valence from -1 (dark, sad) to 1 (bright, happy); energy from 0 (still) to 1 (intense); one emotion; up to 3 visual motifs only if the line clearly evokes them; up to 2 words from the line to emphasise. Answer only with the JSON."
-- **JSON schema:** an array of exactly n objects:
-  - `valence`: number, −1..1;
-  - `energy`: number, 0..1;
-  - `emotion`: enum of joy, love, sadness, anger, fear, calm, hope, awe;
-  - `motifs`: array ≤ 3 from the enum of fire, rain, snow, stars, ocean, flowers, hearts, city, sun, night, storm, smoke;
-  - `emphasis`: array ≤ 2 of strings.
-- **Settings:** temperature 0.2; `Purpose: "Reading the mood of the words"`.
-- **Recovery:** a reply that fails the schema or has the wrong count is retried once, then the batch goes line by line. A line that still fails gets a neutral reading (valence 0, energy 0.5, calm, no motifs).
-- **Emphasis words** must match a word of the line (NFKC, case-insensitive, punctuation stripped). Matches add to the loudness emphasis (§5.1 step 6); the rest are dropped.
-- **Merging with the reader:**
-  - Where the reader's confidence is < 0.5, the chat's emotion, valence and energy replace the reader's. Otherwise valence and energy are averaged, and the emotion stays the reader's.
-  - Motifs are the union, best-scored first, at most 3.
-- The chat reading can be used without the reader. If the mood reader isn't installed, the chat result is used alone.
-
-**Mood keyframes** (written to `text.json`; the same for every source):
-- One keyframe per line start: its valence, energy and emotion. A weak reading (confidence < 0.2) counts at half weight.
-- It is blended 70/30 with the **musical mood** at that time: valence 0.5·(major ? 1 : −1)·0.6 + 0.4·(brightness − 0.5); energy = section energy.
-- Between lines the mood eases towards the musical mood over 4 s.
-- **Without a reading** (mood off, no words, or no models): keyframes every bar from the musical mood alone, with the emotion from a lookup:
-
-    | Valence | Energy < 0.33 | 0.33–0.66 | > 0.66 |
-    |---|---|---|---|
-    | < −0.2 | sadness | fear | anger |
-    | −0.2..0.2 | calm | awe | anger |
-    | > 0.2 | calm | hope | joy |
-
-### 5.5 File schemas (version 1; written by Python (audio) and Go (text); read by `viz/analysis.ts`)
-
-**`s<0|1>.json`:**
-```json
-{ "version": 1, "durationMs": 214000, "fps": 60, "frames": 12840, "stems": true,
-  "tempo": 120.2, "beatsPerBar": 4, "beats": [512, 1011], "downbeats": [512, 2510],
-  "key": { "name": "A minor", "camelot": "8A", "minor": true },
-  "chords": [ { "startMs": 512, "endMs": 2510, "name": "Am", "root": 9, "minor": true } ],
-  "sections": [ { "startMs": 0, "endMs": 15800, "label": "intro", "group": "A", "energy": 0.21 } ],
-  "events": { "kick": [[512, 230]], "snare": [], "hats": [], "bass": [], "vocals": [], "other": [], "mix": [],
-              "lift": [], "drop": [[61000, 255]], "break": [], "held": [[70500, 72100, 64]] },
-  "blocks": [ { "id": "mix.level", "kind": "scalar", "offset": 0, "width": 1 },
-              { "id": "spectrum", "kind": "vector", "offset": 488160, "width": 64 } ],
-  "features": "s1.bin" }
-```
-
-**`s<0|1>.bin`:**
-- Blocks are back to back. A scalar block is `frames` bytes. A vector block is `frames × width` bytes, frame-major.
-- All u8 (`wave` is offset by 128).
-- A 4-minute song at 60 Hz is about 2.1 MB with stems.
-
-**`t-<hash>-m<0|1|2>.json`:**
-```json
-{ "version": 1, "source": "detect", "language": "en", "matched": 0.0, "moodSource": "reader",
-  "lines": [ { "startMs": 15800, "endMs": 19200, "text": "We were burning bright",
-               "words": [ { "startMs": 15800, "endMs": 16100, "text": "We", "emphasis": false } ],
-               "meaning": { "valence": 0.4, "energy": 0.8, "emotion": "joy", "confidence": 0.62, "motifs": ["fire"] } } ],
-  "mood": [ { "ms": 0, "valence": -0.1, "energy": 0.2, "emotion": "calm" } ] }
-```
-`meaning` is absent with `m0`.
+- **Expansion:** `core.ExpandVars(tpl, maps...)`, where later maps win.
+  - An unknown name expands to "" and logs a warning on the cell.
+  - Values are capped at 256 KiB each (truncated, with a log line) and 1 MiB per item in total.
+- **Where `{vars}` work:** the option fields listed in `StepInfo.Templates`, which are JSON pointers into the step options. Describe reports a problem for any name that no earlier step (or built-in) defines there.
 
 ---
 
-## 6. The visual engine (`frontend/src/viz/`)
+## 5. Wire types (`core/pipeline_types.go`, new; in the bindings)
 
-### 6.1 Frame model and determinism
-- **`Engine.render(tMs)`** draws the frame at time tMs. Its output is a pure function of `(show, analysis, textures, size, seed, tMs)`, plus GPU feedback state for layers marked `stateful`.
-- **Rules for every layer:**
-  - No `Math.random`, `Date` or `performance.now`. Use `rng(seed, key)` (a PCG32 hash).
-  - **Motion that accumulates** (particle drift, rotation speed driven by bass, highway scroll) uses the analysis's **cumulative signals**: prefix sums of a channel, computed once at load. For example the angle is `base·t + k·(cum(bass, t) − cum(bass, t0))`, so any frame can be computed directly.
-  - **Spawned things** (particles, ripples, notes) come from events within a lookback window ≤ 8 s. Their state is closed-form in age; a damped velocity is `v0·(1 − dᵃᵍᵉ)/(1 − d)`.
-  - **Stateful layers** (feedback trails, kaleidoscope-of-feedback) read the previous frame. After a seek, the engine **warms up** by rendering the previous 1 s at the same fps without presenting. The export renders sequentially, so it never needs this.
-- **Preview/export parity:** at the same tMs, size and show, the preview and the export produce the same pixels. Stateful layers match from 1 s after a seek.
-- **Draft quality** (preview only, automatic below 45 fps for 2 s, or chosen by the user): bloom at quarter resolution and particle counts ×0.5. The export is always full quality.
-
-### 6.2 Analysis loading (`analysis.ts`)
-- `loadAnalysis({audioJsonUrl, featuresUrl, textJsonUrl?})`:
-  - fetches each URL in **4 MiB ranges** until done (the media route caps responses);
-  - checks `version`, `frames` and block sizes;
-  - builds `Float32Array` views (0..1) lazily per block, and prefix sums on first use.
-- **Sampling** is linear interpolation between frames. Events are queried by binary search (`eventsBetween(id, t0, t1)`, `lastEvent(id, t)`). `sectionAt(t)`, `chordAt(t)`, `lineAt(t)` and `wordAt(t)` are O(log n).
-
-### 6.3 Signals (`signals.ts`)
-Every reactive parameter is driven by named signals (0..1 unless noted). The UI names are in brackets.
-
-| Signal id | [UI name] | Definition |
-|---|---|---|
-| `mix.level`, `mix.onset`, `mix.brightness`, `mix.balance` | Whole song, Hits, Brightness, Left/right | channels |
-| `mix.sub` … `mix.air` (8) | Sub, Bass band, … Air | channels |
-| `kick`, `snare`, `hats` | Kick, Snare, Hi-hats | pulse from events (τ 90 / 110 / 60 ms) × strength |
-| `drums.level`, `bass.level`, `vocals.level`, `other.level` | Drums, Bass, Vocals, Other instruments | channels |
-| `bass.onset`, `vocals.onset`, `other.onset` | … hits | pulse from events (τ 120 ms) |
-| `vocals.pitch`, `vocals.voiced`, `vocals.held` | Vocal pitch, Singing, Held note | channels / 1 during held notes, easing in and out over 150 ms |
-| `beat.pulse`, `beat.phase`, `bar.pulse`, `bar.phase` | Beat, Beat position, Bar, Bar position | pulse (τ 120 / 300 ms) / 0..1 saw |
-| `section.energy`, `section.progress`, `song.progress` | Section energy, … | from sections / 0..1 |
-| `lift.pulse`, `drop.pulse`, `break.pulse` | Build-up, Drop, Break | pulse (τ 2,000 / 1,200 / 800 ms); lift ramps up over its 2–4 bars |
-| `chord.change`, `chord.hue`, `key.minor` | Chord change, Chord colour, Minor key | pulse (τ 250 ms) / root on the circle of fifths → 0..1 / 0 or 1 |
-| `word.pulse`, `word.emphasis`, `line.progress`, `line.active` | Words, Emphasised words, Line progress, Singing a line | pulse at word starts (τ 150 ms) / pulse at emphasised words (τ 400 ms) / 0..1 / 0 or 1 |
-| `mood.valence` (−1..1 → 0..1), `mood.energy` | Mood (bright ↔ dark), Mood energy | mood keyframes, eased |
-| `lfo.slow`, `lfo.mid`, `time` | Slow drift, Sway, — | 0.03 / 0.2 Hz sine, seconds |
-
-- **Fallbacks without stems:**
-  - `drums.level` → `mix.onset` envelope; `bass.level` → `mix.bass`; `vocals.level` → `mix.presence`; `other.level` → `mix.mid`.
-  - Kick, snare and hats come from the mix events (§5.2). Presets work either way.
-- **Without words:** the word, line and mood signals that depend on lines are 0, except mood, which uses the musical mood.
-- **Modulation** (`Param`, §6.4):
-  - `value = clamp(base + Σ amountᵢ · shape(env(signalᵢ)) · mixGain(group(signalᵢ)) · reactivity, min, max)`.
-  - `env` is a one-pole attack/release envelope (default 10 ms / 180 ms), precomputed per (signal, attack, release) over the whole song and cached.
-  - Shapes: `linear`, `ease` (smoothstep), `exp` (x²), `gate` (x > 0.5).
-  - `mixGain`: the visual-mix fader of the signal's group (drums, bass, vocals, other, words, mood; default 1, range 0–2).
-  - `reactivity`: the global Reactivity slider, 0–2.
-
-### 6.4 Show format (`types.ts`; the source of truth, round-tripped as `ShowJSON`)
-```ts
-export interface Show {
-  version: 1;
-  name: string;
-  presetId: string | null;           // preset it came from
-  scenes: Scene[];                   // 1–6; variants like "calm", "main", "full"
-  timeline: { mode: "auto" | "manual"; entries: TimelineEntry[] }; // manual entries; auto computes them
-  palette: { mode: "fixed" | "journey" | "mood" | "chords" | "sections"; ids: PaletteId[] }; // ids: 1 (fixed), 2–5 (journey/sections)
-  mix: Record<"drums" | "bass" | "vocals" | "other" | "words" | "mood", number>; // 0–2
-  reactivity: number;                // 0–2
-  speed: number;                     // 0.25–2, scales time-based motion
-  text: TextStyle | null;            // null = no words on screen
-  motifs: boolean;                   // add motif layers where the words evoke them
-  post: PostConfig[];                // global post chain (after scenes)
-  controls: ReactionSlot[];          // the Reactions panel rows (§8.3)
-}
-export interface Scene { id: string; name: string; layers: LayerConfig[]; post: PostConfig[] }
-export interface LayerConfig {
-  id: string; type: LayerType; enabled: boolean;
-  blend: "normal" | "add" | "screen" | "multiply"; opacity: Param;
-  params: Record<string, Param | string | boolean>;   // numbers may be reactive
-}
-export type Param = number | { base: number; mods: Mod[] };
-export interface Mod { signal: SignalId; amount: number; shape: "linear" | "ease" | "exp" | "gate"; attackMs?: number; releaseMs?: number }
-export interface TimelineEntry { startMs: number; endMs: number; sceneId: string; transition: Transition; paletteId?: PaletteId }
-export interface Transition { kind: "cut" | "crossfade" | "flash" | "zoom" | "sweep" | "glitch"; ms: number }
-export interface ReactionSlot { label: string; target: string /* "<layerId>.<param>" or "post.<id>.<param>" */ }
-```
-- **Validation** (`validateShow`): types exist; params are within each layer's spec ranges; signals exist; ids are unique; ≤ 12 layers per scene; JSON ≤ 512 KiB. The renderer validates before rendering.
-- An invalid show fails the render with "This design couldn't be read" and the first problem as the hint.
-
-### 6.5 Rendering pipeline (`engine.ts`, `gl/`)
-1. **Scene pass:** the active timeline entry (and, during a transition, the next one) is drawn into its own HDR target (RGBA16F).
-   - Layers draw in order with their blend mode and opacity.
-   - Background-group layers are skipped in overlay mode.
-2. **Scene post chain:** the scene's `post` effects.
-3. **Transition:** `crossfade` mixes; `flash` adds white decaying over its length; `zoom` scales the outgoing scene up while the new one fades in; `sweep` is golden-hour's light band moving left → right; `glitch` is RGB-split blocks for 4 frames.
-   - Transitions start on the downbeat nearest the section boundary (±1 bar) and last `ms` (default: 1 bar for crossfade).
-4. **Text layer** (§6.8), unless the show has no text.
-5. **Global post chain:**
-   - bloom: 6-level dual-filter downsample/upsample, threshold 0.8, knee 0.5, intensity a param;
-   - chromatic aberration, film grain, vignette;
-   - **ACES-fit tonemap**;
-   - **blue-noise dither** to 8-bit (removes banding in gradients after H.264).
-6. **Output:**
-   - **opaque:** sRGB 8-bit to the canvas;
-   - **overlay:** a canvas twice as tall, with un-premultiplied colour on top and alpha as grey below. Alpha is the tonemapped coverage: `max(r,g,b)` of additive light, clamped, combined with text alpha.
-
-**Shapes:**
-- Lines, rings, bars and dots are drawn as **instanced quads with SDF fragment shaders** (analytic anti-aliasing at any resolution, round caps, soft glow falloff).
-- Particles are instanced point sprites with SDF discs, streaks, or soft sprites from a small generated atlas: ember, snowflake, raindrop streak, petal, star, heart, bokeh.
-
-### 6.6 Palettes (`palette.ts`)
-- **24 palettes**, each `{id, name, bg, colors[4], accent, glow}` as hex, converted to OKLab for every mix:
-  - the 20 from song-visualizer (cyber, fire, ice, mono, sunset, matrix, neon, galaxy, lava, ocean, toxic, vaporwave, rose, plasma, gold, arctic, candy, blood, forest, synthwave);
-  - golden-hour's four phases as `deep-night`, `dawn`, `golden`, `electric`;
-  - The palette backgrounds are made darker than the source where needed, so bloom has room.
-- **Modes:**
-  - `fixed`: one palette.
-  - `journey`: interpolates through 2–5 palettes over `song.progress` (golden hour: deep-night → dawn → golden → electric).
-  - `mood`: a palette per emotion:
-
-    | Emotion | Palette |
-    |---|---|
-    | joy | sunset |
-    | love | rose |
-    | sadness | ocean |
-    | anger | blood |
-    | fear | galaxy |
-    | calm | arctic |
-    | hope | dawn |
-    | awe | plasma |
-
-    It crossfades over 2 s at mood changes. Valence shifts lightness ±8% and energy shifts chroma ±15%.
-  - `chords`: the base palette rotated in hue so that `colors[0]` sits at the chord root's angle (circle of fifths). It eases over 400 ms per change.
-  - `sections`: one palette per section group (A, B, C…), cycling through the listed ids.
-
-### 6.7 Layer catalogue (31 types; every numeric param is reactive)
-Each layer type is a file in `layers/` exporting a `LayerDef`:
-```ts
-export interface LayerDef { type: LayerType; label: string; group: "background" | "shape" | "particles" | "accent" | "highway" | "motif";
-  stateful?: boolean; params: Record<string, ParamSpec>; create(ctx: LayerContext): LayerInstance }
-export interface LayerInstance { render(f: FrameInput, out: RenderTarget): void; resize?(w: number, h: number): void; dispose(): void }
-// FrameInput: { tMs, dtMs, params (resolved numbers/strings/bools), palette (resolved), analysis, signals, w, h, seed, quality, mode }
-```
-Common params on most layers: `intensity`, `scale`, `x`, `y`, `rotation`, `colorIndex` (0–3 or "cycle"), `glow`. "src" lists where each idea comes from: SV = song-visualizer, GH = golden-hour, PH = pitch-hero, new.
-
-| # | Type | Group | What it draws | Main params (default drivers in presets) | src |
-|---|---|---|---|---|---|
-| 1 | `gradient` | background | Slow mesh gradient of the palette (4 moving colour points) | speed, contrast, pointDrift ← mood.energy | new |
-| 2 | `nebula` | background | Domain-warped fBm clouds with star sparkle | warp ← bass.level, detail, sparkle ← hats, drift | new |
-| 3 | `aurora` | background | Curtains or bands of light; left half follows L, right half R; blue/red edge tint by channel level | bands 3–8, height ← mix.mid, tint ← mix.balance, style curtains/bands | SV, GH |
-| 4 | `ink` | background | Metaball ink in water, slow and soft (ballads, speech) | blobs 4–12, viscosity, swell ← vocals.level | new |
-| 5 | `synthgrid` | background | Horizon sun with scanlines, a perspective grid floor scrolling at tempo, spectrum mountains | gridSpeed ← beat (scroll locked to beats), sunPulse ← kick, mountains ← spectrum | new (SV terrain) |
-| 6 | `tunnel` | background | Polar tunnel of rings, a new ring per beat, twisting | ringsPerBeat, twist ← bass.level, speed ← drums.level | SV |
-| 7 | `starfield` | background | 3D stars with streaks; warp speed | speed ← drums.level, warp ← drop.pulse, density | SV |
-| 8 | `terrain` | background | Scrolling spectrogram terrain lines in perspective under a sky | rows 24–64, height ← mix.level | SV |
-| 9 | `image` | background | Cover art or the user's image: fill, slow Ken Burns, blur, breathing zoom | blur 0–40, zoom ← bass.level, kenBurns speed, darken | new (P6 cover) |
-| 10 | `kaleido` | background (stateful) | Kaleidoscope of a feedback buffer seeded by the layers beneath | segments 4–16, spin ← bar.phase, zoom ← kick | SV |
-| 11 | `bars` | shape | Spectrum bars: straight, mirrored or reflected, rounded SDF caps, peak caps that fall | count 16–128, mirror, height ← spectrum, peakFall | SV |
-| 12 | `radial` | shape | Radial bars around a centre glow | count 48–256, innerR ← kick, length ← spectrum | SV |
-| 13 | `ribbons` | shape | 3 layered waveform ribbons with thickness and soft trails | layers 1–4, amplitude ← mix.level, source spectrum/wave | SV |
-| 14 | `wavering` | shape | Noisy rings that wobble with bass; optional L/R pair tinted blue/red | radius, wobble ← bass.level, pair (GH) | GH |
-| 15 | `oscilloscope` | shape | The actual waveform as a glowing line, or an X/Y Lissajous of L/R | mode line/xy, gain, persistence | new |
-| 16 | `lissajous` | shape | Layered Lissajous curves; frequency ratio from vocal pitch | ratio ← vocals.pitch, layers 1–3, phaseDrift ← hats | SV, PH |
-| 17 | `helix` | shape | Double helix with rungs lit by the spectrum | turns, amplitude ← bass.level | SV |
-| 18 | `vortex` | shape | Lines from the centre twisting with energy | lines 24–160, twist ← bass.level | SV |
-| 19 | `geometry` | shape | Nested rotating polygons with perturbed edges, rays on hits | shapes 3–8, rays ← kick | SV |
-| 20 | `pitchribbon` | shape | A ribbon tracing the vocal melody across the screen over the last 4 s, thicker on held notes | height ← vocals.pitch, width ← vocals.level | new |
-| 21 | `embers` | particles | Rising embers and sparks that speed up with energy (bounded count) | count 20–600 ← mix.level, rise ← bass.level | GH |
-| 22 | `bursts` | particles | Particles fired from onsets, one colour per instrument, with trails | sources (kick/snare/hats/bass/vocals/other), spread, trail | SV |
-| 23 | `fireflies` | particles | Soft drifting motes that brighten with vocals | count, glow ← vocals.level | PH |
-| 24 | `ripples` | accent | Expanding rings on events | trigger (kick/snare/beat/word…), maxRadius, width | SV |
-| 25 | `shockwave` | accent | A screen-space distortion ring plus flash on drops and downbeats | trigger, strength | new |
-| 26 | `sweep` | accent | Golden-hour light band sweeping across on section starts | trigger section/drop, width | GH |
-| 27 | `lightrays` | accent | God rays from a point, pulsing | rays, length ← vocals.held, origin | new |
-| 28 | `frame` | accent | A glowing frame/border around the picture (for videos) | thickness ← beat.pulse, corners only | new |
-| 29 | `highway` | highway | Note highway: lanes = instruments (kick, snare, hats, bass, vocals by default, or 5 bands without stems), hyperbolic perspective, notes hitting the fret on time, sustains from held notes, fret flashes; `reverse` option | lanes, lookahead 1.5–4 s, reverse | SV (both GH modes) |
-| 30 | `motif` | motif | One of the 12 motifs, rendered as a particle/overlay effect while active (fire: rising flames + embers; rain: streaks + drops; snow; stars: twinkling field; ocean: wave lines at the bottom; flowers: drifting petals; hearts: soft bokeh hearts; city: bokeh lights; sun: warm rays; night: moon glow + darker grade; storm: lightning on snares; smoke: drifting fog) | motif, amount ← line.active | new |
-| 31 | `text` | (special) | The words (§6.8) | | new |
-
-**Post effects** (`post/`): `bloom`, `tonemap`, `dither`, `vignette`, `grain`, `chromatic` (RGB split ← kick, or L/R balance like GH), `feedback` (zoom/rotate/decay trails), `mirror` (kaleidoscope post), `shake` (camera shake ← kick, bounded 0–2% of the short side), `zoompulse` (← beat.pulse), `glitch` (← drop.pulse, rare blocks), `grade` (lift/gamma/gain and saturation, ← mood). Each has a `PostDef` like layers.
-
-### 6.8 Text layer (`text/`)
-- **Source:** the `text.json` lines. Without words, there is no text.
-- **TextStyle:**
-```ts
-export interface TextStyle {
-  preset: "karaoke" | "pop" | "rise" | "typewriter" | "fade" | "wave" | "subtitle" | "subtitle-boxed";
-  font: string;                     // media.Fonts() (P6 §3.6)
-  weight: 400 | 700 | 900;
-  size: number;                     // % of the short side, 3–12
-  color: string; highlight: string; // #rrggbb ("mood" allowed for highlight: from the palette's accent)
-  position: "center" | "lower" | "upper";
-  showNext: boolean;
-  uppercase: boolean;
-  outline: number;                  // 0–0.15 of size
-  glow: number;                     // 0–1 (text added to bloom input)
-  emphasis: { scale: number; glow: number; color: "highlight" | "mood"; sparks: boolean };
-  react: { signal: SignalId | null; amount: number };  // e.g. scale with vocals.level
-}
-```
-- **Animations:**
-  - `karaoke`: the word fill sweeps across each word as it is sung.
-  - `pop`: words appear at their start with a 120 ms overshoot scale.
-  - `rise`: the line slides up 3% and fades in, then out.
-  - `typewriter`: characters appear between word start and end.
-  - `fade`: plain fades.
-  - `wave`: words bob along a travelling sine while sung.
-  - `subtitle` / `subtitle-boxed`: plain readable subtitles at the bottom; boxed puts them on a black 55% box.
-- **Emphasised words** get `emphasis.scale` (default 1.25), more glow, the highlight or mood colour and, when `sparks` is on, a burst of particles at the word.
-- **Layout:**
-  - Lines wrap at 80% width (16:9) or 88% (9:16); at most 2 lines.
-  - Text keeps to the 5% title-safe area. `lower` sits at 14% from the bottom (24% in 9:16).
-  - `showNext` draws the next line at 55% alpha and 80% size below.
-  - A title card from the song tags (title and artist), when enabled in the look, shows for up to 3 s before the first line.
-- **Rasterising:**
-  - Each line is drawn once into a shared atlas texture (2048² RGBA8; a second page when full) with Canvas2D at the output resolution: R = fill, G = outline (`strokeText`), B = glow mask.
-  - Word boxes come from `measureText`.
-  - The shader draws word quads with per-word transforms and colours (karaoke progress per word).
-  - On the main thread this uses `OffscreenCanvas` (or a DOM canvas); in the worker, `OffscreenCanvas` 2D.
-  - Fonts are referenced by family name (system fonts). A font that isn't available falls back to Arial, with a warning in the render log.
-
-### 6.9 Director (`director.ts`)
-**`autoTimeline(analysis, show)`**, used when `timeline.mode = "auto"`:
-- Every section gets the scene its preset maps for its label (`preset.director.sceneFor: Record<SectionLabel, sceneId>`). The default map:
-
-  | Section | Scene |
-  |---|---|
-  | intro, outro, bridge | `calm` |
-  | verse, section | `main` |
-  | chorus, drop | `full` |
-
-  A scene id missing from the show falls back to `main`.
-- Transitions: the preset's `director.transitions[label]`. Default: crossfade, 1 bar; `drop` → flash; `chorus` after `lift` → zoom.
-- **Motifs** (when `show.motifs` is on and lines have motifs): a `motif` layer is added on top of the scene for each line's motifs, from 1 beat before the line to its end + 1 bar. At most 2 motifs at once; the newest wins.
-- `section.energy` is available to every scene as a signal, so a single scene still builds with the song.
-
-**`manual` mode:** the Song Map lets the user set the scene, palette override and transition per section (§8.3). New entries copy from auto. The manual entries are stored in the show.
-
-### 6.10 Presets (`presets/`, 20)
-Every preset is a `Show` template plus `director` rules plus its `controls` (Reactions rows). Each has a one-line description shown on its card.
-
-| # | Preset | Scenes (calm / main / full) — key layers | Palette | Best for |
-|---|---|---|---|---|
-| 1 | **Golden Hour** | aurora + wavering pair (L/R blue/red) + embers + ripples on kick + sweep on sections | journey deep-night → dawn → golden → electric | Any song; the party look |
-| 2 | **Neon Highway** | synthgrid floor + highway (instrument lanes) + bloom; full adds starfield streaks | synthwave | Dance, rock, anything with drums |
-| 3 | **Nebula** | nebula + fireflies + pitchribbon; full adds lightrays on held notes | chords (galaxy) | Ambient, ballads, cinematic |
-| 4 | **Synthwave** | synthgrid sun + terrain mountains + chromatic on snare | synthwave | Synthpop, retrowave |
-| 5 | **Spectrum Classic** | gradient + mirrored bars with peaks + reflection | fixed cyber | Clean, universal |
-| 6 | **Radial Pulse** | radial bars + centre glow on kick + ripples; full adds shockwave on downbeats | neon | EDM, hip-hop |
-| 7 | **Silk Waves** | ribbons with feedback trails + soft gradient | vaporwave | Pop, R&B |
-| 8 | **Warp Drive** | starfield warp on drums + flash on drops + shake on kick | ice | Drum & bass, energetic |
-| 9 | **Kaleido Bloom** | nebula base → kaleido + mirror post, spin on bars | plasma | Psychedelic, electronic |
-| 10 | **Ink & Water** | ink + fireflies, slow; mood grade | mood | Ballads, speech, poetry |
-| 11 | **Particle Storm** | bursts per instrument (each instrument its colour) + feedback | candy | Busy mixes; shows the stems |
-| 12 | **Aurora Curtains** | aurora curtains + snow motif-style particles | arctic | Chill, winter, piano |
-| 13 | **Tunnel Run** | tunnel rings per beat + zoompulse + glitch on drops | lava | Techno, trance |
-| 14 | **Night Terrain** | terrain + starfield sky + moon glow | galaxy | Lo-fi, chill |
-| 15 | **Oscilloscope Lab** | oscilloscope XY + lissajous + helix, phosphor green persistence | matrix | Electronic, experimental |
-| 16 | **Vortex** | vortex + geometry rays on kick + chromatic | toxic | Heavy, bass music |
-| 17 | **Lyric Stage** | image (cover, blurred, breathing) + light rays + dust fireflies + big karaoke text | mood (from cover accent) | Lyric videos |
-| 18 | **Mood Field** | gradient + motifs everywhere + mood grade; scenes follow emotion, not sections | mood | Songs with strong imagery; spoken word |
-| 19 | **Clean Captions** *(overlay)* | no background; subtitle text that pops on emphasis with mood colour; tiny sparks | mood | Talking-head videos with subtitles |
-| 20 | **Frame Pulse** *(overlay)* | frame glow on the beat + corner bursts + karaoke-style captions | neon | Music clips, reels |
-
-- Presets marked *(overlay)* are offered first when the input is a video in "Over the video" mode. All presets work in both modes; background layers are dropped in overlay mode.
-- **User presets:** "Save as my preset" stores the show in module state (`visualizer.myPresets`, ≤ 50, ≤ 512 KiB each, ≤ 4 MiB total). They can be renamed and deleted.
-
----
-
-## 7. Rendering and export
-
-### 7.1 Render job (`modules/visualizer`, actions `render` and `preview`)
-1. Validate:
-   - the analysis key exists (`Analyzer.Lookup`);
-   - ShowJSON ≤ 512 KiB;
-   - size, fps and range are within bounds;
-   - overlay mode needs a video input;
-   - `instrumental` needs stems.
-2. **Size:**
-   - **full mode:** from aspect and height; the short side is `height`:
-
-     | Aspect | Size at 1080 |
-     |---|---|
-     | 16:9 | 1920×1080 |
-     | 9:16 | 1080×1920 |
-     | 1:1 | 1080×1080 |
-     | 4:5 | 1080×1350 |
-
-     The same ratios apply at 720/1440/2160.
-   - **overlay mode:** the video's display size, scaled so the overlay height is ≤ 1440 (FFmpeg scales it back up, §7.4).
-   - **fps:** full mode uses the chosen 30/60. Overlay mode uses the video's fps rounded to 24/25/30/50/60; variable or unknown fps becomes 30.
-3. **Textures:** the cover art is extracted as in P6 §7.3 into TempDir. The image background is copied by path; the renderer loads both through `MediaService.URLFor`.
-4. **Plan:** write the plan JSON to TempDir. URLs replace paths: the analysis files, textures and the plan itself go through `URLFor`.
-5. `broker.Render(...)`. Progress 0–0.9 from the renderer's frame count; the title is "Rendering visuals — <name>".
-6. **Finish:**
-   - **full mode, no background video:** `MuxOpaque`, using the original or `instrumental.flac`.
-   - **full mode with a background video, or overlay mode:** `CompositeOverlay`. Progress 0.9–1, or 0.5–1 when compositing is the slow part.
-7. **Outputs:**
-   - `<base> (visualizer).mp4` in `Visualizer/`;
-   - **preview:** 10 s from `PreviewStartMs` at the chosen size but at most 1080p, to `<support>/cache/visualizer/preview-<jobID>.mp4`. The result is `{previewPath}`. Previews are pruned at start (more than 1 day old) and when the view unmounts.
-8. **Result:** `{outputs, previewPath, encoder, speed}`, where speed = media seconds ÷ wall seconds.
-
-### 7.2 Render broker and transport (`core/viz/broker.go`, `viz/RenderHost.tsx`, `viz/worker/*`)
-**Broker:**
-- One render at a time (a semaphore). A waiting job shows "Waiting for another render to finish".
-- `Render` creates a token, records `{jobID, tempDir, expectedBytes: 0, nextSeq: 0}`, and emits `viz:render {token, planUrl, jobId}`.
-- **Timeouts:**
-  - no `start` within 20 s → AppError "The visual renderer didn't start", hint "Show Toolbox's window and try again";
-  - no message for 30 s → "The visual renderer stopped responding".
-- **Cancel** (ctx): emits `viz:render-cancel`, waits ≤ 3 s for `cancelled`, then returns `context.Canceled` regardless. Partial files are left to TempDir cleanup.
-
-**RenderHost** (mounted once in `App.tsx` for the main window):
-- It listens for `viz:render` and starts **one** `render.worker.ts` per render, posting `{token, planUrl}`.
-- It relays worker messages to Go with `System.invoke` (Wails runtime).
-- It ignores the echoes Wails sends back (it never adds a `message` listener for them).
-- It relays `viz:render-cancel` and `viz:render-ack` to the worker.
-
-**Worker:**
-1. Fetches the plan and the analysis (§6.2) and loads the textures (`createImageBitmap(await fetch(url).blob())`).
-2. Validates the show. Builds an `Engine` on an `OffscreenCanvas` (twice as tall in overlay mode).
-3. **Picks the encoder (§7.3)**, then sends `start`.
-4. **For each frame i in [0, n):** `tMs = StartMs + i·1000/fps` → `engine.render(tMs)` → `new VideoFrame(canvas, {timestamp: i·1e6/fps})` → `encoder.encode(frame, {keyFrame: i % (2·fps) == 0})` → `frame.close()`.
-5. **Back-pressure:**
-   - The worker waits while `encodeQueueSize > 6`.
-   - It also waits while bytes sent − acked bytes > 16 MiB.
-6. **Batching:** output chunks are packed into ≤ 2 MiB batches and transferred to the main thread, which sends them in order.
-7. **Progress** every 15 frames.
-8. **Finish:** `flush()`, the last batch, then `done`. Any exception → `error` with a message; the worker then exits.
-
-**Raw message format** (pipe-separated; the base64 payload is last):
-```
-vz1|<token>|start|{"encoder":"h264-hw"|"h264-sw"|"jpeg","width":1920,"height":1080,"fps":30,"frames":6420}
-vz1|<token>|data|<seq>|<base64>          // seq 0,1,2,…; decoded ≤ 2 MiB
-vz1|<token>|progress|<frame>|<frames>
-vz1|<token>|done|{"frames":6420,"bytes":91234567}
-vz1|<token>|cancelled
-vz1|<token>|error|{"message":"…","detail":"…"}
-```
-- **Go checks:**
-  - `seq` must equal `nextSeq`; a gap or repeat → error "The renderer sent data out of order".
-  - Base64 must decode.
-  - The total must stay ≤ 8 GiB.
-  - `done.frames` must equal the planned frame count, and the byte count must match.
-- **Writes:** data is appended to `TempDir/video.h264` (or `frames.mjpeg`) by a single writer goroutine. It emits `viz:render-ack` every ≥ 4 MiB.
-- **base64:** `Uint8Array.prototype.toBase64` when present; otherwise a chunked `btoa(String.fromCharCode(...sub))` over 32 KiB slices.
-
-### 7.3 Encoder choice (`viz/worker/encoder.ts`)
-1. **H.264 High:**
-   - Codec `avc1.640028` for ≤ 1920×1088, `avc1.640033` up to 4096×2304 (stacked 1080p overlays are 1920×2160).
-   - Settings: `avc: {format: "annexb"}`, `latencyMode: "quality"`, `bitrateMode: "variable"`, and `hardwareAcceleration: "prefer-hardware"`. If `isConfigSupported` says no, retry with `"prefer-software"`.
-   - **Bitrate:**
-
-     | Output | Bitrate |
-     |---|---|
-     | 720p30 | 8 Mbps |
-     | 1080p30 | 14 Mbps |
-     | 1440p30 | 24 Mbps |
-     | 2160p30 | 45 Mbps |
-
-     60 fps is ×1.5 and overlay stacks are ×1.6. Vertical uses the same pixel-count rule.
-2. **JPEG fallback** (no H.264 encoder):
-   - `canvas.convertToBlob({type: "image/jpeg", quality: 0.92})` per frame, concatenated as MJPEG.
-   - Go transcodes with libx264 (§7.4).
-   - The render log notes "Using the slower JPEG path".
-3. No WebGL2 → error "This computer's graphics can't run the visualizer" (with the GPU string in the detail).
-
-### 7.4 FFmpeg (`core/viz/mux.go`)
-**MuxOpaque:**
-```
-ffmpeg -f h264 -framerate <fps> -i video.h264 [-ss <start> -to <end>] -i <audio>
-       -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out.mp4
-```
-- For MJPEG: `-f mjpeg -framerate <fps> -i frames.mjpeg … -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p`.
-
-**CompositeOverlay** (base = the input video, or a background video looped with `-stream_loop -1`):
-```
-ffmpeg -i <base> -f h264 -framerate <fps> -i overlay.h264 [-i <audio>]
-  -filter_complex "[1:v]split[a][b];[a]crop=iw:ih/2:0:0[c];[b]crop=iw:ih/2:0:ih/2,format=gray[m];
-                   [c][m]alphamerge,scale=<W>:<H>:flags=bicubic[ov];
-                   [0:v]fps=<fps>[bg];[bg][ov]overlay=0:0:format=auto:shortest=1,format=yuv420p[v]"
-  -map "[v]" -map <0:a:0? | 2:a> -c:v libx264 -preset medium -crf 18 -c:a copy|aac -b:a 192k -movflags +faststart out.mp4
-```
-- **Audio:** copied when it's AAC/MP3 and comes from the base; otherwise AAC 192k. In overlay mode the audio is the video's own.
-- **Size:** W×H is the base's display size (rotation applied, as in P6 §3.3), or the plan size for a looping background.
-- Progress comes from `media.ProgressTracker`.
-
----
-
-## 8. Visualizer UI (`tools/visualizer/`)
-
-Steps: **Source → Analyze → Design → Export**.
-
-### 8.1 Source
-- **Drop an audio or video file** (or receive a handoff, §9).
-  - Audio shows the cover and tags. Video shows a still frame plus duration.
-- **Video choice:** "Over the video" (default) or "Use only its sound".
-- **Words (SegmentedControl):**
-  - "Detect from the audio";
-  - "Paste lyrics" (text area);
-  - "From a file" (.lrc/.srt/.vtt/.txt);
-  - "No words".
-  - A handoff pre-selects a fourth option, "From <Lyric Video / Subtitles>".
-  - Language select for detect and paste.
-- **Separate instruments:** a switch, on by default for audio and off for video. Hint: "Lets drums, bass, vocals and other instruments drive different visuals. Takes about as long as the song."
-  - Under it, **"Also save the stems to the Library"** (off by default; §9.7).
-- **Read the mood of the words:** a switch, on by default when words are on. Hint: "A small local model reads how each line feels and what it pictures (fire, rain, stars…), in any language."
-  - Under it, **"Deeper reading with Local Chat"** (off by default; disabled with "Download a model in Local Chat" when none is ready). Hint: "Slower, picks the words to emphasise and catches subtler lines."
-- DepsGate rows appear for:
-  - the engine;
-  - `stems-default` when stems are on;
-  - `whisper-default` when words are detect or paste;
-  - `mood-reader` when mood is on.
-- Footer: **Analyze**.
-
-### 8.2 Analyze
-- Job progress with the stage list:
-  1. Separating instruments
-  2. Listening (beat, chords, sections)
-  3. Finding the words
-  4. Reading the mood
-- Steps that are cached show "✓ from earlier".
-- **The Song Map** is the result, and it stays visible in Design. Lanes, top to bottom, all sharing one time axis with zoom and a playhead:
-  - **sections** as labelled coloured blocks (intro/verse/chorus…);
-  - **beats and bars** as ticks;
-  - **drums** (kick/snare/hats dots), **bass**, **vocals** (energy plus the pitch line), **other**;
-  - **chords** as a strip with names;
-  - **mood** as a colour strip by emotion, with valence as brightness;
-  - **lyrics**: line blocks with emphasised words bold and motif icons.
-- **Summary chips:** tempo, key, sections, "4 instruments", "86 lines · English", and warnings as a Banner.
-- "Re-analyze with different options" goes back to Source and keeps the cache.
-
-### 8.3 Design
-**Left: the preview.**
-- A WebGL canvas at the export aspect (letterboxed), driven by an audio `MediaPlayer` (or the video `MediaPlayer` with the canvas as its overlay in "Over the video" mode).
-- Controls: play/pause, the Song Map below for seeking, "Full screen" (F key; Esc leaves), and a quality toggle (Auto / Full / Draft) with an fps readout.
-
-**Under the preview: "Why" (live).** Up to 4 short facts for the playhead, updated 4× per second. For example:
-> Chorus (B) · energy 0.86 · Kick → Rings 80% · "burning" → Fire motif · Mood: joy → Sunset palette
-
-They are built from the active section, the 3 strongest active mods (amount × current signal), the active motifs and the palette mode.
-
-**Right panel tabs:**
-1. **Presets:**
-   - A grid of cards with live thumbnails from `PresetThumbs` (`components/viz/`, shared with the `VisualsPicker`, §9.1): one hidden `Engine` renders each visible preset at 320×180 at the playhead every 500 ms.
-   - The name and one-line description; "My presets" listed first.
-   - Clicking applies the preset; the current design is kept in undo.
-2. **Look:**
-   - Palette mode and palettes (swatches);
-   - Reactivity, Speed, Intensity, Glow, Grain;
-   - **Visual mix** faders: Drums, Bass, Vocals, Other, Words, Mood;
-   - Motifs on/off;
-   - **Text:** style preset cards, font, size, colours, position, show next line, uppercase, emphasis options, "React to" signal and amount, title card.
-3. **Reactions:**
-   - The preset's `controls` rows. Each row is a label (e.g. "Rings", "Camera", "Background colour"), a driver Select of signal UI names grouped as Instruments, Rhythm, Song, Voice, Words & mood, Drift, and an amount slider (−2..2).
-   - "Add reaction" picks any reactive parameter of any layer (a two-level menu: layer → param) and adds a row.
-   - Rows show a tiny live meter of the driver.
-4. **Layers** (Advanced):
-   - The scenes as tabs (calm/main/full…).
-   - Each scene's layer stack: drag to reorder; toggle; blend; opacity; add from the catalogue grouped by kind with icons; duplicate; delete.
-   - Selecting a layer shows its params. Each numeric param has a ⚡ button that opens its mods list (signal, amount, shape, attack/release).
-   - Post effects per scene and global.
-5. **Timeline:**
-   - Director **Auto / Manual**.
-   - The Song Map's section lane becomes editable: click a section to pick its scene, palette override and transition (with a preview of the transition when played).
-   - "Reset to auto".
-
-**Undo/redo** (Ctrl+Z / Ctrl+Shift+Z, 100 steps) covers every design change.
-- The current design is kept in module state (`visualizer.lastShow`) so it survives a restart. The analysis key is kept per input path, so returning to a file reuses the analysis.
-
-### 8.4 Export
-- **Size:**
-  - Aspect (16:9 / 9:16 / 1:1 / 4:5; hidden in overlay mode, which keeps the video's shape);
-  - Quality (720p / 1080p / 1440p / 2160p — 2160p only when the encoder supports it, checked with `isConfigSupported`);
-  - FPS (30/60; overlay mode follows the video).
-- **Range:** whole song, or the selection on the Song Map (shift-drag).
-- **Audio:** Original / Instrumental (with stems).
-- **Background** (full mode): none / cover art / image… / video… (looped under the visuals; this uses the overlay composite).
-- **Buttons:**
-  - "Render 10 s preview" from the playhead → plays the clip.
-  - "Render video" → progress with fps and "×N real time", then a result card (video, Open, Show in folder, Send to).
-- If the encoder is the JPEG fallback, a note says "This computer can't encode video in the window, so rendering will be slower."
-
----
-
-## 9. Visuals in Lyric Video and Subtitles
-
-- **With lyrics:** Lyric Video's wizard gets a **Visuals step**.
-- **Without:** Subtitles' "burn into a video", which now also works from an audio file, gets a **Visuals** choice.
-- In both, the user picks either:
-  - **Quick:** a card that moves to your own song, then render;
-  - **Full designer:** everything the Visualizer can do, embedded in the step, fed by the tool's own lyrics or cues and by the separated instruments.
-- The tool keeps drawing its own words on top.
-
-### 9.1 `VisualsPicker` (`frontend/src/components/viz/VisualsPicker.tsx`, shared)
-```ts
-interface VisualsPickerProps {
-  inputPath: string;                 // the song / audio / video the tool works on
-  lines: TimedLine[] | null;         // the tool's timed text (lyrics or cues), for word reactions and mood
-  value: VisualsSpec | null;         // { showJson, stems, useWords } (= core/viz.VisualsSpec)
-  onChange(v: VisualsSpec): void;
-  mode: "background" | "overlay";    // overlay = over a video (background layers dropped)
-  aspect: number;                    // the tool's output aspect, for the thumbnails
-  playheadMs?: number;               // the tool's player position, if it has one
-}
-```
-**What it shows, top to bottom:**
-1. **Listening (only when needed).**
-   - `VisualizerService.AnalysisFor(path, stems)` is checked first.
-   - If there is no analysis yet, it submits a `visualizer` analyze job by itself: stems as chosen (off by default), words `given` from `lines` when `useWords`, mood on when the reader is installed.
-   - Inline progress shows "Listening to the song… 40%" (about 10 s without stems). The cards show still previews until it finishes.
-2. **Cards:**
-   - "My designs" (saved in the Visualizer), then the 20 presets. In `overlay` mode the overlay presets come first.
-   - Each card is a **live thumbnail reacting to this file**, rendered by the shared thumbnail engine (§8.3), at the tool's playhead or, without a player, looping the loudest 8 s.
-   - A click selects the card.
-3. **Two simple controls:**
-   - **Intensity** (`show.reactivity`, 0–2);
-   - **Colours**: "Design's own" or one of 8 palette swatches, which sets `palette = {mode: "fixed"}`.
-4. **Two switches:**
-   - "Separate instruments", with the hint "richer reactions; takes about as long as the song". It re-analyses.
-   - "React to the words" (`useWords`, shown when `lines` exist, on by default).
-5. **"Open the full designer"**, a secondary button. It switches the step to the embedded designer (§9.4), keeping the selection.
-
-**Around it:**
-- The picker never renders text: the tool draws its own words.
-- `VisualsCanvas` (same folder) is the live background for the tools' previews: `{spec, analysis, timeMs, aspect}` → a WebGL canvas with one shared `Engine`.
-
-### 9.2 Lyric Video
-- **`Look`:**
-  - `Background` gains `"visualizer"`.
-  - `Look` gains `Visuals viz.VisualsSpec` (`json:"visuals"`).
-  - The default stays `blur-cover` until the user picks visuals.
-- **Wizard steps: Song → Lyrics → Visuals → Look → Render.** The new Visuals step sits between Lyrics and Look.
-- **Visuals step:**
-  - **Top: "Instruments" panel.**
-    - "Separate instruments (drums, bass, vocals, other)" switch: on by default when `stems-default` is installed; DepsGate otherwise.
-    - "Also save the stems to the Library" checkbox (off by default): the 4 FLAC stems go to `Stems/<song>/`, named as the Stems tool names them (`AnalyzeOptions.SaveStems`, §9.7).
-    - The separation and the listening start by themselves when the step opens. It is one `visualizer` analyze job with the lyric sheet as `given` words and the mood reader on, cached, with progress inline.
-    - When separation is done, the Song Map's instrument lanes appear. The Song step's Audio choice (Original / Instrumental) then uses the 4-stem instrumental when there is one.
-  - **A SegmentedControl:**
-    - **Quick:** the `VisualsPicker`.
-    - **Full designer:** the embedded `VisualDesigner` (§9.4), with the Song Map, Presets, Look (colours and motion), Reactions, Layers, Timeline and the Why readout. The words are drawn as Lyric Video's own preview text over the designer's canvas.
-    - **Classic background:** no visuals; the Look step shows the P6 backgrounds.
-  - The step's footer shows the chosen design ("Golden Hour", "Custom design" or "Classic") and Next.
-- **Look step:**
-  - With visuals, the background area shows "Visuals: <design>" with a "Change" link back to the Visuals step. Text options are unchanged.
-  - The live preview's background becomes `VisualsCanvas` under the existing HTML lyrics. The "approximate" note stays; Render preview is exact.
-  - The old `Visualiser` strip option (wave/bars) is hidden with visuals.
-- **Render / preview** (`render.go`), with `Background == "visualizer"`:
-  1. `viz.RenderVisuals(…, mode "opaque", w×h of the canvas, 30 fps, lines = the sheet when UseWords)`. Progress 0–0.6, or 0–0.8 for preview. Preview renders only the 10 s range.
-  2. The FFmpeg graph takes `-f h264 -framerate 30 -i visuals.h264` as its background input instead of the cover/colour source. The ASS lyrics, title card and audio (original or instrumental) are unchanged. Progress 0.6–1.
-  - Validate: `"visualizer"` needs `Visuals.ShowJSON` (≤ 512 KiB).
-- **"Make the whole video in Visualizer"**, a link in the Visuals step: hands off `{inputs: [song], seed: {kind: "timed-text", from: "lyric-video", lines, look}}` for reactive karaoke words drawn by the engine (§9.5).
-
-### 9.3 Subtitles
-- **`Cue` gains `Words []CueWord`** (`json:"words,omitempty"`, `CueWord {startMs, endMs, text}`):
-  - Generate fills it from the Whisper words it already reads.
-  - Editing a cue's text re-spreads its words by character share. Shifting times shifts the words.
-  - Split and merge split or concatenate them.
-  - `.srt`/`.vtt` saving ignores them, and loading files leaves them empty.
-- **Burn from an audio file** (new; today burn needs a video). New options:
-  ```go
-  Canvas          string           `json:"canvas"`          // burn, audio input: "16:9" | "9:16" | "1:1"
-  CanvasHeight    int              `json:"canvasHeight"`    // 720 | 1080 (short side)
-  Background      string           `json:"background"`      // burn, audio input: "visualizer" | "color" | "image"
-  BackgroundColor string           `json:"backgroundColor"` // #rrggbb
-  BackgroundPath  string           `json:"backgroundPath"`  // image
-  Visuals         *viz.VisualsSpec `json:"visuals"`         // audio: the background design; video: optional overlay visuals
-  ```
-  - Visualizer background: `RenderVisuals(opaque, canvas size, 30 fps, lines = cues)` → `MuxOpaque` with the ASS burned in (§9.6) and the input's audio.
-  - Colour: a `color` source. Image: fill + crop.
-  - The output is `<base> (subtitled).mp4`, with the font size rules of P6 §5.4 applied to the canvas.
-- **Burn onto a video with visuals** (optional): with `Visuals` set, `RenderVisuals(overlay, the video's size, its fps, lines = cues)` → `CompositeOverlay` with the ASS burned in **after** the overlay, so subtitles stay on top and readable.
-- **Export step:**
-  - The Burn card gains a **"Visuals"** row.
-  - **For a video:** "None" (default) or "Add visuals over the video". The latter shows Quick (`VisualsPicker`, `overlay` mode) and "Open the full designer".
-  - **For audio:** the burn card is now enabled and titled **"Make a video"**, with Canvas, Quality and Background: **Visualizer (default)** / colour / image.
-    - Visualizer shows the "Separate instruments" switch (off by default here; speech rarely needs it), Quick (`VisualsPicker`, `background` mode) and "Open the full designer".
-  - **"Open the full designer"** opens the embedded `VisualDesigner` in a full-height sheet over the Subtitles view. The cues are its `given` words and are drawn as the burn-style preview text. "Done" closes the sheet and keeps the design; Esc asks to discard changes.
-  - The burn style's mini preview draws the cue over `VisualsCanvas` (or the colour or image) at the current time.
-- **"Make it fully reactive in Visualizer"**, a link: hands off `{inputs: [file], seed: {kind: "timed-text", from: "subtitles", lines: cues, overlay: <is video>}}`.
-
-### 9.4 The embedded designer (`tools/visualizer/designer/VisualDesigner.tsx`)
-The Visualizer's Design step (§8.3) is built as one component, so Lyric Video and Subtitles can embed it.
-```ts
-interface VisualDesignerProps {
-  inputPath: string;
-  analysis: Analysis;                 // loaded by the host (useVisualsAnalysis)
-  show: Show;
-  onChange(show: Show): void;         // every edit; the host owns undo (useShowHistory, exported too)
-  aspect: number;                     // locked when the host fixes the output shape
-  mode: "full" | "overlay";
-  player: MediaPlayerHandle | null;   // the host's player drives time; null = the designer's own audio player
-  text: "engine" | { overlay: (rect: ContentRect, timeMs: number) => ReactNode }; // engine text (Visualizer) or the host's preview text
-  tabs?: Array<"presets" | "look" | "reactions" | "layers" | "timeline">;          // default: all
-  onSavePreset?(show: Show): void;    // "Save as my preset" (writes visualizer.myPresets)
-}
-```
-- **Inside the Visualizer:** `text: "engine"` and the Look tab includes the text section.
-- **Inside Lyric Video and Subtitles:** the host's overlay draws its words, and the Look tab hides the text section. Shows passed to `RenderVisuals` always have `text: null`.
-- **Shared hooks** (`tools/visualizer/designer/`):
-  - `useVisualsAnalysis(path, {stems, saveStems, lines, mood})`: looks up `AnalysisFor`, submits the analyze job when needed, follows its progress, and loads the files;
-  - `useShowHistory(initial)`: undo and redo, 100 steps.
-- **State:** the hosts keep their design in their own options and module state, and their sheets and cues in their view stores. Nothing is handed between tools.
-
-**The handoff seed** (only for sending timed text to the Visualizer, §9.5):
-```ts
-// state/ui.ts
-export interface Handoff { moduleId: string; inputs: string[]; seed?: ToolSeed }
-export type ToolSeed = {
-  kind: "timed-text"; from: "lyric-video" | "subtitles"; lines: TimedLine[];
-  look?: { font: string; textColor: string; highlightColor: string; karaoke: boolean; position: "center" | "lower" };
-  overlay?: boolean;
-};
-```
-
-### 9.5 Timed text into the Visualizer
-The Visualizer reads a `timed-text` seed on `takeHandoff`:
-- Words become "From Lyric Video/Subtitles" (`Words: "given"` with those lines).
-- The look's font and colours prefill the text style.
-- From Lyric Video, the **Lyric Stage** preset is selected; from Subtitles, **Clean Captions**, in "Over the video" mode when `overlay`.
-
-### 9.6 FFmpeg helpers with burned text
-`MuxOpaque` and `CompositeOverlay` (§7.4) take an optional `ass string`, a file name in the job's TempDir.
-- When it is set, FFmpeg runs with TempDir as its working directory (P6 §3.3).
-- `,ass=subs.ass` is appended to the final video chain (after `overlay` in the composite).
-- `MuxOpaque` then re-encodes (`libx264 -preset medium -crf 18 -pix_fmt yuv420p`) instead of copying.
-
-### 9.7 Saving stems from an analysis
-- `viz.AnalyzeOptions` gains `SaveStems bool` (`json:"saveStems"`), which only applies with `Stems`.
-- After separation, the analyze job copies the 4 FLAC stems into the Library as outputs under `Stems/<base>/`, named `<base> - <Stem>.flac` as `stems.separate` names them in the Stems tool (P2 §6). It does this before deleting its own copies.
-- If the analysis is cached and the stems were already deleted, separation runs again (the features are reused).
-
----
-
-## 10. Bound API changes (summary)
-- **New:** `visualizer.Service`:
-  - `Defaults() Options`
-  - `Enqueue(inputs []string, opts Options) ([]core.Job, error)`
-  - `Analysis(key string) (viz.AnalysisRef, error)`
-  - `AnalysisFor(path string, stems bool) (viz.AnalysisRef, bool)` (reuse on return)
-  - `Fonts() []string`
-  - `ChatStatus() (model string, ready bool)`
-- **`visualizer.Options`:**
 ```go
-type Action string // "analyze" | "render" | "preview"
-type Mode string   // "full" | "overlay"
-type Options struct {
-    Action  Action             `json:"action"`
-    Analyze viz.AnalyzeOptions `json:"analyze"`        // analyze
-    AnalysisKey string         `json:"analysisKey"`    // render/preview
-    ShowJSON    string         `json:"showJson"`       // ≤ 512 KiB
-    Mode        Mode           `json:"mode"`
-    Aspect      string         `json:"aspect"`         // "16:9" | "9:16" | "1:1" | "4:5" (full)
-    Height      int            `json:"height"`         // 720 | 1080 | 1440 | 2160 (short side, full)
-    FPS         int            `json:"fps"`            // 30 | 60 (full)
-    StartMs     int64          `json:"startMs"`        // 0 = start
-    EndMs       int64          `json:"endMs"`          // 0 = end
-    Audio       string         `json:"audio"`          // "original" | "instrumental"
-    Background  string         `json:"background"`     // "none" | "cover" | "image" | "video" (full)
-    BackgroundPath string      `json:"backgroundPath"`
-    PreviewStartMs int64       `json:"previewStartMs"`
-    Seed        int64          `json:"seed"`
+// Pipeline is a saved chain of steps.
+type Pipeline struct {
+	ID          string         `json:"id"`          // ULID; "" when unsaved
+	Name        string         `json:"name"`        // 1–80 chars, unique ignoring case
+	Description string         `json:"description"` // ≤ 300 chars
+	TemplateID  string         `json:"templateId"`  // the template it came from ("" = blank)
+	Steps       []PipelineStep `json:"steps"`       // 1–30
+	Watch       WatchConfig    `json:"watch"`
+	CreatedAt   int64          `json:"createdAt"`
+	UpdatedAt   int64          `json:"updatedAt"`
 }
-type Result struct {
-    Action      Action           `json:"action"`
-    Analysis    *viz.AnalysisRef `json:"analysis"`    // analyze
-    PreviewPath string           `json:"previewPath"` // preview
-    Outputs     []string         `json:"outputs"`     // render
-    Encoder     string           `json:"encoder"`
-    Speed       float64          `json:"speed"`
+
+// PipelineStep is one step of a pipeline.
+type PipelineStep struct {
+	ID           string     `json:"id"`           // 8 chars [a-z0-9], unique in the pipeline; not "input"/"none"
+	Type         string     `json:"type"`         // StepType.ID
+	Label        string     `json:"label"`        // optional title (≤ 60); "" = the type's name
+	OptionsJSON  string     `json:"optionsJson"`  // the type's step options; "{}" for manual and check steps
+	From         string     `json:"from"`         // "input" | "none" | an earlier step's ID
+	Filter       StepFilter `json:"filter"`
+	Manual       bool       `json:"manual"`       // "I'll do this step myself"
+	AutoContinue bool       `json:"autoContinue"` // manual: continue when an adopted job finishes with files
+	Keep         bool       `json:"keep"`         // keep this step's files in the Library after the run
+	Note         string     `json:"note"`         // manual/check: shown on the "needs you" card (≤ 200)
+}
+
+// StepFilter narrows the files a step reads. Empty fields match anything;
+// all set fields must match.
+type StepFilter struct {
+	Roles []string     `json:"roles"`
+	Kinds []OutputKind `json:"kinds"`
+	Exts  []string     `json:"exts"` // lowercase with the dot
+	Name  string       `json:"name"` // case-insensitive substring of the file name
+}
+
+// WatchConfig is a pipeline's watch folder.
+type WatchConfig struct {
+	Enabled bool   `json:"enabled"`
+	Folder  string `json:"folder"` // absolute
+}
+
+// StepType is an entry of the step catalogue.
+type StepType struct {
+	ID           string   `json:"id"`       // module ID, or "pipelines.<action>", or "pipelines.check"
+	ModuleID     string   `json:"moduleId"` // the module whose jobs it runs ("" for check)
+	Name         string   `json:"name"`
+	Icon         string   `json:"icon"`
+	Category     Category `json:"category"`
+	Description  string   `json:"description"` // one sentence for the Add-step menu
+	Auto         bool     `json:"auto"`        // can run automatically
+	Manual       bool     `json:"manual"`      // can be done by hand in its tool
+	Builtin      bool     `json:"builtin"`
+	Accepts      Accepts  `json:"accepts"`     // the widest it reads, over all options
+	DefaultsJSON string   `json:"defaultsJson"`
+}
+
+// StepInfo is what a step does with given options (core.Chainable.DescribeStep).
+type StepInfo struct {
+	Accepts   Accepts       `json:"accepts"`
+	Produces  []StepProduct `json:"produces"`
+	Vars      []StepVar     `json:"vars"`
+	Together  bool          `json:"together"`
+	NoFiles   bool          `json:"noFiles"`   // may run with From "none" or zero files
+	Secrets   []StepSecret  `json:"secrets"`   // asked for when a run starts; never stored
+	Templates []string      `json:"templates"` // JSON pointers of option strings that take {vars}
+	Warnings  []string      `json:"warnings"`  // e.g. "Download a model in Local Chat first"
+	Summary   string        `json:"summary"`   // one line, e.g. "MP4 · H.264 · ≤ 1080p"
+}
+
+// StepProduct is one kind of file a step makes.
+type StepProduct struct {
+	Role  string     `json:"role"`  // stable: "vocals", "video", "subtitles"; "" = the main file
+	Label string     `json:"label"` // "Vocals"
+	Kind  OutputKind `json:"kind"`  // "" = same as its input
+	Exts  []string   `json:"exts"`  // nil = same as its input
+	Many  bool       `json:"many"`  // may make several of this per item
+}
+
+type StepVar struct {
+	Name  string `json:"name"`
+	Label string `json:"label"`
+}
+
+type StepSecret struct {
+	Key   string `json:"key"`   // unique within the step
+	Label string `json:"label"` // "PDF password"
+}
+
+// PipelineCheck is Describe's answer for a whole pipeline.
+type PipelineCheck struct {
+	Steps    []StepCheck   `json:"steps"`    // same order as the pipeline's
+	Accepts  Accepts       `json:"accepts"`  // what a run takes: the union over steps with From "input"
+	Problems []string      `json:"problems"` // pipeline-level: name, no steps, too many steps, watch folder
+	Secrets  []SecretAsk   `json:"secrets"`  // asked for at Start
+	Missing  []string      `json:"missing"`  // dep IDs not installed (descriptor Requires of its modules)
+	Ready    bool          `json:"ready"`    // no problems anywhere and nothing missing
+}
+
+type StepCheck struct {
+	StepID   string   `json:"stepId"`
+	Info     StepInfo `json:"info"`     // Produces resolved: no "same as input" left (§8.8)
+	Problems []string `json:"problems"` // block running
+	Vars     []StepVar `json:"vars"`    // variables this step can use: built-ins + earlier steps'
+}
+
+type SecretAsk struct {
+	StepID string `json:"stepId"`
+	Key    string `json:"key"`
+	Label  string `json:"label"` // "Step 3 · PDF password"
+}
+
+// PipelineEntry is a pipeline as listed (pipelines:changed carries all of them).
+type PipelineEntry struct {
+	Pipeline Pipeline      `json:"pipeline"`
+	Check    PipelineCheck `json:"check"`
+	Watch    WatchState    `json:"watch"`
+	LastRun  *RunBrief     `json:"lastRun"`
+}
+
+type WatchState struct {
+	Active  bool   `json:"active"`  // enabled and polling
+	Message string `json:"message"` // "" = fine; else why it's paused ("Fix the problems in step 2")
+}
+
+type RunBrief struct {
+	ID        string    `json:"id"`
+	Status    RunStatus `json:"status"`
+	CreatedAt int64     `json:"createdAt"`
+}
+
+type PipelineTemplate struct {
+	ID       string   `json:"id"`
+	Blurb    string   `json:"blurb"` // one sentence
+	Icon     string   `json:"icon"`
+	Packs    []string `json:"packs"` // pack IDs it needs (for the "needs" chip)
+	Pipeline Pipeline `json:"pipeline"`
+}
+
+type RunStatus string
+
+const (
+	RunRunning   RunStatus = "running"
+	RunWaiting   RunStatus = "waiting"   // at least one cell needs the user
+	RunDone      RunStatus = "done"      // every item succeeded
+	RunPartial   RunStatus = "partial"   // some items failed, cancelled or blocked
+	RunFailed    RunStatus = "failed"    // no item succeeded
+	RunCancelled RunStatus = "cancelled" // the user cancelled the run
+)
+
+type CellStatus string
+
+const (
+	CellPending   CellStatus = "pending"
+	CellPreparing CellStatus = "preparing"
+	CellRunning   CellStatus = "running"
+	CellWaiting   CellStatus = "waiting" // Wait says why
+	CellDone      CellStatus = "done"
+	CellFailed    CellStatus = "failed"
+	CellCancelled CellStatus = "cancelled"
+	CellSkipped   CellStatus = "skipped"
+	CellBlocked   CellStatus = "blocked" // an earlier cell failed or was cancelled
+	CellMerged    CellStatus = "merged"  // gathered into a merged item at this together step
+	CellNone      CellStatus = "none"    // not applicable (merged items before their merge; items after it)
+)
+
+type WaitKind string
+
+const (
+	WaitManual    WaitKind = "manual"    // do this step in its tool
+	WaitCheck     WaitKind = "check"     // look at the files
+	WaitCondition WaitKind = "condition" // e.g. "Unlock the Vault to continue"; retried every 5 s
+)
+
+type PipelineRun struct {
+	ID         string         `json:"id"`
+	PipelineID string         `json:"pipelineId"`
+	Name       string         `json:"name"`  // the pipeline's name at start
+	Steps      []PipelineStep `json:"steps"` // snapshot
+	Status     RunStatus      `json:"status"`
+	Trigger    string         `json:"trigger"` // "manual" | "watch"
+	Inputs     []string       `json:"inputs"`
+	Items      []RunItem      `json:"items"`
+	NeedsYou   int            `json:"needsYou"` // cells waiting with WaitManual or WaitCheck
+	Error      string         `json:"error"`    // run-level, e.g. a failed preflight
+	Cleaned    bool           `json:"cleaned"`  // temporary files were deleted
+	CreatedAt  int64          `json:"createdAt"`
+	FinishedAt int64          `json:"finishedAt"`
+}
+
+type RunItem struct {
+	Index    int               `json:"index"`    // 0-based; merged items take the next free index
+	Label    string            `json:"label"`    // input name, the download title, or "All 12 files"
+	Input    string            `json:"input"`    // "" for merged items
+	Merged   []int             `json:"merged"`   // merged item: the items it gathers
+	MergedAt string            `json:"mergedAt"` // merged item: the together step that made it
+	Cells    []RunCell         `json:"cells"`    // one per step, same order
+	Vars     map[string]string `json:"vars"`     // previews: ≤ 300 chars each
+}
+
+type RunCell struct {
+	StepID     string     `json:"stepId"`
+	Status     CellStatus `json:"status"`
+	Wait       WaitKind   `json:"wait"` // when waiting
+	JobIDs     []string   `json:"jobIds"`
+	Inputs     []RunFile  `json:"inputs"` // what it was given
+	Files      []RunFile  `json:"files"`  // what it made (check: what was kept)
+	Message    string     `json:"message"`
+	ErrorCode  ErrorCode  `json:"errorCode"`
+	Error      string     `json:"error"`
+	ErrorHint  string     `json:"errorHint"`
+	StartedAt  int64      `json:"startedAt"`
+	FinishedAt int64      `json:"finishedAt"`
+}
+
+type RunFile struct {
+	Path      string     `json:"path"`
+	Name      string     `json:"name"`
+	Kind      OutputKind `json:"kind"`
+	Role      string     `json:"role"`
+	RoleLabel string     `json:"roleLabel"`
+	OutputID  string     `json:"outputId"`  // "" when not a Library output (a run input, a link)
+	Temporary bool       `json:"temporary"` // deleted when the run is cleaned up
+	Missing   bool       `json:"missing"`   // computed when a run is read
+}
+
+type RunRequest struct {
+	PipelineID string            `json:"pipelineId"`
+	Inputs     []string          `json:"inputs"`  // paths or http(s) links; 1–200
+	Secrets    map[string]string `json:"secrets"` // "<stepId>.<key>" → value
+}
+
+type RunFilter struct {
+	PipelineID string `json:"pipelineId"` // "" = all
+	ActiveOnly bool   `json:"activeOnly"`
+	Limit      int    `json:"limit"` // default 50, max 200
+}
+
+type ContinueRequest struct {
+	RunID  string   `json:"runId"`
+	Item   int      `json:"item"`
+	StepID string   `json:"stepId"`
+	// Keep lists the paths to carry on (check: a subset of the inputs; manual:
+	// a subset of the adopted files). nil = all.
+	Keep []string `json:"keep"`
+	// PassThrough (manual): continue with the step's inputs unchanged.
+	PassThrough bool `json:"passThrough"`
+}
+
+// PipelinesChanged is the payload of pipelines:changed.
+type PipelinesChanged struct {
+	Pipelines []PipelineEntry `json:"pipelines"`
+}
+
+// RunsRemoved is the payload of pipelines:runs-removed.
+type RunsRemoved struct {
+	IDs []string `json:"ids"`
 }
 ```
-- **`visualizer.Module`** implements `core.ModelProvider` (preset `mood`).
-- **`lyricvideo.Look`:** `Background` gains `"visualizer"` and a new `Visuals viz.VisualsSpec` field.
-- **`subtitles`:**
-  - `Cue` gains `Words`.
-  - `Options` gains `Canvas`, `CanvasHeight`, `Background`, `BackgroundColor`, `BackgroundPath` and `Visuals`.
-  - `Validate` allows burn on an audio input when a background is set.
-- **`Handoff`** gains `seed` (§9.4).
-- **New events:** `viz:render`, `viz:render-ack` and `viz:render-cancel` (§4.5).
+
+**Job changes** (`core/types.go`):
+- `Job` gains `PipelineRunID string \`json:"pipelineRunId"\`` and `PipelineStepID string \`json:"pipelineStepId"\``. Both are "" for ordinary jobs.
+
+**New error code:**
+- `CodeWaiting ErrorCode = "waiting"`, plus `core.ErrWaiting(message, hint string) *AppError`. An adapter returns it from `PrepareStep` when a condition must clear first.
+
+**New event names** (`core/events.go`):
+- `EventPipelinesChanged = "pipelines:changed"` carries `PipelinesChanged`.
+- `EventPipelinesRun = "pipelines:run"` carries `PipelineRun`, throttled to one per 250 ms per run, with the latest snapshot always delivered.
+- `EventPipelinesRunsRemoved = "pipelines:runs-removed"` carries `RunsRemoved`.
 
 ---
 
-## 11. Test plan
+## 6. Step adapters
 
-### 11.1 Go
-- **`core/lyrics`:** the moved Lyric Video tests, plus `SpreadWords` and `WordsToLines` edge cases.
-- **`core/viz`:**
-  - **Broker**, with a fake raw-message source:
-    - happy path and ordering;
-    - seq gap or repeat; wrong token; wrong origin; child frame;
-    - start and idle timeouts; cancel; ack cadence;
-    - frame/byte mismatch; the 8 GiB cap.
-  - **Plan writing:** URLs, not paths.
-  - **Mux / composite** arg tables: rotation, VFR → 30, audio copy vs AAC, loop base, MJPEG.
-  - **Cache:** keys, reuse per step, prune by age and size.
-  - **Mood:**
-    - the reader result is mapped into `text.json`;
-    - a missing reader → music mood plus a warning;
-    - with a fake `TextGenerator`, the chat merge rules (confidence < 0.5 replaces; the motif union capped at 3).
-  - **Deeper reading:** with a fake `TextGenerator`:
-    - batching and context lines;
-    - schema retries and the line-by-line fallback;
-    - emphasis filtering;
-    - mood blending and the no-model keyframes;
-    - the emotion table.
-- **`modules/visualizer`:**
-  - `Validate` tables;
-  - `Run` analyze and render against fakes (a fake engine caller, a fake broker that writes a canned H.264);
-  - outputs and result fields.
-- **`core/viz` SaveStems:** stems are copied as outputs with Stems-tool names before deletion; on a cached analysis without stems, separation runs again.
-- **`core/viz.RenderVisuals`:** with fakes. The show's text is forced to null, progress maps into [p0, p1], the analysis is reused when cached, and lines are passed as `given` words.
-- **`modules/subtitles`:**
-  - words carried through generate, edit, split, merge and shift;
-  - burn from audio: Validate (canvas and background rules), and the argument graph for visualizer, colour and image backgrounds;
-  - burn on video with `Visuals`: overlay then ASS.
-- **`modules/lyricvideo`:** the `visualizer` background replaces the background input in the graph; preview renders only its 10 s range; Validate needs `Visuals.ShowJSON`.
-- **`modules/visualizer`:** `ModelPresent`/`FetchModel` for `mood`, with the OS-specific file chosen by `runtime.GOOS/GOARCH`.
-- **Integration** (`-tags integration`):
-  - `MuxOpaque` and `CompositeOverlay` with a libx264 Annex-B stream generated by FFmpeg in the test as the "renderer output". The test checks:
-    - the frame count, duration and audio;
-    - the overlay alpha: a known red square with half alpha over a grey video gives the expected pixel ±3.
+### 6.1 The interface (`core/steps.go`, new)
 
-### 11.2 Python (`sidecar/tests/test_viz.py`, generated signals like `analysis_bench.py`)
-- **Tempo** within ±1 bpm on the 120 bpm track; beat count ±2; the downbeat phase matches the kick pattern (bar-level kick accent).
-- **Chords:** a 4-chord loop (Am F C G) is ≥ 85% correct per beat; key A minor or C major in the top 2.
-- **Sections:**
-  - a boundary within ±1 bar of a +8 dB jump, labelled `drop`;
-  - the intro is detected for a quiet first 16 s;
-  - the repeated loud group is labelled `chorus`.
-- **Pitch:** a synthetic sung sine at MIDI 64 for 1 s gives a held note `[…, 64]`; unvoiced noise gives none.
-- **Features:**
-  - shapes, block offsets and the u8 range;
-  - `fps` 30 for a fake 21-minute duration (mocked length);
-  - a 61-minute input is a validation error.
-- **Stem fallbacks** produce the same channel ids without stems.
-- **Mood reader** (`test_viz_mood.py`):
-  - The labelled set `tests/data/mood_lines.json` has ≥ 120 lines written for the tests, ≥ 25 of them non-English across ≥ 5 languages, with an emotion and motifs for each. The 34 lines of `.dev/p7-research/nlp/bench.py` are a seed, and none of them may be an anchor.
-  - The test runs only when the model is present (`TOOLBOX_SLOW=1` downloads it).
-  - Targets: emotion accuracy ≥ 0.75 overall and ≥ 0.6 on non-English; motif precision ≥ 0.8 with recall ≥ 0.5.
-  - Unit tests without the model use a fake encoder: pooling and normalisation, the anchor cache key, the valence/energy softmax table, empty and symbol-only lines.
-- **Slow** (`TOOLBOX_SLOW=1`): real `htdemucs` on a 20 s mix, then `viz.analyze` with stems.
+```go
+// Chainable is implemented by modules that can run as automatic pipeline
+// steps (SPEC.md §6). Implementations live in modules/<id>/pipeline.go.
+type Chainable interface {
+	// StepDefaults returns the options a new step starts with (JSON-marshalable).
+	StepDefaults() any
+	// DescribeStep checks options without inputs and says what the step
+	// takes and makes. Return ValidationError for bad options.
+	DescribeStep(options json.RawMessage) (StepInfo, error)
+	// PrepareStep turns one item's files (or, when Together, every merged
+	// item's) into job submissions for this module. It may probe the files.
+	// ErrWaiting(...) means "not yet": the runner retries every 5 s.
+	PrepareStep(ctx context.Context, req StepRequest) ([]StepJob, error)
+	// StepOutputs reads a finished (done) job back: its files with roles,
+	// and its variables. It may read the output files (≤ 1 MiB of text).
+	StepOutputs(job Job) (StepResult, error)
+}
 
-### 11.3 Frontend (Vitest, jsdom, no WebGL)
-- **`analysis.ts`:** ranged fetch reassembly (a mocked 206 sequence), sampling and interpolation, prefix sums, event queries, schema version errors.
-- **`signals.ts`:** pulses (τ and strength), envelopes (attack/release on a step), fallbacks without stems or words, the modulation formula with mix gains, reactivity and clamping.
-- **`palette.ts`:** OKLab round trip; `journey` at 0, 0.5 and 1; mood crossfade timing; chord hue rotation.
-- **`director.ts`:** the auto timeline on a fixture analysis (labels → scenes, downbeat snapping, the drop flash, motif insertion and the cap of 2), and manual overrides.
-- **`types.ts`:** `validateShow` (every rule in §6.4). **Every preset validates.** Every preset only references existing layers, params and signals, and has ≥ 3 `controls`.
-- **Transport:** batching ≤ 2 MiB, seq numbering, base64 fallback equals native, back-pressure waits on acks, message format.
-- **Text layout:** wrap and safe areas at 16:9 and 9:16 with a stub `measureText`; animation timing functions.
-- **UI:**
-  - Source options and DepsGate visibility;
-  - the analyze stage list from job progress;
-  - Song Map lanes render from a fixture;
-  - Reactions add, change and remove update the show; Layers reorder and delete;
-  - undo/redo;
-  - Export option rules (2160p gating, overlay hiding aspect);
-  - the `timed-text` seed prefills the Source;
-  - `VisualDesigner` works with the host's text overlay and a locked aspect, hides the text section, and never puts text into the show it emits;
-  - `useVisualsAnalysis` reuses a cached analysis, submits one with `saveStems` when asked, and reports progress.
-- **`VisualsPicker`:**
-  - it starts an analysis only when `AnalysisFor` misses, and shows its progress;
-  - selecting a card calls `onChange` with that preset's show;
-  - Intensity and Colours edit the show;
-  - "Open the full designer" keeps the selection.
-- **Lyric Video:**
-  - the wizard has the Visuals step;
-  - analysis starts on entering it, with the sheet as words;
-  - Quick, Full designer and Classic switch correctly and persist;
-  - "Also save the stems" sets `saveStems`;
-  - Look shows "Visuals: <design>" and hides the strip option;
-  - the "whole video" link hands off `timed-text`.
-- **Subtitles:**
-  - an audio input enables "Make a video" with Visualizer as the default background;
-  - a video input shows the Visuals row with None as the default;
-  - the designer sheet keeps the design on Done and asks before discarding on Esc.
+type StepRequest struct {
+	RunID    string
+	StepID   string
+	Pipeline string            // the pipeline's name
+	Options  json.RawMessage   // the step's options, unexpanded
+	Item     StepItem          // each-item steps
+	Items    []StepItem        // together steps: every merged item, in order (§4.2 rule 5)
+	Secrets  map[string]string // this step's secrets by key
+	Started  int64             // the run's start (for {date}/{time})
+}
 
-### 11.4 Visual lab and checks (`viz/lab/VizLab.tsx`, `TOOLBOX_VIZLAB=1`)
-- A dev-only view (`TOOLBOX_VIEW=vizlab` with `TOOLBOX_VIZLAB=1`; otherwise the route doesn't exist):
-  1. loads a fixture analysis from `.dev/p7/fixture/` (any analysed song);
-  2. renders every preset at 5 moments (intro, verse, chorus, drop or loudest bar, outro) at 960×540;
-  3. sends PNGs over the raw channel (`vzlab|…`, accepted only with that env var) into `<support>/tmp/vizlab/<preset>-<moment>.png`;
-  4. writes `fps.json` (mean fps of 300 preview frames per preset at 1280×720) and `hash.json` (pixel hashes of 10 frames per preset).
-- Builders of layers and presets use it to see their work (they can read PNGs).
-- The architect reviews the contact sheets in Wave 3.
-- **Determinism check:** two lab runs produce the same `hash.json`.
-- **Parity check:** the lab renders frames via the export worker path (encode skipped, `readPixels` hashed) and the preview path, and compares them.
+type StepItem struct {
+	Index int
+	Label string
+	Files []RunFile         // already filtered and accepted
+	Vars  map[string]string // built-ins + every earlier step's
+}
 
-### 11.5 Mac checklist (new steps)
-1. The preview renders and plays in sync.
-2. Export uses `h264-hw` (render log) at ≥ 2× real time at 1080p.
-3. Exporting with the window hidden works.
-4. Raw-message throughput: a 4-minute export finishes and `done` arrives without timeouts.
-5. Text renders in the worker with the chosen fonts; a CJK lyric falls back to a system font.
-6. The overlay composite on a 9:16 iPhone HEVC video keeps rotation and audio.
-7. The JPEG fallback path (forced with `TOOLBOX_VIZ_FORCE_JPEG=1`) still produces a correct video.
+type StepJob struct {
+	Inputs  []string
+	Options any // marshalled to the job's options
+}
+
+type StepResult struct {
+	Files []RunFile         // Role/RoleLabel set; Kind may be "" (filled from the extension)
+	Vars  map[string]string
+}
+
+// ExpandVars replaces {name} with the value from the last map defining it;
+// unknown names become "" and are returned in missing. "{{"/"}}" are braces.
+func ExpandVars(tpl string, maps ...map[string]string) (out string, missing []string)
+
+// FileVars are the per-file built-ins: name, ext, role.
+func FileVars(f RunFile) map[string]string
+
+// TemplateVars returns the variable names used in tpl (for Describe checks).
+func TemplateVars(tpl string) []string
+```
+
+**Manual steps** don't need `Chainable`. Every ready, visible, non-job-less module whose `Accepts` isn't empty can be a manual step.
+- Files from an adopted job are read with the module's `StepOutputs` when it is `Chainable`.
+- Otherwise every output is a file with role "" and the kind taken from its extension.
+
+**Shared rules for every adapter:**
+- `PrepareStep` decodes options with `core.DecodeOptionsJSON` and fills unset fields from the defaults where the module has no `withDefaults`.
+- It expands `{vars}` with `FileVars(file)` over `Item.Vars` for per-file fields.
+- It returns jobs the module's `Validate` will accept.
+- Grouping is the adapter's call. Use one submission with every file for `SplitInputs` modules: the job manager splits them.
+
+### 6.2 Step catalogue
+
+All of these are **automatic and manual** unless marked. "Same" means the same kind and extension as the input.
+
+| Type | Step options (Go type) | Accepts | Grouping | Produces (role → kind/ext) | Vars | Notes |
+|---|---|---|---|---|---|---|
+| `downloader` | `downloader.Options` (defaults with `Playlist: false`) | URLs | one submission per item | `""` → audio .mp3/.wav/.flac by format, or video .mp4; `Many` when Playlist | title, url | The item label becomes the job title once known |
+| `converter` | `converter.Options` | per preset (audio presets: audio+video; video: video; image: images) | one submission | `""` → the preset's kind and ext | — | Image presets now honour `MaxHeight` (§6.3) |
+| `trimmer` | `trimmer.StepOptions` (§6.3) | audio + video | one job per file | `""` → same (fast) or .mp4 / the audio family (precise) | — | Segments resolved at run time |
+| `subtitles` | `subtitles.StepOptions` (§6.4) | audio + video | one job per file | `subtitles` → .srt/.vtt (Many); `video` → .mp4 (burn) or same container (embed) | subtitles, language | Uses the new action `auto` |
+| `audio-cleanup` | `audiocleanup.StepOptions` (Options without the preview fields) | audio + video | one submission | `""` → same (audio: the chosen format) | — | |
+| `lyric-video` | `lyricvideo.StepOptions` (§6.4) | audio | one job per file | `video` → .mp4; `lyrics` → .lrc | — | Action `auto`; Title and Artist take `{vars}` |
+| `visualizer` | `visualizer.StepOptions` (§6.4) | audio + video | one job per file | `video` → .mp4; with SaveStems: `vocals`/`drums`/`bass`/`other` → .flac | — | Action `auto`; rendering uses the always-mounted RenderHost, so the app must be running (it is) |
+| `redact` | `redact.StepOptions` (the `RedactSettings` fields) | images + video | per item: all images in one job, each video alone | `""` → same (TIFF → .png, HEIC/.jpeg → .jpg; video → .mp4) | — | Action `auto` |
+| `stems` | `stems.Options` | audio + video | one submission | per preset: `vocals`, `instrumental` or `vocals`, `drums`, `bass`, `other` → audio by format | — | Roles from `Result.stems[].name`, lowercased |
+| `bpm-key` | `bpmkey.Options` (empty struct) | audio + video | one submission | nothing | bpm, bpm_exact, key, key_short, camelot | |
+| `audio-to-midi` | `midi.Options` | audio + video | one submission | `midi` → other .mid | notes | |
+| `transcribe` | `transcribe.Options` | audio + video | one submission | `text` → .txt; `subtitles` → .srt/.vtt; `json` → .json (per Formats) | transcript, transcript_timed (srt/vtt/json), language | `transcript` reads .txt, else the cues of .srt/.vtt, else .json |
+| `ocr` | `ocr.Options` | pdf + images | one submission | images: `text` → .txt or `json` → .json; PDFs: `pdf` → .pdf and/or `text` → .txt | text | |
+| `pdf` | `pdf.StepOptions` (§6.3) | per action | §6.3 | §6.3 | — | Passwords are asked at run start |
+| `vault` | `vault.StepOptions{Folder}` | any | one job per item, all its files | nothing (files are copied into the Vault) | — | Waits while the Vault is locked |
+| `bg-remover` | `bgremove.Options` | its images | one submission | `cutout` (transparent/colour) or `mask` → image .png | — | |
+| `upscaler` | `upscale.Options` | its images | one submission | `""` → image (ext by Format) | — | An input over the size cap fails its cell with Validate's message |
+| `exif` | `exif.Options` (`Fields` values take `{vars}`) | the writable images (.jpg .jpeg .png .webp .gif .heic .tif .tiff) | one submission | `""` → same | — | |
+| `object-eraser` | — | its images | — | manual only | — | `Auto: false` |
+| `pipelines.*` | §7 | §7 | §7 | §7 | §7 | Built-ins |
+
+`StepInfo.Summary` examples:
+- downloader: "Video · up to 1080p" or "Audio · MP3 320"
+- converter: the preset label (+ "· ≤ 720p")
+- stems: "4 stems · fast · FLAC"
+- transcribe: "Small model · TXT, SRT"
+- pdf: "Merge into one PDF"
+
+### 6.3 Changes inside modules (besides `pipeline.go`)
+
+**Trimmer** (`modules/trimmer/pipeline.go`):
+
+```go
+type StepKeep string
+
+const (
+	KeepWhole StepKeep = "whole"
+	KeepFirst StepKeep = "first" // the first Seconds
+	KeepLast  StepKeep = "last"  // the last Seconds
+	KeepRange StepKeep = "range" // From–To
+)
+
+type StepOptions struct {
+	Keep        StepKeep `json:"keep"`
+	Seconds     float64  `json:"seconds"` // first/last: 1–36,000
+	From        string   `json:"from"`    // range: timecode, "" = start
+	To          string   `json:"to"`      // range: timecode, "" = end
+	Mode        Mode     `json:"mode"`
+	Aspect      Aspect   `json:"aspect"`
+	CropX       float64  `json:"cropX"`
+	CropY       float64  `json:"cropY"`
+	MaxSizeMB   int      `json:"maxSizeMB"`
+	MaxHeight   int      `json:"maxHeight"`
+	RemoveAudio bool     `json:"removeAudio"`
+}
+// Defaults: whole, 30 s, precise, keep, 0.5/0.5, 0, 0, false.
+```
+
+- `PrepareStep` probes each file (ffprobe) and builds one segment.
+- The segment is clamped to the file's length. If it comes out shorter than 100 ms, the cell fails with "This file is shorter than the part to keep".
+- `whole` with fast mode and nothing else set is a problem in Describe ("Nothing to do: pick a part, a shape or a size").
+
+**Converter:**
+- Image presets apply `MaxHeight`: they scale down only, keep the aspect ratio, and use the same `scale=-2:min(ih,N)` filter as video.
+- The tool's view stops hiding the height control for image presets.
+
+**PDF Toolkit** (`modules/pdf/pipeline.go`):
+
+```go
+type StepOptions struct {
+	Action      Action `json:"action"` // merge | split | compress | images-to-pdf | pdf-to-images | protect | unlock
+	Every       int    `json:"every"`  // split: pages per file, ≥ 1
+	Level       string `json:"level"`
+	PageSize    string `json:"pageSize"`
+	Margin      string `json:"margin"`
+	ImageFormat string `json:"imageFormat"`
+	DPI         int    `json:"dpi"`
+}
+```
+
+- **merge** and **images-to-pdf** are `Together` and make one job over every file. They produce `pdf` → .pdf.
+  - Merge with a single file passes it through unchanged instead of failing.
+- **split**, **compress**, **pdf-to-images**, **protect** and **unlock** run one job per file.
+  - split and pdf-to-images produce `Many` files: .pdf for split, and `page` → images for pdf-to-images.
+- **compress** with no output ("Already compact") passes its input through.
+- **Secrets:**
+  - protect asks for `password` (the new password);
+  - unlock asks for `password`.
+  - `PrepareStep` stores them in the module's in-memory secret store and puts the `passwordRef` in the job options.
+  - The submission goes through the same document checks as `Service.Enqueue` (`checkDocuments`). Its failures fail the cell with that message.
+
+**Vault** (`modules/vault/pipeline.go`):
+- `StepOptions{Folder string}`, where `Folder` takes `{vars}` and is cleaned as in `Validate`.
+- **Locked** → `ErrWaiting("Unlock the Vault to continue", "Open the Vault and unlock it")`.
+- `StepOutputs` returns no files, since Vault adds make none.
+
+**Audio Cleanup, Redact:** a `StepOptions` struct each (fields listed in §6.2), mapped to `Options` with `Preview: false` / `Action: auto`.
+
+**Every module service** whose step options type isn't already in the bindings gains `StepShape() StepOptions` (bindings only, like `ResultShape`). That covers trimmer, subtitles, audio-cleanup, lyric-video, visualizer, redact, pdf and vault.
+
+### 6.4 New `auto` actions
+
+**Subtitles: `ActionAuto Action = "auto"`.** One job does generate, then optional translate, then save, burn and/or embed.
+
+```go
+// New Options fields (auto):
+Video     string `json:"video"`     // auto: "none" | "burn" | "embed"
+MaxSizeMB int    `json:"maxSizeMB"` // auto burn: 0 = no limit, else 1–4000 (bitrate from duration, as Trimmer)
+
+// modules/subtitles/pipeline.go
+type StepOptions struct {
+	Model              string           `json:"model"`
+	Language           string           `json:"language"`
+	TranslateToEnglish bool             `json:"translateToEnglish"` // Whisper's own translation
+	TargetLanguage     string           `json:"targetLanguage"`     // "" = keep; else via Local Chat
+	MaxLineChars       int              `json:"maxLineChars"`
+	MaxLines           int              `json:"maxLines"`
+	Save               []string         `json:"save"`  // "srt", "vtt" (0–2)
+	Video              string           `json:"video"` // "none" | "burn" | "embed"
+	Style              Style            `json:"style"`
+	Size               string           `json:"size"`
+	Position           string           `json:"position"`
+	Font               string           `json:"font"`
+	TrackLanguage      string           `json:"trackLanguage"`
+	MaxSizeMB          int              `json:"maxSizeMB"`
+	Canvas             string           `json:"canvas"`          // audio input + burn
+	CanvasHeight       int              `json:"canvasHeight"`
+	Background         string           `json:"background"`      // "color" | "image" | "visualizer"
+	BackgroundColor    string           `json:"backgroundColor"`
+	BackgroundPath     string           `json:"backgroundPath"`
+	Visuals            *viz.VisualsSpec `json:"visuals"`
+}
+```
+
+- **Validate (auto):**
+  - The input must be media.
+  - At least one of `Save` or `Video` ≠ "none".
+  - embed needs a video. burn on audio needs a valid background (the existing canvas checks).
+  - `TargetLanguage` requires `TextGenerator.Ready()` at **Run**, failing with Translate's existing hint.
+- **Run:**
+  1. Generate the cues (as `generate`).
+  2. No speech found → fail with `CodeValidation` "No speech found" and the hint "Check the audio has speech".
+  3. Translate if set.
+  4. Save each format in `Save`, then burn or embed with the same code paths as those actions.
+- **Progress** is split 0–60 % (generate), 60–75 % (translate), 75–100 % (video).
+- **`Result`**: `Action: auto`, with `Language`, `Cues` and `Outputs` as today.
+- **`StepOutputs`**: `subtitles` files (.srt/.vtt) and the `video` file. The `subtitles` variable is read from the cues.
+
+**Lyric Video: `ActionAuto Action = "auto"`.**
+- One job runs `lyrics` with `Source: detect`, then `render` with the lines it got.
+- Uses `Language`, `Look`, `Audio`, `Aspect` and `Height` from the options.
+- Fewer than 1 line → fail "No lyrics heard", with the hint "Use Lyric Video with pasted lyrics".
+
+```go
+// modules/lyricvideo/pipeline.go
+type StepOptions struct {
+	Language string `json:"language"`
+	Look     Look   `json:"look"`   // Look.Title / Look.Artist take {vars} (default "{title}" / "")
+	Audio    string `json:"audio"`  // "original" | "instrumental"
+	Aspect   string `json:"aspect"`
+	Height   int    `json:"height"`
+}
+```
+
+- **Progress** is 0–55 % lyrics, then 55–100 % render.
+- **`Result`**: `Action: auto`, with `Lines`, `Matched` and `Outputs`.
+- **Produces:** `video` → .mp4 and `lyrics` → .lrc.
+
+**Visualizer: `ActionAuto Action = "auto"`.**
+- One job runs analyze with `Analyze`, then render with the new ref's key and the other render fields.
+
+```go
+// modules/visualizer/pipeline.go
+type StepOptions struct {
+	PresetID   string `json:"presetId"`   // the preset it came from ("" = a saved design); a label only
+	DesignName string `json:"designName"` // shown in the summary
+	ShowJSON   string `json:"showJson"`   // required, ≤ 512 KiB
+	Mode       Mode   `json:"mode"`       // full | overlay (overlay needs a video input)
+	Aspect     string `json:"aspect"`
+	Height     int    `json:"height"`
+	FPS        int    `json:"fps"`
+	Audio      string `json:"audio"`      // "original" | "instrumental" (needs Stems)
+	Background string `json:"background"` // "none" | "cover"
+	Stems      bool   `json:"stems"`
+	SaveStems  bool   `json:"saveStems"`
+	Words      string `json:"words"`    // "none" | "detect"
+	Language   string `json:"language"` // words: "" = auto
+	Mood       bool   `json:"mood"`
+}
+```
+
+- Validate and Run reuse the analyze and render paths.
+- **Progress** is 0–40 % analyze (it may be cached), then 40–100 % render.
+- An empty `ShowJSON` is a Describe problem: "Pick a design".
+- **Instrumental audio** without `Stems` is a problem.
 
 ---
 
-## 12. Work packages
+## 7. Built-in steps (`modules/pipelines`, ID `pipelines`)
+
+**The module.**
+- Descriptor: Name "Pipelines", Tagline "Chain tools into one-click workflows", Icon `workflow`, Category utility, OutputSubdir `Pipelines`, Order 0.
+- It has no `Accepts`: drops never match it as a tool, and pipelines are matched separately (§11.6). It has no Requires.
+- It is listed in the sidebar as its own item (§11.1), not among the tools.
+- Its view is the Pipelines page.
+- Its jobs run the five built-in actions. Built-in files go to `<library>/Pipelines/<pipeline name>/`, with the name cleaned for the file system.
+
+```go
+type Action string
+
+const (
+	ActionRename Action = "rename"
+	ActionChat   Action = "chat"
+	ActionTable  Action = "table"
+	ActionZip    Action = "zip"
+	ActionCopy   Action = "copy"
+)
+
+// Options are the job options (made by PrepareStep; everything expanded).
+type Options struct {
+	Action   Action      `json:"action"`
+	Pipeline string      `json:"pipeline"` // folder name under Pipelines/
+	Rename   []RenameOp  `json:"rename"`
+	Chat     *ChatJob    `json:"chat"`
+	Table    *TableJob   `json:"table"`
+	Zip      *ZipJob     `json:"zip"`
+	Copy     *CopyJob    `json:"copy"`
+}
+
+type RenameOp struct {
+	Path   string `json:"path"`
+	Name   string `json:"name"`   // new base name, no extension
+	Move   bool   `json:"move"`   // true: a file this run made (renamed in place); false: copied into Pipelines/<name>/
+	Role   string `json:"role"`   // carried through
+}
+
+type ChatJob struct {
+	Mode        string            `json:"mode"`   // "write" | "extract"
+	System      string            `json:"system"` // ≤ 4,000
+	Prompt      string            `json:"prompt"` // the template, unexpanded (expansion happens in Run, for chunking)
+	Vars        map[string]string `json:"vars"`   // only the variables the prompt uses
+	Fields      []ChatField       `json:"fields"` // extract
+	OutputName  string            `json:"outputName"` // write: expanded base name
+	Format      string            `json:"format"`     // write: "md" | "txt"
+	SaveJSON    bool              `json:"saveJson"`   // extract: also write <name>.json
+	Temperature float64           `json:"temperature"`
+}
+
+type ChatField struct {
+	Name  string `json:"name"`  // variable name, [a-z][a-z0-9_]{0,31}
+	Label string `json:"label"` // shown and given to the model ("Merchant")
+	Type  string `json:"type"`  // "text" | "number" | "date"
+}
+
+type TableJob struct {
+	Name   string     `json:"name"` // base name
+	Header []string   `json:"header"`
+	Rows   [][]string `json:"rows"`
+}
+
+type ZipJob struct {
+	Name  string   `json:"name"`
+	Files []string `json:"files"`
+}
+
+type CopyJob struct {
+	Folder string   `json:"folder"` // absolute, chosen by the user
+	Files  []string `json:"files"`
+}
+
+// StepOptions are what the user edits, one struct per built-in type.
+type RenameStep struct {
+	Template string `json:"template"` // default "{name}"; takes {vars}
+}
+
+type ChatStep struct {
+	Mode        string      `json:"mode"`        // "write" | "extract"
+	System      string      `json:"system"`
+	Prompt      string      `json:"prompt"`      // takes {vars}; ≤ 8,000 chars
+	Fields      []ChatField `json:"fields"`      // extract: 1–12
+	OutputName  string      `json:"outputName"`  // write: default "{item} (notes)"; takes {vars}
+	Format      string      `json:"format"`      // write: md | txt
+	SaveJSON    bool        `json:"saveJson"`
+	Temperature float64     `json:"temperature"` // 0–1.5, default 0.3
+}
+
+type TableColumn struct {
+	Header string `json:"header"`
+	Value  string `json:"value"` // takes {vars}
+}
+
+type TableStep struct {
+	Name    string        `json:"name"`    // default "{pipeline} {date}"; takes the run's built-ins only
+	Columns []TableColumn `json:"columns"` // 1–30
+}
+
+type ZipStep struct {
+	Together bool   `json:"together"` // one zip for the whole run (else one per item)
+	Name     string `json:"name"`     // default "{item}" / "{pipeline} {date}"; takes {vars}
+}
+
+type CopyStep struct {
+	Folder    string `json:"folder"`    // absolute, chosen with the folder picker
+	Subfolder string `json:"subfolder"` // takes {vars}; "" = none, e.g. "{pipeline}/{date}"
+}
+```
+
+**`Service.StepShape*()` methods** expose these types to the bindings: `RenameShape`, `ChatShape`, `TableShape`, `ZipShape`, `CopyShape`.
+
+### 7.1 Rename files (`pipelines.rename`)
+- **Shape:** each item, any files, `Template` takes `{vars}`.
+- **Result:** a file this run made is **renamed in place** (`Move: true`). Anything else, i.e. the run's own inputs, is copied into `Pipelines/<pipeline>/` under the new name. Run inputs are never moved.
+- **Names:**
+  - The extension is kept.
+  - Characters that are illegal on either OS (`<>:"/\|?*` and control characters) become "-". Whitespace is collapsed and the name is trimmed to 150 characters.
+  - An empty result keeps the old name.
+  - Collisions get `UniquePath`.
+- **Library record:** a moved file keeps its Library record, via `OutputStore.MoveOutput` (§9.1), and emits `library:added` with the updated output.
+- **Roles** are kept, so a later filter on "Bass" still works.
+- **Produces:** the same kind and role as the input.
+
+### 7.2 Copy to folder (`pipelines.copy`)
+- **Shape:** each item, any files.
+- **What it does:** copies the files into `Folder[/Subfolder]` (created if missing) and never overwrites (`UniquePath`).
+- **Folder rules:**
+  - It must be absolute, exist when the step is saved (a Describe problem otherwise), and not be inside the Library.
+  - It may be anywhere else the user picks. This is the user's own destination, like an export.
+- **Output:** the copies are not Library outputs; the step's `Files` are the originals.
+
+### 7.3 Ask Local Chat (`pipelines.chat`)
+- **Shape:** each item, `NoFiles: true`.
+- **Accepts** text files: .txt .md .srt .vtt .json .csv, ≤ 256 KiB each.
+- **The prompt** may use `{file}`, the text of the step's input files joined with blank lines (`.srt`/`.vtt` reduced to their cue text), plus any variable.
+- **Write mode:** the reply is saved as `<OutputName>.<md|txt>` in `Pipelines/<pipeline>/`, with role `text`. The variable `reply` holds the reply.
+- **Extract mode:**
+  - The model replies with `CompletionRequest.JSONSchema` = an object with one string property per field. Number fields are described as numbers but still returned as strings. Every field is required.
+  - Each field becomes a variable.
+  - With `SaveJSON`, the reply is also written as `<item>.json`.
+  - A reply that doesn't parse is retried once at temperature 0, then fails the cell with "The chat model's answer wasn't usable".
+- **Long text:**
+  - `core.TextGenerator` gains `ContextTokens() int` (chat implements it from `Settings.Chat.ContextSize`; Ollama returns 8192).
+  - The budget for the prompt is `ContextTokens × 0.7 − 1,024` tokens, estimated at 3.5 characters per token.
+  - If the expanded prompt is over the budget, the longest variable used (or `{file}`) is split into chunks of half the budget, on paragraph or line boundaries.
+  - Each chunk gets "Take concise notes of this part of a longer text, keeping any [h:mm:ss] timestamps:" (map).
+  - The notes, joined, then replace that variable in the user's prompt (reduce).
+  - The log says "Long text: read in N parts".
+- **Requests:** `Purpose: "Pipeline · <step label>"`, `MaxTokens` 2,048 (write) or 512 (extract), and the step's temperature.
+- **Model check:** `Ready()` fails → the cell fails with that error. Describe also shows it as a warning, using `StepInfo.Warnings`.
+- **Produces:** `text` → .md/.txt (write), `json` → .json (extract + SaveJSON).
+
+### 7.4 Make a table (`pipelines.table`)
+- **Shape:** `Together`, `NoFiles: true`.
+- **Rows:** one per merged item, in item order. Each column's `Value` is expanded with that item's variables.
+- **Output:** one CSV (RFC 4180, UTF-8 with BOM so spreadsheet apps read accents) in `Pipelines/<pipeline>/<Name>.csv`.
+- **Produces:** `table` → document .csv.
+
+### 7.5 Zip (`pipelines.zip`)
+- **Shape:** each item, or `Together` (`ZipStep.Together`).
+- **What it does:** writes `<Name>.zip` to `Pipelines/<pipeline>/` with every input file at the zip's top level. Duplicate names get " (2)".
+- **Compression:** files already compressed (audio, video, images, .zip, .pdf) are stored; others use Deflate.
+- **Produces:** `zip` → other .zip.
+
+### 7.6 Check (`pipelines.check`)
+- **Not a job.** It accepts anything and produces the same.
+- **Pause:** the item waits (`WaitCheck`) with its input files. `Continue{Keep}` carries the kept files on, and keeping none skips the rest of the item (§8.5).
+- **Note:** an optional text shown on the card, e.g. "Check the faces are all blurred".
+
+---
+
+## 8. The runner (`core/pipeline`)
+
+```go
+package pipeline // imports core only
+
+type Config struct {
+	Store    core.PipelineStore
+	Outputs  core.OutputStore
+	Jobs     *core.Jobs
+	Reg      *core.Registry
+	Em       core.Emitter
+	Tools    func(depID string) (string, error) // dependency check at Start
+	Settings func() core.Settings
+	Clock    func() time.Time // tests
+}
+
+func New(cfg Config) *Runner
+func (r *Runner) RegisterBuiltin(t core.StepType, a core.Chainable) error // modules/pipelines
+func (r *Runner) Start(ctx context.Context) error // after Jobs.Start: load, reconcile, observe, watch
+func (r *Runner) Stop()                           // idempotent; stops the loop, watchers and persists
+
+// Pipelines
+func (r *Runner) List() []core.PipelineEntry
+func (r *Runner) Get(id string) (core.Pipeline, error)
+func (r *Runner) Catalog() []core.StepType
+func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck
+func (r *Runner) Save(p core.Pipeline) (core.PipelineEntry, error)
+func (r *Runner) Delete(id string) error
+func (r *Runner) Duplicate(id string) (core.PipelineEntry, error)
+
+// Runs
+func (r *Runner) StartRun(req core.RunRequest, trigger string) (core.PipelineRun, error)
+func (r *Runner) Runs(f core.RunFilter) ([]core.PipelineRun, error)
+func (r *Runner) Run(id string) (core.PipelineRun, error)
+func (r *Runner) Cancel(runID string) error
+func (r *Runner) Retry(runID string) (core.PipelineRun, error)
+func (r *Runner) Continue(req core.ContinueRequest) error
+func (r *Runner) SkipStep(runID string, item int, stepID string) error // manual/check: carry the inputs on
+func (r *Runner) StopItem(runID string, item int) error                // cancel this item's active jobs; later cells blocked
+func (r *Runner) CleanUp(runID string) (int, error)                    // delete temporary files now
+func (r *Runner) Remove(runID string, deleteTemporary bool) error      // finished runs only
+
+// OnNeedsYou is called (from the loop) whenever the total of NeedsYou over
+// active runs changes; main.go wires it to the tray.
+func (r *Runner) OnNeedsYou(fn func(total int, firstRunName string))
+```
+
+### 8.1 Event loop
+- **One goroutine** owns all run state. Everything reaches it through one channel:
+  - commands (start, cancel, continue, …), each with a reply channel;
+  - job snapshots from `Jobs.Observe`;
+  - prepare results;
+  - timers: wait retries every 5 s, persistence.
+- **The observer callback only enqueues.** It never blocks: an unbounded slice queue sits behind the channel.
+- **After every change, `schedule()`** walks the active runs and starts ready cells:
+  - deepest step first, then lower item index, so results arrive early;
+  - each run keeps at most `max(2, Settings.Concurrency)` cells preparing or with active jobs.
+- **Preparing:** `PrepareStep` runs in its own goroutine with a context cancelled by Cancel/StopItem, and its result goes back into the loop.
+- **Submitting:** for each `StepJob`, the loop calls `Jobs.SubmitFor` with the tag. A submit error fails the cell with that `AppError`; jobs already submitted for that cell are cancelled.
+- **Zero `StepJob`s** → the cell is done with no files.
+
+### 8.2 Cells from job updates
+- **When every job of a cell has finished:**
+  - all done → `StepOutputs` per job, in submission order. Files are deduplicated by path; `Temporary` is `!step.Keep`, and `OutputID` comes from the job's outputs. The variables merge into the item. The cell is **done**.
+  - any failed → the cell is **failed**, with the first failed job's error and the message "1 of 3 jobs failed".
+  - else any cancelled → **cancelled**.
+- **A job of a finished cell going back to queued** (a retry from the tray) puts the cell back to **running** and its blocked successors back to **pending**.
+- **The item label** follows the job title when the item's input is a link and its first step is `downloader`.
+- **A `StepOutputs` error** fails the cell with `CodeInternal` "Couldn't read what <tool> made".
+
+### 8.3 Run status
+- **The status is recomputed** after each change:
+  - `cancelled` if the user cancelled;
+  - otherwise, once every cell is in a final state (done/failed/cancelled/skipped/blocked/merged/none): `done`, `partial` or `failed`;
+  - otherwise `waiting` if `NeedsYou > 0`, else `running`.
+- **An item succeeded** when none of its cells is failed, cancelled or blocked.
+- **A run that becomes `done`** cleans up its temporary files (§8.7).
+- **Preflight at `StartRun`.** The run is refused with an `AppError` when:
+  - there are no inputs, or more than 200 ("At most 200 files per run");
+  - the pipeline isn't `Ready` (hint "Fix the problems in the pipeline first");
+  - any `Missing` dep (message "Needs <names>", hint "Install them in Settings → Tool packs");
+  - a secret is missing;
+  - no input is accepted by any input step.
+- **Inputs no input step accepts** are left out of the run, and listed in the run's `Error` as a note.
+
+### 8.4 Manual steps ("I'll do this step myself")
+1. **The cell becomes `waiting`** (`WaitManual`) with its `Inputs`. The toast (§11.7) offers "Open <tool>".
+2. **Adoption.** The observer sees each job the first time it appears. An untagged job is adopted (`Jobs.Tag(id, run, step)`) and appended to the cell's `JobIDs` when:
+   - its module is the step's module, and
+   - its inputs share a path with a cell that is waiting for that step.
+   A job matching several cells goes to the oldest run's first matching cell.
+3. **AutoContinue on:** when an adopted job finishes **done with at least one output** and no other adopted job of the cell is active, the cell continues with those outputs.
+4. **Continue (button):**
+   - The cell's files are the outputs of every adopted done job, or the subset in `Keep`.
+   - With no adopted outputs, the UI offers "Continue with the original file", which sends `PassThrough`.
+5. **Skip step** carries the inputs on unchanged.
+6. **Adopted jobs** keep their normal behaviour: tray, logs, retry. A failed adopted job doesn't fail the cell, because you can run the tool again.
+
+**Defaults:**
+- `AutoContinue` defaults to **on**, except for tools whose view makes several jobs per task: subtitles, lyric-video, visualizer and pdf.
+- The editor sets it when Manual is switched on; it is stored per step.
+
+### 8.5 Check steps
+- **The cell waits** (`WaitCheck`) with its `Inputs`.
+- **`Continue{Keep}`** sets `Files` to the kept subset, in order. An empty subset makes the cell **done**, and later cells **skipped** ("You kept nothing").
+- **`SkipStep`** keeps everything.
+
+### 8.6 Condition waits
+- An adapter returning `CodeWaiting` puts the cell in `waiting` with `WaitCondition` and the message. The loop re-prepares it every 5 s, and immediately on `Retry`.
+- Condition waits don't count in `NeedsYou` and don't make the run `waiting`.
+- The run card still shows them: "Waiting: Unlock the Vault to continue".
+
+### 8.7 Cancel, retry, restart and clean-up
+- **Cancel run:**
+  - cancels every active job of the run (`Jobs.Cancel`);
+  - waiting, preparing and pending cells become cancelled or blocked;
+  - the status becomes `cancelled`.
+- **StopItem** does the same for one item.
+- **Retry run:**
+  - every failed or cancelled cell with jobs → `Jobs.Retry` of its failed or cancelled jobs;
+  - cells without jobs (a prepare or submit error) → pending;
+  - blocked → pending;
+  - the status goes back to running.
+  - Refused when the run is `Cleaned` ("Its in-between files were deleted; start it again").
+- **Restart:**
+  - `Start` loads the runs that were `running` or `waiting` and reconciles each cell with its jobs (`Jobs.Get`).
+  - The job manager has already marked interrupted jobs failed, so their cells fail and **Retry** resumes them.
+  - Queued jobs run again by themselves.
+  - Preparing cells re-prepare.
+  - Secrets are gone: a pending cell that needs one fails with "Passwords aren't kept after a restart" and the hint "Start the run again".
+- **Clean-up** deletes files that are all of these:
+  - `Temporary`;
+  - registered outputs of this run's jobs;
+  - inside the Library folder;
+  - not also listed in a non-temporary cell's `Files`.
+
+  It deletes the file and the Library record (`OutputStore.DeleteOutput`, emitting `library:removed`). Run inputs are never deleted.
+- **When clean-up runs:**
+  - automatically when a run ends `done`;
+  - by **CleanUp** (the run's "Delete in-between files" button);
+  - and by **Remove** with `deleteTemporary`.
+  - `partial`, `failed` and `cancelled` runs keep their files until then, so Retry still works.
+- **History:**
+  - at most 200 finished runs, the oldest pruned at `Start` (their jobs stay);
+  - a run's persisted state is ≤ 16 MiB (beyond that, values of variables are truncated first).
+- **Limits:**
+  - ≤ 2,000 jobs per run; past that, the cell fails with "This run is too big";
+  - ≤ 1,000 files per cell.
+
+### 8.8 Describe (validation)
+For each step, in order:
+1. **The type exists.**
+   - An unknown type, or a module that isn't ready, is a problem: "<Tool> isn't available".
+   - Manual is set but the type can't be manual, or Manual is off but it can't be automatic: that is a problem too.
+2. **Options** (automatic steps): `DescribeStep(options)`. An error is the step's problem, using its message.
+3. **`From` and the filter:**
+   - `From` must be `input`, `none` (only with `NoFiles`), or an **earlier** step's ID.
+   - The filter's roles must exist among the source's `Produces` (a warning, not a problem).
+4. **What the source makes** (`Produces`, resolved):
+   - a product with `Kind`/`Exts` "same" takes those of the source's own source, recursively;
+   - the run's inputs count as everything the step accepts.
+
+   If no resolved product (after the filter) matches the step's `Accepts`, it's a problem: "<Tool> can't read what step N makes (.mp3)". URLs count only for `input`.
+5. **`{vars}`:** for every option at `Templates`, each name used must be a built-in or a variable of an **earlier** step. Otherwise it's a problem: "{bpm} isn't made by an earlier step".
+6. **Steps after a together step** may still read from steps before it (the merged union).
+7. **Keep:** a step whose files no later step reads, and that isn't the last step, still has `Keep` honoured. No implicit rule.
+
+Pipeline-level problems:
+- an empty or duplicate name;
+- 0 or more than 30 steps;
+- options over 1 MiB in total;
+- watch folder problems (§8.9);
+- a watched pipeline that needs secrets ("A watched pipeline can't ask for passwords").
+
+`Missing` lists the `Requires` deps of the step modules that `Tools` can't resolve.
+
+### 8.9 Watch folders (`core/pipeline/watch.go`)
+- **Polling:** a single ticker, every 5 s, over pipelines with `Watch.Enabled` that are `Ready`. Others report `WatchState.Message`: "Fix the problems first", or "Folder not found".
+- **Which files count:**
+  - regular files at the top level, not hidden (`.` prefix, or the Windows hidden attribute);
+  - not temporary (`~$*`, `*.part`, `*.crdownload`, `*.tmp`, `*.download`);
+  - matching the pipeline's `Check.Accepts` extensions.
+- **When a file is ready:** it is unchanged in size and mtime since the previous poll, and its mtime is at least 3 s old.
+- **New files** are those not in `pipeline_watch_seen` with the same size and mtime. Those found in one poll start **one** run (`trigger: "watch"`), with up to 200 files; the rest wait for the next poll. Each is recorded as seen.
+- **Baseline:**
+  - enabling a watch, or changing its folder, records the files already there as seen, without running them;
+  - files that appeared while Toolbox was closed are new, and run at the next start.
+- **Folder rules** (checked in Describe):
+  - absolute;
+  - exists and is a directory;
+  - not the Library folder or inside it;
+  - not inside the support or tools directory.
+- **Seen table:** rows of deleted pipelines are deleted with the pipeline. Rows of files that no longer exist are pruned at `Start`.
+
+---
+
+## 9. Storage, events and services
+
+### 9.1 Store (`core/store`, migration `0005_pipelines.sql`)
+
+```sql
+ALTER TABLE jobs ADD COLUMN pipeline_run_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE jobs ADD COLUMN pipeline_step_id TEXT NOT NULL DEFAULT '';
+CREATE INDEX jobs_pipeline_idx ON jobs(pipeline_run_id) WHERE pipeline_run_id <> '';
+
+CREATE TABLE pipelines (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  definition TEXT NOT NULL,          -- the Pipeline as JSON
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE pipeline_runs (
+  id          TEXT PRIMARY KEY,
+  pipeline_id TEXT NOT NULL,         -- no FK: runs outlive their pipeline
+  status      TEXT NOT NULL,
+  state       TEXT NOT NULL,         -- the PipelineRun as JSON, full variable values included
+  created_at  INTEGER NOT NULL,
+  finished_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX pipeline_runs_created_idx ON pipeline_runs(created_at DESC);
+CREATE INDEX pipeline_runs_status_idx  ON pipeline_runs(status);
+
+CREATE TABLE pipeline_watch_seen (
+  pipeline_id TEXT NOT NULL,
+  path        TEXT NOT NULL,
+  size        INTEGER NOT NULL,
+  mtime       INTEGER NOT NULL,
+  PRIMARY KEY (pipeline_id, path)
+);
+```
+
+**`core.PipelineStore`** (`core/interfaces.go`):
+
+```go
+type PipelineStore interface {
+	ListPipelines(ctx context.Context) ([]Pipeline, error)
+	PutPipeline(ctx context.Context, p Pipeline) error // insert or replace
+	DeletePipeline(ctx context.Context, id string) error // also its watch_seen rows
+	PutRun(ctx context.Context, run PipelineRun, stateJSON string) error
+	GetRun(ctx context.Context, id string) (stateJSON string, err error) // CodeNotFound
+	ListRuns(ctx context.Context, f RunFilter) ([]string, error)         // state JSONs, newest first
+	DeleteRuns(ctx context.Context, ids []string) error
+	PruneRuns(ctx context.Context, keepFinished int) ([]string, error)
+	SeenFiles(ctx context.Context, pipelineID string) (map[string]SeenFile, error)
+	MarkSeen(ctx context.Context, pipelineID string, files []SeenFile) error
+	ForgetSeen(ctx context.Context, pipelineID string, paths []string) error
+}
+
+type SeenFile struct {
+	Path  string
+	Size  int64
+	MTime int64
+}
+```
+
+**Other store changes:**
+- `JobStore` reads and writes the two new job columns.
+- `OutputStore` gains `MoveOutput(ctx, id, newPath string) (Output, error)`, which updates the path and name and keeps the ID and tags.
+
+### 9.2 Jobs (`core/jobs.go`)
+
+```go
+type PipelineTag struct{ RunID, StepID string }
+
+// SubmitFor is Submit with a pipeline tag on every job it creates.
+func (m *Jobs) SubmitFor(ctx context.Context, moduleID string, inputs []string, optionsJSON string, tag PipelineTag) ([]Job, error)
+
+// Tag sets the pipeline tag of an active or finished job (manual-step adoption).
+func (m *Jobs) Tag(id string, tag PipelineTag) error
+
+// Observe calls fn with every job snapshot after it is persisted (submit,
+// start, progress-free updates, finish, retry, cancel). fn must not block.
+// Returns a function that removes the observer.
+func (m *Jobs) Observe(fn func(Job)) (stop func())
+```
+
+- **`Submit`** becomes `SubmitFor` with an empty tag.
+- **Throttled progress** isn't sent to observers; only `publish` snapshots are.
+- **`JobFilter`** gains `PipelineRunID string \`json:"pipelineRunId"\``.
+
+### 9.3 Service (`modules/pipelines/service.go`, bound as `PipelinesService`)
+
+```go
+func (s *Service) List() []core.PipelineEntry
+func (s *Service) Catalog() []core.StepType
+func (s *Service) Templates() []core.PipelineTemplate
+func (s *Service) Describe(p core.Pipeline) core.PipelineCheck
+func (s *Service) Save(p core.Pipeline) (core.PipelineEntry, error) // ID "" = create
+func (s *Service) Delete(id string) error
+func (s *Service) Duplicate(id string) (core.PipelineEntry, error)  // "<name> copy"
+func (s *Service) FromTemplate(templateID string) (core.Pipeline, error) // unsaved copy with fresh IDs
+func (s *Service) Start(req core.RunRequest) (core.PipelineRun, error)
+func (s *Service) Runs(f core.RunFilter) ([]core.PipelineRun, error)
+func (s *Service) Run(id string) (core.PipelineRun, error)
+func (s *Service) Cancel(runID string) error
+func (s *Service) Retry(runID string) (core.PipelineRun, error)
+func (s *Service) Continue(req core.ContinueRequest) error
+func (s *Service) SkipStep(runID string, item int, stepID string) error
+func (s *Service) StopItem(runID string, item int) error
+func (s *Service) CleanUp(runID string) (int, error)
+func (s *Service) Remove(runID string, deleteTemporary bool) error
+// StepShape methods for the built-ins (bindings only): RenameShape, ChatShape, TableShape, ZipShape, CopyShape.
+```
+
+**`api/files.go`** gains `PickFolder(title string) (string, error)` (Wails directory dialog; "" when cancelled). It is used by the watch folder and Copy to folder.
+
+**Events** are registered in `api/events.go`, typed in the bindings: `pipelines:changed`, `pipelines:run`, `pipelines:runs-removed`.
+
+### 9.4 Wiring (`main.go`)
+1. `runner := pipeline.New(...)` after `jobs`.
+2. `pipelines.Register(reg, runner, chatSvc, db, libraryDir)` registers the module and the built-in step types.
+3. `runner.Start(ctx)` right after `jobs.Start(ctx)`.
+4. `runner.OnNeedsYou(shell.SetPipelinesNeedYou)`.
+5. `defer runner.Stop()`.
+6. Every module implementing `core.Chainable` is found through the registry; no extra wiring.
+
+---
+
+## 10. Built-in templates (`modules/pipelines/templates.go`)
+
+**Template rules:**
+- Templates are Go data. `FromTemplate` copies one with fresh step IDs and the name "<template name>". If the name is taken, it gets " 2", " 3", and so on.
+- The **frontend** fills `showJson` for any visualizer step whose `presetId` is set and `showJson` is empty, from `viz/presets` (§11.3), before the first Save.
+- Each template's `Packs` lists the packs it needs. The gallery shows them, with "Install" when missing (the existing packs flow).
+- A Go test checks that every template passes `Describe` with all tools present, except for the visualizer `showJson` (filled by a fixture in the test).
+
+| # | ID / name | Steps (`From` is the previous step unless noted; **K** = Keep) |
+|---|---|---|
+| 1 | `social-clip` · Clip for social | 1. downloader (video, ≤ 1080p) → 2. trimmer **manual** (note "Pick the part to keep, then Export") → 3. trimmer (whole, precise, 9:16, centre crop, ≤ 1080p) → 4. subtitles (small, burn, style boxed, size l, ≤ 50 MB) **K** |
+| 2 | `podcast` · Podcast | 1. audio-cleanup (podcast) **K** → 2. transcribe (small, txt + srt) **K** → 3. pipelines.chat write (prompt below, `{transcript_timed}`, "{item} (show notes)", md) **K** |
+| 3 | `sampling` · Sampling | 1. downloader (audio, FLAC) → 2. stems (four-fast, FLAC) → 3. bpm-key (From step 1) → 4. pipelines.rename (From step 2, `{name} · {bpm} BPM · {key}`) **K** → 5. audio-to-midi (From step 4, filter role `bass`, range bass) **K** |
+| 4 | `karaoke` · Karaoke | 1. stems (vocals-fast, FLAC, From input) **K** → 2. lyric-video (From input; audio instrumental, karaoke on, title `{item}`) **K** |
+| 5 | `product-photos` · Product photos | 1. bg-remover (balanced, on colour #ffffff, crop, padding 48) → 2. upscaler (photo, 2×) → 3. converter (webp, ≤ 1440, metadata off) **K** |
+| 6 | `paper-archive` · Paper to archive | 1. pdf images-to-pdf (A4, small margin; together) → 2. ocr (searchable) → 3. pdf compress (balanced) → 4. vault (folder "Documents") |
+| 7 | `foreign-video` · Foreign-language video | 1. downloader (video, ≤ 1080p) → 2. subtitles (turbo, translate to English, save srt, burn classic) **K** |
+| 8 | `receipts` · Receipts | 1. ocr (text) → 2. pipelines.chat extract (fields date/date, merchant/text, total/number, currency/text; prompt below) → 3. pipelines.table (columns Date `{date_1}`… see below) **K** |
+| 9 | `lecture` · Lecture | 1. transcribe (small, txt + srt) **K** → 2. pipelines.chat write (study notes + 10 flashcards, md) **K** |
+| 10 | `before-sharing` · Before sharing | 1. redact (faces + plates, blur, strip metadata) → 2. pipelines.check (note "Check every face and plate is hidden") → 3. pipelines.zip (together, "{pipeline} {date}") **K** |
+| 11 | `music-video` · Music video | 1. visualizer (preset `golden-hour`, full, 9:16, 1080, 30 fps, stems on, words none, mood on) **K** |
+
+**Notes on the templates:**
+- **Receipts:** the extract fields are named `when`, `merchant`, `total` and `currency`, because `{date}` is a built-in. The table columns are: File `{item}`, Date `{when}`, Merchant `{merchant}`, Total `{total}`, Currency `{currency}`.
+- **Before sharing:** Redact's metadata strip covers "strip location" for images and videos, so there is no separate EXIF step.
+
+**Prompts** (in `templates.go`, editable after copying):
+- **Podcast:** "You are writing show notes for a podcast episode. From the transcript below, write in Markdown: a one-paragraph **Summary**; **Show notes** as 5–10 bullet points; **Chapters** as a list of `[h:mm:ss] Title` using the timestamps in the transcript. Transcript:\n\n{transcript_timed}"
+- **Lecture:** "From this lecture transcript, write Markdown study notes: the key ideas as headed sections with bullet points, a short glossary of terms, then 10 **flashcards** as `Q:`/`A:` pairs. Transcript:\n\n{transcript}"
+- **Receipts:** "Read this receipt text and extract the purchase date (YYYY-MM-DD), the merchant's name, the total paid as a number, and the currency code. Text:\n\n{text}"
+
+---
+
+## 11. UI
+
+### 11.1 Sidebar and routing
+- **Sidebar:** `nav.ts` adds `PIPELINES_ITEM = {id: "pipelines", label: "Pipelines", icon: "workflow"}` right after Recent, and filters `pipelines` out of the tools group. `Mod+1` is Recent and `Mod+2` is Pipelines, then the tools follow.
+- **Badge:** the item shows a badge with the number of cells that need you, plus the running dot while any run is active.
+- **Route:** `toolViews["pipelines"]` → `tools/pipelines/PipelinesView.tsx`.
+
+### 11.2 Pipelines page
+
+```
+┌ Pipelines ───────────────────────────────────────── [Pipelines | Runs (2)] [+ New] ┐
+│ ┌───────────────────────┐ ┌────────────────────────────────────────────────────────┐│
+│ │ ▣ Clip for social   ▶ │ │ Clip for social                         [Run…]  [⋯]   ││
+│ │   ⇩ ✂ ✂ CC  · links   │ │ Takes: links            ● Ready                       ││
+│ │ ▣ Podcast           ▶ │ │ ① ⇩ Downloader      Video · up to 1080p        [⋯]     ││
+│ │   ✧ ≋ ✦  · watching   │ │ ② ✂ Video Trimmer   I'll do this myself        [⋯]     ││
+│ │ ▣ Receipts          ▶ │ │ ③ ✂ Video Trimmer   Whole · 9:16 · precise     [⋯]     ││
+│ │ …                     │ │ ④ CC Subtitles      Burn · boxed · ≤ 50 MB  ▣K  [⋯]     ││
+│ │                       │ │        [+ Add step]                                    ││
+│ │ (drop files on a card │ │ Triggers  ☐ Watch a folder   [Choose…]                 ││
+│ │  to run it)           │ │ Run history: 3 runs · last: done 10 min ago  → Runs    ││
+│ └───────────────────────┘ └────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Left: the pipeline list.**
+- Each card shows the name, the step icons in order, what it takes ("files"/"links"), a watch indicator, a ▶ Run button and a status dot (ready, problems, missing tools).
+- **Each card is a drop target** with id `pipeline-drop:<id>` (§11.6).
+- **Empty state:** "No pipelines yet", with **New pipeline** and a strip of four template cards (Clip for social, Podcast, Sampling, Product photos), plus "All templates…".
+
+**+ New** opens the **template gallery** (a dialog):
+- a "Blank pipeline" card, plus the 11 templates;
+- each shows its icon, name, blurb, step icons and a "Needs: Music pack" chip, with Install where missing;
+- choosing one → `FromTemplate` (or a blank pipeline with one Downloader step reading `input`) → fill the visualizer designs → `Save` → select it.
+
+**Right: the editor** for the selected pipeline.
+- **Header:**
+  - the name, editable inline;
+  - an optional description;
+  - **Run…**;
+  - a ⋯ menu: Duplicate, Delete (with a confirm that names any active runs, which keep going).
+- **"Takes:"** comes from `Check.Accepts`, e.g. "audio & video files", "links", or "images & PDFs".
+- **Autosave:** edits save automatically, debounced 600 ms (`Save`), with a "Saved" or "Couldn't save: …" indicator.
+- **Describe** runs debounced 250 ms after each edit. Its problems show on the step they belong to, and above the steps for the pipeline-level ones. Run is disabled with the first problem as its tooltip.
+- **Step list:**
+  - a vertical list of **step cards** (§11.4); a drag handle or Alt+↑/↓ moves a step;
+  - **+ Add step** appears at the end and on hover between cards.
+- **Triggers:**
+  - **Watch a folder:** a switch, the folder path, **Choose…** (`FilesService.PickFolder`), and the `WatchState` message.
+  - The line "Also: drop files on this pipeline, Library → Send to, or the command palette".
+- **Run history:** the count and last status, with a link to the Runs tab filtered to this pipeline.
+
+### 11.3 Add-step menu
+A popover with search, grouped by category, built from `Catalog()`.
+
+**Built-ins come first, under "Pipeline steps":**
+- Check
+- Rename files
+- Ask Local Chat
+- Make a table
+- Zip
+- Copy to folder
+
+**Compatibility:**
+- Each tool shows whether it can read what's available at that point. The FE computes this from the resolved `Produces` of the earlier steps (`StepCheck.Info.Produces`) against the type's `Accepts`, in `pipelines/compat.ts`.
+- **Compatible tools are listed first.** The others are dimmed, with the reason, e.g. "Reads images; nothing earlier makes images". They can still be added, reading from `input`.
+
+**Defaults for a new step:**
+- `From` is the nearest earlier step whose products it can read, else `input`, else `none` for `NoFiles` types.
+- Its options are the type's `DefaultsJSON`.
+- `Manual` is on for types that can only be manual, like Object Eraser.
+- `Keep` is on if it is the new last step. The previous last step's `Keep` is switched off unless the user had set it.
+
+**Visualizer steps:** picking one opens its editor straight away on the design choice. `presetId` and `showJson` come from `viz/presets` (`presetById(id).show`, serialised as the Visualizer does) or from **My designs** (`VisualizerService.Designs`).
+
+### 11.4 Step cards and step editors
+**Collapsed:**
+- the number, icon, label (or type name), and `Info.Summary`;
+- chips:
+  - "from step 2 · Bass only" when the source isn't the previous step or there's a filter;
+  - "I'll do this myself";
+  - "Kept" (or "In-between" when Keep is off);
+  - ⚠ with the problem count.
+
+**Expanded (click),** top to bottom:
+1. **Files from:** a select listing "The files you run it on", each earlier step ("Step 2 · Stem Splitter"), and "No files" (`NoFiles` types). Then **Only:** chips for the source's roles (resolved products), plus "More filters…": kinds, extensions and a name contains field.
+2. **How:**
+   - **Automatically** or **I'll do it myself in <Tool>** (where both are possible).
+   - With manual on: a switch "Continue when <Tool> finishes" (AutoContinue), plus a Note field.
+   - Manual steps show no option editor, just "The tool opens with the file loaded and uses its own settings".
+3. **Options:** the type's **step editor** (below).
+4. **Keep its files in the Library:** a switch, with help "Off: deleted when the run finishes without problems".
+5. **Footer:** Label override, Duplicate, Remove.
+
+**Step editors:** `frontend/src/pipelines/steps/`.
+
+```ts
+// registry.ts (Wave 0, frozen)
+export interface StepEditorProps<T> {
+  value: T;
+  onChange: (next: T) => void;
+  check: StepCheck | undefined; // problems, info, available vars
+  vars: StepVar[];              // shorthand for check?.vars ?? built-ins
+}
+export interface StepUI<T = unknown> {
+  type: string;                         // StepType.ID
+  parse: (optionsJson: string) => T;    // sanitize over the defaults (never throws)
+  Editor: ComponentType<StepEditorProps<T>>;
+}
+export function registerSteps(list: StepUI<never>[]): void; // called by the group files
+export function stepUI(type: string): StepUI | undefined;
+```
+
+- **Group files:**
+  - `steps/media.tsx` (AD1's tools)
+  - `steps/compound.tsx` (AD2)
+  - `steps/docs.tsx` (AD3)
+  - `steps/builtin.tsx` (BI1)
+  - `steps/index.ts` (Wave 0) imports all four.
+- **What editors reuse:**
+  - each tool's `DEFAULT_*`/`sanitize*` helpers;
+  - the existing panels where they exist: Downloader `OptionsPanel` (trim fields hidden), Redact `OptionsPanel` with `part="all"`;
+  - `components/` primitives.
+- **Subsets:** editors show the step options' fields only. Fields that need a specific file, like trim segments, aren't there.
+- **Unknown types** render "This step can't be edited here" with a raw summary (never crash).
+- **Vitest:** a test asserts every type in a fixture `Catalog()` snapshot that is `Auto` has a `StepUI`.
+
+**`components/TemplateField.tsx`** (Wave 0, final):
+- a text input or textarea (`multiline`) that highlights `{vars}` and marks unknown ones in red;
+- typing `{` opens a variable list (the `vars` prop, labels shown);
+- an **Insert variable** menu button;
+- props: `{value, onChange, vars, multiline?, placeholder?, label, error?}`.
+
+**`pipelines/vars.ts`** (Wave 0) has `templateVars(tpl)` and `expandPreview(tpl, sample)`, mirroring `core.TemplateVars`/`ExpandVars`, with shared test vectors in `testdata/vars.json` read by both test suites.
+
+### 11.5 Run sheet and the Runs tab
+**Run sheet** (a dialog opened by Run…, a card's ▶, the palette, Send to, or the drop chooser).
+- **Inputs:**
+  - a `DropZone` (id `pipeline-run:<id>`) plus **Choose files** (`FilesService.PickWith(title, Check.Accepts.extensions, true)`);
+  - a **Links** textarea when `Accepts.urls`;
+  - the list of inputs, with unaccepted ones struck through ("not for this pipeline").
+- **Secrets:** a password field for each `Check.Secrets` entry, labelled "Step 3 · PDF password".
+- **Start:** `Start` closes the sheet and switches to the Runs tab on the new run. Errors show inline.
+
+**Runs tab:**
+- **Left: the runs list**, active first, then newest. Each row has the pipeline name, the status chip, "3 of 5 files", the time, and a "Needs you" badge. There is a filter for one pipeline or all.
+- **Right: the run detail.**
+  - **Header:** name, status, started (relative), trigger, and actions: **Cancel** (active), **Retry failed** (partial/failed/cancelled, not Cleaned), **Delete in-between files** (finished with temporary files left), **Remove** (finished; its confirm has a checkbox "Also delete in-between files", on by default).
+  - **Needs you:** one card per waiting cell (manual/check) of this run (§11.7).
+  - **Grid:**
+    - rows are items, with their label; merged items are labelled "All N files" and sit under the items they gather;
+    - columns are steps, with an icon and number;
+    - each cell shows a status icon (spinner with job progress, check, ✕, ⏸, –, ⤵ merged).
+  - **Clicking a cell** opens a popover with:
+    - its message or error, with the hint;
+    - its jobs, each with status and **Show log** (opens the job tray with that job's log expanded: `setExpandedLogJobId`);
+    - its files, each with Open, Reveal and Send to;
+    - the variables it made (previews).
+  - **Results:** the files of every Keep step's cells, grouped by item, with Open/Reveal, **Open folder** (for built-ins, `Pipelines/<name>/`), and the variables of each item in a small table (bpm, key…).
+
+### 11.6 Triggers in the shell
+**Drops** (`shell/dropRouting.ts`):
+- `targetId` `pipeline-drop:<id>`: if the pipeline is Ready, needs no secrets and accepts at least one path, `Start` right away and toast "Started <name> with 3 files" (action "Show"). Otherwise open the Run sheet with the paths.
+- `targetId` `pipeline-run:<id>`: add the paths to the open Run sheet.
+- **The global chooser** (`DropOverlay`) gets a **Pipelines** section under the tools: every pipeline whose `Check.Accepts` takes at least one path, opening the Run sheet with them.
+
+**Library → Send to:** after the tools, a separator and "Pipeline: <name>" for each pipeline accepting the file → the Run sheet.
+
+**Command palette** (block in `useBuiltinCommands.ts`):
+- "Open Pipelines"
+- "New pipeline…"
+- "Run pipeline: <name>" for each pipeline (opens the Run sheet)
+- "Show pipeline runs"
+
+**Job tray** (`JobRow`): jobs with `pipelineRunId` show a chip "⛓ <run name> · <step n>/<N>". Clicking it navigates to Pipelines → Runs → that run.
+
+### 11.7 "Needs you"
+**The card** (`NeedsYouCard`, on the Runs tab):
+- Title: "<run name> · <item label>"; subtitle: the step's label and its Note.
+- **Manual:**
+  - the input files;
+  - the adopted jobs so far ("Made in Video Trimmer: clip (trim).mp4");
+  - buttons: **Open <Tool>** (`handOff({moduleId, inputs: cell input paths})`), **Continue** (disabled until an adopted job is done, with "Continue with the original file" as a secondary link), **Skip step**, **Stop this file**.
+- **Check:**
+  - each input file with a thumbnail (images: `ImageThumb`; others: a kind tile) and a checkbox (all on);
+  - buttons: Open, Reveal, **Continue with N files**, **Stop this file**.
+
+**Banner** (`shell/PipelineBanner.tsx`, rendered by `Shell.tsx` above the tool view):
+- Shows when the current view is a module with a waiting manual cell: "Clip for social is waiting: Pick the part to keep, then Export".
+- Buttons: **Continue** (as the card), **Skip step**, **Show run**.
+- With several waiting cells for that tool, it says "2 pipeline steps are waiting" and **Show** goes to the Runs tab.
+- It is a thin bar in tokens' accent colour and never covers the tool's own controls.
+
+**Toast:** when a cell starts waiting (manual or check), the FE toasts "<run name> needs you", with the step label as its description. The action is "Open <Tool>" (manual) or "Check files" (check). Duration 0 if the main window isn't focused, 8 s otherwise.
+
+**Tray** (`desktop`): `Shell.SetPipelinesNeedYou(total, firstRunName)` adds a menu item at the top, "<firstRunName> needs you" (or "N pipeline steps need you"). It opens the main window on Pipelines → Runs, and is removed at 0.
+
+### 11.8 State (`frontend/src/state/pipelines.ts`, Wave 0)
+- A Zustand store:
+  - `entries` (from `List` + `pipelines:changed`);
+  - `catalog` and `templates` (loaded once);
+  - `runs` by ID (from `Runs({limit: 50})` + `pipelines:run`, merged);
+  - `selectedPipelineId`, `selectedRunId`, `tab` ("pipelines" | "runs");
+  - `runSheet: {pipelineId, inputs} | null`.
+- **Selectors:** `useNeedsYou()` (cells waiting with manual/check across runs, stable via `useMemo` on the runs map), `useWaitingForModule(moduleId)`, `useRunName(runId)`.
+- **Actions:** `openRunSheet(pipelineId, inputs?)`, `showRun(runId)`, plus thin wrappers over the service.
+- **Bootstrap:** `bootstrap.ts` loads the entries and active runs at start, so the banner, badge and chips work before the page is opened.
+
+---
+
+## 12. Foundation (Wave 0, architect, committed to main before builders start)
+
+1. **Archive and roadmap:** P7's spec archived to `docs/specs/phase-7.md` (done); `docs/ROADMAP.md` points Phase 7 at it.
+2. **`core`:**
+   - `pipeline_types.go` (§5) and `steps.go` (§6.1) with `ExpandVars`/`TemplateVars`/`FileVars` **implemented and tested** against `testdata/vars.json`;
+   - `CodeWaiting`/`ErrWaiting`;
+   - the `Job` fields;
+   - the events;
+   - `PipelineStore`, `OutputStore.MoveOutput`;
+   - `TextGenerator.ContextTokens` (chat implements it; the fakes in tests too).
+3. **`core/jobs.go`:** `SubmitFor`, `Tag`, `Observe` and the `JobFilter` field, implemented with tests.
+4. **`core/store`:** migration 0005, the job columns, `PipelineStore` and `MoveOutput`, implemented with tests.
+5. **`core/pipeline`:** the package with `Config`, `New` and every method signature from §8. The bodies are stubs: `Catalog` and `Describe` work for type lookup only; the rest return `CodeInternal` "not implemented". `fake_test.go` provides a fake Chainable module for PR1.
+6. **`modules/pipelines`:**
+   - the module (descriptor, `Options`, the five StepOptions types);
+   - `Register`;
+   - a `Service` with every method from §9.3 delegating to the runner, including the shape methods;
+   - `templates.go` with the IDs and names only (BI1 fills in the steps).
+7. **Every adapter module:**
+   - `pipeline.go` with its final `StepOptions` type (where new) and a `Chainable` implementation whose `DescribeStep` returns the static Accepts/Produces/Vars of §6.2 and whose `PrepareStep`/`StepOutputs` return "not implemented";
+   - the new action constants and option fields (§6.3, §6.4) with `Validate` rejecting `auto` as "not implemented yet";
+   - the `StepShape()` service methods.
+8. **API and wiring:**
+   - `api/files.go` `PickFolder`;
+   - the events in `api/events.go`;
+   - the `main.go` wiring (§9.4);
+   - the desktop `SetPipelinesNeedYou` (tray item).
+9. **Bindings** regenerated; `lib/api.ts` re-exports.
+10. **Frontend skeleton:**
+    - `state/pipelines.ts` (complete) and the bootstrap;
+    - `nav.ts` item;
+    - `tools/pipelines/PipelinesView.tsx` with the tab layout mounting `PipelineList`, `PipelineEditor`, `RunsPanel` and `RunSheet` stubs;
+    - `pipelines/steps/registry.ts` + `index.ts` + the four empty group files;
+    - `pipelines/vars.ts`, `pipelines/compat.ts` (with tests);
+    - `components/TemplateField.tsx` (complete);
+    - the toolViews line.
+11. **Docs:** a Phase 8 section in `CLAUDE.md` (§16); `docs/MAC-CHECKLIST.md` Phase 8 steps (§13.5).
+
+---
+
+## 13. Test plan
+
+### 13.1 Go (stdlib `testing`, table tests, fakes)
+**`core`:**
+- `ExpandVars`, `TemplateVars` and `FileVars` (the shared vectors, including braces, unknown names and the caps);
+- `Jobs.SubmitFor`/`Tag`/`Observe`: snapshots arrive, the tag persists across Retry, observers can stop.
+
+**`core/store`:**
+- migration 0005 on a Phase 7 DB;
+- the round trips (pipelines, runs, seen, `MoveOutput` keeps ID and tags);
+- `PruneRuns`.
+
+**`core/pipeline` (PR1),** with a fake registry of fake Chainable modules that make files in a temp library (they can fail, wait, make several files or none, set variables, take secrets):
+- linear 3 steps on 3 items; per-item order; the in-flight cap;
+- fan-out (one item → 4 files) and filter by role;
+- `From` an earlier step (branching);
+- together: merge, a together step reading a pre-merge step, items that fail before the merge being left out, a late retry being `skipped`;
+- variables: accumulation, override, unknown names, table rows from each item's variables;
+- manual: adoption by module and path, AutoContinue only on done-with-files, Continue with Keep, PassThrough, Skip, StopItem;
+- check: keep a subset, keep none;
+- condition wait: re-prepared until it clears;
+- cancel run; retry run (failed job retried with the same ID, prepare errors re-prepared, blocked → pending); retry from the job tray resuming the item;
+- restart: a persisted running run with an interrupted job, a queued job, a preparing cell and a lost secret;
+- clean-up: only temporary files of the run inside the Library, never inputs, record removed;
+- Describe: every rule in §8.8, with messages;
+- watch: stability across two polls, temp/hidden ignored, baseline, one run per poll, folder rules;
+- preflight refusals;
+- the status table.
+
+**Adapters (AD1–AD3):** for each module, a table test of `DescribeStep` (summary, accepts, products, problems), `PrepareStep` (grouping, expansion, defaults filled, the trimmer segments from a fake probe), and `StepOutputs` from recorded `Job`s (roles, variables, pass-through for PDF compress).
+- **Subtitles, Lyric Video and Visualizer `auto`:** `Run` against fakes (fake engine, fake TextGenerator, the fake render broker from P7 tests). Covered:
+  - the order of the parts;
+  - progress ranges;
+  - the no-speech / no-lyrics errors;
+  - outputs.
+
+**Built-ins (BI1):**
+- rename: move vs copy, illegal characters, collisions, roles kept, `MoveOutput` called;
+- chat: write, extract (schema, retry once, unusable), chunking with a fake generator and a small `ContextTokens`;
+- table: CSV quoting and BOM;
+- zip: store vs deflate, duplicate names;
+- copy: never overwrite, folder rules;
+- templates: every template Describes Ready with a fake full registry.
+
+**Integration** (`-tags integration`, real tools):
+- `integration/pipeline_test.go`: converter → rename on a generated WAV → MP3 → `{name} · copy`;
+- trimmer first-5-s on a generated video;
+- PDF images-to-pdf → compress on generated PNGs;
+- a manual step adopted from a direct `Jobs.Submit`.
+
+### 13.2 Frontend (Vitest, jsdom)
+- `vars.ts` (the shared vectors); `compat.ts`.
+- `TemplateField`: highlighting, the `{` menu, insert.
+- **Step editors:** each renders from defaults, edits round-trip through `parse`, and every `Auto` catalogue type has a `StepUI`.
+- **Editor:**
+  - add, remove and move steps;
+  - the From and filter selects;
+  - the manual toggle setting AutoContinue by tool;
+  - Keep defaults on add;
+  - problems shown on the right step;
+  - autosave debounce;
+  - the template gallery fills the visualizer design.
+- **Run sheet:** accepted vs struck inputs, links, secrets, Start errors.
+- **Runs:** grid statuses, the cell popover, Needs-you cards (manual/check actions call the right service), Retry/Clean/Remove states.
+- **Shell:**
+  - drop routing (instant start vs sheet);
+  - the DropOverlay section;
+  - Library Send to items;
+  - palette commands;
+  - the banner shown only for the waiting module;
+  - the JobRow chip;
+  - the sidebar badge.
+
+### 13.3 End to end (architect, Wave 3)
+Real runs in the dev sandbox on the Windows box, of templates 1, 2, 3, 5, 6, 8, 10 and 11 on real inputs, plus a watch-folder run. Details in §14 Wave 3.
+
+### 13.4 Checks
+`go vet`, `go test -race` (where cgo is available), gofmt, the darwin cross-vet, `npm run check`, `wails3 build`.
+
+### 13.5 Mac checklist (new steps)
+1. **Watch folder on APFS:** files copied in from Finder start one run after they settle.
+2. **Manual step:** the Trimmer opened from a pipeline is adopted; the banner shows; AutoContinue carries on.
+3. **The tray "needs you" item** opens the Runs tab.
+4. **Template 11 (Visualizer)** renders with the window hidden in the tray.
+
+---
+
+## 14. Work packages
 
 ### Wave 0: foundation (architect)
-1. Archive P6's spec (done); update `docs/ROADMAP.md` (done).
-2. `core/lyrics`, moved with its tests; Lyric Video converts at its boundary.
-3. `core/viz` types, the Analyzer/RenderBroker/mux signatures with stub bodies, the cache paths and prune; RawMessageHandler wiring and events in `main.go`/`api/events.go`.
-4. `modules/visualizer` stub (§4.6) with final options, `Validate` and service, plus the mood reader's pins and `ModelProvider` stub.
-   - Packs (§4.7): the `mood-reader` component with its measured size.
-   - Engine 0.7.0 with the `viz.analyze`, `viz.mood` and `viz.prefetch` stubs.
-   - The new option fields of Lyric Video (`Look.Visuals`) and Subtitles (§9.3), with `Validate`.
-   - `core/viz.VisualsSpec` and the `RenderVisuals` signature.
-5. Bindings, `lib/api.ts` re-exports, icons, the `Handoff.seed` type, the tool view stub, `RenderHost` mounted.
-6. **`viz/` working minimum:**
-   - `types.ts` (final), `validateShow`, and `analysis.ts`, `signals.ts` and `palette.ts` complete with tests;
-   - the GL core: context, targets, bloom, tonemap, dither, the overlay output;
-   - the layer and post registries;
-   - reference layers `gradient` and `bars`; the reference preset `spectrum-classic`;
-   - the engine rendering a show at a time;
-   - the worker skeleton with the message protocol and the H.264 encoder (no JPEG yet);
-   - VizLab with the PNG sink.
-   - Builders branch from a state where a preset renders end to end in the lab.
-7. **CLAUDE.md** Phase 7 section; `docs/MAC-CHECKLIST.md` Phase 7 steps.
+§12, committed to main.
 
 ### Wave 1 (parallel)
+
 | WP | Owns | Acceptance |
 |---|---|---|
-| **AN1 Analysis engine** | `sidecar/.../handlers/viz.py`, `toolbox_sidecar/viz/**`, `sidecar/tests/test_viz.py` | §5.2–5.3, §5.5 audio schema; §11.2 |
-| **AN2 Analysis orchestration** | `core/viz/analyze.go`, `meaning.go`, `cache.go`, `visuals.go` (`RenderVisuals`) (+ tests) | §4.3 visuals, §5.1, §5.4 merge rules, §5.5 text schema; §11.1 |
-| **AN3 Mood reader** | `toolbox_sidecar/viz/mood.py`, `anchors.json`, the `viz.mood`/`viz.prefetch` parts of `handlers/viz.py` (AN1 owns the rest of that file; a marked block), `sidecar/tests/test_viz_mood.py`, `tests/data/mood_lines.json` | §5.4 reader; §11.2 targets |
-| **RB1 Render broker + FFmpeg** | `core/viz/broker.go`, `mux.go`, `plan.go` (+ tests, integration) | §7.2 (Go side), §7.4; §11.1 |
-| **VM1 Visualizer module** | `modules/visualizer/**` (except frozen files) | §7.1, §10; Go tests against fakes |
-| **RH1 Render host + worker** | `viz/RenderHost.tsx`, `viz/worker/**` | §7.2 (web side), §7.3; transport tests; a real export from VizLab |
-| **L1 Backgrounds** | `viz/layers/{nebula,aurora,ink,synthgrid,tunnel,starfield,terrain,image,kaleido}.ts` + shaders | §6.7 #2–10; lab PNGs; ≥ 50 fps each at 720p |
-| **L2 Shapes + highway** | `viz/layers/{radial,ribbons,wavering,oscilloscope,lissajous,helix,vortex,geometry,pitchribbon,highway}.ts` (+ `bars` polish) | §6.7 #11–20, #29 |
-| **L3 Particles, accents, motifs** | `viz/layers/{embers,bursts,fireflies,ripples,shockwave,sweep,lightrays,frame,motif}.ts`, the sprite atlas generator | §6.7 #21–28, #30 |
-| **PX1 Post + transitions** | `viz/post/**` (beyond Wave 0's), transitions in `engine.ts`' transition module (`viz/transitions.ts`) | §6.5 steps 3 and 5, §6.7 post list |
-| **TX1 Text layer** | `viz/text/**` | §6.8; layout tests; lab PNGs at 16:9 and 9:16 |
-| **SB3 Subtitles words** | `modules/subtitles` Cue words + the edit operations in `tools/subtitles/**` | §9.3 (words), tests. SB4 builds on it in Wave 2 |
+| **PR1 Runner** | `core/pipeline/**` (except the frozen `types`/signatures), its tests | §8 complete; §13.1 runner tests; Describe messages as written |
+| **BI1 Built-in steps** | `modules/pipelines/**` (except the frozen `service.go` signatures and module descriptor), `frontend/src/pipelines/steps/builtin.tsx` | §7, §10; §13.1 built-ins; editors for the five built-ins + Check (note only) |
+| **AD1 Media adapters** | `pipeline.go` (+ tests) of downloader, converter, trimmer, audiocleanup, redact, stems, bpmkey, midi, transcribe; converter image `MaxHeight` (+ its view's height control); `frontend/src/pipelines/steps/media.tsx` | §6.2–6.3 rows; §13.1 adapters; editors |
+| **AD2 Compound actions** | subtitles, lyricvideo and visualizer: the `auto` actions in their run code + `pipeline.go` (+ tests); `frontend/src/pipelines/steps/compound.tsx` (the visualizer editor uses `viz/presets` and `VisualizerService.Designs`) | §6.4; §13.1; one real auto run of each |
+| **AD3 Image and document adapters** | `pipeline.go` (+ tests) of pdf (secrets, grouping, pass-through), vault (wait), bgremove, upscale, exif, eraser (manual-only descriptor); `frontend/src/pipelines/steps/docs.tsx` | §6.2–6.3 rows; §13.1 |
+| **UI1 Pipelines page** | `tools/pipelines/{PipelineList,PipelineEditor,StepCard,AddStepMenu,TemplateGallery,FiltersPopover}*` | §11.2–11.4; FE tests |
 
-### Wave 2 (parallel, after Wave 1 merges; VP1 also needs PR1's preset list, so it starts with the reference preset and picks up the rest when PR1 merges)
+### Wave 2 (parallel, after Wave 1 merges)
+
 | WP | Owns | Acceptance |
 |---|---|---|
-| **PR1 Presets + director** | `viz/presets/**`, `viz/director.ts` | §6.9, §6.10: 20 presets that validate; contact sheets reviewed by the architect; each ≥ 50 fps at 720p in the lab |
-| **UI-V1 Source + Analyze + Song Map** | `tools/visualizer/{SourceStep,AnalyzeStep,SongMap}*` | §8.1, §8.2 |
-| **UI-V2 Design + Export** | `tools/visualizer/designer/**` (`VisualDesigner`, `useVisualsAnalysis`, `useShowHistory`, Preview, WhyPanel, the tabs), `tools/visualizer/{DesignStep,ExportStep,useSeed}*`, `VisualizerView.tsx` | §8.3, §8.4, §9.4, §9.5 |
-| **VP1 Visuals picker** | `frontend/src/components/viz/**` (`VisualsPicker`, `VisualsCanvas`, the shared `PresetThumbs` thumbnail engine that UI-V2's Presets tab also uses) | §9.1; FE tests |
+| **UI2 Runs and triggers** | `tools/pipelines/{RunSheet,RunsPanel,RunGrid,CellPopover,NeedsYouCard,RunResults}*`, `shell/PipelineBanner.tsx`, the pipelines parts of `shell/{dropRouting,DropOverlay,JobRow,Sidebar,Shell,useBuiltinCommands}` (marked blocks), `views/LibraryView.tsx` Send to | §11.5–11.7; FE tests |
 
+UI2 waits for Wave 1 because it needs a working runner to be checked against the real app. It may start from the Wave 0 store and types if Wave 1 runs long.
 
-Palette commands for the Visualizer (open, Analyze, Render, Render preview, Full screen) go in the marked block of `shell/useBuiltinCommands.ts` (UI-V2).
-
-### Wave 3 (parallel, after UI-V2 and VP1 merge)
-| WP | Owns | Acceptance |
-|---|---|---|
-| **LV3 Lyric Video visuals** | `modules/lyricvideo` (`Look.Visuals`, the render/preview graph) + `tools/lyric-video/**` (the Visuals step with Instruments panel, Quick / Full designer / Classic, the Look summary, the preview background, the "whole video" link) | §9.2; Go + FE tests; a real render |
-| **SB4 Subtitles visuals** | `modules/subtitles` (audio burn, overlay burn) + `tools/subtitles/**` (Make a video, the Visuals row, the designer sheet, the reactive link) | §9.3; Go + FE + integration tests |
-
-### Wave 4: integration (architect)
-1. Merge, regenerate bindings, and run every check, the engine e2e (extended with `viz.analyze` on the synthetic track with stems) and `wails3 build`.
-2. VizLab contact sheets: review all 20 presets × 5 moments and send back any that look poor.
-3. Determinism and parity checks.
-4. Measurements against §13.
-5. A real song end to end (detect + mood reader; then with Deeper reading).
-6. A subtitled talking-head video in overlay mode.
-7. A Lyric Video through the Visuals step: once Quick, once with the full designer, stems on and saved.
-8. A podcast-style audio file → Subtitles "Make a video" with a Visualizer background.
-9. The `timed-text` handoffs.
-10. No listeners during a render.
-11. The mood-reader download in a fresh sandbox (Music pack): disk use within ±10% of the card.
-12. DECISIONS.md and the summary.
+### Wave 3: integration (architect)
+1. Merge, regenerate the bindings, run every check and `wails3 build`.
+2. **Real runs, in the sandbox:**
+   1. **Clip for social** on a real link, with the manual trim through the Trimmer.
+   2. **Podcast** on a 30-minute recording; chunking kicks in at an 8k context.
+   3. **Sampling** on a real link: the stems are renamed with BPM and key, and MIDI is made from the bass only.
+   4. **Product photos** on 5 photos.
+   5. **Paper to archive** on 4 phone photos of pages, with the Vault locked first, then unlocked.
+   6. **Receipts** on 5 receipt photos, giving a CSV.
+   7. **Before sharing** on 3 photos and a video, with the check step.
+   8. **Music video** with the window hidden.
+3. **A watch folder** on `.dev/watch-in` (copy 3 files in, then 1 more later).
+4. **Restart in the middle of a run**, then resume it with Retry.
+5. **No listeners** beyond P5's; nothing written outside the repo, the sandbox and the user-chosen folders.
+6. DECISIONS.md, ROADMAP, the Mac checklist and the summary.
 
 ---
 
-## 13. Acceptance criteria
-1. **No sockets:**
-   - A full export runs with no listening socket other than llama-server's (P5).
-   - The raw-message channel ignores wrong tokens, wrong origins and child frames (tests).
-2. **Analysis (Windows box, 4-minute song):**
-   - audio features without stems ≤ 20 s;
-   - with stems + detect + mood reader ≤ 1.5× the song length (Deeper reading adds the chat model's reply time);
-   - a second analysis of the same file ≤ 2 s (cache).
-   - On a real song: tempo matches a manual count (or its double or half), and the chorus is labelled on at least 2 of its occurrences.
-3. **Export speed (Windows box):**
-   - 1080p30 full ≥ 4× real time for the 3 heaviest presets (measured in the render log);
-   - 2160p30 ≥ 1× real time;
-   - a 1080p overlay over a 1080p 30 fps video ≥ 1× real time end to end (composite included).
-4. **Preview:** every preset ≥ 50 fps at 1280×720 (VizLab `fps.json`).
-5. **Exactness:**
-   - two renders of the same plan give identical pre-encode hashes (VizLab);
-   - preview and export frames match (VizLab parity, mean absolute difference ≤ 1/255);
-   - the exported video's frame count equals duration × fps, and its audio stays in sync (±1 frame at the end of a 4-minute render).
-6. **Reactivity you can see:**
-   - on the contact sheets, every preset differs visibly between verse and chorus;
-   - on a kick vs no-kick frame pair, every preset with a kick-driven control changes measurably (mean pixel difference > 2%);
-   - the "Why" readout names the drivers that are actually active.
-7. **Words:**
-   - with lyrics, karaoke text is in sync (word fill within ±1 frame of the word times);
-   - emphasised words stand out;
-   - with the mood reader alone, the mood strip and motifs follow the lyrics on a test song (e.g. a line about fire shows the fire motif); the mood-reader targets in §11.2 pass.
-8. **Video overlay:**
-   - Over a subtitled talking-head video, Clean Captions shows readable subtitles that pop on emphasis.
-   - The output keeps the video's size, rotation, fps and audio.
-9. **Visuals in the other tools:**
-   - In Lyric Video's Visuals step, a Quick choice takes ≤ 2 clicks after ~10 s of listening (more with stems), and the preview moves to the song.
-   - The render has the visuals under the libass lyrics.
-   - The Visuals step's full designer edits the design with the lyrics shown, and the stems can be saved from it.
-   - Subtitles makes a captioned video from an audio file with a Visualizer background, and adds overlay visuals under the subtitles of a video.
-   - The `timed-text` handoffs open the Visualizer with the defaults of §9.5.
-10. **Quality:** no visible banding in dark gradients after export (dither), no jagged lines (SDF), no flicker from raw signals (envelopes) — checked on the contact sheets and one exported video.
-11. **Housekeeping:**
-    - all checks are clean (`go vet`, `go test`, pytest, `npm run check`, gofmt, darwin cross-vet);
-    - the engine e2e passes;
+## 15. Acceptance criteria
+
+1. **Making:**
+   - A pipeline of any listed step types can be built, reordered and saved.
+   - Every built-in template opens Ready, when its packs are installed, with no edits.
+   - Problems name the step and the cause in plain words.
+2. **Data flow:**
+   - **Fan-out:** the Sampling run makes MIDI from the bass stem only, and the stems carry the BPM and key in their names.
+   - **Branching:** step 3 of Sampling reads step 1.
+   - **Fan-in:** Paper to archive makes one searchable, compressed PDF from 4 photos, and Receipts one CSV with one row per photo.
+3. **Variables:** `{bpm}`, `{key}`, `{title}`, `{transcript}`, `{transcript_timed}`, `{text}` and the extracted fields reach file names, prompts and columns. An unknown variable is a Describe problem.
+4. **Manual and check:**
+   - **Manual:** a manual Trimmer step opens the Trimmer with the file. The banner shows. The Trimmer's export is picked up, and the run continues without another click.
+   - **Check:** a check step can drop a file, and the zip then leaves it out.
+5. **Jobs:**
+   - Every step's work shows in the job tray with the run chip and its log.
+   - Cancelling the run stops its jobs.
+   - Retrying a failed job from the tray resumes its item.
+   - A restart in the middle is recoverable with Retry failed.
+6. **Triggers:**
+   - A drop on a ready pipeline starts it at once.
+   - The drop chooser and Library Send to list matching pipelines.
+   - The palette runs any pipeline.
+   - A watch folder runs once per batch of settled files and never on files that were already there.
+7. **Library:**
+   - In-between files of a `done` run are deleted from disk and the Library.
+   - Kept files stay.
+   - Inputs are never touched.
+   - Outputs of built-ins live in `Pipelines/<name>/`.
+8. **Waiting conditions:** a locked Vault makes the step wait and continue by itself after unlocking. PDF passwords are asked at start and never stored.
+9. **Speed:** the run overhead is ≤ 300 ms per cell over the jobs themselves (measured on the Converter → Rename run with 20 files).
+10. **Housekeeping:**
+    - all checks are clean (`go vet`, `go test`, gofmt, darwin cross-vet, `npm run check`);
+    - the integration tests pass;
     - CLAUDE.md, the Mac checklist, ROADMAP and DECISIONS are updated.
 
-## 14. Risks
-- **Raw messages on macOS** (WKScriptMessageHandler) aren't measured. If they're slow, a 4-minute 1080p export (~400 MB of base64) could take minutes. Two mitigations:
-  - **Bitrate:** export bitrate scales down automatically if the measured transport rate is below 3× the stream rate. The worker measures it from acks.
-  - **Fallback:** the JPEG path doesn't help here, so the fallback is a lower bitrate with a note.
-  - Mac checklist step 4.
-- **Hardware encoder availability** varies by GPU and driver. The software H.264 path in Chromium (OpenH264) was 65 fps at 1080p here, and the JPEG path is last.
-- **Analysis quality on real music:**
-  - Beat tracking and section labels are heuristics. Labels can be wrong (the Song Map lets users reassign scenes per section, and nothing depends on a label being right).
-  - Whisper on singing is weak (P6 risk), so "Paste lyrics" stays recommended.
-- **The mood reader is approximate.** It scored 0.86 on English test lines and 4 of 6 on other languages in research, and lines that only hint at a feeling come out weak. Weak readings count half, mood always blends with the musical mood, the "Why" readout shows what it read, and Deeper reading (Local Chat) is there for subtler lyrics. Imagery has a high threshold, so a wrong motif is rarer than a missed one.
-- **GPU differences** (ANGLE D3D11 vs Metal) can change shader precision. Shaders use `highp` and avoid derivative-dependent tricks in the parity path; VizLab parity runs on each OS.
-- **Text in workers on macOS** (`OffscreenCanvas` 2D fonts) is *docs only*. If system fonts don't resolve there, text is rasterised on the main thread and transferred as `ImageBitmap`s to the worker (the atlas is small).
-- **Scope:** 31 layers and 20 presets is a lot of art direction for builders. VizLab contact sheets make every layer visible to its builder, and the architect reviews them before the presets are accepted. Presets can ship in fewer numbers if some don't meet the bar (logged in DECISIONS).
-- **Cache growth:** analyses are small (a few MB each), plus `instrumental.flac` per song (~30 MB). Capped at 3 GB and 30 days.
+## 16. CLAUDE.md additions (Wave 0)
+
+A "Pipelines (Phase 8)" section:
+- **A run isn't a job.** The `core/pipeline` Runner is one event loop that submits tagged jobs (`Jobs.SubmitFor`) and follows them with `Jobs.Observe`. Never block in an observer.
+- **How to make a module a pipeline step:**
+  - implement `core.Chainable` in `modules/<id>/pipeline.go`: `StepDefaults`, `DescribeStep` (Accepts/Produces with roles/Vars/Summary/Templates), `PrepareStep` (grouping; expand `{vars}` with `core.ExpandVars`) and `StepOutputs` (roles + variables);
+  - add a `StepShape()` service method if its step options are a new type;
+  - add its `StepUI` to a `frontend/src/pipelines/steps/*.tsx` group.
+- **Manual steps** need nothing from a module. They adopt jobs by module and input path.
+- **Secrets** (passwords) are asked at run start, live only in Runner memory, and are never in the DB or job options (only a `passwordRef`).
+- **Temporary files:** clean-up only deletes the run's own registered outputs inside the Library, never inputs.
+
+## 17. Risks
+- **The chat model's quality on long transcripts.** Map-reduce notes lose detail, and an 8k context reads a 1-hour podcast in about 6 parts. Chapters depend on the model keeping the timestamps.
+  - Mitigations: the map prompt says to keep the timestamps; the Podcast template uses `{transcript_timed}`; the user can raise the context size in Settings → Local Chat.
+- **Adoption by path can pick up an unrelated job.** For example, the user runs the Trimmer on the same file for another reason while a manual step waits. The card lists what was picked up and Continue takes a subset, but AutoContinue would carry it on.
+  - This is acceptable for a personal app; it's in the help text.
+- **Watch folders over network drives or cloud folders** (iCloud, OneDrive placeholders) may report sizes before the content arrives. The 3-second and two-poll rules help, and placeholder files without local content fail their first step with a read error, which Retry fixes.
+- **Template 1 encodes the video three times** (trim, crop, burn). Quality at 1080p stays acceptable at the bitrates Trimmer and Subtitles use, and the size cap is applied last.
+- **Run state size:** 200 items × 30 steps with full transcripts could reach megabytes. Variables are stored once per item, previews on the wire are capped, the state is capped at 16 MiB, and `pipelines:run` is throttled.
+- **Scope:** six Wave 1 packages touch many modules, but each module's change is one new file plus, for three of them, one new action. The adapters share one interface and one test pattern.
