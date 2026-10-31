@@ -189,3 +189,19 @@
   padding: var(--space-2);
   border-top: 1px solid var(--line);
 }
+
+/* --- pipelines --- */
+.badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: var(--text-xs);
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+/* --- end pipelines --- */

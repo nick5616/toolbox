@@ -1,0 +1,109 @@
+.pop {
+  position: fixed;
+  z-index: 60;
+  max-height: min(420px, calc(100vh - 80px));
+  overflow-y: auto;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--bg-raised);
+  border: 1px solid var(--pop-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+}
+
+.pop:focus {
+  outline: none;
+}
+
+.title {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.sub {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.message {
+  font-size: var(--text-md);
+}
+
+.error {
+  padding: var(--space-2);
+  border-radius: var(--r-md);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--text-md);
+}
+
+.hint {
+  margin-top: var(--space-1);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-subtle);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.job {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+}
+
+.jobTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vars {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-sm);
+}
+
+.var {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.var dt {
+  flex: none;
+  min-width: 70px;
+  color: var(--fg-muted);
+}
+
+.var dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

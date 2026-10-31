@@ -1,0 +1,150 @@
+.root {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
+.empty {
+  height: 100%;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.none {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--bg-hover);
+}
+
+.row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.selected,
+.selected:hover {
+  background: var(--bg-active);
+  border-color: var(--line-strong);
+}
+
+.rowTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.rowName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+
+.rowMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.main {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.headTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.name {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.headMeta {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.runError {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-md);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--text-sm);
+}
+
+.confirm p {
+  margin: 0 0 var(--space-2);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--fg);
+}

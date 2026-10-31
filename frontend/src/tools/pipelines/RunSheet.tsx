@@ -1,9 +1,200 @@
-// STUB (Wave 0): WP-UI2 implements the Run sheet dialog (SPEC.md §11.5). Props frozen;
-// it reads and updates usePipelines().runSheet and closes with closeRunSheet().
+import { useEffect, useId, useMemo, useState, type KeyboardEvent } from "react";
+import { Banner, Button, DropZone, Icon, IconButton, TextArea, TextField, cx } from "@/components";
+import { FilesService, PipelinesService } from "@/lib/api";
+import { toAppError } from "@/lib/errors";
+import { describeAccepts } from "@/pipelines/compat";
+import { usePipelineEntry, usePipelines } from "@/state/pipelines";
+import { baseName } from "./RunGridModel";
+import { inputAccepted, isLink, mergeInputs } from "./RunSheetModel";
+import styles from "./RunSheet.module.css";
+
+// The Run sheet (SPEC.md §11.5): choose the files or links, enter the
+// passwords the steps need, and start a run.
 export interface RunSheetProps {
   pipelineId: string;
 }
 
-export function RunSheet(_props: RunSheetProps) {
-  return null;
+const MAX_INPUTS = 200;
+const NO_INPUTS: string[] = [];
+
+function parseLinks(text: string): string[] {
+  return text
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter((s) => isLink(s));
+}
+
+export function RunSheet({ pipelineId }: RunSheetProps) {
+  const titleId = useId();
+  const entry = usePipelineEntry(pipelineId);
+  const inputs = usePipelines((s) => s.runSheet?.inputs ?? NO_INPUTS);
+  const setInputs = usePipelines((s) => s.setRunSheetInputs);
+  const close = usePipelines((s) => s.closeRunSheet);
+  const [linksText, setLinksText] = useState("");
+  const [secrets, setSecrets] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<{ message: string; hint: string } | null>(null);
+
+  const accepts = entry?.check.accepts;
+  const links = useMemo(() => parseLinks(linksText), [linksText]);
+  const all = useMemo(() => mergeInputs(inputs, links), [inputs, links]);
+
+  useEffect(() => {
+    if (!entry) close();
+  }, [entry, close]);
+
+  if (!entry || !accepts) return null;
+  const name = entry.pipeline.name;
+  const needs = entry.check.secrets ?? [];
+
+  const accepted = all.filter((i) => inputAccepted(accepts, i));
+  const secretKey = (stepId: string, key: string) => `${stepId}.${key}`;
+  const missingSecret = needs.some((s) => !(secrets[secretKey(s.stepId, s.key)] ?? "").length);
+  const tooMany = accepted.length > MAX_INPUTS;
+  const ready = entry.check.ready;
+  const canStart = ready && !busy && accepted.length > 0 && !tooMany && !missingSecret;
+
+  const choose = async () => {
+    try {
+      const picked = await FilesService.PickWith(`Run ${name}`, accepts.extensions ?? [], true);
+      if (picked && picked.length > 0) setInputs(mergeInputs(inputs, picked));
+    } catch (e) {
+      const err = toAppError(e);
+      setError({ message: err.message, hint: err.hint ?? "" });
+    }
+  };
+
+  const start = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const sec: Record<string, string> = {};
+      for (const s of needs) sec[secretKey(s.stepId, s.key)] = secrets[secretKey(s.stepId, s.key)] ?? "";
+      const run = await PipelinesService.Start({ pipelineId, inputs: accepted, secrets: sec });
+      usePipelines.getState().upsertRun(run);
+      close();
+      usePipelines.getState().showRun(run.id);
+    } catch (e) {
+      const err = toAppError(e);
+      setError({ message: err.message, hint: err.hint ?? "" });
+      setBusy(false);
+    }
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    }
+  };
+
+  const takes = describeAccepts(accepts);
+
+  return (
+    <div className={styles.backdrop} onMouseDown={close}>
+      <div
+        className={styles.panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={onKeyDown}
+      >
+        <h2 id={titleId} className={styles.title}>
+          Run {name}
+        </h2>
+        <p className={styles.sub}>Takes {takes}.</p>
+
+        {!ready && (
+          <Banner tone="warn" title="This pipeline can't run yet">
+            {(entry.check.missing ?? []).length > 0 ? `Needs ${(entry.check.missing ?? []).join(", ")}. Install them in Settings.` : "Fix the problems in the pipeline first."}
+          </Banner>
+        )}
+
+        <DropZone
+          id={`pipeline-run:${pipelineId}`}
+          label="Drop files here"
+          hint={accepts.urls ? "or paste links below" : undefined}
+          className={styles.drop}
+        >
+          <Button size="sm" icon="folder-open" onClick={() => void choose()}>
+            Choose files
+          </Button>
+        </DropZone>
+
+        {accepts.urls && (
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Links</span>
+            <TextArea
+              aria-label="Links"
+              placeholder="One link per line"
+              value={linksText}
+              minRows={2}
+              maxRows={5}
+              mono
+              onChange={(e) => setLinksText(e.target.value)}
+            />
+          </label>
+        )}
+
+        {all.length > 0 && (
+          <ul className={styles.inputs} aria-label="Inputs">
+            {all.map((i) => {
+              const ok = inputAccepted(accepts, i);
+              const link = isLink(i);
+              return (
+                <li key={i} className={cx(styles.input, !ok && styles.struck)} data-accepted={ok}>
+                  <Icon name={link ? "link" : "file"} size={14} className={styles.inputIcon} />
+                  <span className={styles.inputName} title={i}>
+                    {link ? i : baseName(i)}
+                  </span>
+                  {!ok && <span className={styles.notFor}>not for this pipeline</span>}
+                  {!link && <IconButton size="sm" icon="x" label={`Remove ${baseName(i)}`} onClick={() => setInputs(inputs.filter((x) => x !== i))} />}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {tooMany && <div className={styles.problem}>At most {MAX_INPUTS} files per run.</div>}
+
+        {needs.length > 0 && (
+          <div className={styles.secrets}>
+            {needs.map((s) => {
+              const key = secretKey(s.stepId, s.key);
+              return (
+                <label key={key} className={styles.field}>
+                  <span className={styles.fieldLabel}>{s.label}</span>
+                  <TextField
+                    type="password"
+                    aria-label={s.label}
+                    autoComplete="off"
+                    value={secrets[key] ?? ""}
+                    onChange={(e) => setSecrets((cur) => ({ ...cur, [key]: e.target.value }))}
+                  />
+                </label>
+              );
+            })}
+            <span className={styles.note}>Passwords are kept in memory for this run only.</span>
+          </div>
+        )}
+
+        {error && (
+          <Banner tone="danger" title={error.message}>
+            {error.hint}
+          </Banner>
+        )}
+
+        <div className={styles.footer}>
+          <Button variant="secondary" onClick={close}>
+            Cancel
+          </Button>
+          <Button variant="primary" icon="play" disabled={!canStart} onClick={() => void start()}>
+            {accepted.length > 1 ? `Start with ${accepted.length} files` : "Start"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
