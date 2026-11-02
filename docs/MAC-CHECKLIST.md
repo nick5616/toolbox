@@ -108,6 +108,15 @@ Everything from Phases 3–6 that can only be checked on the Mac (Apple Silicon)
 41. Run **Music video** on a song and hide the window to the tray.
     Expect: the run finishes; the video plays.
 
+## 9. Creator tools (Phase 8 Part B)
+
+42. **Photo Composer**: new 4:5 composition with a HEIC photo from Photos as the background; add 2 photos, Remove background on both, Layouts → Scatter, add a text layer, Export JPG.
+    Expect: the HEIC loads upright; cut-outs have white outlines and shadows; the exported image looks like the editor; text uses the chosen font.
+43. **Video Editor**: Quick vlog with 4 iPhone clips (one recorded in portrait) and a song, cut on the beat; play the preview, then Render preview, then Export.
+    Expect: the portrait clip is upright; cuts land on the beat; the exported video plays in QuickTime with music and titles.
+44. **Post Builder**: a 4:5 carousel with 3 photos (one HEIC, one with location), the composition and the vlog; Export, then AirDrop the folder to the phone and start a post with it.
+    Expect: files are 01…05 in order, 1080×1350, upright, and the location isn't in the photos (check in Photos → Info).
+
 ## Logs to send back
 
 - `~/Library/Application Support/Toolbox/logs/toolbox.log` (and `toolbox.log.1` if present).
