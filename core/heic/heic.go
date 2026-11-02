@@ -16,7 +16,9 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +27,10 @@ import (
 	"toolbox/core/proc"
 	"toolbox/core/sidecar"
 )
+
+// cacheVersion changes when conversions change (v2: rotation read from
+// FFmpeg's stream dump, which ffprobe 8 leaves out for tile grids).
+const cacheVersion = "v2"
 
 // Decoder converts HEIC files to cached PNGs.
 type Decoder struct {
@@ -58,7 +64,7 @@ func (d *Decoder) ToPNG(ctx context.Context, path string) (string, error) {
 	if err != nil {
 		return "", core.Errorf(core.CodeNotFound, "%s doesn't exist", filepath.Base(path)).WithCause(err)
 	}
-	sum := sha1.Sum([]byte(fmt.Sprintf("%s|%d|%d", path, fi.Size(), fi.ModTime().UnixNano())))
+	sum := sha1.Sum([]byte(fmt.Sprintf("%s|%s|%d|%d", cacheVersion, path, fi.Size(), fi.ModTime().UnixNano())))
 	key := hex.EncodeToString(sum[:])
 	out := filepath.Join(d.CacheDir, key+".png")
 	if st, err := os.Stat(out); err == nil && st.Size() > 0 {
@@ -190,7 +196,14 @@ func (d *Decoder) viaFFmpeg(ctx context.Context, src, out string) error {
 	if err := json.Unmarshal([]byte(buf.String()), &p); err != nil {
 		return fmt.Errorf("ffprobe output: %w", err)
 	}
-	args, err := buildArgs(p, src, out)
+	// ffprobe 8 prints empty side data for tile-grid groups, so the rotation
+	// (irot) is read from FFmpeg's own stream dump.
+	var dump strings.Builder
+	dctx, cancel3 := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel3()
+	_, _ = proc.Run(dctx, proc.Spec{Path: ffmpeg, Args: []string{"-hide_banner", "-i", src},
+		OnStderr: func(l string) { dump.WriteString(l); dump.WriteByte('\n') }})
+	args, err := buildArgs(p, src, out, dumpRotation(dump.String()))
 	if err != nil {
 		return err
 	}
@@ -212,7 +225,7 @@ func (d *Decoder) viaFFmpeg(ctx context.Context, src, out string) error {
 // buildArgs picks the photo (the tile grid if there is one, else the largest
 // video stream, which skips thumbnails, depth and gain maps) and returns the
 // FFmpeg arguments that write it upright to out.
-func buildArgs(p probe, src, out string) ([]string, error) {
+func buildArgs(p probe, src, out string, dumped float64) ([]string, error) {
 	// Rotation is applied here, once: FFmpeg's own autorotate is off.
 	base := []string{"-hide_banner", "-loglevel", "error", "-y", "-noautorotate", "-i", src}
 	tail := []string{"-frames:v", "1", "-update", "1", "-pix_fmt", "rgb24", out}
@@ -240,6 +253,9 @@ func buildArgs(p probe, src, out string) ([]string, error) {
 				}
 			}
 		}
+		if rot == 0 {
+			rot = dumped
+		}
 		var graph string
 		if len(in) == 1 {
 			graph = in[0] + "null"
@@ -266,6 +282,9 @@ func buildArgs(p probe, src, out string) ([]string, error) {
 	}
 	if best < 0 {
 		return nil, fmt.Errorf("no image stream")
+	}
+	if rot == 0 {
+		rot = dumped
 	}
 	args := append(base, "-map", fmt.Sprintf("0:%d", best))
 	if f := rotateFilter(rot); f != "" {
@@ -353,4 +372,20 @@ func (d *Decoder) Prune() {
 			total -= f.size
 		}
 	}
+}
+
+var dumpRotRe = regexp.MustCompile(`displaymatrix: rotation of (-?[0-9]+(?:\.[0-9]+)?) degrees`)
+
+// dumpRotation returns the first display-matrix rotation in FFmpeg's stream
+// dump (the image's, listed first), or 0.
+func dumpRotation(dump string) float64 {
+	m := dumpRotRe.FindStringSubmatch(dump)
+	if m == nil {
+		return 0
+	}
+	v, err := strconv.ParseFloat(m[1], 64)
+	if err != nil {
+		return 0
+	}
+	return v
 }

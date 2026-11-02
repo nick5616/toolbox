@@ -72,7 +72,7 @@ func (m *Module) LoadImage(ctx context.Context, path string, maxDim int) (string
 	if fi.Size() > imaging.MaxFileBytes {
 		return "", core.ValidationError("This image is too large", nil)
 	}
-	key := fileKey(path, fi.Size(), fi.ModTime().UnixNano(), maxDim)
+	key := fileKey("v2", path, fi.Size(), fi.ModTime().UnixNano(), maxDim) // v2: HEIC rotation fix
 	if url, ok := m.readCached(key); ok {
 		return url, nil
 	}

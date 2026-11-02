@@ -25,7 +25,7 @@ func TestBuildArgsGrid(t *testing.T) {
 	p := mustProbe(t, `{"streams":[{"index":0,"codec_type":"video","width":512,"height":512},{"index":1,"codec_type":"video","width":512,"height":512},{"index":2,"codec_type":"video","width":756,"height":426,"pix_fmt":"gray"}],
 	"stream_groups":[{"type":"Tile Grid","side_data_list":[{"rotation":-90}],"components":[{"width":1000,"height":500,"horizontal_offset":0,"vertical_offset":0,
 	"subcomponents":[{"stream_index":0,"tile_horizontal_offset":0,"tile_vertical_offset":0},{"stream_index":1,"tile_horizontal_offset":512,"tile_vertical_offset":0}]}]}]}`)
-	args, err := buildArgs(p, "in.heic", "out.png")
+	args, err := buildArgs(p, "in.heic", "out.png", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestBuildArgsGrid(t *testing.T) {
 
 func TestBuildArgsSingleSkipsGrayAndThumbnails(t *testing.T) {
 	p := mustProbe(t, `{"streams":[{"index":0,"codec_type":"video","width":320,"height":212},{"index":1,"codec_type":"video","width":1280,"height":854,"side_data_list":[{},{"rotation":90}]},{"index":2,"codec_type":"video","width":4000,"height":3000,"pix_fmt":"gray"}]}`)
-	args, err := buildArgs(p, "in.heic", "out.png")
+	args, err := buildArgs(p, "in.heic", "out.png", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestBuildArgsSingleSkipsGrayAndThumbnails(t *testing.T) {
 	if !strings.Contains(joined, "-map 0:1") || !strings.Contains(joined, "-vf transpose=cclock") {
 		t.Fatalf("args = %s", joined)
 	}
-	if _, err := buildArgs(mustProbe(t, `{"streams":[]}`), "a", "b"); err == nil {
+	if _, err := buildArgs(mustProbe(t, `{"streams":[]}`), "a", "b", 0); err == nil {
 		t.Fatal("no stream should fail")
 	}
 }
@@ -118,4 +118,62 @@ func TestMissingToolsSaysWhatToInstall(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "dependency_missing") {
 		t.Fatalf("err = %v", err)
 	}
+}
+
+func TestRotationFromTheStreamDump(t *testing.T) {
+	dump := "  Stream group #0:0[0x31]: Tile Grid: hevc, 4032x3024 (default)\n    Side data:\n      displaymatrix: rotation of -90.00 degrees\n"
+	if got := dumpRotation(dump); got != -90 {
+		t.Fatalf("dumpRotation = %v", got)
+	}
+	if dumpRotation("no rotation here") != 0 {
+		t.Fatal("expected 0")
+	}
+	// ffprobe 8 leaves the group's side data empty: the dumped rotation is used.
+	p := mustProbe(t, `{"streams":[{"index":0,"codec_type":"video","width":512,"height":512,"side_data_list":[{}]}],
+	"stream_groups":[{"type":"Tile Grid","side_data_list":[{}],"components":[{"width":500,"height":400,"subcomponents":[{"stream_index":0,"tile_horizontal_offset":0,"tile_vertical_offset":0}]}]}]}`)
+	args, err := buildArgs(p, "in.heic", "out.png", -90)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j := strings.Join(args, " "); !strings.Contains(j, "crop=500:400:0:0,transpose=clock[o]") {
+		t.Fatalf("args = %s", j)
+	}
+}
+
+// TestFileFromEnv decodes $TOOLBOX_HEIC_FILE (manual checks on real photos)
+// into $TOOLBOX_HEIC_OUT (default: a temp dir) and logs the PNG's size.
+func TestFileFromEnv(t *testing.T) {
+	src := os.Getenv("TOOLBOX_HEIC_FILE")
+	if src == "" {
+		t.Skip("set TOOLBOX_HEIC_FILE")
+	}
+	ffmpeg, err1 := exec.LookPath("ffmpeg")
+	ffprobe, err2 := exec.LookPath("ffprobe")
+	if err1 != nil || err2 != nil {
+		t.Skip("ffmpeg not on PATH")
+	}
+	dir := os.Getenv("TOOLBOX_HEIC_OUT")
+	if dir == "" {
+		dir = t.TempDir()
+	}
+	d := &Decoder{CacheDir: dir, Resolve: func(id string) (string, error) {
+		if id == "ffprobe" {
+			return ffprobe, nil
+		}
+		return ffmpeg, nil
+	}}
+	out, err := d.ToPNG(context.Background(), src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	cfg, err := png.DecodeConfig(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%s → %s (%dx%d)", filepath.Base(src), out, cfg.Width, cfg.Height)
 }
