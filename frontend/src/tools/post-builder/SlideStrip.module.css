@@ -156,3 +156,9 @@
   gap: 2px;
   padding-top: var(--space-1);
 }
+
+.root[data-source-over] {
+  outline: 2px dashed var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-md);
+}

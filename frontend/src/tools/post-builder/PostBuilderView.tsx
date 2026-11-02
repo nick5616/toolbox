@@ -14,9 +14,11 @@ import {
 } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { isActive, useJob, useJobs } from "@/state/jobs";
-import { useUI, type Handoff } from "@/state/ui";
+import { useUI, type Handoff, type SlideBuild } from "@/state/ui";
 import type { ToolViewProps } from "../index";
 import { NameDialog, NewPostDialog, ProjectPickerDialog } from "./dialogs";
+import { addExtras, folderBaseName, insertAt, type StripDrop } from "./pool";
+import { MEDIA_EXTS as SOURCE_EXTS, SourcesPanel } from "./SourcesPanel";
 import { PhonePreview } from "./PhonePreview";
 import { PostsStrip } from "./PostsStrip";
 import { AltPanel, CaptionPanel, ChecksPanel, ShapePanel, copyText } from "./SidePanel";
@@ -32,13 +34,15 @@ import {
   isPending,
   issuesBySlide,
   reorder,
+  maxClipMs,
   roomLeft,
   sanitizeState,
+  SOURCES_DEFAULT,
   slidesFromSources,
   type PostBuilderState,
   type PostDoc,
 } from "./logic";
-import { NEW_POST, useAddToPost } from "./store";
+import { NEW_POST, useAddToPost, usePostDrop } from "./store";
 import { usePostEditor, type SaveState } from "./usePostEditor";
 import styles from "./PostBuilderView.module.css";
 
@@ -93,6 +97,8 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
 
   const projects = useMemo(() => new Map([...comps, ...videos].map((p) => [p.id, p])), [comps, videos]);
   const slideIssues = useMemo(() => issuesBySlide(editor.issues), [editor.issues]);
+  const docRef = useRef(doc);
+  docRef.current = doc;
   const selected = doc?.slides.find((s) => s.id === selectedId);
   const selectedIndex = doc ? doc.slides.findIndex((s) => s.id === selectedId) : -1;
 
@@ -171,16 +177,16 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
   );
 
   const appendSlides = useCallback(
-    (slides: PostSlide[]) => {
+    (slides: PostSlide[], at?: number) => {
       if (slides.length === 0) return;
-      update((d) => ({ ...d, slides: [...d.slides, ...slides] }));
+      update((d) => ({ ...d, slides: at === undefined ? [...d.slides, ...slides] : insertAt(d.slides, at, slides) }));
       setSelectedId(slides[0]!.id);
     },
     [update],
   );
 
   const addPaths = useCallback(
-    async (paths: string[]) => {
+    async (paths: string[], at?: number) => {
       if (!doc || paths.length === 0) return;
       const room = roomLeft(doc, limits);
       if (room === 0) {
@@ -193,12 +199,79 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
         const take = slides.slice(0, room);
         if (skipped > 0) toast({ tone: "warn", title: `Skipped ${skipped} ${skipped === 1 ? "file" : "files"} that aren't photos or videos` });
         if (take.length < slides.length) toast({ tone: "warn", title: `Only ${take.length} more fit in this post` });
-        appendSlides(take);
+        appendSlides(take, at);
       } catch (e) {
         fail(e);
       }
     },
     [doc, limits, appendSlides],
+  );
+
+  /** A source dropped on a photo or clip slide takes its place (framing starts over). */
+  const replaceSource = useCallback(
+    async (slideId: string, path: string) => {
+      if (!doc) return;
+      try {
+        const src = ((await PostsService.SlideInfo([path])) ?? [])[0];
+        if (!src || src.error || (src.kind !== "photo" && src.kind !== "clip")) {
+          toast({ tone: "warn", title: src?.error || "That file isn't a photo or video" });
+          return;
+        }
+        if (doc.format === "reel" && src.kind !== "clip") {
+          toast({ tone: "warn", title: "A reel is one video" });
+          return;
+        }
+        const kind = src.kind;
+        const outMs = kind === "clip" ? Math.max(1, Math.min(src.durationMs, maxClipMs(limits, doc.format))) : 0;
+        patchSlide(slideId, { kind, path: src.path, panX: 0, panY: 0, zoom: 1, rotation: 0, inMs: 0, outMs });
+        setSelectedId(slideId);
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [doc, limits, patchSlide],
+  );
+
+  const dropSources = useCallback(
+    (paths: string[], drop: StripDrop) => {
+      const d = docRef.current;
+      if (!d || paths.length === 0) return;
+      if (drop.kind === "replace") {
+        const slide = d.slides[drop.index];
+        if (!slide) return;
+        if (paths.length > 1) toast({ title: "Used the first of the sources for this slide" });
+        void replaceSource(slide.id, paths[0]!);
+      } else {
+        void addPaths(paths, drop.index);
+      }
+    },
+    [addPaths, replaceSource],
+  );
+
+  /** Make a collage / stitch: a new composition or video slide, then the editor builds it from the sources. */
+  const buildSlide = useCallback(
+    async (inputs: string[], build: SlideBuild) => {
+      if (!doc || inputs.length === 0) return;
+      if (roomLeft(doc, limits) === 0) {
+        toast({ tone: "warn", title: doc.format === "reel" ? "A reel is one video" : `A post holds at most ${limits.maxSlides} slides` });
+        return;
+      }
+      const kind = build.kind === "collage" ? "composition" : "video";
+      const slide = blankSlide(kind, { projectId: PENDING_PROJECT });
+      appendSlides([slide]);
+      try {
+        await editor.flush();
+      } catch (e) {
+        fail(e);
+        return;
+      }
+      useUI.getState().handOff({
+        moduleId: kind === "composition" ? "photo-composer" : "video-editor",
+        inputs,
+        postSlide: { postId, slideId: slide.id, aspect: doc.aspect, projectId: "", build },
+      });
+    },
+    [doc, limits, appendSlides, editor, postId],
   );
 
   const pickFiles = useCallback(async (): Promise<string[]> => {
@@ -278,18 +351,29 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
   };
 
   // ---- posts ----
-  const createPost = useCallback(
-    async (name: string, format: string, aspect: string, paths: string[]) => {
-      try {
-        const info = await PostsService.Create(name, format, aspect, paths);
-        setPosts((list) => [info, ...list.filter((p) => p.id !== info.id)]);
-        setPostId(info.id);
-      } catch (e) {
-        fail(e);
-      }
-    },
-    [],
-  );
+  const createPost = useCallback(async (name: string, format: string, aspect: string, paths: string[]): Promise<string> => {
+    try {
+      const info = await PostsService.Create(name, format, aspect, paths);
+      setPosts((list) => [info, ...list.filter((p) => p.id !== info.id)]);
+      setPostId(info.id);
+      return info.id;
+    } catch (e) {
+      fail(e);
+      return "";
+    }
+  }, []);
+
+  const createFromFolder = useCallback(async (name: string, format: string, aspect: string, folder: string, subfolders: boolean): Promise<string> => {
+    try {
+      const info = await PostsService.CreateFromFolder(name, format, aspect, folder, subfolders);
+      setPosts((list) => [info, ...list.filter((p) => p.id !== info.id)]);
+      setPostId(info.id);
+      return info.id;
+    } catch (e) {
+      fail(e);
+      return "";
+    }
+  }, []);
 
   const duplicatePost = async (id: string) => {
     try {
@@ -331,9 +415,9 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
   };
 
   // ---- handoffs ----
-  const live = useRef({ doc, postId, addPaths, createPost, editor, refreshProjects });
-  live.current = { doc, postId, addPaths, createPost, editor, refreshProjects };
-  const pendingAdd = useRef<{ postId: string; paths: string[] } | null>(null);
+  const live = useRef({ doc, postId, addPaths, createPost, createFromFolder, editor, refreshProjects });
+  live.current = { doc, postId, addPaths, createPost, createFromFolder, editor, refreshProjects };
+  const pendingAdd = useRef<{ postId: string; paths: string[]; extra?: boolean } | null>(null);
 
   const applyHandoff = useCallback(async (h: Handoff) => {
     const l = live.current;
@@ -346,7 +430,32 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
       return;
     }
     if (h.inputs.length === 0) return;
+    const dropped = usePostDrop.getState().take();
+    // Folders (from a drop) make a post; the files dropped with them become its extra sources.
+    const infos = (await FilesService.Stat(h.inputs).catch(() => null)) ?? [];
+    const dirs = infos.filter((i) => i.isDir).map((i) => i.path);
+    if (dirs.length > 0) {
+      const folder = dirs[0]!;
+      const files = h.inputs.filter((p) => !dirs.includes(p));
+      if (dirs.length > 1) toast({ title: "Made a post from the first folder", description: "Drop the others one at a time." });
+      const id = await l.createFromFolder(folderBaseName(folder) || defaultPostName("carousel"), "carousel", "4:5", folder, false);
+      if (id && files.length > 0) pendingAdd.current = { postId: id, paths: files, extra: true };
+      return;
+    }
     const target = useAddToPost.getState().takeTarget();
+    if (dropped && !target) {
+      const files = h.inputs.filter((p) => SOURCE_EXTS.some((x) => p.toLowerCase().endsWith(x)));
+      if (files.length === 0) return;
+      if (l.doc) {
+        l.editor.update((d) => ({ ...d, extra: addExtras(d.extra, files) }));
+      } else if (l.postId) {
+        pendingAdd.current = { postId: l.postId, paths: files, extra: true };
+      } else {
+        const id = await l.createPost(defaultPostName("carousel"), "carousel", "4:5", []);
+        if (id) pendingAdd.current = { postId: id, paths: files, extra: true };
+      }
+      return;
+    }
     if (target === NEW_POST || (!target && !l.postId)) {
       await l.createPost(defaultPostName("carousel"), "carousel", "4:5", h.inputs);
     } else if (target && target !== l.postId) {
@@ -371,8 +480,9 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
     const p = pendingAdd.current;
     if (!p || !doc || p.postId !== postId) return;
     pendingAdd.current = null;
-    void live.current.addPaths(p.paths);
-  }, [doc, postId]);
+    if (p.extra) update((d) => ({ ...d, extra: addExtras(d.extra, p.paths) }));
+    else void live.current.addPaths(p.paths);
+  }, [doc, postId, update]);
 
   // ---- export ----
   const job = useJob(jobId);
@@ -462,6 +572,10 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
             setDialog(null);
             void createPost(name, format, aspect, newFiles);
           }}
+          onCreateFromFolder={(name, format, aspect, folder, subfolders) => {
+            setDialog(null);
+            void createFromFolder(name, format, aspect, folder, subfolders);
+          }}
         />
       )}
       {renameTarget && <NameDialog title="Rename post" initial={renameTarget.name} confirmLabel="Rename" onConfirm={(n) => void renamePost(renameTarget.id, n)} onClose={() => setDialog(null)} />}
@@ -530,7 +644,21 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
         </div>
       ) : (
         <>
-          <div className={styles.body}>
+          <div className={styles.body} style={{ gridTemplateColumns: `${pstate.sourcesCollapsed ? 32 : (pstate.sourcesWidth ?? SOURCES_DEFAULT)}px 170px minmax(0, 1fr) 340px` }}>
+            <SourcesPanel
+              postId={postId}
+              doc={doc}
+              format={doc.format}
+              saved={editor.saveState === "saved"}
+              selectedSlide={selected}
+              width={pstate.sourcesWidth ?? SOURCES_DEFAULT}
+              collapsed={!!pstate.sourcesCollapsed}
+              onWidth={(w) => persist({ ...pstateRef.current, sourcesWidth: w })}
+              onCollapsed={(c) => persist({ ...pstateRef.current, sourcesCollapsed: c })}
+              update={update}
+              onAddSlides={(paths) => void addPaths(paths)}
+              onBuild={(inputs, build) => void buildSlide(inputs, build)}
+            />
             <aside className={styles.left}>
               <SlideStrip
                 slides={doc.slides}
@@ -544,6 +672,7 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
                 onReorder={(from, to) => update((d) => ({ ...d, slides: reorder(d.slides, from, to) }))}
                 onDelete={deleteSlide}
                 onDuplicate={copySlide}
+                onSourceDrop={dropSources}
               />
             </aside>
             <main className={styles.centre}>

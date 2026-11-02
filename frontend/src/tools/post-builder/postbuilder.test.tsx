@@ -389,6 +389,7 @@ describe("posts", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "New post" }));
     const dlg = await screen.findByRole("dialog", { name: "New post" });
+    await user.click(within(dlg).getByRole("radio", { name: "Empty post" }));
     await user.click(within(dlg).getByRole("radio", { name: "Reel" }));
     await user.click(within(dlg).getByRole("button", { name: "Create" }));
     await waitFor(() => expect(h.create).toHaveBeenCalled());

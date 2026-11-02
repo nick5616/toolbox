@@ -1,8 +1,10 @@
-import { useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { useCallback, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { cx, Icon, IconButton, MenuButton, type MenuItem } from "@/components";
 import type { PostIssue, PostSlide, ProjectInfo } from "@/lib/api";
 import { FramedMedia } from "./FramedMedia";
 import { indexAtY, isPending, worstLevel } from "./logic";
+import { stripDrop, type StripDrop } from "./pool";
+import { useSourceDropTarget, type SourceDropInfo } from "./sourceDrag";
 import { useSlideVisual } from "./useSlideVisual";
 import styles from "./SlideStrip.module.css";
 
@@ -21,6 +23,8 @@ export interface SlideStripProps {
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
   maxSlides: number;
+  /** Sources dropped on the strip: insert at an index, or replace a photo/clip slide's source. */
+  onSourceDrop?: (paths: string[], drop: StripDrop) => void;
 }
 
 function SlideThumb({ slide, aspect, project }: { slide: PostSlide; aspect: string; project: ProjectInfo | undefined }) {
@@ -37,8 +41,20 @@ function SlideThumb({ slide, aspect, project }: { slide: PostSlide; aspect: stri
   );
 }
 
-export function SlideStrip({ slides, selectedId, aspect, issues, projects, addItems, onSelect, onReorder, onDelete, onDuplicate, maxSlides }: SlideStripProps) {
+export function SlideStrip({ slides, selectedId, aspect, issues, projects, addItems, onSelect, onReorder, onDelete, onDuplicate, maxSlides, onSourceDrop }: SlideStripProps) {
   const list = useRef<HTMLOListElement>(null);
+  const root = useRef<HTMLElement>(null);
+  const slidesRef = useRef(slides);
+  slidesRef.current = slides;
+  const dropSources = useCallback(
+    (info: SourceDropInfo) => {
+      const tiles = Array.from(root.current?.querySelectorAll<HTMLElement>("[data-slide-tile]") ?? []);
+      const rects = tiles.map((t) => t.getBoundingClientRect());
+      onSourceDrop?.(info.paths, stripDrop(rects, slidesRef.current.map((x) => x.kind), info.y));
+    },
+    [onSourceDrop],
+  );
+  useSourceDropTarget(root, dropSources);
   const [drag, setDrag] = useState<{ id: string; from: number; over: number } | null>(null);
   const dragRef = useRef<{ id: string; from: number; over: number; startY: number; active: boolean; pointer: number } | null>(null);
 
@@ -72,7 +88,7 @@ export function SlideStrip({ slides, selectedId, aspect, issues, projects, addIt
   };
 
   return (
-    <section className={styles.root} aria-label="Slides">
+    <section ref={root} className={styles.root} aria-label="Slides">
       <header className={styles.head}>
         <h2 className={styles.title}>
           Slides <span className={styles.count}>{slides.length}/{maxSlides}</span>

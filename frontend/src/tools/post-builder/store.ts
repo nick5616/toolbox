@@ -23,3 +23,23 @@ export const useAddToPost = create<AddToPostState>((set, get) => ({
 }));
 
 export const NEW_POST = "new";
+
+interface PostDropState {
+  /** The next handoff to Post Builder came from a file drop (its files become sources, not slides). */
+  dropped: boolean;
+  mark: () => void;
+  unmark: () => void;
+  /** Returns and clears the flag. */
+  take: () => boolean;
+}
+
+export const usePostDrop = create<PostDropState>((set, get) => ({
+  dropped: false,
+  mark: () => set({ dropped: true }),
+  unmark: () => set({ dropped: false }),
+  take: () => {
+    const d = get().dropped;
+    if (d) set({ dropped: false });
+    return d;
+  },
+}));

@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { Button, Field, Icon, SegmentedControl, Select, TextField, cx } from "@/components";
-import type { ProjectInfo } from "@/lib/api";
+import { Button, Field, Icon, SegmentedControl, Select, Switch, TextField, cx, toast } from "@/components";
+import { FilesService, type ProjectInfo } from "@/lib/api";
+import { toAppError } from "@/lib/errors";
 import { CAROUSEL_ASPECTS, FORMAT_LABELS, defaultPostName, type PostFormat } from "./logic";
+import { folderBaseName } from "./pool";
 import { Modal } from "./Modal";
 import { ProjectThumb } from "./ProjectThumb";
 import styles from "./dialogs.module.css";
@@ -9,14 +11,19 @@ import styles from "./dialogs.module.css";
 const FORMAT_OPTIONS = (Object.keys(FORMAT_LABELS) as PostFormat[]).map((value) => ({ value, label: FORMAT_LABELS[value] }));
 
 export interface NewPostDialogProps {
-  /** Files that will become the first slides. */
+  /** Files that will become the first slides of an empty post. */
   fileCount: number;
   onPickFiles: () => void;
   onCreate: (name: string, format: PostFormat, aspect: string) => void;
+  /** A post whose source pool is a folder (SPEC.md §B13.4). */
+  onCreateFromFolder: (name: string, format: PostFormat, aspect: string, folder: string, subfolders: boolean) => void;
   onClose: () => void;
 }
 
-export function NewPostDialog({ fileCount, onPickFiles, onCreate, onClose }: NewPostDialogProps) {
+export function NewPostDialog({ fileCount, onPickFiles, onCreate, onCreateFromFolder, onClose }: NewPostDialogProps) {
+  const [mode, setMode] = useState<"folder" | "empty">("folder");
+  const [folder, setFolder] = useState("");
+  const [subfolders, setSubfolders] = useState(false);
   const [format, setFormat] = useState<PostFormat>("carousel");
   const [aspect, setAspect] = useState("4:5");
   const [name, setName] = useState(() => defaultPostName("carousel"));
@@ -28,8 +35,62 @@ export function NewPostDialog({ fileCount, onPickFiles, onCreate, onClose }: New
     if (!touched) setName(defaultPostName(f));
   };
 
+  const pickFolder = async () => {
+    try {
+      const picked = await FilesService.PickFolder("Choose the folder with your photos and clips");
+      if (!picked) return;
+      setFolder(picked);
+      if (!touched) setName(folderBaseName(picked) || defaultPostName(format));
+    } catch (e) {
+      toast({ tone: "danger", title: toAppError(e).message });
+    }
+  };
+
+  const fromFolder = mode === "folder";
+  const shape = format === "carousel" ? aspect : "9:16";
   return (
-    <Modal title="New post" confirmLabel="Create" confirmDisabled={!trimmed} onConfirm={() => onCreate(trimmed, format, format === "carousel" ? aspect : "9:16")} onClose={onClose}>
+    <Modal
+      title="New post"
+      confirmLabel="Create"
+      confirmDisabled={!trimmed || (fromFolder && !folder)}
+      onConfirm={() => (fromFolder ? onCreateFromFolder(trimmed, format, shape, folder, subfolders) : onCreate(trimmed, format, shape))}
+      onClose={onClose}
+    >
+      <SegmentedControl
+        value={mode}
+        onChange={setMode}
+        aria-label="Start from"
+        options={[
+          { value: "folder", label: "From a folder" },
+          { value: "empty", label: "Empty post" },
+        ]}
+      />
+      {fromFolder ? (
+        <div className={styles.files}>
+          <Button size="sm" variant="primary" icon="folder-open" onClick={() => void pickFolder()}>
+            {folder ? "Change folder…" : "From a folder…"}
+          </Button>
+          {folder ? (
+            <span className={styles.note} title={folder}>
+              {folder}
+            </span>
+          ) : (
+            <span className={styles.note}>Every photo and clip in the folder becomes a source you can use in any slide. Your files are not changed.</span>
+          )}
+          <Switch checked={subfolders} onChange={setSubfolders} label="Include subfolders" aria-label="Include subfolders" />
+        </div>
+      ) : (
+        <div className={styles.files}>
+          <Button size="sm" variant="secondary" icon="plus" onClick={onPickFiles}>
+            Add photos and clips…
+          </Button>
+          {fileCount > 0 && (
+            <span className={styles.note}>
+              {fileCount} {fileCount === 1 ? "file" : "files"} will be added as slides.
+            </span>
+          )}
+        </div>
+      )}
       <Field label="Name">
         {(c) => (
           <TextField
@@ -52,16 +113,6 @@ export function NewPostDialog({ fileCount, onPickFiles, onCreate, onClose }: New
       ) : (
         <p className={styles.note}>{format === "reel" ? "A reel is one 9:16 video, up to 3 minutes." : "Stories are 9:16 slides; a video slide can run up to 60 seconds."}</p>
       )}
-      <div className={styles.files}>
-        <Button size="sm" variant="secondary" icon="plus" onClick={onPickFiles}>
-          Add photos and clips…
-        </Button>
-        {fileCount > 0 && (
-          <span className={styles.note}>
-            {fileCount} {fileCount === 1 ? "file" : "files"} will be added as slides.
-          </span>
-        )}
-      </div>
     </Modal>
   );
 }
