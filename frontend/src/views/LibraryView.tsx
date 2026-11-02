@@ -13,6 +13,10 @@ import { usePipelines } from "@/state/pipelines";
 import { inputAccepted } from "@/tools/pipelines/RunSheetModel";
 import { openPipelineRunSheet } from "@/shell/dropRouting";
 // --- end pipelines ---
+// --- add to post ---
+import { openAddToPostDialog } from "@/tools/post-builder/AddToPostDialog";
+import { acceptsPath } from "@/tools/_kit/accepts";
+// --- end add to post ---
 import styles from "./LibraryView.module.css";
 
 const kindIcon: Record<string, string> = {
@@ -49,6 +53,17 @@ export async function sendToItems(path: string): Promise<MenuItem[]> {
       icon: "workflow",
       onSelect: () => openPipelineRunSheet(e.pipeline.id, [path]),
     }));
+  // --- add to post ---
+  const postModule = useModules.getState().byId["post-builder"];
+  if (postModule && isReady(postModule) && acceptsPath(postModule.accepts.extensions, path)) {
+    tools.push({
+      id: "add-to-post",
+      label: "Add to post…",
+      icon: "gallery-horizontal-end",
+      onSelect: () => void openAddToPostDialog(path),
+    });
+  }
+  // --- end add to post ---
   return pipelines.length > 0 ? [...tools, ...pipelines] : tools;
   // --- end pipelines ---
 }

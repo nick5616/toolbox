@@ -1,0 +1,95 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.h {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.hint {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.counter {
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.over {
+  color: var(--danger);
+}
+
+.issues {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.issue {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--r-sm);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  text-align: left;
+  color: var(--fg);
+}
+
+.issueButton {
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.issueButton:hover {
+  background: var(--bg-hover);
+}
+
+.issueIcon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.warning {
+  color: var(--warn);
+}
+
+.note {
+  color: var(--fg-subtle);
+}
+
+.issueText {
+  min-width: 0;
+}

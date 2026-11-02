@@ -1,0 +1,93 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.area {
+  flex: 1 1 280px;
+  min-height: 200px;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--fg-muted);
+  text-align: center;
+}
+
+.pending p {
+  margin: 0;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 220px;
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+
+.label {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.projectName {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.clip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.player {
+  height: 220px;
+  min-height: 0;
+}
+
+.trimRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
