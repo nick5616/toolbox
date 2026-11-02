@@ -21,23 +21,23 @@ func (s *Service) Get(id string) (Composition, error) { return s.m.Get(context.B
 // Create makes a new composition at aspect, optionally with a background
 // photo.
 func (s *Service) Create(name, aspect, backgroundPath string) (core.ProjectInfo, error) {
-	return core.ProjectInfo{}, core.NotImplemented("Photo Composer") // WP-CO1
+	return s.m.Create(context.Background(), name, aspect, backgroundPath)
 }
 
 // Save validates and stores a composition.
 func (s *Service) Save(id, name string, doc Composition) (core.ProjectInfo, error) {
-	return core.ProjectInfo{}, core.NotImplemented("Photo Composer") // WP-CO1
+	return s.m.Save(context.Background(), id, name, doc)
 }
 
 // SaveRender stores the latest render (format "jpg" | "png", base64) and a
 // thumbnail.
 func (s *Service) SaveRender(id, format, base64Data string) error {
-	return core.NotImplemented("Photo Composer") // WP-CO1
+	return s.m.SaveRender(context.Background(), id, format, base64Data)
 }
 
 // Export copies the latest render into <library>/Compositions.
 func (s *Service) Export(id string) (core.Output, error) {
-	return core.Output{}, core.NotImplemented("Photo Composer") // WP-CO1
+	return s.m.Export(context.Background(), id)
 }
 
 // Duplicate copies a composition.
@@ -51,13 +51,13 @@ func (s *Service) Delete(id string) error { return s.m.docs.Delete(context.Backg
 // LoadImage returns an image as a data URL scaled to maxDim (≤ 4096), with
 // EXIF orientation applied; HEIC is converted by the AI engine.
 func (s *Service) LoadImage(path string, maxDim int) (string, error) {
-	return "", core.NotImplemented("Photo Composer") // WP-CO1
+	return s.m.LoadImage(context.Background(), path, maxDim)
 }
 
 // RemoveBackground submits a Background Remover job for path (balanced,
 // transparent, cropped to the subject).
 func (s *Service) RemoveBackground(path string) (core.Job, error) {
-	return core.Job{}, core.NotImplemented("Photo Composer") // WP-CO1
+	return s.m.RemoveBackground(context.Background(), path)
 }
 
 // Aspects lists the canvas shapes with their 1× sizes.
