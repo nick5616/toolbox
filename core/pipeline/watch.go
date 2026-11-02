@@ -16,7 +16,13 @@ import (
 type watchSig struct{ size, mtime int64 }
 
 // watchTrack remembers the previous poll of one pipeline's folder.
-type watchTrack struct{ prev map[string]watchSig }
+// maxWatchHold caps how long settled files wait for others still arriving.
+const maxWatchHold = 60 * time.Second
+
+type watchTrack struct {
+	prev      map[string]watchSig
+	holdSince int64 // Unix ms when settled files started waiting for settling ones; 0 = not waiting
+}
 
 type watchFile struct {
 	path string
@@ -153,25 +159,40 @@ func (r *Runner) pollPipeline(p core.Pipeline) {
 	now := r.nowMs()
 	cur := map[string]watchSig{}
 	var ready []watchFile
+	settling := false
 	for _, f := range files {
 		if !check.Accepts.Any && !hasExt(check.Accepts.Extensions, f.path) {
 			continue
 		}
 		cur[f.path] = f.sig
-		prev, ok := tr.prev[f.path]
-		if !ok || prev != f.sig || now-f.sig.mtime < r.stableAge.Milliseconds() {
+		if s, ok := seen[f.path]; ok && s.Size == f.sig.size && s.MTime == f.sig.mtime {
 			continue
 		}
-		if s, ok := seen[f.path]; ok && s.Size == f.sig.size && s.MTime == f.sig.mtime {
+		prev, ok := tr.prev[f.path]
+		if !ok || prev != f.sig || now-f.sig.mtime < r.stableAge.Milliseconds() {
+			settling = true
 			continue
 		}
 		ready = append(ready, f)
 	}
 	tr.prev = cur
 	if len(ready) == 0 {
+		tr.holdSince = 0
 		r.setWatchMsg(p.ID, "")
 		return
 	}
+	// A batch still being copied in becomes one run: wait while any new file
+	// is settling, but not longer than maxWatchHold (a file that never stops
+	// changing mustn't block the folder).
+	if settling {
+		if tr.holdSince == 0 {
+			tr.holdSince = now
+		}
+		if now-tr.holdSince < maxWatchHold.Milliseconds() {
+			return
+		}
+	}
+	tr.holdSince = 0
 	if len(ready) > MaxItems {
 		ready = ready[:MaxItems]
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -255,4 +256,38 @@ func TestWatchRefusedRunKeepsFilesNewAndReportsWhy(t *testing.T) {
 	e.r.pollWatch()
 	e.r.pollWatch()
 	eq(t, "runs once the tools are back", len(e.runsOf(p)), 1)
+}
+
+func TestWatchWaitsForABatchStillArriving(t *testing.T) {
+	e, dir, p := watchEnv(t)
+	p = e.save(p)
+	writeOld(t, dir, "a1.txt")
+	e.r.pollWatch() // first sighting of a1
+	writeOld(t, dir, "a2.txt")
+	e.r.pollWatch() // a1 has settled, but a2 just arrived: hold the batch
+	eq(t, "no run while a file is settling", len(e.runsOf(p)), 0)
+	e.r.pollWatch() // both settled
+	runs := e.runsOf(p)
+	eq(t, "one run for the batch", len(runs), 1)
+	eq(t, "both files", len(runs[0].Inputs), 2)
+}
+
+func TestWatchHoldIsCapped(t *testing.T) {
+	e, dir, p := watchEnv(t)
+	p = e.save(p)
+	writeOld(t, dir, "done.txt")
+	e.r.pollWatch() // first sighting of done.txt
+	busy := filepath.Join(dir, "busy.txt")
+	start := time.Now()
+	for i := 0; i < 4; i++ { // busy.txt keeps changing: done.txt waits…
+		must(t, os.WriteFile(busy, []byte(strings.Repeat("x", i+1)), 0o644)) // grows: never settles
+		e.r.pollWatch()
+	}
+	eq(t, "held while busy.txt changes", len(e.runsOf(p)), 0)
+	e.r.watch[p.ID].holdSince = start.Add(-2 * maxWatchHold).UnixMilli() // …until the cap
+	must(t, os.WriteFile(busy, []byte(strings.Repeat("x", 9)), 0o644))
+	e.r.pollWatch()
+	runs := e.runsOf(p)
+	eq(t, "runs after the cap", len(runs), 1)
+	eq(t, "only the settled file", filepath.Base(runs[0].Inputs[0]), "done.txt")
 }
