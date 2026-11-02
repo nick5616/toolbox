@@ -80,6 +80,30 @@ func (m *Module) validateRender(input string, o Options) error {
 	if !ok {
 		return bad("analysisKey", "Analyze the file again")
 	}
+	if err := validateRenderFields(input, o); err != nil {
+		return err
+	}
+	return validateAudio(o.Audio, ref.Instrumental != "")
+}
+
+// validateAudio checks the audio choice; haveInstrumental says whether the
+// analysis has (or will have) the instrumental.
+func validateAudio(audio string, haveInstrumental bool) error {
+	switch audio {
+	case "", "original":
+	case "instrumental":
+		if !haveInstrumental {
+			return bad("audio", "Separate the instruments to use the instrumental")
+		}
+	default:
+		return bad("audio", "Choose the original or the instrumental")
+	}
+	return nil
+}
+
+// validateRenderFields checks everything about a render that doesn't need
+// the analysis: the design, the picture, the background and the range.
+func validateRenderFields(input string, o Options) error {
 	if strings.TrimSpace(o.ShowJSON) == "" || len(o.ShowJSON) > viz.MaxShowBytes || !json.Valid([]byte(o.ShowJSON)) {
 		return bad("showJson", "This design couldn't be read")
 	}
@@ -117,16 +141,22 @@ func (m *Module) validateRender(input string, o Options) error {
 	if o.StartMs < 0 || (o.EndMs != 0 && o.EndMs <= o.StartMs) {
 		return bad("endMs", "The range is empty")
 	}
-	switch o.Audio {
-	case "", "original":
-	case "instrumental":
-		if ref.Instrumental == "" {
-			return bad("audio", "Separate the instruments to use the instrumental")
-		}
-	default:
-		return bad("audio", "Choose the original or the instrumental")
-	}
 	return nil
+}
+
+// validateAuto checks an auto job (analyze, then render) without touching
+// the analysis cache; the analysis key is made by the job.
+func validateAuto(input string, o Options) error {
+	if err := validateAnalyze(o.Analyze); err != nil {
+		return err
+	}
+	if o.Analyze.Words == viz.WordsGiven || o.Analyze.Words == viz.WordsAlign || o.Analyze.Words == viz.WordsFile {
+		return bad("analyze.words", "Steps can detect words or leave them out")
+	}
+	if err := validateRenderFields(input, o); err != nil {
+		return err
+	}
+	return validateAudio(o.Audio, o.Analyze.Stems)
 }
 
 func (m *Module) validateOptions(inputs []string, o Options) error {
@@ -135,6 +165,8 @@ func (m *Module) validateOptions(inputs []string, o Options) error {
 		return validateAnalyze(o.Analyze)
 	case ActionRender, ActionPreview:
 		return m.validateRender(inputs[0], o)
+	case ActionAuto:
+		return validateAuto(inputs[0], o)
 	default:
 		return bad("action", "Unknown action")
 	}

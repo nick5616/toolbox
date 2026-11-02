@@ -72,6 +72,23 @@ type harness struct {
 	logs   []string
 	outs   []string
 	noTool map[string]bool
+	tools  map[string]string // overrides for the paths Tool returns
+}
+
+func (h *harness) setTool(id, path string) {
+	if h.tools == nil {
+		h.tools = map[string]string{}
+	}
+	h.tools[id] = path
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }
 
 func newHarness(t *testing.T, o Options) *harness {
@@ -99,6 +116,9 @@ func (h *harness) newJob(t *testing.T, o Options) *core.JobContext {
 		Tool: func(id string) (string, error) {
 			if h.noTool[id] {
 				return "", core.ErrDependencyMissing(id, "install it")
+			}
+			if p, ok := h.tools[id]; ok {
+				return p, nil
 			}
 			return "/bin/" + id, nil
 		},

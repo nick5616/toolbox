@@ -35,7 +35,7 @@ var whisperRepos = map[string]string{
 }
 
 func (a Action) needsMedia() bool {
-	return a == ActionGenerate || a == ActionExtract || a == ActionBurn || a == ActionEmbed
+	return a == ActionGenerate || a == ActionExtract || a == ActionBurn || a == ActionEmbed || a == ActionAuto
 }
 
 func isSubtitleExt(path string) bool {
@@ -154,6 +154,8 @@ func validateOptions(o Options) error {
 				f["trackLanguage"] = "Choose a listed language"
 			}
 		}
+	case ActionAuto:
+		mergeFields(f, validateAuto(o))
 	default:
 		f["action"] = "Choose what to do"
 	}
@@ -180,7 +182,8 @@ func (m *Module) validate(inputs []string, options json.RawMessage) error {
 	if o.Action.needsMedia() && isSubtitleExt(inputs[0]) {
 		return core.ValidationError("Choose a video or audio file", map[string]string{"inputs.0": "This needs a video or audio file"})
 	}
-	if o.Action != ActionExtract && o.Action != ActionBurn && o.Action != ActionEmbed {
+	autoVideo := o.Action == ActionAuto && (o.Video == VideoBurn || o.Video == VideoEmbed)
+	if o.Action != ActionExtract && o.Action != ActionBurn && o.Action != ActionEmbed && !autoVideo {
 		return nil
 	}
 	if m.resolve == nil {
@@ -204,6 +207,10 @@ func checkStreams(o Options, info media.Info) error {
 	switch o.Action {
 	case ActionBurn, ActionEmbed:
 		if info.Video == nil && (o.Action == ActionEmbed || !burnsAudio(o)) {
+			return core.ValidationError("This needs a video file", map[string]string{"inputs.0": "No video stream found"})
+		}
+	case ActionAuto:
+		if info.Video == nil && (o.Video == VideoEmbed || (o.Video == VideoBurn && !burnsAudio(o))) {
 			return core.ValidationError("This needs a video file", map[string]string{"inputs.0": "No video stream found"})
 		}
 	case ActionExtract:
@@ -245,6 +252,8 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 		return m.runBurn(ctx, job, o)
 	case ActionEmbed:
 		return m.runEmbed(ctx, job, o)
+	case ActionAuto:
+		return m.runAuto(ctx, job, o)
 	}
 	return core.ValidationError("Choose what to do", nil)
 }
@@ -331,12 +340,15 @@ func parseEngineDoc(b []byte) (string, []rawSegment, error) {
 	return d.Language, segs, nil
 }
 
-func (m *Module) runGenerate(ctx context.Context, job *core.JobContext, o Options) error {
+// generateCues runs the speech model on the job's input and returns the
+// language and the cues (none when no speech was found). Engine progress is
+// mapped into [lo, hi] of the job's progress.
+func (m *Module) generateCues(ctx context.Context, job *core.JobContext, o Options, lo, hi float64) (string, []Cue, error) {
 	if m.sc == nil {
-		return core.Errorf(core.CodeDependencyMissing, "The AI engine isn't available")
+		return "", nil, core.Errorf(core.CodeDependencyMissing, "The AI engine isn't available")
 	}
 	if _, err := job.Tool(sidecar.DepID); err != nil {
-		return err
+		return "", nil, err
 	}
 	input := job.Inputs[0]
 	var language any
@@ -352,7 +364,7 @@ func (m *Module) runGenerate(ctx context.Context, job *core.JobContext, o Option
 		"model": whisperRepos[o.Model], "modelDir": filepath.Join(m.modelsDir, "whisper", o.Model),
 		"language": language, "task": task, "formats": []string{"json"}, "vad": true,
 	}
-	scoped := job.Scoped(0, 0.9)
+	scoped := job.Scoped(lo, hi)
 	raw, err := m.sc.Call(ctx, "transcribe.run", params, func(ev sidecar.Event) {
 		switch ev.Kind {
 		case "progress":
@@ -366,26 +378,34 @@ func (m *Module) runGenerate(ctx context.Context, job *core.JobContext, o Option
 		}
 	})
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	var res struct {
 		Language string `json:"language"`
 	}
 	if err := json.Unmarshal(raw, &res); err != nil {
-		return core.Errorf(core.CodeInternal, "The AI engine returned an unreadable result").WithCause(err)
+		return "", nil, core.Errorf(core.CodeInternal, "The AI engine returned an unreadable result").WithCause(err)
 	}
 	data, err := os.ReadFile(filepath.Join(job.TempDir, "transcript.json"))
 	if err != nil {
-		return core.Errorf(core.CodeInternal, "The AI engine didn't produce a transcript").WithCause(err)
+		return "", nil, core.Errorf(core.CodeInternal, "The AI engine didn't produce a transcript").WithCause(err)
 	}
 	lang, segs, err := parseEngineDoc(data)
 	if err != nil {
-		return core.Errorf(core.CodeInternal, "The AI engine returned an unreadable transcript").WithCause(err)
+		return "", nil, core.Errorf(core.CodeInternal, "The AI engine returned an unreadable transcript").WithCause(err)
 	}
 	if lang == "" {
 		lang = res.Language
 	}
-	cues := buildCues(segs, o.MaxLineChars, o.MaxLines)
+	return lang, buildCues(segs, o.MaxLineChars, o.MaxLines), nil
+}
+
+func (m *Module) runGenerate(ctx context.Context, job *core.JobContext, o Options) error {
+	input := job.Inputs[0]
+	lang, cues, err := m.generateCues(ctx, job, o, 0, 0.9)
+	if err != nil {
+		return err
+	}
 	if len(cues) == 0 {
 		job.Progress(1, "No speech found")
 		return finishResult(job, o, lang, 0, nil)
@@ -476,22 +496,30 @@ func (m *Module) runSave(job *core.JobContext, o Options) error {
 
 const openChatHint = "Open Local Chat and download a model"
 
-func (m *Module) runTranslate(ctx context.Context, job *core.JobContext, o Options) error {
+// translate runs the cues through Local Chat. Progress is mapped into
+// [lo, hi] of the job's progress.
+func (m *Module) translate(ctx context.Context, job *core.JobContext, cues []Cue, source, target string, lineChars int, lo, hi float64) ([]Cue, error) {
 	if m.tg == nil {
-		return core.Errorf(core.CodeDependencyMissing, "Local Chat isn't available").WithHint(openChatHint)
+		return nil, core.Errorf(core.CodeDependencyMissing, "Local Chat isn't available").WithHint(openChatHint)
 	}
 	if _, err := m.tg.Ready(); err != nil {
 		var ae *core.AppError
 		if errors.As(err, &ae) && ae.Hint == "" {
 			ae.Hint = openChatHint
 		}
-		return err
+		return nil, err
 	}
-	total := len(o.Cues)
-	job.Progress(0, "Translating…")
-	translated, err := translateCues(ctx, m.tg, o.Cues, o.SourceLanguage, o.TargetLanguage, o.MaxLineChars, func(done int) {
-		job.Progress(float64(done)/float64(total), fmt.Sprintf("Translated %d of %d", done, total))
+	sc := job.Scoped(lo, hi)
+	total := len(cues)
+	sc.Progress(0, "Translating…")
+	return translateCues(ctx, m.tg, cues, source, target, lineChars, func(done int) {
+		sc.Progress(float64(done)/float64(total), fmt.Sprintf("Translated %d of %d", done, total))
 	})
+}
+
+func (m *Module) runTranslate(ctx context.Context, job *core.JobContext, o Options) error {
+	total := len(o.Cues)
+	translated, err := m.translate(ctx, job, o.Cues, o.SourceLanguage, o.TargetLanguage, o.MaxLineChars, 0, 1)
 	if err != nil {
 		return err
 	}

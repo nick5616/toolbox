@@ -32,13 +32,13 @@ func validateOptions(o Options) error {
 		}
 	}
 	switch o.Action {
-	case ActionLyrics, ActionRender, ActionPreview, ActionLRC:
+	case ActionLyrics, ActionRender, ActionPreview, ActionLRC, ActionAuto:
 	default:
 		fields["action"] = "Choose lyrics, render, preview or lrc"
 	}
 	l := o.Look
 	oneOf("look.background", l.Background, "blur-cover", "cover", "color", "gradient", "image", "video", "visualizer")
-	if l.Background == "visualizer" && (o.Action == ActionRender || o.Action == ActionPreview) {
+	if l.Background == "visualizer" && (o.Action == ActionRender || o.Action == ActionPreview || o.Action == ActionAuto) {
 		if s := strings.TrimSpace(l.Visuals.ShowJSON); s == "" || len(s) > viz.MaxShowBytes || !json.Valid([]byte(s)) {
 			fields["look.visuals"] = "Choose a visual design"
 		}
@@ -87,9 +87,11 @@ func validateOptions(o Options) error {
 		default:
 			return core.ValidationError("Choose where the lyrics come from", map[string]string{"source": "Choose detect, align or file"})
 		}
-	case ActionRender, ActionPreview:
-		if err := validateLines(o.Lines); err != nil {
-			return err
+	case ActionRender, ActionPreview, ActionAuto:
+		if o.Action != ActionAuto { // auto detects its own lines
+			if err := validateLines(o.Lines); err != nil {
+				return err
+			}
 		}
 		if l.Background == "image" || l.Background == "video" {
 			if fi, err := os.Stat(l.BackgroundPath); l.BackgroundPath == "" || err != nil || !fi.Mode().IsRegular() {
@@ -127,6 +129,8 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 	switch o.Action {
 	case ActionLRC:
 		return m.runLRC(job, o)
+	case ActionAuto:
+		return m.runAuto(ctx, job, o)
 	case ActionLyrics:
 		if o.Source != SourceFile || strings.EqualFold(filepath.Ext(o.LyricsPath), ".txt") {
 			if _, err := job.Tool(sidecar.DepID); err != nil {

@@ -234,6 +234,11 @@ func extractCover(ctx context.Context, ffmpeg, song, dir string) (string, error)
 
 // runRender is the "render" and "preview" actions.
 func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options) error {
+	return m.doRender(ctx, job, o, job.SetResult)
+}
+
+// doRender is runRender with the result handed to emit (auto keeps it).
+func (m *Module) doRender(ctx context.Context, job *core.JobContext, o Options, emit func(any) error) error {
 	o = normalize(o)
 	visual := o.Look.Background == "visualizer"
 	if visual && (m.an == nil || m.br == nil) {
@@ -381,7 +386,7 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options)
 		}
 		res.PreviewPath = dst
 		job.Progress(1, "Preview ready")
-		return job.SetResult(res)
+		return emit(res)
 	}
 
 	base := core.StemName(song)
@@ -402,7 +407,7 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options)
 	}
 	res.HasInstrumental = m.bestInstrumental(song) != ""
 	job.Progress(1, "Saved "+filepath.Base(video))
-	return job.SetResult(res)
+	return emit(res)
 }
 
 // bestInstrumental is the instrumental to use for song: the Visualizer's

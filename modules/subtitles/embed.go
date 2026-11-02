@@ -51,6 +51,10 @@ func embedArgs(input, srt, out, codec, lang string, n int) []string {
 }
 
 func (m *Module) runEmbed(ctx context.Context, job *core.JobContext, o Options) error {
+	return m.embed(ctx, job, o, standaloneFinish(job, o))
+}
+
+func (m *Module) embed(ctx context.Context, job *core.JobContext, o Options, fin finishFn) error {
 	input := job.Inputs[0]
 	ffmpeg, err := job.Tool("ffmpeg")
 	if err != nil {
@@ -82,5 +86,5 @@ func (m *Module) runEmbed(ctx context.Context, job *core.JobContext, o Options) 
 	if remuxed {
 		hint = "This container can't hold a subtitle track, so the video was remuxed into .mkv"
 	}
-	return finishMedia(job, o.Action, tmp, final, hint, len(o.Cues))
+	return fin(tmp, final, hint)
 }
