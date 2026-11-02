@@ -3,6 +3,8 @@ import vectors from "../../../../modules/videoeditor/testdata/timeline.json";
 import type { VideoClip, VideoProject } from "@/lib/api";
 import {
   appendClips,
+  dropIndexAt,
+  insertClips,
   clipFromInfo,
   deleteClip,
   emptyProject,
@@ -220,6 +222,22 @@ describe("edit operations", () => {
     ]);
     expect(r.added).toBe(2);
     expect(r.doc.clips?.map((c) => c.motion)).toEqual(["in", "out"]);
+  });
+
+  it("inserts clips at an index and finds the drop index", () => {
+    const base = { path: "x", durationMs: 4000, width: 1920, height: 1080, fps: 30, rotation: 0, hasAudio: true, takenAt: 0, error: "", kind: "video" };
+    const d = three();
+    const n = (d.clips ?? []).length;
+    const r = insertClips(d, [{ ...base, path: "n1.mp4" }, { ...base, path: "n2.mp4" }], 1);
+    expect(r.added).toBe(2);
+    expect(r.doc.clips?.map((c) => c.path).slice(1, 3)).toEqual(["n1.mp4", "n2.mp4"]);
+    expect(r.doc.clips).toHaveLength(n + 2);
+    expect(insertClips(d, [{ ...base, path: "e.mp4" }], 999).doc.clips?.at(-1)?.path).toBe("e.mp4");
+    const spans = [
+      { startMs: 0, lenMs: 2000 },
+      { startMs: 2000, lenMs: 2000 },
+    ];
+    expect([dropIndexAt(spans, 500), dropIndexAt(spans, 1500), dropIndexAt(spans, 2900), dropIndexAt(spans, 3500), dropIndexAt([], 10)]).toEqual([0, 1, 1, 2, 0]);
   });
 
   it("titles clamp their times", () => {

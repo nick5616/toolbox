@@ -273,3 +273,8 @@
   color: var(--fg-muted);
   font-size: var(--text-sm);
 }
+
+.clipLane[data-source-over] {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
