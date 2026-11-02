@@ -84,7 +84,7 @@ describe("slides from sources", () => {
 });
 
 describe("post shape helpers", () => {
-  const doc = (n: number, format = "carousel"): PostDoc => ({ version: 1, format, aspect: "4:5", slides: Array.from({ length: n }, () => blankSlide("photo")), caption: "", keepLocation: false });
+  const doc = (n: number, format = "carousel"): PostDoc => ({ version: 1, format, aspect: "4:5", slides: Array.from({ length: n }, () => blankSlide("photo")), caption: "", keepLocation: false, folder: "", subfolders: false, extra: [], hidden: [] });
   it("tracks room left", () => {
     expect(roomLeft(doc(18), DEFAULT_LIMITS)).toBe(2);
     expect(roomLeft(doc(20), DEFAULT_LIMITS)).toBe(0);
