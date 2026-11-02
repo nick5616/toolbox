@@ -151,6 +151,9 @@ import {
   ArrowDown,
   Loader,
   Ellipsis,
+  GalleryHorizontalEnd,
+  Images,
+  Sticker,
 } from "lucide-react";
 
 /** Static map: only these icons end up in the bundle. */
@@ -307,6 +310,10 @@ const icons = {
   "arrow-down": ArrowDown,
   loader: Loader,
   ellipsis: Ellipsis,
+  // Phase 8 Part B (creator tools)
+  "gallery-horizontal-end": GalleryHorizontalEnd,
+  images: Images,
+  sticker: Sticker,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;

@@ -1,0 +1,33 @@
+package posts
+
+// The post document (SPEC.md Part B §B7.1–B7.2). FROZEN (Wave B0).
+
+type Post struct {
+	Version      int     `json:"version"`      // 1
+	Format       string  `json:"format"`       // "carousel" | "reel" | "story"
+	Aspect       string  `json:"aspect"`       // carousel: "4:5" | "1:1" | "3:4" | "1.91:1"; reel/story: "9:16"
+	Slides       []Slide `json:"slides"`       // carousel/story 1–20; reel exactly 1 video
+	Caption      string  `json:"caption"`      // ≤ 2,200 chars
+	KeepLocation bool    `json:"keepLocation"` // default false: strip EXIF/XMP/location from photos and metadata from videos
+}
+
+type Slide struct {
+	ID        string  `json:"id"`
+	Kind      string  `json:"kind"`      // "photo" | "clip" | "composition" | "video"
+	Path      string  `json:"path"`      // photo/clip
+	ProjectID string  `json:"projectId"` // composition/video
+	PanX      float64 `json:"panX"`      // framing at the post's shape: -1..1
+	PanY      float64 `json:"panY"`
+	Zoom      float64 `json:"zoom"`     // 1..4
+	Rotation  int     `json:"rotation"` // 0 | 90 | 180 | 270 (on top of EXIF/metadata orientation)
+	InMs      int64   `json:"inMs"`     // clip
+	OutMs     int64   `json:"outMs"`    // clip; carousel/story ≤ 60 s, reel ≤ 180 s
+	Mute      bool    `json:"mute"`
+	AltText   string  `json:"altText"` // ≤ 1,000 chars
+}
+
+type Issue struct {
+	Level   string `json:"level"`   // "error" | "warning" | "note"
+	SlideID string `json:"slideId"` // "" = the whole post
+	Message string `json:"message"`
+}

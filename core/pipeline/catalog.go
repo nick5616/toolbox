@@ -30,7 +30,7 @@ func (r *Runner) stepType(id string) (core.StepType, core.Chainable, bool) {
 // stepCapable reports whether a module can be a step at all: ready, listed,
 // runs jobs, and either reads something or is Chainable.
 func stepCapable(d core.Descriptor) bool {
-	if d.Status != core.StatusReady || d.Hidden || d.JobLess || d.ID == "pipelines" {
+	if d.Status != core.StatusReady || d.Hidden || d.JobLess || d.NotAStep || d.ID == "pipelines" {
 		return false
 	}
 	return d.Accepts.URLs || d.Accepts.Any || len(d.Accepts.Extensions) > 0

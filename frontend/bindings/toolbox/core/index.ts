@@ -19,6 +19,7 @@ export {
     PackComponentKind,
     PackComponentState,
     PackState,
+    ProjectKind,
     RunStatus,
     Theme,
     WaitKind
@@ -79,6 +80,7 @@ export type {
     PipelineTemplate,
     PipelinesChanged,
     PresetInfo,
+    ProjectInfo,
     RunBrief,
     RunCell,
     RunFile,

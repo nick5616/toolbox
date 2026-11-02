@@ -1231,6 +1231,45 @@ export interface PresetInfo {
     "speed": string;
 }
 
+/**
+ * ProjectInfo is a project as listed.
+ */
+export interface ProjectInfo {
+    "id": string;
+    "kind": ProjectKind;
+    "name": string;
+
+    /**
+     * <support>/projects/<id>/thumb.jpg ("" if none)
+     */
+    "thumb": string;
+
+    /**
+     * slides / layers / clips
+     */
+    "items": number;
+
+    /**
+     * source files that no longer exist
+     */
+    "missing": number;
+    "updatedAt": number;
+}
+
+/**
+ * ProjectKind is the type of a project document.
+ */
+export enum ProjectKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ProjectPost = "post",
+    ProjectComposition = "composition",
+    ProjectVideo = "video",
+};
+
 export interface RunBrief {
     "id": string;
     "status": RunStatus;

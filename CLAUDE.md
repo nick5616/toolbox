@@ -227,6 +227,15 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Temporary files:** clean-up only deletes the run's own registered outputs inside the Library, never inputs, and only when a run ends `done` or the user asks.
 - **Variables:** `{name}` syntax, `[a-z][a-z0-9_]{0,31}`; `core.ExpandVars` and `frontend/src/pipelines/vars.ts` share the vectors in `core/testdata/vars.json`.
 
+## Creator tools (Phase 8 Part B)
+
+- **Three projects tools:** Photo Composer (`photo-composer`), Video Editor (`video-editor`), Post Builder (`post-builder`). Their documents are typed Go structs (`modules/<pkg>/document.go`, in the bindings) stored as JSON in the `projects` table (migration 0006) through `core/projectdocs` (CRUD, names, duplicate, delete; per-project files in `<support>/projects/<id>/`: `thumb.jpg`, `render.*`, `preview.mp4`). They set `Descriptor.NotAStep` (never pipeline steps).
+- **Compositions render in the webview** with `frontend/src/composer/render.ts` — the editor and the export draw with the same function. Every Save stores a 1× render (`ComposerService.SaveRender`), so Post Builder's export never needs the UI. Images reach the canvas through `ComposerService.LoadImage` (orientation applied, HEIC via the engine, cached in `<support>/cache/composer/`).
+- **Videos render in Go with FFmpeg** (`videoeditor` jobs; `Module.RenderProject` is also called by Post Builder's export inside its own job). Titles are ASS files in the job TempDir, burned with FFmpeg run there (as Lyric Video).
+- **Photos are oriented by EXIF** (`imaging.Orientation` / `imaging.Orient`) everywhere these tools read them; Go has no HEIC decoder, so HEIC goes through the engine's `image.convert`.
+- **Instagram limits** live only in `modules/posts/limits.go`. Exports strip location and metadata unless the post keeps them. Never modify source files.
+- **Handoffs:** `Handoff.postSlide` opens Composer or Video Editor for a post's slide; the first save links the project to the slide.
+
 ## Conventions
 
 - **Go**: idiomatic, context-aware, wrapped errors, stdlib `testing` only (no testify), table tests, `t.TempDir()` for files. No goroutine leaks: everything stops on ctx cancel.

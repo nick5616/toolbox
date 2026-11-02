@@ -9,6 +9,18 @@ export interface Handoff {
   inputs: string[];
   /** Extra data for the target tool (SPEC.md §9.4): timed text for the Visualizer. */
   seed?: ToolSeed;
+  /** A Post Builder slide to make or edit (SPEC.md Part B §B7.5): Photo Composer and Video Editor. */
+  postSlide?: PostSlideSeed;
+}
+
+/** Opens Photo Composer or Video Editor for a slide of a post. */
+export interface PostSlideSeed {
+  postId: string;
+  slideId: string;
+  /** The post's aspect ("4:5", "9:16", …): new projects start at it. */
+  aspect: string;
+  /** The slide's linked project ("" = make a new one and link it on first save). */
+  projectId: string;
 }
 
 /** Timed text handed to the Visualizer from Lyric Video or Subtitles (SPEC.md §9.5). */

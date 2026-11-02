@@ -302,3 +302,41 @@ export type { StepOptions as VisualizerStepOptions } from "@bindings/modules/vis
 export type { StepOptions as RedactStepOptions } from "@bindings/modules/redact/models";
 export type { StepOptions as PdfStepOptions } from "@bindings/modules/pdf/models";
 export type { StepOptions as VaultStepOptions } from "@bindings/modules/vault/models";
+
+// --- Phase 8 Part B: creator tools ---
+export * as ComposerService from "@bindings/modules/composer/service";
+export * as VideoEditorService from "@bindings/modules/videoeditor/service";
+export * as PostsService from "@bindings/modules/posts/service";
+export { ProjectKind } from "@bindings/core/models";
+export type { ProjectInfo } from "@bindings/core/models";
+export type {
+  AspectInfo as ComposerAspect,
+  Background as ComposerBackground,
+  Composition,
+  ImageLayer as ComposerImageLayer,
+  ImageRef as ComposerImageRef,
+  Layer as ComposerLayer,
+  Look as ComposerLook,
+  Outline as ComposerOutline,
+  Rect as ComposerRect,
+  Shadow as ComposerShadow,
+  TextLayer as ComposerTextLayer,
+} from "@bindings/modules/composer/models";
+export type {
+  Clip as VideoClip,
+  ClipInfo as VideoClipInfo,
+  Music as VideoMusic,
+  PlanRequest as VlogPlanRequest,
+  PlanResult as VlogPlanResult,
+  Title as VideoTitle,
+  Transition as VideoTransition,
+  VideoProject,
+} from "@bindings/modules/videoeditor/models";
+export type {
+  ExportResult as PostExportResult,
+  Issue as PostIssue,
+  Limits as PostLimits,
+  Post,
+  Slide as PostSlide,
+  SlideSource as PostSlideSource,
+} from "@bindings/modules/posts/models";

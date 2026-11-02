@@ -34,6 +34,7 @@ import (
 	"toolbox/modules/bpmkey"
 	"toolbox/modules/chat"
 	"toolbox/modules/clipboard"
+	"toolbox/modules/composer"
 	"toolbox/modules/converter"
 	"toolbox/modules/devutils"
 	"toolbox/modules/downloader"
@@ -45,6 +46,7 @@ import (
 	"toolbox/modules/pdf"
 	"toolbox/modules/pipelines"
 	"toolbox/modules/placeholders"
+	"toolbox/modules/posts"
 	"toolbox/modules/redact"
 	"toolbox/modules/stems"
 	"toolbox/modules/subtitles"
@@ -52,6 +54,7 @@ import (
 	"toolbox/modules/trimmer"
 	"toolbox/modules/upscale"
 	"toolbox/modules/vault"
+	"toolbox/modules/videoeditor"
 	"toolbox/modules/visualizer"
 )
 
@@ -267,6 +270,29 @@ func run() error {
 	}
 	// --- end Phase 8 ---
 
+	// --- Phase 8 Part B: creator tools (architect) ---
+	projectsDir := filepath.Join(paths.SupportDir, "projects")
+	composerMod := composer.New(composer.Config{
+		Store: db, ProjectsDir: projectsDir, CacheDir: filepath.Join(paths.CacheDir, "composer"),
+		Engine: engine, Jobs: jobs, Outputs: db, Emitter: emitter, LibraryDir: libraryDir,
+	})
+	videoMod := videoeditor.New(videoeditor.Config{
+		Store: db, ProjectsDir: projectsDir, Engine: engine, Analyzer: vizAnalyzer, Resolve: depSvc.Resolve, Jobs: jobs,
+	})
+	postsMod := posts.New(posts.Config{
+		Store: db, ProjectsDir: projectsDir, Engine: engine, Composer: composerMod, Video: videoMod, Resolve: depSvc.Resolve,
+	})
+	for _, register := range []func() error{
+		func() error { return composer.Register(reg, composerMod) },
+		func() error { return videoeditor.Register(reg, videoMod) },
+		func() error { return posts.Register(reg, postsMod) },
+	} {
+		if err := register(); err != nil {
+			return err
+		}
+	}
+	// --- end Part B ---
+
 	settings.OnChange(func(old, new core.Settings) {
 		if old.Concurrency != new.Concurrency {
 			jobs.SetConcurrency(new.Concurrency)
@@ -329,6 +355,9 @@ func run() error {
 			application.NewServiceWithOptions(devutils.NewService(jobs), opts),
 			application.NewServiceWithOptions(visualizer.NewService(jobs, visualizerMod), opts),
 			application.NewServiceWithOptions(pipelines.NewService(runner), opts),
+			application.NewServiceWithOptions(composer.NewService(composerMod), opts),
+			application.NewServiceWithOptions(videoeditor.NewService(jobs, videoMod), opts),
+			application.NewServiceWithOptions(posts.NewService(jobs, postsMod), opts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

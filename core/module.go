@@ -62,6 +62,9 @@ type Descriptor struct {
 	MaxConcurrent int `json:"-"`
 	// MaxInputs caps inputs per submission; 0 = no limit.
 	MaxInputs int `json:"maxInputs"`
+	// NotAStep keeps a module out of the pipeline step catalogue (creator
+	// tools whose work is an interactive project).
+	NotAStep bool `json:"-"`
 }
 
 // ErrJobLess is returned by Jobs.Submit (and by job-less modules' Validate)
