@@ -1,11 +1,11 @@
 // The timeline (SPEC.md Part B §B6.5): clips, titles and music lanes with a
 // playhead, zoom and snapping.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from "react";
 import { Button, IconButton, SegmentedControl, Slider, cx } from "@/components";
 import { Waveform } from "@/components/media";
 import type { VideoClip, VideoClipInfo, VideoProject, VideoTitle } from "@/lib/api";
 import { formatMs } from "@/components/media";
-import { clipsOf, moveClip, setTransition, titlesOf, trimClip, updateTitle } from "./edit";
+import { clipsOf, dropIndexAt, moveClip, setTransition, titlesOf, trimClip, updateTitle } from "./edit";
 import {
   clampPps,
   musicPeaksWindow,
@@ -17,6 +17,7 @@ import {
   SNAP_PX,
 } from "./panelLogic";
 import { MAX_TRANSITION_MS, MIN_TRANSITION_MS, type Span } from "./timeline";
+import { useSourceDropTarget } from "@/tools/post-builder/sourceDrag";
 import { useThumb, useWaveform } from "./useThumbs";
 import type { Selection } from "./types";
 import styles from "./TimelinePanel.module.css";
@@ -37,6 +38,8 @@ export interface TimelinePanelProps {
   onAddClips: () => void;
   onAddTitle: () => void;
   onPickMusic: () => void;
+  /** Post sources dropped on the clips lane: insert them as clips at index. */
+  onDropSources?: (paths: string[], index: number) => void;
 }
 
 const LANE_PAD_MS = 1500;
@@ -86,8 +89,8 @@ export function TimelinePanel(p: TimelinePanelProps) {
   const widthPx = Math.max(300, (totalMs + LANE_PAD_MS) * ppms);
   const [popover, setPopover] = useState<TransitionPopover | null>(null);
   const [drag, setDrag] = useState<{ index: number; dx: number; target: number } | null>(null);
-  const live = useRef({ doc, spans, timeMs, ppms, onChange: p.onChange, onSeek: p.onSeek });
-  live.current = { doc, spans, timeMs, ppms, onChange: p.onChange, onSeek: p.onSeek };
+  const live = useRef({ doc, spans, timeMs, ppms, onChange: p.onChange, onSeek: p.onSeek, onDropSources: p.onDropSources });
+  live.current = { doc, spans, timeMs, ppms, onChange: p.onChange, onSeek: p.onSeek, onDropSources: p.onDropSources };
 
   const fit = () => {
     const w = scroller.current?.clientWidth ?? 600;
@@ -123,6 +126,16 @@ export function TimelinePanel(p: TimelinePanelProps) {
     const x = timeMs * ppms;
     if (x < el.scrollLeft || x > el.scrollLeft + el.clientWidth - 40) el.scrollLeft = Math.max(0, x - 80);
   }, [timeMs, ppms, p.playing]);
+
+  const clipLane = useRef<HTMLDivElement>(null);
+  const onDropSources = useCallback((info: { paths: string[]; x: number }) => {
+    const el = scroller.current;
+    if (!el || !live.current.onDropSources) return;
+    const rect = el.getBoundingClientRect();
+    const ms = Math.max(0, (info.x - rect.left + el.scrollLeft) / live.current.ppms);
+    live.current.onDropSources(info.paths, dropIndexAt(live.current.spans, ms));
+  }, []);
+  useSourceDropTarget(clipLane, onDropSources);
 
   const msAtClientX = (clientX: number): number => {
     const el = scroller.current;
@@ -331,7 +344,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
             ))}
           </div>
 
-          <div className={cx(styles.lane, styles.clipLane)} data-testid="clips-lane">
+          <div className={cx(styles.lane, styles.clipLane)} data-testid="clips-lane" ref={clipLane}>
             {clips.map((c, i) => {
               const s = spans[i];
               if (!s) return null;

@@ -86,17 +86,32 @@ export function clipFromInfo(info: VideoClipInfo, id: string = newId("c")): Vide
 
 /** Appends probed files as clips (alternating photo motion). */
 export function appendClips(doc: VideoProject, infos: readonly VideoClipInfo[]): { doc: VideoProject; added: number } {
+  return insertClips(doc, infos, Number.MAX_SAFE_INTEGER);
+}
+
+/** Inserts probed files as clips at index (clamped), keeping their order. */
+export function insertClips(doc: VideoProject, infos: readonly VideoClipInfo[], index: number): { doc: VideoProject; added: number } {
   const clips = [...clipsOf(doc)];
-  let added = 0;
+  const at = Math.min(Math.max(index, 0), clips.length);
+  const fresh: VideoClip[] = [];
   for (const info of infos) {
-    if (clips.length >= MAX_CLIPS) break;
+    if (clips.length + fresh.length >= MAX_CLIPS) break;
     const c = clipFromInfo(info);
     if (!c) continue;
-    if (c.kind === "image") c.motion = clips.filter((x) => x.kind === "image").length % 2 === 0 ? "in" : "out";
-    clips.push(c);
-    added++;
+    if (c.kind === "image") {
+      const images = clips.filter((x) => x.kind === "image").length + fresh.filter((x) => x.kind === "image").length;
+      c.motion = images % 2 === 0 ? "in" : "out";
+    }
+    fresh.push(c);
   }
-  return { doc: fixTransitions({ ...doc, clips }), added };
+  clips.splice(at, 0, ...fresh);
+  return { doc: fixTransitions({ ...doc, clips }), added: fresh.length };
+}
+
+/** The clip index a drop at timeMs lands on: before the first clip whose middle is after it. */
+export function dropIndexAt(spans: readonly { startMs: number; lenMs: number }[], timeMs: number): number {
+  const i = spans.findIndex((s) => timeMs < s.startMs + s.lenMs / 2);
+  return i < 0 ? spans.length : i;
 }
 
 /** Clamps every transition to what the neighbours allow; one that can't fit becomes a cut. */

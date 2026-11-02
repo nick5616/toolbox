@@ -20,6 +20,28 @@ const h = vi.hoisted(() => ({
   moduleState: vi.fn(),
   setState: vi.fn(),
   revealPath: vi.fn(),
+  sources: vi.fn(),
+  dropHandler: null as null | ((info: { paths: string[]; x: number; y: number }) => void),
+}));
+
+vi.mock("@/tools/post-builder/sourceDrag", () => ({
+  useSourceDropTarget: (_ref: unknown, onDrop: (info: { paths: string[]; x: number; y: number }) => void) => {
+    h.dropHandler = onDrop;
+  },
+  startSourceDrag: () => undefined,
+  useSourceDrag: () => undefined,
+}));
+
+vi.mock("@/tools/post-builder/SourceGrid", () => ({
+  SourceGrid: (p: { sources: { path: string; name: string }[]; onActivate?: (path: string) => void }) => (
+    <ul aria-label="Sources grid">
+      {p.sources.map((s) => (
+        <li key={s.path}>
+          <button onDoubleClick={() => p.onActivate?.(s.path)}>{s.name}</button>
+        </li>
+      ))}
+    </ul>
+  ),
 }));
 
 vi.mock("@/lib/api", async (orig) => {
@@ -43,6 +65,7 @@ vi.mock("@/lib/api", async (orig) => {
       Get: (...a: unknown[]) => h.postGet(...a),
       Save: (...a: unknown[]) => h.postSave(...a),
       List: (...a: unknown[]) => h.postList(...a),
+      Sources: (...a: unknown[]) => h.sources(...a),
     },
     LyricVideoService: { Fonts: async () => ["Arial"] },
     MediaService: {
@@ -166,6 +189,7 @@ beforeEach(() => {
   h.postList.mockResolvedValue([info("post1", "My post")]);
   h.postGet.mockResolvedValue({ version: 1, format: "reel", aspect: "9:16", slides: [{ id: "s1", kind: "clip", path: "x.mp4", projectId: "" }], caption: "", keepLocation: false });
   h.postSave.mockResolvedValue(info("post1", "My post"));
+  h.sources.mockResolvedValue([]);
   h.pick.mockResolvedValue([]);
   h.pickWith.mockResolvedValue([]);
   h.revealPath.mockResolvedValue(undefined);
@@ -420,6 +444,115 @@ describe("post handoff", () => {
     await waitFor(() => expect(h.save).toHaveBeenCalled(), { timeout: 3000 });
     expect(h.postSave).not.toHaveBeenCalled(); // already linked
     expect(screen.getByRole("button", { name: "Back to post" })).toBeTruthy();
+  });
+});
+
+describe("stitch build", () => {
+  const seed = (over: Record<string, unknown> = {}) => ({
+    postId: "post1",
+    slideId: "s1",
+    aspect: "3:4",
+    projectId: "pending",
+    build: { kind: "stitch" as const, music: "/m/song.mp3", beatCut: true, order: "as-given" as const, transition: "dip" },
+    ...over,
+  });
+  const inputs = ["/p/a.jpg", "/p/b.mp4"];
+
+  it("submits Plan directly with the mapped aspect, shows progress, opens and links the result", async () => {
+    h.plan.mockResolvedValue(job("jp", { status: JobStatus.JobRunning }));
+    h.get.mockResolvedValue(project());
+    useUI.setState({ handoff: { moduleId: "video-editor", inputs, postSlide: seed() } });
+    render(<VideoEditorView moduleId="video-editor" />);
+    await screen.findByText("Building your video…");
+    expect(screen.queryByText("Quick vlog")).toBeNull();
+    expect(h.plan).toHaveBeenCalledWith({
+      paths: inputs,
+      musicPath: "/m/song.mp3",
+      aspect: "4:5",
+      order: "as-given",
+      targetMs: 0,
+      beatCut: true,
+      transition: "dip",
+    });
+    act(() => useJobs.getState().upsert(job("jp", { status: JobStatus.JobRunning, progress: 0.4 })));
+    await screen.findByText(/40%/);
+    expect(h.postSave).not.toHaveBeenCalled();
+    act(() => useJobs.getState().upsert(job("jp", { status: JobStatus.JobDone, progress: 1, resultJson: JSON.stringify({ projectId: "p1" }) })));
+    await screen.findByLabelText("Project name");
+    expect(h.get).toHaveBeenCalledWith("p1");
+    await waitFor(() => expect(h.postSave).toHaveBeenCalled());
+    const post = h.postSave.mock.calls[0]?.[2] as { slides: { id: string; kind: string; projectId: string }[] };
+    expect(post.slides[0]).toMatchObject({ id: "s1", kind: "video", projectId: "p1" });
+    expect(h.create).not.toHaveBeenCalled();
+  });
+
+  it("maps 1.91:1 to 16:9 and turns the beat cut off without a song", async () => {
+    h.plan.mockResolvedValue(job("jp", { status: JobStatus.JobRunning }));
+    useUI.setState({
+      handoff: { moduleId: "video-editor", inputs, postSlide: seed({ aspect: "1.91:1", build: { kind: "stitch", music: "", beatCut: true, order: "date-taken", transition: "fade" } }) },
+    });
+    render(<VideoEditorView moduleId="video-editor" />);
+    await screen.findByText("Building your video…");
+    expect(h.plan).toHaveBeenCalledWith(expect.objectContaining({ aspect: "16:9", musicPath: "", beatCut: false, order: "date-taken", targetMs: 0 }));
+  });
+
+  it("offers Quick vlog prefilled with the same values when the build fails", async () => {
+    h.plan.mockResolvedValue(job("jp", { status: JobStatus.JobRunning }));
+    useUI.setState({ handoff: { moduleId: "video-editor", inputs, postSlide: seed() } });
+    render(<VideoEditorView moduleId="video-editor" />);
+    await screen.findByText("Building your video…");
+    act(() => useJobs.getState().upsert(job("jp", { status: JobStatus.JobFailed, error: "FFmpeg broke", errorHint: "Try fewer clips" })));
+    await screen.findByText("FFmpeg broke");
+    expect(screen.getByText("Try fewer clips")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Open Quick vlog instead" }));
+    const files = await screen.findByRole("list", { name: "Files" });
+    expect(within(files).getByText("a.jpg")).toBeTruthy();
+    expect(within(files).getByText("b.mp4")).toBeTruthy();
+    expect(screen.getByText("song.mp3")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "As given" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Dip" }).getAttribute("aria-checked")).toBe("true");
+  });
+});
+
+describe("sources tab", () => {
+  const seed = { postId: "post1", slideId: "s1", aspect: "9:16", projectId: "p1" };
+  async function openTab() {
+    h.sources.mockResolvedValue([
+      { path: "/s/new.mp4", name: "new.mp4", rel: "", kind: "clip", sizeBytes: 1, modTime: 1, takenAt: 1 },
+      { path: "/s/pic.jpg", name: "pic.jpg", rel: "", kind: "photo", sizeBytes: 1, modTime: 1, takenAt: 1 },
+    ]);
+    useUI.setState({ handoff: { moduleId: "video-editor", inputs: [], postSlide: seed } });
+    render(<VideoEditorView moduleId="video-editor" />);
+    await screen.findByLabelText("Project name");
+    await userEvent.click(screen.getByRole("radio", { name: "Sources" }));
+    await screen.findByText("new.mp4");
+  }
+  const lastSaved = () => (h.save.mock.calls.at(-1)?.[2] as VideoProject).clips?.map((c) => c.path);
+
+  it("appends a source on activation after probing it", async () => {
+    await openTab();
+    fireEvent.doubleClick(screen.getByText("new.mp4"));
+    await waitFor(() => expect(h.probe).toHaveBeenCalledWith(["/s/new.mp4"]));
+    await waitFor(() => expect(lastSaved()).toEqual(["/v/a.mp4", "/v/b.mp4", "/s/new.mp4"]), { timeout: 3000 });
+  });
+
+  it("inserts dropped sources at the index computed from the pointer", async () => {
+    await openTab();
+    await waitFor(() => expect(h.dropHandler).not.toBeNull());
+    // 60 px/s: clip 1 spans 0-3 s (0-180 px); x=100 is past its middle, so the drop lands before clip 2.
+    act(() => h.dropHandler?.({ paths: ["/s/new.mp4"], x: 100, y: 0 }));
+    await waitFor(() => expect(lastSaved()).toEqual(["/v/a.mp4", "/s/new.mp4", "/v/b.mp4"]), { timeout: 3000 });
+    act(() => h.dropHandler?.({ paths: ["/s/pic.jpg"], x: 5, y: 0 }));
+    await waitFor(() => expect(lastSaved()).toEqual(["/s/pic.jpg", "/v/a.mp4", "/s/new.mp4", "/v/b.mp4"]), { timeout: 3000 });
+  });
+
+  it("shows the error when the sources can't be listed", async () => {
+    h.sources.mockRejectedValue(new Error("not implemented"));
+    useUI.setState({ handoff: { moduleId: "video-editor", inputs: [], postSlide: seed } });
+    render(<VideoEditorView moduleId="video-editor" />);
+    await screen.findByLabelText("Project name");
+    await userEvent.click(screen.getByRole("radio", { name: "Sources" }));
+    await screen.findByText(/not implemented/);
   });
 });
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Banner, Button, IconButton, Meter, Select, Slider, TextField, toast } from "@/components";
+import { Badge, Banner, Button, IconButton, Meter, SegmentedControl, Select, Slider, TextField, toast } from "@/components";
 import { formatMs, useMediaSource } from "@/components/media";
 import {
   FilesService,
@@ -27,6 +27,7 @@ import { Inspector } from "./Inspector";
 import { ProjectsHome } from "./ProjectsHome";
 import { QuickVlogDialog } from "./QuickVlogDialog";
 import { SequencePlayer } from "./SequencePlayer";
+import { SourcesTab } from "./SourcesTab";
 import { TimelinePanel } from "./TimelinePanel";
 import {
   ASPECTS,
@@ -37,6 +38,7 @@ import {
   deleteClip,
   deleteTitle,
   emptyProject,
+  insertClips,
   localWarnings,
   mapPostAspect,
   newTitle,
@@ -77,6 +79,14 @@ function aspectFor(info: VideoClipInfo | undefined): string {
   const h = rot ? info.width : info.height;
   return h > w ? "9:16" : h === w ? "1:1" : "16:9";
 }
+
+/** A stitch build from a post (SPEC.md §B13.5): the Plan request's form, and why it failed. */
+interface StitchState {
+  form: VlogForm;
+  error?: { message: string; hint: string };
+}
+
+const TRANSITIONS: readonly VlogForm["transition"][] = ["cut", "fade", "dip", "slide"];
 
 /** A thin progress bar for a running job with a cancel button. */
 function JobBar({ label, jobId }: { label: string; jobId: string }) {
@@ -134,6 +144,10 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
   const postSlideRef = useRef<PostSlideSeed | null>(null);
   postSlideRef.current = postSlide;
   const needsLink = useRef(false);
+  const [stitch, setStitch] = useState<StitchState | null>(null);
+  const stitchRef = useRef<StitchState | null>(null);
+  stitchRef.current = stitch;
+  const [sideTab, setSideTab] = useState<"inspector" | "sources">("inspector");
 
   const live = useRef({ projectId, name, doc, timeMs, vlogOpen });
   live.current = { projectId, name, doc, timeMs, vlogOpen };
@@ -300,7 +314,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
 
   // ---- adding clips ----
   const addPaths = useCallback(
-    async (paths: string[]) => {
+    async (paths: string[], index?: number) => {
       if (paths.length === 0) return;
       let res: VideoClipInfo[];
       try {
@@ -324,11 +338,24 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
         const base = emptyProject(aspect);
         await createAndOpen("New video", aspect, appendClips(base, usable).doc);
       } else {
-        edit(appendClips(cur, usable).doc);
+        edit((index === undefined ? appendClips(cur, usable) : insertClips(cur, usable, index)).doc);
       }
     },
     [probe, createAndOpen, edit],
   );
+
+  // ---- stitch build (from a post) ----
+  const startStitch = useCallback(async (form: VlogForm) => {
+    setStitch({ form });
+    try {
+      const j = await VideoEditorService.Plan(buildPlanRequest(form));
+      useJobs.getState().upsert(j);
+      setPlanJobId(j.id);
+    } catch (e) {
+      const err = toAppError(e);
+      setStitch({ form, error: { message: err.message, hint: err.hint ?? "" } });
+    }
+  }, []);
 
   // ---- handoffs ----
   const handoff = useUI((s) => s.handoff);
@@ -341,6 +368,22 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
     if (h.postSlide) {
       const ps = h.postSlide;
       setPostSlide(ps);
+      if (ps.build?.kind === "stitch") {
+        const b = ps.build;
+        needsLink.current = true;
+        const transition = TRANSITIONS.find((t) => t === b.transition) ?? "fade";
+        void startStitch({
+          ...DEFAULT_VLOG,
+          paths: h.inputs,
+          musicPath: b.music,
+          aspect: mapPostAspect(ps.aspect),
+          order: b.order,
+          length: "music",
+          beatCut: b.beatCut && b.music !== "",
+          transition,
+        });
+        return;
+      }
       void (async () => {
         if (ps.projectId && ps.projectId !== "pending" && (await openProject(ps.projectId))) return;
         needsLink.current = true;
@@ -351,7 +394,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
     }
     if (live.current.vlogOpen) setVlog((f) => addVlogPaths(f, h.inputs));
     else void addPaths(h.inputs);
-  }, [handoff, moduleId, openProject, createAndOpen, addPaths]);
+  }, [handoff, moduleId, openProject, createAndOpen, addPaths, startStitch]);
 
   // ---- startup ----
   useEffect(() => {
@@ -455,6 +498,24 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
     if (handled.current.has(planJob.id)) return;
     handled.current.add(planJob.id);
     setPlanJobId("");
+    const st = stitchRef.current;
+    if (st) {
+      if (planJob.status === JobStatus.JobDone) {
+        const id = parseProjectId(planJob.resultJson);
+        void (async () => {
+          if (id && (await openProject(id))) {
+            await linkPostSlide(id);
+            setStitch(null);
+          } else {
+            setStitch({ form: st.form, error: { message: "The video was built but couldn't be opened", hint: "" } });
+          }
+        })();
+      } else {
+        const message = planJob.status === JobStatus.JobCancelled ? "The build was cancelled" : planJob.error || "Couldn't build the video";
+        setStitch({ form: st.form, error: { message, hint: planJob.errorHint || "" } });
+      }
+      return;
+    }
     if (planJob.status === JobStatus.JobDone) {
       const id = parseProjectId(planJob.resultJson);
       if (id) void openProject(id);
@@ -462,7 +523,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
     } else if (planJob.status === JobStatus.JobFailed) {
       toast({ title: planJob.error || "Couldn't build the vlog", description: planJob.errorHint || undefined, tone: "danger" });
     }
-  }, [planJob, openProject]);
+  }, [planJob, openProject, linkPostSlide]);
 
   useEffect(() => {
     if (!exportJob || exportJob.status === JobStatus.JobRunning || exportJob.status === JobStatus.JobQueued) return;
@@ -662,6 +723,44 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
     />
   );
 
+  if (stitch) {
+    return (
+      <div className={styles.root}>
+        <DepsGate moduleId={moduleId} />
+        <div className={styles.building} role="status">
+          {!stitch.error ? (
+            <>
+              <h2>Building your video…</h2>
+              <p>
+                {planJob && planJob.progress >= 0 ? `${Math.round(planJob.progress * 100)}%` : "Working…"}
+                {planJob?.message ? ` ${planJob.message}` : ""}
+              </p>
+              <Meter value={planJob?.progress ?? -1} label="Building your video" className={styles.buildingMeter} />
+              {planJobId && <Button onClick={() => void JobsService.Cancel(planJobId).catch(() => undefined)}>Cancel</Button>}
+            </>
+          ) : (
+            <>
+              <Banner tone="danger" title={stitch.error.message}>
+                {stitch.error.hint}
+              </Banner>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setVlog(stitch.form);
+                  setVlogOpen(true);
+                  setStitch(null);
+                }}
+              >
+                Open Quick vlog instead
+              </Button>
+            </>
+          )}
+        </div>
+        {dialog}
+      </div>
+    );
+  }
+
   if (!doc || !projectId) {
     return (
       <div className={styles.root}>
@@ -827,6 +926,24 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
           </div>
         </div>
         <div className={styles.inspector}>
+          {postSlide && (
+            <div className={styles.inspectorTabs}>
+              <SegmentedControl
+                size="sm"
+                fullWidth
+                aria-label="Side panel"
+                value={sideTab}
+                onChange={setSideTab}
+                options={[
+                  { value: "inspector", label: "Inspector" },
+                  { value: "sources", label: "Sources" },
+                ]}
+              />
+            </div>
+          )}
+          {postSlide && sideTab === "sources" ? (
+            <SourcesTab postId={postSlide.postId} onAdd={(paths) => void addPaths(paths)} />
+          ) : (
           <Inspector
             doc={doc}
             selection={selection}
@@ -838,6 +955,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
             onPickMusic={() => void pickSong(false)}
             onSelect={setSelection}
           />
+          )}
         </div>
       </div>
 
@@ -859,6 +977,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
         onAddClips={() => void pickClips()}
         onAddTitle={addTitle}
         onPickMusic={() => void pickSong(false)}
+        onDropSources={(paths, index) => void addPaths(paths, index)}
       />
       {loaders}
       {dialog}
