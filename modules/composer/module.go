@@ -1,10 +1,6 @@
 // Package composer is the Photo Composer (SPEC.md Part B §B5): layered
 // compositions rendered in the webview (frontend/src/composer/render.ts) and
 // stored here as projects with their latest render.
-//
-// CONTRACT STUB (Wave B0): document.go, the descriptor, Config, Register,
-// the exported methods and service.go signatures are final; WP-CO1
-// implements them.
 package composer
 
 import (
@@ -83,12 +79,6 @@ func (m *Module) Docs() *projectdocs.Docs { return m.docs }
 // Get returns a composition document.
 func (m *Module) Get(ctx context.Context, id string) (Composition, error) {
 	return projectdocs.Get[Composition](ctx, m.docs, id)
-}
-
-// RenderPath returns the latest stored render of a composition, or a
-// CodeNotFound error when it was never rendered.
-func (m *Module) RenderPath(id string) (string, error) {
-	return "", core.NotImplemented("Photo Composer renders") // WP-CO1
 }
 
 // summarize counts layers and missing sources.
