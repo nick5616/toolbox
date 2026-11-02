@@ -9,7 +9,10 @@ package videoeditor
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 
 	"toolbox/core"
 	"toolbox/core/media"
@@ -90,11 +93,14 @@ type Config struct {
 type Module struct {
 	cfg  Config
 	docs *projectdocs.Docs
+	// bars gets a song's bar starts and length (a seam for tests).
+	bars func(ctx context.Context, job *core.JobContext, song string) ([]int64, int64, error)
 }
 
 // New builds the module.
 func New(cfg Config) *Module {
 	m := &Module{cfg: cfg}
+	m.bars = m.analyzeBars
 	m.docs = &projectdocs.Docs{Store: cfg.Store, Root: cfg.ProjectsDir, Kind: core.ProjectVideo, Summarize: summarize}
 	return m
 }
@@ -118,15 +124,77 @@ func (m *Module) Descriptor() core.Descriptor {
 
 // Validate implements core.Module.
 func (m *Module) Validate(inputs []string, options json.RawMessage) error {
-	if _, err := core.DecodeOptionsJSON[Options](options); err != nil {
+	o, err := core.DecodeOptionsJSON[Options](options)
+	if err != nil {
 		return err
 	}
-	return core.NotImplemented("Video Editor") // WP-VE1
+	switch o.Action {
+	case ActionRender, ActionPreview:
+		doc, err := m.Get(context.Background(), o.ProjectID)
+		if err != nil {
+			return err
+		}
+		return validateDoc(normalize(doc))
+	case ActionPlan:
+		if o.Plan == nil {
+			return core.ValidationError("Pick the clips for the vlog", nil)
+		}
+		return validatePlan(*o.Plan)
+	}
+	return core.ValidationError("Unknown action", map[string]string{"action": "Render, preview or plan"})
 }
 
 // Run implements core.Module.
 func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
-	return core.NotImplemented("Video Editor") // WP-VE1
+	o, err := core.DecodeOptions[Options](job)
+	if err != nil {
+		return err
+	}
+	switch o.Action {
+	case ActionPlan:
+		if o.Plan == nil {
+			return core.ValidationError("Pick the clips for the vlog", nil)
+		}
+		return m.runPlan(ctx, job, *o.Plan)
+	case ActionRender, ActionPreview:
+		return m.runRender(ctx, job, o)
+	}
+	return core.ValidationError("Unknown action", map[string]string{"action": "Render, preview or plan"})
+}
+
+// runRender is the render and preview actions.
+func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options) error {
+	p, err := m.docs.Load(ctx, o.ProjectID)
+	if err != nil {
+		return err
+	}
+	doc, err := projectdocs.Get[VideoProject](ctx, m.docs, o.ProjectID)
+	if err != nil {
+		return err
+	}
+	job.SetTitle(p.Name)
+	if o.Action == ActionPreview {
+		dir := m.docs.Dir(o.ProjectID)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return core.Errorf(core.CodeInternal, "Couldn't create the project folder").WithCause(err)
+		}
+		tmp := filepath.Join(dir, "preview.tmp.mp4")
+		if err := m.RenderProject(ctx, job, doc, tmp, RenderOptions{Preview: true}); err != nil {
+			_ = os.Remove(tmp)
+			return err
+		}
+		if err := os.Rename(tmp, filepath.Join(dir, "preview.mp4")); err != nil {
+			_ = os.Remove(tmp)
+			return core.Errorf(core.CodeInternal, "Couldn't save the preview").WithCause(err)
+		}
+		return nil
+	}
+	out := core.UniquePath(job.OutputDir, fileStem(p.Name), ".mp4")
+	if err := m.RenderProject(ctx, job, doc, out, RenderOptions{}); err != nil {
+		return err
+	}
+	_, err = job.Output(out)
+	return err
 }
 
 // Docs gives other modules (Post Builder) read access to video projects.
@@ -137,14 +205,19 @@ func (m *Module) Get(ctx context.Context, id string) (VideoProject, error) {
 	return projectdocs.Get[VideoProject](ctx, m.docs, id)
 }
 
-// DurationMs is a project's timeline length.
-func DurationMs(doc VideoProject) int64 { return 0 } // WP-VE1
-
-// RenderProject renders doc into outPath inside an existing job (the Video
-// Editor's own render job, or Post Builder's export). Progress is reported
-// to job over the whole call.
-func (m *Module) RenderProject(ctx context.Context, job *core.JobContext, doc VideoProject, outPath string, o RenderOptions) error {
-	return core.NotImplemented("Video Editor renders") // WP-VE1
+// fileStem makes a project name safe as a file name on Windows and macOS.
+func fileStem(name string) string {
+	name = strings.Map(func(r rune) rune {
+		if r < 0x20 || strings.ContainsRune(`<>:"/\|?*`, r) {
+			return '_'
+		}
+		return r
+	}, projectdocs.CleanName(name))
+	name = strings.Trim(name, " .")
+	if name == "" {
+		return "Video"
+	}
+	return name
 }
 
 // summarize counts clips and missing sources.

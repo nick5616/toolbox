@@ -1,0 +1,76 @@
+[
+  {
+    "name": "single video",
+    "clips": [
+      {"kind": "video", "inMs": 0, "outMs": 4000, "speed": 1, "transition": {"kind": "cut", "durationMs": 0}}
+    ],
+    "spans": [{"startMs": 0, "endMs": 4000}],
+    "totalMs": 4000
+  },
+  {
+    "name": "speed changes the length",
+    "clips": [
+      {"kind": "video", "inMs": 1000, "outMs": 3000, "speed": 0.5, "transition": {"kind": "cut", "durationMs": 0}},
+      {"kind": "video", "inMs": 0, "outMs": 4000, "speed": 2, "transition": {"kind": "cut", "durationMs": 0}},
+      {"kind": "video", "inMs": 0, "outMs": 3000, "speed": 1.5, "transition": {"kind": "cut", "durationMs": 0}}
+    ],
+    "spans": [{"startMs": 0, "endMs": 4000}, {"startMs": 4000, "endMs": 6000}, {"startMs": 6000, "endMs": 8000}],
+    "totalMs": 8000
+  },
+  {
+    "name": "lengths round to the millisecond",
+    "clips": [
+      {"kind": "video", "inMs": 0, "outMs": 1000, "speed": 1.5, "transition": {"kind": "cut", "durationMs": 0}},
+      {"kind": "video", "inMs": 0, "outMs": 1000, "speed": 0.75, "transition": {"kind": "cut", "durationMs": 0}}
+    ],
+    "spans": [{"startMs": 0, "endMs": 667}, {"startMs": 667, "endMs": 2000}],
+    "totalMs": 2000
+  },
+  {
+    "name": "a fade overlaps its neighbours",
+    "clips": [
+      {"kind": "video", "inMs": 0, "outMs": 3000, "speed": 1, "transition": {"kind": "fade", "durationMs": 500}},
+      {"kind": "video", "inMs": 0, "outMs": 3000, "speed": 1, "transition": {"kind": "cut", "durationMs": 0}}
+    ],
+    "spans": [{"startMs": 0, "endMs": 3000}, {"startMs": 2500, "endMs": 5500}],
+    "totalMs": 5500
+  },
+  {
+    "name": "photos and a dip",
+    "clips": [
+      {"kind": "image", "durationMs": 2000, "speed": 1, "transition": {"kind": "dip", "durationMs": 400}},
+      {"kind": "video", "inMs": 0, "outMs": 3000, "speed": 1, "transition": {"kind": "cut", "durationMs": 0}},
+      {"kind": "image", "durationMs": 1500, "speed": 1, "transition": {"kind": "cut", "durationMs": 0}}
+    ],
+    "spans": [{"startMs": 0, "endMs": 2000}, {"startMs": 1600, "endMs": 4600}, {"startMs": 4600, "endMs": 6100}],
+    "totalMs": 6100
+  },
+  {
+    "name": "a clip with transitions on both sides",
+    "clips": [
+      {"kind": "video", "inMs": 0, "outMs": 2000, "speed": 1, "transition": {"kind": "fade", "durationMs": 500}},
+      {"kind": "video", "inMs": 0, "outMs": 2000, "speed": 1, "transition": {"kind": "slide", "durationMs": 600}},
+      {"kind": "video", "inMs": 0, "outMs": 2000, "speed": 1, "transition": {"kind": "cut", "durationMs": 0}}
+    ],
+    "spans": [{"startMs": 0, "endMs": 2000}, {"startMs": 1500, "endMs": 3500}, {"startMs": 2900, "endMs": 4900}],
+    "totalMs": 4900
+  },
+  {
+    "name": "the last clip's transition is ignored",
+    "clips": [
+      {"kind": "video", "inMs": 0, "outMs": 2000, "speed": 1, "transition": {"kind": "cut", "durationMs": 0}},
+      {"kind": "video", "inMs": 0, "outMs": 2000, "speed": 1, "transition": {"kind": "fade", "durationMs": 500}}
+    ],
+    "spans": [{"startMs": 0, "endMs": 2000}, {"startMs": 2000, "endMs": 4000}],
+    "totalMs": 4000
+  },
+  {
+    "name": "an oversized transition is clamped to half of the shorter neighbour",
+    "clips": [
+      {"kind": "video", "inMs": 0, "outMs": 2000, "speed": 1, "transition": {"kind": "fade", "durationMs": 1500}},
+      {"kind": "video", "inMs": 0, "outMs": 1000, "speed": 1, "transition": {"kind": "cut", "durationMs": 0}}
+    ],
+    "spans": [{"startMs": 0, "endMs": 2000}, {"startMs": 1500, "endMs": 2500}],
+    "totalMs": 2500
+  }
+]

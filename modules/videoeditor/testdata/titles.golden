@@ -1,0 +1,67 @@
+-y
+-hide_banner
+-nostats
+-loglevel
+warning
+-progress
+pipe:1
+-ss
+0
+-t
+6
+-i
+a.mp4
+-/filter_complex
+graph.txt
+-map
+[vt]
+-map
+[a0]
+-c:v
+libx264
+-profile:v
+high
+-preset
+medium
+-crf
+20
+-pix_fmt
+yuv420p
+-c:a
+aac
+-b:a
+192k
+-ar
+48000
+-movflags
++faststart
+-t
+6
+-f
+mp4
+OUT.mp4
+--- graph.txt
+[0:v:0]setpts=PTS-STARTPTS,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(iw-ow)/2*1:(ih-oh)/2*1,fps=30,format=yuv420p,setsar=1,tpad=stop_mode=clone:stop_duration=1,trim=end_frame=180,setpts=PTS-STARTPTS[v0];
+[0:a:0]aformat=sample_rates=48000:channel_layouts=stereo,apad=whole_dur=6,atrim=duration=6,asetpts=PTS-STARTPTS[a0];
+[v0]ass=titles.ass[vt]
+--- titles.ass
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Title,Arial,91.80000000000001,&H00FFFFFF,&H00FFFFFF,&H00000000,&HFF000000,-1,0,0,0,100,100,0,0,1,6.48,3.24,5,64,64,134,1
+Style: LowerThird,Arial,54,&H00FFFFFF,&H00FFFFFF,&H64000000,&H64000000,-1,0,0,0,100,100,0,0,3,12.96,0,1,64,64,134,1
+Style: Caption,Arial,56.16,&H00FFFFFF,&H00FFFFFF,&H00000000,&HFF000000,-1,0,0,0,100,100,0,0,1,5.4,0,2,64,64,134,1
+Style: Label,Arial,41.04,&H00FFFFFF,&H00FFFFFF,&H6E000000,&H6E000000,0,0,0,0,100,100,0,0,3,9.719999999999999,0,7,64,64,134,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.10,0:00:01.60,Label,,0,0,0,,{\an7\1c&HFFFFFF&\fad(250,250)}08:41
+Dialogue: 0,0:00:00.50,0:00:03.00,Title,,0,0,0,,{\an5\fnGeorgia\1c&H00CCFF&\fad(250,250)}Day one\NLisbon ｛draft｝
+Dialogue: 0,0:00:03.00,0:00:05.00,LowerThird,,0,0,0,,{\an1\1c&HFFFFFF&\fad(250,250)}Alfama
+Dialogue: 0,0:00:04.00,0:00:06.00,Caption,,0,0,0,,{\an2\1c&HFFFFFF&\fad(250,250)}so good
