@@ -1,0 +1,90 @@
+.viewport {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  background: var(--bg-inset);
+}
+
+.stage {
+  position: relative;
+  flex: none;
+  margin: var(--space-4);
+  box-shadow: var(--shadow-pop);
+  outline: none;
+  touch-action: none;
+  user-select: none;
+}
+
+.stage:focus-visible {
+  box-shadow: var(--shadow-pop), var(--focus-ring);
+}
+
+.canvas {
+  display: block;
+  background: var(--bg-raised);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.guide {
+  stroke: var(--accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.box {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.boxLocked {
+  fill: none;
+  stroke: var(--fg-subtle);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.stem {
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+
+.handle {
+  fill: var(--bg-raised);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.busy {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  padding: var(--space-2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-app) 70%, transparent);
+  color: var(--accent);
+  pointer-events: none;
+}
+
+.editor {
+  position: absolute;
+  padding: 4px 8px;
+  margin: 0;
+  resize: none;
+  overflow: hidden;
+  border: 1px dashed var(--accent);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--bg-app) 35%, transparent);
+  outline: none;
+  field-sizing: content;
+}
