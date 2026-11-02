@@ -289,6 +289,7 @@ func run() error {
 	})
 	postsMod := posts.New(posts.Config{
 		Store: db, ProjectsDir: projectsDir, Engine: engine, Composer: composerMod, Video: videoMod, Resolve: depSvc.Resolve,
+		LibraryDir: libraryDir,
 	})
 	go composerMod.PruneCache() // start-up cleanup of cache/composer (30 days, 2 GB)
 	for _, register := range []func() error{
