@@ -7,9 +7,9 @@
 package posts
 
 import (
-	"context"
 	"encoding/json"
 	"slices"
+	"time"
 
 	"toolbox/core"
 	"toolbox/core/media"
@@ -64,13 +64,22 @@ type Config struct {
 
 // Module is the Post Builder.
 type Module struct {
-	cfg  Config
-	docs *projectdocs.Docs
+	cfg    Config
+	docs   *projectdocs.Docs
+	comps  compositions // nil when the Photo Composer isn't wired
+	videos videos       // nil when the Video Editor isn't wired
+	now    func() time.Time
 }
 
 // New builds the module.
 func New(cfg Config) *Module {
-	m := &Module{cfg: cfg}
+	m := &Module{cfg: cfg, now: time.Now}
+	if cfg.Composer != nil {
+		m.comps = cfg.Composer
+	}
+	if cfg.Video != nil {
+		m.videos = cfg.Video
+	}
 	m.docs = &projectdocs.Docs{Store: cfg.Store, Root: cfg.ProjectsDir, Kind: core.ProjectPost, Summarize: summarize}
 	return m
 }
@@ -94,19 +103,18 @@ func (m *Module) Descriptor() core.Descriptor {
 
 // Validate implements core.Module.
 func (m *Module) Validate(inputs []string, options json.RawMessage) error {
-	if _, err := core.DecodeOptionsJSON[Options](options); err != nil {
+	o, err := core.DecodeOptionsJSON[Options](options)
+	if err != nil {
 		return err
 	}
-	return core.NotImplemented("Post Builder") // WP-PB1
+	if o.Action != ActionExport {
+		return core.ValidationError("Unknown Post Builder action", map[string]string{"action": "must be export"})
+	}
+	if o.ProjectID == "" {
+		return core.ValidationError("Choose a post to export", map[string]string{"projectId": "required"})
+	}
+	return nil
 }
-
-// Run implements core.Module.
-func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
-	return core.NotImplemented("Post Builder") // WP-PB1
-}
-
-// Check validates a post against Instagram's limits (SPEC.md §B7.2).
-func (m *Module) Check(ctx context.Context, doc Post) []Issue { return []Issue{} } // WP-PB1
 
 // summarize counts slides and missing sources.
 func summarize(data string) (items, missing int) {
