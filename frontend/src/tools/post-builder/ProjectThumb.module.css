@@ -1,0 +1,15 @@
+.thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--bg-inset);
+  border-radius: var(--r-sm);
+  color: var(--fg-subtle);
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
