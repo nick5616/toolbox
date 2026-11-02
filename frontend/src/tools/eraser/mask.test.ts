@@ -167,9 +167,10 @@ describe("options", () => {
     ).toBe("Best · 200 MB · Fast · 30 MB");
   });
 
-  it("paints on webview formats and TIFF (via a Go preview), not HEIC", () => {
+  it("paints on webview formats, and TIFF and HEIC via a Go preview", () => {
     expect(canPaintOn("/a/b.JPG")).toBe(true);
-    expect(canPaintOn("/a/b.heic")).toBe(false);
+    expect(canPaintOn("/a/b.heic")).toBe(true);
+    expect(needsThumb("/a/b.HEIC")).toBe(true);
     expect(canPaintOn("/a/b.tiff")).toBe(true);
     expect(needsThumb("/a/b.TIF")).toBe(true);
     expect(needsThumb("/a/b.png")).toBe(false);

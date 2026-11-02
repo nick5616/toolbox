@@ -208,9 +208,10 @@ describe("ObjectEraserView", () => {
     expect((screen.getByRole("button", { name: /^Erase/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("explains that HEIC photos can't be painted on", async () => {
+  it("shows HEIC photos through a Go-decoded preview", async () => {
     await load("/photo.heic");
-    expect(await screen.findByText(/can't be shown for painting/)).toBeTruthy();
+    expect(await screen.findByAltText("Photo to edit")).toBeTruthy();
+    expect(h.thumb).toHaveBeenCalledWith("/photo.heic", 1600);
     expect(h.urlFor).not.toHaveBeenCalled();
   });
 

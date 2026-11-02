@@ -131,7 +131,7 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
     setView(FIT_VIEW);
     if (!path) return;
     if (!canPaintOn(path)) {
-      setLoadError("HEIC photos can't be shown for painting. Convert it to JPG or PNG first.");
+      setLoadError("This file type can't be shown for painting. Convert it to JPG or PNG first.");
       return;
     }
     let cancelled = false;
