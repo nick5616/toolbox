@@ -2397,7 +2397,7 @@ func (s *Service) SlideInfo(paths []string) ([]SlideSource, error) // kind, widt
 
 ## B13. Amendment r2: posts start from a source folder
 
-Status: **DRAFT (Part B r2), awaiting review.** Date: 2026-11-01. Requested by the user after trying r1.
+Status: **APPROVED 2026-11-01** (Part B r2). Requested by the user after trying r1.
 
 ### B13.1 Idea
 A post is no longer "a list of files". It has a **source pool**, usually a whole folder of trip photos and clips with no limit, and **slides** (≤ 20) that are allocated from it.

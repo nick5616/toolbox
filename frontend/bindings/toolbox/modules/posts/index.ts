@@ -12,5 +12,6 @@ export type {
     Limits,
     Post,
     Slide,
-    SlideSource
+    SlideSource,
+    SourceFile
 } from "./models.js";

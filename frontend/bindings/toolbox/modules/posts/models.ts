@@ -79,6 +79,27 @@ export interface Post {
      * default false: strip EXIF/XMP/location from photos and metadata from videos
      */
     "keepLocation": boolean;
+
+    /**
+     * The source pool (SPEC.md §B13): slides are allocated from it.
+     * the source folder ("" = none)
+     */
+    "folder": string;
+
+    /**
+     * include files in subfolders (any depth)
+     */
+    "subfolders": boolean;
+
+    /**
+     * sources added one by one (outside the folder or from the Library)
+     */
+    "extra": string[] | null;
+
+    /**
+     * folder files removed from the pool (never deleted from disk)
+     */
+    "hidden": string[] | null;
 }
 
 export interface Slide {
@@ -148,4 +169,43 @@ export interface SlideSource {
     "hasGps": boolean;
     "heic": boolean;
     "error": string;
+}
+
+/**
+ * SourceFile is one file of a post's source pool (SPEC.md §B13.3).
+ */
+export interface SourceFile {
+    "path": string;
+    "name": string;
+
+    /**
+     * path relative to the folder ("" for extras)
+     */
+    "rel": string;
+
+    /**
+     * "photo" | "clip"
+     */
+    "kind": string;
+    "sizeBytes": number;
+
+    /**
+     * Unix ms
+     */
+    "modTime": number;
+
+    /**
+     * EXIF date (JPEG) or ModTime
+     */
+    "takenAt": number;
+
+    /**
+     * slide IDs using it directly or inside a linked composition / video project
+     */
+    "usedIn": string[] | null;
+
+    /**
+     * an Extra that no longer exists
+     */
+    "missing": boolean;
 }

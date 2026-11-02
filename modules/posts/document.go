@@ -9,6 +9,25 @@ type Post struct {
 	Slides       []Slide `json:"slides"`       // carousel/story 1–20; reel exactly 1 video
 	Caption      string  `json:"caption"`      // ≤ 2,200 chars
 	KeepLocation bool    `json:"keepLocation"` // default false: strip EXIF/XMP/location from photos and metadata from videos
+
+	// The source pool (SPEC.md §B13): slides are allocated from it.
+	Folder     string   `json:"folder"`     // the source folder ("" = none)
+	Subfolders bool     `json:"subfolders"` // include files in subfolders (any depth)
+	Extra      []string `json:"extra"`      // sources added one by one (outside the folder or from the Library)
+	Hidden     []string `json:"hidden"`     // folder files removed from the pool (never deleted from disk)
+}
+
+// SourceFile is one file of a post's source pool (SPEC.md §B13.3).
+type SourceFile struct {
+	Path      string   `json:"path"`
+	Name      string   `json:"name"`
+	Rel       string   `json:"rel"`  // path relative to the folder ("" for extras)
+	Kind      string   `json:"kind"` // "photo" | "clip"
+	SizeBytes int64    `json:"sizeBytes"`
+	ModTime   int64    `json:"modTime"` // Unix ms
+	TakenAt   int64    `json:"takenAt"` // EXIF date (JPEG) or ModTime
+	UsedIn    []string `json:"usedIn"`  // slide IDs using it directly or inside a linked composition / video project
+	Missing   bool     `json:"missing"` // an Extra that no longer exists
 }
 
 type Slide struct {

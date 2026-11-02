@@ -21,7 +21,29 @@ export interface PostSlideSeed {
   aspect: string;
   /** The slide's linked project ("" = make a new one and link it on first save). */
   projectId: string;
+  /** Build a new project from the handoff's inputs (SPEC.md §B13.5); absent = open/create as usual. */
+  build?: SlideBuild;
 }
+
+/** How Photo Composer / Video Editor build a new slide from several sources (the handoff's inputs). */
+export type SlideBuild =
+  | {
+      kind: "collage";
+      /** Source path used as the background ("" = a colour). */
+      background: string;
+      color: string;
+      /** Cut out every other source (one background-removal job each). */
+      cutouts: boolean;
+      layout: "scatter" | "grid" | "stack" | "polaroids";
+    }
+  | {
+      kind: "stitch";
+      /** Song path ("" = none). */
+      music: string;
+      beatCut: boolean;
+      order: "date-taken" | "as-given";
+      transition: string;
+    };
 
 /** Timed text handed to the Visualizer from Lyric Video or Subtitles (SPEC.md §9.5). */
 export interface ToolSeed {

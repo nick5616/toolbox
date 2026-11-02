@@ -339,4 +339,5 @@ export type {
   Post,
   Slide as PostSlide,
   SlideSource as PostSlideSource,
+  SourceFile as PostSourceFile,
 } from "@bindings/modules/posts/models";

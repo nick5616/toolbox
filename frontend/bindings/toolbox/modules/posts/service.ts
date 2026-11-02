@@ -34,6 +34,13 @@ export function Create(name: string, format: string, aspect: string, paths: stri
 }
 
 /**
+ * CreateFromFolder makes a post whose source pool is folder (no slides yet).
+ */
+export function CreateFromFolder(name: string, format: string, aspect: string, folder: string, subfolders: boolean): $CancellablePromise<core$0.ProjectInfo> {
+    return $Call.ByID(3917861551, name, format, aspect, folder, subfolders);
+}
+
+/**
  * Delete removes a post (its exports stay in the Library).
  */
 export function Delete(id: string): $CancellablePromise<void> {
@@ -94,4 +101,11 @@ export function Save(id: string, name: string, doc: $models.Post): $CancellableP
  */
 export function SlideInfo(paths: string[] | null): $CancellablePromise<$models.SlideSource[] | null> {
     return $Call.ByID(3654309868, paths);
+}
+
+/**
+ * Sources lists the post's source pool with usage (SPEC.md §B13.3).
+ */
+export function Sources(id: string): $CancellablePromise<$models.SourceFile[] | null> {
+    return $Call.ByID(312189307, id);
 }

@@ -224,6 +224,16 @@ func (m *Module) slideInfo(ctx context.Context, paths []string) ([]SlideSource, 
 	return out, nil
 }
 
+// CreateFromFolder makes a post whose source pool is folder (no slides yet).
+func (s *Service) CreateFromFolder(name, format, aspect, folder string, subfolders bool) (core.ProjectInfo, error) {
+	return core.ProjectInfo{}, core.NotImplemented("Post sources") // WP-PB3
+}
+
+// Sources lists the post's source pool with usage (SPEC.md §B13.3).
+func (s *Service) Sources(id string) ([]SourceFile, error) {
+	return []SourceFile{}, core.NotImplemented("Post sources") // WP-PB3
+}
+
 // Limits returns the Instagram limits the checks use.
 func (s *Service) Limits() Limits { return DefaultLimits() }
 
