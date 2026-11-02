@@ -1707,3 +1707,688 @@ A "Pipelines (Phase 8)" section:
 - **Template 1 encodes the video three times** (trim, crop, burn). Quality at 1080p stays acceptable at the bitrates Trimmer and Subtitles use, and the size cap is applied last.
 - **Run state size:** 200 items × 30 steps with full transcripts could reach megabytes. Variables are stored once per item, previews on the wire are capped, the state is capped at 16 MiB, and `pipelines:run` is throttled.
 - **Scope:** six Wave 1 packages touch many modules, but each module's change is one new file plus, for three of them, one new action. The adapters share one interface and one test pattern.
+
+---
+---
+
+# Part B — Creator tools: Post Builder, Photo Composer, Video Editor
+
+Status: **DRAFT r1 (Part B), awaiting review.** Part A above stays approved and is being integrated.
+Date: 2026-11-01. Author: architect session (Opus).
+
+The user documents travels with lots of photos and clips and wants to make Instagram posts from them, more creatively than a plain photo dump:
+- a photo of a market with cut-out shirts and clothes placed around it;
+- a low-effort vlog stitched from separate clips;
+- both added to one post, exported as a folder ready to upload.
+
+Three tools that feed each other:
+
+```
+ photos ──▶ Photo Composer ──(composition)───┐
+ clips  ──▶ Video Editor   ──(video project)─┼──▶ Post Builder ──▶ <library>/Posts/<name>/01.jpg 02.mp4 … caption.txt
+ photos / clips ──────────────────────────────┘
+```
+
+"Bn" refers to the sections below. Everything in Part A and P1–P7 still holds.
+
+## B0. Facts this relies on
+
+### B0.1 Instagram (checked 2026-11-01)
+
+| Item | Value | Note |
+|---|---|---|
+| Carousel slides | up to **20** photos or videos, mixed | was 10 |
+| Carousel aspect | the first slide's ratio applies to every slide. **4:5 (1080×1350)** recommended; 1:1 (1080×1080); 1.91:1 (1080×566) | one source reports 3:4 (1080×1440) added in 2026: offered, marked "new, check the app" |
+| Video per carousel slide | up to **60 s** | |
+| Reel | one 9:16 (1080×1920) video, up to 3 min | |
+| Story | 9:16 slides; video up to 60 s per slide | |
+| Caption | ≤ 2,200 characters; ≤ 30 hashtags | |
+| Minimum width | 1080 px | smaller sources look soft |
+
+Toolbox never talks to Instagram. Its output is a folder. The user uploads it from the phone or the web.
+
+### B0.2 What exists and is reused
+- **Background Remover** (`bg-remover` jobs: transparent PNG cut-outs).
+- **Media kit:**
+  - in Go: `MediaService.Open/URLFor/Filmstrip/Waveform/Frame`, preview proxies for files the webview can't play (HEVC on Windows);
+  - in the UI: `MediaPlayer`, `Timeline`, `CropOverlay`, `Waveform`, `useMediaSource`.
+- **FFmpeg + libass:** `core/media` ASS writer and fonts (`media.Fonts()`). The rule "ASS in the TempDir, FFmpeg run there" still applies.
+- **Visualizer analysis** (`viz.Analyzer`) gives beats and downbeats (`audio.json`) without stems in about 9 s for a 3-minute song. The Video Editor uses it to cut on the beat.
+- **HEIC:**
+  - Go can't decode HEIC.
+  - The engine's `image.convert` decodes HEIC, applies EXIF orientation and writes a PNG.
+  - iPhone photos are HEIC, so the creator tools convert them through the engine (Image pack) into a cache.
+- **EXIF orientation:**
+  - `core/imaging` decodes JPEG/PNG/WebP/TIFF but **doesn't apply EXIF orientation**, so phone photos would come out sideways. Part B adds `imaging.Orientation(path)` and applies it everywhere these tools read photos.
+  - It's a minimal reader for the JPEG/TIFF APP1 tag 0x0112; no new dependency.
+
+## B1. Goals
+1. **Photo Composer:** a layered canvas for one image.
+   - **Background:** a photo with pan, zoom and blur; a colour; or a gradient.
+   - **Image layers:** any photo or a **cut-out**. "Remove background" runs on any layer in place.
+   - **Text layers.**
+   - **Per layer:** move, scale, rotate, flip, opacity, crop, rounded corners, drop shadow, **sticker outline** (follows the cut-out's edge), and a colour look (vivid, warm, cool, mono, fade, noir, plus sliders).
+   - **One-click layouts** for N layers: "Scatter" (market-haul style: cut-outs around the edges, slightly rotated, with outlines), "Grid", "Stack", "Polaroids".
+   - Undo/redo, snapping guides, keyboard nudging.
+   - It exports JPEG or PNG at the post's size and saves a project to return to.
+2. **Video Editor:** stitch clips and photos into one video.
+   - Order, trim, speed (0.5×–2×), volume or mute per clip.
+   - **Framing to the output shape:** fill with pan and zoom, or fit on a blurred or coloured background.
+   - Photos as clips with a slow zoom ("Ken Burns").
+   - Transitions between clips: cut, crossfade, dip to black, slide.
+   - A **music track** with offset, volume, fades, and lowering under clip sound ("duck").
+   - **Text titles** on the timeline.
+   - Output 9:16, 4:5, 1:1 or 16:9 at 1080, 30 fps.
+   - **Quick vlog:** pick clips (+ a song) and it builds a timeline that cuts on the beat. You then tweak it.
+   - A live preview of the sequence, an exact low-res "Render preview", and Export.
+3. **Post Builder:** one post as an ordered set of **slides**.
+   - **Formats:** carousel (1–20 slides), reel (1 video) or story (1–20 slides).
+   - **Slides:**
+     - a photo or a clip, framed with pan, zoom and rotate, and trimmed;
+     - a Composer composition;
+     - a Video Editor project.
+   - Caption with character and hashtag counts, alt text per slide.
+   - A phone-frame preview to swipe through.
+   - **Checks** against B0.1.
+   - **Export** writes `Posts/<name> <date>/01.jpg`, `02.mp4`, … plus `caption.txt` and `alt-text.txt` at Instagram's sizes. Location and other metadata are stripped unless you choose to keep them.
+4. **They feed each other:**
+   - "New composition for this slide" / "New video for this slide" open the editor at the post's shape, and the slide links to the result.
+   - **Edit** reopens it.
+   - The post re-uses each project's latest version at export.
+   - Library → Send to → **Add to post…**.
+5. **Everything is a saved project:** posts, compositions and videos are listed in each tool, renamed, duplicated and deleted. Source files are only read, never changed.
+
+## B2. Non-goals (Part B)
+- Posting to Instagram or any network (no accounts, no API). Scheduling.
+- Multi-track video compositing (picture-in-picture, green screen), keyframes, colour curves, LUTs, speed ramps, stabilisation.
+- Stickers/emoji packs, drawing/brush tools, shapes beyond text pills.
+- Auto-captions inside the Video Editor. "Add captions" hands the exported video to Subtitles, where its auto flow (Part A §6.4) burns them in.
+- Smart cropping (face/subject-aware framing) and auto-picking the "best" photos.
+- Pipeline steps for these tools. Projects are interactive; a later phase can add "Make post" as a step.
+
+## B3. Architecture
+
+```
+  ┌──────────── webview ─────────────────────────────┐        ┌──────────────── Go ──────────────────────────┐
+  │ tools/photo-composer  ── composer/render.ts ──┐  │ base64 │ modules/composer  projects, LoadImage (HEIC, │
+  │   (Canvas2D; same renderer for view+export)   └──┼───────▶│   orientation, cache), SaveRender, Export,   │
+  │ tools/video-editor   sequence preview (video  │  │        │   RemoveBackground (→ bg-remover job)         │
+  │   elements, CSS framing, DOM titles)          │  │ calls  │ modules/videoeditor projects, Probe, plan job │
+  │ tools/post-builder   slides, framing, preview │◀─┼────────┤   (quick vlog), render/preview jobs (FFmpeg)  │
+  └──────────────────────────────────────────────────┘ events │ modules/posts  projects, Check, export job    │
+                                                               │ core/store projects table (migration 0006)    │
+                                                               └───────────────────────────────────────────────┘
+```
+
+- **Compositions render in the webview.** The same `composer/render.ts` draws the editor and the export, so what you see is what you get.
+  - Text uses system fonts through Canvas2D.
+  - Colour looks are pixel operations, not `ctx.filter` (portable to WKWebView).
+  - Each Save renders the composition at 1× (`Width×Height`) and stores it (`SaveRender`). A post's export uses the stored render, so no UI is needed at export time.
+- **Videos render in Go with FFmpeg** (jobs), like every other video tool. The editor's live preview approximates the result. "Render preview" is exact.
+- **Posts export in Go** (a job):
+  - photo slides: orientation, crop, resize and JPEG in Go;
+  - clip slides: crop, scale, trim and H.264 with FFmpeg;
+  - composition slides: the stored render, framed;
+  - video-project slides: rendered by the Video Editor's Go code inside the post's job.
+- **No new listener, no new binary, no new dependency.** HEIC needs the AI engine (already in the Image pack).
+
+## B4. Projects store (`core/projects.go`, migration `0006_projects.sql`)
+
+```sql
+CREATE TABLE projects (
+  id         TEXT PRIMARY KEY,                 -- ULID
+  kind       TEXT NOT NULL CHECK (kind IN ('post','composition','video')),
+  name       TEXT NOT NULL,
+  data       TEXT NOT NULL,                    -- the typed document as JSON (≤ 4 MiB)
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX projects_kind_idx ON projects(kind, updated_at DESC);
+```
+
+```go
+type ProjectKind string // "post" | "composition" | "video"
+
+type ProjectInfo struct { // listing row (wire)
+	ID        string      `json:"id"`
+	Kind      ProjectKind `json:"kind"`
+	Name      string      `json:"name"`
+	Thumb     string      `json:"thumb"`   // <support>/projects/<id>/thumb.jpg ("" if none)
+	Items     int         `json:"items"`   // slides / layers / clips
+	Missing   int         `json:"missing"` // source files that no longer exist
+	UpdatedAt int64       `json:"updatedAt"`
+}
+
+type StoredProject struct {
+	ID, Name, Data       string
+	Kind                 ProjectKind
+	CreatedAt, UpdatedAt int64
+}
+
+type ProjectStore interface {
+	ListProjects(ctx context.Context, kind ProjectKind) ([]StoredProject, error) // newest first
+	GetProject(ctx context.Context, id string) (StoredProject, error)            // CodeNotFound
+	PutProject(ctx context.Context, p StoredProject) error                        // insert or replace
+	DeleteProject(ctx context.Context, id string) error
+}
+```
+
+**Per-project files** live in `<support>/projects/<id>/`:
+- `thumb.jpg` (≤ 480 px);
+- `render.png` or `render.jpg` (compositions);
+- `preview.mp4` (video previews, overwritten).
+
+Deleting a project deletes that folder. The editors autosave 800 ms after the last edit, plus on leaving the tool.
+
+## B5. Photo Composer (`modules/composer`, ID `photo-composer`, Name "Photo Composer", icon `layers`, Category image, OutputSubdir `Compositions`)
+
+### B5.1 Document (Go types, in the bindings; JSON tags lowerCamel)
+
+```go
+type Composition struct {
+	Version    int        `json:"version"` // 1
+	Width      int        `json:"width"`   // canvas px at 1×: 1080 wide; height by aspect (1350 for 4:5)
+	Height     int        `json:"height"`
+	Aspect     string     `json:"aspect"`  // "4:5" | "1:1" | "3:4" | "1.91:1" | "9:16" | "16:9"
+	Background Background `json:"background"`
+	Layers     []Layer    `json:"layers"`  // bottom → top, ≤ 60
+	Format     string     `json:"format"`  // export: "jpg" | "png"
+}
+
+type Background struct {
+	Kind   string    `json:"kind"`   // "color" | "gradient" | "image"
+	Color  string    `json:"color"`  // #rrggbb
+	Color2 string    `json:"color2"` // gradient end
+	Angle  int       `json:"angle"`  // gradient, degrees
+	Image  *ImageRef `json:"image"`  // kind image: cover-fitted, then pan/zoom
+	PanX   float64   `json:"panX"`   // -1..1 (focal offset)
+	PanY   float64   `json:"panY"`
+	Zoom   float64   `json:"zoom"`   // 1..4
+	Blur   float64   `json:"blur"`   // 0..1 (fraction of a 40 px radius at 1080)
+	Look   Look      `json:"look"`
+}
+
+type ImageRef struct {
+	Path     string `json:"path"`     // source file (never modified)
+	Original string `json:"original"` // before "Remove background" ("" = Path is the original)
+}
+
+type Layer struct {
+	ID       string      `json:"id"`
+	Kind     string      `json:"kind"` // "image" | "text"
+	Name     string      `json:"name"`
+	Hidden   bool        `json:"hidden"`
+	Locked   bool        `json:"locked"`
+	X        float64     `json:"x"`        // centre, fraction of canvas width
+	Y        float64     `json:"y"`        // centre, fraction of canvas height
+	Size     float64     `json:"size"`     // image: width / canvas width; text: font size / canvas width
+	Rotation float64     `json:"rotation"` // degrees, clockwise
+	FlipX    bool        `json:"flipX"`
+	Opacity  float64     `json:"opacity"`  // 0..1
+	Image    *ImageLayer `json:"image"`
+	Text     *TextLayer  `json:"text"`
+	Shadow   Shadow      `json:"shadow"`
+	Outline  Outline     `json:"outline"`
+	Look     Look        `json:"look"` // image layers
+}
+
+type ImageLayer struct {
+	Ref    ImageRef `json:"ref"`
+	Crop   Rect     `json:"crop"`   // fractions of the source, {0,0,1,1} = whole
+	Radius float64  `json:"radius"` // corner radius, fraction of the layer's shorter side (0..0.5)
+}
+
+type TextLayer struct {
+	Text       string  `json:"text"` // ≤ 500 chars, newlines allowed
+	Font       string  `json:"font"` // media.Fonts()
+	Bold       bool    `json:"bold"`
+	Italic     bool    `json:"italic"`
+	Color      string  `json:"color"`
+	Align      string  `json:"align"`      // "left" | "center" | "right"
+	LineHeight float64 `json:"lineHeight"` // 0.8..2
+	Pill       string  `json:"pill"`       // background colour behind the text ("" = none)
+}
+
+type Shadow struct { // blur and offsets: fractions of canvas width
+	On      bool    `json:"on"`
+	Blur    float64 `json:"blur"`
+	OffsetX float64 `json:"offsetX"`
+	OffsetY float64 `json:"offsetY"`
+	Opacity float64 `json:"opacity"`
+	Color   string  `json:"color"`
+}
+
+type Outline struct { // follows the alpha edge (sticker border)
+	On    bool    `json:"on"`
+	Width float64 `json:"width"` // fraction of canvas width
+	Color string  `json:"color"`
+}
+
+type Look struct {
+	Preset     string  `json:"preset"` // none | vivid | warm | cool | mono | fade | noir
+	Brightness float64 `json:"brightness"` // -1..1
+	Contrast   float64 `json:"contrast"`
+	Saturation float64 `json:"saturation"`
+	Warmth     float64 `json:"warmth"`
+}
+
+type Rect struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+	W float64 `json:"w"`
+	H float64 `json:"h"`
+}
+```
+
+### B5.2 Rendering (`frontend/src/composer/render.ts`, shared by the editor and export)
+- **Signature:** `renderComposition(ctx, doc, images, scale)` draws onto a 2D context of `Width×scale × Height×scale`.
+- **`images`:** a map of path → `ImageBitmap` loaded through `ComposerService.LoadImage(path, maxDim)`, which returns a data URL:
+  - `maxDim` is 2048 for editing and 4096 for export;
+  - orientation is applied;
+  - HEIC is converted by the engine (cached in `<support>/cache/composer/`, keyed by path + size + mtime);
+  - PNG is kept when there's alpha.
+- **Order:** background (cover-fit + pan/zoom, blur via a downscale/upscale box blur, look), then each visible layer.
+- **Image layers:** crop, then corner radius clip, then look (a pixel colour matrix on an offscreen canvas), then outline (alpha dilation: draw the alpha mask shifted around a circle of N samples, tinted, under the image), then shadow (blurred alpha offset), all transformed by position, size, rotation and flip.
+- **Text layers:** canvas text with wrap at newlines only, pill with rounded padding, outline via `strokeText`, shadow.
+- **Deterministic for the same inputs and scale.** No `Math.random` (layouts use a seeded RNG).
+
+### B5.3 Layouts (`composer/layouts.ts`, seeded)
+Each layout positions the **selected image layers**, or all of them, and keeps the background:
+- **Scatter:** cut-outs around a free central area, alternating sides, rotation ±12°, sizes by count, sticker outline on, soft shadow on.
+- **Grid:** 2×2 up to 4×5, equal gutters, rounded corners.
+- **Stack:** overlapping, slightly rotated cards with shadows.
+- **Polaroids:** white frame (outline 3 %, square crop) with a caption-space bottom.
+
+"Shuffle" re-seeds the layout.
+
+### B5.4 Service (`ComposerService`)
+
+```go
+func (s *Service) List() ([]core.ProjectInfo, error)
+func (s *Service) Get(id string) (Composition, error)
+func (s *Service) Create(name, aspect, backgroundPath string) (core.ProjectInfo, error) // backgroundPath optional
+func (s *Service) Save(id, name string, doc Composition) (core.ProjectInfo, error)       // validates (B5.1 limits)
+func (s *Service) SaveRender(id, format, base64Data string) error // writes render + thumb; ≤ 40 MB decoded
+func (s *Service) Export(id string) (core.Output, error)          // copies the render to <library>/Compositions/<name>.<ext> (registered)
+func (s *Service) Duplicate(id string) (core.ProjectInfo, error)
+func (s *Service) Delete(id string) error
+func (s *Service) LoadImage(path string, maxDim int) (string, error) // data URL; HEIC → engine; CodeDependencyMissing without it
+func (s *Service) RemoveBackground(path string) (core.Job, error)     // a bg-remover job (balanced, transparent, crop on, padding 0)
+```
+
+- **Remove background:**
+  1. The layer shows a spinner while the job runs.
+  2. When the job is done (the FE watches the jobs store), `Ref.Path` becomes the cut-out and `Ref.Original` keeps the photo.
+  3. "Restore original" swaps them back.
+- **Outputs** are registered like Chat's exports. The copy is fast, so it isn't a job.
+
+### B5.5 UI (`tools/photo-composer/`)
+- **Projects:** a strip of recent compositions with thumbnails, plus **New** (aspect; optional background photo).
+- **Toolbar:**
+  - Add photo (picker, drop, Library), Add text, Layouts ▾, Remove background (selected), Undo/Redo, Zoom to fit;
+  - Export (format ▾) / Back to post (when opened from a post).
+- **Stage:**
+  - the canvas fit to the view, with selection box, corner handles (scale), rotate handle, centre/edge snapping guides (shown while dragging, threshold 6 px), Shift = keep aspect and Alt = scale from the centre;
+  - drag empty space to deselect, double-click text to edit in place;
+  - arrows nudge 1 px (Shift: 10).
+- **Layers panel:** thumbnails, drag to reorder, eye (hide), lock, rename, duplicate, delete.
+- **Properties panel** for the selection: position/size/rotation numbers, flip, opacity, crop (opens `CropOverlay` on the layer), corners, look preset + sliders, outline (switch, width, colour), shadow (switch, blur, offset, colour), text fields.
+- **Background panel:** kind, colour(s)/angle, photo (choose/replace) + pan/zoom by dragging when "Adjust background" is on, blur, look.
+- **History:** 200 steps, edits within 400 ms merged into one step (as the Visualizer designer does).
+
+## B6. Video Editor (`modules/videoeditor`, ID `video-editor`, Name "Video Editor", icon `clapperboard`, Category media, OutputSubdir `Edits`, Requires ffmpeg + ffprobe)
+
+### B6.1 Document
+
+```go
+type VideoProject struct {
+	Version   int     `json:"version"`   // 1
+	Aspect    string  `json:"aspect"`    // "9:16" | "4:5" | "1:1" | "16:9"
+	Clips     []Clip  `json:"clips"`     // 1–200
+	Music     *Music  `json:"music"`
+	Titles    []Title `json:"titles"`    // ≤ 100
+	MaxSizeMB int     `json:"maxSizeMB"` // 0 = none
+}
+
+type Clip struct {
+	ID         string     `json:"id"`
+	Kind       string     `json:"kind"`       // "video" | "image"
+	Path       string     `json:"path"`
+	InMs       int64      `json:"inMs"`       // video
+	OutMs      int64      `json:"outMs"`      // video; > InMs, ≥ 300 ms after speed
+	DurationMs int64      `json:"durationMs"` // image: 1,000–10,000
+	Speed      float64    `json:"speed"`      // 0.5 | 0.75 | 1 | 1.5 | 2
+	Volume     float64    `json:"volume"`     // 0..2 (0 = muted)
+	Fit        string     `json:"fit"`        // "fill" | "fit-blur" | "fit-color"
+	FitColor   string     `json:"fitColor"`
+	PanX       float64    `json:"panX"`       // fill: -1..1 focal offset
+	PanY       float64    `json:"panY"`
+	Zoom       float64    `json:"zoom"`       // 1..3
+	Motion     string     `json:"motion"`     // image: "none" | "in" | "out" | "left" | "right"
+	Look       string     `json:"look"`       // none|vivid|warm|cool|mono|fade|noir (FFmpeg eq/colorchannelmixer presets)
+	Transition Transition `json:"transition"` // into the NEXT clip
+}
+
+type Transition struct {
+	Kind       string `json:"kind"`       // "cut" | "fade" | "dip" | "slide"
+	DurationMs int64  `json:"durationMs"` // 200–1,500; ≤ half of either neighbour
+}
+
+type Music struct {
+	Path         string  `json:"path"`
+	OffsetMs     int64   `json:"offsetMs"` // where in the song the video starts
+	Volume       float64 `json:"volume"`   // 0..1.5
+	FadeInMs     int64   `json:"fadeInMs"`
+	FadeOutMs    int64   `json:"fadeOutMs"`
+	Duck         bool    `json:"duck"`         // lower the music while clips have sound (sidechaincompress)
+	EndWithMusic bool    `json:"endWithMusic"` // trim the video to the song's end (else fade the song at the video's end)
+}
+
+type Title struct {
+	ID         string `json:"id"`
+	Text       string `json:"text"` // ≤ 200 chars
+	StartMs    int64  `json:"startMs"`
+	DurationMs int64  `json:"durationMs"`
+	Style      string `json:"style"`    // "title" | "lower-third" | "caption" | "label"
+	Position   string `json:"position"` // "top" | "center" | "bottom"
+	Font       string `json:"font"`
+	Color      string `json:"color"`
+}
+```
+
+**Timeline time:**
+- A clip lasts `(OutMs−InMs)/Speed` (video) or `DurationMs` (image).
+- A non-cut transition overlaps the two clips by its duration.
+- Total ≤ 30 minutes.
+
+### B6.2 Render (jobs: actions `render`, `preview`, `plan`)
+- **Inputs:**
+  - video clips: `-ss In -t (Out−In) -i path` (accurate seek);
+  - image clips: `-loop 1 -t dur -i path`, oriented (HEIC converted first through the engine into the job TempDir);
+  - music: `-i`.
+- **Per clip video:**
+  1. `setpts=(PTS-STARTPTS)/Speed`;
+  2. framing:
+     - fill = scale to cover, then crop with pan/zoom;
+     - fit-blur = split into a scaled, cropped, boxblurred background plus the fitted foreground, overlaid;
+     - fit-color = pad;
+  3. image motion via `zoompan` (25 % over the clip);
+  4. look via `eq`/`colorchannelmixer`;
+  5. `fps=30,format=yuv420p,setsar=1`.
+- **Per clip audio:** `atrim/asetpts`, `atempo` for speed, `volume`. Images and muted clips get `anullsrc` of the clip's length.
+- **Joins:**
+  - cut = `concat`;
+  - other transitions = `xfade` (`fade`/`fadeblack`/`slideleft`) with offsets from the timeline, and `acrossfade` for audio.
+- **Music:** `atrim` from Offset, `afade` in/out, `volume`, and with Duck `sidechaincompress` keyed by the clips' audio. Then `amix` (normalize=0).
+- **Titles:** an ASS file in the TempDir (styles: Title = large bold centred, Lower third = boxed bottom-left, Caption = bottom centred outlined, Label = small boxed), burned with `ass=titles.ass` with the TempDir as the working directory.
+- **Output:**
+  - frame size per aspect: 1080×1920, 1080×1350, 1080×1080 or 1920×1080, at 30 fps;
+  - H.264 High, CRF 20 (or a target bitrate from MaxSizeMB, as Trimmer computes), AAC 192 kbps 48 kHz, `+faststart`.
+  - The file is `<library>/Edits/<project name>.mp4`.
+- **Preview:** 540 px on the short side, `-preset veryfast`, CRF 28, the whole timeline. It goes to `<support>/projects/<id>/preview.mp4`, isn't a Library output, and is replaced each time.
+- **Progress** comes from FFmpeg `-progress` against the timeline length.
+- **Validate:** files exist; clip/transition rules (B6.1); fonts valid; durations.
+- **Exported Go func for Posts:** `RenderProject(ctx, job *core.JobContext, doc VideoProject, outPath string, o RenderOptions) error`, where `RenderOptions` = `{Width, Height int; MaxSeconds int64; Preview bool}`.
+
+### B6.3 Quick vlog (`plan` job)
+**Input:**
+
+```go
+type PlanRequest struct {
+	Paths      []string `json:"paths"`      // clips and photos, 1–200
+	MusicPath  string   `json:"musicPath"`  // optional
+	Aspect     string   `json:"aspect"`
+	Order      string   `json:"order"`      // "as-given" | "date-taken"
+	TargetMs   int64    `json:"targetMs"`   // 0 = fit to the music (or ~3 s per clip without music)
+	BeatCut    bool     `json:"beatCut"`    // cut on the music's bars (needs MusicPath)
+	Transition string   `json:"transition"` // default for every join
+}
+```
+
+**Steps:**
+1. Probe each file: duration, creation time from container metadata or EXIF.
+2. Order the files.
+3. If BeatCut, analyse the song with `viz.Analyzer` (no stems, no words, no mood; cached) and get the bar starts.
+4. Give each clip a length:
+   - in whole bars: 2 bars, or 1 bar for clips ≤ 3 s and photos;
+   - without beats: 3 s for videos and 2.5 s for photos;
+   - then scale so the total meets TargetMs or the song's length.
+5. Take each video's **middle** portion.
+6. Photos get alternating `in`/`out` motion.
+
+**Result** (`job.SetResult`): `{projectId}` of a newly created project named "Vlog <date>". The UI opens it.
+
+### B6.4 Service (`VideoEditorService`)
+
+```go
+func (s *Service) List() ([]core.ProjectInfo, error)
+func (s *Service) Get(id string) (VideoProject, error)
+func (s *Service) Create(name, aspect string) (core.ProjectInfo, error)
+func (s *Service) Save(id, name string, doc VideoProject) (core.ProjectInfo, error)
+func (s *Service) Duplicate(id string) (core.ProjectInfo, error)
+func (s *Service) Delete(id string) error
+func (s *Service) Probe(paths []string) ([]ClipInfo, error) // kind, durationMs, width, height, fps, rotation, hasAudio, takenAt (Unix ms)
+func (s *Service) Plan(req PlanRequest) (core.Job, error)
+func (s *Service) Render(id string) (core.Job, error)
+func (s *Service) Preview(id string) (core.Job, error)
+```
+
+### B6.5 UI (`tools/video-editor/`)
+- **Projects** strip + New (aspect) + **Quick vlog…**:
+  - a dialog: add clips and photos, optional song, order, length, cut on the beat, transition;
+  - Build → the `plan` job with progress → opens the result.
+- **Preview** (top), at the output shape:
+  - a **sequence player**: two `<video>` elements in turn (preloading the next clip), `playbackRate` = speed, CSS framing (object-fit + translate/scale for pan/zoom, a blurred copy for fit-blur), crossfade/dip approximated with opacity, image clips as `<img>` with a CSS zoom animation, music in an `<audio>` element synced to the timeline, titles as styled DOM overlays;
+  - unplayable files go through `useMediaSource` (preview proxies);
+  - play/pause, time, and a scrubber that seeks the timeline;
+  - "Render preview" plays the exact 540p file in place, with a banner "Exact preview (rendered 12 s ago)".
+- **Timeline** (bottom):
+  - **clips lane:** filmstrip thumbnails from `MediaService.Filmstrip`, width ∝ duration, drag to reorder, edge handles trim In/Out (photos: duration), transition chips between clips (click to change);
+  - **titles lane:** blocks, drag to move, edges to resize;
+  - **music lane:** waveform (`MediaService.Waveform`), drag to offset;
+  - playhead, zoom (Ctrl+wheel), snapping to clip edges and the playhead.
+- **Inspector** for the selection:
+  - clip: `MediaPlayer` + `Timeline` for In/Out, speed, volume/mute, fit + pan/zoom (`CropOverlay` at the output shape), look, motion (photos), transition;
+  - title: text, style, position, font, colour, start/length;
+  - music: file, volume, fades, duck, end with music.
+- **Header:** name, aspect, total length, warnings, **Export** (→ render job → Library; then "Add captions with Subtitles" and "Add to post…"), Back to post.
+- **Keyboard:** Space play/pause, S split clip at the playhead, Delete, Ctrl+Z / Ctrl+Shift+Z.
+
+## B7. Post Builder (`modules/posts`, ID `post-builder`, Name "Post Builder", icon `gallery-horizontal-end`, Category media, OutputSubdir `Posts`, Requires ffmpeg + ffprobe)
+
+### B7.1 Document
+
+```go
+type Post struct {
+	Version      int     `json:"version"`      // 1
+	Format       string  `json:"format"`       // "carousel" | "reel" | "story"
+	Aspect       string  `json:"aspect"`       // carousel: "4:5" | "1:1" | "3:4" | "1.91:1"; reel/story: "9:16"
+	Slides       []Slide `json:"slides"`       // carousel/story 1–20; reel exactly 1 video
+	Caption      string  `json:"caption"`      // ≤ 2,200 chars
+	KeepLocation bool    `json:"keepLocation"` // default false: strip EXIF/XMP/location from photos and metadata from videos
+}
+
+type Slide struct {
+	ID        string  `json:"id"`
+	Kind      string  `json:"kind"`      // "photo" | "clip" | "composition" | "video"
+	Path      string  `json:"path"`      // photo/clip
+	ProjectID string  `json:"projectId"` // composition/video
+	PanX      float64 `json:"panX"`      // framing at the post's shape: -1..1
+	PanY      float64 `json:"panY"`
+	Zoom      float64 `json:"zoom"`      // 1..4
+	Rotation  int     `json:"rotation"`  // 0 | 90 | 180 | 270 (on top of EXIF/metadata orientation)
+	InMs      int64   `json:"inMs"`      // clip
+	OutMs     int64   `json:"outMs"`     // clip; carousel/story ≤ 60 s, reel ≤ 180 s
+	Mute      bool    `json:"mute"`
+	AltText   string  `json:"altText"`   // ≤ 1,000 chars
+}
+```
+
+### B7.2 Checks (`posts.Check(post) []Issue`, shown live; errors block Export)
+
+```go
+type Issue struct {
+	Level   string `json:"level"`   // "error" | "warning" | "note"
+	SlideID string `json:"slideId"` // "" = the whole post
+	Message string `json:"message"`
+}
+```
+
+**Errors:**
+- no slides, or more than 20;
+- a reel without exactly one video slide;
+- a missing source or project;
+- a clip slide over 60 s (carousel/story) or 180 s (reel);
+- a video project longer than that;
+- caption over 2,200 characters;
+- more than 30 hashtags;
+- HEIC without the AI engine.
+
+**Warnings:**
+- a source narrower than 1080 px after framing ("may look soft");
+- a composition or video project of a different shape (framed to fit);
+- 3:4 ("new; check the Instagram app supports it for you");
+- more than 20 `@mentions`.
+
+**Note:** "Location will be removed" (when KeepLocation is off and a photo has GPS).
+
+All limits live in one table, `modules/posts/limits.go`.
+
+### B7.3 Export (job action `export`)
+**Folder:** `<library>/Posts/<post name> <YYYY-MM-DD>/`. A second export the same day gets " (2)".
+
+**Slides** are numbered `01`–`20` in order:
+- **photo:** decode (HEIC via the engine), apply orientation and Rotation, crop to the aspect with pan/zoom, resize to the frame (1080 × h, CatmullRom), then JPEG q 92 sRGB with no metadata (or EXIF copied when KeepLocation). Output `NN.jpg`.
+- **clip:**
+  - FFmpeg trim In/Out, rotate, crop + scale to the frame with pan/zoom, `fps=30`, H.264 High CRF 19, AAC 192 kbps (or no audio when Mute), `+faststart`;
+  - `-map_metadata -1` unless KeepLocation.
+  - Output `NN.mp4`.
+- **composition:** its stored render, framed like a photo (no crop when the shapes match). Output `NN.jpg`, or `NN.png` when the composition's format is png and the post is a story.
+- **video:** `videoeditor.RenderProject` at the post's frame size, with `MaxSeconds` per format. Output `NN.mp4`.
+
+**Also written:**
+- `caption.txt` (UTF-8, as typed);
+- `alt-text.txt` ("01: …" per slide with alt text; omitted if none);
+- `post.json` (the document, for reference).
+
+**Registration:** every file is a Library output, except `post.json`.
+
+**Progress:** each slide's share by its kind: photo 1, composition 1, clip = duration in seconds / 4, video = duration in seconds / 2.
+
+### B7.4 Service (`PostsService`)
+
+```go
+func (s *Service) List() ([]core.ProjectInfo, error)
+func (s *Service) Get(id string) (Post, error)
+func (s *Service) Create(name, format, aspect string, paths []string) (core.ProjectInfo, error) // paths → slides (photo/clip by extension)
+func (s *Service) Save(id, name string, doc Post) (core.ProjectInfo, error)
+func (s *Service) Duplicate(id string) (core.ProjectInfo, error)
+func (s *Service) Delete(id string) error
+func (s *Service) Check(doc Post) []Issue
+func (s *Service) Export(id string) (core.Job, error)
+func (s *Service) SlideInfo(paths []string) ([]SlideSource, error) // kind, width, height, durationMs, hasGPS, heic
+```
+
+### B7.5 UI (`tools/post-builder/`)
+- **Posts** strip + New (format, aspect, optionally the dropped files).
+- **Left: slides.**
+  - thumbnails in order, drag to reorder, number badges, kind icons, a ⚠ on slides with issues;
+  - **+ Add**: Photos & clips (picker, drop, Library), **New composition** (opens Photo Composer at the post's shape, linked to a new slide), **New video** (opens Video Editor at the post's shape), **Existing composition / video**.
+- **Centre: the selected slide** at the post's shape.
+  - photo/clip: drag to pan, wheel/slider to zoom, rotate buttons; clips have a `MediaPlayer` + `Timeline` for In/Out with a 60 s limit marker;
+  - composition/video: the render or preview, with **Edit** (opens the tool; Back to post returns).
+- **Right:**
+  - format and aspect (changing the aspect re-frames every slide; pans are kept);
+  - **caption** with characters left (2,200), hashtag count (30) and a Copy button;
+  - alt text for the selected slide;
+  - **Checks** list (click to select the slide);
+  - **Phone preview:** a neutral phone frame showing the carousel with dots, swipeable (arrow keys), and the caption below. No Instagram branding.
+- **Export** (disabled with errors) → job → "Open folder" / "Copy caption". The page remembers the last export folder.
+- **Library → Send to → "Add to post…":** a small dialog to pick a post (or a new one). The files are added as slides.
+- **Handoffs** (`Handoff.seed` gains `{kind: "post-slide", postId, slideId, aspect}`):
+  1. The Composer or Video Editor opens with a new or linked project at that aspect.
+  2. Its first Save links the project to the slide (`PostsService.Save` from the editor through the post store).
+  3. "Back to post" navigates back.
+
+## B8. Wire changes (summary)
+- **`core`:** `ProjectKind`, `ProjectInfo`, `StoredProject`, `ProjectStore`; migration 0006; `imaging.Orientation(path) int` + `imaging.Orient(img, o) image.Image`.
+- **Modules:** `composer`, `videoeditor` and `posts` with their documents, services and job options (`Options{Action, ProjectID, …}`).
+- **Frontend:** `Handoff.seed` `post-slide`.
+- **Icons:** `layers`, `clapperboard`, `gallery-horizontal-end`, `images`, `type`, `sticker` (as needed).
+
+## B9. Test plan
+**Go:**
+- **Orientation:** the 8 EXIF orientations on generated JPEGs.
+- **Projects store:** round trip, delete, 4 MiB cap.
+- **Composer:** Save validation; SaveRender size cap and thumb; LoadImage cache keys and HEIC through a fake engine.
+- **Video Editor:**
+  - the filtergraph builder, as golden strings for cut / fade / dip / slide, fill / fit-blur, image motion, speed, mute, music + duck + fades, titles;
+  - timeline maths (overlaps, totals);
+  - plan: ordering by date, beat lengths from a fixed bar list, middle portions;
+  - integration: render a 3-clip + photo + music project with FFmpeg (frame count, duration ±1 frame, size 1080×1920).
+- **Posts:**
+  - Check rules (table);
+  - export integration: 2 photos (one rotated EXIF, one with GPS), a 70 s clip trimmed to 60 s, a composition render and a 2-clip video project → the folder's files, sizes (1080×1350), durations, no GPS in outputs, caption.txt.
+
+**Frontend (Vitest):**
+- composer render on a fake 2D context (call order), layouts (deterministic positions for a seed, inside the canvas), hit-testing and transforms, history merge;
+- video timeline maths mirror (shared vectors with Go: `modules/videoeditor/testdata/timeline.json`), sequence scheduler (which clip at time t);
+- post checks mirror for live counts (caption/hashtags only; the rest comes from Go);
+- editors' main interactions.
+
+**Architect (end to end):** the market scenario.
+1. A market photo plus 4 shirt photos → Composer → Remove background ×4 → Scatter → Export.
+2. 6 clips + 4 photos + a song → Quick vlog (beat cut) → tweak → render.
+3. A post (4:5) with 8 photos, the composition and the vlog.
+4. Export → check the folder on disk.
+
+## B10. Work packages (Part B)
+
+### Wave B0: foundation (architect)
+1. Migration 0006 and the store.
+2. `core` types and `imaging` Orientation signatures (stubs).
+3. The three modules with final documents, job options, Validate stubs and service signatures (stub bodies).
+4. `videoeditor.RenderProject` signature.
+5. Bindings, `lib/api.ts`, icons, tool view stubs, the `post-slide` seed type, the `composer/render.ts` signature (with a stub that draws the background colour only).
+6. CLAUDE.md "Creator tools" section.
+
+### Wave B1 (parallel)
+
+| WP | Owns | Acceptance |
+|---|---|---|
+| **CO1 Composer engine** | `frontend/src/composer/**` (render, layouts, hit-test, history), `modules/composer/**`, `core/imaging` orientation | B5.1–B5.4; tests |
+| **VE1 Video render** | `modules/videoeditor/**` (render/preview/plan jobs, filtergraph, probe), ASS title styles | B6.1–B6.4; golden + integration tests |
+| **PB1 Post export** | `modules/posts/**` | B7.1–B7.4; check table + export integration |
+
+### Wave B2 (parallel, after B1 merges)
+
+| WP | Owns | Acceptance |
+|---|---|---|
+| **CO2 Composer UI** | `tools/photo-composer/**` | B5.5; FE tests |
+| **VE2 Video Editor UI** | `tools/video-editor/**` | B6.5; FE tests |
+| **PB2 Post Builder UI** | `tools/post-builder/**`, Library "Add to post…" (marked block) | B7.5; FE tests |
+
+### Wave B3: integration (architect)
+1. Merge, regenerate the bindings, and run every check and the build.
+2. The B9 end-to-end market scenario on real travel-style files (HEIC + JPEG + iPhone HEVC clips).
+3. Mac checklist steps (HEIC from Photos, a rotated iPhone video, fonts in canvas text).
+4. DECISIONS.md.
+
+## B11. Acceptance criteria
+1. **Composer:** the market collage is made in under 2 minutes from 5 photos, using Remove background ×4 and Scatter, and the export matches the editor view (same layout, outline, shadows, text).
+2. **Video Editor:** the quick vlog of 10 files with a song is built in under 15 s (after the song's first analysis) and cuts land on bars. The export plays with correct order, framing, transitions, titles and music, and no audio drift (±1 frame at the end).
+3. **Posts:**
+   - Export writes 1080-wide files at the post's exact shape, numbered in order.
+   - Clips are ≤ 60 s in carousels.
+   - Photos are upright (EXIF honoured) and have no GPS unless kept.
+   - `caption.txt` matches.
+4. **Round trips:** a slide's Edit opens the right tool and project, and Back returns. An edited composition or video is picked up by the next export without other steps.
+5. **Never modifies inputs;** projects survive restarts; missing sources are shown, not crashes.
+6. **Housekeeping:** all checks, integration tests, CLAUDE.md, the Mac checklist and DECISIONS.
+
+## B12. Risks
+- **Sequence preview fidelity:** two `<video>` elements can stutter at cuts on slow disks, and transitions are approximations. The exact "Render preview" exists for that, at about 5× real time at 540p on the Windows box.
+- **Canvas memory:** 20 layers of 4096-px images ≈ 1.3 GB of bitmaps. The editor loads at 2048 (export at 4096, one layer at a time) and caps layers at 60.
+- **HEIC needs the AI engine.** Without it, HEIC photos show an "Install the Image pack" tile (the setup flow already offers it).
+- **Instagram changes its limits often.** All numbers live in `posts/limits.go` and the checks say what they are.
+- **Fonts:** Canvas2D and libass can pick different files for the same family name. Composer text renders in the webview (what you see is what's saved). Video titles use libass with `media.Fonts()` names, as Lyric Video does.
