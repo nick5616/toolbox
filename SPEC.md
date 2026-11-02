@@ -1713,7 +1713,7 @@ A "Pipelines (Phase 8)" section:
 
 # Part B — Creator tools: Post Builder, Photo Composer, Video Editor
 
-Status: **DRAFT r1 (Part B), awaiting review.** Part A above stays approved and is being integrated.
+Status: **APPROVED 2026-11-01** (Part B r1). Part A above is done.
 Date: 2026-11-01. Author: architect session (Opus).
 
 The user documents travels with lots of photos and clips and wants to make Instagram posts from them, more creatively than a plain photo dump:
