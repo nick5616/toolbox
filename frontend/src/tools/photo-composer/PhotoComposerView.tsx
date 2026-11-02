@@ -156,8 +156,10 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
     const slide = h.postSlide;
     if (slide) {
       void (async () => {
-        if (slide.projectId && (await openProject(slide.projectId, slide, h.inputs))) return;
-        await createProject(DEFAULT_NAME, slide.aspect || "4:5", "", { ...slide, projectId: "" }, h.inputs);
+        // A build only makes new compositions; an existing one opens as it is.
+        if (slide.projectId && (await openProject(slide.projectId, { ...slide, build: undefined }, slide.build ? [] : h.inputs))) return;
+        const bg = slide.build?.kind === "collage" ? slide.build.background : "";
+        await createProject(DEFAULT_NAME, slide.aspect || "4:5", bg, { ...slide, projectId: "" }, h.inputs);
       })();
     } else if (h.inputs.length > 0) {
       if (open) queuePhotos(h.inputs);

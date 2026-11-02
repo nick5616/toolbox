@@ -9,6 +9,12 @@
   min-height: 0;
 }
 
+.busyLabel {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
 .empty {
   margin: 0;
   padding: var(--space-3);

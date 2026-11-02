@@ -4,7 +4,8 @@ import type { ComposerLayer, Composition } from "@/lib/api";
 import { boxCorners, hitHandle, hitLayer, handlePositions, layerBox, type Box, type Guide, type Handle, type Point } from "@/composer/hittest";
 import { imageSize, layerSize, renderComposition, textFont } from "@/composer/render";
 import { findLayer, updateLayer } from "@/composer/model";
-import { fitScale, handleGeometry, moveWithSnap, panBackground, pointsOf, rotateByHandle, scaleByHandle, SNAP_SCREEN_PX, zoomBackground } from "./logic";
+import { useSourceDropTarget, type SourceDropInfo } from "../post-builder/sourceDrag";
+import { canvasFraction, fitScale, handleGeometry, moveWithSnap, panBackground, pointsOf, rotateByHandle, scaleByHandle, SNAP_SCREEN_PX, zoomBackground } from "./logic";
 import styles from "./Stage.module.css";
 
 export interface StageProps {
@@ -24,6 +25,8 @@ export interface StageProps {
   busyIds: ReadonlySet<string>;
   zoom: number;
   onZoom: (z: number) => void;
+  /** Post sources dropped on the canvas, at fractions (0..1) of its width and height. */
+  onSourceDrop?: (paths: string[], x: number, y: number) => void;
 }
 
 type Mode = "move" | "scale" | "rotate" | "bg";
@@ -67,6 +70,17 @@ export function Stage(props: StageProps) {
   const scale = fit * zoom;
   const cssW = Math.round(doc.width * scale);
   const cssH = Math.round(doc.height * scale);
+
+  const onSourceDrop = props.onSourceDrop;
+  const dropped = useCallback(
+    (info: SourceDropInfo) => {
+      const r = wrapRef.current?.getBoundingClientRect() ?? { left: 0, top: 0, width: 0, height: 0 };
+      const p = canvasFraction(info.x, info.y, r);
+      onSourceDrop?.(info.paths, p.x, p.y);
+    },
+    [onSourceDrop],
+  );
+  useSourceDropTarget(wrapRef, dropped);
 
   // Fit the available area.
   useEffect(() => {
@@ -296,9 +310,23 @@ export function Stage(props: StageProps) {
         {[...busyIds].map((id) => {
           const l = findLayer(doc, id);
           if (!l) return null;
+          const box = layerBox(doc, l, sizer);
           return (
-            <span key={id} className={styles.busy} data-stage-ui style={{ left: l.x * doc.width * scale, top: l.y * doc.height * scale }}>
-              <Spinner size={22} label="Removing background" />
+            <span key={id} data-stage-ui>
+              <span
+                className={styles.shimmer}
+                data-testid="cutting-shimmer"
+                style={{
+                  left: (box.cx - box.w / 2) * scale,
+                  top: (box.cy - box.h / 2) * scale,
+                  width: box.w * scale,
+                  height: box.h * scale,
+                  transform: `rotate(${l.rotation}deg)`,
+                }}
+              />
+              <span className={styles.busy} data-stage-ui style={{ left: l.x * doc.width * scale, top: l.y * doc.height * scale }}>
+                <Spinner size={22} label="Removing background" />
+              </span>
             </span>
           );
         })}

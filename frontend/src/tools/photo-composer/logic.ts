@@ -161,6 +161,31 @@ export function roundTo(v: number, digits: number): number {
   return Math.round(v * m) / m;
 }
 
+/** True when a layer present in both documents moved, scaled or rotated. */
+export function geometryChanged(a: Composition, b: Composition): boolean {
+  const before = new Map((a.layers ?? []).map((l) => [l.id, l]));
+  for (const l of b.layers ?? []) {
+    const o = before.get(l.id);
+    if (o && (o.x !== l.x || o.y !== l.y || o.size !== l.size || o.rotation !== l.rotation)) return true;
+  }
+  return false;
+}
+
+/** Client pixels to a position on the canvas as fractions (0..1) of its width and height. */
+export function canvasFraction(clientX: number, clientY: number, rect: { left: number; top: number; width: number; height: number }): { x: number; y: number } {
+  if (rect.width <= 0 || rect.height <= 0) return { x: 0.5, y: 0.5 };
+  const c = (v: number): number => Math.min(1, Math.max(0, v));
+  return { x: c((clientX - rect.left) / rect.width), y: c((clientY - rect.top) / rect.height) };
+}
+
+/** Layer IDs between two layers (inclusive) in the given order. */
+export function idRange(order: readonly string[], a: string, b: string): string[] {
+  const i = order.indexOf(a);
+  const j = order.indexOf(b);
+  if (i < 0 || j < 0) return [b];
+  return order.slice(Math.min(i, j), Math.max(i, j) + 1);
+}
+
 /** Crop rect of a window (fractions of the picture) centred at (cx, cy). */
 export function cropFromWindow(
   win: { w: number; h: number },
