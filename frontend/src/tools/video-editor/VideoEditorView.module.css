@@ -1,0 +1,246 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-app);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.nameField {
+  width: 220px;
+}
+
+.length {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.saveState {
+  min-width: 80px;
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.saveState[data-state="error"] {
+  color: var(--danger);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.banner {
+  margin: var(--space-2) var(--space-3) 0;
+}
+
+.exportActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.jobBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-2) var(--space-3) 0;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.jobMeter {
+  flex: 1;
+  max-width: 260px;
+}
+
+.main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  flex: 1;
+  min-height: 0;
+}
+
+.previewCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  min-width: 0;
+  padding: var(--space-3);
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.transport > :nth-child(3) {
+  flex: 1;
+}
+
+.time {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.inspector {
+  overflow-y: auto;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+
+/* Timeline panel height */
+.root > :last-child {
+  flex-shrink: 0;
+}
+
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.homeBar {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  position: relative;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.card:hover {
+  border-color: var(--line-strong);
+}
+
+.cardMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2);
+  text-align: left;
+  color: var(--fg);
+  background: none;
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.cardMain:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.cardThumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  color: var(--fg-subtle);
+  background: var(--bg-inset);
+  border-radius: var(--r-sm);
+}
+
+.cardName {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+}
+
+.cardMenu {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+}
+
+.vlogForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.vlogFiles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.vlogFileRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.vlogList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 140px;
+  overflow-y: auto;
+  font-size: var(--text-sm);
+}
+
+.vlogList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.vlogList li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
