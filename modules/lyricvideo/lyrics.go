@@ -232,6 +232,11 @@ func (m *Module) transcribeVocals(ctx context.Context, job *core.JobContext, voc
 
 // runLyrics is the "lyrics" action.
 func (m *Module) runLyrics(ctx context.Context, job *core.JobContext, o Options) error {
+	return m.doLyrics(ctx, job, o, job.SetResult)
+}
+
+// doLyrics is runLyrics with the result handed to emit (auto keeps it).
+func (m *Module) doLyrics(ctx context.Context, job *core.JobContext, o Options, emit func(any) error) error {
 	song := job.Inputs[0]
 	job.SetTitle(filepath.Base(song))
 	res := Result{Action: ActionLyrics, Lines: []LyricLine{}}
@@ -259,7 +264,7 @@ func (m *Module) runLyrics(ctx context.Context, job *core.JobContext, o Options)
 			_, inst := m.cachedStems(song)
 			res.HasInstrumental = inst != ""
 			job.Progress(1, fmt.Sprintf("%d lines", len(res.Lines)))
-			return job.SetResult(res)
+			return emit(res)
 		}
 	}
 	if strings.TrimSpace(text) == "" && source == SourceAlign {
@@ -277,8 +282,8 @@ func (m *Module) runLyrics(ctx context.Context, job *core.JobContext, o Options)
 	if source == SourceDetect {
 		res.Lines = DetectLines(segs)
 		if len(res.Lines) == 0 {
-			return core.Errorf(core.CodeToolFailed, "No words were recognised").
-				WithHint("Try pasting the lyrics instead")
+			return &noWordsError{core.Errorf(core.CodeToolFailed, "No words were recognised").
+				WithHint("Try pasting the lyrics instead")}
 		}
 		res.Matched = 1
 	} else {
@@ -287,7 +292,7 @@ func (m *Module) runLyrics(ctx context.Context, job *core.JobContext, o Options)
 	_, inst := m.cachedStems(song)
 	res.HasInstrumental = inst != ""
 	job.Progress(1, fmt.Sprintf("%d lines", len(res.Lines)))
-	return job.SetResult(res)
+	return emit(res)
 }
 
 // pruneCache deletes stems folders untouched for 7 days and previews older
