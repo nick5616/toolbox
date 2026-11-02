@@ -62,11 +62,7 @@ func orientedSize(path string) (w, h int, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	w, h = sz.W, sz.H
-	if o := imaging.Orientation(path); o >= 5 && o <= 8 {
-		w, h = h, w
-	}
-	return w, h, nil
+	return sz.W, sz.H, nil // imaging.Size is already upright
 }
 
 // Check validates a post against Instagram's limits (SPEC.md §B7.2). It never
@@ -141,8 +137,8 @@ func (m *Module) checkPhoto(s Slide, doc Post, aspect float64, l Limits, add fun
 			*engineChecked = true
 			_, *engineErr = m.tool(sidecar.DepID)
 		}
-		if *engineErr != nil {
-			add(LevelError, s.ID, "HEIC photos need the AI engine; install it in Settings")
+		if *engineErr != nil && !imaging.HEICAvailable() {
+			add(LevelError, s.ID, "HEIC photos need FFmpeg (Media pack) or the AI engine (Image pack); install one in Settings")
 		}
 		return // size unknown without decoding
 	}

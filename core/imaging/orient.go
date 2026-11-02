@@ -189,3 +189,14 @@ func Orient(img image.Image, o int) image.Image {
 	}
 	return dst
 }
+
+// toNRGBA returns img as *image.NRGBA (copying only when needed).
+func toNRGBA(img image.Image) *image.NRGBA {
+	if n, ok := img.(*image.NRGBA); ok {
+		return n
+	}
+	b := img.Bounds()
+	n := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	draw.Draw(n, n.Bounds(), img, b.Min, draw.Src)
+	return n
+}

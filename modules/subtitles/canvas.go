@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"toolbox/core/imaging"
 	"toolbox/core/media"
 	"toolbox/core/viz"
 )
@@ -39,7 +40,8 @@ func validateBurnCanvas(o Options) map[string]string {
 		fi, err := os.Stat(o.BackgroundPath)
 		ext := strings.ToLower(filepath.Ext(o.BackgroundPath))
 		if o.BackgroundPath == "" || err != nil || !fi.Mode().IsRegular() ||
-			!slices.Contains(media.ImageExtensions(), ext) || ext == ".heic" || ext == ".heif" { // FFmpeg can't read HEIC
+			!slices.Contains(media.ImageExtensions(), ext) ||
+			((ext == ".heic" || ext == ".heif") && !imaging.HEICAvailable()) { // HEIC is converted first (core/heic)
 			f["backgroundPath"] = "Choose a background image"
 		}
 	default:

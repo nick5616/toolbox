@@ -250,6 +250,9 @@ func (m *Module) decodeImage(ctx context.Context, job *core.JobContext, path str
 }
 
 func (m *Module) convertHEIC(ctx context.Context, job *core.JobContext, input string) (string, error) {
+	if imaging.HEICAvailable() { // FFmpeg first, the engine as its fallback (core/heic)
+		return imaging.ToReadable(ctx, input)
+	}
 	if _, err := job.Tool(sidecar.DepID); err != nil {
 		return "", err
 	}

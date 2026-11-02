@@ -63,7 +63,7 @@ func (m *Module) Descriptor() core.Descriptor {
 		Status:       core.StatusReady,
 		Accepts:      core.Accepts{Extensions: slices.Clone(media.ImageExtensions())},
 		Recommends:   []string{sidecar.DepID},
-		OutputSubdir: "Compositions", Order: 145, JobLess: true, NotAStep: true,
+		OutputSubdir: "Compositions", Order: 12, JobLess: true, NotAStep: true,
 	}
 }
 

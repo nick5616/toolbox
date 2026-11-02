@@ -6,6 +6,7 @@ package imaging
 import (
 	"bytes"
 	"container/list"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"image"
@@ -64,9 +65,6 @@ func Supported(path string) bool {
 }
 
 func checkPath(path string) (os.FileInfo, error) {
-	if IsHEIC(path) {
-		return nil, core.Errorf(core.CodeValidation, "No preview for HEIC")
-	}
 	if !Supported(path) || !filepath.IsAbs(path) {
 		return nil, core.Errorf(core.CodeValidation, "No preview for this file type")
 	}
@@ -80,8 +78,13 @@ func checkPath(path string) (os.FileInfo, error) {
 	return info, nil
 }
 
-// Size returns an image's pixel dimensions without decoding the pixels.
+// Size returns an image's displayed pixel dimensions (EXIF orientation
+// applied) without decoding the pixels. HEIC goes through the converter.
 func Size(path string) (core.Size, error) {
+	path, err := ToReadable(context.Background(), path)
+	if err != nil {
+		return core.Size{}, err
+	}
 	if _, err := checkPath(path); err != nil {
 		return core.Size{}, err
 	}
@@ -99,6 +102,9 @@ func Size(path string) (core.Size, error) {
 	cfg, err := decoders[strings.ToLower(filepath.Ext(path))].config(bytes.NewReader(head[:n]))
 	if err != nil {
 		return core.Size{}, core.Errorf(core.CodeValidation, "Couldn't read this image")
+	}
+	if Orientation(path) >= 5 {
+		return core.Size{W: cfg.Height, H: cfg.Width}, nil
 	}
 	return core.Size{W: cfg.Width, H: cfg.Height}, nil
 }
@@ -135,6 +141,10 @@ func Default() *Thumbnailer {
 // (clamped to 64..1600). PNG when any pixel is non-opaque, else JPEG q85.
 func (t *Thumbnailer) Thumb(path string, maxDim int) (string, error) {
 	maxDim = min(max(maxDim, MinThumbDim), MaxThumbDim)
+	path, err := ToReadable(context.Background(), path)
+	if err != nil {
+		return "", err
+	}
 	info, err := checkPath(path)
 	if err != nil {
 		return "", err
@@ -199,6 +209,9 @@ func build(path string, maxDim int) (string, error) {
 		return "", core.Errorf(core.CodeValidation, "Couldn't read this image")
 	}
 	dst := scale(src, maxDim)
+	if o := Orientation(path); o > 1 {
+		dst = toNRGBA(Orient(dst, o))
+	}
 	var buf bytes.Buffer
 	if dst.Opaque() {
 		if err := jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 85}); err != nil {

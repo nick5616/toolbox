@@ -32,6 +32,29 @@ describe("routeFilesDropped", () => {
     expect(useUI.getState().handoff).toBeNull();
   });
 
+  it("hands files dropped anywhere on a tool's page to that tool when it accepts them", () => {
+    useUI.setState({ view: "stems" });
+    routeFilesDropped(drop("", ["/a.mp3", "/b.txt"]));
+    expect(useUI.getState().drop).toBeNull();
+    expect(useUI.getState().handoff).toEqual({ moduleId: "stems", inputs: ["/a.mp3"] });
+  });
+
+  it("opens the chooser on a tool's page when the tool can't use the files", () => {
+    useUI.setState({ view: "stems" });
+    const d = drop("", ["/a.txt"]);
+    routeFilesDropped(d);
+    expect(useUI.getState().drop).toBe(d);
+    expect(useUI.getState().handoff).toBeNull();
+  });
+
+  it("never hands files to a page whose tool takes no files", () => {
+    useModules.getState().setAll([{ ...mod("pipelines"), accepts: { extensions: [], urls: false, any: false } } as Descriptor]);
+    useUI.setState({ view: "pipelines" });
+    const d = drop("", ["/a.mp3"]);
+    routeFilesDropped(d);
+    expect(useUI.getState().drop).toBe(d);
+  });
+
   it("opens the chooser when nothing is accepted or the module is not ready", () => {
     routeFilesDropped(drop("tool-drop:stems", ["/a.txt"]));
     expect(useUI.getState().drop).not.toBeNull();

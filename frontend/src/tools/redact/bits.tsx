@@ -11,12 +11,9 @@ export function useImageUrl(path: string | null, thumbMax = 1600): { url: string
   const [state, setState] = useState<{ path: string | null; url: string; error: string }>({ path: null, url: "", error: "" });
   useEffect(() => {
     if (!path) return;
-    if (isHeicPath(path)) {
-      setState({ path, url: "", error: "HEIC photos can't be previewed here." });
-      return;
-    }
     let cancelled = false;
-    (isTiffPath(path) ? FilesService.ImageThumb(path, thumbMax) : MediaService.URLFor(path))
+    // TIFF and HEIC: a Go-decoded preview (HEIC is converted once, then cached).
+    (isTiffPath(path) || isHeicPath(path) ? FilesService.ImageThumb(path, thumbMax) : MediaService.URLFor(path))
       .then((url) => !cancelled && setState({ path, url, error: "" }))
       .catch((e) => !cancelled && setState({ path, url: "", error: toAppError(e).message }));
     return () => {
@@ -27,11 +24,10 @@ export function useImageUrl(path: string | null, thumbMax = 1600): { url: string
   return state;
 }
 
-/** A small cached thumbnail (a file tile for HEIC or when it can't be read). */
+/** A small cached thumbnail (a file tile when it can't be read). */
 export function Thumb({ path, size = 240, className }: { path: string; size?: number; className?: string }) {
   const [src, setSrc] = useState<{ path: string; url: string } | null>(null);
   useEffect(() => {
-    if (isHeicPath(path)) return;
     let cancelled = false;
     FilesService.ImageThumb(path, size)
       .then((url) => !cancelled && setSrc({ path, url }))

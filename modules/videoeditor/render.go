@@ -208,6 +208,10 @@ func (m *Module) prepareImages(ctx context.Context, job *core.JobContext, doc Vi
 
 func (m *Module) preparePhoto(ctx context.Context, job *core.JobContext, path string, n int) (string, error) {
 	dst := filepath.Join(job.TempDir, fmt.Sprintf("photo-%d.png", n))
+	if imaging.IsHEIC(path) && imaging.HEICAvailable() { // FFmpeg first, the engine as its fallback (core/heic)
+		job.Progress(core.IndeterminateProgress, "Reading a HEIC photo…")
+		return imaging.ToReadable(ctx, path)
+	}
 	if imaging.IsHEIC(path) {
 		if _, err := job.Tool(sidecar.DepID); err != nil {
 			var ae *core.AppError

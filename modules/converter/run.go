@@ -46,6 +46,15 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 
 	job.SetTitle(filepath.Base(input))
 
+	// FFmpeg reads HEIC grids as separate tiles and ignores EXIF orientation
+	// on stills, so photos are made upright and readable first.
+	src := input
+	if preset.Kind == core.KindImage {
+		if src, err = readablePhoto(ctx, job, input); err != nil {
+			return err
+		}
+	}
+
 	tracker := &media.ProgressTracker{}
 	if preset.Kind != core.KindImage {
 		out, perr := proc.Output(ctx, 15*time.Second, ffprobe,
@@ -61,7 +70,7 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 	}
 
 	tmpOut := filepath.Join(job.TempDir, "out"+preset.Ext)
-	args := buildArgs(opts, input, tmpOut)
+	args := buildArgs(opts, src, tmpOut)
 
 	var (
 		mu         sync.Mutex

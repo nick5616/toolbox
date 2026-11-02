@@ -31,14 +31,14 @@ export function modelHint(models: Array<{ id: string; label: string; downloadByt
 }
 
 const RASTER_EXT = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"];
-const THUMB_EXT = [".tif", ".tiff"];
+const THUMB_EXT = [".tif", ".tiff", ".heic", ".heif"];
 
-/** True for formats that can be painted on (HEIC has no decoder outside the engine). */
+/** True for formats that can be painted on (TIFF and HEIC through Go-decoded previews). */
 export function canPaintOn(path: string): boolean {
   return RASTER_EXT.some((e) => path.toLowerCase().endsWith(e)) || needsThumb(path);
 }
 
-/** TIFF can't be shown by the webview; Go decodes it into a bounded preview (≤ 1600 px). */
+/** TIFF and HEIC can't be shown by the webview; Go decodes them into a bounded preview (≤ 1600 px). */
 export function needsThumb(path: string): boolean {
   return THUMB_EXT.some((e) => path.toLowerCase().endsWith(e));
 }

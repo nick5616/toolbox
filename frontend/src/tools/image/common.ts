@@ -7,7 +7,7 @@ export function basename(path: string): string {
   return i >= 0 ? path.slice(i + 1) : path;
 }
 
-/** HEIC/HEIF have no Go decoder: no thumbnails, no sizes (SPEC §13.1). */
+/** HEIC/HEIF photos (converted to PNG by Go's core/heic for previews). */
 export function isHeic(path: string): boolean {
   return /\.(heic|heif)$/i.test(path);
 }
@@ -39,20 +39,15 @@ export type ThumbState =
 
 const cache = new Map<string, string>();
 
-/** Loads an `ImageThumb` data URL (cached per path+size). HEIC short-circuits to a tile state. */
+/** Loads an `ImageThumb` data URL (cached per path+size); HEIC is converted by Go (a tile if it can't be). */
 export function useThumb(path: string, maxDim: number): ThumbState {
   const key = `${path}\u0000${maxDim}`;
   const [state, setState] = useState<ThumbState>(() => {
-    if (isHeic(path)) return { status: "heic" };
     const hit = cache.get(key);
     return hit ? { status: "ok", src: hit } : { status: "loading" };
   });
 
   useEffect(() => {
-    if (isHeic(path)) {
-      setState({ status: "heic" });
-      return;
-    }
     const hit = cache.get(key);
     if (hit) {
       setState({ status: "ok", src: hit });
@@ -69,7 +64,8 @@ export function useThumb(path: string, maxDim: number): ThumbState {
       .catch((e: unknown) => {
         if (cancelled) return;
         const err = toAppError(e);
-        setState(/heic/i.test(err.message) ? { status: "heic" } : { status: "error", message: err.message });
+        // HEIC that can't be converted (no FFmpeg or engine) falls back to a tile.
+        setState(isHeic(path) ? { status: "heic" } : { status: "error", message: err.message });
       });
     return () => {
       cancelled = true;

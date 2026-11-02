@@ -40,10 +40,7 @@ func probeFile(ctx context.Context, ffprobe, path string) ClipInfo {
 	if kindByExt(path) == "image" {
 		ci.Kind = "image"
 		if sz, err := imaging.Size(path); err == nil {
-			ci.Width, ci.Height = sz.W, sz.H
-			if o := imaging.Orientation(path); o >= 5 && o <= 8 {
-				ci.Width, ci.Height = ci.Height, ci.Width
-			}
+			ci.Width, ci.Height = sz.W, sz.H // already upright (EXIF orientation, HEIC rotation)
 		}
 		ci.TakenAt = exifTakenAt(path)
 		if ci.TakenAt == 0 {

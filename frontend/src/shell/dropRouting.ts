@@ -61,10 +61,25 @@ function routePipelineDrop(id: string, paths: string[]): void {
 }
 // --- end pipelines ---
 
+/** Hands the paths a ready tool accepts to it (toasting what it skipped); false if it takes none. */
+function handToTool(moduleId: string, paths: string[]): boolean {
+  const mod = useModules.getState().byId[moduleId];
+  if (!mod || !isReady(mod)) return false;
+  const exts = mod.accepts.extensions ?? [];
+  if (!mod.accepts.any && exts.length === 0) return false; // takes no files (Pipelines, Dev Utilities…)
+  const accepted = paths.filter((p) => acceptsPath(exts, p));
+  if (accepted.length === 0) return false;
+  const skipped = paths.length - accepted.length;
+  useUI.getState().handOff({ moduleId: mod.id, inputs: accepted });
+  if (skipped > 0) toast({ title: `Skipped ${skipped} unsupported ${skipped === 1 ? "file" : "files"}`, tone: "warn" });
+  return true;
+}
+
 /**
- * Handles `app:files-dropped` (SPEC §3.5). A drop on a tool's own drop zone
- * goes straight to that tool when it is ready and accepts at least one path;
- * anything else opens the chooser.
+ * Handles `app:files-dropped` (SPEC §3.5). A drop on a tool's own drop zone,
+ * or anywhere on the page of the tool being shown, goes straight to that tool
+ * when it is ready and accepts at least one path; anything else (the
+ * Library, Settings, Pipelines, files the tool can't use) opens the chooser.
  */
 export function routeFilesDropped(d: FilesDropped): void {
   const ui = useUI.getState();
@@ -82,18 +97,10 @@ export function routeFilesDropped(d: FilesDropped): void {
     return;
   }
   // --- end pipelines ---
-  if (target.startsWith(TOOL_DROP_PREFIX)) {
-    const mod = useModules.getState().byId[target.slice(TOOL_DROP_PREFIX.length)];
-    const paths = d.paths ?? [];
-    if (mod && isReady(mod)) {
-      const accepted = paths.filter((p) => acceptsPath(mod.accepts.extensions, p));
-      if (accepted.length > 0) {
-        const skipped = paths.length - accepted.length;
-        ui.handOff({ moduleId: mod.id, inputs: accepted });
-        if (skipped > 0) toast({ title: `Skipped ${skipped} unsupported ${skipped === 1 ? "file" : "files"}`, tone: "warn" });
-        return;
-      }
-    }
-  }
+  const paths = d.paths ?? [];
+  // A drop on a tool's own drop zone, or anywhere on the page of the tool
+  // being shown, goes to that tool when it takes at least one of the files.
+  if (target.startsWith(TOOL_DROP_PREFIX) && handToTool(target.slice(TOOL_DROP_PREFIX.length), paths)) return;
+  if (handToTool(ui.view, paths)) return;
   ui.setDrop(d);
 }

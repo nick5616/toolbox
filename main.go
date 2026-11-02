@@ -21,6 +21,8 @@ import (
 	"toolbox/api"
 	"toolbox/core"
 	"toolbox/core/deps"
+	"toolbox/core/heic"
+	"toolbox/core/imaging"
 	"toolbox/core/media"
 	"toolbox/core/packs"
 	"toolbox/core/pdfium"
@@ -269,6 +271,12 @@ func run() error {
 		return err
 	}
 	// --- end Phase 8 ---
+
+	// HEIC photos: FFmpeg stitches iPhone tile grids, the AI engine is the
+	// fallback; every image reader goes through imaging.ToReadable.
+	heicDec := &heic.Decoder{Resolve: depSvc.Resolve, Engine: engine, CacheDir: filepath.Join(paths.CacheDir, "heic")}
+	imaging.SetHEICConverter(heicDec)
+	go heicDec.Prune()
 
 	// --- Phase 8 Part B: creator tools (architect) ---
 	projectsDir := filepath.Join(paths.SupportDir, "projects")

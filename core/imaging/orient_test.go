@@ -2,12 +2,15 @@ package imaging
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"image"
 	"image/color"
 	"image/jpeg"
+	pngpkg "image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -145,5 +148,45 @@ func TestOrient(t *testing.T) {
 	}
 	if Orient(src, 0) != image.Image(src) || Orient(src, 9) != image.Image(src) {
 		t.Error("out-of-range orientation should return the input")
+	}
+}
+
+type fakeHEIC struct{ out string }
+
+func (f fakeHEIC) ToPNG(context.Context, string) (string, error) { return f.out, nil }
+func (f fakeHEIC) Available() bool                               { return true }
+
+func TestHEICGoesThroughTheConverter(t *testing.T) {
+	dir := t.TempDir()
+	png := filepath.Join(dir, "converted.png")
+	img := image.NewNRGBA(image.Rect(0, 0, 30, 20))
+	f, err := os.Create(png)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pngpkg.Encode(f, img); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	heic := filepath.Join(dir, "photo.heic")
+	if err := os.WriteFile(heic, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if HEICAvailable() {
+		t.Fatal("available without a converter")
+	}
+	SetHEICConverter(fakeHEIC{out: png})
+	defer SetHEICConverter(nil)
+	if !HEICAvailable() {
+		t.Fatal("not available with a converter")
+	}
+	if s, err := Size(heic); err != nil || s.W != 30 || s.H != 20 {
+		t.Fatalf("Size = %+v, %v", s, err)
+	}
+	if url, err := NewThumbnailer().Thumb(heic, 100); err != nil || !strings.HasPrefix(url, "data:image/") {
+		t.Fatalf("Thumb = %.30s, %v", url, err)
+	}
+	if p, err := ToReadable(context.Background(), filepath.Join(dir, "a.jpg")); err != nil || !strings.HasSuffix(p, "a.jpg") {
+		t.Fatalf("non-HEIC = %s, %v", p, err)
 	}
 }

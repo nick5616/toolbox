@@ -169,6 +169,9 @@ var imageMIME = map[string]string{
 // gif, bmp; ≤ 20 MB) as a data URL, for thumbnails. The user already chose
 // the file; non-image files are never read.
 func (s *FilesService) ImageDataURL(path string) (string, error) {
+	if imaging.IsHEIC(path) && filepath.IsAbs(path) { // the webview can't show HEIC: a converted preview
+		return imaging.Default().Thumb(path, imaging.MaxThumbDim)
+	}
 	ext := strings.ToLower(filepath.Ext(path))
 	typ, ok := imageMIME[ext]
 	if !ok || !filepath.IsAbs(path) {

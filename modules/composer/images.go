@@ -145,6 +145,9 @@ func (m *Module) writeCached(key, ext string, data []byte) {
 
 // convertHEIC decodes a HEIC photo into a cached PNG via the AI engine.
 func (m *Module) convertHEIC(ctx context.Context, path string, size, mtime int64) (string, error) {
+	if imaging.HEICAvailable() { // FFmpeg first, the engine as its fallback (core/heic)
+		return imaging.ToReadable(ctx, path)
+	}
 	if m.cfg.Engine == nil {
 		return "", core.ErrDependencyMissing(sidecar.DepID, "Install the Image pack in Settings → Tool packs")
 	}

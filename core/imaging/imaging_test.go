@@ -158,7 +158,7 @@ func TestThumbAndSizeErrors(t *testing.T) {
 	cases := []struct {
 		path, want string
 	}{
-		{filepath.Join(dir, "x.heic"), "No preview for HEIC"},
+		{filepath.Join(dir, "x.heic"), "Couldn't read this HEIC photo"}, // no converter registered
 		{filepath.Join(dir, "x.txt"), "No preview for this file type"},
 		{"relative.png", "No preview for this file type"},
 		{filepath.Join(dir, "missing.png"), "doesn't exist"},

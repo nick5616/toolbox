@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"toolbox/core"
+	"toolbox/core/imaging"
 	"toolbox/core/media"
 	"toolbox/core/proc"
 	"toolbox/core/viz"
@@ -311,6 +312,13 @@ func (m *Module) doRender(ctx context.Context, job *core.JobContext, o Options, 
 	}
 	plan.BgKind = kind
 	plan.BgPath = o.Look.BackgroundPath
+	if kind == "image" && imaging.IsHEIC(plan.BgPath) { // FFmpeg reads HEIC grids as tiles: convert first
+		bg, err := imaging.ToReadable(ctx, plan.BgPath)
+		if err != nil {
+			return err
+		}
+		plan.BgPath = bg
+	}
 	o.Look.Background = kind // layout and ASS follow the effective background
 	plan.O = o
 	w, h := canvasSize(o.Aspect, o.Height)

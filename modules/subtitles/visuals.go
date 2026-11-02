@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"toolbox/core"
+	"toolbox/core/imaging"
 	"toolbox/core/lyrics"
 	"toolbox/core/media"
 	"toolbox/core/viz"
@@ -130,6 +131,13 @@ func (m *Module) runBurnAudio(ctx context.Context, job *core.JobContext, o Optio
 		return err
 	}
 	tmp := filepath.Join(job.TempDir, "burn.mp4")
+	if o.Background == "image" && imaging.IsHEIC(o.BackgroundPath) {
+		bg, err := imaging.ToReadable(ctx, o.BackgroundPath)
+		if err != nil {
+			return err
+		}
+		o.BackgroundPath = bg
+	}
 	if o.Background == "visualizer" {
 		if m.an == nil || m.br == nil {
 			return core.Errorf(core.CodeInternal, "Visuals aren't available")

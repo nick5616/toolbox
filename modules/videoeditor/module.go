@@ -118,7 +118,7 @@ func (m *Module) Descriptor() core.Descriptor {
 		Accepts:      core.Accepts{Extensions: slices.Concat(media.VideoExtensions(), media.ImageExtensions(), media.AudioExtensions())},
 		Requires:     []string{"ffmpeg", "ffprobe"},
 		Recommends:   []string{sidecar.DepID},
-		OutputSubdir: "Edits", Order: 125, MaxConcurrent: 1, NotAStep: true,
+		OutputSubdir: "Edits", Order: 13, MaxConcurrent: 1, NotAStep: true,
 	}
 }
 

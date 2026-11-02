@@ -475,6 +475,10 @@ func (m *Module) runCPU(ctx context.Context, job *core.JobContext, o Options, sr
 // convertHEIC decodes a HEIC/HEIF photo to a PNG in the job's temp dir via
 // the AI engine (SPEC §13.1).
 func (m *Module) convertHEIC(ctx context.Context, job *core.JobContext, input string) (string, error) {
+	if imaging.HEICAvailable() { // FFmpeg first, the engine as its fallback (core/heic)
+		job.Progress(core.IndeterminateProgress, "Reading the HEIC photo…")
+		return imaging.ToReadable(ctx, input)
+	}
 	if _, err := job.Tool(sidecar.DepID); err != nil {
 		var ae *core.AppError
 		if errors.As(err, &ae) && ae.Code == core.CodeDependencyMissing {
