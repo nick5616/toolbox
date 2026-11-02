@@ -90,6 +90,11 @@ func burnArgs(input, out string, audioCodec string) []string {
 }
 
 func (m *Module) runBurn(ctx context.Context, job *core.JobContext, o Options) error {
+	return m.burn(ctx, job, o, standaloneFinish(job, o))
+}
+
+// burn makes the burned-in video; fin takes the finished temp file.
+func (m *Module) burn(ctx context.Context, job *core.JobContext, o Options, fin finishFn) error {
 	input := job.Inputs[0]
 	ffmpeg, err := job.Tool("ffmpeg")
 	if err != nil {
@@ -107,10 +112,10 @@ func (m *Module) runBurn(ctx context.Context, job *core.JobContext, o Options) e
 		if !burnsAudio(o) {
 			return core.ValidationError("Choose a background for the video", map[string]string{"background": "Choose a background"})
 		}
-		return m.runBurnAudio(ctx, job, o, ffmpeg, info)
+		return m.runBurnAudio(ctx, job, o, ffmpeg, info, fin)
 	}
 	if o.Visuals != nil {
-		return m.runBurnOverlay(ctx, job, o, ffmpeg, info)
+		return m.runBurnOverlay(ctx, job, o, ffmpeg, info, fin)
 	}
 	if err := writeASS(job.TempDir, o, info.Video.Width, info.Video.Height); err != nil {
 		return err
@@ -125,9 +130,13 @@ func (m *Module) runBurn(ctx context.Context, job *core.JobContext, o Options) e
 		}
 	}
 	tmp := filepath.Join(job.TempDir, "burn.mp4")
-	if err := runFFmpegFn(ctx, job, ffmpeg, job.TempDir, burnArgs(input, tmp, audio), float64(info.DurationMs)/1000, "Burning in subtitles"); err != nil {
+	args, err := capArgs(burnArgs(input, tmp, audio), o.MaxSizeMB, float64(info.DurationMs)/1000)
+	if err != nil {
+		return err
+	}
+	if err := runFFmpegFn(ctx, job, ffmpeg, job.TempDir, args, float64(info.DurationMs)/1000, "Burning in subtitles"); err != nil {
 		return err
 	}
 	final := core.UniquePath(job.OutputDir, core.StemName(input)+" (subtitled)", ".mp4")
-	return finishMedia(job, o.Action, tmp, final, "", len(o.Cues))
+	return fin(tmp, final, "")
 }

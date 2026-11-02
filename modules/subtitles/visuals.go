@@ -123,7 +123,7 @@ func backgroundArgs(o Options, w, h int, audio, out string) []string {
 
 // runBurnAudio makes a video from an audio file: a background under the
 // burned cues (SPEC.md §9.3).
-func (m *Module) runBurnAudio(ctx context.Context, job *core.JobContext, o Options, ffmpeg string, info media.Info) error {
+func (m *Module) runBurnAudio(ctx context.Context, job *core.JobContext, o Options, ffmpeg string, info media.Info, fin finishFn) error {
 	input := job.Inputs[0]
 	w, h := canvasSize(o)
 	if err := writeASS(job.TempDir, o, w, h); err != nil {
@@ -144,17 +144,25 @@ func (m *Module) runBurnAudio(ctx context.Context, job *core.JobContext, o Optio
 		}); err != nil {
 			return err
 		}
-	} else if err := runFFmpegFn(ctx, job, ffmpeg, job.TempDir, backgroundArgs(o, w, h, input, tmp),
-		float64(info.DurationMs)/1000, "Making the video"); err != nil {
-		return err
+		if err := capSize(ctx, job, ffmpeg, tmp, o.MaxSizeMB, float64(info.DurationMs)/1000); err != nil {
+			return err
+		}
+	} else {
+		args, err := capArgs(backgroundArgs(o, w, h, input, tmp), o.MaxSizeMB, float64(info.DurationMs)/1000)
+		if err != nil {
+			return err
+		}
+		if err := runFFmpegFn(ctx, job, ffmpeg, job.TempDir, args, float64(info.DurationMs)/1000, "Making the video"); err != nil {
+			return err
+		}
 	}
 	final := core.UniquePath(job.OutputDir, core.StemName(input)+" (subtitled)", ".mp4")
-	return finishMedia(job, o.Action, tmp, final, "", len(o.Cues))
+	return fin(tmp, final, "")
 }
 
 // runBurnOverlay burns cues into a video with visuals composited over it;
 // the subtitles are drawn after the overlay so they stay on top.
-func (m *Module) runBurnOverlay(ctx context.Context, job *core.JobContext, o Options, ffmpeg string, info media.Info) error {
+func (m *Module) runBurnOverlay(ctx context.Context, job *core.JobContext, o Options, ffmpeg string, info media.Info, fin finishFn) error {
 	input := job.Inputs[0]
 	if m.an == nil || m.br == nil {
 		return core.Errorf(core.CodeInternal, "Visuals aren't available")
@@ -176,6 +184,9 @@ func (m *Module) runBurnOverlay(ctx context.Context, job *core.JobContext, o Opt
 	}); err != nil {
 		return err
 	}
+	if err := capSize(ctx, job, ffmpeg, tmp, o.MaxSizeMB, float64(info.DurationMs)/1000); err != nil {
+		return err
+	}
 	final := core.UniquePath(job.OutputDir, core.StemName(input)+" (subtitled)", ".mp4")
-	return finishMedia(job, o.Action, tmp, final, "", len(o.Cues))
+	return fin(tmp, final, "")
 }
