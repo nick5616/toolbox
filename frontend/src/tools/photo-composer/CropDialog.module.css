@@ -1,0 +1,15 @@
+.frame {
+  position: relative;
+  align-self: center;
+  background: var(--bg-inset);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  user-select: none;
+}
