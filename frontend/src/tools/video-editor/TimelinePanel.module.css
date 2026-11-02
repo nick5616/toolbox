@@ -1,0 +1,275 @@
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--line);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.scroller {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.canvas {
+  position: relative;
+  min-height: 100%;
+  padding-bottom: var(--space-2);
+}
+
+.ruler {
+  position: relative;
+  height: 18px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+  color: var(--fg-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  padding-left: 3px;
+  border-left: 1px solid var(--line-strong);
+  line-height: 18px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.lane {
+  position: relative;
+  margin-top: var(--space-1);
+  background: var(--bg-inset);
+  border-radius: var(--r-sm);
+}
+
+.clipLane {
+  height: 64px;
+}
+
+.titleLane {
+  min-height: 32px;
+}
+
+.musicLane {
+  height: 44px;
+}
+
+.laneEmpty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding-left: var(--space-3);
+  color: var(--fg-faint);
+  font-size: var(--text-xs);
+  pointer-events: none;
+}
+
+.clip {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.clip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.missing {
+  border-color: var(--danger);
+}
+
+.thumb {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  opacity: 0.85;
+}
+
+.clipLabel {
+  position: relative;
+  max-width: 100%;
+  padding: 1px var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--fg);
+  background: rgb(0 0 0 / 45%);
+  border-top-right-radius: var(--r-sm);
+}
+
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  z-index: 2;
+}
+
+.handleStart {
+  left: 0;
+}
+
+.handleEnd {
+  right: 0;
+}
+
+.handle:hover {
+  background: var(--accent-soft);
+}
+
+.dropMark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  z-index: 30;
+  pointer-events: none;
+}
+
+.chip {
+  position: absolute;
+  top: 50%;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  padding: 0;
+  color: var(--fg-muted);
+  background: var(--bg-panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.chipOn {
+  color: var(--accent-fg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.title {
+  position: absolute;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  font-size: var(--text-xs);
+}
+
+.titleText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.music {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  overflow: hidden;
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.wave {
+  position: absolute;
+  inset: 0;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--danger);
+  z-index: 40;
+  pointer-events: none;
+}
+
+.popBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+}
+
+.pop {
+  position: fixed;
+  z-index: 91;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 260px;
+  padding: var(--space-3);
+  transform: translate(-50%, calc(-100% - 8px));
+  background: var(--bg-raised);
+  border: 1px solid var(--pop-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+}
+
+.popNote {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
