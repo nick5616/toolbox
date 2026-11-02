@@ -82,7 +82,8 @@ export function PreviewPath(id: string): $CancellablePromise<string> {
 }
 
 /**
- * Probe describes source files for the timeline.
+ * Probe describes source files for the timeline. A file that can't be read
+ * still gets a row, with Error set.
  */
 export function Probe(paths: string[] | null): $CancellablePromise<$models.ClipInfo[] | null> {
     return $Call.ByID(4288391742, paths);
@@ -96,7 +97,8 @@ export function Render(id: string): $CancellablePromise<core$0.Job> {
 }
 
 /**
- * Save validates and stores a project.
+ * Save validates and stores a project. Files don't have to exist: a project
+ * with a missing clip still opens and saves.
  */
 export function Save(id: string, name: string, doc: $models.VideoProject): $CancellablePromise<core$0.ProjectInfo> {
     return $Call.ByID(1823609305, id, name, doc);

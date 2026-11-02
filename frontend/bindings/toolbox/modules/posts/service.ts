@@ -26,7 +26,8 @@ export function Check(doc: $models.Post): $CancellablePromise<$models.Issue[] | 
 }
 
 /**
- * Create makes a post; paths become photo/clip slides.
+ * Create makes a post; paths become photo/clip slides by extension (other
+ * files are ignored). Reels and stories are always 9:16.
  */
 export function Create(name: string, format: string, aspect: string, paths: string[] | null): $CancellablePromise<core$0.ProjectInfo> {
     return $Call.ByID(3977486711, name, format, aspect, paths);
@@ -47,7 +48,7 @@ export function Duplicate(id: string): $CancellablePromise<core$0.ProjectInfo> {
 }
 
 /**
- * Export submits the export job.
+ * Export submits the export job; it refuses while Check has errors.
  */
 export function Export(id: string): $CancellablePromise<core$0.Job> {
     return $Call.ByID(2582344989, id);
