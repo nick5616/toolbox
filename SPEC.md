@@ -2392,3 +2392,141 @@ func (s *Service) SlideInfo(paths []string) ([]SlideSource, error) // kind, widt
 - **HEIC needs the AI engine.** Without it, HEIC photos show an "Install the Image pack" tile (the setup flow already offers it).
 - **Instagram changes its limits often.** All numbers live in `posts/limits.go` and the checks say what they are.
 - **Fonts:** Canvas2D and libass can pick different files for the same family name. Composer text renders in the webview (what you see is what's saved). Video titles use libass with `media.Fonts()` names, as Lyric Video does.
+
+---
+
+## B13. Amendment r2: posts start from a source folder
+
+Status: **DRAFT (Part B r2), awaiting review.** Date: 2026-11-01. Requested by the user after trying r1.
+
+### B13.1 Idea
+A post is no longer "a list of files". It has a **source pool**, usually a whole folder of trip photos and clips with no limit, and **slides** (≤ 20) that are allocated from it.
+
+- **Sources and slides are decoupled:**
+  - a source can feed any number of slides, or none;
+  - a slide can use one source (a photo or clip) or many: a **collage** (Photo Composer) or a **stitched video** (Video Editor).
+- **Examples:**
+  - one slide is a market photo with 10 shirts cut out of 10 other sources;
+  - another is 6 clips stitched into a vlog;
+  - a third is a single photo that's also in the collage.
+- **Source files are never modified** (unchanged rule).
+
+### B13.2 Document changes (`modules/posts/document.go`, additive; old posts keep working)
+
+```go
+type Post struct {
+	// … r1 fields …
+	Folder     string   `json:"folder"`     // the source folder ("" = none)
+	Subfolders bool     `json:"subfolders"` // include files in subfolders (any depth)
+	Extra      []string `json:"extra"`      // sources added one by one (outside the folder or picked from the Library)
+	Hidden     []string `json:"hidden"`     // folder files the user removed from the pool (never deleted from disk)
+}
+```
+
+**The pool** is the union of the folder's photos and clips, with `Subfolders` honoured, and `Extra`, minus `Hidden`. Supported extensions are the Post Builder's photos and videos; HEIC included, through `core/heic`.
+
+### B13.3 Service (additions to `PostsService`)
+
+```go
+func (s *Service) CreateFromFolder(name, format, aspect, folder string, subfolders bool) (core.ProjectInfo, error) // no slides yet
+func (s *Service) Sources(id string) ([]SourceFile, error) // the pool, with usage
+
+type SourceFile struct {
+	Path      string   `json:"path"`
+	Name      string   `json:"name"`
+	Rel       string   `json:"rel"`  // path relative to the folder ("" for extras)
+	Kind      string   `json:"kind"` // "photo" | "clip"
+	SizeBytes int64    `json:"sizeBytes"`
+	ModTime   int64    `json:"modTime"` // Unix ms
+	TakenAt   int64    `json:"takenAt"` // EXIF DateTimeOriginal for JPEG, container creation_time for clips if cheap; else ModTime
+	UsedIn    []string `json:"usedIn"`  // slide IDs using it directly or inside a linked composition / video project
+	Missing   bool     `json:"missing"` // an Extra that no longer exists
+}
+```
+
+**`Sources` must stay fast for a 500-file folder (< 1 s):**
+- It reads directory entries, plus a JPEG EXIF date read (header only) where cheap.
+- It does **no** decoding, no ffprobe and no HEIC conversion. Thumbnails, sizes and durations are loaded lazily by the UI for visible tiles (`FilesService.ImageThumb`, `MediaService.Frame`, `PostsService.SlideInfo`).
+- **Usage** comes from the slides' paths and the linked projects' layer and clip paths. It reads the composition and video project documents (cheap DB reads).
+- A missing or unreadable folder returns an empty pool with an AppError: "The source folder isn't there any more", hint "Choose it again".
+
+`Check` gains a note: "N sources aren't used in any slide" (informational only).
+
+### B13.4 Post Builder UI changes (`tools/post-builder/`)
+- **New post:**
+  - **From a folder…** is the primary choice: pick a folder (`FilesService.PickFolder`), plus "Include subfolders". The format and aspect pickers stay.
+  - "Empty post" stays.
+  - **Dropping a folder** on the Post Builder page creates a post from it. Dropping files adds them as `Extra` sources, not slides.
+- **Sources panel** (new, left of the slides; resizable, collapsible):
+  - **The grid:** thumbnails, lazy-loaded as tiles scroll into view, plus a kind badge, the clip duration (lazy), and a "used in 2, 5" badge (slide numbers).
+  - **Controls:** sort (date taken / name), a filter (all / photos / clips / unused), and a search on the name.
+  - **Header:** the folder path, Refresh (rescans) and Change folder…; "Add files…" adds extras.
+  - **Removing a source** hides it from the pool (`Hidden`); it is never deleted from disk. "Show hidden" brings sources back.
+  - **Selection:** multi-select with click, Shift-click and Ctrl/Cmd-click, plus keyboard arrows.
+- **Allocating slides:**
+  - **Drag** sources onto the slides strip, at a position, or press **Add as slides** (one slide per selected source). The 20-slide limit is enforced with a clear message.
+  - **Make a collage** (selected photos):
+    1. It opens a small dialog: background = the first selected photo, or a colour; "Cut out the others" (on by default); layout Scatter / Grid / Stack / Polaroids.
+    2. It creates a composition slide and hands off to Photo Composer with `postSlide` + the sources.
+    3. The Composer builds it: background, layers, a background-removal job for each cut-out, then the layout.
+  - **Stitch into a video** (selected clips and photos):
+    1. It opens a small dialog: order by date taken or as selected; optional song from the pool's audio or a file; cut on the beat; transition.
+    2. It creates a video slide and hands off to the Video Editor with `postSlide` + the sources + those settings.
+    3. The Video Editor runs Quick vlog with them and links the result.
+  - **Replace a slide's source:** drop a source onto a photo or clip slide.
+- **Sources stay visible while editing slides.** Selecting a slide highlights the sources it uses.
+
+### B13.5 Photo Composer and Video Editor changes
+- **`PostSlideSeed` gains `build?: SlideBuild`:**
+  ```ts
+  type SlideBuild =
+    | { kind: "collage"; background: string /* source path or "" */; color: string; cutouts: boolean; layout: "scatter" | "grid" | "stack" | "polaroids" }
+    | { kind: "stitch"; music: string; beatCut: boolean; order: "date-taken" | "as-given"; transition: string };
+  ```
+  This is a frontend-only type in `state/ui.ts`.
+- **Composer with `build.kind === "collage"`:**
+  1. Create at the post's aspect with the background.
+  2. Add the other sources as layers. If `cutouts`, show them at once (with a "cutting out…" shimmer) and submit their background-removal jobs. Each layer swaps to its cut-out as its job finishes; at most one job runs at a time, because `bg-remover` runs one at a time.
+  3. Apply the layout when all layers exist, then again after the cut-outs finish (so aspect changes from cropping are taken into account), unless the user has moved something in between.
+  4. Link it to the slide on the first save, as r1 does.
+- **Composer, batch background removal:** "Remove background" works on a **multi-selection** (one job each, queued).
+- **Video Editor with `build.kind === "stitch"`:** submit `Plan` with the sources (order, music, beat cut, transition, the post's aspect mapped as r1), open the result, and link it to the slide.
+- **Sources tab** in both editors when opened from a post:
+  - it lists the post's pool (`PostsService.Sources(postId)`), with the same grid component, shared from `tools/post-builder/SourceGrid.tsx`;
+  - dragging a source in adds a layer or a clip; double-click adds it at the end or centre.
+
+### B13.6 Tests
+- **Go:**
+  - `Sources` on a generated folder of 500 files (< 1 s, sorted, subfolders on/off, hidden, extras, missing);
+  - usage through slides, compositions and video projects;
+  - `CreateFromFolder` validation;
+  - old posts without the new fields still load.
+- **Frontend:**
+  - the sources grid: lazy thumbnails, selection, filters, usage badges;
+  - allocation: drag/add, the 20 limit, replace;
+  - Make a collage and Stitch: dialog → handoff args;
+  - Composer collage build: layers, a cut-out job per layer, the layout applied, the slide linked;
+  - batch remove background;
+  - Video Editor stitch build → the Plan request;
+  - folder drop → new post.
+
+### B13.7 Work packages
+- **Wave C0 (architect):**
+  - the document fields and `SourceFile`;
+  - service signatures (stubs);
+  - the `SlideBuild` type;
+  - bindings;
+  - a stub `SourceGrid` component with its final props.
+- **Wave C1 (parallel):**
+
+| WP | Owns | Acceptance |
+|---|---|---|
+| **PB3 Post sources** | `modules/posts/**` (Sources, CreateFromFolder, usage, the Check note), `tools/post-builder/**` (Sources panel, SourceGrid, new-from-folder, folder drop, allocation, the collage/stitch dialogs) | B13.2–B13.4 |
+| **CO3 Composer collage** | `tools/photo-composer/**` | B13.5 (Composer) |
+| **VE3 Video stitch** | `tools/video-editor/**` | B13.5 (Video Editor) |
+
+The Sources tab inside CO3 and VE3 imports PB3's `SourceGrid`. Until PB3 merges, they use the C0 stub, which has the final props.
+
+- **Integration (architect):**
+  - merge, bindings, checks, build;
+  - an end-to-end with a generated 60-file folder: sources listed and the usage right after a collage (8 sources, 7 cut-outs) and a stitched video (5 clips), then export.
