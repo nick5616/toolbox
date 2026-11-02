@@ -50,6 +50,8 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 	switch o.Action {
 	case ActionAnalyze:
 		return m.runAnalyze(ctx, job, o)
+	case ActionAuto:
+		return m.runAuto(ctx, job, o)
 	default:
 		return m.runRender(ctx, job, o)
 	}
@@ -98,15 +100,20 @@ func resolveSizes(o Options, preview bool, info media.Info) (sizes, error) {
 }
 
 func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options) error {
-	start := nowFn()
-	input := job.Inputs[0]
-	preview := o.Action == ActionPreview
-	job.SetTitle("Rendering visuals — " + filepath.Base(input))
-
+	job.SetTitle("Rendering visuals — " + filepath.Base(job.Inputs[0]))
 	ref, ok := m.an.Lookup(o.AnalysisKey)
 	if !ok {
 		return bad("analysisKey", "Analyze the file again")
 	}
+	return m.render(ctx, job, o, ref, job.SetResult)
+}
+
+// render is the render/preview body for an analysis; the result goes to
+// emit (the auto action keeps it).
+func (m *Module) render(ctx context.Context, job *core.JobContext, o Options, ref viz.AnalysisRef, emit func(any) error) error {
+	start := nowFn()
+	input := job.Inputs[0]
+	preview := o.Action == ActionPreview
 	ffmpeg, err := job.Tool("ffmpeg")
 	if err != nil {
 		return err
@@ -220,7 +227,7 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options)
 		}
 		res.PreviewPath = dst
 		job.Progress(1, "Preview ready")
-		return job.SetResult(res)
+		return emit(res)
 	}
 	final := core.UniquePath(job.OutputDir, outputName(input), ".mp4")
 	if err := moveFile(out, final); err != nil {
@@ -231,7 +238,7 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, o Options)
 	}
 	res.Outputs = append(res.Outputs, final)
 	job.Progress(1, "Saved "+filepath.Base(final))
-	return job.SetResult(res)
+	return emit(res)
 }
 
 func cutErr(ctx context.Context, err error) error {
