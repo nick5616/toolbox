@@ -16,6 +16,33 @@ const m = vi.hoisted(() => ({
   postsSave: vi.fn(),
   exportComposition: vi.fn(),
   applyLayout: vi.fn(),
+  sources: vi.fn(),
+  drop: { current: null as null | ((info: { paths: string[]; x: number; y: number }) => void) },
+}));
+
+vi.mock("../post-builder/sourceDrag", async (orig) => {
+  const actual = await orig<typeof import("../post-builder/sourceDrag")>();
+  return {
+    ...actual,
+    useSourceDropTarget: (_ref: unknown, onDrop: (info: { paths: string[]; x: number; y: number }) => void) => {
+      m.drop.current = onDrop;
+    },
+  };
+});
+
+vi.mock("../post-builder/SourceGrid", () => ({
+  SourceGrid: (p: { sources: Array<{ path: string; name: string }>; onActivate?: (path: string) => void; emptyLabel?: string }) => (
+    <ul aria-label="Sources">
+      {p.sources.length === 0 && <li>{p.emptyLabel}</li>}
+      {p.sources.map((s) => (
+        <li key={s.path}>
+          <button onDoubleClick={() => p.onActivate?.(s.path)} onKeyDown={(e) => e.key === "Enter" && p.onActivate?.(s.path)}>
+            {s.name}
+          </button>
+        </li>
+      ))}
+    </ul>
+  ),
 }));
 
 vi.mock("@/lib/api", async (orig) => {
@@ -37,6 +64,7 @@ vi.mock("@/lib/api", async (orig) => {
       Get: (...a: unknown[]) => m.postsGet(...a),
       List: (...a: unknown[]) => m.postsList(...a),
       Save: (...a: unknown[]) => m.postsSave(...a),
+      Sources: (...a: unknown[]) => m.sources(...a),
     },
     SettingsService: { ModuleState: async () => "", SetModuleState: async () => undefined },
     FilesService: { PickWith: async () => [], ImageThumb: async () => "data:image/png;base64,AAAA" },
@@ -121,6 +149,8 @@ beforeEach(() => {
   m.postsList.mockReset().mockResolvedValue([{ id: "post1", name: "My post" }]);
   m.postsSave.mockReset().mockResolvedValue({});
   m.applyLayout.mockClear();
+  m.sources.mockReset().mockResolvedValue([]);
+  m.drop.current = null;
   useJobs.setState({ byId: {} });
   useUI.setState({ handoff: null, view: "photo-composer" });
   discardedProjects.clear();
@@ -426,6 +456,205 @@ describe("post handoff", () => {
     expect(m.save).toHaveBeenCalled();
     expect(m.postsSave).toHaveBeenCalledTimes(1);
     expect(useUI.getState().handoff?.postSlide?.projectId).toBe("new1");
+  });
+});
+
+const cutJob = (path: string, status: string, outputs: Array<{ path: string }> = [], extra: Partial<Job> = {}): Job =>
+  ({ id: `job:${path}`, moduleId: "bg-remover", title: "", status, progress: 0, message: "", inputs: [path], outputs, error: "", errorHint: "", ...extra }) as unknown as Job;
+
+describe("collage build", () => {
+  const SRC = ["C:/s/bg.jpg", "C:/s/1.jpg", "C:/s/2.jpg", "C:/s/3.jpg"];
+  const slide = {
+    postId: "post1",
+    slideId: "s1",
+    aspect: "4:5",
+    projectId: "",
+    build: { kind: "collage" as const, background: "C:/s/bg.jpg", color: "", cutouts: true, layout: "grid" as const },
+  };
+
+  async function startBuild(over: Partial<typeof slide.build> = {}, inputs = SRC) {
+    m.removeBg.mockImplementation(async (path: string) => cutJob(path, JobStatus.JobRunning));
+    renderView();
+    await act(async () => {
+      useUI.getState().handOff({ moduleId: "photo-composer", inputs, postSlide: { ...slide, build: { ...slide.build, ...over } } });
+    });
+    await screen.findByRole("toolbar", { name: "Composer tools" });
+  }
+  const finish = (n: number) => act(() => useJobs.getState().upsert(cutJob(`C:/s/${n}.jpg`, JobStatus.JobDone, [{ path: `C:/out/${n}-cut.png` }])));
+  const lastSaved = () => m.save.mock.calls.at(-1)?.[2] as Composition;
+
+  it("adds every other source as a layer, cuts them out one job each, and lays out twice", async () => {
+    await startBuild();
+    await waitFor(() => expect(layerNames()).toEqual(["3", "2", "1"]));
+    await waitFor(() => expect(m.removeBg.mock.calls.map((c) => c[0])).toEqual(["C:/s/1.jpg", "C:/s/2.jpg", "C:/s/3.jpg"]));
+    // Shimmer on the stage and a spinner per layer while they are being cut out.
+    expect(screen.getAllByTestId("cutting-shimmer")).toHaveLength(3);
+    expect(m.applyLayout).toHaveBeenCalledTimes(1);
+    expect(m.applyLayout.mock.calls[0]?.[1]).toBe("grid");
+
+    await finish(1);
+    await finish(2);
+    expect(m.applyLayout).toHaveBeenCalledTimes(1);
+    await finish(3);
+    await waitFor(() => expect(m.applyLayout).toHaveBeenCalledTimes(2));
+    expect(screen.queryAllByTestId("cutting-shimmer")).toHaveLength(0);
+
+    await waitFor(() => expect(lastSaved().layers?.map((l) => l.image?.ref.path)).toEqual(["C:/out/1-cut.png", "C:/out/2-cut.png", "C:/out/3-cut.png"]), { timeout: 3000 });
+    expect(lastSaved().layers?.map((l) => l.image?.ref.original)).toEqual(["C:/s/1.jpg", "C:/s/2.jpg", "C:/s/3.jpg"]);
+    expect(lastSaved().background.image?.path).toBe("C:/s/bg.jpg");
+    expect(lastSaved().background.kind).toBe("image");
+  });
+
+  it("uses a colour background and skips cut-outs when asked", async () => {
+    await startBuild({ background: "", color: "#112233", cutouts: false });
+    await waitFor(() => expect(layerNames()).toHaveLength(4));
+    await waitFor(() => expect(m.applyLayout).toHaveBeenCalledTimes(1));
+    expect(m.removeBg).not.toHaveBeenCalled();
+    await waitFor(() => expect(m.save).toHaveBeenCalled(), { timeout: 3000 });
+    expect(lastSaved().background).toMatchObject({ kind: "color", color: "#112233" });
+  });
+
+  it("does not rearrange after the user moved a layer", async () => {
+    await startBuild();
+    await waitFor(() => expect(m.removeBg).toHaveBeenCalledTimes(3));
+    const row = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
+    fireEvent.pointerDown(row, { button: 0, clientY: 10 });
+    fireEvent.pointerUp(row);
+    fireEvent.keyDown(row, { key: "ArrowRight" });
+    await finish(1);
+    await finish(2);
+    await finish(3);
+    await waitFor(() => expect(lastSaved()).toBeDefined(), { timeout: 3000 });
+    await waitFor(() => expect(screen.queryAllByTestId("cutting-shimmer")).toHaveLength(0));
+    expect(m.applyLayout).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the original on a failed job and reports it once", async () => {
+    await startBuild();
+    await waitFor(() => expect(m.removeBg).toHaveBeenCalledTimes(3));
+    const { useToastStore } = await import("@/components/toast");
+    useToastStore.setState({ toasts: [] });
+    const fail = (n: number) =>
+      act(() => useJobs.getState().upsert(cutJob(`C:/s/${n}.jpg`, JobStatus.JobFailed, [], { error: "Image pack missing", errorHint: "Install the Image pack." })));
+    await fail(1);
+    await fail(2);
+    await finish(3);
+    await waitFor(() => expect(screen.queryAllByTestId("cutting-shimmer")).toHaveLength(0));
+    const toasts = useToastStore.getState().toasts.filter((t) => t.description?.includes("Install the Image pack."));
+    expect(toasts).toHaveLength(1);
+    await waitFor(() => expect(lastSaved().layers?.map((l) => l.image?.ref.path)).toEqual(["C:/s/1.jpg", "C:/s/2.jpg", "C:/out/3-cut.png"]), { timeout: 3000 });
+  });
+
+  it("links the new composition to the slide on the first save", async () => {
+    await startBuild({ cutouts: false });
+    await waitFor(() => expect(m.postsSave).toHaveBeenCalledTimes(1), { timeout: 3000 });
+    const post = m.postsSave.mock.calls[0]?.[2] as { slides: Array<{ id: string; kind: string; projectId: string }> };
+    expect(post.slides[0]).toMatchObject({ id: "s1", kind: "composition", projectId: "new1" });
+    expect(m.create).toHaveBeenCalledWith("Untitled composition", "4:5", "C:/s/bg.jpg");
+  });
+});
+
+describe("batch remove background", () => {
+  const ctrlClick = (row: HTMLElement) => {
+    fireEvent.pointerDown(row, { button: 0, ctrlKey: true });
+    fireEvent.pointerUp(row);
+  };
+
+  it("cuts out every selected layer, one job each, and restores them together", async () => {
+    m.removeBg.mockImplementation(async (path: string) => cutJob(path, JobStatus.JobRunning));
+    renderView();
+    await openProject("Market");
+    const rows = within(layerList()).getAllByRole("listitem") as HTMLElement[];
+    fireEvent.pointerDown(rows[0] as HTMLElement, { button: 0 });
+    fireEvent.pointerUp(rows[0] as HTMLElement);
+    ctrlClick(rows[1] as HTMLElement);
+    expect(screen.getByText("2 layers selected")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove background (2)" }));
+    await waitFor(() => expect(m.removeBg.mock.calls.map((c) => c[0])).toEqual(["C:/photos/b.jpg", "C:/photos/a.jpg"]));
+    expect(screen.getAllByRole("status", { name: "Removing background" }).length).toBeGreaterThanOrEqual(2);
+
+    act(() => {
+      useJobs.getState().upsert(cutJob("C:/photos/b.jpg", JobStatus.JobDone, [{ path: "C:/out/b.png" }]));
+      useJobs.getState().upsert(cutJob("C:/photos/a.jpg", JobStatus.JobDone, [{ path: "C:/out/a.png" }]));
+    });
+    await waitFor(() => expect(m.save).toHaveBeenCalledTimes(1));
+    expect(lastSavedLayers().map((l) => l.image?.ref)).toEqual([
+      { path: "C:/out/a.png", original: "C:/photos/a.jpg" },
+      { path: "C:/out/b.png", original: "C:/photos/b.jpg" },
+    ]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Restore originals" }));
+    await waitFor(() => expect(m.save).toHaveBeenCalledTimes(2));
+    expect(lastSavedLayers().map((l) => l.image?.ref)).toEqual([
+      { path: "C:/photos/a.jpg", original: "" },
+      { path: "C:/photos/b.jpg", original: "" },
+    ]);
+  });
+
+  function lastSavedLayers() {
+    return ((m.save.mock.calls.at(-1)?.[2] as Composition).layers ?? []) as NonNullable<Composition["layers"]>;
+  }
+});
+
+describe("sources tab", () => {
+  const slide = { postId: "post1", slideId: "s1", aspect: "4:5", projectId: "p1" };
+  const sources = [
+    { path: "C:/s/x.jpg", name: "x.jpg", kind: "photo" },
+    { path: "C:/s/clip.mp4", name: "clip.mp4", kind: "clip" },
+  ];
+
+  async function openFromPost() {
+    renderView();
+    await act(async () => {
+      useUI.getState().handOff({ moduleId: "photo-composer", inputs: [], postSlide: slide });
+    });
+    await screen.findByRole("toolbar", { name: "Composer tools" });
+  }
+
+  it("is only there when the composition came from a post", async () => {
+    renderView();
+    await openProject("Market");
+    expect(screen.queryByRole("radio", { name: "Sources" })).toBeNull();
+    expect(m.sources).not.toHaveBeenCalled();
+  });
+
+  it("lists the photos and adds one at the centre on activation", async () => {
+    m.sources.mockResolvedValue(sources);
+    await openFromPost();
+    await userEvent.click(screen.getByRole("radio", { name: "Sources" }));
+    expect(m.sources).toHaveBeenCalledWith("post1");
+    expect(await screen.findByText("x.jpg")).toBeTruthy();
+    expect(screen.queryByText("clip.mp4")).toBeNull();
+
+    fireEvent.doubleClick(screen.getByText("x.jpg"));
+    await userEvent.click(screen.getByRole("radio", { name: "Layers" }));
+    await waitFor(() => expect(layerNames()).toEqual(["x", "b", "a"]));
+    expect((screen.getByLabelText("X") as HTMLInputElement).value).toBe("540");
+    expect((screen.getByLabelText("Y") as HTMLInputElement).value).toBe("675");
+  });
+
+  it("adds sources dropped on the stage at the drop point", async () => {
+    m.sources.mockResolvedValue(sources);
+    await openFromPost();
+    const stage = screen.getByTestId("composer-stage");
+    vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({ left: 100, top: 100, width: 200, height: 400, right: 300, bottom: 500, x: 100, y: 100, toJSON: () => ({}) });
+    await act(async () => {
+      m.drop.current?.({ paths: ["C:/s/x.jpg"], x: 150, y: 200 });
+    });
+    await waitFor(() => expect(layerNames()).toEqual(["x", "b", "a"]));
+    expect((screen.getByLabelText("X") as HTMLInputElement).value).toBe("270");
+    expect((screen.getByLabelText("Y") as HTMLInputElement).value).toBe("337.5");
+  });
+
+  it("explains when the sources can't be listed and refreshes on demand", async () => {
+    m.sources.mockRejectedValueOnce(new Error("not implemented")).mockResolvedValue(sources);
+    await openFromPost();
+    await userEvent.click(screen.getByRole("radio", { name: "Sources" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("Couldn't list");
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByText("x.jpg")).toBeTruthy();
+    expect(m.sources).toHaveBeenCalledTimes(2);
   });
 });
 

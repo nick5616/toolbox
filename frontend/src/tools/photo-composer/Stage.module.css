@@ -76,6 +76,30 @@
   pointer-events: none;
 }
 
+.shimmer {
+  position: absolute;
+  pointer-events: none;
+  border-radius: var(--r-sm);
+  background: linear-gradient(105deg, transparent 20%, color-mix(in srgb, var(--accent) 35%, transparent) 50%, transparent 80%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+  }
+}
+
 .editor {
   position: absolute;
   padding: 4px 8px;

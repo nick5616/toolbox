@@ -8,7 +8,11 @@ export interface LayersPanelProps {
   layers: readonly ComposerLayer[];
   selectedId: string | null;
   busyIds: ReadonlySet<string>;
-  onSelect: (id: string) => void;
+  /** Extra text beside a busy layer's spinner ("queued", "42%"). */
+  busyLabels?: Readonly<Record<string, string>>;
+  /** Every selected layer when several are (Ctrl/Cmd+click toggles, Shift+click selects a range). */
+  multi?: ReadonlySet<string>;
+  onSelect: (id: string, mods?: { toggle: boolean; range: boolean }) => void;
   onPatch: (id: string, patch: Partial<ComposerLayer>) => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
@@ -59,7 +63,7 @@ interface DragState {
 }
 
 /** The layer list, topmost layer first. Drag a row to reorder. */
-export function LayersPanel({ layers, selectedId, busyIds, onSelect, onPatch, onDuplicate, onDelete, onReorder }: LayersPanelProps) {
+export function LayersPanel({ layers, selectedId, busyIds, busyLabels, multi, onSelect, onPatch, onDuplicate, onDelete, onReorder }: LayersPanelProps) {
   const display = [...layers].reverse();
   const rows = useRef(new Map<string, HTMLLIElement>());
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -74,7 +78,9 @@ export function LayersPanel({ layers, selectedId, busyIds, onSelect, onPatch, on
 
   const onDown = (e: RPointerEvent<HTMLLIElement>, l: ComposerLayer, index: number) => {
     if (e.button !== 0 || (e.target as HTMLElement).closest("button, input")) return;
-    onSelect(l.id);
+    const toggle = e.ctrlKey || e.metaKey;
+    onSelect(l.id, { toggle, range: e.shiftKey });
+    if (toggle || e.shiftKey) return;
     const d: DragState = { id: l.id, from: index, startY: e.clientY, active: false, target: index };
     dragRef.current = d;
     e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -113,7 +119,7 @@ export function LayersPanel({ layers, selectedId, busyIds, onSelect, onPatch, on
             if (el) rows.current.set(l.id, el);
             else rows.current.delete(l.id);
           }}
-          className={cx(styles.row, l.id === selectedId && styles.selected, l.hidden && styles.hidden, drag?.active && drag.id === l.id && styles.dragging, lineBefore === l.id && styles.dropBefore)}
+          className={cx(styles.row, (l.id === selectedId || multi?.has(l.id)) && styles.selected, l.hidden && styles.hidden, drag?.active && drag.id === l.id && styles.dragging, lineBefore === l.id && styles.dropBefore)}
           data-layer-id={l.id}
           aria-current={l.id === selectedId || undefined}
           onPointerDown={(e) => onDown(e, l, i)}
@@ -144,7 +150,12 @@ export function LayersPanel({ layers, selectedId, busyIds, onSelect, onPatch, on
               {l.name}
             </span>
           )}
-          {busyIds.has(l.id) && <Spinner size={14} label="Removing background" />}
+          {busyIds.has(l.id) && (
+            <>
+              {busyLabels?.[l.id] && <span className={styles.busyLabel}>{busyLabels[l.id]}</span>}
+              <Spinner size={14} label="Removing background" />
+            </>
+          )}
           <span className={styles.actions}>
             <IconButton size="sm" icon={l.hidden ? "eye-off" : "eye"} label={l.hidden ? "Show layer" : "Hide layer"} onClick={() => onPatch(l.id, { hidden: !l.hidden })} />
             <IconButton size="sm" icon="lock" label={l.locked ? "Unlock layer" : "Lock layer"} pressed={l.locked} onClick={() => onPatch(l.id, { locked: !l.locked })} />

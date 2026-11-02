@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent } from "react";
-import { Button, IconButton, MenuButton, Spinner, TextField, toast } from "@/components";
+import { Button, IconButton, MenuButton, SegmentedControl, Spinner, TextField, toast } from "@/components";
 import {
   ComposerService,
   FilesService,
@@ -38,8 +38,9 @@ import type { PostSlideSeed } from "@/state/ui";
 import { BackgroundPanel } from "./BackgroundPanel";
 import { CropDialog } from "./CropDialog";
 import { LayersPanel } from "./LayersPanel";
-import { nudge } from "./logic";
+import { geometryChanged, idRange, nudge } from "./logic";
 import { PropertiesPanel } from "./PropertiesPanel";
+import { SourcesPanel } from "./SourcesPanel";
 import { Stage } from "./Stage";
 import { useAutosave, type SaveState } from "./useAutosave";
 import styles from "./Editor.module.css";
@@ -89,6 +90,9 @@ interface Pending {
   from: string;
 }
 
+/** Steps of a collage build (SPEC.md §B13.5). */
+type BuildPhase = "idle" | "adding" | "layout1" | "submitting" | "cutting" | "layout2" | "done";
+
 /** The open composition: toolbar, stage, layers and properties. */
 export function Editor({ project, initialDoc, postSlide, incoming, onClose, onInfo, onBackToPost, renameTo }: EditorProps) {
   const hist = useHistory<Composition>(initialDoc);
@@ -110,6 +114,15 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   const [zoom, setZoom] = useState(1);
   const [cropId, setCropId] = useState<string | null>(null);
   const [pending, setPending] = useState<Record<string, Pending>>({});
+  const pendingRef = useRef<Record<string, Pending>>({});
+  const [multi, setMulti] = useState<string[]>([]);
+  const [sideTab, setSideTab] = useState<"edit" | "sources">("edit");
+  const [phase, setPhase] = useState<BuildPhase>("idle");
+  const buildIds = useRef<string[]>([]);
+  const buildStarted = useRef(false);
+  /** The user moved, scaled or rotated a layer (or chose a layout): a build must not rearrange it. */
+  const touched = useRef(false);
+  const internal = useRef(false);
   const [exporting, setExporting] = useState(false);
   const [images, setImages] = useState<ReadonlyMap<string, ImageBitmap>>(() => new Map());
   const exts = useModules((s) => s.byId["photo-composer"]?.accepts.extensions);
@@ -119,6 +132,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
     (fn: (d: Composition) => Composition, opts: { merge?: boolean } = {}) => {
       const next = fn(committed.current);
       if (next === committed.current) return;
+      if (!internal.current && geometryChanged(committed.current, next)) touched.current = true;
       if (!opts.merge) hist.checkpoint();
       committed.current = next;
       hist.set(next);
@@ -190,7 +204,8 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
 
   // ---- adding things ----
   const addPhotos = useCallback(
-    async (paths: string[]) => {
+    async (paths: string[], at?: { x: number; y: number }) => {
+      let n = 0;
       for (const path of paths) {
         if (layerList(committed.current).length >= MAX_LAYERS) {
           toast({ title: `At most ${MAX_LAYERS} layers`, tone: "warn" });
@@ -199,9 +214,16 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
         try {
           const bmp = await loadImage(path);
           const { w, h } = imageSize(bmp);
-          const layer = newImageLayer(path, w, h, committed.current);
-          edit((d) => addLayer(d, layer));
+          let layer = newImageLayer(path, w, h, committed.current);
+          if (at) {
+            const fan = n * 0.03;
+            layer = { ...layer, x: Math.min(1, at.x + fan), y: Math.min(1, at.y + fan) };
+          }
+          n++;
+          const added = layer;
+          edit((d) => addLayer(d, added));
           setSelectedId(layer.id);
+          setMulti([]);
         } catch (e) {
           toastError(`Couldn't add ${baseName(path)}`, e);
         }
@@ -209,13 +231,6 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
     },
     [edit],
   );
-
-  const lastIncoming = useRef(0);
-  useEffect(() => {
-    if (!incoming || incoming.id === lastIncoming.current) return;
-    lastIncoming.current = incoming.id;
-    void addPhotos(incoming.paths);
-  }, [incoming, addPhotos]);
 
   const pickPhotos = useCallback(async () => {
     try {
@@ -252,6 +267,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   const deleteById = useCallback(
     (id: string) => {
       edit((d) => deleteLayer(d, id));
+      setMulti((m) => m.filter((x) => x !== id));
       setSelectedId((s) => (s === id ? null : s));
       setEditingId((s) => (s === id ? null : s));
     },
@@ -271,7 +287,34 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   );
   const setBackground = useCallback((bg: ComposerBackground) => edit((d) => ({ ...d, background: bg })), [edit]);
 
-  const selected = selectedId ? findLayer(doc, selectedId) : undefined;
+  const multiSelected = multi.length > 1;
+  const selected = !multiSelected && selectedId ? findLayer(doc, selectedId) : undefined;
+  /** Every selected layer, in selection order. */
+  const selectedLayers = useMemo(() => {
+    const ids = multiSelected ? multi : selectedId ? [selectedId] : [];
+    return ids.map((id) => findLayer(doc, id)).filter((l): l is ComposerLayer => !!l);
+  }, [doc, multi, multiSelected, selectedId]);
+
+  const selectLayer = useCallback(
+    (id: string | null, mods?: { toggle: boolean; range: boolean }) => {
+      if (id && mods?.toggle) {
+        const cur = multi.length > 1 ? multi : selectedId ? [selectedId] : [];
+        const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+        setSelectedId(next.length > 0 ? (next[next.length - 1] ?? null) : null);
+        setMulti(next.length > 1 ? next : []);
+      } else if (id && mods?.range && selectedId) {
+        const order = layerList(committed.current).map((l) => l.id).reverse();
+        const ids = idRange(order, selectedId, id);
+        setSelectedId(id);
+        setMulti(ids.length > 1 ? ids : []);
+      } else {
+        setSelectedId(id);
+        setMulti([]);
+      }
+      if (id) setAdjustBg(false);
+    },
+    [multi, selectedId],
+  );
 
   // ---- layouts ----
   const layoutKind = useRef<LayoutKind>("scatter");
@@ -288,25 +331,50 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   );
 
   // ---- remove background ----
-  const removeBackground = useCallback(
-    async (layer: ComposerLayer) => {
-      const path = layer.image?.ref.path;
-      if (!path || pending[layer.id]) return;
-      try {
-        const job = await ComposerService.RemoveBackground(path);
-        useJobs.getState().upsert(job);
-        setPending((p) => ({ ...p, [layer.id]: { jobId: job.id, from: path } }));
-      } catch (e) {
-        toastError("Couldn't remove the background", e);
+  const failShown = useRef(new Set<string>());
+  /** Toasts a failure once per batch, however many layers hit it. */
+  const toastFailureOnce = useCallback((title: string, description: string, tone: "danger" | "warn" = "danger") => {
+    const key = `${title}|${description}`;
+    if (failShown.current.has(key)) return;
+    failShown.current.add(key);
+    toast({ title, description, tone });
+  }, []);
+
+  /** Starts one background-removal job per layer; the jobs queue (the engine runs one at a time). */
+  const removeBackgrounds = useCallback(
+    async (layers: readonly ComposerLayer[]) => {
+      for (const layer of layers) {
+        const path = layer.image?.ref.path;
+        if (!path || pendingRef.current[layer.id]) continue;
+        try {
+          const job = await ComposerService.RemoveBackground(path);
+          useJobs.getState().upsert(job);
+          pendingRef.current = { ...pendingRef.current, [layer.id]: { jobId: job.id, from: path } };
+          setPending(pendingRef.current);
+        } catch (e) {
+          const err = toAppError(e);
+          toastFailureOnce("Couldn't remove the background", err.hint ? `${err.message} ${err.hint}` : err.message);
+        }
       }
     },
+    [toastFailureOnce],
+  );
+
+  const removeBackground = useCallback((layer: ComposerLayer) => removeBackgrounds([layer]), [removeBackgrounds]);
+
+  /** The selected image layers that can be cut out (not already cut out when several are selected). */
+  const batchRemovable = useCallback(
+    (layers: readonly ComposerLayer[]) => layers.filter((l) => l.kind === "image" && !!l.image && !pending[l.id] && (layers.length === 1 || !l.image.ref.original)),
     [pending],
   );
 
   const jobsById = useJobs((s) => s.byId);
   useEffect(() => {
     const entries = Object.entries(pending);
-    if (entries.length === 0) return;
+    if (entries.length === 0) {
+      failShown.current.clear();
+      return;
+    }
     const finished: string[] = [];
     for (const [layerId, p] of entries) {
       const job = jobsById[p.jobId];
@@ -325,34 +393,126 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
         }
       } else if (job.status === "failed") {
         finished.push(layerId);
-        toast({
-          title: "Couldn't remove the background",
-          description: [job.error, job.errorHint].filter(Boolean).join(" "),
-          tone: "danger",
-        });
+        toastFailureOnce("Couldn't remove the background", [job.error, job.errorHint].filter(Boolean).join(" "));
       } else if (job.status === "cancelled") {
         finished.push(layerId);
       }
     }
     if (finished.length > 0) {
-      setPending((cur) => {
-        const next = { ...cur };
-        for (const id of finished) delete next[id];
-        return next;
-      });
+      const next = { ...pendingRef.current };
+      for (const id of finished) delete next[id];
+      pendingRef.current = next;
+      setPending(next);
     }
-  }, [jobsById, pending, edit]);
+  }, [jobsById, pending, edit, toastFailureOnce]);
 
   const busyIds = useMemo(() => new Set(Object.keys(pending)), [pending]);
+  const busyLabels = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const [layerId, p] of Object.entries(pending)) {
+      const job = jobsById[p.jobId];
+      if (!job) continue;
+      out[layerId] = job.status === "queued" ? "queued" : job.progress > 0 && job.progress <= 1 ? `${Math.round(job.progress * 100)}%` : "";
+    }
+    return out;
+  }, [pending, jobsById]);
 
-  const restoreOriginal = useCallback(
-    (layer: ComposerLayer) => {
-      const original = layer.image?.ref.original;
-      if (!original) return;
-      edit((d) => setLayerSource(d, layer.id, original, ""));
+  const restoreOriginals = useCallback(
+    (layers: readonly ComposerLayer[]) => {
+      const targets = layers.filter((l) => !!l.image?.ref.original);
+      if (targets.length === 0) return;
+      edit((d) => targets.reduce((acc, l) => setLayerSource(acc, l.id, l.image?.ref.original ?? "", ""), d));
     },
     [edit],
   );
+  const restoreOriginal = useCallback((layer: ComposerLayer) => restoreOriginals([layer]), [restoreOriginals]);
+
+  // ---- collage build (SPEC.md §B13.5) ----
+  const build = postSlide?.build?.kind === "collage" ? postSlide.build : null;
+
+  const lastIncoming = useRef(0);
+  useEffect(() => {
+    if (!incoming || incoming.id === lastIncoming.current) return;
+    lastIncoming.current = incoming.id;
+    if (build && !buildStarted.current) {
+      buildStarted.current = true;
+      void startBuild(build, incoming.paths);
+    } else {
+      void addPhotos(incoming.paths);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incoming, addPhotos]);
+
+  /** Background and layers go in at once; the layout and cut-outs follow as the phases advance. */
+  async function startBuild(b: NonNullable<typeof build>, paths: string[]) {
+    setPhase("adding");
+    internal.current = true;
+    try {
+      edit((d) => ({
+        ...d,
+        background: b.background
+          ? { ...d.background, kind: "image", image: { path: b.background, original: "" }, panX: 0, panY: 0, zoom: 1 }
+          : { ...d.background, kind: "color", color: b.color || d.background.color, image: null },
+      }));
+      const layers: ComposerLayer[] = [];
+      for (const path of paths) {
+        if (path === b.background || layers.length >= MAX_LAYERS) continue;
+        try {
+          const bmp = await loadImage(path);
+          const { w, h } = imageSize(bmp);
+          layers.push(newImageLayer(path, w, h, committed.current));
+        } catch (e) {
+          toastFailureOnce(`Couldn't add ${baseName(path)}`, toAppError(e).message, "warn");
+        }
+      }
+      edit((d) => layers.reduce(addLayer, d));
+      buildIds.current = layers.map((l) => l.id);
+      layoutKind.current = b.layout;
+    } finally {
+      internal.current = false;
+    }
+    setPhase("layout1");
+  }
+
+  const buildLayout = useCallback(() => {
+    if (!build || touched.current) return;
+    internal.current = true;
+    try {
+      edit((d) => applyLayout(d, build.layout, layoutSeed.current, buildIds.current, sizerFor(d)));
+    } finally {
+      internal.current = false;
+    }
+  }, [build, edit, sizerFor]);
+
+  // The images behind the build's layers (or their failure) are known.
+  const imagesReady = useMemo(
+    () =>
+      buildIds.current.every((id) => {
+        const p = findLayer(hist.value, id)?.image?.ref.path;
+        return !p || images.has(p) || reported.current.has(p);
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hist.value, images],
+  );
+
+  useEffect(() => {
+    if (!build) return;
+    if (phase === "layout1" && imagesReady) {
+      buildLayout();
+      if (build.cutouts && buildIds.current.length > 0) {
+        setPhase("submitting");
+        const layers = buildIds.current.map((id) => findLayer(committed.current, id)).filter((l): l is ComposerLayer => !!l);
+        void removeBackgrounds(layers).then(() => setPhase("cutting"));
+      } else {
+        setPhase("done");
+      }
+    } else if (phase === "cutting" && Object.keys(pending).length === 0) {
+      setPhase("layout2");
+    } else if (phase === "layout2" && imagesReady) {
+      buildLayout();
+      setPhase("done");
+    }
+  }, [build, phase, imagesReady, pending, buildLayout, removeBackgrounds]);
 
   // ---- export ----
   const exportAs = useCallback(
@@ -409,8 +569,15 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
     } else if ((e.key === "Delete" || e.key === "Backspace") && selected) {
       e.preventDefault();
       deleteById(selected.id);
+    } else if ((e.key === "Delete" || e.key === "Backspace") && multiSelected) {
+      e.preventDefault();
+      const ids = [...multi];
+      edit((d) => ids.reduce(deleteLayer, d));
+      setMulti([]);
+      setSelectedId(null);
     } else if (e.key === "Escape") {
       setSelectedId(null);
+      setMulti([]);
     } else if (e.key.startsWith("Arrow") && selected && !selected.locked) {
       const patch = nudge(committed.current, selected, e.key, e.shiftKey);
       if (patch) {
@@ -421,7 +588,10 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   };
 
   const cropLayer = cropId ? findLayer(doc, cropId) : undefined;
-  const canRemove = selected?.kind === "image" && !busyIds.has(selected.id);
+  const removable = batchRemovable(selectedLayers);
+  const canRemove = removable.length > 0;
+  const restorable = selectedLayers.filter((l) => !!l.image?.ref.original);
+  const anyBusy = selectedLayers.some((l) => busyIds.has(l.id));
   const hasBgPhoto = doc.background.kind === "image" && !!doc.background.image?.path;
 
   return (
@@ -457,10 +627,10 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
           variant="secondary"
           icon="wand-sparkles"
           disabled={!canRemove}
-          loading={!!selected && busyIds.has(selected.id)}
-          onClick={() => selected && void removeBackground(selected)}
+          loading={anyBusy && !canRemove}
+          onClick={() => void removeBackgrounds(removable)}
         >
-          Remove background
+          {multiSelected ? `Remove background (${removable.length})` : "Remove background"}
         </Button>
         <span className={styles.sep} />
         <IconButton icon="undo-2" label="Undo" kbd="Ctrl+Z" disabled={!hist.canUndo} onClick={hist.undo} />
@@ -491,11 +661,9 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
         <Stage
           doc={doc}
           images={images}
-          selectedId={selectedId}
-          onSelect={(id) => {
-            setSelectedId(id);
-            if (id) setAdjustBg(false);
-          }}
+          selectedId={multiSelected ? null : selectedId}
+          onSelect={(id) => selectLayer(id)}
+          onSourceDrop={(paths, x, y) => void addPhotos(paths, { x, y })}
           onLive={setLive}
           onCommit={(d, opts) => {
             setLive(null);
@@ -515,16 +683,34 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
           onZoom={setZoom}
         />
         <aside className={styles.side} aria-label="Layers and properties">
+          {postSlide && (
+            <div className={styles.tabs}>
+              <SegmentedControl
+                size="sm"
+                fullWidth
+                aria-label="Side panel"
+                value={sideTab}
+                onChange={setSideTab}
+                options={[
+                  { value: "edit", label: "Layers" },
+                  { value: "sources", label: "Sources" },
+                ]}
+              />
+            </div>
+          )}
+          {postSlide && sideTab === "sources" ? (
+            <SourcesPanel postId={postSlide.postId} onAdd={(paths) => void addPhotos(paths)} />
+          ) : (
+            <>
           <div className={styles.layers}>
             <h2 className={styles.sideTitle}>Layers</h2>
             <LayersPanel
               layers={layerList(doc)}
               selectedId={selectedId}
+              multi={multiSelected ? new Set(multi) : undefined}
               busyIds={busyIds}
-              onSelect={(id) => {
-                setSelectedId(id);
-                setAdjustBg(false);
-              }}
+              busyLabels={busyLabels}
+              onSelect={selectLayer}
               onPatch={patchLayer}
               onDuplicate={duplicateById}
               onDelete={deleteById}
@@ -532,7 +718,23 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
             />
           </div>
           <div className={styles.props}>
-            {selected ? (
+            {multiSelected ? (
+              <div className={styles.multi} role="group" aria-label="Several layers">
+                <p className={styles.multiText}>{multi.length} layers selected</p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon="wand-sparkles"
+                  disabled={!canRemove}
+                  onClick={() => void removeBackgrounds(removable)}
+                >
+                  Cut out all
+                </Button>
+                <Button size="sm" variant="secondary" icon="undo-2" disabled={restorable.length === 0} onClick={() => restoreOriginals(restorable)}>
+                  Restore originals
+                </Button>
+              </div>
+            ) : selected ? (
               <PropertiesPanel
                 layer={selected}
                 docWidth={doc.width}
@@ -554,6 +756,8 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
               />
             )}
           </div>
+            </>
+          )}
         </aside>
       </div>
 
