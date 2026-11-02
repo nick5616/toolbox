@@ -118,6 +118,13 @@ func (m *Module) Check(ctx context.Context, doc Post) []Issue {
 			add(LevelError, s.ID, "Unknown slide type %q", s.Kind)
 		}
 	}
+	if n := m.unusedSources(ctx, doc); n > 0 {
+		if n == 1 {
+			add(LevelNote, "", "1 source isn't used in any slide")
+		} else {
+			add(LevelNote, "", "%d sources aren't used in any slide", n)
+		}
+	}
 	return issues
 }
 

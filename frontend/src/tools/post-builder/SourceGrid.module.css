@@ -1,0 +1,110 @@
+.grid {
+  display: grid;
+  gap: var(--space-2);
+  justify-content: start;
+  align-content: start;
+  outline: none;
+}
+
+.grid:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent-soft);
+  border-radius: var(--r-md);
+}
+
+.empty {
+  margin: 0;
+  padding: var(--space-4) var(--space-2);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  text-align: center;
+}
+
+.tile {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--bg-panel);
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+
+.tile:hover {
+  background: var(--bg-hover);
+}
+
+.selected {
+  border-color: var(--accent);
+}
+
+.highlighted {
+  box-shadow: inset 0 0 0 2px var(--warn);
+}
+
+.active {
+  outline: 1px dashed var(--fg-subtle);
+  outline-offset: -4px;
+}
+
+.missing {
+  opacity: 0.55;
+}
+
+.img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.placeholder {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-subtle);
+}
+
+.kind {
+  position: absolute;
+  left: var(--space-1);
+  top: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 4px;
+  border-radius: var(--r-sm);
+  background: var(--bg-app);
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.used {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1px var(--space-1);
+  background: var(--accent);
+  color: var(--accent-fg, var(--fg));
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flag {
+  position: absolute;
+  right: var(--space-1);
+  top: var(--space-1);
+  padding: 1px 4px;
+  border-radius: var(--r-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--text-xs);
+}

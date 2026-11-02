@@ -38,15 +38,9 @@ var carouselAspects = []string{"4:5", "1:1", "3:4", "1.91:1"}
 // Create makes a post; paths become photo/clip slides by extension (other
 // files are ignored). Reels and stories are always 9:16.
 func (s *Service) Create(name, format, aspect string, paths []string) (core.ProjectInfo, error) {
-	switch format {
-	case "carousel":
-		if !slices.Contains(carouselAspects, aspect) {
-			return core.ProjectInfo{}, core.ValidationError("Choose 4:5, 1:1, 3:4 or 1.91:1", map[string]string{"aspect": "invalid"})
-		}
-	case "reel", "story":
-		aspect = "9:16"
-	default:
-		return core.ProjectInfo{}, core.ValidationError("Choose carousel, reel or story", map[string]string{"format": "invalid"})
+	aspect, err := normalizeFormat(format, aspect)
+	if err != nil {
+		return core.ProjectInfo{}, err
 	}
 	doc := Post{Version: 1, Format: format, Aspect: aspect, Slides: []Slide{}}
 	limit := maxClipMs(DefaultLimits(), format)
@@ -66,6 +60,21 @@ func (s *Service) Create(name, format, aspect string, paths []string) (core.Proj
 		doc.Slides = append(doc.Slides, sl)
 	}
 	return s.m.docs.Create(context.Background(), name, doc)
+}
+
+// normalizeFormat validates the format and aspect; reels and stories are 9:16.
+func normalizeFormat(format, aspect string) (string, error) {
+	switch format {
+	case "carousel":
+		if !slices.Contains(carouselAspects, aspect) {
+			return "", core.ValidationError("Choose 4:5, 1:1, 3:4 or 1.91:1", map[string]string{"aspect": "invalid"})
+		}
+	case "reel", "story":
+		aspect = "9:16"
+	default:
+		return "", core.ValidationError("Choose carousel, reel or story", map[string]string{"format": "invalid"})
+	}
+	return aspect, nil
 }
 
 // validateShape checks a post's structure (not Instagram's limits).
@@ -119,6 +128,23 @@ func validateShape(doc Post) error {
 			fail(key, "Alt text is too long")
 		}
 	}
+	if doc.Folder != "" && !filepath.IsAbs(doc.Folder) {
+		fail("folder", "The source folder must be an absolute path")
+	}
+	for _, list := range []struct {
+		key  string
+		vals []string
+	}{{"extra", doc.Extra}, {"hidden", doc.Hidden}} {
+		if len(list.vals) > maxPoolEntries {
+			fail(list.key, fmt.Sprintf("At most %d entries", maxPoolEntries))
+		}
+		for _, p := range list.vals {
+			if !filepath.IsAbs(p) {
+				fail(list.key, "Source paths must be absolute")
+				break
+			}
+		}
+	}
 	if len(fields) == 0 {
 		return nil
 	}
@@ -133,6 +159,12 @@ func (s *Service) Save(id, name string, doc Post) (core.ProjectInfo, error) {
 	}
 	if doc.Slides == nil {
 		doc.Slides = []Slide{}
+	}
+	if doc.Extra == nil {
+		doc.Extra = []string{}
+	}
+	if doc.Hidden == nil {
+		doc.Hidden = []string{}
 	}
 	if err := validateShape(doc); err != nil {
 		return core.ProjectInfo{}, err
@@ -222,16 +254,6 @@ func (m *Module) slideInfo(ctx context.Context, paths []string) ([]SlideSource, 
 		out = append(out, src)
 	}
 	return out, nil
-}
-
-// CreateFromFolder makes a post whose source pool is folder (no slides yet).
-func (s *Service) CreateFromFolder(name, format, aspect, folder string, subfolders bool) (core.ProjectInfo, error) {
-	return core.ProjectInfo{}, core.NotImplemented("Post sources") // WP-PB3
-}
-
-// Sources lists the post's source pool with usage (SPEC.md §B13.3).
-func (s *Service) Sources(id string) ([]SourceFile, error) {
-	return []SourceFile{}, core.NotImplemented("Post sources") // WP-PB3
 }
 
 // Limits returns the Instagram limits the checks use.

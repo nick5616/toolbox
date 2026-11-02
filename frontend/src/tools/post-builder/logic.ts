@@ -1,7 +1,7 @@
 import type { Post, PostIssue, PostLimits, PostSlide, PostSlideSource } from "@/lib/api";
 
-/** A post whose slides are always an array. */
-export type PostDoc = Omit<Post, "slides"> & { slides: PostSlide[] };
+/** A post whose slides and source lists are always arrays. */
+export type PostDoc = Omit<Post, "slides" | "extra" | "hidden"> & { slides: PostSlide[]; extra: string[]; hidden: string[] };
 
 export type PostFormat = "carousel" | "reel" | "story";
 
@@ -40,7 +40,14 @@ export function aspectFor(format: string, current: string): string {
 }
 
 export function normalizePost(p: Post): PostDoc {
-  return { ...p, slides: (p.slides ?? []).map((s) => ({ ...s })) };
+  return {
+    ...p,
+    slides: (p.slides ?? []).map((s) => ({ ...s })),
+    folder: p.folder ?? "",
+    subfolders: !!p.subfolders,
+    extra: [...(p.extra ?? [])],
+    hidden: [...(p.hidden ?? [])],
+  };
 }
 
 export function isPending(s: PostSlide): boolean {
@@ -205,13 +212,23 @@ export interface PostBuilderState {
   lastPostId: string;
   /** Last export folder by post id. */
   exports: Record<string, string>;
+  /** Width of the Sources panel in px (absent = default). */
+  sourcesWidth?: number;
+  /** Whether the Sources panel is collapsed (absent = open). */
+  sourcesCollapsed?: boolean;
 }
+
+export const SOURCES_MIN = 190;
+export const SOURCES_MAX = 520;
+export const SOURCES_DEFAULT = 280;
 
 export function sanitizeState(saved: unknown): PostBuilderState {
   const out: PostBuilderState = { lastPostId: "", exports: {} };
   if (typeof saved !== "object" || saved === null) return out;
   const r = saved as Record<string, unknown>;
   if (typeof r.lastPostId === "string") out.lastPostId = r.lastPostId;
+  if (typeof r.sourcesWidth === "number" && Number.isFinite(r.sourcesWidth)) out.sourcesWidth = Math.min(SOURCES_MAX, Math.max(SOURCES_MIN, r.sourcesWidth));
+  if (typeof r.sourcesCollapsed === "boolean") out.sourcesCollapsed = r.sourcesCollapsed;
   if (typeof r.exports === "object" && r.exports !== null) {
     for (const [k, v] of Object.entries(r.exports as Record<string, unknown>)) if (typeof v === "string") out.exports[k] = v;
   }

@@ -60,6 +60,7 @@ type Config struct {
 	Composer    *composer.Module
 	Video       *videoeditor.Module
 	Resolve     func(depID string) (string, error)
+	LibraryDir  func() string // the Library folder (a source folder may not be inside it); nil = the default
 }
 
 // Module is the Post Builder.

@@ -9,6 +9,10 @@ import { toAppError } from "@/lib/errors";
 import { usePipelines } from "@/state/pipelines";
 import { inputAccepted, mergeInputs } from "@/tools/pipelines/RunSheetModel";
 // --- end pipelines ---
+// --- post folders ---
+import { FilesService } from "@/lib/api";
+import { usePostDrop } from "@/tools/post-builder/store";
+// --- end post folders ---
 
 export const TOOL_DROP_PREFIX = "tool-drop:";
 
@@ -75,6 +79,43 @@ function handToTool(moduleId: string, paths: string[]): boolean {
   return true;
 }
 
+// --- post folders ---
+/**
+ * On the Post Builder page a drop with folders hands everything to the tool
+ * (the view makes a post from the first folder); plain files are handed over
+ * flagged as a drop, so the view adds them as source files, not slides.
+ */
+function routePostBuilderDrop(d: FilesDropped, paths: string[]): void {
+  const ui = useUI.getState();
+  const fallback = () => {
+    const target = d.targetId ?? "";
+    if (target.startsWith(TOOL_DROP_PREFIX) && handToTool(target.slice(TOOL_DROP_PREFIX.length), paths)) return;
+    if (handToTool(ui.view, paths)) return;
+    ui.setDrop(d);
+  };
+  const plain = () => {
+    usePostDrop.getState().mark();
+    const target = d.targetId ?? "";
+    const handed =
+      (target.startsWith(TOOL_DROP_PREFIX) && handToTool(target.slice(TOOL_DROP_PREFIX.length), paths)) || handToTool(ui.view, paths);
+    if (handed) return;
+    usePostDrop.getState().unmark();
+    ui.setDrop(d);
+  };
+  FilesService.Stat(paths).then(
+    (infos) => {
+      if ((infos ?? []).some((i) => i.isDir)) {
+        usePostDrop.getState().mark();
+        useUI.getState().handOff({ moduleId: "post-builder", inputs: paths });
+      } else {
+        plain();
+      }
+    },
+    () => fallback(),
+  );
+}
+// --- end post folders ---
+
 /**
  * Handles `app:files-dropped` (SPEC §3.5). A drop on a tool's own drop zone,
  * or anywhere on the page of the tool being shown, goes straight to that tool
@@ -98,6 +139,12 @@ export function routeFilesDropped(d: FilesDropped): void {
   }
   // --- end pipelines ---
   const paths = d.paths ?? [];
+  // --- post folders ---
+  if (paths.length > 0 && (target === TOOL_DROP_PREFIX + "post-builder" || ui.view === "post-builder")) {
+    routePostBuilderDrop(d, paths);
+    return;
+  }
+  // --- end post folders ---
   // A drop on a tool's own drop zone, or anywhere on the page of the tool
   // being shown, goes to that tool when it takes at least one of the files.
   if (target.startsWith(TOOL_DROP_PREFIX) && handToTool(target.slice(TOOL_DROP_PREFIX.length), paths)) return;
