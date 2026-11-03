@@ -1,0 +1,144 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.panel {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--bg-raised);
+  border: 1px solid var(--pop-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+}
+
+.panel:focus {
+  outline: none;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: var(--text-lg-lh);
+  font-weight: 600;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-2);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  color: var(--fg);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.card:hover {
+  background: var(--bg-hover);
+}
+
+.card:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.cardOn {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.cardName {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.cardText {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--fg-muted);
+}
+
+.strip {
+  width: 100%;
+  height: 10px;
+  margin-top: var(--space-1);
+  background: var(--bg-inset);
+  border-radius: var(--r-sm);
+}
+
+.tick {
+  fill: var(--accent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.chips {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.chip {
+  padding: 2px var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.chipOn {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.readonly {
+  font-size: var(--text-md);
+  color: var(--fg-muted);
+  line-height: 28px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.summary {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
