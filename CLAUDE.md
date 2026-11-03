@@ -59,6 +59,7 @@ On the Windows dev box, Go lives in `%LOCALAPPDATA%\Programs\go1.27.3` and Node 
 wails3 task dev:sandbox     # wails3 dev with support/library dirs under .dev/ (preferred)
 TOOLBOX_VIEW=settings ...   # optional: open on a view (library, settings, or a module id)
 TOOLBOX_SHOW_POPUP=1 ...    # optional: open the clipboard popup 2 s after start (visual QA)
+TOOLBOX_DEVTOOLS_PORT=9222 ...  # sandbox only: WebView2 DevTools on 127.0.0.1 for automated UI checks (CDP)
 wails3 dev                  # dev against the real support dir and ~/Toolbox
 wails3 build                # production binary in bin/
 wails3 generate bindings -clean=true -ts -i   # regenerate frontend/bindings (architect only)
@@ -254,4 +255,5 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Go**: idiomatic, context-aware, wrapped errors, stdlib `testing` only (no testify), table tests, `t.TempDir()` for files. No goroutine leaks: everything stops on ctx cancel.
 - **TS**: strict + `noUncheckedIndexedAccess`; no `any` in `src/**` (enforced by `npm run check:any`). Import bindings only through `@/lib/api`. Zustand stores in `state/`; selectors must return stable references (use the provided hooks or `useMemo`, never build new arrays inside a selector).
 - **CSS**: CSS Modules (`*.module.css`) + tokens from `styles/tokens.css`. No component libraries, no CSS frameworks. Every colour comes from a token.
+- **Small windows**: every view must work at the 960 × 600 minimum. Workspace tools set `height: 100%` on their root so the shell's `<main>` never scrolls them (form tools may scroll as pages). Use `useMediaQuery(NARROW_QUERY | SHORT_QUERY)` from `lib/media.ts`, `useElementSize` for container-driven columns, and `collapsible` buttons inside a `container: toolbar-compact / inline-size` toolbar. Check with the survey scripts (`QA_W=960 QA_H=600`).
 - **Commits**: small and descriptive, one concern each. Never push.
