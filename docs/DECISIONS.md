@@ -279,3 +279,46 @@ Newest last. Format: date — decision — why.
   - empty enum strings mean the default.
 - 2026-11-03 — The WebCodecs decode spike moved from Wave 0 to Wave 2. ES3 builds both upload paths behind a runtime feature check, and Edit Lab measures and picks. — The design doesn't depend on the result: the preview reads 540p streams and exports aren't real-time.
 - 2026-11-03 — The Video Editor's undo history moved to `lib/history.ts` (re-exported from the old path); `viz/fixture.ts` `buildFixture` gained `sections`/`silences` options (old output unchanged); `Analysis.withText` shares the feature bytes.
+- 2026-11-03 — Wave 1 choices where the spec was silent (ES1–ES10):
+  - Markers are derived on the whole song, then clipped to the range (every N, first of bar and bar indices don't depend on the range). Ranged markers that overlap the range are clamped to it. In a marker signal `every` applies before `sections`. Drag-snapping a marker ignores the transport's snap toggle (Alt only).
+  - Clip drags snap whichever edge is nearer; Alt bypasses snapping. Duplicate is Mod+D (to the right), not Alt-drag. A drag is one undo step even if it pauses longer than 800 ms.
+  - Auto-fill: sections come from the section lane (renames apply). An empty cut lane falls back to downbeats, then beats, with a warning. An auto clip that overlaps the range is removed whole.
+  - Export:
+    - FFmpeg muxes into TempDir, then the file moves into the Library (cancel never leaves a half file).
+    - Clip audio uses one seeked input per clip.
+    - Slow-motion interp applies when the clip's slowest speed is below 1 and the range is ≤ 30 s.
+    - The progress card floats bottom-right.
+  - Edit sources:
+    - `setsar=1` after `scale`.
+    - CRF by short side (≤ 540 → 20).
+    - Interp reads a ≤ 1080 stream.
+    - Prepare results are trimmed to the 64 KB result cap, so the UI re-reads `Sources()` after a prepare job.
+  - The edit output skips the Visualizer's ACES tone map (it dimmed video by ~20 %); glow is a single-pass ring blur.
+  - Captions: TextStyleEditor was extracted from the Visualizer's LookTab (no behaviour change). The word list has its own rows (CueList is tied to CueRow).
+  - Mattes:
+    - every Rebuild gets a fresh matte ID;
+    - the select preview uses the preview-tier stream;
+    - recent `-try.png` previews survive Save for an hour;
+    - Split subject mutes the copy and turns off the lower clip's cut-out;
+    - SAM's tqdm output isn't forwarded as progress.
+  - The Inspector keeps the selected mask in its own small store, shared with the overlays.
+- 2026-11-03 — Integration fixes:
+  - New edits stay in Setup until a range is chosen (`setupOpen`), and Song → Change range opens it with Cancel.
+  - The document carries the padded range matte files really cover (the engine maps matte frames through `clip.matte.fromMs`).
+  - Markers' Delete is owned by the lanes.
+  - Add folder via `EditStudioService.ListFolder` (non-recursive, no dot files).
+  - Auto-fill reads the Sources panel's selection.
+- 2026-11-03 — Store migration 0007 rebuilds `projects` so `kind` accepts `'edit'`. — The CHECK constraint from 0006 rejected Edit Studio saves; found by the end-to-end run.
+- 2026-11-03 — Decode bench (Windows, RTX 3070, WebView2 Chromium 156):
+  - **Decode:** 540p decodes at 1,447 fps (1 stream) / 2,225 fps (4 streams) on the main thread, and 1080p at 884 / 762 fps. A random seek costs 6–18 ms at 540p and 13–39 ms at 1080p.
+  - **Upload:** direct `VideoFrame` upload is only 4–13 % faster than ImageBitmap.
+  - **Decoder stall:** it stalls when 16 decoded frames are held.
+  - **Choice:** **bitmap** upload is the default (§16.1 rule); direct stays available behind the runtime check.
+- 2026-11-03 — Edit Lab:
+  - **Determinism:** two renders with fresh engines and providers give identical pixel hashes at 5 times, and both upload paths give identical pixels.
+  - **Preview speed:** the preview path renders the lab project (video + matte + masks + captions) at 540 × 960 at ≈ 143 fps unthrottled, with 0 dropped frames in bitmap mode.
+- 2026-11-03 — End to end (real engine and webview, `integration/editstudio_e2e_test.go`):
+  - **E2E cuts:** 16 barcode segments + an EXIF-rotated photo, 32 s at 1080 × 1920 / 30, rendered in 17.2 s including the export transcodes. Every checked frame shows the planned clip and source frame (±1); the photo is upright; 960 frames. The audio is the click track (lag 5 ms, AAC priming).
+  - **E2E flash:** flash ← marker.beat on black. Every click from 500 ms on has a bright frame within ±1 frame; two exports decode to identical frames (6.1 s each).
+  - The click track's analysis found the drop at exactly 16,000 ms. The beat tracker's first beat is the second click (500 ms), so the sync check starts there.
+- 2026-11-03 — `integration/sandbox_engine_test.go` (`TOOLBOX_UPDATE_SANDBOX_ENGINE=1`) updates the dev sandbox's engine the way Settings → Update does, so lab runs don't stop at "needs an update".

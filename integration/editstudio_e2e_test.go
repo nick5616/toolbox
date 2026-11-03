@@ -105,7 +105,9 @@ func writeClickTrack(t *testing.T, path string) {
 	buf.WriteString("RIFF")
 	_ = binary.Write(&buf, binary.LittleEndian, uint32(36+len(data)))
 	buf.WriteString("WAVEfmt ")
-	_ = binary.Write(&buf, binary.LittleEndian, []any{uint32(16), uint16(1), uint16(1), uint32(sr), uint32(sr * 2), uint16(2), uint16(16)})
+	for _, v := range []any{uint32(16), uint16(1), uint16(1), uint32(sr), uint32(sr * 2), uint16(2), uint16(16)} {
+		_ = binary.Write(&buf, binary.LittleEndian, v)
+	}
 	buf.WriteString("data")
 	_ = binary.Write(&buf, binary.LittleEndian, uint32(len(data)))
 	buf.Write(data)
@@ -358,7 +360,8 @@ func TestEditE2EVerify(t *testing.T) {
 		bright := func(k int) bool { return k >= 0 && k < len(a) && a[k] > 128 }
 		for beat := 0; beat*e2eBeatMs < e2eSongMs-e2eBeatMs; beat++ {
 			ms := beat * e2eBeatMs
-			if ms == e2eSilentBeat {
+			// The beat tracker starts at the second click (it can't lock on at 0 ms); the silent beat has no click.
+			if ms == e2eSilentBeat || ms < e2eBeatMs {
 				continue
 			}
 			k := ms * e2eFPS / 1000
