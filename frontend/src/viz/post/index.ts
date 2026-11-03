@@ -9,6 +9,13 @@ import "./zoompulse";
 import "./glitch";
 import "./grade";
 // --- end PX1 ---
+// --- ES5 post passes ---
+import "./punch";
+import "./flash";
+import "./blurpulse";
+import "./exposure";
+import "./invert";
+// --- end ES5 ---
 
 export { postDef, postDefs, registerPost } from "./registry";
 export type { PostContext, PostDef, PostInstance } from "./registry";

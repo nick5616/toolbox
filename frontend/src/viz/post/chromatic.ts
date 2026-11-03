@@ -23,7 +23,7 @@ registerPost({
   kind: "pass",
   params: {
     amount: { kind: "number", label: "Amount (px)", min: 0, max: 24, default: 4 },
-    source: { kind: "enum", label: "Driven by", options: ["kick", "snare", "balance", "none"], default: "kick" },
+    source: { kind: "enum", label: "Driven by", options: ["kick", "snare", "balance", "none", "amount"], default: "kick" },
   },
   create(ctx) {
     return simplePass(ctx, SRC, (p, f, w, h) => {
@@ -36,6 +36,8 @@ registerPost({
         const bal = (f.signals.value("mix.balance", f.tMs, 30, 200) - 0.5) * 2;
         radial = chromaticPx(amount, 0.2, short);
         shift = chromaticPx(amount, Math.abs(bal), short) * Math.sign(bal) * 0.5;
+      } else if (src === "amount") {
+        radial = chromaticPx(amount, 1, short);
       } else if (src === "none") {
         radial = chromaticPx(amount, 1, short) * 0.5;
       } else {
