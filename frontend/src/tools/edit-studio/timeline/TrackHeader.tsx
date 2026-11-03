@@ -1,0 +1,76 @@
+/** A track's header column (Phase 9 SPEC §14.5): kind icon, name (double-click renames), mute, lock, menu. */
+import { useEffect, useRef, useState } from "react";
+import { Icon, IconButton, MenuButton, cx, type MenuItem } from "@/components";
+import type { NormalTrack } from "@/viz/edit/defaults";
+import styles from "./TracksPanel.module.css";
+
+export interface TrackHeaderProps {
+  track: NormalTrack;
+  index: number;
+  count: number;
+  selected: boolean;
+  onSelect(): void;
+  onRename(name: string): void;
+  onMute(muted: boolean): void;
+  onLock(locked: boolean): void;
+  onMove(dir: -1 | 1): void;
+  onKind(kind: "video" | "adjust"): void;
+  onRemove(): void;
+}
+
+export function TrackHeader(p: TrackHeaderProps) {
+  const { track } = p;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(track.name);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (editing) input.current?.select();
+  }, [editing]);
+
+  const done = (save: boolean) => {
+    setEditing(false);
+    if (save && draft.trim() && draft.trim() !== track.name) p.onRename(draft.trim());
+  };
+  const items = (): MenuItem[] => [
+    { id: "rename", label: "Rename", icon: "pencil", onSelect: () => (setDraft(track.name), setEditing(true)) },
+    { id: "up", label: "Move up", icon: "chevron-up", disabled: p.index >= p.count - 1, onSelect: () => p.onMove(1) },
+    { id: "down", label: "Move down", icon: "chevron-down", disabled: p.index <= 0, onSelect: () => p.onMove(-1) },
+    {
+      id: "kind",
+      label: track.kind === "video" ? "Make it an adjustment track" : "Make it a video track",
+      icon: "refresh-cw",
+      disabled: track.clips.length > 0,
+      onSelect: () => p.onKind(track.kind === "video" ? "adjust" : "video"),
+    },
+    { id: "remove", label: "Remove track", icon: "trash-2", disabled: p.count <= 1, onSelect: p.onRemove },
+  ];
+
+  return (
+    <div className={cx(styles.header, p.selected && styles.headerSelected)} onPointerDown={p.onSelect} data-track-header={track.id}>
+      <Icon name={track.kind === "video" ? "film" : "sliders-horizontal"} size={14} className={styles.headerIcon} />
+      {editing ? (
+        <input
+          ref={input}
+          className={styles.rename}
+          aria-label="Track name"
+          value={draft}
+          maxLength={40}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => done(true)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") done(true);
+            if (e.key === "Escape") done(false);
+          }}
+        />
+      ) : (
+        <span className={styles.trackName} onDoubleClick={() => (setDraft(track.name), setEditing(true))} title={track.name}>
+          {track.name}
+        </span>
+      )}
+      <IconButton size="sm" icon={track.muted ? "volume-x" : "volume-2"} label={track.muted ? "Unmute track" : "Mute track"} pressed={track.muted} onClick={() => p.onMute(!track.muted)} />
+      <IconButton size="sm" icon="lock" label={track.locked ? "Unlock track" : "Lock track"} pressed={track.locked} onClick={() => p.onLock(!track.locked)} />
+      <MenuButton label={`Actions for ${track.name}`} icon="ellipsis" variant="ghost" size="sm" items={items} />
+    </div>
+  );
+}

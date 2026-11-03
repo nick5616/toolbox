@@ -9,7 +9,7 @@ import type { NormalProject } from "@/viz/edit/defaults";
 import type { Marker } from "@/viz/edit/types";
 import { splitSubject } from "../matte/split";
 import { useEditStudio, type Selection } from "../store";
-import { deleteClips, duplicateClips, laneMarkersMs, sliceAtMarkers, splitAt, type SourceFacts } from "./ops";
+import { deleteClips, duplicateClips, insertClipAt, laneMarkersMs, sliceAtMarkers, splitAt, type InsertMode, type SourceFacts } from "./ops";
 
 export function currentDoc(): NormalProject | null {
   return useEditStudio.getState().history?.present ?? null;
@@ -101,6 +101,58 @@ export function duplicateSelection(): boolean {
   const sel = useEditStudio.getState().selection;
   if (!doc || sel?.kind !== "clips") return false;
   return commit(duplicateClips(doc, sel.ids));
+}
+
+/**
+ * Puts source files on a video track one after the other from atMs (photos
+ * and videos only; each lands after the previous). Selects what it added.
+ * Returns the number of clips added.
+ */
+export function insertSources(paths: readonly string[], trackId: string, atMs: number, mode: InsertMode, markers: readonly Marker[]): number {
+  const doc = currentDoc();
+  if (!doc) return 0;
+  const st = useEditStudio.getState();
+  const markersMs = laneMarkersMs(markers, st.activeLane);
+  let next = doc;
+  let at = atMs;
+  const added: string[] = [];
+  for (const path of paths) {
+    const info = st.sources[path]?.info;
+    const kind = info?.kind === "image" ? "image" : info?.kind === "video" ? "video" : null;
+    if (!kind) continue;
+    const ins = insertClipAt(next, trackId, { kind, path, durationMs: info?.durationMs ?? 0 }, at, mode, { markersMs });
+    if (!ins) break;
+    next = ins.project;
+    added.push(ins.clip.id);
+    at = ins.clip.endMs;
+  }
+  if (!added.length) {
+    toast({ title: "No room there", description: "Pick a gap on an unlocked video track, inside the edit.", tone: "warn" });
+    return 0;
+  }
+  commit(next);
+  st.select({ kind: "clips", ids: added });
+  return added.length;
+}
+
+/** The track a double-click inserts into: the selected video track, else the first unlocked one. */
+export function insertionTrack(doc: NormalProject, sel: Selection): string | null {
+  const picked = sel?.kind === "track" ? doc.tracks.find((t) => t.id === sel.id) : undefined;
+  const t = picked && picked.kind === "video" && !picked.locked ? picked : doc.tracks.find((x) => x.kind === "video" && !x.locked);
+  return t?.id ?? null;
+}
+
+/** Inserts sources at the playhead (double-click in the Sources panel). */
+export function insertAtPlayhead(paths: readonly string[], markers: readonly Marker[]): number {
+  const doc = currentDoc();
+  if (!doc) return 0;
+  const st = useEditStudio.getState();
+  const track = insertionTrack(doc, st.selection);
+  if (!track) {
+    toast({ title: "No unlocked video track", tone: "warn" });
+    return 0;
+  }
+  return insertSources(paths, track, st.playheadMs, "source", markers);
 }
 
 /** Split subject for the selected clip (a WP-ES7 operation on a clip with a ready matte). */
