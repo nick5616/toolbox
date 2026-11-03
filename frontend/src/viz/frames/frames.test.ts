@@ -457,3 +457,17 @@ describe("EditFrameProvider", () => {
     expect(r.bitmaps.every((b) => b.closed === 1)).toBe(true);
   });
 });
+
+describe("upload mode", () => {
+  it("falls back to bitmap when direct upload can't be probed, and stays there", async () => {
+    const up = await import("./upload");
+    expect(up.getUploadMode()).toBe(up.DEFAULT_UPLOAD_MODE);
+    expect(up.initUploadMode({} as WebGL2RenderingContext)).toBe("bitmap"); // jsdom has no VideoFrame
+    expect(up.uploadReason()).toMatch(/probe/);
+    expect(up.initUploadMode({} as WebGL2RenderingContext)).toBe("bitmap"); // probed once
+    resetUploadMode();
+    setUploadMode("direct");
+    up.fallBackToBitmap("texImage2D(VideoFrame) failed");
+    expect(up.getUploadMode()).toBe("bitmap");
+  });
+});
