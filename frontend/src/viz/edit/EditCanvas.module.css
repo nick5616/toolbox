@@ -27,3 +27,19 @@
   font-size: var(--text-sm);
   line-height: var(--text-sm-lh);
 }
+
+.banner {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  text-align: center;
+  pointer-events: none;
+}
