@@ -50,6 +50,8 @@ export interface EditStudioState {
   scrollMs: number; // left edge of the timeline view
   rightPanel: "inspector" | "captions";
   safeZones: boolean;
+  /** Setup (analysis + range) is shown instead of the timeline. New edits without clips start there. */
+  setupOpen: boolean;
   /** The open dialog (any package may ask; the view shows it). */
   dialog: { kind: "autofill"; range: { fromMs: number; toMs: number } | null } | { kind: "export" } | null;
 
@@ -78,6 +80,7 @@ export interface EditStudioState {
   setRightPanel(p: "inspector" | "captions"): void;
   setSafeZones(on: boolean): void;
   openDialog(d: EditStudioState["dialog"]): void;
+  setSetupOpen(open: boolean): void;
   setSaveState(s: SaveState, error?: string | null): void;
   setAnalysis(ref: AnalysisRef | null, a: Analysis | null, state: AnalysisState): void;
   setSources(states: EditSourceState[]): void;
@@ -104,6 +107,7 @@ const initial = {
   scrollMs: 0,
   rightPanel: "inspector" as const,
   safeZones: false,
+  setupOpen: false,
   dialog: null,
   analysisRef: null,
   analysis: null,
@@ -125,7 +129,7 @@ const without = <T>(r: Record<string, T>, k: string): Record<string, T> => {
 export const useEditStudio = create<EditStudioState>((set, get) => ({
   ...initial,
 
-  open: (id, name, doc) => set({ ...initial, urls: get().urls, projectId: id, name, history: newHistory(normalizeProject(doc)), saveState: "saved" }),
+  open: (id, name, doc) => set({ ...initial, urls: get().urls, projectId: id, name, history: newHistory(normalizeProject(doc)), saveState: "saved", setupOpen: normalizeProject(doc).tracks.every((t) => t.clips.length === 0) }),
   close: () => set({ ...initial, urls: get().urls }),
   setName: (name) => set({ name }),
   edit: (next, key = "") => {
@@ -152,6 +156,7 @@ export const useEditStudio = create<EditStudioState>((set, get) => ({
   setRightPanel: (rightPanel) => set({ rightPanel }),
   setSafeZones: (safeZones) => set({ safeZones }),
   openDialog: (dialog) => set({ dialog }),
+  setSetupOpen: (setupOpen) => set({ setupOpen }),
   setSaveState: (saveState, saveError = null) => set({ saveState, saveError }),
   setAnalysis: (analysisRef, analysis, analysisState) => set({ analysisRef, analysis, analysisState }),
   setSources: (states) => {

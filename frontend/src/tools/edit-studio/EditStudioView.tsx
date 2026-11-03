@@ -89,6 +89,7 @@ function Editor({ moduleId }: { moduleId: string }) {
   const canUndo = useEditStudio((s) => (s.history?.past.length ?? 0) > 0);
   const canRedo = useEditStudio((s) => (s.history?.future.length ?? 0) > 0);
   const analysisState = useEditStudio((s) => s.analysisState);
+  const setupOpen = useEditStudio((s) => s.setupOpen);
   const rightPanel = useEditStudio((s) => s.rightPanel);
   const playheadMs = useEditStudio((s) => s.playheadMs);
   const playing = useEditStudio((s) => s.playing);
@@ -118,7 +119,7 @@ function Editor({ moduleId }: { moduleId: string }) {
   }, [projectId]);
 
   if (!project) return null;
-  const setup = !project.song || analysisState !== "ready";
+  const setup = !project.song || analysisState !== "ready" || setupOpen;
   const size = previewSize(project.aspect);
   const close = async () => {
     await flushEdit();

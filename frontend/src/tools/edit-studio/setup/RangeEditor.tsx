@@ -42,6 +42,16 @@ export function RangeEditor({ onDone }: RangeEditorProps) {
       <div className={styles.row}>
         {hasClips && moves && <Switch label="Keep clips on the music" checked={keep} onChange={setKeep} />}
         <span className={styles.spacer} />
+        {hasClips && onDone && (
+          <Button
+            onClick={() => {
+              setDraft(null);
+              onDone();
+            }}
+          >
+            Cancel
+          </Button>
+        )}
         <Button variant="primary" onClick={apply}>
           Use this range
         </Button>

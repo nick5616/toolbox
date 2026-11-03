@@ -52,7 +52,7 @@ export const useMaskSelection = create<MaskSel>((set) => ({
   select: (clipId, maskId) => set({ clipId, maskId }),
 }));
 
-/** Where Song's "Change range…" goes. WP-ES1's range picker lives in Setup; until it is wired the Song inspector is simply shown. */
+/** Song's "Change range…": shows Setup's range picker in place of the timeline. */
 export function openRangePicker(): void {
-  useEditStudio.getState().select({ kind: "song" });
+  useEditStudio.getState().setSetupOpen(true);
 }

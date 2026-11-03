@@ -43,7 +43,7 @@ export function SetupPanel() {
           Analyze the song again to continue. Your clips and markers are kept.
         </Banner>
       )}
-      {state === "ready" ? <RangeEditor /> : state === "loading" ? null : <AnalysisPanel />}
+      {state === "ready" ? <RangeEditor onDone={() => useEditStudio.getState().setSetupOpen(false)} /> : state === "loading" ? null : <AnalysisPanel />}
     </div>
   );
 }
