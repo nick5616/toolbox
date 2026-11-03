@@ -1,0 +1,72 @@
+.layer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 168px;
+  right: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid color-mix(in srgb, var(--lane-section) 70%, transparent);
+  background: color-mix(in srgb, var(--lane-section) 10%, transparent);
+  pointer-events: none;
+}
+
+.band[data-alt="true"] {
+  background: color-mix(in srgb, var(--lane-section) 18%, transparent);
+}
+
+.band[data-selected="true"] {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-left-color: var(--accent);
+}
+
+.chip {
+  position: absolute;
+  top: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 6px);
+  height: 16px;
+  padding: 0 2px 0 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.chipLabel {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.chipLabel:focus-visible {
+  outline: 2px solid var(--focus-ring);
+}
+
+.rename {
+  width: 110px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+}
