@@ -41,6 +41,8 @@ dev_mode:
       - node_modules
       - frontend
       - bin
+      - .claude # builder worktrees
+      - .dev # sandbox data and QA files
     file:
       - .DS_Store
       - .gitignore
