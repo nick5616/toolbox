@@ -349,6 +349,11 @@ export class EditFrameProvider implements FrameProvider {
     return true;
   }
 
+  /** True when a key names a photo or image matte rather than a stream. */
+  isImageKey(k: string): boolean {
+    return k in this.files.images && !(k in this.files.streams);
+  }
+
   /** True when every key is resident (exactly), for the preview's "waiting" count. */
   isReady(keys: readonly FrameKey[]): boolean {
     for (const k of keys) {

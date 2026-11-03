@@ -1,17 +1,71 @@
 /**
  * Edit Studio export renders inside the export worker (Phase 9 SPEC §12.2).
- * WP-ES3 implements it with encodeFrames (../worker/loop.ts): load the
- * analysis and project, deriveMarkers, compileEdit, an exact FrameProvider on
- * the export URLs, then per frame i: t = i·1000/fps, await prepare(needs(t)),
- * render(t).
+ *
+ * Loads the analysis and the project, derives the markers, compiles the edit,
+ * builds an exact FrameProvider on the export URLs, then per frame i:
+ * t = i·1000/fps, await prepare(needs(t)), render(t), encode. The same
+ * EditEngine as the preview draws the frame, so the export matches it.
  */
+import { loadAnalysis } from "../analysis";
+import { EditFrameProvider } from "../frames/provider";
+import { GLUnavailableError } from "../gl/core";
 import type { PlanForWorker } from "../types";
-import type { LoopIO } from "../worker/loop";
+import { encodeFrames, type LoopIO } from "../worker/loop";
 import { RenderError } from "../worker/transport";
+import { compileEdit } from "./compile";
+import { normalizeProject } from "./defaults";
+import { EditEngine } from "./engine";
+import { deriveMarkers } from "./markers";
+import type { EditProject } from "./types";
+
+function parseProject(json: string): EditProject {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch (e) {
+    throw new RenderError("The edit couldn't be read", String(e));
+  }
+  if (typeof raw !== "object" || raw === null || !Array.isArray((raw as { tracks?: unknown }).tracks)) throw new RenderError("The edit couldn't be read", "no tracks");
+  return normalizeProject(raw as EditProject);
+}
 
 export async function runEdit(plan: PlanForWorker, forceJpeg: boolean, io: LoopIO): Promise<void> {
-  void plan;
-  void forceJpeg;
-  void io;
-  throw new RenderError("Edit Studio exports aren't built yet");
+  const edit = plan.edit;
+  if (!edit) throw new RenderError("The edit couldn't be read", "the render plan has no edit");
+  const project = parseProject(edit.projectJson);
+  if (!project.song) throw new RenderError("This edit has no song");
+  const analysis = await loadAnalysis({ audioJsonUrl: plan.analysis.audioJsonUrl, featuresUrl: plan.analysis.featuresUrl, textJsonUrl: plan.analysis.textJsonUrl || undefined });
+  if (io.flow.cancelled) return void io.post({ type: "cancelled" });
+
+  const markers = deriveMarkers(analysis, project.markers, { startMs: project.song.startMs, endMs: project.song.endMs });
+  const provider = new EditFrameProvider({ files: { streams: edit.streams, images: edit.images }, mode: "export" });
+  let engine: EditEngine | null = null;
+  try {
+    // Stream lengths first, so clips hold their last frame exactly.
+    const streamFrames = await provider.loadIndexes(Object.keys(edit.streams));
+    const compiled = compileEdit({ project, analysis, markers, files: { streams: edit.streams, images: edit.images } }, { width: plan.width, height: plan.height, fps: plan.fps, streamFrames });
+    const canvas = new OffscreenCanvas(plan.width, plan.height);
+    try {
+      engine = new EditEngine(canvas, { width: plan.width, height: plan.height, fps: plan.fps, seed: project.seed, quality: "full", inWorker: true });
+    } catch (e) {
+      if (e instanceof GLUnavailableError) throw new RenderError(e.message, e.gpu);
+      throw e;
+    }
+    engine.setEdit(compiled);
+    const eng = engine;
+    if (io.flow.cancelled) return void io.post({ type: "cancelled" });
+    await encodeFrames(
+      canvas,
+      { fps: plan.fps, frames: Math.max(1, Math.round(((compiled.durationMs) / 1000) * plan.fps)), overlay: false, forceJpeg },
+      async (i) => {
+        const t = (i * 1000) / plan.fps;
+        await provider.prepare(eng.needs(t), true);
+        eng.render(t, provider);
+      },
+      io,
+    );
+  } finally {
+    engine?.dispose();
+    provider.dispose();
+  }
 }
