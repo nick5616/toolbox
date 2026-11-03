@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as R
 import { Button, ConfirmDialog, DropZone, TextField, cx } from "@/components";
 import { useJobs } from "@/state/jobs";
 import type { NormalProject } from "@/viz/edit/defaults";
+import { SongReplaceDialog } from "../home/SongReplaceDialog";
 import { useEditStudio, useMarkers, useProject } from "../store";
 import { commit, insertAtPlayhead } from "../timeline/actions";
 import { addSourcePaths, pickAndAddSources, prepare, relinkSource, watchPrepareJobs } from "./actions";
@@ -19,7 +20,12 @@ import styles from "./SourcesPanel.module.css";
 export function SourcesPanel() {
   const project = useProject();
   if (!project) return null;
-  return <Sources project={project} />;
+  return (
+    <>
+      <Sources project={project} />
+      <SongReplaceDialog />
+    </>
+  );
 }
 
 function Sources({ project }: { project: NormalProject }) {

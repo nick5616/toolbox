@@ -12,11 +12,11 @@ import { toAppError } from "@/lib/errors";
 import { editLength, MARKER_LANES, type MarkerLane } from "@/viz/edit/types";
 import { HEADER_PX } from "../geometry";
 import { useEditStudio, useProject } from "../store";
-import { fitPps, keepsRange, songVolume, visibleLanes } from "./logic";
+import { fitPps, keepsRange, SONG_EXTENSIONS, songVolume, visibleLanes } from "./logic";
 import { registerPlayer, type PlayerController } from "./player";
 import styles from "./Transport.module.css";
 
-export const SONG_EXTENSIONS = [".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac", ".opus", ".wma", ".aiff", ".aif", ".mp4", ".mov", ".mkv", ".webm", ".m4v"];
+
 
 export function Transport() {
   const project = useProject();
