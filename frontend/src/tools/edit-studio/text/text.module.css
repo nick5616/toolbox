@@ -1,0 +1,29 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.label {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.hint {
+  margin: 0;
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+}
+
+.counter {
+  align-self: flex-end;
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+}
+
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
