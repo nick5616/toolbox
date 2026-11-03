@@ -8,9 +8,11 @@
 }
 
 .toolbar {
+  container: toolbar-compact / inline-size;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--line);
@@ -18,7 +20,8 @@
 }
 
 .name {
-  width: 180px;
+  flex: 0 1 180px;
+  min-width: 96px;
 }
 
 .sep {
@@ -48,7 +51,7 @@
 
 .side {
   flex: none;
-  width: 320px;
+  width: clamp(260px, 30%, 320px);
   display: flex;
   flex-direction: column;
   min-height: 0;

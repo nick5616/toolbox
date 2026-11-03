@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useElementSize } from "@/lib/useElementSize";
 import { Button, ConfirmDialog, DropZone, EmptyState, Meter, Spinner, Tooltip, toast, type MenuItem } from "@/components";
 import {
   ComposerService,
@@ -38,6 +39,7 @@ import {
   roomLeft,
   sanitizeState,
   SOURCES_DEFAULT,
+  bodyLayout,
   slidesFromSources,
   type PostBuilderState,
   type PostDoc,
@@ -84,6 +86,10 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
   const [pstate, setPstate] = useState<PostBuilderState>({ lastPostId: "", exports: {} });
   const [selectedId, setSelectedId] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [bodyEl, setBodyEl] = useState<HTMLDivElement | null>(null);
+  const [sourcesForced, setSourcesForced] = useState(false);
+  const bodyWidth = useElementSize(bodyEl).width;
+  const layout = bodyLayout(bodyWidth, { width: pstate.sourcesWidth ?? SOURCES_DEFAULT, collapsed: !!pstate.sourcesCollapsed, forcedOpen: sourcesForced });
   const [newFiles, setNewFiles] = useState<string[]>([]);
   const [jobId, setJobId] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -644,7 +650,7 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
         </div>
       ) : (
         <>
-          <div className={styles.body} style={{ gridTemplateColumns: `${pstate.sourcesCollapsed ? 32 : (pstate.sourcesWidth ?? SOURCES_DEFAULT)}px 170px minmax(0, 1fr) 340px` }}>
+          <div ref={setBodyEl} className={styles.body} style={{ gridTemplateColumns: `${layout.sources}px ${layout.strip}px minmax(0, 1fr) ${layout.right}px` }}>
             <SourcesPanel
               postId={postId}
               doc={doc}
@@ -652,9 +658,9 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
               saved={editor.saveState === "saved"}
               selectedSlide={selected}
               width={pstate.sourcesWidth ?? SOURCES_DEFAULT}
-              collapsed={!!pstate.sourcesCollapsed}
+              collapsed={layout.sourcesCollapsed}
               onWidth={(w) => persist({ ...pstateRef.current, sourcesWidth: w })}
-              onCollapsed={(c) => persist({ ...pstateRef.current, sourcesCollapsed: c })}
+              onCollapsed={(c) => (layout.autoCollapsed ? setSourcesForced(!c) : persist({ ...pstateRef.current, sourcesCollapsed: c }))}
               update={update}
               onAddSlides={(paths) => void addPaths(paths)}
               onBuild={(inputs, build) => void buildSlide(inputs, build)}

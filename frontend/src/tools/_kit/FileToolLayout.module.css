@@ -43,10 +43,19 @@
   font-size: var(--text-sm);
 }
 
+/* The run button stays in view while the options scroll (it sits in the flow when everything fits). */
 .run {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-3));
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
+  backdrop-filter: blur(6px);
 }
 
 .reason {
@@ -58,4 +67,11 @@
 .jobs {
   display: flex;
   flex-direction: column;
+}
+
+@media (max-height: 759px) {
+  .root {
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+  }
 }

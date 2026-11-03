@@ -298,7 +298,9 @@ export default function ChatView({ moduleId }: ToolViewProps) {
             </div>
           </div>
         )}
-        <DepsGate moduleId={moduleId} />
+        <div className={styles.gate}>
+          <DepsGate moduleId={moduleId} />
+        </div>
         {status.state === ChatServerState.ChatError && (
           <Banner tone="danger" title="The chat engine had a problem">
             {status.error}

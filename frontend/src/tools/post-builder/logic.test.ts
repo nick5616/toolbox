@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PostIssue, PostSlideSource } from "@/lib/api";
 import {
   DEFAULT_LIMITS,
+  bodyLayout,
   aspectFor,
   blankSlide,
   captionStats,
@@ -124,5 +125,21 @@ describe("saved state", () => {
   it("sanitises", () => {
     expect(sanitizeState({ lastPostId: "p", exports: { p: "/out", q: 3 } })).toEqual({ lastPostId: "p", exports: { p: "/out" } });
     expect(sanitizeState("junk")).toEqual({ lastPostId: "", exports: {} });
+  });
+});
+
+describe("bodyLayout", () => {
+  const src = { width: 280, collapsed: false, forcedOpen: false };
+  it("keeps the full layout when there's room (or before measuring)", () => {
+    expect(bodyLayout(0, src)).toMatchObject({ sources: 280, strip: 170, right: 340, autoCollapsed: false });
+    expect(bodyLayout(1400, src)).toMatchObject({ sources: 280, strip: 170, right: 340 });
+  });
+  it("narrows the side columns, then makes Sources a rail on small windows", () => {
+    expect(bodyLayout(1100, src)).toMatchObject({ sources: 280, strip: 140, right: 280, sourcesCollapsed: false });
+    expect(bodyLayout(860, src)).toMatchObject({ sources: 32, strip: 140, right: 280, sourcesCollapsed: true, autoCollapsed: true });
+  });
+  it("lets the user open Sources anyway, and keeps a chosen rail", () => {
+    expect(bodyLayout(860, { ...src, forcedOpen: true })).toMatchObject({ sources: 280, sourcesCollapsed: false, autoCollapsed: true });
+    expect(bodyLayout(860, { ...src, collapsed: true })).toMatchObject({ sources: 32, sourcesCollapsed: true, autoCollapsed: false });
   });
 });

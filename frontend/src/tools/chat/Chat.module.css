@@ -1,6 +1,6 @@
 .root {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: clamp(190px, 22vw, 240px) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
 }
@@ -306,4 +306,13 @@
   right: var(--space-2);
   top: 7px;
   color: var(--fg-muted);
+}
+
+.gate {
+  flex: none;
+  padding: 0 var(--space-4);
+}
+
+.gate:empty {
+  display: none;
 }

@@ -17,17 +17,25 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: string;
   /** Shortcut hint, e.g. "Mod+Enter", rendered with Kbd. */
   kbd?: string;
+  /**
+   * Inside a compact toolbar (an ancestor with `container: toolbar-compact / inline-size`)
+   * the label hides below 820 px and only
+   * the icon shows; the label becomes the tooltip and accessible name.
+   */
+  collapsible?: boolean;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "secondary", size = "md", loading = false, icon, kbd, className, children, disabled, type = "button", ...rest },
+  { variant = "secondary", size = "md", loading = false, icon, kbd, collapsible = false, className, children, disabled, type = "button", ...rest },
   ref,
 ) {
   return (
     <button
       ref={ref}
       type={type}
-      className={cx(styles.button, styles[variant], styles[size], loading && styles.loading, className)}
+      className={cx(styles.button, styles[variant], styles[size], loading && styles.loading, collapsible && icon && styles.collapsible, className)}
+      title={collapsible && typeof children === "string" && rest.title === undefined ? children : rest.title}
+      aria-label={collapsible && typeof children === "string" && rest["aria-label"] === undefined ? children : rest["aria-label"]}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       {...rest}

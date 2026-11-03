@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { FilesDropped, TimedLine } from "@/lib/api";
+import { matchesNow, NARROW_QUERY, useMediaQuery } from "@/lib/media";
 
 /** View ids: "library", "settings", "setup" (the setup overlay), or a module id. */
 export type ViewId = string;
@@ -69,6 +70,10 @@ interface UIState {
 
   navigate: (view: ViewId) => void;
   setSidebarCollapsed: (v: boolean) => void;
+  /** On a narrow window the sidebar is a rail unless opened for the session. */
+  sidebarNarrowOpen: boolean;
+  /** Collapses or expands the sidebar: the saved preference on wide windows, the session override on narrow ones. */
+  toggleSidebar: () => void;
   setComingSoonOpen: (v: boolean) => void;
   setTrayOpen: (v: boolean) => void;
   setTrayHeight: (px: number) => void;
@@ -115,6 +120,8 @@ export const useUI = create<UIState>((set, get) => ({
   navigate: (view) =>
     set((s) => (view === "setup" && s.view !== "setup" ? { view, returnView: s.view } : { view })),
   setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+  sidebarNarrowOpen: false,
+  toggleSidebar: () => set((s) => (matchesNow(NARROW_QUERY) ? { sidebarNarrowOpen: !s.sidebarNarrowOpen } : { sidebarCollapsed: !s.sidebarCollapsed })),
   setComingSoonOpen: (comingSoonOpen) => set({ comingSoonOpen }),
   setTrayOpen: (trayOpen) => set({ trayOpen }),
   setTrayHeight: (trayHeight) => set({ trayHeight }),
@@ -147,3 +154,11 @@ useUI.subscribe((s) => {
 
 // Dev builds only: a handle for automated UI checks (.dev QA scripts).
 if (import.meta.env.DEV && typeof window !== "undefined") (window as unknown as { __ui?: typeof useUI }).__ui = useUI;
+
+/** Whether the sidebar shows as an icon rail (saved preference, or a narrow window). */
+export function useSidebarCollapsed(): boolean {
+  const pref = useUI((s) => s.sidebarCollapsed);
+  const narrowOpen = useUI((s) => s.sidebarNarrowOpen);
+  const narrow = useMediaQuery(NARROW_QUERY);
+  return narrow ? !narrowOpen : pref;
+}

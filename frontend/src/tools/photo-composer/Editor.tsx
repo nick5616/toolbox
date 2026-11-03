@@ -607,16 +607,17 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
           onChange={(e) => setName(e.target.value)}
         />
         <span className={styles.sep} />
-        <Button size="sm" variant="secondary" icon="image" onClick={() => void pickPhotos()}>
+        <Button size="sm" variant="secondary" collapsible icon="image" onClick={() => void pickPhotos()}>
           Add photo
         </Button>
-        <Button size="sm" variant="secondary" icon="type" onClick={addText}>
+        <Button size="sm" variant="secondary" collapsible icon="type" onClick={addText}>
           Add text
         </Button>
         <MenuButton
           size="sm"
           label="Layouts"
           icon="grid-3x3"
+          collapsible
           items={() => [
             ...LAYOUTS.map((l) => ({ id: l.id, label: `${l.label} - ${l.hint}`, onSelect: () => doLayout(l.id) })),
             { id: "shuffle", label: "Shuffle (same layout, new arrangement)", icon: "refresh-cw", onSelect: () => doLayout(layoutKind.current) },
@@ -626,6 +627,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
           size="sm"
           variant="secondary"
           icon="wand-sparkles"
+          collapsible
           disabled={!canRemove}
           loading={anyBusy && !canRemove}
           onClick={() => void removeBackgrounds(removable)}
@@ -642,7 +644,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
         </span>
         {exporting && <Spinner size={14} label="Exporting" />}
         {postSlide && (
-          <Button size="sm" variant="secondary" icon="arrow-left" onClick={() => void backToPost()}>
+          <Button size="sm" variant="secondary" icon="arrow-left" collapsible onClick={() => void backToPost()}>
             Back to post
           </Button>
         )}
@@ -650,6 +652,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
           size="sm"
           label="Export"
           icon="download"
+          collapsible
           items={() => [
             { id: "jpg", label: "Export as JPG", onSelect: () => void exportAs("jpg") },
             { id: "png", label: "Export as PNG", onSelect: () => void exportAs("png") },

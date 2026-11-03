@@ -4,7 +4,7 @@ import { isMac } from "@/lib/platform";
 import { Badge, Icon, IconButton, Tooltip, cx } from "@/components";
 import { useDeps } from "@/state/deps";
 import { useJobs, isActive } from "@/state/jobs";
-import { useUI } from "@/state/ui";
+import { useSidebarCollapsed, useUI } from "@/state/ui";
 // --- pipelines ---
 import { isRunActive, useNeedsYou, usePipelines } from "@/state/pipelines";
 // --- end pipelines ---
@@ -55,10 +55,10 @@ function SidebarItem({ item, collapsed, active, dot, running, badge, onClick }: 
 
 export function Sidebar() {
   const view = useUI((s) => s.view);
-  const collapsed = useUI((s) => s.sidebarCollapsed);
+  const collapsed = useSidebarCollapsed();
   const comingSoonOpen = useUI((s) => s.comingSoonOpen);
   const navigate = useUI((s) => s.navigate);
-  const setCollapsed = useUI((s) => s.setSidebarCollapsed);
+  const toggleSidebar = useUI((s) => s.toggleSidebar);
   const setSoonOpen = useUI((s) => s.setComingSoonOpen);
   const { tools, soon } = useNavGroups();
   const deps = useDeps((s) => s.list);
@@ -111,7 +111,7 @@ export function Sidebar() {
           kbd="Mod+Backslash"
           tooltipSide="right"
           className={styles.noDrag}
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={toggleSidebar}
         />
       </div>
       <div className={styles.scroll}>

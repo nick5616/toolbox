@@ -23,13 +23,15 @@ export interface MenuButtonProps {
   emptyLabel?: string;
   size?: "sm" | "md";
   variant?: "ghost" | "secondary";
+  /** In a compact toolbar, shows only the icon below 820 px (see Button's `collapsible`). */
+  collapsible?: boolean;
 }
 
 /**
  * A button that opens a popover menu. With `icon` and the ghost variant it
  * renders icon-only (label becomes the aria-label); otherwise a labelled button.
  */
-export function MenuButton({ label, icon, items, emptyLabel = "Nothing available", size = "md", variant = "secondary" }: MenuButtonProps) {
+export function MenuButton({ label, icon, items, emptyLabel = "Nothing available", size = "md", variant = "secondary", collapsible = false }: MenuButtonProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [list, setList] = useState<MenuItem[]>([]);
@@ -139,7 +141,7 @@ export function MenuButton({ label, icon, items, emptyLabel = "Nothing available
       {icon && variant === "ghost" ? (
         <IconButton ref={triggerRef} icon={icon} label={label} size={size} variant="ghost" {...triggerProps} />
       ) : (
-        <Button ref={triggerRef} variant={variant} size={size} icon={icon} {...triggerProps}>
+        <Button ref={triggerRef} variant={variant} size={size} icon={icon} collapsible={collapsible} {...triggerProps}>
           {label}
         </Button>
       )}

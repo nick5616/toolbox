@@ -17,7 +17,7 @@ export function useShellShortcuts(): void {
   });
   useShortcut("Mod+,", () => useUI.getState().navigate("settings"));
   useShortcut("Mod+J", () => useUI.getState().setTrayOpen(!useUI.getState().trayOpen));
-  useShortcut("Mod+Backslash", () => useUI.getState().setSidebarCollapsed(!useUI.getState().sidebarCollapsed));
+  useShortcut("Mod+Backslash", () => useUI.getState().toggleSidebar());
 
   // Esc closes the topmost overlay. The palette closes itself; `paletteOpen`
   // is the render-time value, so this never double-closes in the same event.

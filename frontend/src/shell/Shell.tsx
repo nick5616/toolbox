@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { isMac } from "@/lib/platform";
 import { Button, ErrorBoundary, Gallery, Kbd, Toaster, cx } from "@/components";
 import { useModules } from "@/state/modules";
-import { useUI } from "@/state/ui";
+import { useSidebarCollapsed, useUI } from "@/state/ui";
 import { toolViews } from "@/tools";
 import { ComingSoonView } from "@/views/ComingSoonView";
 import { LibraryView } from "@/views/LibraryView";
@@ -44,7 +44,7 @@ function ViewRouter({ view }: { view: string }) {
 export function Shell() {
   const view = useUI((s) => s.view);
   const returnView = useUI((s) => s.returnView);
-  const collapsed = useUI((s) => s.sidebarCollapsed);
+  const collapsed = useSidebarCollapsed();
   const setPaletteOpen = useUI((s) => s.setPaletteOpen);
   const byId = useModules((s) => s.byId);
 

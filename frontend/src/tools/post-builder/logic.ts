@@ -234,3 +234,28 @@ export function sanitizeState(saved: unknown): PostBuilderState {
   }
   return out;
 }
+
+export interface BodyLayout {
+  sources: number;
+  strip: number;
+  right: number;
+  sourcesCollapsed: boolean;
+  /** The Sources panel is a rail only because the window is narrow (the user's choice isn't changed). */
+  autoCollapsed: boolean;
+}
+
+/** Below this the slide stage is too small to work in: narrower columns, then a Sources rail. */
+const STAGE_MIN = 300;
+const GAPS = 3 * 16;
+
+/** Column widths of the editor body for its width (0 = not measured yet: the full layout). */
+export function bodyLayout(width: number, sources: { width: number; collapsed: boolean; forcedOpen: boolean }): BodyLayout {
+  const wide = { strip: 170, right: 340 };
+  const narrow = { strip: 140, right: 280 };
+  const stage = (src: number, c: { strip: number; right: number }) => width - GAPS - src - c.strip - c.right;
+  const open = sources.collapsed ? 32 : sources.width;
+  if (width <= 0 || stage(open, wide) >= STAGE_MIN) return { sources: open, ...wide, sourcesCollapsed: sources.collapsed, autoCollapsed: false };
+  if (stage(open, narrow) >= STAGE_MIN || sources.collapsed) return { sources: open, ...narrow, sourcesCollapsed: sources.collapsed, autoCollapsed: false };
+  if (sources.forcedOpen) return { sources: open, ...narrow, sourcesCollapsed: false, autoCollapsed: true };
+  return { sources: 32, ...narrow, sourcesCollapsed: true, autoCollapsed: true };
+}

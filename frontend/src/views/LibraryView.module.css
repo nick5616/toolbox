@@ -29,7 +29,7 @@
 }
 
 .search {
-  width: 240px;
+  width: clamp(140px, 24vw, 240px);
 }
 
 .filter {
@@ -47,7 +47,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto 140px 72px 72px auto;
+  grid-template-columns: 20px minmax(0, 1fr) minmax(72px, 160px) 76px 72px auto;
   align-items: center;
   column-gap: var(--space-3);
   height: var(--row-h);

@@ -74,7 +74,7 @@ export function useBuiltinCommands(): void {
       section: "Actions",
       icon: "panel-left",
       shortcut: "Mod+Backslash",
-      run: () => useUI.getState().setSidebarCollapsed(!useUI.getState().sidebarCollapsed),
+      run: () => useUI.getState().toggleSidebar(),
     },
     {
       id: "jobs.cancel-all",

@@ -11,6 +11,7 @@ import { Modal } from "./Modal";
 import { ProjectsStrip } from "./ProjectsStrip";
 import { discardedProjects } from "./useAutosave";
 import styles from "./PhotoComposerView.module.css";
+import { SHORT_QUERY, useMediaQuery } from "@/lib/media";
 
 export const MODULE_ID = "photo-composer";
 const DEFAULT_NAME = "Untitled composition";
@@ -242,6 +243,8 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
     }
   };
 
+  // Short windows give the canvas the strip's height while a composition is open (Back returns to it).
+  const short = useMediaQuery(SHORT_QUERY);
   const backToPost = useCallback((slide: PostSlideSeed) => {
     setOpen(null);
     useUI.getState().handOff({ moduleId: "post-builder", inputs: [], postSlide: slide });
@@ -251,7 +254,7 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
 
   return (
     <div className={styles.view}>
-      {(projects.length > 0 || open) && (
+      {(projects.length > 0 || open) && !(open && short) && (
         <ProjectsStrip
           projects={projects}
           openId={open?.info.id ?? null}
