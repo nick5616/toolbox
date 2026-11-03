@@ -354,7 +354,7 @@ func (m *Module) validateDoc(ctx context.Context, projectID string, doc EditProj
 				return vErr(f+".path", baseName(c.Path)+" is missing")
 			}
 			if c.Matte != nil {
-				ok, err := m.matteReady(projectID, c)
+				ok, err := m.matteReady(projectID, c, doc.FPS)
 				if err != nil {
 					return err
 				}

@@ -199,7 +199,7 @@ func run() error {
 	}
 	vizAnalyzer := viz.NewAnalyzer(filepath.Join(paths.CacheDir, "visualizer"), paths.ModelsDir, engine, chatSvc)
 	vizBroker := viz.NewRenderBroker(emitter, mediaAPI.URLFor, vizLabDir)
-	vizBroker.SetAppOrigins("http://wails.localhost", "wails://wails")
+	vizBroker.SetAppOrigins(appOrigins()...)
 	visualizerMod, err := visualizer.Register(reg, vizAnalyzer, vizBroker, engine, chatSvc, depSvc.Resolve,
 		paths.ModelsDir, filepath.Join(paths.CacheDir, "visualizer"))
 	if err != nil {
@@ -508,6 +508,19 @@ func sandboxWebviewDir(p core.Paths) string {
 		return ""
 	}
 	return filepath.Join(p.SupportDir, "webview2")
+}
+
+// appOrigins are the origins the render broker accepts raw messages from: the
+// app's own, plus the Vite dev server's under `wails3 dev` (the page is then
+// served from http://wails.localhost:<port>; production never sets the env var).
+func appOrigins() []string {
+	out := []string{"http://wails.localhost", "wails://wails"}
+	if dev := os.Getenv("FRONTEND_DEVSERVER_URL"); dev != "" {
+		if u, err := url.Parse(dev); err == nil && u.Port() != "" {
+			out = append(out, "http://wails.localhost:"+u.Port())
+		}
+	}
+	return out
 }
 
 // devtoolsArgs opens WebView2's DevTools protocol on 127.0.0.1 for automated

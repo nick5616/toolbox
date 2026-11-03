@@ -9,8 +9,8 @@ import { findClip, newId } from "../doc";
 const MAX_TRACKS = 8;
 
 /**
- * Duplicates a clip with a matte onto a new video track directly above (same timing, cutout on, effects
- * cleared on the copy). The lower clip stays as the background: if it was a cut-out itself, its cut-out turns
+ * Duplicates a clip with a matte onto a new video track directly above (same timing, transform and effects,
+ * so the subject stays exactly over its background; cutout on). The lower clip stays as the background: if it was a cut-out itself, its cut-out turns
  * off (the subject now lives on the copy). The copy is muted (the original keeps the sound). Null when the
  * clip has no matte, isn't on a video track, or there are already 8 tracks.
  */
@@ -23,7 +23,6 @@ export function splitSubject(p: NormalProject, clipId: string): NormalProject | 
     ...ref.clip,
     id: newId("c"),
     matte: { ...matte, cutout: true },
-    effects: "",
     fxTarget: "clip",
     volume: 0,
     pinned: false,

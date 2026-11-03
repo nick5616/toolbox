@@ -5,6 +5,7 @@ export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from ".
 export { cx } from "./cx";
 export { DropZone, type DropZoneProps } from "./DropZone";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
+export { ErrorBoundary, type ErrorBoundaryProps } from "./ErrorBoundary";
 export { Field, type FieldControlProps, type FieldProps } from "./Field";
 export { FileList, type FileListItem, type FileListProps } from "./FileList";
 export { Icon, iconNames, type IconName, type IconProps } from "./Icon";

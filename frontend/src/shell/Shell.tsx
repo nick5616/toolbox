@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { isMac } from "@/lib/platform";
-import { Button, Gallery, Kbd, Toaster, cx } from "@/components";
+import { Button, ErrorBoundary, Gallery, Kbd, Toaster, cx } from "@/components";
 import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
 import { toolViews } from "@/tools";
@@ -31,9 +31,11 @@ function ViewRouter({ view }: { view: string }) {
   const Tool = toolViews[view];
   if (Tool) {
     return (
-      <Suspense fallback={null}>
-        <Tool moduleId={view} />
-      </Suspense>
+      <ErrorBoundary label="This tool" resetKey={view}>
+        <Suspense fallback={null}>
+          <Tool moduleId={view} />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
   return <ComingSoonView moduleId={view} />;

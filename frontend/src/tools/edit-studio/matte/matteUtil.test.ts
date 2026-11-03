@@ -51,15 +51,18 @@ describe("matteStatus", () => {
     ["covered", matte(), state(), "none", "ready"],
     ["exactly covered", matte(), state({ fromMs: 1000, toMs: 9000 }), "none", "ready"],
     ["starts before the matte", matte(), state({ fromMs: 1500 }), "none", "stale"],
-    ["ends after the matte", matte(), state({ toMs: 8999 }), "none", "stale"],
+    ["ends after the matte", matte(), state({ toMs: 8900 }), "none", "stale"],
+    ["a frame of rounding is fine", matte(), state({ toMs: 8990 }), "none", "ready"],
     ["photos have no range", matte({ mode: "image" }), state({ fromMs: 0, toMs: 0, image: "/a.png" }), "none", "ready"],
   ] as const)("%s", (_n, m, s, job, want) => {
     expect(matteStatus(m, s, span, job)).toBe(want);
   });
 
-  it("covers is inclusive", () => {
+  it("covers is inclusive, with a frame of slack", () => {
     expect(covers({ fromMs: 0, toMs: 10 }, { fromMs: 0, toMs: 10 })).toBe(true);
-    expect(covers({ fromMs: 1, toMs: 10 }, { fromMs: 0, toMs: 10 })).toBe(false);
+    expect(covers({ fromMs: 30, toMs: 1000 }, { fromMs: 0, toMs: 1000 })).toBe(true);
+    expect(covers({ fromMs: 100, toMs: 1000 }, { fromMs: 0, toMs: 1000 })).toBe(false);
+    expect(covers({ fromMs: 0, toMs: 1000 }, { fromMs: 0, toMs: 1100 })).toBe(false);
   });
 });
 

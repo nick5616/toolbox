@@ -23,3 +23,7 @@ Thumbs.db
 
 # Wails task runner cache
 .task/
+
+# wails3 dev build output at the repo root
+/toolbox.exe
+/*.syso

@@ -479,7 +479,7 @@ func maxSpeed(speed string) float64 {
 }
 
 // matteReady is true when a clip's matte files exist and cover its source range.
-func (m *Module) matteReady(projectID string, c Clip) (bool, error) {
+func (m *Module) matteReady(projectID string, c Clip, fps int) (bool, error) {
 	if c.Matte == nil || !validMatteID(c.Matte.ID) {
 		return false, nil
 	}
@@ -490,8 +490,14 @@ func (m *Module) matteReady(projectID string, c Clip) (bool, error) {
 	if st.Image != "" {
 		return true, nil
 	}
-	from, to := clipSourceSpan(c)
-	return from >= st.FromMs && to <= st.ToMs, nil
+	if fps <= 0 {
+		fps = 30
+	}
+	// The same source range the UI computes (speed integrated on the frame
+	// grid), with a frame of slack for rounding on either side.
+	from, to := clipSourceRange(c, fps)
+	slack := int64(math.Ceil(1000 / float64(fps)))
+	return from+slack >= st.FromMs && to-slack <= st.ToMs, nil
 }
 
 var matteFileRe = regexp.MustCompile(`^(.+?)(-export\.|-preview\.|-try\.png|\.png|\.json)`)

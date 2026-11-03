@@ -34,8 +34,12 @@ export const MODE_LABEL: Record<MatteMode, string> = { image: "Photo", people: "
 
 /** Is the source range covered by a ready matte? (Image mattes have no range.) */
 export function covers(state: Pick<EditMatteState, "fromMs" | "toMs">, span: SourceSpan): boolean {
-  return span.fromMs >= state.fromMs && span.toMs <= state.toMs;
+  // A frame of slack for rounding (Go's readiness check allows the same).
+  return span.fromMs + COVER_SLACK_MS >= state.fromMs && span.toMs - COVER_SLACK_MS <= state.toMs;
 }
+
+/** Rounding slack when comparing a clip's source range with a matte's (one 30 fps frame). */
+export const COVER_SLACK_MS = 34;
 
 /** What the Inspector says about a clip's matte. */
 export function matteStatus(matte: EditMatte | null, state: EditMatteState | undefined, span: SourceSpan, job: JobPhase): MatteStatus {

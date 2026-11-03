@@ -338,7 +338,7 @@ func TestRunImageMatte(t *testing.T) {
 	if res.Matte == nil || !res.Matte.Ready || !strings.HasSuffix(res.Matte.Image, "ph1.png") {
 		t.Errorf("state = %+v", res.Matte)
 	}
-	ok, err := e.m.matteReady(e.pid, Clip{Kind: "image", Matte: &Matte{Mode: MatteImage, ID: "ph1"}})
+	ok, err := e.m.matteReady(e.pid, Clip{Kind: "image", Matte: &Matte{Mode: MatteImage, ID: "ph1"}}, 30)
 	if err != nil || !ok {
 		t.Errorf("image matte ready = %v %v", ok, err)
 	}
@@ -452,7 +452,8 @@ func TestMatteStatesAndReady(t *testing.T) {
 		{"inside", clip(2000, 0, 3000, ""), true},
 		{"exactly the range", clip(1000, 0, 6000, ""), true},
 		{"starts early", clip(900, 0, 1000, ""), false},
-		{"ends late", clip(2000, 0, 5001, ""), false},
+		{"ends late", clip(2000, 0, 5100, ""), false},
+		{"a frame of rounding is fine", clip(2000, 0, 5020, ""), true},
 		{"fast speed reaches further", clip(2000, 0, 2500, `{"base":2}`), true},
 		{"fast speed too far", clip(2000, 0, 3000, `{"base":4}`), false},
 		{"slow speed fits", clip(2000, 0, 8000, `{"base":0.5}`), true},
@@ -461,7 +462,7 @@ func TestMatteStatesAndReady(t *testing.T) {
 		{"no matte", Clip{}, false},
 		{"unknown matte", Clip{Matte: &Matte{ID: "zzz"}, InMs: 2000, EndMs: 3000}, false},
 	} {
-		ok, err := m.matteReady(pid, c.clip)
+		ok, err := m.matteReady(pid, c.clip, 30)
 		if err != nil || ok != c.want {
 			t.Errorf("%s: ready = %v (%v), want %v", c.name, ok, err, c.want)
 		}
@@ -470,7 +471,7 @@ func TestMatteStatesAndReady(t *testing.T) {
 	if err := os.Remove(filepath.Join(m.mattesDir(pid), "m1-preview.h264")); err != nil {
 		t.Fatal(err)
 	}
-	if ok, _ := m.matteReady(pid, clip(2000, 0, 3000, "")); ok {
+	if ok, _ := m.matteReady(pid, clip(2000, 0, 3000, ""), 30); ok {
 		t.Error("missing preview copy must not be ready")
 	}
 }

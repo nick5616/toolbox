@@ -4,7 +4,7 @@
  * packages. Packages own the components it imports, not this file.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge, Button, IconButton, MenuButton, toast } from "@/components";
+import { Badge, Button, ErrorBoundary, IconButton, MenuButton, toast } from "@/components";
 import { EditStudioService, SettingsService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { useUI } from "@/state/ui";
@@ -164,7 +164,9 @@ function Editor({ moduleId }: { moduleId: string }) {
 
       <div className={styles.top}>
         <aside className={styles.sources}>
-          <SourcesPanel />
+          <ErrorBoundary label="Sources" compact>
+            <SourcesPanel />
+          </ErrorBoundary>
         </aside>
         <section className={styles.preview}>
           <EditCanvas
@@ -177,7 +179,9 @@ function Editor({ moduleId }: { moduleId: string }) {
             onStats={setStats}
             onCanvas={setCanvas}
           />
-          <PreviewOverlays canvas={canvas} width={size.width} height={size.height} />
+          <ErrorBoundary label="The preview overlays" compact>
+            <PreviewOverlays canvas={canvas} width={size.width} height={size.height} />
+          </ErrorBoundary>
           {stats && playing && inputs && !setup && <span className={styles.stats}>{`${Math.round(stats.fps)} fps · ${stats.dropped} dropped`}</span>}
         </section>
         <aside className={styles.right}>
@@ -189,21 +193,31 @@ function Editor({ moduleId }: { moduleId: string }) {
               Captions
             </button>
           </div>
-          <div className={styles.panel}>{rightPanel === "inspector" ? <InspectorPanel /> : <CaptionsPanel />}</div>
+          <div className={styles.panel}>
+            <ErrorBoundary label={rightPanel === "inspector" ? "The Inspector" : "Captions"} resetKey={rightPanel} compact>
+              {rightPanel === "inspector" ? <InspectorPanel /> : <CaptionsPanel />}
+            </ErrorBoundary>
+          </div>
         </aside>
       </div>
 
       {setup ? (
         <div className={styles.setup}>
-          <SetupPanel />
+          <ErrorBoundary label="Setup" compact>
+            <SetupPanel />
+          </ErrorBoundary>
         </div>
       ) : (
         <div className={styles.bottom}>
           <Transport />
           <div className={styles.timeline}>
             <SectionBands className={styles.bands} />
-            <LanesPanel />
-            <TracksPanel />
+            <ErrorBoundary label="The lanes" compact>
+              <LanesPanel />
+            </ErrorBoundary>
+            <ErrorBoundary label="The timeline" compact>
+              <TracksPanel />
+            </ErrorBoundary>
           </div>
         </div>
       )}

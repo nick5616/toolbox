@@ -25,7 +25,7 @@ function withMatte(over: Partial<EditMatte> = {}): NormalProject {
 }
 
 describe("splitSubject", () => {
-  it("puts a cut-out copy on a new video track directly above, same timing, effects cleared", () => {
+  it("puts a cut-out copy on a new video track directly above, same timing and effects (the subject stays over its background)", () => {
     const p = withMatte();
     const out = splitSubject(p, "c1");
     expect(out).not.toBeNull();
@@ -38,7 +38,8 @@ describe("splitSubject", () => {
     const copy = above?.clips[0];
     const orig = findClip(q, "c1")?.clip;
     expect(copy?.id).not.toBe("c1");
-    expect(copy).toMatchObject({ kind: "video", path: "/fixture/a.mp4", startMs: 0, endMs: 8000, inMs: 1000, effects: "", volume: 0 });
+    expect(copy).toMatchObject({ kind: "video", path: "/fixture/a.mp4", startMs: 0, endMs: 8000, inMs: 1000, volume: 0 });
+    expect(copy?.effects).toBe(orig?.effects);
     expect(copy?.matte).toMatchObject({ id: "m1", cutout: true });
     // the lower clip stays as the background (its effects are kept)
     expect(orig?.effects).not.toBe("");

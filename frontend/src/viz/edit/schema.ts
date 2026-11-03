@@ -368,7 +368,7 @@ export const DEFAULT_TEXT_STYLE: TextStyle = {
   preset: "pop",
   font: "Arial",
   weight: 900,
-  size: 7,
+  size: 9,
   color: "#ffffff",
   highlight: "#ffd400",
   position: "center",
