@@ -1,6 +1,6 @@
 .designer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 34%, 380px);
   gap: var(--space-4);
   flex: 1;
   min-height: 0;
@@ -22,6 +22,7 @@
 }
 
 .right {
+  container: designer-panel / inline-size;
   background: var(--bg-panel);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
@@ -191,6 +192,17 @@
 .tabOn {
   color: var(--fg);
   border-bottom-color: var(--accent);
+}
+
+/* A narrow panel shows only the open tab's name; the others are icons (their name is the tooltip). */
+@container designer-panel (max-width: 400px) {
+  .tab:not(.tabOn) .tabLabel {
+    display: none;
+  }
+
+  .tab {
+    padding: var(--space-2) 6px;
+  }
 }
 
 .panel {
@@ -655,7 +667,8 @@
   gap: var(--space-2);
 }
 
-@media (max-width: 1000px) {
+/* Stacked only when the window is narrower than the app allows (side by side keeps the preview in view). */
+@media (max-width: 760px) {
   .designer {
     grid-template-columns: 1fr;
     overflow-y: auto;

@@ -101,6 +101,7 @@ def stems_separate(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
         raise
     except Exception as e:
         _state.update(key=None, sep=None)
+        logging.getLogger(__name__).exception("stems.separate failed")  # the traceback goes to the app log
         if _is_download_error(e):
             raise HandlerError("tool_failed", f"Model download failed: {e}", "Check your connection") from e
         raise HandlerError("tool_failed", f"Separation failed: {e}", "Check the model name and try again") from e

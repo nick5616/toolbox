@@ -127,7 +127,7 @@ export function LanesPanel() {
   const selection = useEditStudio((s) => s.selection);
   const [el, setEl] = useState<HTMLDivElement | null>(null);
   // Smaller screens get shorter lanes so the tracks stay in view (drag the bottom edge to change it).
-  const [height, setHeight] = useState(() => (typeof window === "undefined" ? 180 : Math.round(Math.max(100, Math.min(180, window.innerHeight * 0.2)))));
+  const [height, setHeight] = useState(() => (typeof window === "undefined" ? 180 : Math.round(Math.max(84, Math.min(180, window.innerHeight * 0.2 - 20)))));
   const [stemsOpen, setStemsOpen] = useState(false);
   const [rename, setRename] = useState<{ id: string; value: string; left: number; top: number } | null>(null);
   const tapState = useRef<TapState>({ lastAt: -Infinity });

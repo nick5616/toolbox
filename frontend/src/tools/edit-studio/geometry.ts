@@ -32,8 +32,10 @@ export function visibleRange(widthPx: number, pps: number, scrollMs: number): { 
 
 /**
  * Wheel handling for any timeline row container (attach to the element that
- * spans header + time area): Ctrl/Cmd+wheel zooms around the pointer, other
- * wheels scroll horizontally. Clamped to [0, durationMs].
+ * spans header + time area): Ctrl/Cmd+wheel zooms around the pointer;
+ * Shift+wheel and sideways (trackpad) scrolling move along the time; a plain
+ * wheel scrolls the rows when they overflow (lanes or tracks that don't fit)
+ * and otherwise moves along the time. Clamped to [0, durationMs].
  */
 export function useTimelineWheel(el: HTMLElement | null, durationMs: number): void {
   useEffect(() => {
@@ -44,18 +46,33 @@ export function useTimelineWheel(el: HTMLElement | null, durationMs: number): vo
       const x = Math.max(0, e.clientX - rect.left - HEADER_PX);
       const timeWidth = Math.max(1, rect.width - HEADER_PX);
       const maxScroll = Math.max(0, durationMs - (timeWidth * 1000) / pps);
-      e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
         const at = xToMs(x, pps, scrollMs);
         const next = Math.max(6, Math.min(800, pps * Math.exp(-e.deltaY * 0.0015)));
         const nextMax = Math.max(0, durationMs - (timeWidth * 1000) / next);
         setView(next, Math.min(nextMax, Math.max(0, at - (x * 1000) / next)));
-      } else {
-        const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-        setView(pps, Math.min(maxScroll, Math.max(0, scrollMs + (d * 1000) / pps)));
+        return;
       }
+      const sideways = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+      if (!sideways && !e.shiftKey && rowsScroll(e.target, el)) return; // the browser scrolls the rows
+      e.preventDefault();
+      const d = sideways ? e.deltaX : e.deltaY;
+      setView(pps, Math.min(maxScroll, Math.max(0, scrollMs + (d * 1000) / pps)));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, [el, durationMs]);
+}
+
+/** Whether a vertically scrollable box with more rows than fit sits between the wheel's target and the timeline root. */
+function rowsScroll(target: EventTarget | null, root: HTMLElement): boolean {
+  for (let n = target instanceof Element ? target : null; n && n !== root.parentElement; n = n.parentElement) {
+    if (n instanceof HTMLElement && n.scrollHeight > n.clientHeight + 1) {
+      const oy = getComputedStyle(n).overflowY;
+      if (oy === "auto" || oy === "scroll") return true;
+    }
+    if (n === root) break;
+  }
+  return false;
 }

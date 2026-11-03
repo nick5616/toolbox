@@ -168,9 +168,9 @@ export function VisualDesigner({ inputPath, analysis, show, onChange, aspect, mo
         <div className={styles.right}>
           <div className={styles.tabs} role="tablist" aria-label="Designer">
             {visible.map((t) => (
-              <button key={t.id} type="button" role="tab" id={`vd-tab-${t.id}`} aria-selected={tab === t.id} aria-controls="vd-panel" tabIndex={tab === t.id ? 0 : -1} className={cx(styles.tab, tab === t.id && styles.tabOn)} onClick={() => setTab(t.id)}>
+              <button key={t.id} type="button" role="tab" id={`vd-tab-${t.id}`} aria-selected={tab === t.id} aria-controls="vd-panel" tabIndex={tab === t.id ? 0 : -1} className={cx(styles.tab, tab === t.id && styles.tabOn)} title={t.label} onClick={() => setTab(t.id)}>
                 <Icon name={t.icon} size={14} />
-                <span>{t.label}</span>
+                <span className={styles.tabLabel}>{t.label}</span>
               </button>
             ))}
           </div>

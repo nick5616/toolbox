@@ -220,7 +220,7 @@ def _label_by_energy(
     bridge, and the rest are verses."""
     body = [i for i in range(len(labels)) if labels[i] is None]
     hi = [i for i in body if energy[i] >= 0.7]
-    if not hi:
+    if len(body) < 3 or not hi:  # too few parts to tell a chorus from a verse
         return [lab or "section" for lab in labels]
     for i in hi:
         at_drop = any(abs(starts_ms[i] - d) <= bar_ms for d in drop_ms)

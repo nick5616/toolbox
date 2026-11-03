@@ -1,4 +1,5 @@
 .root {
+  container: media-player / inline-size;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -68,6 +69,7 @@
 }
 
 .duration {
+  white-space: nowrap;
   color: var(--fg-subtle);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
@@ -81,4 +83,16 @@
 .volume {
   width: 72px;
   accent-color: var(--accent);
+}
+
+/* Narrow players keep play, frame steps, time, mute and speed; the volume slider goes. */
+@container media-player (max-width: 460px) {
+  .controls {
+    gap: var(--space-1);
+    padding: var(--space-2);
+  }
+
+  .volume {
+    display: none;
+  }
 }

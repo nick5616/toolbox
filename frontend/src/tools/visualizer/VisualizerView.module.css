@@ -87,3 +87,10 @@
   justify-content: center;
   padding: var(--space-8);
 }
+
+@media (max-height: 759px) {
+  .root {
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+  }
+}

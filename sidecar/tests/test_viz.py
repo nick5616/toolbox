@@ -201,6 +201,8 @@ def test_labels_without_repeats_follow_energy():
     # nothing loud: plain sections, as before
     flat = sections.label_sections(starts, ends, g, [0.1, 0.4, 0.5, 0.5, 0.4, 0.5, 0.2], [], 2000, 130000)
     assert flat[2] == "section"
+    # two parts (a short clip): no guessing
+    assert sections.label_sections([0, 10000], [10000, 19000], ["A", "B"], [1.0, 0.0], [], 2000, 19000) == ["section", "outro"]
 
 
 def test_downbeat_phase_picks_the_accent():

@@ -141,12 +141,14 @@ function Editor({ moduleId }: { moduleId: string }) {
         <span className={styles.save} title={saveError ?? undefined}>
           {SAVE_LABEL[saveState]}
         </span>
-        <Badge>{project.aspect}</Badge>
-        <Badge>{project.fps} fps</Badge>
+        <span className={styles.badges}>
+          <Badge>{project.aspect}</Badge>
+          <Badge>{project.fps} fps</Badge>
+        </span>
         <div className={styles.spacer} />
         <IconButton icon="undo-2" label="Undo" kbd="Mod+Z" disabled={!canUndo} onClick={() => useEditStudio.getState().undo()} />
         <IconButton icon="redo-2" label="Redo" kbd="Mod+Shift+Z" disabled={!canRedo} onClick={() => useEditStudio.getState().redo()} />
-        <Button icon="wand-sparkles" disabled={setup} onClick={() => useEditStudio.getState().openDialog({ kind: "autofill", range: selection?.kind === "range" ? { fromMs: selection.fromMs, toMs: selection.toMs } : null })}>
+        <Button icon="wand-sparkles" collapsible disabled={setup} onClick={() => useEditStudio.getState().openDialog({ kind: "autofill", range: selection?.kind === "range" ? { fromMs: selection.fromMs, toMs: selection.toMs } : null })}>
           Auto-fill
         </Button>
         <MenuButton
@@ -159,7 +161,7 @@ function Editor({ moduleId }: { moduleId: string }) {
             { id: "srt", label: "Export captions (SRT)", disabled: setup || !project.captions, onSelect: () => void exportSrt() },
           ]}
         />
-        <Button variant="primary" icon="download" disabled={setup} onClick={() => useEditStudio.getState().openDialog({ kind: "export" })}>
+        <Button variant="primary" icon="download" collapsible disabled={setup} onClick={() => useEditStudio.getState().openDialog({ kind: "export" })}>
           Export
         </Button>
       </header>
