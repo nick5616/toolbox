@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { RenderError } from "../worker/transport";
 import { ByteCache, FrameLRU } from "./cache";
 import type { DecoderEnv, VideoDecoderLike } from "./decoder";
@@ -408,6 +408,24 @@ describe("EditFrameProvider", () => {
     r.env.failAt = 3;
     await expect(r.p.prepare([key(5)], true)).rejects.toBeInstanceOf(RenderError);
     r.p.dispose();
+  });
+
+  it("retries a failed stream after a cool-down and clears the error once frames arrive", async () => {
+    setUploadMode("bitmap");
+    const r = rig();
+    r.env.failAt = 3;
+    for (let i = 0; i < 3; i++) await expect(r.p.prepare([key(5)], true)).rejects.toBeInstanceOf(RenderError);
+    expect(r.p.lastError).toContain("v:a");
+    r.env.failAt = null;
+    const now = Date.now();
+    const spy = vi.spyOn(Date, "now").mockReturnValue(now + 10_000);
+    try {
+      await r.p.prepare([key(5)], true);
+      expect(r.p.lastError).toBe("");
+    } finally {
+      spy.mockRestore();
+      r.p.dispose();
+    }
   });
 
   it("rejects when the index can't be read", async () => {

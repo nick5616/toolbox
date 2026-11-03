@@ -49,6 +49,8 @@ const QUEUE_HIGH = 4;
 /** After the queue drains and a wanted frame is still missing, flush (a decoder that buffers). */
 const STALL_MS = 250;
 const MAX_FAILURES = 3;
+/** A stream that failed MAX_FAILURES times is retried after this long (a seek or play then rebuilds it). */
+const RETRY_MS = 3000;
 
 export interface StreamDecoderOptions {
   key: string;
@@ -73,6 +75,7 @@ export class StreamDecoder {
   private dirty = false;
   private disposed = false;
   private failures = 0;
+  private failedAt = 0;
   private waiter: { n: number; done: () => void; fail: (e: Error) => void } | null = null;
   /** Decode runs started (tests). */
   runs = 0;
@@ -86,12 +89,13 @@ export class StreamDecoder {
   }
 
   get failed(): boolean {
-    return this.failures >= MAX_FAILURES;
+    return this.failures >= MAX_FAILURES && Date.now() - this.failedAt < RETRY_MS;
   }
 
   /** Something changed (new wants): (re)start the pump if idle. */
   kick(): void {
     if (this.disposed || this.failed) return;
+    if (this.failures >= MAX_FAILURES) this.failures = 0; // cooled down: try again
     this.dirty = true;
     if (this.running) return;
     this.running = true;
@@ -149,6 +153,7 @@ export class StreamDecoder {
 
   private fail(e: Error): void {
     this.failures++;
+    this.failedAt = Date.now();
     this.lastFed = -1;
     const d = this.decoder;
     this.decoder = null;

@@ -183,7 +183,7 @@ export function EditCanvas({ inputs, width, height, timeMs, playing, quality, on
     <div className={`${styles.root} ${className ?? ""}`}>
       {unavailable ? <p className={styles.unavailable}>{unavailable}</p> : <canvas ref={canvasRef} className={styles.canvas} width={width} height={height} />}
       {!unavailable && !decoder && hasVideo && <p className={styles.banner}>This system can&apos;t decode video for Edit Studio</p>}
-      {!unavailable && decoder && decodeError && <p className={styles.banner}>A clip couldn&apos;t be decoded</p>}
+      {!unavailable && decoder && decodeError && <p className={styles.banner} title={decodeError}>A clip couldn&apos;t be decoded</p>}
     </div>
   );
 }

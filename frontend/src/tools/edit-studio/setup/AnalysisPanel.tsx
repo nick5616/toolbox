@@ -85,6 +85,7 @@ export function AnalysisPanel() {
     if (ref && p) {
       st.edit({ ...p, analysisKey: ref.key });
       st.setJob("analyze", undefined);
+      st.setReanalyze(false);
     } else {
       setError({ code: "internal", message: "The analysis finished but didn't leave a result", hint: "Try analyzing again." });
     }
@@ -97,6 +98,7 @@ export function AnalysisPanel() {
     const st = useEditStudio.getState();
     const p = st.history?.present;
     if (p) st.edit({ ...p, analysisKey: offer.ref.key });
+    st.setReanalyze(false);
   };
 
   const start = async () => {
@@ -145,7 +147,7 @@ export function AnalysisPanel() {
 
   return (
     <div className={styles.group}>
-      {offer && (
+      {offer && offer.ref.key !== project.analysisKey && (
         <Banner
           tone="info"
           title="This song was analysed before"

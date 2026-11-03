@@ -4,7 +4,7 @@
  * words, analyze job) and, once an analysis is loaded, the range picker.
  * `RangeEditor` and `RangePicker` are exported for the Song inspector.
  */
-import { Banner, EmptyState, Spinner } from "@/components";
+import { Banner, Button, EmptyState, Spinner } from "@/components";
 import { useEditStudio, useProject } from "../store";
 import { AnalysisPanel } from "./AnalysisPanel";
 import { RangeEditor } from "./RangeEditor";
@@ -17,6 +17,7 @@ export { RangePicker, type RangePickerProps } from "./RangePicker";
 export function SetupPanel() {
   const project = useProject();
   const state = useEditStudio((s) => s.analysisState);
+  const reanalyze = useEditStudio((s) => s.reanalyze);
   if (!project) return null;
   if (!project.song) {
     return (
@@ -43,7 +44,18 @@ export function SetupPanel() {
           Analyze the song again to continue. Your clips and markers are kept.
         </Banner>
       )}
-      {state === "ready" ? <RangeEditor onDone={() => useEditStudio.getState().setSetupOpen(false)} /> : state === "loading" ? null : <AnalysisPanel />}
+      {state === "ready" && reanalyze && (
+        <div className={styles.row}>
+          <Button size="sm" variant="ghost" icon="arrow-left" onClick={() => useEditStudio.getState().setSetupOpen(false)}>
+            Keep the current analysis
+          </Button>
+        </div>
+      )}
+      {state === "ready" && !reanalyze ? (
+        <RangeEditor onDone={() => useEditStudio.getState().setSetupOpen(false)} />
+      ) : state === "loading" ? null : (
+        <AnalysisPanel />
+      )}
     </div>
   );
 }

@@ -52,6 +52,8 @@ export interface EditStudioState {
   safeZones: boolean;
   /** Setup (analysis + range) is shown instead of the timeline. New edits without clips start there. */
   setupOpen: boolean;
+  /** Setup shows the analysis panel even though an analysis is loaded ("Analyze again…"). */
+  reanalyze: boolean;
   /** The open dialog (any package may ask; the view shows it). */
   dialog: { kind: "autofill"; range: { fromMs: number; toMs: number } | null } | { kind: "export" } | null;
 
@@ -81,6 +83,8 @@ export interface EditStudioState {
   setSafeZones(on: boolean): void;
   openDialog(d: EditStudioState["dialog"]): void;
   setSetupOpen(open: boolean): void;
+  /** Opens Setup on the analysis panel to analyze the song again (or closes that). */
+  setReanalyze(on: boolean): void;
   setSaveState(s: SaveState, error?: string | null): void;
   setAnalysis(ref: AnalysisRef | null, a: Analysis | null, state: AnalysisState): void;
   setSources(states: EditSourceState[]): void;
@@ -108,6 +112,7 @@ const initial = {
   rightPanel: "inspector" as const,
   safeZones: false,
   setupOpen: false,
+  reanalyze: false,
   dialog: null,
   analysisRef: null,
   analysis: null,
@@ -156,7 +161,8 @@ export const useEditStudio = create<EditStudioState>((set, get) => ({
   setRightPanel: (rightPanel) => set({ rightPanel }),
   setSafeZones: (safeZones) => set({ safeZones }),
   openDialog: (dialog) => set({ dialog }),
-  setSetupOpen: (setupOpen) => set({ setupOpen }),
+  setSetupOpen: (setupOpen) => set(setupOpen ? { setupOpen } : { setupOpen, reanalyze: false }),
+  setReanalyze: (reanalyze) => set(reanalyze ? { reanalyze, setupOpen: true } : { reanalyze }),
   setSaveState: (saveState, saveError = null) => set({ saveState, saveError }),
   setAnalysis: (analysisRef, analysis, analysisState) => set({ analysisRef, analysis, analysisState }),
   setSources: (states) => {

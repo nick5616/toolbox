@@ -295,6 +295,11 @@ export class EditFrameProvider implements FrameProvider {
       this.lru.setCaps(direct ? DIRECT_PER_STREAM : PREVIEW_PER_STREAM, direct ? DIRECT_TOTAL : PREVIEW_TOTAL);
     }
     this.lru.put(rec.key, n, image);
+    if (rec.error) {
+      // the stream recovered (a retry after a failure)
+      rec.error = "";
+      if (this.lastError.startsWith(`${rec.key}: `)) this.lastError = "";
+    }
     this.notify();
   }
 

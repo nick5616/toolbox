@@ -2,7 +2,7 @@
 import { Button, Section, Slider } from "@/components";
 import type { EditSong } from "@/lib/api";
 import { editDoc, openRangePicker } from "./inspectorState";
-import { useProject } from "../store";
+import { useEditStudio, useProject } from "../store";
 import styles from "./inspector.module.css";
 
 export function formatClock(ms: number): string {
@@ -45,6 +45,9 @@ export function SongInspector() {
             <span className={styles.mono}>{formatClock(length)}</span>
           </div>
         </div>
+      </Section>
+      <Section label="Analysis" action={<Button size="sm" onClick={() => useEditStudio.getState().setReanalyze(true)}>Analyze again…</Button>}>
+        <p className={styles.hint}>Analyze again to add the lyrics or pick up a newer AI engine. Your clips and markers are kept.</p>
       </Section>
       <Section label="Sound">
         <div className={styles.stack}>
