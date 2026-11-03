@@ -14,10 +14,10 @@ describe("maxTextWidth / edgeInset", () => {
     expect(edgeInset(1920, 1080)).toBe(0.14);
     expect(edgeInset(1080, 1920)).toBe(0.24);
   });
-  it("sizes fonts as a percentage of the short side, clamped to 3..12", () => {
+  it("sizes fonts as a percentage of the short side, clamped to 3..30", () => {
     expect(fontSizePx(6, 1920, 1080)).toBeCloseTo(64.8);
     expect(fontSizePx(6, 1080, 1920)).toBeCloseTo(64.8);
-    expect(fontSizePx(40, 1000, 1000)).toBeCloseTo(120);
+    expect(fontSizePx(40, 1000, 1000)).toBeCloseTo(300);
     expect(fontSizePx(0, 1000, 1000)).toBeCloseTo(30);
   });
 });
