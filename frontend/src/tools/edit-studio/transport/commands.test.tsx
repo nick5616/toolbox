@@ -210,14 +210,12 @@ describe("editing keys", () => {
     expect(spans()).toEqual([]);
   });
 
-  it("Delete on selected markers hides derived ones and removes custom ones", () => {
+  it("Delete leaves selected markers to the lanes' own handler", () => {
     render(<Harness />);
-    const d = project();
-    useEditStudio.getState().edit({ ...d, markers: { ...d.markers, custom: [{ id: "k1", ms: 1234, label: "" }] } });
-    useEditStudio.getState().select({ kind: "markers", ids: ["kick:1000", "k1"] });
+    const before = project().markers;
+    useEditStudio.getState().select({ kind: "markers", ids: ["kick:1000"] });
     key("Delete");
-    expect(project().markers.hidden).toEqual(["kick:1000"]);
-    expect(project().markers.custom).toEqual([]);
+    expect(project().markers).toBe(before);
   });
 
   it("Mod+D duplicates to the right; Mod+Z undoes; Mod+Shift+Z and Mod+Y redo", () => {

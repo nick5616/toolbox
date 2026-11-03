@@ -305,6 +305,28 @@ func (s *Service) ExportText(projectID string, req TextRequest) (core.Job, error
 	return s.submit(Options{Action: ActionText, ProjectID: projectID, Text: &req})
 }
 
+// ListFolder lists the video and photo files directly inside dir (not
+// recursive, dot files skipped), sorted by name, at most MaxSources (§14.6).
+func (s *Service) ListFolder(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, core.Errorf(core.CodeNotFound, "Couldn't read that folder").WithCause(err)
+	}
+	exts := slices.Concat(media.VideoExtensions(), media.ImageExtensions())
+	out := []string{}
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || strings.HasPrefix(name, ".") || !slices.Contains(exts, strings.ToLower(filepath.Ext(name))) {
+			continue
+		}
+		out = append(out, filepath.Join(dir, name))
+		if len(out) == MaxSources {
+			break
+		}
+	}
+	return out, nil
+}
+
 // Fonts lists the fonts offered for captions.
 func (s *Service) Fonts() []string { return media.Fonts() }
 

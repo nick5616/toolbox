@@ -4,13 +4,13 @@
  * double-click to insert at the playhead.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { Button, ConfirmDialog, DropZone, TextField, cx } from "@/components";
+import { Button, ConfirmDialog, DropZone, IconButton, TextField, cx } from "@/components";
 import { useJobs } from "@/state/jobs";
 import type { NormalProject } from "@/viz/edit/defaults";
 import { SongReplaceDialog } from "../home/SongReplaceDialog";
 import { useEditStudio, useMarkers, useProject } from "../store";
 import { commit, insertAtPlayhead } from "../timeline/actions";
-import { addSourcePaths, pickAndAddSources, prepare, relinkSource, watchPrepareJobs } from "./actions";
+import { addSourcePaths, pickAndAddSources, pickFolderAndAddSources, prepare, relinkSource, watchPrepareJobs } from "./actions";
 import { startSourcesDrag } from "./dragSource";
 import { useSourceSelection } from "./selection";
 import { SourceTile } from "./SourceTile";
@@ -109,6 +109,7 @@ function Sources({ project }: { project: NormalProject }) {
         <Button size="sm" icon="plus" onClick={() => void pickAndAddSources()} disabled={project.sources.length >= MAX_SOURCES}>
           Add
         </Button>
+        <IconButton size="sm" icon="folder-plus" label="Add a folder" onClick={() => void pickFolderAndAddSources()} disabled={project.sources.length >= MAX_SOURCES} />
       </div>
       {project.sources.length > 0 && (
         <div className={styles.filters} role="group" aria-label="Filter by tag">

@@ -91,11 +91,7 @@ export function deleteSelection(): boolean {
     if (ok) useEditStudio.getState().select(null);
     return ok;
   }
-  if (sel?.kind === "markers") {
-    const ok = commit(deleteMarkers(doc, sel.ids));
-    if (ok) useEditStudio.getState().select(null);
-    return ok;
-  }
+  // Markers: the lanes' own Delete handler (lanes/LanesPanel.tsx) removes or hides them.
   return false;
 }
 

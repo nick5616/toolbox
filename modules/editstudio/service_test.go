@@ -86,6 +86,23 @@ func TestServiceCRUD(t *testing.T) {
 	}
 }
 
+func TestListFolder(t *testing.T) {
+	dir := t.TempDir()
+	for _, n := range []string{"b.mov", "a.JPG", ".hidden.mp4", "notes.txt", "song.mp3"} {
+		if err := os.WriteFile(dir+"/"+n, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = os.Mkdir(dir+"/sub.mp4", 0o755)
+	got, err := NewService(nil, newTestModule(t)).ListFolder(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || !strings.HasSuffix(got[0], "a.JPG") || !strings.HasSuffix(got[1], "b.mov") {
+		t.Errorf("got %v", got)
+	}
+}
+
 func TestSaveThumb(t *testing.T) {
 	m := newTestModule(t)
 	s := NewService(nil, m)

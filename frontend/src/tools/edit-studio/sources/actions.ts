@@ -94,6 +94,22 @@ export async function pickAndAddSources(): Promise<void> {
   }
 }
 
+/** Picks a folder and adds the videos and photos directly inside it (not subfolders, no dot files). */
+export async function pickFolderAndAddSources(): Promise<void> {
+  try {
+    const dir = await FilesService.PickFolder("Add a folder of clips and photos");
+    if (!dir) return;
+    const paths = (await EditStudioService.ListFolder(dir)) ?? [];
+    if (!paths.length) {
+      toast({ title: "No clips or photos in that folder", tone: "warn" });
+      return;
+    }
+    await addSourcePaths(paths);
+  } catch (e) {
+    toast({ title: toAppError(e).message, tone: "danger" });
+  }
+}
+
 /** Picks a new file for a source whose file is gone and points every clip and source entry at it. */
 export async function relinkSource(path: string): Promise<void> {
   try {

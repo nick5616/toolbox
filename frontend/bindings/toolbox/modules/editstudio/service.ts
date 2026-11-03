@@ -109,6 +109,14 @@ export function List(): $CancellablePromise<core$0.ProjectInfo[] | null> {
 }
 
 /**
+ * ListFolder lists the video and photo files directly inside dir (not
+ * recursive, dot files skipped), sorted by name, at most MaxSources (§14.6).
+ */
+export function ListFolder(dir: string): $CancellablePromise<string[] | null> {
+    return $Call.ByID(1107247202, dir);
+}
+
+/**
  * Matte submits a clip's cut-out job.
  */
 export function Matte(projectID: string, req: $models.MatteRequest): $CancellablePromise<core$0.Job> {
