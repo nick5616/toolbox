@@ -16,7 +16,8 @@ import type { FrameImage } from "./types";
 export type UploadMode = "direct" | "bitmap";
 
 /** The default until the lab's decode bench says otherwise (SPEC §16.1 decision rule). */
-export const DEFAULT_UPLOAD_MODE: UploadMode = "direct";
+// Decode bench on the Windows box (2026-11-03): direct is ≤ 13 % faster at 1080p and holding 16 frames stalls the decoder, so bitmap is the default (SPEC §16.1 rule).
+export const DEFAULT_UPLOAD_MODE: UploadMode = "bitmap";
 
 let mode: UploadMode = DEFAULT_UPLOAD_MODE;
 let probed = false;
