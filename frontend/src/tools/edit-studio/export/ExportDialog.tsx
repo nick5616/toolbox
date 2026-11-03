@@ -1,10 +1,260 @@
-/** The Export dialog, its checks and the done banner (§14.10). Wave 0 stub (owned by WP-ES8); the props are frozen. */
+/**
+ * The Export dialog, its checks and the done banner (§14.10). Props are frozen
+ * (Wave 0). The dialog is a modal; the progress/result banner (ExportBanner)
+ * is rendered here too so it outlives the dialog.
+ */
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { Banner, Button, Select, Spinner, toast } from "@/components";
+import { EditStudioService } from "@/lib/api";
+import { toAppError } from "@/lib/errors";
+import { isActive, useJobs } from "@/state/jobs";
+import { editLength } from "@/viz/edit/types";
+import { flushEdit } from "../useEditAutosave";
+import { refreshMattes, refreshSources } from "../useEditData";
+import { useEditStudio, useProject } from "../store";
+import { ExportBanner } from "./ExportBanner";
+import { baseName, exportChecks, formatLength, normalizeHeight, rebuildRequest, sizeLabel, withoutCutouts, EXPORT_HEIGHTS, type ExportHeight } from "./checks";
+import styles from "./ExportDialog.module.css";
+
 export interface ExportDialogProps {
   open: boolean;
   onClose(): void;
 }
 
-export function ExportDialog(props: ExportDialogProps) {
-  void props;
-  return null;
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const FOCUSABLE = "button:not(:disabled), select:not(:disabled)";
+
+function Panel({ onClose }: { onClose(): void }) {
+  const titleId = useId();
+  const panel = useRef<HTMLDivElement>(null);
+  const project = useProject();
+  const sources = useEditStudio((s) => s.sources);
+  const mattes = useEditStudio((s) => s.mattes);
+  const matteJobs = useEditStudio((s) => s.jobs.mattes);
+  const jobsById = useJobs((s) => s.byId);
+
+  const [height, setHeight] = useState<ExportHeight>(normalizeHeight(project?.exportHeight ?? 1080));
+  const [checked, setChecked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  // Fresh source and matte states before the checks speak.
+  useEffect(() => {
+    let live = true;
+    void Promise.all([refreshSources(), refreshMattes()]).then(() => live && setChecked(true));
+    return () => {
+      live = false;
+    };
+  }, []);
+  useEffect(() => {
+    panel.current?.focus();
+  }, []);
+
+  const checks = useMemo(() => (project ? exportChecks(project, sources, mattes) : null), [project, sources, mattes]);
+  const rebuilding = useMemo(() => {
+    if (!checks) return 0;
+    return checks.badMattes.filter((c) => {
+      const id = c.matte ? matteJobs[c.matte.id] : undefined;
+      const j = id ? jobsById[id] : undefined;
+      return !!j && isActive(j);
+    }).length;
+  }, [checks, matteJobs, jobsById]);
+  // A rebuild that just finished: read the new matte states.
+  const wasRebuilding = useRef(0);
+  useEffect(() => {
+    if (wasRebuilding.current > 0 && rebuilding === 0) void refreshMattes();
+    wasRebuilding.current = rebuilding;
+  }, [rebuilding]);
+
+  if (!project || !checks) return null;
+  const d = editLength(project);
+  const frames = Math.round((d / 1000) * project.fps);
+  const waitingOnPrep = checks.preparing.length > 0;
+  const blockers: string[] = [];
+  if (!project.song) blockers.push("Pick a song first.");
+  else if (!project.analysisKey) blockers.push("Analyze the song first.");
+  else if (checks.clipCount === 0) blockers.push("Add a clip to the edit first.");
+  const blocked = blockers.length > 0 || waitingOnPrep || checks.missing.length > 0 || checks.badMattes.length > 0 || !checked || busy;
+  const badCount = checks.badMattes.length;
+
+  const rebuild = async () => {
+    const st = useEditStudio.getState();
+    if (!st.projectId) return;
+    setError("");
+    try {
+      await flushEdit(); // the matte IDs are in the saved document
+      for (const c of checks.badMattes) {
+        const req = rebuildRequest(c, project.fps);
+        if (!req) continue;
+        const job = await EditStudioService.Matte(st.projectId, req);
+        useJobs.getState().upsert(job);
+        useEditStudio.getState().setMatteJob(req.matteId, job.id);
+      }
+    } catch (e) {
+      setError(toAppError(e).message);
+    }
+  };
+
+  const removeCutouts = () => {
+    const ids = new Set(checks.badMattes.map((c) => c.id));
+    useEditStudio.getState().edit(withoutCutouts(project, ids));
+  };
+
+  const start = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const st = useEditStudio.getState();
+      const p = st.history?.present;
+      if (p && p.exportHeight !== height) st.edit({ ...p, exportHeight: height }, "exportHeight");
+      await flushEdit();
+      const after = useEditStudio.getState();
+      if (after.saveState === "error") {
+        setError(after.saveError ?? "Couldn't save the edit");
+        return;
+      }
+      if (!after.projectId) return;
+      const job = await EditStudioService.Render(after.projectId);
+      useJobs.getState().upsert(job);
+      useEditStudio.getState().setJob("render", job.id);
+      onClose();
+    } catch (e) {
+      const msg = toAppError(e).message;
+      setError(msg);
+      toast({ title: msg, tone: "danger" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    } else if (e.key === "Tab") {
+      const nodes = Array.from(panel.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (!first || !last) return;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  };
+
+  return (
+    <div className={styles.backdrop} onMouseDown={onClose}>
+      <div ref={panel} className={styles.panel} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKeyDown}>
+        <h2 id={titleId} className={styles.title}>
+          Export video
+        </h2>
+
+        <div className={styles.form}>
+          <div className={styles.field}>
+            <span className={styles.label}>Size</span>
+            <Select
+              size="sm"
+              aria-label="Size"
+              value={String(height)}
+              onChange={(v) => setHeight(normalizeHeight(Number(v)))}
+              options={EXPORT_HEIGHTS.map((h) => ({ value: String(h), label: `${sizeLabel(project.aspect, h)} (${h}p)` }))}
+            />
+          </div>
+          <div className={styles.field}>
+            <span className={styles.label}>Frame rate</span>
+            <span className={styles.value}>{project.fps} fps</span>
+            <span className={styles.hint}>Set in the edit's setup</span>
+          </div>
+          <div className={styles.field}>
+            <span className={styles.label}>Length</span>
+            <span className={styles.value}>
+              {formatLength(d)} · {frames} frames
+            </span>
+          </div>
+        </div>
+
+        {!checked && (
+          <div className={styles.checking} role="status">
+            <Spinner size={14} /> Checking your files…
+          </div>
+        )}
+        {blockers.map((b) => (
+          <Banner key={b} tone="warn" title={b} />
+        ))}
+        {checked && waitingOnPrep && (
+          <Banner tone="warn" title={`Wait for ${plural(checks.preparing.length, "clip", "clips")} to finish preparing`}>
+            {checks.preparing.map(baseName).join(", ")}
+          </Banner>
+        )}
+        {checked && checks.missing.length > 0 && (
+          <Banner tone="danger" title={`${plural(checks.missing.length, "file is", "files are")} missing`}>
+            <ul className={styles.list}>
+              {checks.missing.map((m) => (
+                <li key={m.path} title={m.path}>
+                  {baseName(m.path)}
+                  <span className={styles.hint}> — {m.reason}</span>
+                </li>
+              ))}
+            </ul>
+            Put them back, or remove those clips from the edit.
+          </Banner>
+        )}
+        {checked && badCount > 0 && (
+          <Banner
+            tone="warn"
+            title={
+              rebuilding > 0
+                ? `Rebuilding ${plural(rebuilding, "cut-out", "cut-outs")}…`
+                : `${plural(badCount, "cut-out isn't", "cut-outs aren't")} ready or ${badCount === 1 ? "is" : "are"} out of date`
+            }
+            action={
+              rebuilding > 0 ? (
+                <Spinner size={14} />
+              ) : (
+                <div className={styles.actions}>
+                  <Button size="sm" onClick={() => void rebuild()}>
+                    Rebuild
+                  </Button>
+                  <Button size="sm" onClick={removeCutouts}>
+                    Remove the cut-out from those clips
+                  </Button>
+                </div>
+              )
+            }
+          >
+            {checks.badMattes.map((c) => baseName(c.path)).join(", ")}
+          </Banner>
+        )}
+        {checked && checks.unprepared.length > 0 && !waitingOnPrep && (
+          <p className={styles.note}>
+            {plural(checks.unprepared.length, "file isn't", "files aren't")} prepared for editing yet, so the export will prepare {checks.unprepared.length === 1 ? "it" : "them"} first.
+          </p>
+        )}
+        {error && <Banner tone="danger" title={error} />}
+
+        <div className={styles.footer}>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" icon="download" disabled={blocked} onClick={() => void start()}>
+            Export
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ExportDialog({ open, onClose }: ExportDialogProps) {
+  return (
+    <>
+      {open && <Panel onClose={onClose} />}
+      <ExportBanner />
+    </>
+  );
 }
