@@ -30,6 +30,8 @@ function Knob({ label, value, min, max, step, onChange, format = pct }: { label:
 }
 
 export interface TextStyleEditorProps {
+  /** Largest size in % of the short side (captions 12; Edit Studio text clips 30). */
+  maxSize?: number;
   value: TextStyle;
   onChange(next: TextStyle): void;
   /** Font names to offer; empty falls back to a text field. */
@@ -40,7 +42,7 @@ export interface TextStyleEditorProps {
   children?: ReactNode;
 }
 
-export function TextStyleEditor({ value: t, onChange, fonts, allowMood = true, children }: TextStyleEditorProps) {
+export function TextStyleEditor({ value: t, onChange, fonts, allowMood = true, maxSize = 12, children }: TextStyleEditorProps) {
   const patch = (p: Partial<TextStyle>) => onChange({ ...t, ...p });
   const fontList = fonts.includes(t.font) || fonts.length === 0 ? fonts : [t.font, ...fonts];
   return (
@@ -72,7 +74,7 @@ export function TextStyleEditor({ value: t, onChange, fonts, allowMood = true, c
         <span className={styles.paramLabel}>Weight</span>
         <SegmentedControl size="sm" aria-label="Weight" value={String(t.weight)} onChange={(w) => patch({ weight: Number(w) as TextStyle["weight"] })} options={[{ value: "400", label: "Regular" }, { value: "700", label: "Bold" }, { value: "900", label: "Black" }]} />
       </label>
-      <Knob label="Size" min={3} max={12} step={0.5} value={t.size} onChange={(size) => patch({ size })} format={(v) => `${v}%`} />
+      <Knob label="Size" min={3} max={maxSize} step={0.5} value={t.size} onChange={(size) => patch({ size })} format={(v) => `${v}%`} />
       <div className={styles.param}>
         <span className={styles.paramLabel}>Text colour</span>
         <ColorSwatchPicker aria-label="Text colour" value={t.color} onChange={(color) => patch({ color })} />

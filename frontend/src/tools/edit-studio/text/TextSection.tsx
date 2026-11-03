@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, SegmentedControl, Section, Select, Slider, TextArea, toast } from "@/components";
 import { TextStyleEditor } from "@/components/viz/TextStyleEditor";
+import { MAX_TEXT_CLIP_SIZE } from "@/viz/edit/schema";
 import { EditStudioService, type EditClip } from "@/lib/api";
 import { MAX_CLIP_TEXT, parseTextClip, serializeTextClip } from "@/viz/edit/schema";
 import { MARKER_LANES, type MarkerLane, type TextClip } from "@/viz/edit/types";
@@ -109,7 +110,7 @@ export function TextSection({ clip }: { clip: EditClip }) {
       </Section>
 
       <Section label="Style">
-        <TextStyleEditor value={t.style} fonts={fonts} allowMood={false} onChange={(style: TextStyle) => edit((c) => ({ ...c, style }), "style")} />
+        <TextStyleEditor value={t.style} fonts={fonts} allowMood={false} maxSize={MAX_TEXT_CLIP_SIZE} onChange={(style: TextStyle) => edit((c) => ({ ...c, style }), "style")} />
       </Section>
 
       <Section label="Through video">

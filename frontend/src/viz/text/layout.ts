@@ -151,9 +151,9 @@ export function rowBaseline(top: number, row: number, rowHeight: number, fontPx:
   return top + (row + 0.5) * rowHeight + BASELINE_OFFSET * fontPx * fit;
 }
 
-/** The base font size in px: `size` is a percentage of the short side. */
+/** The base font size in px: `size` is a percentage of the short side (captions use 3–12; Edit Studio text clips up to 30). */
 export function fontSizePx(sizePercent: number, w: number, h: number): number {
-  return (Math.max(3, Math.min(12, sizePercent)) / 100) * Math.min(w, h);
+  return (Math.max(3, Math.min(30, sizePercent)) / 100) * Math.min(w, h);
 }
 
 /** Stacks a title card: title above, artist below, centred on the frame. Returns the block tops. */

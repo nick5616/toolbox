@@ -481,9 +481,10 @@ export function serializeCaptionLines(lines: TextLine[] | null): string {
 // ---- Part B: text and visual clips ----
 
 export const MAX_CLIP_TEXT = 500;
+export const MAX_TEXT_CLIP_SIZE = 30;
 
 export function defaultTextClip(text = "TEXT"): TextClip {
-  return { text, style: { ...DEFAULT_TEXT_STYLE, preset: "pop", size: 9, weight: 900, uppercase: true, position: "center", emphasis: { ...DEFAULT_TEXT_STYLE.emphasis }, react: { ...DEFAULT_TEXT_STYLE.react } }, reveal: "all", wordMs: 250, lane: "beat", every: 1 };
+  return { text, style: { ...DEFAULT_TEXT_STYLE, preset: "pop", size: 16, weight: 900, uppercase: true, position: "center", emphasis: { ...DEFAULT_TEXT_STYLE.emphasis }, react: { ...DEFAULT_TEXT_STYLE.react } }, reveal: "all", wordMs: 250, lane: "beat", every: 1 };
 }
 
 export function parseTextClip(raw: string): Parsed<TextClip> {
@@ -495,6 +496,9 @@ export function parseTextClip(raw: string): Parsed<TextClip> {
   if (typeof v.text !== "string") problems.push("text.text: missing");
   const st = parseTextStyle(v.style === undefined ? "" : JSON.stringify(v.style));
   for (const m of st.problems) problems.push(m.replace(/^captions\.style/, "text.style"));
+  // Text clips may be much bigger than captions (3–30 % of the short side).
+  const rawStyle = isObj(v.style) ? v.style : {};
+  if (isNum(rawStyle.size)) st.value.size = clamp(rawStyle.size, 3, MAX_TEXT_CLIP_SIZE);
   const reveal = v.reveal === "words" || v.reveal === "beats" ? v.reveal : "all";
   const wordMs = isNum(v.wordMs) ? clamp(v.wordMs, 40, 2000) : d.wordMs;
   const lane = typeof v.lane === "string" && (MARKER_LANES as readonly string[]).includes(v.lane) ? (v.lane as TextClip["lane"]) : "beat";
