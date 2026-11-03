@@ -8,6 +8,7 @@ import { Shell } from "@/shell/Shell";
 import { BootError } from "@/views/BootError";
 import { SetupView } from "@/views/setup/SetupView";
 import RenderHost from "@/viz/RenderHost";
+import { TooltipLayer } from "@/components/TooltipLayer";
 
 const VizLab = lazy(() => import("@/viz/lab/VizLab"));
 
@@ -26,6 +27,7 @@ function MainWindow() {
   return (
     <>
       <RenderHost />
+      <TooltipLayer />
       {done ? <Shell /> : <SetupView />}
     </>
   );

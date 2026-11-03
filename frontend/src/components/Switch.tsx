@@ -11,15 +11,17 @@ export interface SwitchProps {
   id?: string;
   className?: string;
   "aria-label"?: string;
+  /** Tooltip text (what turning it on does). */
+  tip?: string;
   "aria-describedby"?: string;
 }
 
 export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch(
-  { checked, onChange, label, disabled, className, id, ...aria },
+  { checked, onChange, label, disabled, className, id, tip, ...aria },
   ref,
 ) {
   return (
-    <label className={cx(styles.root, disabled && styles.disabled, className)}>
+    <label className={cx(styles.root, disabled && styles.disabled, className)} data-tip={tip}>
       <button
         ref={ref}
         id={id}

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import threading
 from typing import Any
 
 from ..registry import Context, HandlerError, handler
@@ -22,6 +23,21 @@ KNOWN_STEMS = (
 
 # (model, outputFormat, outputDir) → Separator; one at a time to bound memory.
 _state: dict[str, Any] = {"key": None, "sep": None}
+
+# Requests run on their own threads, and audio-separator keeps per-file state on the
+# Separator (a second separation's cleanup cleared the first one's input path:
+# "At least one of (y, sr), S, or path must be provided"). Separations run one at a time.
+_lock = threading.Lock()
+
+
+def _acquire(ctx: Context) -> None:
+    """Waits for the separator, staying cancellable."""
+    first = True
+    while not _lock.acquire(timeout=0.5):
+        if first:
+            ctx.stage("Waiting for another separation")
+            first = False
+        ctx.check_cancelled()
 
 
 def _models_dir() -> str:
@@ -80,6 +96,14 @@ def stems_separate(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
     models_dir = _models_dir()
 
     key = (model, fmt, out_dir)
+    _acquire(ctx)
+    try:
+        return _separate_locked(ctx, path, out_dir, model, fmt, base, models_dir, key)
+    finally:
+        _lock.release()
+
+
+def _separate_locked(ctx: Context, path: str, out_dir: str, model: str, fmt: str, base: str, models_dir: str, key: tuple[str, str, str]) -> dict[str, Any]:
     try:
         if _state["key"] != key or _state["sep"] is None:
             # Importing torch/audio-separator and probing hardware takes seconds.
@@ -128,6 +152,14 @@ def stems_prefetch(ctx: Context, params: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(model, str) or not model.strip() or os.path.basename(model) != model:
         raise HandlerError("validation", "model must be a plain model file name")
     models_dir = _models_dir()
+    _acquire(ctx)
+    try:
+        return _prefetch_locked(ctx, model, models_dir)
+    finally:
+        _lock.release()
+
+
+def _prefetch_locked(ctx: Context, model: str, models_dir: str) -> dict[str, Any]:
     try:
         ctx.stage("Downloading model")
         # audio-separator downloads inside load_model; the tqdm shim reports its progress.

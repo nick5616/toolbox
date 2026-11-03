@@ -45,3 +45,24 @@
     opacity: 0;
   }
 }
+
+/* The window-wide tooltip (TooltipLayer). */
+.floating {
+  position: fixed;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 300px;
+  padding: 5px 9px;
+  pointer-events: none;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--fg);
+  background: var(--bg-raised);
+  border: 1px solid var(--pop-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+  white-space: normal;
+  animation: in var(--dur-fast) var(--ease-out);
+}

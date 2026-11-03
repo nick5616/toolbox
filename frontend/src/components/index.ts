@@ -26,6 +26,7 @@ export { TimecodeInput, type TimecodeInputProps } from "./TimecodeInput";
 export { Toaster } from "./Toaster";
 export { dismissToast, toast, type ToastOptions, type ToastTone } from "./toast";
 export { Tooltip, useDelayedHover, type TooltipProps } from "./Tooltip";
+export { TooltipLayer, tipFor } from "./TooltipLayer";
 export { Gallery } from "./Gallery";
 export { Slider } from "./Slider";
 export type { SliderProps } from "./Slider";

@@ -3,6 +3,8 @@ import { cx } from "./cx";
 import styles from "./SegmentedControl.module.css";
 
 export interface SegmentedOption<T extends string> {
+  /** Tooltip text for this option. */
+  tip?: string;
   value: T;
   label: string;
   disabled?: boolean;
@@ -99,6 +101,7 @@ export function SegmentedControl<T extends string>({
             tabIndex={i === tabbable ? 0 : -1}
             disabled={disabled || opt.disabled}
             className={cx(styles.option, checked && styles.checked)}
+            data-tip={opt.tip}
             onClick={() => onChange(opt.value)}
             onKeyDown={(e) => onKeyDown(e, i)}
           >

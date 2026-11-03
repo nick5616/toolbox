@@ -1,7 +1,5 @@
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { Icon } from "./Icon";
-import { Kbd } from "./Kbd";
-import { Tooltip } from "./Tooltip";
 import { cx } from "./cx";
 import styles from "./IconButton.module.css";
 
@@ -23,26 +21,19 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   { label, icon, size = "md", variant = "ghost", kbd, pressed, tooltipSide, className, type = "button", ...rest },
   ref,
 ) {
-  const tip: ReactNode = kbd ? (
-    <>
-      {label}
-      <Kbd combo={kbd} />
-    </>
-  ) : (
-    label
-  );
   return (
-    <Tooltip label={tip} side={tooltipSide}>
-      <button
-        ref={ref}
-        type={type}
-        aria-label={label}
-        aria-pressed={pressed}
-        className={cx(styles.button, styles[size], styles[variant], pressed && styles.pressed, className)}
-        {...rest}
-      >
-        <Icon name={icon} size={size === "sm" ? 14 : 16} />
-      </button>
-    </Tooltip>
+    <button
+      ref={ref}
+      type={type}
+      aria-label={label}
+      aria-pressed={pressed}
+      data-tip={label}
+      data-tip-kbd={kbd}
+      data-tip-side={tooltipSide}
+      className={cx(styles.button, styles[size], styles[variant], pressed && styles.pressed, className)}
+      {...rest}
+    >
+      <Icon name={icon} size={size === "sm" ? 14 : 16} />
+    </button>
   );
 });

@@ -33,8 +33,22 @@ export interface TooltipProps {
   className?: string;
 }
 
-/** Wraps a child; shows `label` after hovering or focusing it for 400 ms. */
+/**
+ * Wraps a child with a tooltip. String labels go through the window-wide
+ * TooltipLayer (never clipped); other content keeps a local bubble.
+ */
 export function Tooltip({ label, children, side = "top", delay = TOOLTIP_DELAY_MS, className }: TooltipProps) {
+  if (typeof label === "string") {
+    return (
+      <span className={cx(styles.wrap, className)} data-tip={label} data-tip-side={side}>
+        {children}
+      </span>
+    );
+  }
+  return <LocalTooltip label={label} side={side} delay={delay} className={className}>{children}</LocalTooltip>;
+}
+
+function LocalTooltip({ label, children, side = "top", delay = TOOLTIP_DELAY_MS, className }: TooltipProps) {
   const id = useId();
   const { open, show, hide } = useDelayedHover(delay);
   return (

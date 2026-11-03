@@ -11,6 +11,8 @@ export interface MenuItem {
   label: string;
   icon?: string;
   disabled?: boolean;
+  /** Tooltip text for the item. */
+  tip?: string;
   onSelect: () => void;
 }
 
@@ -170,6 +172,8 @@ export function MenuButton({ label, icon, items, emptyLabel = "Nothing available
                 tabIndex={-1}
                 disabled={item.disabled}
                 data-active={i === active || undefined}
+                data-tip={item.tip}
+                data-tip-side="left"
                 className={cx(styles.item, i === active && styles.active)}
                 onMouseEnter={() => !item.disabled && setActive(i)}
                 onClick={() => select(item)}

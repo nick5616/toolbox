@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { EmptyState, Toaster } from "@/components";
+import { TooltipLayer } from "@/components/TooltipLayer";
 import { popupViews } from "@/tools";
 import styles from "./PopupShell.module.css";
 
@@ -24,6 +25,7 @@ export function PopupShell({ view }: PopupShellProps) {
         <EmptyState icon="circle-alert" title="Nothing to show here" />
       )}
       <Toaster />
+      <TooltipLayer />
     </div>
   );
 }
