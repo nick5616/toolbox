@@ -11,3 +11,5 @@ export { PresetThumbs } from "./PresetThumbs";
 export type { PresetThumbsProps, ThumbItem } from "./PresetThumbs";
 export { VisualsPicker } from "./VisualsPicker";
 export type { VisualsPickerProps } from "./VisualsPicker";
+export { TextStyleEditor, TEXT_PRESET_CARDS } from "./TextStyleEditor";
+export type { TextStyleEditorProps } from "./TextStyleEditor";
