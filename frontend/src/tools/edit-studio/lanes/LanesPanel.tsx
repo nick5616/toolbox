@@ -208,7 +208,20 @@ export function LanesPanel() {
 
   return (
     <div ref={setEl} className={styles.root} style={{ height }} aria-label="Lanes">
-      <div className={styles.scroll} role="radiogroup" aria-label="Active lane">
+      <div
+        className={styles.scroll}
+        role="radiogroup"
+        aria-label="Active lane"
+        onPointerDown={(e) => {
+          // Anywhere along the time that nothing else handles (stem levels, the Instruments row…) moves the playhead.
+          const t = e.target as HTMLElement;
+          if (e.button !== 0 || t.closest("button,input,[role=menu]")) return;
+          if (t.tagName === "CANVAS" && t.getAttribute("aria-label")?.endsWith("markers")) return; // marker lanes handle their own clicks
+          const left = e.currentTarget.getBoundingClientRect().left + HEADER_PX;
+          if (e.clientX < left) return;
+          startScrub(e, () => left, duration);
+        }}
+      >
         {/* The ruler and the song stay in view while the lanes scroll under them. */}
         <div className={styles.pinned}>
           <RulerRow width={width} pps={pps} scrollMs={scrollMs} hiddenLanes={hiddenLanes} seek={seek} />
