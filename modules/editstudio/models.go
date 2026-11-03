@@ -2,12 +2,19 @@ package editstudio
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 
 	"toolbox/core"
+	"toolbox/core/sidecar"
+	"toolbox/modules/bgremove"
 )
 
-// Cut-out models (SPEC.md §10.6). Pins measured in Wave 0; WP-ES7 fills the
-// ModelProvider bodies (files in <models>/matte/, downloads via matte.prefetch).
+// Cut-out models (SPEC.md §10.6). The pins were measured in Wave 0; the files live in
+// <models>/matte/ and are downloaded by the engine's matte.prefetch (sha256-verified).
+// Run handlers never download; photo cut-outs use Background Remover's "balanced" model
+// (<models>/bg/).
 
 // Module is a core.ModelProvider for the presets "people" and "select".
 var _ core.ModelProvider = (*Module)(nil)
@@ -40,16 +47,75 @@ var matteModelPins = map[string]modelSpec{
 	},
 }
 
-// ModelPresent implements core.ModelProvider.
-func (m *Module) ModelPresent(preset string) bool { return false }
+// matteModelDir is <models>/matte.
+func (m *Module) matteModelDir() string { return filepath.Join(m.cfg.ModelsDir, "matte") }
 
-// FetchModel implements core.ModelProvider.
+func (m *Module) matteModelPath(preset string) string {
+	return filepath.Join(m.matteModelDir(), matteModelPins[preset].File)
+}
+
+func regularFile(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode().IsRegular()
+}
+
+// ModelPresent implements core.ModelProvider.
+func (m *Module) ModelPresent(preset string) bool {
+	if _, ok := matteModelPins[preset]; !ok || m.cfg.ModelsDir == "" {
+		return false
+	}
+	return regularFile(m.matteModelPath(preset))
+}
+
+// FetchModel implements core.ModelProvider via the engine's matte.prefetch.
 func (m *Module) FetchModel(ctx context.Context, job *core.JobContext, preset string) error {
-	return notBuilt("Cut-out models")
+	spec, ok := matteModelPins[preset]
+	if !ok {
+		return core.ValidationError("Unknown cut-out model", map[string]string{"preset": preset})
+	}
+	if m.ModelPresent(preset) {
+		return nil
+	}
+	if m.cfg.Engine == nil {
+		return core.Errorf(core.CodeInternal, "The AI engine isn't available")
+	}
+	if _, err := job.Tool(sidecar.DepID); err != nil {
+		return err
+	}
+	sink := &matteSink{job: job, span: 1}
+	_, err := m.cfg.Engine.Call(ctx, "matte.prefetch", map[string]any{
+		"model":    map[string]any{"file": spec.File, "sha256": spec.SHA256, "url": spec.URL},
+		"modelDir": m.matteModelDir(),
+	}, sink.onEvent)
+	return err
 }
 
 // RemoveModel implements core.ModelProvider.
-func (m *Module) RemoveModel(preset string) error { return nil }
+func (m *Module) RemoveModel(preset string) error {
+	spec, ok := matteModelPins[preset]
+	if !ok || m.cfg.ModelsDir == "" {
+		return nil
+	}
+	if err := os.Remove(m.matteModelPath(preset)); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("removing the %s model: %w", spec.Label, err)
+	}
+	return nil
+}
 
-// matteModels reports which cut-out models are installed.
-func (m *Module) matteModels() MatteModels { return MatteModels{} }
+// imageModelPresent reports Background Remover's balanced model (photo cut-outs).
+func (m *Module) imageModelPresent() bool {
+	spec, ok := bgremove.SpecFor("balanced")
+	if !ok || m.cfg.ModelsDir == "" {
+		return false
+	}
+	return regularFile(filepath.Join(bgremove.ModelDir(m.cfg.ModelsDir), spec.File))
+}
+
+// matteModels reports which cut-out models are installed. SelectAvailable stays true: the engine
+// answers "unavailable" itself where SAM 2 can't run (§10.4).
+func (m *Module) matteModels() MatteModels {
+	return MatteModels{
+		People: m.ModelPresent(PresetPeople), Select: m.ModelPresent(PresetSelect),
+		Image: m.imageModelPresent(), SelectAvailable: true,
+	}
+}
