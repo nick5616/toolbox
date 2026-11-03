@@ -1,5 +1,6 @@
 /** Glitch (SPEC.md §6.7): rare displaced blocks with an RGB split, only while a drop is hitting. Frozen to 30 steps/s and hashed, so every frame is reproducible. */
 import { glitchStep, glitchStrength } from "./px1math";
+import { triggerDrive } from "./px2math";
 import { simplePass } from "./pass";
 import { registerPost } from "./registry";
 
@@ -26,10 +27,11 @@ registerPost({
   kind: "pass",
   params: {
     amount: { kind: "number", label: "Amount", min: 0, max: 1, default: 0.7 },
+    trigger: { kind: "enum", label: "Triggered by", options: ["drop", "amount"], default: "drop" },
   },
   create(ctx) {
     return simplePass(ctx, SRC, (p, f) => {
-      const drop = f.signals.value("drop.pulse", f.tMs, 5, 200);
+      const drop = triggerDrive(f.params.trigger, () => f.signals.value("drop.pulse", f.tMs, 5, 200));
       p.f1("u_strength", glitchStrength(drop, f.params.amount as number))
         .f1("u_step", glitchStep(f.tMs))
         .f1("u_seed", (f.seed % 1000) * 0.137);
