@@ -149,8 +149,11 @@ describe("ExportDialog", () => {
     await user.click(screen.getByRole("button", { name: "Rebuild" }));
     await waitFor(() => expect(h.matte).toHaveBeenCalledTimes(1));
     expect(h.matte.mock.calls[0]![0]).toBe("p1");
-    expect(h.matte.mock.calls[0]![1]).toMatchObject({ clipId: "a", matteId: "m1", mode: "people", path: "/a.mov", fromMs: 0, toMs: 2000, preview: false });
-    expect(useEditStudio.getState().jobs.mattes.m1).toBe("mj1");
+    const req = h.matte.mock.calls[0]![1] as { matteId: string };
+    expect(req).toMatchObject({ clipId: "a", mode: "people", path: "/a.mov", fromMs: 0, toMs: 2000, preview: false });
+    expect(req.matteId).not.toBe("m1"); // a fresh matte ID, recorded in the clip
+    expect(useEditStudio.getState().history!.present.tracks[0]!.clips[0]!.matte!.id).toBe(req.matteId);
+    expect(useEditStudio.getState().jobs.mattes[req.matteId]).toBe("mj1");
     expect(await screen.findByText("Rebuilding 1 cut-out…")).toBeTruthy();
   });
 

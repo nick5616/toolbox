@@ -5,7 +5,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Banner, Button, Select, Spinner, toast } from "@/components";
-import { EditStudioService } from "@/lib/api";
+import { EditStudioService, type EditMatteRequest } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { isActive, useJobs } from "@/state/jobs";
 import { editLength } from "@/viz/edit/types";
@@ -13,6 +13,9 @@ import { flushEdit } from "../useEditAutosave";
 import { refreshMattes, refreshSources } from "../useEditData";
 import { useEditStudio, useProject } from "../store";
 import { ExportBanner } from "./ExportBanner";
+import { newId, withClip } from "../doc";
+import { followMatteJob } from "../matte/matteJobs";
+import { makeMatte, type MatteMode } from "../matte/matteUtil";
 import { baseName, exportChecks, formatLength, normalizeHeight, rebuildRequest, sizeLabel, withoutCutouts, EXPORT_HEIGHTS, type ExportHeight } from "./checks";
 import styles from "./ExportDialog.module.css";
 
@@ -79,16 +82,28 @@ function Panel({ onClose }: { onClose(): void }) {
 
   const rebuild = async () => {
     const st = useEditStudio.getState();
-    if (!st.projectId) return;
+    const doc = st.history?.present;
+    if (!st.projectId || !doc) return;
     setError("");
     try {
-      await flushEdit(); // the matte IDs are in the saved document
+      // Like the Cut-out section: every rebuild gets a fresh matte ID (no stale files in the engine's caches).
+      let next = doc;
+      const reqs: EditMatteRequest[] = [];
       for (const c of checks.badMattes) {
-        const req = rebuildRequest(c, project.fps);
-        if (!req) continue;
+        const old = rebuildRequest(c, project.fps);
+        if (!old || !c.matte) continue;
+        const id = newId("m");
+        const matte = makeMatte(c.matte.mode as MatteMode, id, { fromMs: old.fromMs, toMs: old.toMs }, c.matte.clicks ?? [], c.matte);
+        next = withClip(next, c.id, { matte });
+        reqs.push({ ...old, matteId: id, fromMs: matte.fromMs, toMs: matte.toMs });
+      }
+      if (next !== doc) st.edit(next);
+      await flushEdit(); // the matte IDs are in the saved document
+      for (const req of reqs) {
         const job = await EditStudioService.Matte(st.projectId, req);
         useJobs.getState().upsert(job);
         useEditStudio.getState().setMatteJob(req.matteId, job.id);
+        followMatteJob(req.matteId, job.id);
       }
     } catch (e) {
       setError(toAppError(e).message);

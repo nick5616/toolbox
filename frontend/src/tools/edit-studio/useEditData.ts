@@ -5,7 +5,7 @@
  * refreshSources / refreshMattes.
  */
 import { useEffect } from "react";
-import { EditStudioService, MediaService, type AnalysisRef } from "@/lib/api";
+import { EditStudioService, MediaService, type AnalysisRef, type EditMatteState } from "@/lib/api";
 import { loadAnalysis, type Analysis } from "@/viz/analysis";
 import { useEditStudio } from "./store";
 
@@ -77,6 +77,7 @@ export async function refreshMattes(ids?: string[]): Promise<void> {
   try {
     const states = await EditStudioService.Mattes(s.projectId, list);
     useEditStudio.getState().setMattes(states ?? []);
+    syncMatteRanges(states ?? []);
   } catch {
     // stays unknown
   }
@@ -95,4 +96,33 @@ export function useEditData(): void {
     void refreshSources();
     void refreshMattes();
   }, [projectId, fps]);
+}
+
+/**
+ * Matte files cover a padded source range (Go pads ±500 ms, §10.5). The engine
+ * maps matte frames through clip.matte.fromMs, so the document must carry the
+ * range the files really cover. Updates the present document in place (not an
+ * undo step); autosave stores it.
+ */
+export function syncMatteRanges(states: readonly EditMatteState[]): void {
+  const st = useEditStudio.getState();
+  const h = st.history;
+  if (!h) return;
+  const byId = new Map(states.filter((m) => m.ready && m.toMs > m.fromMs).map((m) => [m.id, m]));
+  if (!byId.size) return;
+  let changed = false;
+  const tracks = h.present.tracks.map((t) => {
+    let tc = false;
+    const clips = t.clips.map((c) => {
+      const m = c.matte?.id ? byId.get(c.matte.id) : undefined;
+      if (!m || !c.matte || (c.matte.fromMs === m.fromMs && c.matte.toMs === m.toMs)) return c;
+      tc = true;
+      return { ...c, matte: { ...c.matte, fromMs: m.fromMs, toMs: m.toMs } };
+    });
+    if (!tc) return t;
+    changed = true;
+    return { ...t, clips };
+  });
+  if (!changed) return;
+  useEditStudio.setState({ history: { ...h, present: { ...h.present, tracks } }, saveState: "dirty" });
 }
