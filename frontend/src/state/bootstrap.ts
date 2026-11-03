@@ -31,7 +31,7 @@ export function subscribeAll(): void {
     on("jobs:log", (b) => useJobs.getState().appendLogs(b)),
     on("library:added", (o) => useLibrary.getState().add(o)),
     on("library:removed", (p) => useLibrary.getState().removeLocal(p.ids ?? [])),
-    on("deps:changed", (p) => useDeps.getState().setAll(p.deps ?? [])),
+    on("deps:changed", (p) => useDeps.getState().setAll(p.deps ?? [], true)),
     on("settings:changed", (s) => useSettings.getState().set(s)),
     on("app:files-dropped", routeFilesDropped),
     on("app:navigate", (n) => {
@@ -85,6 +85,7 @@ export async function bootstrapPopup(): Promise<void> {
 export async function bootstrap(): Promise<void> {
   // Subscribe first so nothing emitted during loading is lost.
   subscribeAll();
+  const depsGen = useDeps.getState().gen;
   const [settings, appInfo, modules, jobs, deps, recent, clip, hotkeys] = await Promise.all([
     SettingsService.Get(),
     SettingsService.AppInfo(),
@@ -100,7 +101,8 @@ export async function bootstrap(): Promise<void> {
   useSettings.getState().setAppInfo(appInfo);
   useModules.getState().setAll(modules ?? []);
   useJobs.getState().setAll(jobs ?? []);
-  useDeps.getState().setAll(deps ?? []);
+  // A deps:changed that arrived while loading is newer than this reply (start-up detection races the first List).
+  if (useDeps.getState().gen === depsGen) useDeps.getState().setAll(deps ?? []);
   useLibrary.getState().setPage(recent.items ?? [], recent.nextCursor);
   useDesktop.getState().setClipboardState(clip);
   useDesktop.getState().setHotkeys(hotkeys ?? []);

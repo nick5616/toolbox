@@ -12,7 +12,9 @@ interface DepsState {
   list: DepView[];
   byId: Record<string, DepView>;
   checking: boolean;
-  setAll: (list: DepStatus[]) => void;
+  /** Counts deps:changed events (bootstrap ignores a List() reply older than an event). */
+  gen: number;
+  setAll: (list: DepStatus[], fromEvent?: boolean) => void;
   recheck: () => Promise<void>;
   /** Queues the yt-dlp install/update job. */
   updateYtDlp: () => Promise<Job>;
@@ -22,9 +24,10 @@ export const useDeps = create<DepsState>((set, get) => ({
   list: [],
   byId: {},
   checking: false,
-  setAll: (list) => {
+  gen: 0,
+  setAll: (list, fromEvent = false) => {
     const views = list.map(normalizeDep);
-    set({ list: views, byId: Object.fromEntries(views.map((d) => [d.id, d])) });
+    set({ list: views, byId: Object.fromEntries(views.map((d) => [d.id, d])), gen: get().gen + (fromEvent ? 1 : 0) });
   },
   recheck: async () => {
     set({ checking: true });

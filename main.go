@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -393,7 +394,7 @@ func run() error {
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
-		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true, WebviewUserDataPath: sandboxWebviewDir(paths)},
+		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true, WebviewUserDataPath: sandboxWebviewDir(paths), AdditionalBrowserArgs: devtoolsArgs()},
 		// The Visualizer streams rendered video over raw messages: no socket
 		// (SPEC.md §4.4). The broker checks the token and the origin.
 		RawMessageHandler: func(_ application.Window, msg string, origin *application.OriginInfo) {
@@ -507,6 +508,20 @@ func sandboxWebviewDir(p core.Paths) string {
 		return ""
 	}
 	return filepath.Join(p.SupportDir, "webview2")
+}
+
+// devtoolsArgs opens WebView2's DevTools protocol on 127.0.0.1 for automated
+// UI checks, only when both the sandbox support dir and TOOLBOX_DEVTOOLS_PORT
+// are set (dev only, like the Vite dev server; never in a normal run).
+func devtoolsArgs() []string {
+	port := os.Getenv("TOOLBOX_DEVTOOLS_PORT")
+	if port == "" || os.Getenv(core.EnvSupportDir) == "" {
+		return nil
+	}
+	if n, err := strconv.Atoi(port); err != nil || n < 1024 || n > 65535 {
+		return nil
+	}
+	return []string{"--remote-debugging-port=" + port, "--remote-debugging-address=127.0.0.1"}
 }
 
 func startURL() string {
