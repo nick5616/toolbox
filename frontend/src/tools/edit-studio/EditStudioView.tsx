@@ -98,6 +98,8 @@ function Editor({ moduleId }: { moduleId: string }) {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const [stats, setStats] = useState<EditCanvasStats | null>(null);
   const dialog = useEditStudio((s) => s.dialog);
+  const [split, setSplit] = useState(loadSplit);
+  const splitDrag = useRef<{ top: number; height: number } | null>(null);
   const projectId = useEditStudio((s) => s.projectId);
   void moduleId;
 
@@ -162,7 +164,7 @@ function Editor({ moduleId }: { moduleId: string }) {
         </Button>
       </header>
 
-      <div className={styles.top}>
+      <div className={styles.top} style={{ flex: `0 0 ${Math.round(split * 100)}%` }}>
         <aside className={styles.sources}>
           <ErrorBoundary label="Sources" compact>
             <SourcesPanel />
@@ -201,6 +203,27 @@ function Editor({ moduleId }: { moduleId: string }) {
         </aside>
       </div>
 
+      <div
+        className={styles.splitter}
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize the preview"
+        onPointerDown={(e) => {
+          const box = e.currentTarget.parentElement?.getBoundingClientRect();
+          if (!box) return;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          splitDrag.current = { top: box.top + HEADER_H, height: box.height - HEADER_H };
+        }}
+        onPointerMove={(e) => {
+          const d = splitDrag.current;
+          if (d) setSplit(clampSplit((e.clientY - d.top) / d.height));
+        }}
+        onPointerUp={(e) => {
+          splitDrag.current = null;
+          if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+          saveSplit(split);
+        }}
+      />
       {setup ? (
         <div className={styles.setup}>
           <ErrorBoundary label="Setup" compact>
@@ -239,5 +262,28 @@ function thumbnail(src: HTMLCanvasElement): string | null {
     return c.toDataURL("image/jpeg", 0.8);
   } catch {
     return null;
+  }
+}
+
+const HEADER_H = 46; // the editor header above the panels
+const SPLIT_KEY = "edit-studio.split";
+const clampSplit = (f: number) => Math.max(0.28, Math.min(0.72, f));
+
+/** The preview's share of the editor height (remembered per machine; smaller screens start lower). */
+function loadSplit(): number {
+  try {
+    const v = Number(localStorage.getItem(SPLIT_KEY));
+    if (v > 0) return clampSplit(v);
+  } catch {
+    // storage unavailable: use the default
+  }
+  return typeof window !== "undefined" && window.innerHeight < 850 ? 0.42 : 0.52;
+}
+
+function saveSplit(f: number): void {
+  try {
+    localStorage.setItem(SPLIT_KEY, String(f));
+  } catch {
+    // not remembered
   }
 }

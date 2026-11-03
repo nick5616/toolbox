@@ -50,9 +50,22 @@
 .top {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr) 320px;
-  flex: 1 1 55%;
-  min-height: 0;
+  min-height: 180px;
+}
+
+.splitter {
+  position: relative;
+  z-index: 4;
+  flex: none;
+  height: 5px;
+  margin-top: -2px;
   border-bottom: 1px solid var(--line);
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.splitter:hover {
+  border-bottom-color: var(--accent);
 }
 
 .sources,
@@ -119,8 +132,8 @@
 .setup {
   display: flex;
   flex-direction: column;
-  flex: 1 1 45%;
-  min-height: 0;
+  flex: 1 1 0;
+  min-height: 160px;
 }
 
 .setup {
@@ -138,7 +151,10 @@
 
 .bands {
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: 168px; /* geometry.ts HEADER_PX: bands cover the time area only */
   pointer-events: none;
 }
 

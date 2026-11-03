@@ -13,7 +13,7 @@ import { useEditStudio } from "../store";
 import { refreshSources } from "../useEditData";
 import { appendSources, MAX_SOURCES, relinkPath } from "./tags";
 
-export const MEDIA_EXTENSIONS = [".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp", ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic", ".heif"];
+export const MEDIA_EXTENSIONS = [".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp", ".ogv", ".mpg", ".mpeg", ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic", ".heif"];
 
 /** Prepare jobs this panel follows; each refreshes the source states when it ends. */
 const following = new Set<string>();

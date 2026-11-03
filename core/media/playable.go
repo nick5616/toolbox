@@ -68,7 +68,7 @@ func ValidFont(name string) bool {
 
 // VideoExtensions are the video inputs the Phase 6 tools accept.
 func VideoExtensions() []string {
-	return []string{".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp"}
+	return []string{".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp", ".ogv", ".mpg", ".mpeg"}
 }
 
 // AudioExtensions are the audio inputs the Phase 6 tools accept.

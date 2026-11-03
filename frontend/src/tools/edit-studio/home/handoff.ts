@@ -8,13 +8,12 @@ import { toast } from "@/components";
 import { toAppError } from "@/lib/errors";
 import { useUI } from "@/state/ui";
 import { acceptsPath } from "@/tools/_kit/accepts";
-import { addSourcePaths } from "../sources/actions";
+import { addSourcePaths, MEDIA_EXTENSIONS as MEDIA } from "../sources/actions";
 import { useEditStudio } from "../store";
 import { AUDIO_EXTENSIONS } from "../transport/logic";
 import { useAsSong } from "./createEdit";
 import { useNewEditRequest } from "./newEditRequest";
 
-const MEDIA = [".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp", ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic", ".heif"];
 
 export interface ClassifiedInputs {
   /** Audio files (a song). */

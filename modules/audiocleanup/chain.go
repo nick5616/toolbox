@@ -178,7 +178,7 @@ func parseEBU128(lines []string) (float64, bool) {
 
 func isVideoExt(ext string) bool {
 	switch strings.ToLower(ext) {
-	case ".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp":
+	case ".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp", ".ogv", ".mpg", ".mpeg":
 		return true
 	}
 	return false

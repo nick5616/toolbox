@@ -189,6 +189,20 @@ def test_group_and_labels():
     assert lab2[2] == "drop"
 
 
+def test_labels_without_repeats_follow_energy():
+    # An instrumental: nothing repeats. Loud parts become choruses (a drop on one makes it a drop),
+    # parts before the first chorus verses, the quietest late part the bridge.
+    starts = [0, 15000, 35000, 55000, 75000, 95000, 115000]
+    ends = starts[1:] + [130000]
+    g = ["A", "B", "C", "D", "E", "F", "G"]
+    en = [0.1, 0.45, 0.9, 0.5, 0.3, 0.95, 0.2]
+    lab = sections.label_sections(starts, ends, g, en, [95000], 2000, 130000)
+    assert lab == ["intro", "verse", "chorus", "verse", "bridge", "drop", "outro"]
+    # nothing loud: plain sections, as before
+    flat = sections.label_sections(starts, ends, g, [0.1, 0.4, 0.5, 0.5, 0.4, 0.5, 0.2], [], 2000, 130000)
+    assert flat[2] == "section"
+
+
 def test_downbeat_phase_picks_the_accent():
     fps = 60
     beats_ms = np.arange(0, 20000, 500.0)

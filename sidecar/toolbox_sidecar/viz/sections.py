@@ -185,6 +185,8 @@ def label_sections(
         return float(np.mean([energy[i] for i in range(n) if group_names[i] == g]))
 
     chorus = max(repeated, key=gen, default=None)
+    if chorus is None:
+        return _label_by_energy(labels, starts_ms, energy, drop_ms, bar_ms, duration_ms)
     if chorus is not None:
         for i in range(n):
             if group_names[i] == chorus and labels[i] is None:
@@ -201,6 +203,35 @@ def label_sections(
     for i in range(n):
         if labels[i] is None and any(abs(starts_ms[i] - d) <= bar_ms for d in drop_ms):
             labels[i] = "drop"
+    return [lab or "section" for lab in labels]
+
+
+def _label_by_energy(
+    labels: list[str | None],
+    starts_ms: list[float],
+    energy: list[float],
+    drop_ms: list[int],
+    bar_ms: float,
+    duration_ms: float,
+) -> list[str]:
+    """Labels when no part repeats (instrumentals, through-composed songs): the
+    loud parts are choruses (drops when a drop lands on them), the parts before
+    the first one are verses, the quietest part in the second half is the
+    bridge, and the rest are verses."""
+    body = [i for i in range(len(labels)) if labels[i] is None]
+    hi = [i for i in body if energy[i] >= 0.7]
+    if not hi:
+        return [lab or "section" for lab in labels]
+    for i in hi:
+        at_drop = any(abs(starts_ms[i] - d) <= bar_ms for d in drop_ms)
+        labels[i] = "drop" if at_drop else "chorus"
+    first = min(hi, key=lambda i: starts_ms[i])
+    rest = [i for i in body if labels[i] is None and starts_ms[i] >= duration_ms / 2 and starts_ms[i] > starts_ms[first]]
+    if rest:
+        labels[min(rest, key=lambda i: energy[i])] = "bridge"
+    for i in body:
+        if labels[i] is None:
+            labels[i] = "verse"
     return [lab or "section" for lab in labels]
 
 

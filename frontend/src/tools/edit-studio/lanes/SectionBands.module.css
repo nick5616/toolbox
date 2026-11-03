@@ -6,6 +6,8 @@
   right: 0;
   overflow: hidden;
   pointer-events: none;
+  /* Above the lanes and tracks (which paint opaque rows), but faint and click-through. */
+  z-index: 3;
 }
 
 .band {
@@ -13,12 +15,12 @@
   top: 0;
   bottom: 0;
   border-left: 1px solid color-mix(in srgb, var(--lane-section) 70%, transparent);
-  background: color-mix(in srgb, var(--lane-section) 10%, transparent);
+  background: color-mix(in srgb, var(--lane-section) 5%, transparent);
   pointer-events: none;
 }
 
 .band[data-alt="true"] {
-  background: color-mix(in srgb, var(--lane-section) 18%, transparent);
+  background: color-mix(in srgb, var(--lane-section) 10%, transparent);
 }
 
 .band[data-selected="true"] {
@@ -28,7 +30,7 @@
 
 .chip {
   position: absolute;
-  top: 24px;
+  top: 3px;
   display: inline-flex;
   align-items: center;
   gap: 2px;
