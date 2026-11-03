@@ -19,6 +19,20 @@ import { useVisualizer } from "./store";
 import { liveSpeed, parseVizResult, useVizJob, type VizJob } from "./useVizJob";
 import styles from "./ExportStep.module.css";
 
+const ASPECT_TIP: Record<string, string> = {
+  "16:9": "Widescreen, for YouTube and TVs",
+  "9:16": "Tall, for Reels, Shorts and TikTok",
+  "1:1": "Square, for feed posts",
+  "4:5": "Slightly tall, for Instagram feed posts",
+};
+
+const QUALITY_TIP: Record<number, string> = {
+  720: "Smallest and fastest; fine for previews and phones",
+  1080: "Full HD; a good balance of sharpness and speed",
+  1440: "Sharper than Full HD; renders slower",
+  2160: "4K; sharpest, slowest and biggest files",
+};
+
 export interface ExportStepProps {
   prefs: ExportPrefs;
   onPrefs(patch: Partial<ExportPrefs>): void;
@@ -50,7 +64,7 @@ function PreviewClip({ path }: { path: string }) {
   const media = useMediaSource(path);
   if (media.status === "error") {
     return (
-      <Banner tone="danger" title={media.error?.message ?? "Couldn't open the preview"} action={<Button size="sm" onClick={media.retry}>Try again</Button>}>
+      <Banner tone="danger" title={media.error?.message ?? "Couldn't open the preview"} action={<Button size="sm" onClick={media.retry} data-tip="Try opening the preview clip again">Try again</Button>}>
         {media.error?.hint}
       </Banner>
     );
@@ -88,14 +102,14 @@ function Progress({ run, label, rangeSec, outFps }: { run: VizJob; label: string
       <div className={styles.run} role="status" aria-live="polite">
         <div className={styles.runHead}>
           <span>{queued ? "Waiting to start…" : label}</span>
-          <Button size="sm" variant="ghost" onClick={run.cancel}>
+          <Button size="sm" variant="ghost" onClick={run.cancel} data-tip="Stop rendering; nothing is kept">
             Cancel
           </Button>
         </div>
         <Meter value={queued ? 0 : job.progress} status={queued ? "queued" : "running"} label={label} />
         <div className={styles.runMsg}>
           {job.message}
-          {speed && <span className={styles.speed}> {Math.round(speed.fps)} fps · ×{speed.times.toFixed(1)} real time</span>}
+          {speed && <span className={styles.speed} data-tip="How fast frames are being made, and how that compares with the video's length"> {Math.round(speed.fps)} fps · ×{speed.times.toFixed(1)} real time</span>}
         </div>
       </div>
     );
@@ -115,7 +129,7 @@ function ResultCard({ job }: { job: NonNullable<VizJob["job"]> }) {
   const result = parseVizResult(job.resultJson);
   const outputs = result?.outputs?.length ? result.outputs : job.outputs.map((o) => o.path);
   return (
-    <div className={styles.result} aria-label="Result">
+    <div className={styles.result} aria-label="Result" data-tip="The finished video is saved in your Library">
       <div className={styles.resultHead}>
         <Icon name="check" size={14} />
         <span>Your video is ready</span>
@@ -127,11 +141,11 @@ function ResultCard({ job }: { job: NonNullable<VizJob["job"]> }) {
           return (
             <li key={path} className={styles.resultRow}>
               <Icon name="film" size={14} />
-              <span className={styles.resultName} title={path}>
+              <span className={styles.resultName} data-tip={path}>
                 {base(path)}
               </span>
               <FileActions outputId={out?.id} path={path} disabled={out?.missing} />
-              <IconButton size="sm" icon="copy" label="Copy path" onClick={() => void copyText(path, { what: "path" })} />
+              <IconButton size="sm" icon="copy" label="Copy path" data-tip="Copy the full path of this file" onClick={() => void copyText(path, { what: "path" })} />
             </li>
           );
         })}
@@ -228,43 +242,43 @@ export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) 
       {blocker && <Banner tone="warn" title={blocker} />}
       {enc.checked && enc.jpeg && <Banner tone="info" title="This computer can't encode video in the window, so rendering will be slower." />}
 
-      <Section label="Size">
+      <Section label="Size" tip="Shape, resolution and frame rate of the video">
         <div className={styles.form}>
           {rules.showAspect ? (
             <div className={styles.field}>
-              <span className={styles.label}>Shape</span>
-              <SegmentedControl size="sm" aria-label="Aspect" value={prefs.aspect} onChange={(aspect: Aspect) => onPrefs({ aspect })} options={ASPECTS.map((a) => ({ value: a, label: a }))} />
+              <span className={styles.label} data-tip="The width to height ratio of the video">Shape</span>
+              <SegmentedControl size="sm" aria-label="Aspect" value={prefs.aspect} onChange={(aspect: Aspect) => onPrefs({ aspect })} options={ASPECTS.map((a) => ({ value: a, label: a, tip: ASPECT_TIP[a] ?? "Video shape " + a }))} />
             </div>
           ) : (
-            <p className={styles.muted}>The picture keeps the video's shape.</p>
+            <p className={styles.muted} data-tip="With visuals over a video, the output is the same shape as your video">The picture keeps the video's shape.</p>
           )}
           <div className={styles.field}>
-            <span className={styles.label}>Quality</span>
+            <span className={styles.label} data-tip="Height of the picture in pixels; higher is sharper but slower and bigger">Quality</span>
             <SegmentedControl
               size="sm"
               aria-label="Quality"
               value={String(prefs.height)}
               onChange={(h) => onPrefs({ height: Number(h) as Height })}
-              options={[720, 1080, 1440, 2160].map((h) => ({ value: String(h), label: `${h}p`, disabled: h === 2160 && !rules.heights.includes(2160) }))}
+              options={[720, 1080, 1440, 2160].map((h) => ({ value: String(h), label: `${h}p`, tip: h === 2160 && !rules.heights.includes(2160) ? "4K can't be rendered here: this computer's video encoder or the chosen setup doesn't support it" : QUALITY_TIP[h], disabled: h === 2160 && !rules.heights.includes(2160) }))}
             />
             {rules.showAspect && (
-              <span className={styles.muted}>
+              <span className={styles.muted} data-tip="The exact size of the video in pixels, width × height">
                 {size.w}×{size.h}
               </span>
             )}
           </div>
           {rules.showFps ? (
             <div className={styles.field}>
-              <span className={styles.label}>Frame rate</span>
-              <SegmentedControl size="sm" aria-label="Frame rate" value={String(prefs.fps)} onChange={(f) => onPrefs({ fps: Number(f) as 30 | 60 })} options={[{ value: "30", label: "30 fps" }, { value: "60", label: "60 fps" }]} />
+              <span className={styles.label} data-tip="Pictures per second; 60 looks smoother but takes about twice as long">Frame rate</span>
+              <SegmentedControl size="sm" aria-label="Frame rate" value={String(prefs.fps)} onChange={(f) => onPrefs({ fps: Number(f) as 30 | 60 })} options={[{ value: "30", label: "30 fps", tip: "Standard smoothness, faster to render" }, { value: "60", label: "60 fps", tip: "Extra smooth motion; renders about twice as slowly" }]} />
             </div>
           ) : (
-            <p className={styles.muted}>The frame rate follows the video.</p>
+            <p className={styles.muted} data-tip="The output uses the same frame rate as your video">The frame rate follows the video.</p>
           )}
         </div>
       </Section>
 
-      <Section label="Range">
+      <Section label="Range" tip="Render the whole song or only part of it">
         <div className={styles.form}>
           <SegmentedControl
             size="sm"
@@ -272,27 +286,28 @@ export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) 
             value={useSel ? "selection" : "whole"}
             onChange={setRange}
             options={[
-              { value: "whole", label: "Whole song" },
-              { value: "selection", label: selection ? `Selection ${formatMs(selection.startMs)}–${formatMs(selection.endMs)}` : "Selection", disabled: !selection },
+              { value: "whole", label: "Whole song", tip: "Render from the start to the end" },
+              { value: "selection", label: selection ? `Selection ${formatMs(selection.startMs)}–${formatMs(selection.endMs)}` : "Selection", disabled: !selection, tip: selection ? "Render only the part you selected on the Song Map" : "Shift-drag on the Song Map in Design to select a part first" },
             ]}
           />
           {!selection && <p className={styles.muted}>Shift-drag on the Song Map in Design to pick a part.</p>}
         </div>
       </Section>
 
-      <Section label="Sound and background">
+      <Section label="Sound and background" tip="Which audio goes in the video and what is behind the visuals">
         <div className={styles.form}>
           <div className={styles.field}>
-            <span className={styles.label}>Audio</span>
-            <SegmentedControl size="sm" aria-label="Audio" value={prefs.audio} onChange={(audio) => onPrefs({ audio })} options={[{ value: "original", label: "Original" }, { value: "instrumental", label: "Instrumental", disabled: !rules.instrumentalAllowed }]} />
+            <span className={styles.label} data-tip="Which sound the finished video carries">Audio</span>
+            <SegmentedControl size="sm" aria-label="Audio" value={prefs.audio} onChange={(audio) => onPrefs({ audio })} options={[{ value: "original", label: "Original", tip: "Use the song exactly as it is" }, { value: "instrumental", label: "Instrumental", tip: rules.instrumentalAllowed ? "Use the song without vocals" : "Needs the instruments separated in the Source step", disabled: !rules.instrumentalAllowed }]} />
             {!rules.instrumentalAllowed && <span className={styles.muted}>Needs the instruments separated.</span>}
           </div>
           {rules.showBackground && (
             <div className={styles.field}>
-              <span className={styles.label}>Background</span>
+              <span className={styles.label} data-tip="What shows behind the visuals">Background</span>
               <Select
                 size="sm"
                 aria-label="Background"
+                data-tip="None is a plain backdrop; Cover art, an image or a video sit behind the visuals"
                 value={prefs.background}
                 onChange={(b) => {
                   if (b === "image" || b === "video") void pickBackground(b);
@@ -306,7 +321,7 @@ export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) 
                 ]}
               />
               {(prefs.background === "image" || prefs.background === "video") && prefs.backgroundPath && (
-                <button type="button" className={styles.linkBtn} title={prefs.backgroundPath} onClick={() => void pickBackground(prefs.background as "image" | "video")}>
+                <button type="button" className={styles.linkBtn} data-tip={`${prefs.backgroundPath} (click to choose another)`} onClick={() => void pickBackground(prefs.background as "image" | "video")}>
                   {base(prefs.backgroundPath)}
                 </button>
               )}
@@ -315,14 +330,14 @@ export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) 
         </div>
       </Section>
 
-      <Section label="Preview">
+      <Section label="Preview" tip="Render a short sample to check the look before the full render">
         <div className={styles.form}>
           <label className={styles.field}>
-            <span className={styles.label}>Starts at {formatMs(previewStart)}</span>
+            <span className={styles.label} data-tip="Where in the song the 10 second preview starts">Starts at {formatMs(previewStart)}</span>
             <Slider aria-label="Preview start" min={0} max={maxStart} step={500} value={Math.min(previewStart, maxStart)} onChange={setPreviewStart} format={formatMs} />
           </label>
           <div className={styles.row}>
-            <Button icon="play" variant="secondary" loading={preview.busy} disabled={!!blocker || busy} onClick={() => go(preview, VisualizerAction.ActionPreview)}>
+            <Button icon="play" variant="secondary" loading={preview.busy} disabled={!!blocker || busy} data-tip={blocker || (busy ? "Wait for the current render to finish" : "Render 10 seconds from the chosen start so you can check it")} onClick={() => go(preview, VisualizerAction.ActionPreview)}>
               Render 10 s preview
             </Button>
           </div>
@@ -331,14 +346,14 @@ export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) 
         </div>
       </Section>
 
-      <Section label="Video">
+      <Section label="Video" tip="Render the finished video">
         <div className={styles.form}>
           <div className={styles.row}>
-            <Button icon="film" variant="primary" loading={render.busy} disabled={!!blocker || busy} onClick={() => go(render, VisualizerAction.ActionRender)}>
+            <Button icon="film" variant="primary" loading={render.busy} disabled={!!blocker || busy} data-tip={blocker || (busy ? "Wait for the current render to finish" : "Render the full video with these settings and save it to your Library")} onClick={() => go(render, VisualizerAction.ActionRender)}>
               Render video
             </Button>
             {onBack && (
-              <Button variant="ghost" icon="chevron-left" onClick={onBack}>
+              <Button variant="ghost" icon="chevron-left" onClick={onBack} data-tip="Return to the designer">
                 Back to design
               </Button>
             )}

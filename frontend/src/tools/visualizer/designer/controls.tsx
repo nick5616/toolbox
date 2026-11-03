@@ -33,6 +33,7 @@ export function SignalSelect({ value, onChange, placeholder = "Choose…", onNon
       <select
         className={styles.nativeSelect}
         aria-label={label}
+        data-tip="Pick the part of the music that drives this: an instrument, the beat, the words or a slow drift"
         value={value ?? ""}
         onChange={(e) => {
           const v = e.target.value;
@@ -61,7 +62,7 @@ export function SignalMeter({ signal, label }: { signal: SignalId | null; label?
   const d = useDesigner();
   const v = signal && d ? Math.max(0, Math.min(1, d.signals.value(signal, d.liveMs))) : 0;
   return (
-    <span className={styles.liveMeter} role="meter" aria-label={label ?? "Signal level"} aria-valuemin={0} aria-valuemax={1} aria-valuenow={Math.round(v * 100) / 100}>
+    <span className={styles.liveMeter} role="meter" aria-label={label ?? "Signal level"} data-tip="Live level of this driver at the playhead" aria-valuemin={0} aria-valuemax={1} aria-valuenow={Math.round(v * 100) / 100}>
       <span className={styles.liveFill} style={{ width: `${Math.round(v * 100)}%` }} />
     </span>
   );
@@ -72,12 +73,14 @@ export const SHAPES: Array<{ value: ModShape; label: string }> = [
   { value: "ease", label: "Smooth" },
   { value: "exp", label: "Punchy" },
   { value: "gate", label: "On/off" },
-];
+]
+
+const SHAPE_TIP = "How the driver maps to the effect: Linear follows it directly, Smooth eases, Punchy reacts mostly to peaks, On/off switches at a threshold";
 
 export function ModsEditor({ mods, onChange, label }: { mods: Mod[]; onChange(mods: Mod[]): void; label: string }) {
   const patch = (i: number, p: Partial<Mod>) => onChange(mods.map((m, k) => (k === i ? { ...m, ...p } : m)));
   return (
-    <div className={styles.mods} role="group" aria-label={`Reactions of ${label}`}>
+    <div className={styles.mods} role="group" aria-label={`Reactions of ${label}`} data-tip="Drivers that move this setting with the music; amounts add together">
       {mods.length === 0 && <p className={styles.hint}>Nothing drives this yet.</p>}
       {mods.map((m, i) => (
         <div key={i} className={styles.mod}>
@@ -86,26 +89,27 @@ export function ModsEditor({ mods, onChange, label }: { mods: Mod[]; onChange(mo
             <Select
               size="sm"
               aria-label="Shape"
+              data-tip={SHAPE_TIP}
               value={m.shape}
               onChange={(shape) => patch(i, { shape })}
               options={SHAPES}
             />
-            <IconButton size="sm" icon="x" label="Remove reaction" onClick={() => onChange(mods.filter((_, k) => k !== i))} />
+            <IconButton size="sm" icon="x" label="Remove reaction" data-tip="Stop this driver from moving the setting" onClick={() => onChange(mods.filter((_, k) => k !== i))} />
           </div>
           <Slider aria-label="Amount" min={-2} max={2} step={0.05} value={m.amount} onChange={(amount) => patch(i, { amount })} format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`} />
           <div className={styles.modTimes}>
             <label className={styles.inline}>
-              <span>Attack</span>
+              <span data-tip="How quickly the effect rises when the driver goes up (milliseconds); lower is snappier">Attack</span>
               <Stepper aria-label="Attack" unit="ms" min={1} max={2000} step={5} value={m.attackMs ?? DEFAULT_ATTACK_MS} onChange={(attackMs) => patch(i, { attackMs })} />
             </label>
             <label className={styles.inline}>
-              <span>Release</span>
+              <span data-tip="How slowly the effect falls back when the driver drops (milliseconds); higher is smoother">Release</span>
               <Stepper aria-label="Release" unit="ms" min={1} max={5000} step={10} value={m.releaseMs ?? DEFAULT_RELEASE_MS} onChange={(releaseMs) => patch(i, { releaseMs })} />
             </label>
           </div>
         </div>
       ))}
-      <button type="button" className={styles.linkBtn} onClick={() => onChange([...mods, { ...DEFAULT_MOD }])}>
+      <button type="button" className={styles.linkBtn} data-tip="Add another part of the music that moves this setting" onClick={() => onChange([...mods, { ...DEFAULT_MOD }])}>
         + Add a driver
       </button>
     </div>
@@ -141,12 +145,13 @@ export function ParamEditor({ spec, label, value, onChange, reactive = true }: P
     return (
       <div className={styles.param}>
         <div className={styles.paramHead}>
-          <span className={styles.paramLabel}>{name}</span>
+          <span className={styles.paramLabel} data-tip={`Drag to set ${name}; the activity button makes it follow the music`}>{name}</span>
           {reactive && (
             <IconButton
               size="sm"
               icon="activity"
               label={`Reactions for ${name}`}
+              data-tip={`Make ${name} move with the music: choose what drives it and how strongly`}
               pressed={open || mods.length > 0}
               onClick={() => setOpen((o) => !o)}
               className={cx(mods.length > 0 && styles.reactive)}
@@ -161,7 +166,7 @@ export function ParamEditor({ spec, label, value, onChange, reactive = true }: P
   if (spec.kind === "bool") {
     return (
       <div className={styles.param}>
-        <Switch label={name} checked={value === true} onChange={onChange} />
+        <Switch tip={`Turn ${name} on or off`} label={name} checked={value === true} onChange={onChange} />
       </div>
     );
   }
@@ -171,7 +176,7 @@ export function ParamEditor({ spec, label, value, onChange, reactive = true }: P
       <div className={styles.param}>
         <label className={styles.inline}>
           <span className={styles.paramLabel}>{name}</span>
-          <Select size="sm" aria-label={name} value={cur} onChange={onChange} options={spec.options.map((o) => ({ value: o, label: o }))} />
+          <Select size="sm" aria-label={name} data-tip={`Choose the option for ${name.toLowerCase()}`} value={cur} onChange={onChange} options={spec.options.map((o) => ({ value: o, label: o }))} />
         </label>
       </div>
     );
@@ -185,6 +190,7 @@ export function ParamEditor({ spec, label, value, onChange, reactive = true }: P
         <Select
           size="sm"
           aria-label={name}
+          data-tip="Use a colour from the palette, or pick your own"
           value={custom ? "custom" : cur}
           onChange={(v) => onChange(v === "custom" ? (/^#[0-9a-f]{6}$/i.test(cur) ? cur : "#ffffff") : v)}
           options={[...COLOR_REFS.map((r) => ({ value: r as string, label: COLOR_LABELS[r] ?? r })), { value: "custom", label: "Custom…" }]}

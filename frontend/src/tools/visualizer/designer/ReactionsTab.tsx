@@ -30,11 +30,11 @@ export function ReactionsTab({ show, onChange }: TabProps) {
             return (
               <li key={slot.target} className={styles.reaction}>
                 <div className={styles.reactionTop}>
-                  <span className={styles.reactionLabel} title={slot.target}>
+                  <span className={styles.reactionLabel} data-tip="A setting of the design that follows the music">
                     {slot.label}
                   </span>
                   <SignalMeter signal={mod?.signal ?? null} label={`${slot.label} driver level`} />
-                  <IconButton size="sm" icon="x" label={`Remove ${slot.label}`} onClick={() => onChange(removeReaction(show, i))} />
+                  <IconButton size="sm" icon="x" label={`Remove ${slot.label}`} data-tip="Stop this setting from following the music" onClick={() => onChange(removeReaction(show, i))} />
                 </div>
                 <div className={styles.reactionRow}>
                   <SignalSelect label={`${slot.label} driver`} value={mod?.signal ?? null} placeholder="Choose a driver" onChange={(s: SignalId) => onChange(setReactionDriver(show, i, s))} />
@@ -57,10 +57,11 @@ export function ReactionsTab({ show, onChange }: TabProps) {
       )}
 
       <div className={styles.addRow}>
-        <span className={styles.paramLabel}>Add reaction</span>
+        <span className={styles.paramLabel} data-tip="Make another setting follow the music: pick the layer, the setting, then Add">Add reaction</span>
         <Select
           size="sm"
           aria-label="Layer"
+          data-tip="The layer whose setting should follow the music"
           value={group}
           onChange={(v) => {
             setGroup(v);
@@ -68,10 +69,11 @@ export function ReactionsTab({ show, onChange }: TabProps) {
           }}
           options={[{ value: "", label: "Layer…" }, ...targets.map((t) => ({ value: t.groupId, label: t.groupLabel }))]}
         />
-        <Select size="sm" aria-label="Parameter" value={param} disabled={!groupItems} onChange={setParam} options={[{ value: "", label: "Parameter…" }, ...params.map((p) => ({ value: p.target, label: p.label }))]} />
+        <Select size="sm" aria-label="Parameter" data-tip={groupItems ? "The setting to move; ones already used are hidden" : "Choose a layer first"} value={param} disabled={!groupItems} onChange={setParam} options={[{ value: "", label: "Parameter…" }, ...params.map((p) => ({ value: p.target, label: p.label }))]} />
         <Button
           size="sm"
           icon="plus"
+          data-tip={param ? "Add this reaction, then choose its driver" : "Choose a layer and a setting first"}
           disabled={!param}
           onClick={() => {
             onChange(addReaction(show, param));

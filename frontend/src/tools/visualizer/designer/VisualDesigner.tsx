@@ -49,6 +49,14 @@ const ALL_TABS: Array<{ id: DesignerTab; label: string; icon: string }> = [
   { id: "timeline", label: "Timeline", icon: "map" },
 ];
 
+const TAB_TIP: Record<DesignerTab, string> = {
+  presets: "Start from a ready-made look, or one of your saved designs",
+  look: "Colours, how strongly it reacts, glow, grain and the words on screen",
+  reactions: "Choose which parts of the music move which settings",
+  layers: "Build the picture layer by layer, with effects and settings",
+  timeline: "Decide which scene plays in each section of the song",
+};
+
 export function VisualDesigner({ inputPath, analysis, show, onChange, aspect, mode, player, text, tabs, onSavePreset }: VisualDesignerProps) {
   const engineText = text === "engine";
   const visible = useMemo(() => ALL_TABS.filter((t) => !tabs || tabs.includes(t.id)), [tabs]);
@@ -166,9 +174,9 @@ export function VisualDesigner({ inputPath, analysis, show, onChange, aspect, mo
           />
         </div>
         <div className={styles.right}>
-          <div className={styles.tabs} role="tablist" aria-label="Designer">
+          <div className={styles.tabs} role="tablist" aria-label="Designer" data-tip="Design sections">
             {visible.map((t) => (
-              <button key={t.id} type="button" role="tab" id={`vd-tab-${t.id}`} aria-selected={tab === t.id} aria-controls="vd-panel" tabIndex={tab === t.id ? 0 : -1} className={cx(styles.tab, tab === t.id && styles.tabOn)} title={t.label} onClick={() => setTab(t.id)}>
+              <button key={t.id} type="button" role="tab" id={`vd-tab-${t.id}`} aria-selected={tab === t.id} aria-controls="vd-panel" tabIndex={tab === t.id ? 0 : -1} className={cx(styles.tab, tab === t.id && styles.tabOn)} data-tip={TAB_TIP[t.id]} onClick={() => setTab(t.id)}>
                 <Icon name={t.icon} size={14} />
                 <span className={styles.tabLabel}>{t.label}</span>
               </button>

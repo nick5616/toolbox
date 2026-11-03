@@ -61,6 +61,18 @@ export interface SongMapProps {
 const FALLBACK_WIDTH = 800;
 const ZOOM_STEP = 1.6;
 
+const LANE_TIP: Record<SongMapLane, string> = {
+  sections: "The parts of the song; click one in the Timeline tab to choose its scene",
+  beats: "Beats and bars; the taller lines are downbeats",
+  drums: "How loud the drums are over time",
+  bass: "How loud the bass is over time",
+  vocals: "How loud the vocals are over time",
+  other: "How loud the remaining instruments are over time",
+  chords: "The chords the song plays",
+  mood: "How the song or words feel over time",
+  lyrics: "The words, placed where they are sung",
+};
+
 type Drag = { mode: "seek" } | { mode: "select"; fromMs: number };
 
 export function SongMap({ analysis, timeline, playheadMs, onSeek, selection, onSelect, onSectionClick, lanes, className }: SongMapProps) {
@@ -248,21 +260,21 @@ export function SongMap({ analysis, timeline, playheadMs, onSeek, selection, onS
   return (
     <div className={cx(styles.root, className)} role="group" aria-label="Song map">
       <div className={styles.toolbar}>
-        <span className={styles.hint}>Ctrl + wheel to zoom · Shift + drag to select a range</span>
+        <span className={styles.hint} data-tip="Click or drag on the map to move the playhead">Ctrl + wheel to zoom · Shift + drag to select a range</span>
         {selection && onSelect && (
-          <button type="button" className={styles.clear} onClick={() => onSelect(null)}>
+          <button type="button" className={styles.clear} onClick={() => onSelect(null)} data-tip="Remove the selected range so the export covers the whole song" data-tip-kbd="Esc">
             Clear selection
           </button>
         )}
-        <IconButton size="sm" icon="zoom-out" label="Zoom out" disabled={!zoomed} onClick={() => zoomTo(pps / ZOOM_STEP, width / 2)} />
-        <IconButton size="sm" icon="zoom-in" label="Zoom in" onClick={() => zoomTo(pps * ZOOM_STEP, width / 2)} />
-        <IconButton size="sm" icon="maximize" label="Fit the whole song" disabled={!zoomed} onClick={() => zoomTo(fit, width / 2)} />
+        <IconButton size="sm" icon="zoom-out" label="Zoom out" data-tip="Show more of the song at once" disabled={!zoomed} onClick={() => zoomTo(pps / ZOOM_STEP, width / 2)} />
+        <IconButton size="sm" icon="zoom-in" label="Zoom in" data-tip="Show less of the song in more detail" onClick={() => zoomTo(pps * ZOOM_STEP, width / 2)} />
+        <IconButton size="sm" icon="maximize" label="Fit the whole song" data-tip="Zoom out so the whole song fits the width" disabled={!zoomed} onClick={() => zoomTo(fit, width / 2)} />
       </div>
       <div className={styles.body}>
-        <div className={styles.labels} style={{ width: LABEL_WIDTH }} aria-hidden="true">
+        <div className={styles.labels} style={{ width: LABEL_WIDTH }}>
           <div style={{ height: RULER_HEIGHT }} />
           {laneIds.map((l) => (
-            <div key={l} className={styles.label} style={{ height: LANE_HEIGHT[l] }}>
+            <div key={l} className={styles.label} style={{ height: LANE_HEIGHT[l] }} data-tip={LANE_TIP[l]} data-tip-side="right">
               {LANE_LABEL[l]}
             </div>
           ))}
@@ -273,6 +285,7 @@ export function SongMap({ analysis, timeline, playheadMs, onSeek, selection, onS
           tabIndex={0}
           role="slider"
           aria-label="Song position"
+          data-tip="Click or drag to move the playhead; arrow keys step 1 s (Shift 5 s), Home and End jump"
           aria-valuemin={0}
           aria-valuemax={Math.round(duration)}
           aria-valuenow={Math.round(Math.min(duration, Math.max(0, playheadMs)))}
@@ -282,13 +295,14 @@ export function SongMap({ analysis, timeline, playheadMs, onSeek, selection, onS
         >
           <div className={styles.track} style={{ width: total, height: tops.total }}>
             <div ref={stageRef} className={styles.stage} style={{ width, height: tops.total }} onMouseDown={onMouseDown} data-testid="songmap-stage">
-              <canvas ref={setCanvas("ruler")} role="img" aria-label="Time ruler" className={styles.canvas} style={{ width, height: RULER_HEIGHT }} />
+              <canvas ref={setCanvas("ruler")} role="img" aria-label="Time ruler" data-tip="Time in minutes and seconds" className={styles.canvas} style={{ width, height: RULER_HEIGHT }} />
               {laneIds.map((l) => (
                 <canvas
                   key={l}
                   ref={setCanvas(l)}
                   role="img"
                   aria-label={`${LANE_LABEL[l]} lane`}
+                  data-tip={LANE_TIP[l]}
                   data-lane={l}
                   className={styles.canvas}
                   style={{ width, height: LANE_HEIGHT[l] }}
@@ -317,6 +331,7 @@ export function SongMap({ analysis, timeline, playheadMs, onSeek, selection, onS
             <li key={`${b.startMs}-${i}`}>
               <button
                 type="button"
+                data-tip="Jump to this section and pick its scene"
                 onClick={() => {
                   onSeek(b.startMs);
                   onSectionClick(i);

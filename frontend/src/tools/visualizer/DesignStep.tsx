@@ -86,7 +86,7 @@ export default function DesignStep({ lastShow, aspect, onExport, onBack }: Desig
   if (!input) return <Banner tone="info" title="Choose a song first." />;
   if (!analysis) {
     return loaded.status === "error" ? (
-      <Banner tone="danger" title={loaded.error?.message ?? "Couldn't load the analysis"} action={onBack && <Button size="sm" onClick={onBack}>Back</Button>}>
+      <Banner tone="danger" title={loaded.error?.message ?? "Couldn't load the analysis"} action={onBack && <Button size="sm" onClick={onBack} data-tip="Go back to the analysis">Back</Button>}>
         {loaded.error?.hint}
       </Banner>
     ) : (
@@ -99,16 +99,16 @@ export default function DesignStep({ lastShow, aspect, onExport, onBack }: Desig
   return (
     <div className={styles.root}>
       <div className={styles.bar}>
-        <IconButton icon="undo-2" label="Undo" kbd="Mod+Z" disabled={!history.canUndo} onClick={history.undo} />
-        <IconButton icon="redo-2" label="Redo" kbd="Mod+Shift+Z" disabled={!history.canRedo} onClick={history.redo} />
-        <span className={styles.name}>{history.show.name}</span>
+        <IconButton icon="undo-2" label="Undo" data-tip="Undo the last design change" kbd="Mod+Z" disabled={!history.canUndo} onClick={history.undo} />
+        <IconButton icon="redo-2" label="Redo" data-tip="Redo the change you just undid" kbd="Mod+Shift+Z" disabled={!history.canRedo} onClick={history.redo} />
+        <span className={styles.name} data-tip="The name of this design">{history.show.name}</span>
         <span className={styles.spacer} />
         {onBack && (
-          <Button variant="ghost" onClick={onBack}>
+          <Button variant="ghost" onClick={onBack} data-tip="Go back to the song map">
             Back
           </Button>
         )}
-        <Button variant="primary" icon="film" onClick={onExport}>
+        <Button variant="primary" icon="film" onClick={onExport} data-tip="Choose the size and quality and render the video">
           Export
         </Button>
       </div>

@@ -35,6 +35,50 @@ const GROUPS: Array<{ id: LayerDef["group"]; label: string }> = [
   { id: "motif", label: "Motifs" },
 ];
 
+const GROUP_TIP: Record<string, string> = {
+  background: "A full-frame backdrop behind everything else",
+  shape: "Shapes that draw the music: spectrum, waves and geometry",
+  particles: "Small moving specks that react to hits",
+  accent: "Flashes and glows that punctuate beats",
+  highway: "Notes scrolling toward you as the music plays",
+  motif: "Pictures of what the words describe (fire, rain, stars…)",
+};
+
+const LAYER_TIP: Record<string, string> = {
+  aurora: "Soft curtains of colour that drift and swell with the music",
+  bars: "Classic spectrum bars that jump with the sound",
+  bursts: "Particle bursts thrown out on hits",
+  embers: "Glowing embers that rise and flicker",
+  fireflies: "Drifting lights that pulse with the music",
+  frame: "A glowing border around the picture that pulses",
+  geometry: "Geometric shapes that spin and morph with the beat",
+  gradient: "A smooth colour gradient that shifts with the music",
+  helix: "A twisting double helix driven by the sound",
+  highway: "Notes that scroll toward you, following the melody",
+  image: "Your own picture as a background",
+  ink: "Ink-like clouds that swirl and spread",
+  kaleido: "A kaleidoscope pattern that turns with the music",
+  lightrays: "Beams of light that swell on loud parts",
+  lissajous: "Looping curves traced by the left and right sound",
+  motif: "Pictures of what the words describe",
+  nebula: "A cloudy space backdrop that breathes with the music",
+  oscilloscope: "The sound wave drawn as a glowing line",
+  pitchribbon: "A ribbon that rises and falls with the pitch",
+  radial: "Spectrum bars arranged in a circle",
+  ribbons: "Flowing ribbons that move with the music",
+  ripples: "Rings that spread out on each beat",
+  shockwave: "A ring that blasts outward on strong hits",
+  starfield: "Stars flying past, faster on loud parts",
+  sweep: "A band of light that sweeps across on beats",
+  synthgrid: "A retro perspective grid that scrolls with the music",
+  terrain: "Rolling hills shaped by the sound",
+  tunnel: "Flying through a tunnel that pulses with the music",
+  vortex: "A swirling vortex that spins with the sound",
+  wavering: "A ring that ripples with the waveform",
+};
+
+const BLEND_TIP = "How this layer mixes with the ones below: Normal covers, Add and Screen brighten, Multiply darkens";
+
 const BLENDS: Array<{ value: Blend; label: string }> = [
   { value: "normal", label: "Normal" },
   { value: "add", label: "Add" },
@@ -56,11 +100,11 @@ function PostEditor({ show, scope, onChange }: { show: Show; scope: PostScope; o
         return (
           <div key={pc.id} className={styles.postRow}>
             <div className={styles.layerRow}>
-              <IconButton size="sm" icon={pc.enabled ? "eye" : "eye-off"} label={`${pc.enabled ? "Turn off" : "Turn on"} ${def?.label ?? pc.type}`} onClick={() => onChange(togglePost(show, scope, pc.id))} />
-              <button type="button" className={styles.layerName} aria-expanded={open} onClick={() => setOpenId(open ? "" : pc.id)}>
+              <IconButton size="sm" icon={pc.enabled ? "eye" : "eye-off"} label={`${pc.enabled ? "Turn off" : "Turn on"} ${def?.label ?? pc.type}`} data-tip={pc.enabled ? "Switch this effect off without removing it" : "Switch this effect back on"} onClick={() => onChange(togglePost(show, scope, pc.id))} />
+              <button type="button" className={styles.layerName} aria-expanded={open} data-tip={open ? "Hide this effect's settings" : "Show this effect's settings"} onClick={() => setOpenId(open ? "" : pc.id)}>
                 {def?.label ?? pc.type}
               </button>
-              <IconButton size="sm" icon="trash-2" label={`Remove ${def?.label ?? pc.type}`} onClick={() => onChange(removePost(show, scope, pc.id))} />
+              <IconButton size="sm" icon="trash-2" label={`Remove ${def?.label ?? pc.type}`} data-tip="Remove this effect from the design" onClick={() => onChange(removePost(show, scope, pc.id))} />
             </div>
             {open && def && (
               <div className={styles.layerParams}>
@@ -74,10 +118,11 @@ function PostEditor({ show, scope, onChange }: { show: Show; scope: PostScope; o
       })}
       {free.length > 0 && (
         <div className={styles.addRow}>
-          <Select size="sm" aria-label="Effect" value={adding} onChange={(v) => setAdding(v as PostType | "")} options={[{ value: "", label: "Add an effect…" }, ...free.map((d) => ({ value: d.type, label: d.label }))]} />
+          <Select size="sm" aria-label="Effect" data-tip="Choose a finishing effect (bloom, grain…) to add over the picture" value={adding} onChange={(v) => setAdding(v as PostType | "")} options={[{ value: "", label: "Add an effect…" }, ...free.map((d) => ({ value: d.type, label: d.label }))]} />
           <Button
             size="sm"
             icon="plus"
+            data-tip={adding ? "Add the chosen effect" : "Choose an effect first"}
             disabled={!adding}
             onClick={() => {
               if (adding) onChange(addPost(show, scope, adding));
@@ -117,6 +162,7 @@ export function LayersTab({ show, onChange }: TabProps) {
       <SegmentedControl
         size="sm"
         aria-label="Scene"
+        data-tip="Each scene is its own set of layers; the Timeline decides when each plays"
         value={scene.id}
         onChange={(id) => {
           setSceneId(id);
@@ -126,10 +172,10 @@ export function LayersTab({ show, onChange }: TabProps) {
       />
 
       <div className={styles.stackHead}>
-        <span className={styles.paramLabel}>
-          Layers <span className={styles.count}>{n}/{MAX_LAYERS_PER_SCENE}</span>
+        <span className={styles.paramLabel} data-tip="Layers in this scene; the one at the top draws in front">
+          Layers <span className={styles.count} data-tip="Layers used and the most a scene can hold">{n}/{MAX_LAYERS_PER_SCENE}</span>
         </span>
-        <Button size="sm" icon="plus" variant="secondary" aria-expanded={catalogue} disabled={full} onClick={() => setCatalogue((c) => !c)}>
+        <Button size="sm" icon="plus" variant="secondary" aria-expanded={catalogue} data-tip={full ? "This scene is full; delete a layer to add another" : "Choose a new layer to add to this scene"} disabled={full} onClick={() => setCatalogue((c) => !c)}>
           Add layer
         </Button>
       </div>
@@ -141,13 +187,14 @@ export function LayersTab({ show, onChange }: TabProps) {
             if (items.length === 0) return null;
             return (
               <div key={g.id} className={styles.catGroup}>
-                <div className={styles.catTitle}>{g.label}</div>
+                <div className={styles.catTitle} data-tip={GROUP_TIP[g.id]}>{g.label}</div>
                 <div className={styles.catItems}>
                   {items.map((d) => (
                     <button
                       key={d.type}
                       type="button"
                       className={styles.catItem}
+                      data-tip={LAYER_TIP[d.type] ?? GROUP_TIP[d.group]}
                       onClick={() => {
                         onChange(addLayer(show, scene.id, d.type));
                         setCatalogue(false);
@@ -188,19 +235,20 @@ export function LayersTab({ show, onChange }: TabProps) {
             >
               <div className={styles.layerRow}>
                 <Icon name="grip-vertical" size={14} className={styles.grip} />
-                <IconButton size="sm" icon={l.enabled ? "eye" : "eye-off"} label={`${l.enabled ? "Hide" : "Show"} ${def?.label ?? l.type} (${l.id})`} onClick={() => onChange(toggleLayer(show, scene.id, l.id))} />
-                <button type="button" className={styles.layerName} aria-pressed={selected === l.id} onClick={() => setSelected(selected === l.id ? "" : l.id)}>
+                <IconButton size="sm" icon={l.enabled ? "eye" : "eye-off"} label={`${l.enabled ? "Hide" : "Show"} ${def?.label ?? l.type} (${l.id})`} data-tip={l.enabled ? "Hide this layer without deleting it" : "Show this layer again"} onClick={() => onChange(toggleLayer(show, scene.id, l.id))} />
+                <button type="button" className={styles.layerName} aria-pressed={selected === l.id} data-tip={LAYER_TIP[l.type] ?? "Select this layer to edit its settings"} onClick={() => setSelected(selected === l.id ? "" : l.id)}>
                   <Icon name={def?.icon ?? "box"} size={14} />
                   <span>{def?.label ?? l.type}</span>
                   {l.id !== l.type && <span className={styles.layerId}>{l.id}</span>}
                 </button>
-                <IconButton size="sm" icon="chevron-up" label={`Move ${l.id} up`} disabled={i === n - 1} onClick={() => onChange(moveLayer(show, scene.id, i, i + 1))} />
-                <IconButton size="sm" icon="chevron-down" label={`Move ${l.id} down`} disabled={i === 0} onClick={() => onChange(moveLayer(show, scene.id, i, i - 1))} />
-                <IconButton size="sm" icon="copy" label={`Duplicate ${l.id}`} disabled={full} onClick={() => onChange(duplicateLayer(show, scene.id, l.id))} />
+                <IconButton size="sm" icon="chevron-up" label={`Move ${l.id} up`} data-tip="Bring this layer forward, in front of the one above" disabled={i === n - 1} onClick={() => onChange(moveLayer(show, scene.id, i, i + 1))} />
+                <IconButton size="sm" icon="chevron-down" label={`Move ${l.id} down`} data-tip="Send this layer back, behind the one below" disabled={i === 0} onClick={() => onChange(moveLayer(show, scene.id, i, i - 1))} />
+                <IconButton size="sm" icon="copy" label={`Duplicate ${l.id}`} data-tip={full ? "This scene is full; delete a layer first" : "Add a copy of this layer with the same settings"} disabled={full} onClick={() => onChange(duplicateLayer(show, scene.id, l.id))} />
                 <IconButton
                   size="sm"
                   icon="trash-2"
                   label={`Delete ${l.id}`}
+                  data-tip="Remove this layer from the scene"
                   onClick={() => {
                     if (selected === l.id) setSelected("");
                     onChange(deleteLayer(show, scene.id, l.id));
@@ -216,7 +264,7 @@ export function LayersTab({ show, onChange }: TabProps) {
         <div className={styles.layerParams} role="group" aria-label={`${selDef.label} settings`}>
           <label className={styles.inline}>
             <span className={styles.paramLabel}>Blend</span>
-            <Select size="sm" aria-label="Blend" value={sel.blend} onChange={(b) => onChange(setLayerBlend(show, scene.id, sel.id, b))} options={BLENDS} />
+            <Select size="sm" aria-label="Blend" data-tip={BLEND_TIP} value={sel.blend} onChange={(b) => onChange(setLayerBlend(show, scene.id, sel.id, b))} options={BLENDS} />
           </label>
           <ParamEditor spec={{ kind: "number", label: "Opacity", min: 0, max: 1, default: 1 }} value={sel.opacity} onChange={(v) => onChange(setLayerOpacity(show, scene.id, sel.id, v as Param))} />
           {Object.entries(selDef.params).map(([k, spec]) => (
@@ -226,9 +274,9 @@ export function LayersTab({ show, onChange }: TabProps) {
       )}
 
       <div className={styles.divider} />
-      <div className={styles.paramLabel}>Effects in {scene.name || scene.id}</div>
+      <div className={styles.paramLabel} data-tip="Finishing effects applied only while this scene plays">Effects in {scene.name || scene.id}</div>
       <PostEditor show={show} scope={scene.id} onChange={onChange} />
-      <div className={styles.paramLabel}>Effects on everything</div>
+      <div className={styles.paramLabel} data-tip="Finishing effects applied over every scene">Effects on everything</div>
       <PostEditor show={show} scope="global" onChange={onChange} />
     </div>
   );
