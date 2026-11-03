@@ -322,3 +322,19 @@ Newest last. Format: date — decision — why.
   - **E2E flash:** flash ← marker.beat on black. Every click from 500 ms on has a bright frame within ±1 frame; two exports decode to identical frames (6.1 s each).
   - The click track's analysis found the drop at exactly 16,000 ms. The beat tracker's first beat is the second click (500 ms), so the sync check starts there.
 - 2026-11-03 — `integration/sandbox_engine_test.go` (`TOOLBOX_UPDATE_SANDBOX_ENGINE=1`) updates the dev sandbox's engine the way Settings → Update does, so lab runs don't stop at "needs an update".
+- 2026-11-03 — Edit Studio QA in the real app (after Wave 2):
+  - **Beat grid:** analyses whose tracker starts late (beatless intros, outros, breaks) get a completed grid in `viz/edit/markers.ts` (`beatGrid`): the median period continued before, after and through gaps over 1.75 periods. Estimated beats count at 0.6 strength, estimated downbeats at 0.7.
+  - **Stops:** a stop needs at least max(150 ms, 0.6 beat) of near-silence starting near a beat, and the music must come back; a song showed 28 false stops before.
+  - **Drops:** besides the engine's drops, a stop followed by the low end (sub+bass) or, with stems, the kick returning on a downbeat counts as a drop (deduped within 500 ms).
+  - **Matte readiness** (Go `matteReady`, TS `covers`) uses the clip's real source range with one frame of slack; the Go side used a max-speed bound and refused exports the UI showed as ready.
+  - **Split subject** keeps the clip's effects on the copy so subject and background stay aligned.
+  - **Section labels:** when no part repeats (instrumentals) and there are at least three parts, labels come from energy: loud parts are choruses (drops when a drop lands on them), the quietest late part is the bridge, the rest verses.
+  - **Analyze again** lives in the Song inspector (it reopens Setup's analysis panel with a way back).
+  - **Decoding:** a stream that fails three times is retried after 3 s (on the next seek or play) and its error clears when frames arrive, instead of staying dead for the session.
+  - **Wheel:** over lanes/tracks a plain wheel scrolls the rows when they overflow, Shift+wheel or sideways moves along the time, Ctrl/Cmd+wheel zooms.
+  - **Dev only:** `TOOLBOX_DEVTOOLS_PORT` (sandbox support dir only) opens WebView2's DevTools port on 127.0.0.1 for automated UI checks; under `wails3 dev` the render broker also accepts the dev server's origin. Production never sets either.
+- 2026-11-03 — Small windows (the app's minimum is 960 × 600):
+  - **Sidebar:** below 1180 px of window width the sidebar is an icon rail; its toggle opens it for the session without changing the saved preference.
+  - **Toolbars:** `Button`/`MenuButton` take `collapsible`; inside an element with `container: toolbar-compact / inline-size` their labels hide below 820 px (the label becomes the tooltip and accessible name).
+  - **Layouts:** Post Builder narrows its columns and turns Sources into a rail when the stage would be under 300 px (the user can still open it); the Photo Composer view is bounded to the window (its canvas was cut off) and hides the projects strip while editing on windows under 760 px tall; the Visualizer designer stays side by side (panel 300–380 px, icon tabs when narrow); file tools keep the run button in view while options scroll; dialogs keep their buttons in view when they scroll; the media player drops its volume slider when narrow.
+  - **Scroll chaining:** a global `overscroll-behavior: contain` was tried and dropped: it also blocks the page from scrolling while the pointer is over an input or a box that doesn't overflow.
