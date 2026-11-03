@@ -4,7 +4,7 @@
  * parameters. Used for clips, adjustment clips and the project Look.
  */
 import { useRef, useState, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent } from "react";
-import { ColorSwatchPicker, IconButton, MenuButton, Section, Select, Switch } from "@/components";
+import { ColorSwatchPicker, IconButton, Section, Select, Switch, toast } from "@/components";
 import { MAX_EFFECTS } from "@/viz/edit/schema";
 import type { EditParam, EditPost } from "@/viz/edit/types";
 import "@/viz/post";
@@ -12,21 +12,13 @@ import { postDef } from "@/viz/post/registry";
 import type { PostType } from "@/viz/types";
 import { newId } from "../doc";
 import { EditParamEditor } from "./EditParamEditor";
+import { EFFECT_CATALOG } from "./effectCatalog";
+import { EffectPicker } from "./EffectPicker";
 import { moveItem, targetIndex } from "./reorder";
-import { EFFECT_TEMPLATES } from "./templates";
 import styles from "./inspector.module.css";
 
-/** Names for passes that may not be registered in this build yet. */
-const FALLBACK_LABELS: Partial<Record<PostType, string>> = {
-  punch: "Zoom punch",
-  flash: "Flash",
-  blurpulse: "Blur pulse",
-  exposure: "Exposure pulse",
-  invert: "Invert",
-};
-
 export function effectLabel(type: PostType): string {
-  return postDef(type)?.label ?? FALLBACK_LABELS[type] ?? type;
+  return postDef(type)?.label ?? EFFECT_CATALOG[type]?.label ?? type;
 }
 
 /** A new effect with every parameter at its default. */
@@ -62,19 +54,21 @@ export function EffectsStack({ posts, onChange, types, clipTimeMs, allowKeys, te
       if (!n.delete(id)) n.add(id);
       return n;
     });
-  const add = (post: EditPost) => {
-    onChange([...posts, post], "");
-    setOpen((cur) => new Set(cur).add(post.id));
+  const addAll = (added: EditPost[], skipped: number) => {
+    if (added.length) {
+      onChange([...posts, ...added], "");
+      setOpen((cur) => new Set([...cur, ...added.map((p) => p.id)]));
+    }
+    if (skipped > 0) {
+      toast({
+        title: added.length ? `Added ${added.length} of ${added.length + skipped} effects` : "No room for more effects",
+        description: `An effect stack holds at most ${MAX_EFFECTS} effects.`,
+        tone: "warn",
+      });
+    }
   };
   const patch = (id: string, fn: (p: EditPost) => EditPost, key: string) => onChange(posts.map((p) => (p.id === id ? fn(p) : p)), key);
   const setParam = (id: string, name: string, value: EditParam | string | boolean, key: string) => patch(id, (p) => ({ ...p, params: { ...p.params, [name]: value } }), key);
-
-  const items = () => [
-    ...(templates
-      ? EFFECT_TEMPLATES.map((t) => ({ id: `tpl:${t.id}`, label: t.label, disabled: full, onSelect: () => add(t.make()) }))
-      : []),
-    ...types.map((t) => ({ id: `type:${t}`, label: effectLabel(t), disabled: full, onSelect: () => add(newEffect(t)) })),
-  ];
 
   // Dragging by the grip: pointer capture, the drop index follows the pointer over the items.
   const onGripDown = (e: RPointerEvent<HTMLElement>, id: string) => {
@@ -111,7 +105,7 @@ export function EffectsStack({ posts, onChange, types, clipTimeMs, allowKeys, te
   };
 
   return (
-    <Section label={label} action={<MenuButton label="Add effect" icon="plus" variant="ghost" size="sm" items={items} />}>
+    <Section label={label} action={<EffectPicker types={types} stacks={templates} room={MAX_EFFECTS - posts.length} label={effectLabel} makeEffect={newEffect} onAdd={addAll} />}>
       <div className={styles.stack}>
         {posts.length === 0 && <p className={styles.hint}>No effects yet. Add one, or start from a template that reacts to markers.</p>}
         {posts.map((p, i) => {

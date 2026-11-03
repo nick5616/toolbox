@@ -10,6 +10,7 @@ import {
   parseTransform,
   parseTransition,
   serializeEffects,
+  serializeSpeed,
   serializeTransform,
   serializeTransition,
   TRANSFORM_RULES,
@@ -25,6 +26,7 @@ import { kenBurns, markersInClip } from "./kenBurns";
 import { MasksSection } from "./MasksSection";
 import { isKeyed, paramKeys } from "./paramOps";
 import { baseName, SourceSection } from "./SourceSection";
+import { velocitySpeed, VELOCITY_PRESETS } from "./velocity";
 import { TransitionField } from "./TransitionField";
 import styles from "./inspector.module.css";
 import { TextSection } from "../text/TextSection";
@@ -81,6 +83,19 @@ export function ClipInspector({ clip }: { clip: EditClip }) {
         if (next) commit({ transform: serializeTransform(next) }, "");
       },
     },
+    ...(clip.kind === "video"
+      ? VELOCITY_PRESETS.map((v) => {
+          const speed = velocitySpeed(v.id, markers, clip);
+          return {
+            id: `velocity:${v.id}`,
+            label: `Velocity: ${v.label}`,
+            disabled: speed === null,
+            onSelect: () => {
+              if (speed !== null) commit({ speed: serializeSpeed(speed) }, "");
+            },
+          };
+        })
+      : []),
     { id: "reset-transform", label: "Reset transform", disabled: clip.transform === "", onSelect: () => commit({ transform: "" }, "") },
   ];
 
@@ -116,6 +131,11 @@ export function ClipInspector({ clip }: { clip: EditClip }) {
               />
             );
           })}
+          <Switch
+            label="Mirror past the edges"
+            checked={transform.edges === "mirror"}
+            onChange={(on) => commit({ transform: serializeTransform({ ...transform, edges: on ? "mirror" : undefined }) }, "")}
+          />
         </div>
       </Section>
 
