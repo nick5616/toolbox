@@ -159,6 +159,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
   const seekDrag = useRef(false);
   const onRulerDown = (e: RPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
+    e.stopPropagation();
     seekDrag.current = true;
     e.currentTarget.setPointerCapture?.(e.pointerId);
     p.onSeek(Math.min(msAtClientX(e.clientX), totalMs));
@@ -346,7 +347,18 @@ export function TimelinePanel(p: TimelinePanelProps) {
         <IconButton size="sm" icon="maximize" label="Fit the whole video" onClick={fit} />
       </div>
       <div className={styles.scroller} ref={scroller}>
-        <div className={styles.canvas} style={{ width: widthPx }}>
+        <div
+          className={styles.canvas}
+          style={{ width: widthPx }}
+          onPointerDown={(e) => {
+            // Empty space in any lane works like the ruler: click or drag moves the playhead.
+            const t = e.target as HTMLElement;
+            if (t === e.currentTarget || t.classList.contains(styles.lane as string) || t.classList.contains(styles.laneEmpty as string)) onRulerDown(e);
+          }}
+          onPointerMove={onRulerMove}
+          onPointerUp={onRulerUp}
+          onPointerCancel={onRulerUp}
+        >
           <div className={styles.ruler} onPointerDown={onRulerDown} onPointerMove={onRulerMove} onPointerUp={onRulerUp} onPointerCancel={onRulerUp} data-testid="ruler">
             {ticks.map((s) => (
               <span key={s} className={styles.tick} style={{ left: s * pps }}>
@@ -476,7 +488,10 @@ export function TimelinePanel(p: TimelinePanelProps) {
             )}
           </div>
 
-          <div className={styles.playhead} style={{ left: Math.min(timeMs, totalMs) * ppms }} data-testid="playhead" aria-hidden="true" />
+          <div className={styles.playhead} style={{ left: Math.min(timeMs, totalMs) * ppms }} data-testid="playhead">
+            {/* Drag the playhead (its head or anywhere along the line). */}
+            <div className={styles.playheadGrip} title="Drag to move the playhead" onPointerDown={onRulerDown} onPointerMove={onRulerMove} onPointerUp={onRulerUp} onPointerCancel={onRulerUp} />
+          </div>
         </div>
       </div>
 

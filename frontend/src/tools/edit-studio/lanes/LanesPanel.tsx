@@ -13,12 +13,13 @@ import { laneSettings } from "@/viz/edit/defaults";
 import { TAP_LATENCY_MS } from "@/viz/edit/markers";
 import { MARKER_LANES, editLength } from "@/viz/edit/types";
 import { drawLane, readTheme } from "@/tools/visualizer/songmap/draw";
-import { HEADER_PX, LANE_ROW_PX, msToX, RULER_PX, useTimelinePan, useTimelineWheel, xToMs } from "../geometry";
+import { HEADER_PX, LANE_ROW_PX, msToX, RULER_PX, useTimelinePan, useTimelineWheel } from "../geometry";
 import { useEditStudio, useMarkers, useProject } from "../store";
 import { cssColor, drawPeaks, prepCanvas } from "./draw";
 import { LaneRow } from "./LaneRow";
 import { addCustomMarker, deleteMarkers, groupByLane, LANE_LABELS, renameCustomMarker, tap, withLane, type TapState } from "./laneLogic";
 import styles from "./Lanes.module.css";
+import { startScrub } from "../timeline/scrub";
 
 const WAVE_ROW_PX = 36;
 const STEM_ROW_PX = 26;
@@ -70,8 +71,9 @@ function usePeaks(path: string): number[] {
   return peaks;
 }
 
-/** The playhead line, moved straight from the store (no React render per frame). */
-function Playhead({ width }: { width: number }) {
+/** The playhead line, moved straight from the store (no React render per frame); its head in the ruler and the line can be dragged. */
+function Playhead({ width, durationMs }: { width: number; durationMs: number }) {
+  const layer = useRef<HTMLDivElement>(null);
   const line = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const place = () => {
@@ -86,33 +88,21 @@ function Playhead({ width }: { width: number }) {
     return useEditStudio.subscribe(place);
   }, [width]);
   return (
-    <div className={styles.playheadLayer} aria-hidden="true">
-      <div ref={line} className={styles.playhead} />
+    <div ref={layer} className={styles.playheadLayer}>
+      <div ref={line} className={styles.playhead}>
+        <div className={styles.playheadHead} title="Drag to move the playhead" onPointerDown={(e) => startScrub(e, () => layer.current?.getBoundingClientRect().left ?? 0, durationMs)} />
+        <div className={styles.playheadGrip} title="Drag to move the playhead" onPointerDown={(e) => startScrub(e, () => layer.current?.getBoundingClientRect().left ?? 0, durationMs)} />
+      </div>
     </div>
   );
 }
 
-/** Click or drag on a row seeks the playhead. */
+/** Click or drag on a row seeks the playhead (the audio follows). */
 function useSeek(durationMs: number) {
-  const down = useRef(false);
-  const seek = (e: ReactPointerEvent<HTMLElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    const s = useEditStudio.getState();
-    s.setPlayhead(Math.max(0, Math.min(durationMs, xToMs(e.clientX - r.left, s.pps, s.scrollMs))));
-  };
   return {
     onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
-      if (e.button !== 0) return;
-      down.current = true;
-      e.currentTarget.setPointerCapture(e.pointerId);
-      seek(e);
-    },
-    onPointerMove: (e: ReactPointerEvent<HTMLElement>) => {
-      if (down.current) seek(e);
-    },
-    onPointerUp: (e: ReactPointerEvent<HTMLElement>) => {
-      down.current = false;
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+      const el = e.currentTarget;
+      startScrub(e, () => el.getBoundingClientRect().left, durationMs);
     },
   };
 }
@@ -275,7 +265,7 @@ export function LanesPanel() {
           if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
         }}
       />
-      <Playhead width={width} />
+      <Playhead width={width} durationMs={duration} />
       {rename && (
         <input
           className={styles.renameInput}

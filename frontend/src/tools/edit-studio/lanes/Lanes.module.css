@@ -158,6 +158,7 @@
   bottom: 0;
   left: 168px;
   right: 0;
+  z-index: 3;
   overflow: hidden;
   pointer-events: none;
 }
@@ -166,10 +167,37 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
-  width: 1px;
+  left: -1px;
+  width: 2px;
   background: var(--accent);
   will-change: transform;
+}
+
+/* The playhead's head in the ruler: a handle you can grab. */
+.playheadHead {
+  position: absolute;
+  top: 0;
+  left: -7px;
+  width: 16px;
+  height: 14px;
+  border-radius: 3px 3px 8px 8px;
+  background: var(--accent);
+  cursor: ew-resize;
+  pointer-events: auto;
+}
+
+.playheadGrip {
+  position: absolute;
+  top: 14px;
+  bottom: 0;
+  left: -5px;
+  width: 12px;
+  cursor: ew-resize;
+  pointer-events: auto;
+}
+
+.playheadGrip:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .tooltip {

@@ -18,6 +18,9 @@ import {
 } from "./laneLogic";
 import { LaneSettingsPopover } from "./LaneSettingsPopover";
 import styles from "./Lanes.module.css";
+import { startScrub } from "../timeline/scrub";
+import { seekTo } from "../transport/player";
+import { editLength } from "@/viz/edit/types";
 
 export interface LaneRowProps {
   lane: MarkerLane;
@@ -80,6 +83,10 @@ export function LaneRow(props: LaneRowProps) {
     const cur = st.selection?.kind === "markers" ? st.selection.ids : [];
     if (!hit) {
       if (st.selection?.kind === "markers") st.select(null);
+      // Empty lane space works like the ruler: click or drag moves the playhead.
+      const el = e.currentTarget;
+      const p = st.history?.present;
+      startScrub(e, () => el.getBoundingClientRect().left, p ? editLength(p) : 0);
       return;
     }
     if (e.shiftKey) st.select({ kind: "markers", ids: cur.includes(hit.id) ? cur.filter((i) => i !== hit.id) : [...cur, hit.id] });
@@ -111,6 +118,8 @@ export function LaneRow(props: LaneRowProps) {
     drag.current = null;
     setPreview(null);
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    // A click on a marker (no drag) moves the playhead to it.
+    if (d && !d.active && commit) seekTo(d.marker.ms);
     if (!d || !d.active || !commit) return;
     const p = useEditStudio.getState().history?.present;
     if (p) useEditStudio.getState().edit(moveMarker(p, d.marker, d.target));

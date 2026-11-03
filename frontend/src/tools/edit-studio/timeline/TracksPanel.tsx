@@ -27,6 +27,7 @@ import styles from "./TracksPanel.module.css";
 import { TimeScrollbar } from "./TimeScrollbar";
 import { addTextClip } from "../text/addText";
 import { addVisualClip } from "../visual/addVisual";
+import { startScrub } from "./scrub";
 
 export const VIDEO_ROW_PX = 56;
 export const ADJUST_ROW_PX = 36;
@@ -43,13 +44,18 @@ interface Menu {
   y: number;
 }
 
-function Playhead() {
+function Playhead({ durationMs, timeLeft }: { durationMs: number; timeLeft: () => number }) {
   const ms = useEditStudio((s) => s.playheadMs);
   const pps = useEditStudio((s) => s.pps);
   const scrollMs = useEditStudio((s) => s.scrollMs);
   const x = msToX(ms, pps, scrollMs);
   if (x < -1) return null;
-  return <div className={styles.playhead} style={{ left: HEADER_PX + x }} aria-hidden="true" />;
+  return (
+    <div className={styles.playhead} style={{ left: HEADER_PX + x }}>
+      {/* A wide invisible grip: drag the playhead anywhere along the tracks. */}
+      <div className={styles.playheadGrip} title="Drag to move the playhead" onPointerDown={(e) => startScrub(e, timeLeft, durationMs)} />
+    </div>
+  );
 }
 
 export function TracksPanel() {
@@ -140,7 +146,10 @@ function Tracks({ project }: { project: NormalProject }) {
     st.select(ids.length ? { kind: "clips", ids } : null);
     if (additive || toggle || !ids.includes(clip.id)) return;
     const home = base.tracks.find((t) => t.clips.some((c) => c.id === clip.id));
-    if (!home || home.locked) return;
+    if (!home || home.locked) {
+      seekTo(Math.max(0, Math.min(live.current.D, msAtX(e.clientX))));
+      return;
+    }
 
     const startX = e.clientX;
     const startY = e.clientY;
@@ -161,13 +170,15 @@ function Tracks({ project }: { project: NormalProject }) {
       const next = moveClips(base, ids, Math.round(delta), rowAt(ev.clientY) ?? undefined);
       if (next) now.edit(next, key);
     };
-    const onUp = () => {
+    const onUp = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       setHint(null);
       collapseDrag(startPast, base);
       if (!moved && ids.length > 1) useEditStudio.getState().select({ kind: "clips", ids: [clip.id] });
+      // A click (no drag) on a clip also moves the playhead there.
+      if (!moved && ev.type === "pointerup") seekTo(Math.max(0, Math.min(live.current.D, msAtX(ev.clientX))));
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -258,10 +269,12 @@ function Tracks({ project }: { project: NormalProject }) {
   };
 
   const onAreaDoubleClick = (e: ReactMouseEvent<HTMLDivElement>, trackId: string) => {
-    if (e.target !== e.currentTarget) return;
     const doc = live.current.project;
     const track = doc.tracks.find((t) => t.id === trackId);
-    if (track?.kind !== "adjust") return;
+    if (e.target !== e.currentTarget || track?.kind !== "adjust") {
+      if (!(e.target as HTMLElement).closest("[data-trim]")) seekTo(Math.max(0, Math.min(live.current.D, msAtX(e.clientX))));
+      return;
+    }
     const st = useEditStudio.getState();
     const ins = insertAdjustClip(doc, trackId, msAtX(e.clientX), { markersMs: laneMarkersMs(live.current.markers, st.activeLane) });
     if (ins && commit(ins.project)) st.select({ kind: "clips", ids: [ins.clip.id] });
@@ -402,7 +415,7 @@ function Tracks({ project }: { project: NormalProject }) {
           </div>
         ))}
         <SongTrack timeWidth={timeWidth} />
-        <Playhead />
+        <Playhead durationMs={D} timeLeft={() => (rootRef.current?.getBoundingClientRect().left ?? 0) + HEADER_PX} />
         {hint && (
           <div className={styles.hint} style={{ left: HEADER_PX + msToX(hint.ms, pps, scrollMs) }} role="status">
             {hint.label}
