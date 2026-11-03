@@ -15,7 +15,7 @@
 import { newClip } from "../doc";
 import type { EditClip } from "@/lib/api";
 import { serializeEffects, serializeSpeed, serializeTransition, CUT } from "@/viz/edit/schema";
-import { editLength, type EditParam, type EditPost, type EditTransition, type Key, type Marker, type MarkerLane } from "@/viz/edit/types";
+import { editLength, type EditParam, type EditPost, type EditTransition, type Key, type MarkerLane } from "@/viz/edit/types";
 import { makeRng } from "@/viz/layers/registry";
 import { SECTION_LABELS, type SectionLabel } from "@/viz/types";
 import type { AutofillInput, AutofillResult, AutofillSource, RecipeRule } from "./types";
