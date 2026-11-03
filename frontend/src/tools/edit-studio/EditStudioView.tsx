@@ -3,7 +3,7 @@
  * home, Setup and the editor; the header; panel slots filled by the work
  * packages. Packages own the components it imports, not this file.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, IconButton, MenuButton, toast } from "@/components";
 import { EditStudioService, SettingsService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -30,7 +30,7 @@ import { TracksPanel } from "./timeline/TracksPanel";
 import { useEditCommands } from "./transport/commands";
 import { Transport } from "./transport/Transport";
 import { useEditInputs, useEditStudio, useProject } from "./store";
-import { flushEdit, markOpened, useEditAutosave } from "./useEditAutosave";
+import { flushEdit, markOpened, onEditSaved, useEditAutosave } from "./useEditAutosave";
 import { useEditData } from "./useEditData";
 import styles from "./EditStudioView.module.css";
 
@@ -96,9 +96,26 @@ function Editor({ moduleId }: { moduleId: string }) {
   const inputs = useEditInputs();
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const [stats, setStats] = useState<EditCanvasStats | null>(null);
-  const [autofill, setAutofill] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const dialog = useEditStudio((s) => s.dialog);
+  const projectId = useEditStudio((s) => s.projectId);
   void moduleId;
+
+  // Thumbnail: after a save, at most every 30 s, the preview at the playhead.
+  const lastThumb = useRef(0);
+  useEffect(
+    () =>
+      onEditSaved((info) => {
+        const now = Date.now();
+        if (!canvas || now - lastThumb.current < 30_000) return;
+        lastThumb.current = now;
+        const url = thumbnail(canvas);
+        if (url) void EditStudioService.SaveThumb(info.id, url).catch(() => undefined);
+      }),
+    [canvas],
+  );
+  useEffect(() => {
+    lastThumb.current = 0;
+  }, [projectId]);
 
   if (!project) return null;
   const setup = !project.song || analysisState !== "ready";
@@ -126,7 +143,7 @@ function Editor({ moduleId }: { moduleId: string }) {
         <div className={styles.spacer} />
         <IconButton icon="undo-2" label="Undo" kbd="Mod+Z" disabled={!canUndo} onClick={() => useEditStudio.getState().undo()} />
         <IconButton icon="redo-2" label="Redo" kbd="Mod+Shift+Z" disabled={!canRedo} onClick={() => useEditStudio.getState().redo()} />
-        <Button icon="wand-sparkles" disabled={setup} onClick={() => setAutofill(true)}>
+        <Button icon="wand-sparkles" disabled={setup} onClick={() => useEditStudio.getState().openDialog({ kind: "autofill", range: selection?.kind === "range" ? { fromMs: selection.fromMs, toMs: selection.toMs } : null })}>
           Auto-fill
         </Button>
         <MenuButton
@@ -139,7 +156,7 @@ function Editor({ moduleId }: { moduleId: string }) {
             { id: "srt", label: "Export captions (SRT)", disabled: setup || !project.captions, onSelect: () => void exportSrt() },
           ]}
         />
-        <Button variant="primary" icon="download" disabled={setup} onClick={() => setExporting(true)}>
+        <Button variant="primary" icon="download" disabled={setup} onClick={() => useEditStudio.getState().openDialog({ kind: "export" })}>
           Export
         </Button>
       </header>
@@ -190,8 +207,22 @@ function Editor({ moduleId }: { moduleId: string }) {
         </div>
       )}
 
-      <AutofillDialog open={autofill} range={selection?.kind === "range" ? { fromMs: selection.fromMs, toMs: selection.toMs } : null} onClose={() => setAutofill(false)} />
-      <ExportDialog open={exporting} onClose={() => setExporting(false)} />
+      <AutofillDialog open={dialog?.kind === "autofill"} range={dialog?.kind === "autofill" ? dialog.range : null} onClose={() => useEditStudio.getState().openDialog(null)} />
+      <ExportDialog open={dialog?.kind === "export"} onClose={() => useEditStudio.getState().openDialog(null)} />
     </div>
   );
+}
+
+/** A 320 px JPEG data URL of the preview canvas, or null. */
+function thumbnail(src: HTMLCanvasElement): string | null {
+  try {
+    const scale = 320 / Math.max(src.width, src.height);
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(src.width * scale));
+    c.height = Math.max(1, Math.round(src.height * scale));
+    c.getContext("2d")?.drawImage(src, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", 0.8);
+  } catch {
+    return null;
+  }
 }

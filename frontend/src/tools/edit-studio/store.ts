@@ -50,6 +50,8 @@ export interface EditStudioState {
   scrollMs: number; // left edge of the timeline view
   rightPanel: "inspector" | "captions";
   safeZones: boolean;
+  /** The open dialog (any package may ask; the view shows it). */
+  dialog: { kind: "autofill"; range: { fromMs: number; toMs: number } | null } | { kind: "export" } | null;
 
   analysisRef: AnalysisRef | null;
   analysis: Analysis | null;
@@ -75,6 +77,7 @@ export interface EditStudioState {
   setView(pps: number, scrollMs: number): void;
   setRightPanel(p: "inspector" | "captions"): void;
   setSafeZones(on: boolean): void;
+  openDialog(d: EditStudioState["dialog"]): void;
   setSaveState(s: SaveState, error?: string | null): void;
   setAnalysis(ref: AnalysisRef | null, a: Analysis | null, state: AnalysisState): void;
   setSources(states: EditSourceState[]): void;
@@ -101,6 +104,7 @@ const initial = {
   scrollMs: 0,
   rightPanel: "inspector" as const,
   safeZones: false,
+  dialog: null,
   analysisRef: null,
   analysis: null,
   analysisState: "none" as AnalysisState,
@@ -147,6 +151,7 @@ export const useEditStudio = create<EditStudioState>((set, get) => ({
   setView: (pps, scrollMs) => set({ pps: Math.max(6, Math.min(800, pps)), scrollMs: Math.max(0, scrollMs) }),
   setRightPanel: (rightPanel) => set({ rightPanel }),
   setSafeZones: (safeZones) => set({ safeZones }),
+  openDialog: (dialog) => set({ dialog }),
   setSaveState: (saveState, saveError = null) => set({ saveState, saveError }),
   setAnalysis: (analysisRef, analysis, analysisState) => set({ analysisRef, analysis, analysisState }),
   setSources: (states) => {

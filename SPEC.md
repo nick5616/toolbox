@@ -1841,3 +1841,9 @@ A new section, **"Edit Studio (Phase 9)"**:
    - `sidecar/embed.go` now embeds `toolbox_sidecar/matte/*.py`.
 8. **The decode spike moves to Wave 2.** ES3 builds both upload paths (`VideoFrame` directly, or `createImageBitmap`) behind a runtime feature check. Edit Lab measures decode fps and picks the default. The design never depended on it (§16.1).
 9. **Packs:** the `edit` pack ("Music edits") unlocks `edit-studio` with `engine`, `ffmpeg`, `stems-default`. The `matte-people`/`matte-select` components are in the catalog with measured sizes.
+10. **Shared timeline geometry** (`tools/edit-studio/geometry.ts`): `HEADER_PX` (168), `RULER_PX`, `LANE_ROW_PX`, `SNAP_PX`, `msToX`, `xToMs`, `visibleRange` and `useTimelineWheel(el, durationMs)`.
+    - Lanes, bands and tracks all scroll and zoom through the store's `pps`/`scrollMs` (virtual horizontal scroll; no native horizontal scrollbar is needed).
+    - Every row is a `HEADER_PX` header followed by the time area.
+11. **Dialogs:** `useEditStudio().openDialog({kind: "autofill", range} | {kind: "export"} | null)`. Any package (section band menu, palette commands) can open the Auto-fill or Export dialog; the view renders them.
+12. **`tools/edit-studio/matte/split.ts` `splitSubject(p, clipId)`** is a WP-ES7 stub. WP-ES2's clip menu calls it.
+13. **Thumbnails:** the view saves the preview as `thumb.jpg` after saves, at most every 30 s. No package does it.
