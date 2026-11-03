@@ -45,7 +45,7 @@ describe("LanesPanel", () => {
     expect(screen.queryByRole("radio", { name: /Hi-hats lane/ })).toBeNull();
     expect(within(laneRadio(/Beats lane/)).getByLabelText("48 markers")).toBeTruthy();
     expect(within(laneRadio(/Stops lane/)).getByLabelText("1 markers")).toBeTruthy();
-    expect(within(laneRadio(/Downbeats lane/)).getByText("bar = beat 1")).toBeTruthy();
+    expect(within(laneRadio(/Downbeats lane/)).queryByText("bar = beat 1")).toBeNull(); // shown only when moved
   });
 
   it("clicking a lane header makes it the active lane", () => {

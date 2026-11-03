@@ -224,3 +224,18 @@ export function safeZones(aspect: string, w: number, h: number): ZoneRect[] {
     { id: "right", label: "Right 14%", x: w - right, y: top, w: right, h: h - top - bottom },
   ];
 }
+
+/**
+ * The part of an unrotated box inside the frame (fill-mode clips are larger
+ * than the frame, so their handles would sit off the preview). Rotated boxes
+ * are returned as they are.
+ */
+export function visibleBox(box: Box, frame: Size): Box {
+  if (Math.abs(box.rotation % 360) > 0.01) return box;
+  const x0 = Math.max(0, box.cx - box.w / 2);
+  const x1 = Math.min(frame.w, box.cx + box.w / 2);
+  const y0 = Math.max(0, box.cy - box.h / 2);
+  const y1 = Math.min(frame.h, box.cy + box.h / 2);
+  if (x1 <= x0 || y1 <= y0) return box;
+  return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0, rotation: 0 };
+}

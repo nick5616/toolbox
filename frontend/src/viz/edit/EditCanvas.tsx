@@ -137,10 +137,15 @@ export function EditCanvas({ inputs, width, height, timeMs, playing, quality, on
     engineRef.current?.setQuality(quality);
   }, [quality]);
 
-  // Draw on every time or edit change.
+  // Draw on every time or edit change. While playing, only when the output
+  // frame changes (the audio clock ticks faster than the edit's fps).
+  const drawn = useRef<{ k: number; c: unknown }>({ k: -1, c: null });
   useEffect(() => {
     const e = engineRef.current;
     if (!e || !compiled) return;
+    const k = Math.floor((timeMs * fps) / 1000 + 1e-6);
+    if (playing && drawn.current.k === k && drawn.current.c === compiled) return;
+    drawn.current = { k, c: compiled };
     e.setEdit(compiled);
     renderNow();
   }, [compiled, timeMs, playing, renderNow, width, height, fps, seed, unavailable]);

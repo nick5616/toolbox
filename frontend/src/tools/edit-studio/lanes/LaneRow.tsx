@@ -156,7 +156,7 @@ export function LaneRow(props: LaneRowProps) {
       >
         <span className={styles.swatch} style={{ background: `var(--lane-${lane})` }} />
         <span className={styles.name}>{LANE_LABELS[lane]}</span>
-        {lane === "downbeat" && <span className={styles.hint} title="Bar starts on beat">{`bar = beat ${barOffset + 1}`}</span>}
+        {lane === "downbeat" && barOffset > 0 && <span className={styles.hint} title="Bar starts on beat">{`bar = beat ${barOffset + 1}`}</span>}
         <span className={styles.count} aria-label={`${markers.length} markers`}>
           {markers.length}
         </span>

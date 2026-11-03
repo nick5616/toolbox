@@ -85,6 +85,20 @@ function Tracks({ project }: { project: NormalProject }) {
   useTimelineWheel(root, D);
 
   const timeWidth = Math.max(0, width - HEADER_PX);
+
+  // While playing, keep the playhead in view: when it leaves the right 8 %,
+  // page forward so it sits 10 % in from the left (lanes follow the same scroll).
+  useEffect(() => {
+    if (timeWidth <= 0) return;
+    return useEditStudio.subscribe((s, prev) => {
+      if (!s.playing || s.playheadMs === prev.playheadMs) return;
+      const visible = (timeWidth * 1000) / s.pps;
+      const t = s.playheadMs;
+      if (t >= s.scrollMs && t <= s.scrollMs + visible * 0.92) return;
+      const maxScroll = Math.max(0, live.current.D - visible);
+      s.setView(s.pps, Math.min(maxScroll, Math.max(0, t - visible * 0.1)));
+    });
+  }, [timeWidth]);
   const selected = useMemo(() => new Set(selection?.kind === "clips" ? selection.ids : []), [selection]);
   const selectedTrack = selection?.kind === "track" ? selection.id : null;
 

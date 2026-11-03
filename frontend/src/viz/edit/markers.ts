@@ -46,12 +46,86 @@ function perBar(a: Analysis): number {
   return n >= 1 ? n : 4;
 }
 
-/** The analysis's own phase p: the index of its first downbeat in audio.beats (mod beats per bar). */
+/** The beat grid of an analysis, completed where the tracker found no beats. */
+export interface BeatGrid {
+  /** Song ms of every beat, sorted. */
+  times: number[];
+  /** Indices of beats that were filled in (before the first, after the last, inside long gaps). */
+  estimated: ReadonlySet<number>;
+}
+
+const gridCache = new WeakMap<Analysis, BeatGrid>();
+
+/**
+ * The tracker often finds no beats in a quiet intro, an outro or a breakdown
+ * (librosa needs onsets). Edits still cut there, so the grid is continued at
+ * the median beat period: back to 0, on to the end of the song, and through
+ * gaps longer than 1.75 periods. Filled beats are marked estimated.
+ */
+export function beatGrid(a: Analysis): BeatGrid {
+  const hit = gridCache.get(a);
+  if (hit) return hit;
+  const src = a.audio.beats;
+  let out: BeatGrid;
+  if (src.length < 2) out = { times: [...src], estimated: new Set() };
+  else {
+    const diffs: number[] = [];
+    for (let i = 1; i < src.length; i++) diffs.push((src[i] as number) - (src[i - 1] as number));
+    diffs.sort((x, y) => x - y);
+    const period = diffs[diffs.length >> 1] as number;
+    const times: number[] = [];
+    const est = new Set<number>();
+    if (period >= 200 && period <= 2000) {
+      const before: number[] = [];
+      for (let t = (src[0] as number) - period; t >= -period * 0.25; t -= period) before.unshift(Math.max(0, Math.round(t)));
+      for (const t of before) {
+        est.add(times.length);
+        times.push(t);
+      }
+      for (let i = 0; i < src.length; i++) {
+        const t = src[i] as number;
+        if (i > 0) {
+          const prev = src[i - 1] as number;
+          const gap = t - prev;
+          if (gap > period * 1.75) {
+            const n = Math.round(gap / period);
+            for (let k = 1; k < n; k++) {
+              est.add(times.length);
+              times.push(Math.round(prev + (gap * k) / n));
+            }
+          }
+        }
+        times.push(t);
+      }
+      for (let t = (src[src.length - 1] as number) + period; t < a.durationMs - period * 0.25; t += period) {
+        est.add(times.length);
+        times.push(Math.round(t));
+      }
+      // Rounding can collide at 0: keep times strictly increasing.
+      for (let i = times.length - 1; i > 0; i--) if ((times[i] as number) <= (times[i - 1] as number)) times.splice(i - 1, 1);
+    } else times.push(...src);
+    out = { times, estimated: est };
+  }
+  gridCache.set(a, out);
+  return out;
+}
+
+/** The median beat period in ms (0 without beats). */
+export function beatPeriod(a: Analysis): number {
+  const t = beatGrid(a).times;
+  if (t.length < 2) return 0;
+  const d: number[] = [];
+  for (let i = 1; i < t.length; i++) d.push((t[i] as number) - (t[i - 1] as number));
+  d.sort((x, y) => x - y);
+  return d[d.length >> 1] as number;
+}
+
+/** The analysis's own phase p: the index of its first downbeat in the beat grid (mod beats per bar). */
 export function analysisPhase(a: Analysis): number {
   const first = a.audio.downbeats[0];
   const n = perBar(a);
   if (first === undefined) return 0;
-  const beats = a.audio.beats;
+  const beats = beatGrid(a).times;
   let best = 0;
   let bestD = Infinity;
   for (let i = 0; i < beats.length; i++) {
@@ -71,7 +145,7 @@ export function barGrid(a: Analysis, barOffset: number): BarGrid {
   const phase = (analysisPhase(a) + (((barOffset % n) + n) % n)) % n;
   const starts: number[] = [];
   const startIndex: number[] = [];
-  const beats = a.audio.beats;
+  const beats = beatGrid(a).times;
   for (let i = phase; i < beats.length; i += n) {
     starts.push(beats[i] as number);
     startIndex.push(i);
@@ -101,7 +175,7 @@ export function barOf(grid: BarGrid, songMs: number): number {
 
 /** The beat nearest to a song ms, or null without beats. */
 export function nearestBeat(a: Analysis, songMs: number): { ms: number; index: number } | null {
-  const b = a.audio.beats;
+  const b = beatGrid(a).times;
   if (!b.length) return null;
   const i = lastAtOrBefore(b, songMs);
   const lo = i < 0 ? 0 : i;
@@ -170,6 +244,7 @@ function deriveStops(a: Analysis, grid: BarGrid): Raw[] {
   const n = L.length;
   const win = Math.max(1, Math.round(2 * fps));
   const hold = Math.max(1, Math.ceil(0.15 * fps));
+  const period = beatPeriod(a);
   const out: Raw[] = [];
   // Sliding maximum of the previous 2 s: a cheap necessary condition (the median is <= the maximum).
   const dq = new Int32Array(n);
@@ -206,24 +281,39 @@ function deriveStops(a: Analysis, grid: BarGrid): Raw[] {
       }
     }
     if (!ok || i + hold > n) continue;
-    const beatIdx = lastAtOrBefore(a.audio.beats, startMs);
+    const beatIdx = lastAtOrBefore(beatGrid(a).times, startMs);
     // The end: L is back at 0.5·ref, or 2 s.
     let end = i + hold;
     let minL = Infinity;
+    let back = false;
     for (let j = i; j < Math.min(n, i + win); j++) {
       if ((L[j] as number) >= 0.5 * ref) {
         end = j;
+        back = true;
         break;
       }
       end = j + 1;
     }
+    // Music that never comes back is an ending (or a fade), not a stop.
+    if (!back) {
+      skipTo = Math.max(end, i + 1);
+      continue;
+    }
     for (let j = i; j < end; j++) minL = Math.min(minL, L[j] as number);
     skipTo = Math.max(end, i + 1);
+    // A stop (beat cut) silences most of a beat and starts on the beat. Shorter
+    // dips between hits (side-chain pumping, re-attacked pads) aren't stops.
+    const endMs = Math.round((end * 1000) / fps);
+    if (period > 0) {
+      if (endMs - startMs < Math.max(150, 0.6 * period)) continue;
+      const near = nearestBeat(a, startMs);
+      if (near && (startMs - near.ms < -60 || startMs - near.ms > 150)) continue;
+    }
     if (beatIdx >= 0 && beatIdx === lastBeat) continue;
     lastBeat = beatIdx;
     out.push({
       ms: startMs,
-      endMs: Math.round((end * 1000) / fps),
+      endMs,
       strength: Math.max(0, Math.min(1, 1 - minL / ref)),
       bar: barOf(grid, startMs),
     });
@@ -273,15 +363,67 @@ function deriveSections(a: Analysis, grid: BarGrid): Raw[] {
   return a.audio.sections.map((s: Section) => ({ ms: s.startMs, endMs: s.endMs, strength: s.energy, label: s.label, bar: barOf(grid, s.startMs) }));
 }
 
+/** Mean of a channel over [t0, t1) song ms (0 when absent or empty). */
+function meanOf(a: Analysis, ids: readonly string[], t0: number, t1: number): number {
+  const fps = a.fps;
+  const i0 = Math.max(0, Math.floor((t0 * fps) / 1000));
+  const i1 = Math.min(a.frames, Math.ceil((t1 * fps) / 1000));
+  if (i1 <= i0) return 0;
+  let sum = 0;
+  for (const id of ids) {
+    const ch = a.channel(id);
+    if (!ch) continue;
+    for (let i = i0; i < i1; i++) sum += ch[i] as number;
+  }
+  return sum / (i1 - i0);
+}
+
+/**
+ * Drops: the analysis's own (a bar ≥ 6 dB louder than the two before), plus
+ * the classic "stop, then the drop": a downbeat right after a stop where the
+ * low end (sub + bass) comes back much stronger than in the bar before the
+ * stop. A loud build-up often hides that second kind from the loudness rule.
+ */
+function deriveDrops(a: Analysis, grid: BarGrid): Raw[] {
+  const out = fromEvents(a, "drop", grid);
+  const stops = deriveStops(a, grid);
+  if (!stops.length || !grid.starts.length) return out;
+  const barMs = grid.starts.length > 1 ? ((grid.starts[grid.starts.length - 1] as number) - (grid.starts[0] as number)) / (grid.starts.length - 1) : 2000;
+  // Cues that come back hard on a drop: the low end, or (with stems) the kick drum.
+  const cues: Array<{ ids: string[]; min: number; ratio: number }> = [{ ids: a.has("mix.sub") ? ["mix.sub", "mix.bass"] : ["mix.level"], min: 0.25, ratio: 1.3 }];
+  if (a.audio.stems && a.has("drums.kick")) cues.push({ ids: ["drums.kick"], min: 0.08, ratio: 1.8 });
+  for (const st of stops) {
+    const end = st.endMs ?? st.ms;
+    const k = grid.starts.findIndex((d) => d >= st.ms);
+    if (k < 0) continue;
+    const d = grid.starts[k] as number;
+    if (d - end > 250 || d < end - barMs / 2) continue;
+    let ratio = 0;
+    for (const cue of cues) {
+      const before = meanOf(a, cue.ids, st.ms - barMs, st.ms);
+      const after = meanOf(a, cue.ids, d, d + barMs);
+      const r = after / Math.max(cue.ids.length * 0.02, before);
+      if (after >= cue.min * cue.ids.length && r >= cue.ratio) ratio = Math.max(ratio, r);
+    }
+    if (ratio === 0) continue;
+    if (out.some((e) => Math.abs(e.ms - d) < 500)) continue;
+    out.push({ ms: d, strength: Math.max(0.5, Math.min(1, (ratio - 1) / 1.5)), bar: barOf(grid, d) });
+  }
+  return out.sort((x, y) => x.ms - y.ms);
+}
+
 /** Every marker of a derived lane before filters (song ms, whole song). */
 function rawLane(a: Analysis, lane: MarkerLane, s: LaneSettings, grid: BarGrid): Raw[] {
   switch (lane) {
     case "beat": {
       const onBar = new Set(grid.startIndex);
-      return a.audio.beats.map((t, i) => ({ ms: t, strength: onBar.has(i) ? 1 : 0.6, beatIndex: i, bar: barOf(grid, t) }));
+      const bg = beatGrid(a);
+      return bg.times.map((t, i) => ({ ms: t, strength: (onBar.has(i) ? 1 : 0.6) * (bg.estimated.has(i) ? 0.6 : 1), beatIndex: i, bar: barOf(grid, t) }));
     }
-    case "downbeat":
-      return grid.starts.map((t, k) => ({ ms: t, strength: 1, beatIndex: grid.startIndex[k], bar: k }));
+    case "downbeat": {
+      const est = beatGrid(a).estimated;
+      return grid.starts.map((t, k) => ({ ms: t, strength: est.has(grid.startIndex[k] as number) ? 0.7 : 1, beatIndex: grid.startIndex[k], bar: k }));
+    }
     case "kick":
     case "snare":
     case "hats": {
@@ -292,10 +434,11 @@ function rawLane(a: Analysis, lane: MarkerLane, s: LaneSettings, grid: BarGrid):
       }
       return fromEvents(a, EVENT_LANES[lane] as string, grid);
     }
+    case "drop":
+      return deriveDrops(a, grid);
     case "bass":
     case "vocals":
     case "other":
-    case "drop":
     case "lift":
     case "break":
       return fromEvents(a, EVENT_LANES[lane] as string, grid);

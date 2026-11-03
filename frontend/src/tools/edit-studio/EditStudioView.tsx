@@ -178,7 +178,7 @@ function Editor({ moduleId }: { moduleId: string }) {
             onCanvas={setCanvas}
           />
           <PreviewOverlays canvas={canvas} width={size.width} height={size.height} />
-          {stats && <span className={styles.stats}>{`${Math.round(stats.fps)} fps · ${stats.dropped} dropped`}</span>}
+          {stats && playing && inputs && !setup && <span className={styles.stats}>{`${Math.round(stats.fps)} fps · ${stats.dropped} dropped`}</span>}
         </section>
         <aside className={styles.right}>
           <div className={styles.tabs} role="tablist">

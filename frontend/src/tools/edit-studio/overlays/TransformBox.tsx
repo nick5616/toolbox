@@ -9,7 +9,7 @@ import { parseTransform, serializeTransform, TRANSFORM_RULES } from "@/viz/edit/
 import type { ClipTransform } from "@/viz/edit/types";
 import { currentClip, patchClip } from "../inspector/inspectorState";
 import { writeValue } from "../inspector/paramOps";
-import { CORNERS, cornerPoint, rotateHandle, rotationFromDrag, scaleFromDrag, snapCentre, type Box, type Pt, type TransformValues } from "./overlayGeometry";
+import { CORNERS, cornerPoint, rotateHandle, rotationFromDrag, scaleFromDrag, snapCentre, visibleBox, type Box, type Pt, type TransformValues } from "./overlayGeometry";
 import type { OverlayCtx } from "./overlayContext";
 import styles from "./overlays.module.css";
 
@@ -86,9 +86,12 @@ export function TransformBox({ ctx }: { ctx: OverlayCtx }) {
   };
 
   const handlers = (kind: Kind) => ({ onPointerDown: begin(kind), onPointerMove: move, onPointerUp: end, onPointerCancel: end });
-  const corners = CORNERS.map((c) => ({ id: c, p: cornerPoint(box, c) }));
+  // Handles sit on the part of the clip inside the frame; scaling and rotating
+  // still pivot on the clip's own centre (the drag keeps the full box).
+  const shown = visibleBox(box, frame);
+  const corners = CORNERS.map((c) => ({ id: c, p: cornerPoint(shown, c) }));
   const poly = corners.map((c) => `${c.p.x},${c.p.y}`).join(" ");
-  const rot = rotateHandle(box, ROTATE_STEM_PX * k);
+  const rot = rotateHandle(shown, ROTATE_STEM_PX * k);
   const r = HANDLE_PX * k;
 
   return (

@@ -188,6 +188,9 @@ export const useEditStudio = create<EditStudioState>((set, get) => ({
   },
 }));
 
+// Dev builds only: a handle for automated UI checks (.dev QA scripts drive the editor over DevTools).
+if (import.meta.env.DEV && typeof window !== "undefined") (window as unknown as { __editStudio?: typeof useEditStudio }).__editStudio = useEditStudio;
+
 // ---- hooks ----
 
 /** The current document (null when no edit is open). */

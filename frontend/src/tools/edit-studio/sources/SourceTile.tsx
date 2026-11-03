@@ -36,6 +36,8 @@ export interface SourceTileProps {
   onPrepare(path: string): void;
 }
 
+const PHOTO_EXT = /\.(jpe?g|png|webp|bmp|tiff?|heic|heif|gif)$/i;
+
 function Thumb({ path, kind }: { path: string; kind: string }) {
   const url = useThumb(path, kind === "image" ? "image" : "video");
   if (!url) return <Icon name={kind === "image" ? "image" : "film"} size={20} />;
@@ -48,7 +50,8 @@ function Thumb({ path, kind }: { path: string; kind: string }) {
 
 function TileImpl(p: SourceTileProps) {
   const status = tileStatus(p.state);
-  const kind = p.state?.info.kind ?? "";
+  // Until the source is probed, the extension decides (a photo must never ask for a filmstrip).
+  const kind = p.state?.info.kind || (PHOTO_EXT.test(p.path) ? "image" : "video");
   const name = p.path.split(/[\\/]/).pop() ?? p.path;
   const tagItems = (): MenuItem[] => [
     ...TAG_PRESETS.map((t) => ({

@@ -144,3 +144,6 @@ useUI.subscribe((s) => {
     /* storage unavailable */
   }
 });
+
+// Dev builds only: a handle for automated UI checks (.dev QA scripts).
+if (import.meta.env.DEV && typeof window !== "undefined") (window as unknown as { __ui?: typeof useUI }).__ui = useUI;
