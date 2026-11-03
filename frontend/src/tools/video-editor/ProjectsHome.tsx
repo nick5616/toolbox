@@ -42,8 +42,8 @@ export function ProjectsHome(p: ProjectsHomeProps) {
   return (
     <div className={styles.home}>
       <div className={styles.homeBar}>
-        <MenuButton label="New video" icon="plus" items={newItems} />
-        <Button icon="wand-sparkles" onClick={p.onQuickVlog}>
+        <span data-tip="Start an empty video in the shape you pick" style={{ display: "contents" }}><MenuButton label="New video" icon="plus" items={newItems} /></span>
+        <Button icon="wand-sparkles" data-tip="Pick clips and a song and get a first-draft video cut for you" onClick={p.onQuickVlog}>
           Quick vlog…
         </Button>
       </div>
@@ -53,27 +53,27 @@ export function ProjectsHome(p: ProjectsHomeProps) {
           <DropZone id="tool-drop:video-editor" label="Drop clips and photos here" hint="They become a new video" />
         </>
       ) : (
-        <ul className={styles.cards} aria-label="Video projects">
+        <ul className={styles.cards} aria-label="Video projects" data-tip="Your video projects">
           {p.projects.map((pr) => (
             <li key={pr.id} className={styles.card}>
-              <button type="button" className={styles.cardMain} onClick={() => p.onOpen(pr.id)} aria-label={`Open ${pr.name}`}>
+              <button type="button" className={styles.cardMain} onClick={() => p.onOpen(pr.id)} aria-label={`Open ${pr.name}`} data-tip="Open this video in the editor">
                 <Thumb path={pr.thumb} />
                 <span className={styles.cardName}>{pr.name}</span>
                 <span className={styles.cardMeta}>
                   {pr.items} {pr.items === 1 ? "clip" : "clips"}
-                  {pr.missing > 0 && <Badge tone="warn">{pr.missing} missing</Badge>}
+                  {pr.missing > 0 && <Badge tone="warn" tip="Some source files were moved or deleted; open the video to see which">{pr.missing} missing</Badge>}
                 </span>
               </button>
-              <div className={styles.cardMenu}>
+              <div className={styles.cardMenu} data-tip="Duplicate, rename or delete this video">
                 <MenuButton
                   label={`Actions for ${pr.name}`}
                   icon="ellipsis"
                   variant="ghost"
                   size="sm"
                   items={() => [
-                    { id: "dup", label: "Duplicate", icon: "copy", onSelect: () => p.onDuplicate(pr.id) },
-                    { id: "rename", label: "Rename", icon: "pencil", onSelect: () => { setRenaming(pr); setDraft(pr.name); } },
-                    { id: "delete", label: "Delete", icon: "trash-2", onSelect: () => setDeleting(pr) },
+                    { id: "dup", label: "Duplicate", tip: "Make a copy you can change without touching this one", icon: "copy", onSelect: () => p.onDuplicate(pr.id) },
+                    { id: "rename", label: "Rename", tip: "Change the name of this video", icon: "pencil", onSelect: () => { setRenaming(pr); setDraft(pr.name); } },
+                    { id: "delete", label: "Delete", tip: "Remove this project from the app; clips and exports stay", icon: "trash-2", onSelect: () => setDeleting(pr) },
                   ]}
                 />
               </div>
@@ -85,7 +85,7 @@ export function ProjectsHome(p: ProjectsHomeProps) {
         open={!!renaming}
         title="Rename video"
         confirmLabel="Rename"
-        body={<TextField aria-label="Name" value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />}
+        body={<TextField aria-label="Name" data-tip="New name for this video" value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />}
         onConfirm={() => {
           if (renaming && draft.trim()) p.onRename(renaming.id, draft.trim());
           setRenaming(null);

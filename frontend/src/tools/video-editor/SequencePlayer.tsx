@@ -256,7 +256,7 @@ export const SequencePlayer = forwardRef<PlayerHandle, SequencePlayerProps>(func
 
   return (
     <div className={styles.stage}>
-      <div className={styles.frame} style={{ "--ar": String(frameAspect) } as CSSProperties} data-testid="player-frame">
+      <div className={styles.frame} style={{ "--ar": String(frameAspect) } as CSSProperties} data-testid="player-frame" data-tip="Quick preview of your edits; use Render preview for the exact result">
         {[0, 1].map((s) => {
           const idx = slots[s];
           const clip = idx === undefined ? undefined : clips[idx];
