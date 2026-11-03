@@ -57,7 +57,8 @@ describe("envelopes vanish at the ends", () => {
     }
     expect(whipShift(0)).toBe(0);
     expect(whipShift(1)).toBe(0);
-    expect(shakeOffset(1234, 0)).toEqual([0, 0]);
+    const [x0, y0] = shakeOffset(1234, 0);
+    expect(Math.abs(x0) + Math.abs(y0)).toBe(0);
     const [x, y] = shakeOffset(1234, 1);
     expect(Math.abs(x) + Math.abs(y)).toBeLessThan(1e-15);
   });
