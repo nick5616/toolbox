@@ -1,4 +1,4 @@
-/** Letterbox (FX2): bars top and bottom so the picture between is 2.39:1 at amount 1. */
+/** Letterbox (FX2): bars top and bottom: 2.39:1 at amount 1 on landscape frames, 12 % bars on tall or square ones. */
 import { paletteRef } from "../layers/registry";
 import { hexToLinear } from "../palette";
 import { simplePass } from "./pass";

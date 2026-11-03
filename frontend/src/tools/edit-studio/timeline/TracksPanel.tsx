@@ -369,9 +369,10 @@ function Tracks({ project }: { project: NormalProject }) {
               onMove={(dir) => edit(reorderTrack(project, track.id, i + dir))}
               onKind={(k) => edit(setTrackKind(project, track.id, k))}
               onRemove={() => (track.clips.length ? setRemoving(track.id) : edit(removeTrack(project, track.id)))}
+              matteRole={matteRoleOf(project.tracks, i)}
             />
             <div
-              className={cx(styles.timeArea, track.kind === "adjust" && styles.adjustArea)}
+              className={cx(styles.timeArea, track.kind === "adjust" && styles.adjustArea, matteRoleOf(project.tracks, i) === "matte" && styles.matteArea)}
               data-track-row={track.id}
               onPointerDown={(e) => onAreaPointerDown(e, track.id)}
               onDoubleClick={(e) => onAreaDoubleClick(e, track.id)}
@@ -431,4 +432,14 @@ function Tracks({ project }: { project: NormalProject }) {
       />
     </div>
   );
+}
+
+/** Part B: a track's role in a track matte (the track directly above a matted video track is its matte). */
+export function matteRoleOf(tracks: readonly { kind: string; matte?: string; muted: boolean }[], i: number): "matte" | "matted" | null {
+  const t = tracks[i];
+  const above = tracks[i + 1];
+  const below = tracks[i - 1];
+  if (t?.kind === "video" && t.matte && above?.kind === "video" && !above.muted) return "matted";
+  if (t?.kind === "video" && below?.kind === "video" && below.matte && !t.muted) return "matte";
+  return null;
 }

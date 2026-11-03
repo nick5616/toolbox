@@ -87,9 +87,14 @@ export function vhsBucket(tMs: number): number {
 
 /** Letterbox: height of each bar as a fraction of the frame height. */
 export function letterboxBar(w: number, h: number, amount: number): number {
+  // Tall and square frames (TikTok, Reels): a 2.39:1 strip would leave almost nothing, so the bars are 12 % each.
+  if (h >= w) return clamp01(amount) * TALL_BAR;
   const picture = w / 2.39;
   return (clamp01(amount) * Math.max(0, h - picture)) / (2 * h);
 }
+
+/** Each bar's height on tall and square frames at amount 1 (fraction of the height). */
+export const TALL_BAR = 0.12;
 
 /** Light leak: blob centres (0..1) drifting with time. */
 export function leakBlob(i: number, tMs: number, speed: number, seed: number): [number, number, number] {

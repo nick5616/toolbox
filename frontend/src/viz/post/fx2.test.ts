@@ -9,6 +9,7 @@ import {
   hueDistance,
   leakIntensity,
   letterboxBar,
+  TALL_BAR,
   luma,
   mono,
   monoValue,
@@ -193,15 +194,15 @@ describe("colour pop", () => {
 
 describe("letterbox", () => {
   const picture = (w: number, h: number, a: number): number => h * (1 - 2 * letterboxBar(w, h, a));
-  it("leaves a 2.39:1 picture at amount 1", () => {
-    for (const [w, h] of [[1080, 1920], [1920, 1080], [1080, 1080]] as const) {
+  it("leaves a 2.39:1 picture at amount 1 on landscape frames", () => {
+    for (const [w, h] of [[1920, 1080], [1440, 1080]] as const) {
       expect(w / picture(w, h, 1)).toBeCloseTo(2.39, 5);
     }
   });
-  it("bar sizes for 9:16, 16:9 and 1:1", () => {
-    expect(letterboxBar(1080, 1920, 1)).toBeCloseTo((1920 - 1080 / 2.39) / 3840);
+  it("bar sizes for 9:16, 16:9 and 1:1 (tall and square frames get 12 % bars)", () => {
+    expect(letterboxBar(1080, 1920, 1)).toBeCloseTo(TALL_BAR);
     expect(letterboxBar(1920, 1080, 1)).toBeCloseTo(0.1281, 3);
-    expect(letterboxBar(1000, 1000, 1)).toBeCloseTo(0.2908, 3);
+    expect(letterboxBar(1000, 1000, 1)).toBeCloseTo(TALL_BAR);
   });
   it("scales with amount and vanishes for frames already wider than 2.39:1", () => {
     expect(letterboxBar(1920, 1080, 0.5)).toBeCloseTo(letterboxBar(1920, 1080, 1) / 2);

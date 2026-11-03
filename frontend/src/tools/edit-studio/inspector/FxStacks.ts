@@ -36,7 +36,7 @@ export const FX_STACKS: readonly FxStack[] = [
       post("shake", { trigger: "amount", amount: pulse(mod("marker.kick", 0.8, 5, 160)) }),
       post("punch", { amount: pulse(mod("marker.kick", 1, 5, 160)) }),
       post("chromatic", { source: "amount", amount: pulse(mod("marker.kick", 0.35, 5, 140)) }),
-      post("flash", { amount: pulse(mod("marker.kick", 0.5, 3, 110)) }),
+      post("flash", { amount: pulse(mod("marker.kick", 0.3, 3, 90)) }),
     ],
   },
   {

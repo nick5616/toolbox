@@ -9,7 +9,7 @@ void main() {
   float s = min(u_res.x, u_res.y);
   vec2 p = (uv - 0.5) * u_res / s;
   float ca = cos(u_rx), sa = sin(u_rx), cb = cos(u_ry), sb = sin(u_ry);
-  float invD = u_persp * 0.8;
+  float invD = u_persp * 1.6;
   vec3 n = vec3(sb, -cb * sa, cb * ca);
   float np = n.x * p.x + n.y * p.y;
   float den = n.z - invD * np;

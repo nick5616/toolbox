@@ -70,7 +70,7 @@ export function swingMap(p: [number, number], rotXDeg: number, rotYDeg: number, 
   const a = (rotXDeg * Math.PI) / 180;
   const b = (rotYDeg * Math.PI) / 180;
   const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
-  const invD = persp * 0.8;
+  const invD = persp * 1.6;
   const n: [number, number, number] = [sb, -cb * sa, cb * ca];
   const np = n[0] * p[0] + n[1] * p[1];
   const den = n[2] - invD * np;

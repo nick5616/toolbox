@@ -3,6 +3,9 @@
  * back up, the levels weighted by the radius, added to the picture x amount x tint.
  * Own programs and targets; the maths is in fx1math (glowBright, glowLevelWeights, glowLevelSizes).
  */
+
+/** The pyramid spreads the bright pass thin; this makes amount 1 a clearly visible glow. */
+const GLOW_GAIN = 3;
 import { FULLSCREEN_VS, Program, Target } from "../gl/core";
 import type { FrameInput } from "../layers/registry";
 import { hexToLinear } from "../palette";
@@ -115,7 +118,7 @@ function create(ctx: PostContext): PostInstance {
         .tex("u_glow", 1, glowTex.tex)
         .f2("u_res", output.w, output.h)
         .f2("u_gts", 1 / glowTex.w, 1 / glowTex.h)
-        .f3("u_k", amount > 0 ? [tint[0] * amount, tint[1] * amount, tint[2] * amount] : [0, 0, 0]);
+        .f3("u_k", amount > 0 ? [tint[0] * amount * GLOW_GAIN, tint[1] * amount * GLOW_GAIN, tint[2] * amount * GLOW_GAIN] : [0, 0, 0]);
       ctx.fullscreen.draw();
     },
     resize(w: number, h: number) {

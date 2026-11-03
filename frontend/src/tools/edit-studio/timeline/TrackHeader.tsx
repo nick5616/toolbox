@@ -16,6 +16,8 @@ export interface TrackHeaderProps {
   onMove(dir: -1 | 1): void;
   onKind(kind: "video" | "adjust"): void;
   onRemove(): void;
+  /** Part B: "matte" = the track below shows through this one (it isn't drawn itself); "matted" = this one shows through the track above. */
+  matteRole?: "matte" | "matted" | null;
 }
 
 export function TrackHeader(p: TrackHeaderProps) {
@@ -47,7 +49,12 @@ export function TrackHeader(p: TrackHeaderProps) {
 
   return (
     <div className={cx(styles.header, p.selected && styles.headerSelected)} onPointerDown={p.onSelect} data-track-header={track.id}>
-      <Icon name={track.kind === "video" ? "film" : "sliders-horizontal"} size={14} className={styles.headerIcon} />
+      <Icon
+        name={p.matteRole === "matte" ? "scan-line" : p.matteRole === "matted" ? "layers" : track.kind === "video" ? "film" : "sliders-horizontal"}
+        size={14}
+        className={styles.headerIcon}
+        title={p.matteRole === "matte" ? "Matte: the track below shows through this one (not drawn itself)" : p.matteRole === "matted" ? "Shows through the track above" : undefined}
+      />
       {editing ? (
         <input
           ref={input}

@@ -299,3 +299,13 @@
 .fadeHandle:hover {
   background: var(--accent);
 }
+
+/* Part B: a matte track's clips only cut the track below; they're drawn dashed. */
+.matteArea {
+  background-image: repeating-linear-gradient(90deg, transparent 0 10px, color-mix(in srgb, var(--accent) 10%, transparent) 10px 12px);
+}
+
+.matteArea > * {
+  border-style: dashed;
+  opacity: 0.85;
+}
