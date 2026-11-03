@@ -1,6 +1,7 @@
 /** Look (SPEC.md §8.3): palette, the main sliders, the visual mix, motifs and (Visualizer only) the text. */
 import { useEffect, useState } from "react";
-import { ColorSwatchPicker, Section, SegmentedControl, Select, Slider, Switch, TextField, cx } from "@/components";
+import { Section, SegmentedControl, Slider, Switch, TextField, cx } from "@/components";
+import { TextStyleEditor } from "@/components/viz/TextStyleEditor";
 import { VisualizerService } from "@/lib/api";
 import { PALETTES } from "@/viz/palette";
 import type { PaletteMode, SignalId, TextStyle } from "@/viz/types";
@@ -18,7 +19,6 @@ import {
   setReactivity,
   setSpeed,
   setText,
-  TEXT_PRESETS,
   togglePalette,
 } from "./model";
 import type { TabProps } from "./ReactionsTab";
@@ -75,64 +75,9 @@ function TextSection({ show, onChange }: TabProps) {
     );
   }
   const patch = (p: Partial<TextStyle>) => onChange(setText(show, p));
-  const fontList = fonts.includes(t.font) || fonts.length === 0 ? fonts : [t.font, ...fonts];
   return (
     <Section label="Words on screen" action={<Switch aria-label="Show the words" checked onChange={() => onChange({ ...show, text: null })} />}>
-      <div className={styles.cards} role="radiogroup" aria-label="Text style">
-        {TEXT_PRESETS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            role="radio"
-            aria-checked={t.preset === p.id}
-            className={cx(styles.textCard, t.preset === p.id && styles.layerSelected)}
-            onClick={() => patch({ preset: p.id, position: p.id === "subtitle" || p.id === "subtitle-boxed" ? "lower" : t.position })}
-          >
-            <strong>{p.label}</strong>
-            <span>{p.hint}</span>
-          </button>
-        ))}
-      </div>
-      <label className={styles.inline}>
-        <span className={styles.paramLabel}>Font</span>
-        {fontList.length > 0 ? (
-          <Select size="sm" aria-label="Font" value={t.font} onChange={(font) => patch({ font })} options={fontList.map((f) => ({ value: f, label: f }))} />
-        ) : (
-          <TextField size="sm" aria-label="Font" value={t.font} onChange={(e) => patch({ font: e.target.value })} />
-        )}
-      </label>
-      <label className={styles.inline}>
-        <span className={styles.paramLabel}>Weight</span>
-        <SegmentedControl size="sm" aria-label="Weight" value={String(t.weight)} onChange={(w) => patch({ weight: Number(w) as TextStyle["weight"] })} options={[{ value: "400", label: "Regular" }, { value: "700", label: "Bold" }, { value: "900", label: "Black" }]} />
-      </label>
-      <Knob label="Size" min={3} max={12} step={0.5} value={t.size} onChange={(size) => patch({ size })} format={(v) => `${v}%`} />
-      <div className={styles.param}>
-        <span className={styles.paramLabel}>Text colour</span>
-        <ColorSwatchPicker aria-label="Text colour" value={t.color} onChange={(color) => patch({ color })} />
-      </div>
-      <div className={styles.param}>
-        <span className={styles.paramLabel}>Highlight</span>
-        <SegmentedControl size="sm" aria-label="Highlight" value={t.highlight === "mood" ? "mood" : "colour"} onChange={(v) => patch({ highlight: v === "mood" ? "mood" : t.highlight === "mood" ? "#ffd166" : t.highlight })} options={[{ value: "mood", label: "From the mood" }, { value: "colour", label: "Colour" }]} />
-        {t.highlight !== "mood" && <ColorSwatchPicker aria-label="Highlight colour" value={t.highlight} onChange={(highlight) => patch({ highlight })} />}
-      </div>
-      <label className={styles.inline}>
-        <span className={styles.paramLabel}>Position</span>
-        <SegmentedControl size="sm" aria-label="Position" value={t.position} onChange={(position) => patch({ position })} options={[{ value: "upper", label: "Top" }, { value: "center", label: "Middle" }, { value: "lower", label: "Bottom" }]} />
-      </label>
-      <Switch label="Show the next line" checked={t.showNext} onChange={(showNext) => patch({ showNext })} />
-      <Switch label="Capital letters" checked={t.uppercase} onChange={(uppercase) => patch({ uppercase })} />
-      <Knob label="Outline" min={0} max={0.15} step={0.005} value={t.outline} onChange={(outline) => patch({ outline })} />
-      <Knob label="Text glow" min={0} max={1} step={0.05} value={t.glow} onChange={(glow) => patch({ glow })} />
-
-      <div className={styles.subTitle}>Emphasised words</div>
-      <Knob label="Emphasis size" min={1} max={2} step={0.05} value={t.emphasis.scale} onChange={(scale) => patch({ emphasis: { ...t.emphasis, scale } })} format={(v) => `×${v.toFixed(2)}`} />
-      <Knob label="Emphasis glow" min={0} max={2} step={0.05} value={t.emphasis.glow} onChange={(glow) => patch({ emphasis: { ...t.emphasis, glow } })} />
-      <label className={styles.inline}>
-        <span className={styles.paramLabel}>Emphasis colour</span>
-        <SegmentedControl size="sm" aria-label="Emphasis colour" value={t.emphasis.color} onChange={(color) => patch({ emphasis: { ...t.emphasis, color } })} options={[{ value: "highlight", label: "Highlight" }, { value: "mood", label: "Mood" }]} />
-      </label>
-      <Switch label="Sparks on emphasised words" checked={t.emphasis.sparks} onChange={(sparks) => patch({ emphasis: { ...t.emphasis, sparks } })} />
-
+      <TextStyleEditor value={t} onChange={(next) => onChange({ ...show, text: next })} fonts={fonts} allowMood>
       <div className={styles.subTitle}>React to</div>
       <div className={styles.inline}>
         <SignalSelect label="React to" value={t.react.signal} placeholder="Nothing" onNone={() => patch({ react: { ...t.react, signal: null } })} onChange={(signal: SignalId) => patch({ react: { ...t.react, signal } })} />
@@ -147,6 +92,7 @@ function TextSection({ show, onChange }: TabProps) {
           <TextField size="sm" aria-label="Artist" placeholder="Artist" value={t.titleCard.artist} onChange={(e) => patch({ titleCard: { title: t.titleCard?.title ?? "", artist: e.target.value } })} />
         </div>
       )}
+      </TextStyleEditor>
     </Section>
   );
 }
