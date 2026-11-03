@@ -118,8 +118,8 @@ export function LaneRow(props: LaneRowProps) {
     drag.current = null;
     setPreview(null);
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-    // A click on a marker (no drag) moves the playhead to it.
-    if (d && !d.active && commit) seekTo(d.marker.ms);
+    // A click (no drag) moves the playhead to where you clicked, even on a marker.
+    if (d && !d.active && commit) seekTo(Math.max(0, xToMs(localX(e), pps, scrollMs)));
     if (!d || !d.active || !commit) return;
     const p = useEditStudio.getState().history?.present;
     if (p) useEditStudio.getState().edit(moveMarker(p, d.marker, d.target));

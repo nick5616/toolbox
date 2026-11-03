@@ -16,6 +16,7 @@ import { EFFECT_CATALOG } from "./effectCatalog";
 import { EffectPicker } from "./EffectPicker";
 import { moveItem, targetIndex } from "./reorder";
 import styles from "./inspector.module.css";
+import { HitOn } from "../beatsync/HitOn";
 
 export function effectLabel(type: PostType): string {
   return postDef(type)?.label ?? EFFECT_CATALOG[type]?.label ?? type;
@@ -142,6 +143,7 @@ export function EffectsStack({ posts, onChange, types, clipTimeMs, allowKeys, te
                 <Switch aria-label={`Enable ${effectLabel(p.type)}`} checked={p.enabled} onChange={(enabled) => patch(p.id, (x) => ({ ...x, enabled }), "")} />
                 <IconButton size="sm" icon="trash-2" label={`Remove ${effectLabel(p.type)}`} onClick={() => onChange(posts.filter((x) => x.id !== p.id), "")} />
               </div>
+              {p.enabled && <HitOn post={p} onChange={(next, key) => patch(p.id, () => next, key)} />}
               {expanded && (
                 <div className={styles.itemBody}>
                   {!def && <p className={styles.warn}>This effect isn&apos;t available in this build.</p>}

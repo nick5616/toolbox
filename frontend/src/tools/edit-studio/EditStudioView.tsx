@@ -4,7 +4,7 @@
  * packages. Packages own the components it imports, not this file.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge, Button, ErrorBoundary, IconButton, MenuButton, toast } from "@/components";
+import { Button, ErrorBoundary, IconButton, MenuButton, toast } from "@/components";
 import { EditStudioService, SettingsService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { useUI } from "@/state/ui";
@@ -33,6 +33,10 @@ import { useEditInputs, useEditStudio, useProject } from "./store";
 import { flushEdit, markOpened, onEditSaved, useEditAutosave } from "./useEditAutosave";
 import { useEditData } from "./useEditData";
 import styles from "./EditStudioView.module.css";
+import { HeaderControls } from "./beatsync/HeaderControls";
+import { HEADER_PX, xToMs } from "./geometry";
+import { editLength } from "@/viz/edit/types";
+import { seekTo } from "./transport/player";
 
 const SAVE_LABEL: Record<string, string> = { idle: "", dirty: "Unsaved", saving: "Saving…", saved: "Saved", error: "Couldn't save" };
 
@@ -141,10 +145,7 @@ function Editor({ moduleId }: { moduleId: string }) {
         <span className={styles.save} title={saveError ?? undefined}>
           {SAVE_LABEL[saveState]}
         </span>
-        <span className={styles.badges}>
-          <Badge>{project.aspect}</Badge>
-          <Badge>{project.fps} fps</Badge>
-        </span>
+        <HeaderControls disabled={setup} />
         <div className={styles.spacer} />
         <IconButton icon="undo-2" label="Undo" kbd="Mod+Z" disabled={!canUndo} onClick={() => useEditStudio.getState().undo()} />
         <IconButton icon="redo-2" label="Redo" kbd="Mod+Shift+Z" disabled={!canRedo} onClick={() => useEditStudio.getState().redo()} />
@@ -235,7 +236,17 @@ function Editor({ moduleId }: { moduleId: string }) {
       ) : (
         <div className={styles.bottom}>
           <Transport />
-          <div className={styles.timeline}>
+          <div
+            className={styles.timeline}
+            onDoubleClick={(e) => {
+              // Double-click anywhere along the time (lanes or tracks) puts the playhead there.
+              const r = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - r.left - HEADER_PX;
+              if (x < 0 || (e.target as HTMLElement).closest("input,button,[data-trim],[role=menu]")) return;
+              const st = useEditStudio.getState();
+              seekTo(Math.max(0, Math.min(editLength(project), xToMs(x, st.pps, st.scrollMs))));
+            }}
+          >
             <SectionBands className={styles.bands} />
             <ErrorBoundary label="The lanes" compact>
               <LanesPanel />
