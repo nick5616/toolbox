@@ -245,3 +245,37 @@ Newest last. Format: date — decision — why.
 - 2026-11-01 — HEIC rotation is read from FFmpeg's stream dump (`displaymatrix: rotation of -90.00 degrees`) when ffprobe's JSON has none: ffprobe 8 prints empty side data for tile-grid groups, so portrait iPhone photos came out sideways (found on the user's IMG_3083.HEIC). The HEIC and Composer caches are versioned (v2) so old sideways conversions are not reused.
 - 2026-11-01 — Composer collage build: a background that is also in the inputs isn't added as a layer; batch background removal skips layers already cut out; the "user touched layout" flag counts x/y/size/rotation changes and a manual layout choice; dropped sources fan out 3 % apart (CO3).
 - 2026-11-01 — Post sources: `Sources` reads JPEG EXIF dates with 8 parallel workers (opens were the slow part on Windows; 500 files ≈ 36 ms) and skips dot-folders; dropping a folder on the Post Builder makes a 4:5 carousel named after it (subfolders off; files dropped with it become extras); Change folder clears Hidden; the strip replaces a slide's source only when released on the middle half of a photo/clip tile, else inserts; the stitch dialog's song is a file picker (the pool has photos and clips only); collage and stitch need ≥ 2 sources; build inputs keep the selection order, "Add as slides" the grid order; the Sources panel refetches after the post is saved (PB3).
+
+## Phase 9: Edit Studio (SPEC.md approved 2026-11-03)
+
+- 2026-11-03 — Edit Studio is cut in as Phase 9 (Documents → 10, LAN → 11) and is its own tool, `edit-studio`, not a Video Editor mode. — The documents differ (tracks at absolute times vs a sequence), and it renders on the GPU engine, not FFmpeg filtergraphs.
+- 2026-11-03 — Departures from the brief (SPEC §0.2):
+  - clips render in a new `EditEngine` built on the Visualizer engine's GL pieces, not as a Visualizer `clip` layer (a layer can't wait for decoded frames, and Show limits can't hold an edit);
+  - adjustment tracks hold `adjust` clips;
+  - output effects (bloom/vignette/grain) are project-wide only (the Look);
+  - mattes are per clip in the project folder;
+  - `EditParam`/`EditMod` add keyframes and `marker.<lane>` signals with `every`/`sections`, instead of `stop.pulse`/`custom.pulse`;
+  - shake/zoompulse/glitch/chromatic get a `trigger` option, plus a new `punch` pass;
+  - slow motion uses FFmpeg `minterpolate`, not RIFE;
+  - stem rows show level curves (stems aren't cached);
+  - path masks have static points;
+  - clip audio only in exports;
+  - edit sources are CFR at the project fps;
+  - caption edits store whole lines;
+  - added color clips, `fxTarget`, `flipX`, `auto`, source tags, the bar offset and a text-export job;
+  - the analysis runs with mood off.
+- 2026-11-03 — SAM 2 comes from the official `facebookresearch/sam2` source (commit `2b90b9f`, package `sam-2`) as a pinned archive URL in `[tool.uv.sources]`, with `no-build-isolation-package` and `SAM2_BUILD_CUDA=0`. — The PyPI `sam2` 1.1.0 sdist was uploaded by a third party (same code, but a supply-chain risk). Building against the venv's torch avoids a 140 MB build-env download, and no compiler is needed. The engine venv grows by ≈ 1.7 MB (hydra-core, iopath, portalocker, antlr4). omegaconf moves 2.4.0 → 2.3.1 (hydra's pin; rapidocr also uses it).
+- 2026-11-03 — Model pins:
+  - `rvm_mobilenetv3_fp32.onnx`: 14,975,696 B, sha256 `88d45312…2828`, GPL-3.0;
+  - `sam2.1_hiera_tiny.pt`: 156,008,466 B, sha256 `7402e0d8…be69`, Apache-2.0.
+  - GPL/AGPL code is fine for this never-distributed personal app (as upscayl-bin).
+- 2026-11-03 — Measured on the Windows box (CPU, i7-11700K): SAM 2.1 tiny propagates at ≈ 2 s/frame and RVM at ≈ 70 ms/frame at 720p. Subject select therefore runs SAM on ≤ 15 frames per second of source and blends logits between them; the 60 s cap stays and the dialog shows an estimate.
+- 2026-11-03 — A new tool pack, `edit` ("Music edits"): engine, ffmpeg, stems-default, whisper-default, matte-people, matte-select; it unlocks `edit-studio`. The engine component's disk size grows by the sam-2 delta.
+- 2026-11-03 — Wave 0 contract changes from the spec text (SPEC §22):
+  - `FrameProvider.hint` takes the frames ahead, not a time;
+  - parsers return `{ok, value, problems}`;
+  - `Config` has no `BgRemove` (`bgremove.SpecFor`/`ModelDir` instead);
+  - `MatteState` carries the covered range;
+  - empty enum strings mean the default.
+- 2026-11-03 — The WebCodecs decode spike moved from Wave 0 to Wave 2. ES3 builds both upload paths behind a runtime feature check, and Edit Lab measures and picks. — The design doesn't depend on the result: the preview reads 540p streams and exports aren't real-time.
+- 2026-11-03 — The Video Editor's undo history moved to `lib/history.ts` (re-exported from the old path); `viz/fixture.ts` `buildFixture` gained `sections`/`silences` options (old output unchanged); `Analysis.withText` shares the feature bytes.

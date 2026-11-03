@@ -22,6 +22,19 @@ type PlanForWorker struct {
 	CoverURL string         `json:"coverUrl"`
 	ImageURL string         `json:"imageUrl"`
 	Seed     int64          `json:"seed"`
+	Kind     string         `json:"kind"` // "show" | "edit"
+	Edit     *workerEdit    `json:"edit,omitempty"`
+}
+
+type workerEdit struct {
+	ProjectJSON string                      `json:"projectJson"`
+	Streams     map[string]workerEditStream `json:"streams"`
+	Images      map[string]string           `json:"images"`
+}
+
+type workerEditStream struct {
+	URL      string `json:"url"`
+	IndexURL string `json:"indexUrl"`
 }
 
 type workerAnalysis struct {
@@ -61,6 +74,27 @@ func buildWorkerPlan(plan RenderPlan, urlFor func(string) (string, error)) (Plan
 	}
 	if w.ImageURL, err = conv(plan.ImagePath); err != nil {
 		return w, fmt.Errorf("image url: %w", err)
+	}
+	w.Kind = "show"
+	if plan.Edit != nil {
+		w.Kind = "edit"
+		e := &workerEdit{ProjectJSON: plan.Edit.ProjectJSON, Streams: map[string]workerEditStream{}, Images: map[string]string{}}
+		for k, s := range plan.Edit.Streams {
+			var ws workerEditStream
+			if ws.URL, err = conv(s.Stream); err != nil {
+				return w, fmt.Errorf("stream url: %w", err)
+			}
+			if ws.IndexURL, err = conv(s.Index); err != nil {
+				return w, fmt.Errorf("index url: %w", err)
+			}
+			e.Streams[k] = ws
+		}
+		for k, p := range plan.Edit.Images {
+			if e.Images[k], err = conv(p); err != nil {
+				return w, fmt.Errorf("image url: %w", err)
+			}
+		}
+		w.Edit = e
 	}
 	return w, nil
 }

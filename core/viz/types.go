@@ -89,6 +89,23 @@ type RenderPlan struct {
 	CoverPath string      `json:"coverPath"` // optional texture
 	ImagePath string      `json:"imagePath"` // optional still background texture
 	Seed      int64       `json:"seed"`
+	Edit      *EditPlan   `json:"edit"` // non-nil: an Edit Studio render (ShowJSON is "") (Phase 9 §12.2)
+}
+
+// EditPlan is everything an Edit Studio render needs besides the analysis
+// (Phase 9 SPEC §12.2). core/viz treats the project as opaque JSON; the keys
+// of Streams and Images are the frontend's EditFiles keys ("v:<path>",
+// "m:<matteId>", "i:<path>|<from>-<to>", "p:<path>").
+type EditPlan struct {
+	ProjectJSON string                    `json:"projectJson"`
+	Streams     map[string]EditPlanStream `json:"streams"`
+	Images      map[string]string         `json:"images"`
+}
+
+// EditPlanStream is an edit stream and its frame index.
+type EditPlanStream struct {
+	Stream string `json:"stream"`
+	Index  string `json:"index"`
 }
 
 // RenderOutput is the elementary stream the renderer produced in TempDir.

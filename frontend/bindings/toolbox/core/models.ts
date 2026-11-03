@@ -1268,6 +1268,11 @@ export enum ProjectKind {
     ProjectPost = "post",
     ProjectComposition = "composition",
     ProjectVideo = "video",
+
+    /**
+     * Edit Studio (Phase 9)
+     */
+    ProjectEdit = "edit",
 };
 
 export interface RunBrief {

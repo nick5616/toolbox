@@ -27,6 +27,16 @@ func kindByExt(path string) string {
 	return ""
 }
 
+// ProbeFiles describes source files in order (Edit Studio uses it). A file
+// that can't be read still gets a row, with Error set.
+func ProbeFiles(ctx context.Context, ffprobe string, paths []string) []ClipInfo {
+	out := make([]ClipInfo, 0, len(paths))
+	for _, p := range paths {
+		out = append(out, probeFile(ctx, ffprobe, p))
+	}
+	return out
+}
+
 // probeFile describes one source file. Failures go into ClipInfo.Error.
 func probeFile(ctx context.Context, ffprobe, path string) ClipInfo {
 	ci := ClipInfo{Path: path}

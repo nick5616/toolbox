@@ -11,6 +11,10 @@ export interface FixtureOptions {
   fps?: number;
   stems?: boolean;
   words?: boolean;
+  /** Sections as [startMs, label, group, energy] (default: the PLAN fractions). */
+  sections?: Array<[number, SectionLabel, string, number]>;
+  /** [fromMs, toMs) windows of near-silence: no drum events, mix.level ≈ 0.02 (Edit Studio's stop lane). */
+  silences?: Array<[number, number]>;
 }
 
 const SCALARS_MIX = ["mix.level", "mix.onset", "mix.brightness", "mix.balance", "mix.sub", "mix.bass", "mix.lowmid", "mix.mid", "mix.highmid", "mix.presence", "mix.brilliance", "mix.air"];
@@ -56,13 +60,16 @@ export function buildFixture(o: FixtureOptions = {}): Analysis {
   const beat = 500;
   const r = rand(7);
 
-  const sections = PLAN.map(([f, label, group, energy], i) => ({
-    startMs: Math.round((f * durationMs) / 2000) * 2000,
-    endMs: i + 1 < PLAN.length ? Math.round(((PLAN[i + 1] as [number, SectionLabel, string, number])[0] * durationMs) / 2000) * 2000 : durationMs,
-    label,
-    group,
-    energy,
-  }));
+  const sections = o.sections
+    ? o.sections.map(([startMs, label, group, energy], i, all) => ({ startMs, endMs: all[i + 1]?.[0] ?? durationMs, label, group, energy }))
+    : PLAN.map(([f, label, group, energy], i) => ({
+        startMs: Math.round((f * durationMs) / 2000) * 2000,
+        endMs: i + 1 < PLAN.length ? Math.round(((PLAN[i + 1] as [number, SectionLabel, string, number])[0] * durationMs) / 2000) * 2000 : durationMs,
+        label,
+        group,
+        energy,
+      }));
+  const silent = (t: number) => (o.silences ?? []).some(([a, b]) => t >= a && t < b);
   const energyAt = (t: number) => sections.find((s) => t >= s.startMs && t < s.endMs)?.energy ?? 0.3;
 
   const beats: number[] = [];
@@ -76,13 +83,15 @@ export function buildFixture(o: FixtureOptions = {}): Analysis {
     for (let t = offset; t < durationMs; t += every) out.push([t, Math.max(1, Math.min(255, Math.round(strength(t) * 255)))]);
     return out;
   };
-  const kick = ev(beat, 0, (t) => 0.5 + energyAt(t) * 0.5);
-  const snare = ev(beat * 2, beat, (t) => 0.4 + energyAt(t) * 0.6);
-  const hats = ev(beat / 2, beat / 4, (t) => (energyAt(t) > 0.4 ? 0.3 + r() * 0.4 : 0));
+  const audible = (e: Event2[]) => e.filter(([t]) => !silent(t));
+  const kick = audible(ev(beat, 0, (t) => 0.5 + energyAt(t) * 0.5));
+  const snare = audible(ev(beat * 2, beat, (t) => 0.4 + energyAt(t) * 0.6));
+  const hats = audible(ev(beat / 2, beat / 4, (t) => (energyAt(t) > 0.4 ? 0.3 + r() * 0.4 : 0)));
   const pulseAt = (events: Event2[], t: number, tau: number) => {
     let v = 0;
     for (const [ms, s] of events) {
       if (ms > t) break;
+      if (silent(ms)) continue;
       if (t - ms < tau * 6) v = Math.max(v, (s / 255) * Math.exp(-(t - ms) / tau));
     }
     return v;
@@ -132,7 +141,7 @@ export function buildFixture(o: FixtureOptions = {}): Analysis {
     const h = pulseAt(hats, t, 60);
     const sing = singing(t) ? 1 : 0;
     const wob = 0.5 + 0.5 * Math.sin(t / 900);
-    put("mix.level", i, 0.15 + e * 0.6 + k * 0.2);
+    put("mix.level", i, silent(t) ? 0.02 : 0.15 + e * 0.6 + k * 0.2);
     put("mix.onset", i, Math.max(k, s * 0.8, h * 0.5));
     put("mix.brightness", i, 0.3 + e * 0.4 + h * 0.2);
     put("mix.balance", i, 0.5 + 0.15 * Math.sin(t / 2300));

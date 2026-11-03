@@ -12,6 +12,7 @@ const (
 	ProjectPost        ProjectKind = "post"
 	ProjectComposition ProjectKind = "composition"
 	ProjectVideo       ProjectKind = "video"
+	ProjectEdit        ProjectKind = "edit" // Edit Studio (Phase 9)
 )
 
 // MaxProjectBytes caps a project document's JSON.

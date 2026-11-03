@@ -23,6 +23,7 @@ dependencies = [
   "python-bidi>=0.6.12",   # Arabic text order for RapidOCR
   "pypdf>=6",              # searchable-PDF text overlay
   "opencv-python-headless>=5.0.0.93",  # face detection (YuNet decode), image ops; already pulled in by rapidocr
+  "sam-2",                # SAM 2.1 (facebookresearch/sam2, pinned in [tool.uv.sources])
 ]
 
 [dependency-groups]
@@ -34,6 +35,13 @@ dev = ["pytest>=8"]
 exclude-dependencies = ["tensorflow", "tensorflow-macos", "coremltools"]
 # resampy<0.4.3 (basic-pitch's pin) imports pkg_resources, removed in setuptools 81.
 override-dependencies = ["resampy>=0.4.3"]
+# sam2 is sdist-only and its build-system requires torch: build it against the
+# venv's torch (no 140 MB build-env download) and never try the CUDA extension.
+no-build-isolation-package = ["sam-2"]
+extra-build-variables = { sam-2 = { SAM2_BUILD_CUDA = "0" } }
+
+[tool.uv.sources]
+sam-2 = { url = "https://github.com/facebookresearch/sam2/archive/2b90b9f5ceec907a1c18123530e92e794ad901a4.tar.gz" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

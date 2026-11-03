@@ -15,6 +15,7 @@ import (
 	"toolbox/modules/converter"
 	"toolbox/modules/devutils"
 	"toolbox/modules/downloader"
+	"toolbox/modules/editstudio"
 	"toolbox/modules/eraser"
 	"toolbox/modules/exif"
 	"toolbox/modules/lyricvideo"
@@ -64,6 +65,7 @@ func TestEveryToolIsInOnePack(t *testing.T) {
 			_, err := visualizer.Register(reg, viz.NewAnalyzer("", "", nil, nil), nil, nil, nil, nil, "", "")
 			return err
 		},
+		func() error { return editstudio.Register(reg, editstudio.New(editstudio.Config{})) },
 	} {
 		if err := register(); err != nil {
 			t.Fatal(err)

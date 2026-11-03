@@ -38,6 +38,8 @@ export type LayerType = (typeof LAYER_TYPES)[number];
 
 export const POST_TYPES = [
   "bloom", "vignette", "grain", "chromatic", "feedback", "mirror", "shake", "zoompulse", "glitch", "grade",
+  // Phase 9 (Edit Studio, WP-ES5): unregistered types are skipped by the engine until their files land.
+  "punch", "flash", "blurpulse", "exposure", "invert",
 ] as const;
 export type PostType = (typeof POST_TYPES)[number];
 
@@ -174,6 +176,16 @@ export interface PlanForWorker {
   coverUrl: string;
   imageUrl: string;
   seed: number;
+  /** "edit" plans are Edit Studio renders (Phase 9 SPEC §12.2); absent = "show". */
+  kind?: "show" | "edit";
+  edit?: EditPlanForWorker;
+}
+
+/** An Edit Studio render: the project and its files as /media URLs (keys: viz/edit/types.ts EditFiles). */
+export interface EditPlanForWorker {
+  projectJson: string;
+  streams: Record<string, { url: string; indexUrl: string }>;
+  images: Record<string, string>;
 }
 
 export const MAX_SHOW_BYTES = 512 * 1024;

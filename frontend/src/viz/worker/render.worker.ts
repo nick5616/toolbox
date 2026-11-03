@@ -10,8 +10,9 @@ import { buildFixture } from "../fixture";
 import { GLUnavailableError } from "../gl/core";
 import { validateShow } from "../validate";
 import type { PlanForWorker } from "../types";
-import { chooseEncoder } from "./encoder";
-import { Batcher, FlowControl, RenderError, type HostMessage, type ParityRequest, type WorkerMessage } from "./transport";
+import { runEdit } from "../edit/worker";
+import { encodeFrames } from "./loop";
+import { FlowControl, RenderError, type HostMessage, type ParityRequest, type WorkerMessage } from "./transport";
 
 interface WorkerScope {
   postMessage(m: WorkerMessage, transfer?: Transferable[]): void;
@@ -21,7 +22,7 @@ const scope = self as unknown as WorkerScope;
 const post = (m: WorkerMessage, transfer?: Transferable[]) => scope.postMessage(m, transfer);
 
 const flow = new FlowControl();
-const MAX_ENCODE_QUEUE = 6;
+const io = { post, flow };
 
 async function loadBitmap(url: string): Promise<ImageBitmap | null> {
   if (!url) return null;
@@ -42,8 +43,6 @@ function makeEngine(canvas: OffscreenCanvas, opts: ConstructorParameters<typeof 
   }
 }
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
 async function run(planUrl: string, forceJpeg: boolean): Promise<void> {
   let plan: PlanForWorker;
   try {
@@ -51,6 +50,7 @@ async function run(planUrl: string, forceJpeg: boolean): Promise<void> {
   } catch (e) {
     throw new RenderError("The visual renderer couldn't read its instructions", String(e));
   }
+  if (plan.kind === "edit") return runEdit(plan, forceJpeg, io); // Edit Studio (Phase 9 §12.2)
   const v = validateShow(plan.showJson);
   if (!v.ok) throw new RenderError("This design couldn't be read", v.problem);
   const analysis = await loadAnalysis({ audioJsonUrl: plan.analysis.audioJsonUrl, featuresUrl: plan.analysis.featuresUrl, textJsonUrl: plan.analysis.textJsonUrl || undefined });
@@ -58,7 +58,6 @@ async function run(planUrl: string, forceJpeg: boolean): Promise<void> {
 
   const canvas = new OffscreenCanvas(plan.width, plan.height);
   const engine = makeEngine(canvas, { width: plan.width, height: plan.height, mode: plan.mode, quality: "full", seed: plan.seed, fps: plan.fps, inWorker: true });
-  let enc: VideoEncoder | null = null;
   try {
     engine.setAnalysis(analysis);
     engine.setShow(v.show);
@@ -67,57 +66,8 @@ async function run(planUrl: string, forceJpeg: boolean): Promise<void> {
 
     const endMs = plan.endMs > plan.startMs ? plan.endMs : analysis.durationMs;
     const frames = Math.max(1, Math.round(((endMs - plan.startMs) / 1000) * plan.fps));
-    const choice = await chooseEncoder(canvas.width, canvas.height, plan.fps, plan.mode === "overlay", forceJpeg);
-    post({ type: "start", info: { encoder: choice.label, width: canvas.width, height: canvas.height, fps: plan.fps, frames } });
-
-    const batcher = new Batcher((buf) => {
-      const copy = buf.slice();
-      flow.addSent(copy.length);
-      post({ type: "data", buf: copy.buffer }, [copy.buffer]);
-    });
-    let encErr: string | null = null;
-    if (choice.kind === "h264") {
-      enc = new VideoEncoder({
-        output: (chunk) => {
-          const b = new Uint8Array(chunk.byteLength);
-          chunk.copyTo(b);
-          batcher.push(b);
-        },
-        error: (e) => {
-          encErr = e.message;
-        },
-      });
-      enc.configure(choice.config);
-    }
-
-    for (let i = 0; i < frames; i++) {
-      if (flow.cancelled) return void post({ type: "cancelled" });
-      if (encErr) throw new RenderError("Video encoding failed", encErr);
-      engine.render(plan.startMs + (i * 1000) / plan.fps);
-      if (enc) {
-        const vf = new VideoFrame(canvas, { timestamp: Math.round((i * 1e6) / plan.fps), duration: Math.round(1e6 / plan.fps) });
-        enc.encode(vf, { keyFrame: i % (2 * plan.fps) === 0 });
-        vf.close();
-        while (enc.encodeQueueSize > MAX_ENCODE_QUEUE && !flow.cancelled && !encErr) {
-          await Promise.race([new Promise<void>((r) => enc?.addEventListener("dequeue", () => r(), { once: true })), sleep(50)]);
-        }
-      } else {
-        const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.92 });
-        batcher.push(new Uint8Array(await blob.arrayBuffer()));
-      }
-      await flow.waitWindow();
-      if (i % 15 === 0) post({ type: "progress", frame: i, frames });
-    }
-    if (flow.cancelled) return void post({ type: "cancelled" });
-    if (enc) {
-      await enc.flush();
-      if (encErr) throw new RenderError("Video encoding failed", encErr);
-    }
-    batcher.flush();
-    post({ type: "progress", frame: frames, frames });
-    post({ type: "done", frames, bytes: flow.sent });
+    await encodeFrames(canvas, { fps: plan.fps, frames, overlay: plan.mode === "overlay", forceJpeg }, (i) => engine.render(plan.startMs + (i * 1000) / plan.fps), io);
   } finally {
-    if (enc && enc.state !== "closed") enc.close();
     engine.dispose();
   }
 }

@@ -1,6 +1,10 @@
 package bgremove
 
-import "toolbox/core"
+import (
+	"path/filepath"
+
+	"toolbox/core"
+)
 
 // ModelKind selects the pre/post-processing in the engine.
 type ModelKind string
@@ -51,3 +55,24 @@ func PresetInfos() []core.PresetInfo {
 	}
 	return out
 }
+
+// ModelSpec is a pinned background-removal model, exported for Edit Studio's
+// photo cut-outs (which call bgremove.run with output "mask").
+type ModelSpec struct {
+	File   string
+	SHA256 string
+	URL    string
+	Kind   string
+}
+
+// SpecFor returns the pinned model of a preset ("fast" | "balanced" | "best").
+func SpecFor(preset string) (ModelSpec, bool) {
+	m, ok := models[Model(preset)]
+	if !ok {
+		return ModelSpec{}, false
+	}
+	return ModelSpec{File: m.File, SHA256: m.SHA256, URL: m.URL, Kind: string(m.Kind)}, true
+}
+
+// ModelDir is where background-removal models live under the models folder.
+func ModelDir(modelsDir string) string { return filepath.Join(modelsDir, "bg") }

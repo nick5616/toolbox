@@ -341,3 +341,34 @@ export type {
   SlideSource as PostSlideSource,
   SourceFile as PostSourceFile,
 } from "@bindings/modules/posts/models";
+
+// --- Phase 9: Edit Studio ---
+export * as EditStudioService from "@bindings/modules/editstudio/service";
+export { Action as EditAction } from "@bindings/modules/editstudio/models";
+export type {
+  AnalyzeRequest as EditAnalyzeRequest,
+  Captions as EditCaptions,
+  Clip as EditClip,
+  CustomMarker as EditCustomMarker,
+  EditProject,
+  EditStream,
+  InterpRequest as EditInterpRequest,
+  LaneSettings as EditLaneSettings,
+  MarkerRow as EditMarkerRow,
+  MarkerState as EditMarkerState,
+  Matte as EditMatte,
+  MatteClick as EditMatteClick,
+  MatteGlow as EditMatteGlow,
+  MatteModels as EditMatteModels,
+  MatteRequest as EditMatteRequest,
+  MatteState as EditMatteState,
+  MatteStroke as EditMatteStroke,
+  RecipeRun as EditRecipeRun,
+  Result as EditResult,
+  Song as EditSong,
+  Source as EditSource,
+  SourceState as EditSourceState,
+  StreamIndex as EditStreamIndex,
+  TextRequest as EditTextRequest,
+  Track as EditTrack,
+} from "@bindings/modules/editstudio/models";

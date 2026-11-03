@@ -40,6 +40,7 @@ import (
 	"toolbox/modules/converter"
 	"toolbox/modules/devutils"
 	"toolbox/modules/downloader"
+	"toolbox/modules/editstudio"
 	"toolbox/modules/eraser"
 	"toolbox/modules/exif"
 	"toolbox/modules/lyricvideo"
@@ -303,6 +304,18 @@ func run() error {
 	}
 	// --- end Part B ---
 
+	// --- Phase 9: Edit Studio (architect) ---
+	editMod := editstudio.New(editstudio.Config{
+		Store: db, ProjectsDir: projectsDir, CacheDir: filepath.Join(paths.CacheDir, "editstudio"),
+		ModelsDir: paths.ModelsDir, Engine: engine, Analyzer: vizAnalyzer, Broker: vizBroker,
+		Resolve: depSvc.Resolve, Jobs: jobs,
+	})
+	if err := editstudio.Register(reg, editMod); err != nil {
+		return err
+	}
+	go editMod.PruneCache() // start-up cleanup of cache/editstudio (30 days, 10 GB)
+	// --- end Phase 9 ---
+
 	settings.OnChange(func(old, new core.Settings) {
 		if old.Concurrency != new.Concurrency {
 			jobs.SetConcurrency(new.Concurrency)
@@ -368,6 +381,7 @@ func run() error {
 			application.NewServiceWithOptions(composer.NewService(composerMod), opts),
 			application.NewServiceWithOptions(videoeditor.NewService(jobs, videoMod), opts),
 			application.NewServiceWithOptions(posts.NewService(jobs, postsMod), opts),
+			application.NewServiceWithOptions(editstudio.NewService(jobs, editMod), opts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

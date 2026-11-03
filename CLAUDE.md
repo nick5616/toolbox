@@ -237,6 +237,18 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Instagram limits** live only in `modules/posts/limits.go`. Exports strip location and metadata unless the post keeps them. Never modify source files.
 - **Handoffs:** `Handoff.postSlide` opens Composer or Video Editor for a post's slide; the first save links the project to the slide.
 
+## Edit Studio (Phase 9)
+
+- **The engine never reads camera files.** Video reaches it only as **edit streams**: Annex-B H.264 + `.idx.json` (`modules/editstudio` makes them with FFmpeg: CFR at the project fps, GOP 10, no B-frames, an AUD per frame, SPS/PPS on every keyframe), in `cache/editstudio/src/<fileKey>/` (two tiers: preview ≤ 540 short side, export). Frames are decoded with WebCodecs `VideoDecoder` in `viz/frames/`. **Never use `<video>` seeking for rendered frames.**
+- **Close every `VideoFrame` exactly once**, as soon as it is converted or dropped (decoders stall otherwise).
+- A frame is a function of (project, analysis, markers, size, seed, time). `viz/edit/` and `viz/frames/` follow the engine's determinism rules; the preview (`EditCanvas`) and the export (`viz/edit/worker.ts`, plan kind `"edit"` through the same `RenderBroker`) run the same `EditEngine`. Only the stream tier differs.
+- **Time units:** song ms (analysis, derived marker ids `"<lane>:<songMs>"`, custom markers, caption lines), timeline ms (clips, playhead, `Marker.ms`), source ms (`InMs`, matte ranges). `songMs = song.startMs + timelineMs`.
+- The Go document (`modules/editstudio/document.go`) holds the frontend's shapes as JSON strings (`speed`, `transform`, `masks`, `effects`, `in`, `look`, `captions.style/lines`); parse them only with `viz/edit/schema.ts`. Edit the document only through `useEditStudio().edit(next, key)`; any edit to an `auto` clip clears `auto`.
+- Effects use `EditParam`/`EditMod` (keyframes + marker signals `marker.<lane>` with `every`/`sections`). Visualizer types stay unchanged; a new post pass goes in `POST_TYPES` + `post/index.ts`. Output effects (bloom/vignette/grain) are project-wide (the Look) only; stateful posts (`feedback`) aren't offered.
+- **Mattes** are per clip, in `<support>/projects/<id>/mattes/`, made by `matte.*` engine handlers that never download (models pinned in `modules/editstudio/models.go`, `<models>/matte/`). One matte job at a time. SAM 2 comes from the official repo at a pinned commit (`[tool.uv.sources]`), never the PyPI `sam2` package (not Meta's).
+- Caches: `cache/editstudio/` (30 days, 10 GB) pruned at start.
+- **How to add an auto-fill recipe:** a `Recipe` in `tools/edit-studio/autofill/recipes.ts` with golden tests on `viz/edit/fixture.ts`.
+
 ## Conventions
 
 - **Go**: idiomatic, context-aware, wrapped errors, stdlib `testing` only (no testify), table tests, `t.TempDir()` for files. No goroutine leaks: everything stops on ctx cancel.

@@ -35,6 +35,7 @@ export const toolViews: Record<string, LazyExoticComponent<ComponentType<ToolVie
   pipelines: lazy(() => import("./pipelines/PipelinesView")),
   "photo-composer": lazy(() => import("./photo-composer/PhotoComposerView")),
   "video-editor": lazy(() => import("./video-editor/VideoEditorView")),
+  "edit-studio": lazy(() => import("./edit-studio/EditStudioView")),
   "post-builder": lazy(() => import("./post-builder/PostBuilderView")),
 };
 

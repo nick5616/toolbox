@@ -51,6 +51,9 @@ func cueBody(text string) string {
 	return strings.Join(out, "\n")
 }
 
+// FormatSRT renders cues as SubRip (LF line endings). Edit Studio uses it.
+func FormatSRT(cues []Cue) string { return formatSRT(cues) }
+
 // formatSRT renders cues as SubRip (LF line endings).
 func formatSRT(cues []Cue) string {
 	var b strings.Builder

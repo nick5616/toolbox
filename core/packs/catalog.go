@@ -103,8 +103,8 @@ func Components() []ComponentSpec {
 			// measured on Windows on 2026-10-28. The download is mostly the
 			// torch CPU wheel; Mac numbers use Windows until measured there.
 			Sizes: map[string]Size{
-				Windows: {Download: 1_000 * mb, Disk: 1_407_624_938},
-				MacARM:  {Download: 1_000 * mb, Disk: 1_407_624_938},
+				Windows: {Download: 1_001 * mb, Disk: 1_407_624_938 + 1_655_069}, // + sam-2 and its deps (Phase 9)
+				MacARM:  {Download: 1_001 * mb, Disk: 1_407_624_938 + 1_655_069},
 			},
 		},
 		{
@@ -147,6 +147,18 @@ func Components() []ComponentSpec {
 			ID: "plate-detect", Name: "YOLOv9 plate detector", Href: "https://github.com/ankandrew/open-image-models", License: "MIT (code; weights unstated)",
 			Kind: core.ComponentModel, Module: "redact", Preset: "plates",
 			Sizes: same(Size{Download: 7_835_770, Disk: 7_835_770}),
+		},
+		{
+			// Phase 9 (Edit Studio): pinned files, sizes from the downloads (2026-11-03).
+			ID: "matte-people", Name: "Robust Video Matting", Href: "https://github.com/PeterL1n/RobustVideoMatting", License: "GPL-3.0",
+			Kind: core.ComponentModel, Module: "edit-studio", Preset: "people",
+			Sizes: same(Size{Download: 14_975_696, Disk: 14_975_696}),
+		},
+		{
+			// The checkpoint; the sam-2 package itself adds ≈1.7 MB to the engine's venv.
+			ID: "matte-select", Name: "SAM 2.1 tiny", Href: "https://github.com/facebookresearch/sam2", License: "Apache-2.0",
+			Kind: core.ComponentModel, Module: "edit-studio", Preset: "select",
+			Sizes: same(Size{Download: 156_008_466, Disk: 156_008_466}),
 		},
 		{
 			ID: "inpaint", Name: "LaMa inpainting", Href: "https://github.com/advimman/lama", License: "Apache-2.0",
@@ -222,6 +234,14 @@ func Catalog() []PackSpec {
 				{Module: "exif", Needs: []string{"exiftool"}},
 				{Module: "redact", Needs: []string{"engine", "ffmpeg", "face-detect", "plate-detect"}},
 				{Module: "object-eraser", Needs: []string{"engine", "inpaint"}},
+			},
+		},
+		{
+			ID: "edit", Name: "Music edits", Icon: "audio-waveform",
+			Description: "Cut clips and photos to a song's beats with Edit Studio, with people and subject cut-outs",
+			Components:  []string{"engine", "ffmpeg", "stems-default", "whisper-default", "matte-people", "matte-select"},
+			Unlocks: []Unlock{
+				{Module: "edit-studio", Needs: []string{"engine", "ffmpeg", "stems-default"}},
 			},
 		},
 		{

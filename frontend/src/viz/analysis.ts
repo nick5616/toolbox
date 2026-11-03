@@ -179,6 +179,11 @@ export class Analysis {
     return this.blocks.has(id);
   }
 
+  /** The same audio analysis with other words (Edit Studio's edited captions, Phase 9 §8.4). Shares the feature bytes. */
+  withText(text: TextDoc | null): Analysis {
+    return new Analysis(this.audio, this.bytes, text);
+  }
+
   /** A scalar channel as 0..1 floats (null when absent). */
   channel(id: string): Float32Array | null {
     const hit = this.scalars.get(id);

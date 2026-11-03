@@ -1,6 +1,6 @@
 # Toolbox — Phase 9 Spec: Edit Studio (beat-synced music edits)
 
-Status: **DRAFT r1 — waiting for review** (2026-11-03).
+Status: **APPROVED 2026-11-03** (r1; "ok keep going").
 Date: 2026-11-03. Author: architect session (Opus). Source brief: "Toolbox Edit Studio: Spec" (Nicole, Nov 3 2026), written against `be0e76b`.
 
 Phases 1–8 are shipped; their specs are archived in `docs/specs/phase-{1..8}.md`, and every contract there still holds unless changed here. "P7 §x" refers to `docs/specs/phase-7.md` (Visualizer), "P8 B6" to `docs/specs/phase-8.md` Part B (Video Editor).
@@ -1803,3 +1803,41 @@ A new section, **"Edit Studio (Phase 9)"**:
 | Long exports at 60 fps | Progress and speed in the job; the broker's existing timeouts tolerate decode stalls (< 30 s idle) |
 | Project size (4 MiB) | Field caps; captions ≤ 256 KiB; effects ≤ 8 per clip |
 | Spec scope (ten packages) | Frozen contracts and stubs in Wave 0; each milestone is usable alone |
+
+---
+
+## 22. Wave 0 notes: the contract as built (2026-11-03; these override the sections above)
+
+1. **`FrameProvider.hint(ahead: FrameKey[], playing: boolean)`**: the host passes the frames the next ~0.5 s will need, collected with `EditEngine.needs`, instead of a time (§8.1). The provider can't compute needs itself.
+2. **Parsers return `Parsed<T> = {ok, value, problems: string[]}`**: always a usable value (§6.3). `schema.ts` also exports `parseEditParam`, `baseOf`, `isEditSignal`, `isMarkerSignal`, `newMask`, `CLIP_POST_TYPES`, `LOOK_POST_TYPES`, `TRANSFORM_RULES`, `TRANSITION_KINDS`, `CUT` and the limits.
+3. **ES1 signatures** (`viz/edit/`):
+   - `params.ts`: `evalEditParam(p, min, max, clipMs, songMs, ctx: {signals, markers} | null)` and `interpolateKeys(keys, u)`;
+   - `markerSignals.ts`: `new MarkerSignals(analysis, markers, songStartMs)` with `.value(lane, {every?, sections?}, songMs, attackMs?, releaseMs?)`;
+   - `markers.ts`: `deriveMarkers(analysis, markerState, {startMs, endMs})` and `TAP_LATENCY_MS`.
+4. **Shared helpers:**
+   - `viz/edit/defaults.ts`: `LANE_DEFAULTS`, `laneSettings`, `emptyEditProject`, `normalizeProject` (non-null lists/maps; same object when already clean), `NormalProject`;
+   - `viz/edit/types.ts`: `sizeFor`, `previewSize`, `editLength`;
+   - `viz/edit/fixture.ts`: `buildEditFixture()` (sections intro 0–4 s, verse 4–8 s, chorus 8–16 s, drop 16–24 s; stop 15,000–15,400 ms; drop event 16,000 ms; lines every 4 s from 4 s), `fixtureKicks()`, `fixtureSnares()`, `fixtureProject()`;
+   - `viz/fixture.ts` `buildFixture` gained `sections` and `silences` options (old output unchanged).
+5. **Go:**
+   - `Config` has no `BgRemove`: photo cut-outs use `bgremove.SpecFor("balanced")` and `bgremove.ModelDir(modelsDir)`;
+   - `MatteState` also carries `FromMs`/`ToMs` (the padded range the files cover);
+   - `runMatte(ctx, job, projectID, req)` holds the matte slot already;
+   - `notBuilt()` lives in `sources.go`;
+   - `Service` also has `StreamIndexShape()` (bindings);
+   - `LaneDefaults()` and `NewProject()` are exported;
+   - empty enum strings (`fit`, `slow`, `blend`, `fxTarget`) mean the default.
+   - Test helpers in `fakes_test.go`: `memStore`, `newTestModule`, `validDoc`, `recorder`, `newJob`.
+6. **Frontend state** (`tools/edit-studio/`):
+   - `store.ts` (`useEditStudio`, `useProject`, `useMarkers`, `useSelectedClipIds`, `useEditInputs`, `interpKey`);
+   - `doc.ts` (`newId`, `newClip`, `newTrack`, `findClip`, `allClips`, `withClip`, `withTrack`, `speedAt`, `clipSourceSpan`, `projectPaths`);
+   - `useEditAutosave.ts` (`flushEdit`, `onEditSaved`, `markOpened`, `discardedEdits`);
+   - `useEditData.ts` (`loadRef`, `refreshSources`, `refreshMattes`).
+   - The view shell imports one stub per package (§16.3); keep their exported names and props.
+7. **SAM 2** is the official `facebookresearch/sam2` code at commit `2b90b9f` as the `sam-2` package (a pinned archive URL in `[tool.uv.sources]`, built without isolation and without the CUDA extension). The PyPI `sam2` package was not published by Meta, so it isn't used.
+   - **Measured on this box (CPU):** SAM 2.1 tiny propagates at ≈ 2 s/frame. `matte.select` therefore runs SAM on at most **15 frames per second of source** and blends logits linearly for the frames between. The 60 s cap stays; the dialog shows an estimate ("about N minutes").
+   - **RVM** runs at ≈ 70 ms/frame at 720p on CPU.
+   - The lock moves `omegaconf` 2.4.0 → 2.3.1 (hydra's pin). ES7 runs the OCR tests against it.
+   - `sidecar/embed.go` now embeds `toolbox_sidecar/matte/*.py`.
+8. **The decode spike moves to Wave 2.** ES3 builds both upload paths (`VideoFrame` directly, or `createImageBitmap`) behind a runtime feature check. Edit Lab measures decode fps and picks the default. The design never depended on it (§16.1).
+9. **Packs:** the `edit` pack ("Music edits") unlocks `edit-studio` with `engine`, `ffmpeg`, `stems-default`. The `matte-people`/`matte-select` components are in the catalog with measured sizes.

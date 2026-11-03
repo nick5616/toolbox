@@ -116,3 +116,42 @@
   --checker-a: #ffffff;
   --checker-b: #dcdce1;
 }
+
+/* Edit Studio marker lanes (Phase 9 §14.4). */
+:root {
+  --lane-beat: #8b93a7;
+  --lane-downbeat: #e6e8ef;
+  --lane-kick: #ff8c42;
+  --lane-snare: #ffd166;
+  --lane-hats: #9be564;
+  --lane-bass: #4cc9f0;
+  --lane-vocals: #f72585;
+  --lane-other: #b388eb;
+  --lane-section: #6c7a96;
+  --lane-drop: #ff4d4d;
+  --lane-lift: #ffa94d;
+  --lane-break: #5c7cfa;
+  --lane-stop: #ff6bd6;
+  --lane-phrase: #63e6be;
+  --lane-word: #a5d8ff;
+  --lane-custom: #ffe066;
+}
+
+:root[data-theme="light"] {
+  --lane-beat: #5f6677;
+  --lane-downbeat: #1e2230;
+  --lane-kick: #c2410c;
+  --lane-snare: #a16207;
+  --lane-hats: #3f8f1f;
+  --lane-bass: #0369a1;
+  --lane-vocals: #be185d;
+  --lane-other: #7c3aed;
+  --lane-section: #475569;
+  --lane-drop: #dc2626;
+  --lane-lift: #c2620c;
+  --lane-break: #3b5bdb;
+  --lane-stop: #c026d3;
+  --lane-phrase: #0f766e;
+  --lane-word: #1d4ed8;
+  --lane-custom: #a16207;
+}
