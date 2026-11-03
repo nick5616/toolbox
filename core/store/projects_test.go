@@ -19,6 +19,10 @@ func TestProjectsRoundTrip(t *testing.T) {
 	put("a", core.ProjectPost, 1)
 	put("b", core.ProjectPost, 3)
 	put("c", core.ProjectVideo, 2)
+	put("d", core.ProjectEdit, 4) // migration 0007
+	if edits, err := db.ListProjects(ctx, core.ProjectEdit); err != nil || len(edits) != 1 {
+		t.Fatalf("edits = %+v, %v", edits, err)
+	}
 	posts, err := db.ListProjects(ctx, core.ProjectPost)
 	if err != nil || len(posts) != 2 || posts[0].ID != "b" {
 		t.Fatalf("posts = %+v, %v", posts, err)

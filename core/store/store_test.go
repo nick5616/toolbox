@@ -42,7 +42,7 @@ func TestMigrationsIdempotent(t *testing.T) {
 	}
 	defer db.Close()
 	var n int
-	if err := db.sql.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 6 {
+	if err := db.sql.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 7 {
 		t.Fatalf("migrations = %d, %v", n, err)
 	}
 	if v, ok, _ := db.GetSetting(context.Background(), "k"); !ok || v != `"v"` {
