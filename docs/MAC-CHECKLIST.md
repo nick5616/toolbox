@@ -117,8 +117,23 @@ Everything from Phases 3–6 that can only be checked on the Mac (Apple Silicon)
 44. **Post Builder**: a 4:5 carousel with 3 photos (one HEIC, one with location), the composition and the vlog; Export, then AirDrop the folder to the phone and start a post with it.
     Expect: files are 01…05 in order, 1080×1350, upright, and the location isn't in the photos (check in Photos → Info).
 
+## 10. Edit Studio (Phase 9)
+
+45. **Decode bench**: start with `TOOLBOX_VIZLAB=1 TOOLBOX_VIZLAB_DECODE=1 TOOLBOX_VIEW=vizlab` (sandbox env vars as in step 0).
+    Expect: `<support>/tmp/vizlab/decode.json` appears. Send it back: it has decode fps for 1 and 4 streams at 540p and 1080p, and whether direct `VideoFrame` upload works in WKWebView.
+46. Install the **Music edits** pack in Settings → Tool packs.
+    Expect: the listed download size is close to what it downloads (engine already installed: ≈ 171 MB of models).
+47. **New edit** (9:16, 30 fps) with a song from Music. Analyze with "Detect" words, pick a 30 s range on a chorus, add 4 iPhone clips (one portrait, one HDR) and a HEIC photo, then Auto-fill → Drop slam.
+    Expect: lanes show beats, kicks, snares and the drop; the clips prepare (badges go away); the preview plays at ≥ 28 fps (readout under the preview) with cuts on kicks; the portrait clip and the HEIC photo are upright; the HDR clip isn't washed out.
+48. On one clip: Cut-out → People, then Split subject, add Stroke 6 px white, turn Captions on with **Behind subject**.
+    Expect: the cut-out follows the person; the words pass behind them; note the matte time per second of video.
+49. On another clip: Cut-out → Select a subject, click the subject, Try, then Make cut-out.
+    Expect: the Try mask covers the subject; note the time (MPS) for the whole matte.
+50. Export at 1080 and again at 60 fps (Project → fps 60, wait for re-preparing).
+    Expect: both videos play in QuickTime; cuts and flashes land on the beat; note each export's speed (shown in the job).
+
 ## Logs to send back
 
 - `~/Library/Application Support/Toolbox/logs/toolbox.log` (and `toolbox.log.1` if present).
-- The numbers from steps 7, 12, 21, 22, 30, 32 and 34, and what step 24 showed.
+- The numbers from steps 7, 12, 21, 22, 30, 32, 34, 47, 48, 49 and 50, what step 24 showed, and `decode.json` from step 45.
 - For any failed step: its number, what you saw, and a screenshot if it's visual.
