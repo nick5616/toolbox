@@ -22,6 +22,19 @@ export function commit(next: NormalProject | null, key = ""): boolean {
   return true;
 }
 
+/**
+ * A drag records its edits under one coalescing key, but history only merges
+ * edits less than 800 ms apart: a pause mid-drag would make two undo steps.
+ * At the end of a drag this folds everything since `startPast` (the history's
+ * past length when the drag began, with `base` as the document it began from)
+ * into one entry. The document itself is untouched.
+ */
+export function collapseDrag(startPast: number, base: NormalProject): void {
+  const h = useEditStudio.getState().history;
+  if (!h || h.past.length <= startPast + 1 || h.past[startPast] !== base) return;
+  useEditStudio.setState({ history: { ...h, past: h.past.slice(0, startPast + 1) } });
+}
+
 export function selectedClipIds(sel: Selection): string[] {
   return sel?.kind === "clips" ? [...sel.ids] : [];
 }

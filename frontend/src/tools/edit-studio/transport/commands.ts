@@ -65,6 +65,7 @@ export function useEditCommands(): void {
 
   useShortcut(combosOf("play"), (e) => {
     if (onButton(e)) return;
+    e.preventDefault();
     getPlayer()?.toggle();
   }, { preventDefault: false });
   useShortcut(combosOf("pause"), () => getPlayer()?.pause());

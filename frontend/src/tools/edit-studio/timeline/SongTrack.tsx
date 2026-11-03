@@ -6,6 +6,7 @@ import { useWaveform } from "@/tools/video-editor/useThumbs";
 import { editLength } from "@/viz/edit/types";
 import { msToX, xToMs } from "../geometry";
 import { useEditStudio, useProject } from "../store";
+import { collapseDrag } from "./actions";
 import styles from "./TracksPanel.module.css";
 
 export const SONG_ROW_PX = 52;
@@ -82,8 +83,6 @@ export function SongTrack({ timeWidth }: { timeWidth: number }) {
     if (!project?.song) return;
     e.preventDefault();
     e.stopPropagation();
-    const el = e.currentTarget;
-    el.setPointerCapture(e.pointerId);
     const base = project.song;
     const rect = () => area.current?.getBoundingClientRect();
     const onMove = (ev: PointerEvent) => {
@@ -97,14 +96,17 @@ export function SongTrack({ timeWidth }: { timeWidth: number }) {
       const fade = Math.round(Math.max(0, Math.min(10_000, D, v)));
       st.edit({ ...cur, song: { ...base, ...cur.song, [which === "in" ? "fadeInMs" : "fadeOutMs"]: fade } }, `fade-${which}`);
     };
+    const baseDoc = project;
+    const startPast = useEditStudio.getState().history?.past.length ?? 0;
     const onUp = () => {
-      el.removeEventListener("pointermove", onMove);
-      el.removeEventListener("pointerup", onUp);
-      el.removeEventListener("pointercancel", onUp);
+      collapseDrag(startPast, baseDoc);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
-    el.addEventListener("pointermove", onMove);
-    el.addEventListener("pointerup", onUp);
-    el.addEventListener("pointercancel", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
 
   if (!song) return null;

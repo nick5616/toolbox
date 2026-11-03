@@ -14,7 +14,7 @@ import { HEADER_PX, msToX, useTimelineWheel, xToMs } from "../geometry";
 import { dragWantsSourceLength, useSourceDropTarget, type SourceDropInfo } from "../sources/dragSource";
 import { useEditStudio, useMarkers, useProject } from "../store";
 import { seekTo } from "../transport/player";
-import { commit, selectedClipIds, sliceSelection, splitAtPlayhead, splitSubjectOfSelection, insertSources, deleteSelection, duplicateSelection } from "./actions";
+import { collapseDrag, commit, selectedClipIds, sliceSelection, splitAtPlayhead, splitSubjectOfSelection, insertSources, deleteSelection, duplicateSelection } from "./actions";
 import { clipStatus } from "./clipInfo";
 import { ClipView, type MatteBadge } from "./ClipView";
 import { ContextMenu, type ContextItem } from "./ContextMenu";
@@ -127,6 +127,7 @@ function Tracks({ project }: { project: NormalProject }) {
     const startX = e.clientX;
     const startY = e.clientY;
     const key = `move-${++dragSeq}`;
+    const startPast = st.history?.past.length ?? 0;
     const targets = buildSnapTargets({ project: base, markers: live.current.markers, playheadMs: st.playheadMs, exclude: new Set(ids) });
     let moved = false;
     const onMove = (ev: PointerEvent) => {
@@ -147,6 +148,7 @@ function Tracks({ project }: { project: NormalProject }) {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       setHint(null);
+      collapseDrag(startPast, base);
       if (!moved && ids.length > 1) useEditStudio.getState().select({ kind: "clips", ids: [clip.id] });
     };
     window.addEventListener("pointermove", onMove);
@@ -168,6 +170,7 @@ function Tracks({ project }: { project: NormalProject }) {
     st.select({ kind: "clips", ids: [clip.id] });
     const startX = e.clientX;
     const key = `trim-${++dragSeq}`;
+    const startPast = st.history?.past.length ?? 0;
     const from = edge === "start" ? clip.startMs : clip.endMs;
     const sourceMs = live.current.sources[clip.path]?.info.durationMs ?? 0;
     const targets = buildSnapTargets({ project: base, markers: live.current.markers, playheadMs: st.playheadMs, exclude: new Set([clip.id]) });
@@ -187,6 +190,7 @@ function Tracks({ project }: { project: NormalProject }) {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       setHint(null);
+      collapseDrag(startPast, base);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -349,7 +353,7 @@ function Tracks({ project }: { project: NormalProject }) {
               onDoubleClick={(e) => onAreaDoubleClick(e, track.id)}
             >
               {track.clips.map((c) => {
-                if (c.endMs < visible.from || c.startMs > visible.to) return null;
+                if (timeWidth > 0 && (c.endMs < visible.from || c.startMs > visible.to)) return null;
                 return (
                   <ClipView
                     key={c.id}
