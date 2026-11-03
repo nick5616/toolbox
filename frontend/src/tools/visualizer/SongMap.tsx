@@ -38,6 +38,7 @@ import {
   xAtTime,
 } from "./songmap/model";
 import styles from "./SongMap.module.css";
+import { useMiddleDragScroll } from "@/lib/useDragScroll";
 
 export type SongMapLane = "sections" | "beats" | "drums" | "bass" | "vocals" | "other" | "chords" | "mood" | "lyrics";
 
@@ -65,6 +66,9 @@ type Drag = { mode: "seek" } | { mode: "select"; fromMs: number };
 export function SongMap({ analysis, timeline, playheadMs, onSeek, selection, onSelect, onSectionClick, lanes, className }: SongMapProps) {
   const duration = Math.max(1, analysis.durationMs);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null);
+  useEffect(() => setViewportEl(viewportRef.current), []);
+  useMiddleDragScroll(viewportEl);
   const stageRef = useRef<HTMLDivElement>(null);
   const canvases = useRef(new Map<string, HTMLCanvasElement>());
   const [viewW, setViewW] = useState(0);

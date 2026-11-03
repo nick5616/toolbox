@@ -13,7 +13,7 @@ import { laneSettings } from "@/viz/edit/defaults";
 import { TAP_LATENCY_MS } from "@/viz/edit/markers";
 import { MARKER_LANES, editLength } from "@/viz/edit/types";
 import { drawLane, readTheme } from "@/tools/visualizer/songmap/draw";
-import { HEADER_PX, LANE_ROW_PX, msToX, RULER_PX, useTimelineWheel, xToMs } from "../geometry";
+import { HEADER_PX, LANE_ROW_PX, msToX, RULER_PX, useTimelinePan, useTimelineWheel, xToMs } from "../geometry";
 import { useEditStudio, useMarkers, useProject } from "../store";
 import { cssColor, drawPeaks, prepCanvas } from "./draw";
 import { LaneRow } from "./LaneRow";
@@ -138,6 +138,7 @@ export function LanesPanel() {
   const duration = project ? editLength(project) : 0;
   const width = Math.max(0, useWidth(el) - HEADER_PX);
   useTimelineWheel(el, duration);
+  useTimelinePan(el, duration);
   const seek = useSeek(duration);
   const peaks = usePeaks(project?.song?.path ?? "");
 
@@ -218,8 +219,11 @@ export function LanesPanel() {
   return (
     <div ref={setEl} className={styles.root} style={{ height }} aria-label="Lanes">
       <div className={styles.scroll} role="radiogroup" aria-label="Active lane">
-        <RulerRow width={width} pps={pps} scrollMs={scrollMs} hiddenLanes={hiddenLanes} seek={seek} />
-        <WaveRow width={width} pps={pps} scrollMs={scrollMs} peaks={peaks} songStartMs={song.startMs} songDurationMs={analysis.durationMs} rangeMs={duration} seek={seek} />
+        {/* The ruler and the song stay in view while the lanes scroll under them. */}
+        <div className={styles.pinned}>
+          <RulerRow width={width} pps={pps} scrollMs={scrollMs} hiddenLanes={hiddenLanes} seek={seek} />
+          <WaveRow width={width} pps={pps} scrollMs={scrollMs} peaks={peaks} songStartMs={song.startMs} songDurationMs={analysis.durationMs} rangeMs={duration} seek={seek} />
+        </div>
         {hasStems && (
           <>
             <div className={styles.row} style={{ height: LANE_ROW_PX }}>

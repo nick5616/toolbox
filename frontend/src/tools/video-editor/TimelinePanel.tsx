@@ -21,6 +21,7 @@ import { useSourceDropTarget } from "@/tools/post-builder/sourceDrag";
 import { useThumb, useWaveform } from "./useThumbs";
 import type { Selection } from "./types";
 import styles from "./TimelinePanel.module.css";
+import { useMiddleDragScroll } from "@/lib/useDragScroll";
 
 export interface TimelinePanelProps {
   doc: VideoProject;
@@ -84,6 +85,9 @@ export function TimelinePanel(p: TimelinePanelProps) {
   const clips = clipsOf(doc);
   const titles = titlesOf(doc);
   const scroller = useRef<HTMLDivElement>(null);
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  useEffect(() => setScrollEl(scroller.current), []);
+  useMiddleDragScroll(scrollEl);
   const [pps, setPps] = useState(60);
   const ppms = pps / 1000;
   const widthPx = Math.max(300, (totalMs + LANE_PAD_MS) * ppms);
@@ -102,7 +106,14 @@ export function TimelinePanel(p: TimelinePanelProps) {
     const el = scroller.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return;
+      if (!e.ctrlKey && !e.metaKey) {
+        // A plain wheel moves along the time (the rows fit; sideways trackpad scrolling is native).
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && !e.shiftKey && el.scrollWidth > el.clientWidth) {
+          e.preventDefault();
+          el.scrollLeft += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+        }
+        return;
+      }
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const anchorPx = e.clientX - rect.left + el.scrollLeft;

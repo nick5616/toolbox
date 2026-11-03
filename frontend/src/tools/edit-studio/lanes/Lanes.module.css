@@ -16,6 +16,14 @@
   overflow-y: auto;
 }
 
+.pinned {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--bg-app);
+}
+
 .row {
   display: flex;
   align-items: stretch;

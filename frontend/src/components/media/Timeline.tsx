@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent } from "react";
 import { cx } from "../cx";
 import { formatDuration } from "@/lib/format";
 import { Waveform } from "./Waveform";
@@ -18,6 +18,7 @@ import {
 } from "./logic";
 import type { Marker, Range } from "./types";
 import styles from "./Timeline.module.css";
+import { useMiddleDragScroll } from "@/lib/useDragScroll";
 
 export interface TimelineProps {
   durationMs: number;
@@ -70,8 +71,20 @@ export function Timeline({
   className,
 }: TimelineProps) {
   const track = useRef<HTMLDivElement>(null);
+  const [trackEl, setTrackEl] = useState<HTMLDivElement | null>(null);
+  useEffect(() => setTrackEl(track.current), []);
   const [width, setWidth] = useState(0);
   const [view, setView] = useState<View>({ startMs: 0, spanMs: Math.max(1, durationMs) });
+  // Middle-button drag pans a zoomed timeline.
+  const panBy = useCallback(
+    (dx: number) => {
+      const w = track.current?.clientWidth ?? 0;
+      if (w <= 0) return;
+      setView((v) => (v.spanMs >= durationMs ? v : panView(v, durationMs, (-dx / w) * v.spanMs)));
+    },
+    [durationMs],
+  );
+  useMiddleDragScroll(trackEl, panBy);
   const drag = useRef<Drag | null>(null);
   const [dragging, setDragging] = useState(false);
 

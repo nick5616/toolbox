@@ -10,7 +10,7 @@ import { LibraryService, type EditClip } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import type { NormalProject } from "@/viz/edit/defaults";
 import { editLength } from "@/viz/edit/types";
-import { HEADER_PX, msToX, useTimelineWheel, xToMs } from "../geometry";
+import { HEADER_PX, msToX, useTimelinePan, useTimelineWheel, xToMs } from "../geometry";
 import { dragWantsSourceLength, useSourceDropTarget, type SourceDropInfo } from "../sources/dragSource";
 import { useEditStudio, useMarkers, useProject } from "../store";
 import { seekTo } from "../transport/player";
@@ -24,6 +24,7 @@ import { SongTrack } from "./SongTrack";
 import { TrackHeader } from "./TrackHeader";
 import { withClip } from "../doc";
 import styles from "./TracksPanel.module.css";
+import { TimeScrollbar } from "./TimeScrollbar";
 
 export const VIDEO_ROW_PX = 56;
 export const ADJUST_ROW_PX = 36;
@@ -83,6 +84,7 @@ function Tracks({ project }: { project: NormalProject }) {
     return () => ro.disconnect();
   }, [root]);
   useTimelineWheel(root, D);
+  useTimelinePan(root, D);
 
   const timeWidth = Math.max(0, width - HEADER_PX);
 
@@ -344,7 +346,7 @@ function Tracks({ project }: { project: NormalProject }) {
         </Button>
         <span className={styles.toolbarHint}>{project.tracks.length} of 8 tracks</span>
       </div>
-      <div className={styles.rows} ref={rootRef} role="region" aria-label="Tracks">
+      <div className={styles.rows} ref={rootRef} role="region" aria-label="Tracks" id="es-tracks">
         {tracksTopFirst.map(({ t: track, i }) => (
           <div key={track.id} className={cx(styles.row, track.locked && styles.locked)} style={{ height: track.kind === "adjust" ? ADJUST_ROW_PX : VIDEO_ROW_PX }}>
             <TrackHeader
@@ -405,6 +407,7 @@ function Tracks({ project }: { project: NormalProject }) {
           />
         )}
       </div>
+      <TimeScrollbar width={width} durationMs={D} />
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menuItems()} onClose={closeMenu} />}
       <ConfirmDialog
         open={!!removingTrack}
