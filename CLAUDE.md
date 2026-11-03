@@ -249,6 +249,16 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Mattes** are per clip, in `<support>/projects/<id>/mattes/`, made by `matte.*` engine handlers that never download (models pinned in `modules/editstudio/models.go`, `<models>/matte/`). One matte job at a time. SAM 2 comes from the official repo at a pinned commit (`[tool.uv.sources]`), never the PyPI `sam2` package (not Meta's).
 - Caches: `cache/editstudio/` (30 days, 10 GB) pruned at start.
 - **How to add an auto-fill recipe:** a `Recipe` in `tools/edit-studio/autofill/recipes.ts` with golden tests on `viz/edit/fixture.ts`.
+- **Part B FX** (SPEC §23):
+  - **How to add an effect:**
+    - a file in `viz/post/` that calls `registerPost` (kind `"pass"`, deterministic, an exact identity at defaults, `simplePass` for one-pass shaders);
+    - its id in `POST_TYPES`;
+    - an import in `post/fx1.ts` or `fx2.ts`;
+    - a catalog entry in `inspector/effectCatalog.ts` (typecheck fails without it).
+  - **One-click stacks** go in `inspector/FxStacks.ts`.
+  - **Generated clips** (kinds `text`, `visual`) register with `viz/edit/generated.ts` and draw a full-frame premultiplied picture; the engine treats it like a photo.
+  - **Track mattes:** `Track.Matte` makes the track above the matte. That track isn't drawn by itself, so titles go on their own track.
+  - **Blend modes** beyond normal/add/screen/multiply use `BLEND_FS`.
 
 ## Conventions
 

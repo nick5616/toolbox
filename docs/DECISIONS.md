@@ -338,3 +338,22 @@ Newest last. Format: date — decision — why.
   - **Toolbars:** `Button`/`MenuButton` take `collapsible`; inside an element with `container: toolbar-compact / inline-size` their labels hide below 820 px (the label becomes the tooltip and accessible name).
   - **Layouts:** Post Builder narrows its columns and turns Sources into a rail when the stage would be under 300 px (the user can still open it); the Photo Composer view is bounded to the window (its canvas was cut off) and hides the projects strip while editing on windows under 760 px tall; the Visualizer designer stays side by side (panel 300–380 px, icon tabs when narrow); file tools keep the run button in view while options scroll; dialogs keep their buttons in view when they scroll; the media player drops its volume slider when narrow.
   - **Scroll chaining:** a global `overscroll-behavior: contain` was tried and dropped: it also blocks the page from scrolling while the pointer is over an input or a box that doesn't overflow.
+- 2026-11-03 — Timelines:
+  - The wheel over the time area moves along the time; over the row names, or with Shift, it scrolls the rows; Ctrl zooms.
+  - Middle-button drag pans every timeline (`useTimelinePan`, `lib/useDragScroll.ts`).
+  - Edit Studio has a timeline scrollbar, and its ruler and song row are sticky.
+  - This replaces the earlier rule "rows when they overflow", after the user asked for wheel and mouse-3 scrolling of the timeline itself.
+- 2026-11-03 — Phase 9 Part B (Edit Studio FX, SPEC §23), started on the user's request ("as many cool video effect features as you can … do some research").
+  - **Research:** a researcher summarised AMV / velocity / TikTok editing practice. The headline finding: these edits are mostly effects triggered by beats and kicks, so the existing `EditParam` marker mods carry them.
+  - **Scope:** 22 effects, 12 transitions, text clips, visual clips (Visualizer layers), track mattes, 8 shader blend modes, mirror edges, FX stacks, velocity presets and two recipes.
+  - **Process:** the foundation went on main first; six builders then ran in parallel.
+  - **Not built:** echo trails, stutter, pixel sort and datamosh (non-deterministic or costly).
+- 2026-11-03 — Part B integration:
+  - **Text clips** go up to 30 % of the short side (captions stay at ≤ 12 %; `fontSizePx` clamps at 30).
+  - **Deep glow** gets a ×3 gain, because its pyramid spreads the bright pass thin.
+  - **3D swing** perspective is doubled (`invD = persp·1.6`).
+  - **Letterbox** on tall and square frames draws 12 % bars (a 2.39:1 strip would leave almost nothing on 9:16).
+  - **Anime-hit flash** is 0.3 with a 90 ms release; dense kick lanes washed the frame out at 0.5.
+  - **Matte tracks** are drawn dashed with a matte icon. A track that is the matte of the track below isn't drawn by itself: all of its clips, not just the one over the matted clip. Put a title on its own track.
+  - **Known gap:** the "Velocity edit" recipe can't write speed keys (the auto-fill draft model has none), so it suggests Velocity → Ramp into the beat per clip.
+  - **Wave B (the six builders) in the real app:** all 22 effects, 12 transitions, 8 visual layers, text, text-through-video and the picker were checked in the preview. A 30 s "FX demo" export matched it.
