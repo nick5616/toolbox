@@ -314,10 +314,10 @@ export function trimClip(doc: NormalProject, id: string, edge: "start" | "end", 
   if (!ref || ref.track.locked) return null;
   const c = ref.clip;
   const min = minClipMs(doc.fps);
-  const others = ref.track.clips.filter((x) => x.id !== id);
+  const others = (doc.tracks[ref.trackIndex] as NormalTrack).clips.filter((x) => x.id !== id);
   const target = Math.round(toMs);
   const replace = (patch: Partial<EditClip>): NormalProject => {
-    const clips = ref.track.clips.map((x) => (x.id === id ? { ...x, ...patch, auto: false } : x));
+    const clips = (doc.tracks[ref.trackIndex] as NormalTrack).clips.map((x) => (x.id === id ? { ...x, ...patch, auto: false } : x));
     return setClips(doc, ref.trackIndex, clips);
   };
   if (edge === "end") {
