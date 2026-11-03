@@ -16,7 +16,9 @@ import { layerDef } from "../layers/registry";
 import { PRESETS, showFromPreset, type Preset } from "../presets";
 import type { LayerType, Show, TextPreset, TextStyle } from "../types";
 import { toBase64 } from "../worker/transport";
+import { runDecodeBench } from "./decodeBench";
 import { runE2E } from "./e2e";
+import { runEditE2E, runEditLab } from "./editLab";
 import RenderHost from "../RenderHost";
 import { runParity } from "./parity";
 
@@ -134,6 +136,18 @@ export default function VizLab() {
       };
       // --- end E2E MODE ---
     }
+    // --- EDIT LAB / DECODE BENCH (Phase 9 ES3): TOOLBOX_VIZLAB_ARGS="edit=1" | "edit=e2e&dir=<folder>" | "decode=1" ---
+    const editMode = q.get("edit");
+    if (editMode || q.get("decode")) {
+      const job = q.get("decode") ? runDecodeBench(say, sendJSON) : editMode === "e2e" ? runEditE2E(q, say, sendJSON) : runEditLab(q, say, send, sendJSON);
+      void job
+        .catch((e: unknown) => sendJSON("error.json", { error: String(e) }))
+        .then(() => sendJSON("done.json", { edit: editMode ?? "decode", at: new Date().toISOString() }));
+      return () => {
+        stop = true;
+      };
+    }
+    // --- end EDIT LAB ---
     (async () => {
       let a: Analysis;
       let urls: { audioJsonUrl: string; featuresUrl: string; textJsonUrl: string } | null = null; // parity: the worker loads the same analysis
