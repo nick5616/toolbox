@@ -6,6 +6,7 @@ from . import (  # noqa: F401
     denoise,
     eraser,
     image,
+    matte,
     midi,
     ocr,
     redact,
