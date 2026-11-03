@@ -66,12 +66,16 @@ type Track struct {
 	Name   string `json:"name"`   // ≤ 40 chars
 	Muted  bool   `json:"muted"`  // not drawn (video) / not applied (adjust); its clips' audio is not mixed
 	Locked bool   `json:"locked"` // no edits; auto-fill skips it
-	Clips  []Clip `json:"clips"`  // sorted by StartMs, non-overlapping; ≤ 500 clips per project
+	// Matte (video tracks, Part B): "" | "alpha" | "alpha-inverted" | "luma" | "luma-inverted".
+	// The track shows only where the video track directly above it is opaque (alpha) or
+	// bright (luma); that track becomes the matte and isn't drawn itself.
+	Matte string `json:"matte"`
+	Clips []Clip `json:"clips"` // sorted by StartMs, non-overlapping; ≤ 500 clips per project
 }
 
 type Clip struct {
 	ID        string  `json:"id"`
-	Kind      string  `json:"kind"`     // "video" | "image" | "color" (video tracks) | "adjust" (adjust tracks)
+	Kind      string  `json:"kind"`     // "video" | "image" | "color" | "text" | "visual" (video tracks) | "adjust" (adjust tracks)
 	Path      string  `json:"path"`     // video/image
 	Color     string  `json:"color"`    // color: "#rrggbb"
 	StartMs   int64   `json:"startMs"`  // timeline ms
@@ -83,13 +87,15 @@ type Clip struct {
 	Fit       string  `json:"fit"`      // "fill" | "fit" | "fit-blur" | "fit-color" (video/image)
 	FitColor  string  `json:"fitColor"` // "#rrggbb"
 	FlipX     bool    `json:"flipX"`
-	Blend     string  `json:"blend"`     // "normal" | "add" | "screen" | "multiply"
+	Blend     string  `json:"blend"`     // "normal" | "add" | "screen" | "multiply" | "overlay" | "softlight" | "hardlight" | "difference" | "exclusion" | "lighten" | "darken" | "colordodge"
 	Transform string  `json:"transform"` // ClipTransform JSON; "" = identity
 	Matte     *Matte  `json:"matte"`     // nil = none
 	FxTarget  string  `json:"fxTarget"`  // "clip" | "subject" | "background" (subject/background need a ready matte)
 	Masks     string  `json:"masks"`     // Mask[] JSON; "" = none
 	Effects   string  `json:"effects"`   // EditPost[] JSON; "" = none
 	In        string  `json:"in"`        // EditTransition JSON into this clip; "" = cut
+	Text      string  `json:"text"`      // text clips: TextClip JSON (Part B); "" otherwise
+	Visual    string  `json:"visual"`    // visual clips: VisualClip JSON (a Visualizer layer, Part B); "" otherwise
 	Pinned    bool    `json:"pinned"`    // auto-fill never touches it
 	Auto      bool    `json:"auto"`      // made by auto-fill and not edited since
 }

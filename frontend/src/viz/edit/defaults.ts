@@ -44,7 +44,7 @@ export function emptyEditProject(aspect: string, fps: number, seed: number): Edi
     analysisKey: "",
     markers: { lanes, barOffset: 0, hidden: [], moved: {}, labels: {}, custom: [] },
     sources: [],
-    tracks: [{ id: "t1", kind: "video", name: "Video 1", muted: false, locked: false, clips: [] }],
+    tracks: [{ id: "t1", kind: "video", name: "Video 1", muted: false, locked: false, matte: "", clips: [] }],
     captions: null,
     look: "",
     background: "#000000",

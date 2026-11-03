@@ -27,15 +27,18 @@ import { isKeyed, paramKeys } from "./paramOps";
 import { baseName, SourceSection } from "./SourceSection";
 import { TransitionField } from "./TransitionField";
 import styles from "./inspector.module.css";
+import { TextSection } from "../text/TextSection";
+import { VisualSection } from "../visual/VisualSection";
+import { clipLabel } from "../timeline/clipInfo";
 
-const TRANSFORM_LABELS: Record<keyof ClipTransform, { label: string; step: number; format(v: number): string }> = {
+const TRANSFORM_LABELS: Record<Exclude<keyof ClipTransform, "edges">, { label: string; step: number; format(v: number): string }> = {
   x: { label: "Position x", step: 0.005, format: (v) => `${(v * 100).toFixed(1)}%` },
   y: { label: "Position y", step: 0.005, format: (v) => `${(v * 100).toFixed(1)}%` },
   scale: { label: "Scale", step: 0.01, format: (v) => `${v.toFixed(2)}×` },
   rotation: { label: "Rotation", step: 0.5, format: (v) => `${v.toFixed(1)}°` },
   opacity: { label: "Opacity", step: 0.01, format: (v) => `${Math.round(v * 100)}%` },
 };
-const TRANSFORM_ORDER: Array<keyof ClipTransform> = ["x", "y", "scale", "rotation", "opacity"];
+const TRANSFORM_ORDER: Array<Exclude<keyof ClipTransform, "edges">> = ["x", "y", "scale", "rotation", "opacity"];
 
 const FX_TARGETS = [
   { value: "clip", label: "Whole clip" },
@@ -66,7 +69,7 @@ export function ClipInspector({ clip }: { clip: EditClip }) {
   const commit = (patch: Partial<EditClip>, key: string) => patchClip(clip.id, patch, key);
   const setTransform = (k: keyof ClipTransform, next: EditParam, key: string) => commit({ transform: serializeTransform({ ...transform, [k]: next }) }, scoped(key));
 
-  const title = clip.kind === "color" ? "Colour clip" : baseName(clip.path) || "Clip";
+  const title = clip.kind === "color" ? "Colour clip" : clip.kind === "text" ? "Text clip" : clip.kind === "visual" ? `${clipLabel(clip)} (visual)` : baseName(clip.path) || "Clip";
   const kbCount = markersInClip(markers, activeLane, clip.startMs, clip.endMs).length;
   const menu = () => [
     {
@@ -89,6 +92,9 @@ export function ClipInspector({ clip }: { clip: EditClip }) {
         </h2>
         <MenuButton label="Clip actions" icon="ellipsis" variant="ghost" size="sm" items={menu} />
       </div>
+
+      {clip.kind === "text" && <TextSection clip={clip} />}
+      {clip.kind === "visual" && <VisualSection clip={clip} />}
 
       <SourceSection clip={clip} fps={fps} clipTimeMs={clipTimeMs} onChange={(patch, key) => commit(patch, scoped(key))} />
 

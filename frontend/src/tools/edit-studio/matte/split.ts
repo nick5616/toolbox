@@ -34,6 +34,7 @@ export function splitSubject(p: NormalProject, clipId: string): NormalProject | 
     name: `${ref.track.name} subject`.slice(0, 40),
     muted: false,
     locked: false,
+    matte: "",
     clips: [copy],
   };
   const tracks = p.tracks.map((t, i) => {

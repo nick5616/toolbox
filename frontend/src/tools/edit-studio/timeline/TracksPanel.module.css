@@ -117,6 +117,17 @@
   border-color: var(--line-strong);
 }
 
+/* Part B: generated clips. */
+.kind_text {
+  background: color-mix(in srgb, var(--lane-word, var(--accent)) 22%, var(--bg-raised));
+  border-color: color-mix(in srgb, var(--lane-word, var(--accent)) 70%, transparent);
+}
+
+.kind_visual {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, var(--bg-raised)), color-mix(in srgb, var(--lane-section) 30%, var(--bg-raised)));
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
 .selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);

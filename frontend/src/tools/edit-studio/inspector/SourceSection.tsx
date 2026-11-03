@@ -21,11 +21,19 @@ const FIT_OPTIONS = [
   { value: "fit-blur", label: "Fit over blurred copy" },
   { value: "fit-color", label: "Fit over colour" },
 ];
-const BLEND_OPTIONS = [
+export const BLEND_OPTIONS = [
   { value: "normal", label: "Normal" },
   { value: "add", label: "Add" },
   { value: "screen", label: "Screen" },
   { value: "multiply", label: "Multiply" },
+  { value: "overlay", label: "Overlay" },
+  { value: "softlight", label: "Soft light" },
+  { value: "hardlight", label: "Hard light" },
+  { value: "difference", label: "Difference" },
+  { value: "exclusion", label: "Exclusion" },
+  { value: "lighten", label: "Lighten" },
+  { value: "darken", label: "Darken" },
+  { value: "colordodge", label: "Colour dodge" },
 ];
 const SLOW_OPTIONS = [
   { value: "blend", label: "Blend neighbouring frames" },
@@ -54,7 +62,7 @@ export function SourceSection({ clip, fps, clipTimeMs, onChange }: SourceSection
   const setSpeed = (p: EditParam, key: string) => onChange({ speed: serializeSpeed(p) }, key);
 
   return (
-    <Section label="Source">
+    <Section label={hasSource ? "Source" : "Blend"}>
       <div className={styles.stack}>
         {hasSource && (
           <div className={styles.row}>

@@ -57,6 +57,7 @@ function ClipViewImpl({ clip, left, width, selected, status, pastEnd, sourceMs, 
     >
       {showStrip && <Strip clip={clip} sourceMs={sourceMs} fps={fps} />}
       <div className={styles.clipInfo}>
+        {(clip.kind === "text" || clip.kind === "visual") && width > 20 && <Icon name={clip.kind === "text" ? "type" : "sparkles"} size={12} />}
         {width > 40 && <span className={styles.clipName}>{label}</span>}
         <span className={styles.badges}>
           {clip.pinned && <Icon name="pin" size={11} title="Pinned" />}

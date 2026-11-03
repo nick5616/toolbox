@@ -64,7 +64,7 @@ export function labProject(): EditProject {
     in: "",
     speed: JSON.stringify({ base: 1, keys: [{ t: 0, v: 1, ease: "linear" }, { t: 8000, v: 0.5, ease: "linear" }] }),
   };
-  p.tracks = [...p.tracks, { id: "t3", kind: "video", name: "Video 2", muted: false, locked: false, clips: [top] }];
+  p.tracks = [...p.tracks, { id: "t3", kind: "video", name: "Video 2", muted: false, locked: false, matte: "", clips: [top] }];
   if (p.captions) p.captions.behindSubject = true;
   return p;
 }

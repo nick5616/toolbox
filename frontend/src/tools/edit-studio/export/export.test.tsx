@@ -58,6 +58,7 @@ function makeProject(over: Partial<NormalProject> = {}, withMatte = false): Norm
       name: "V",
       muted: false,
       locked: false,
+      matte: "",
       clips: [
         newClip({ id: "a", kind: "video", path: "/a.mov", startMs: 0, endMs: 2000, matte: withMatte ? matte("m1") : null }),
         newClip({ id: "b", kind: "image", path: "/b.jpg", startMs: 2000, endMs: 4000 }),

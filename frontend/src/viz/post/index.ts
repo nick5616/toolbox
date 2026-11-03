@@ -19,3 +19,5 @@ import "./invert";
 
 export { postDef, postDefs, registerPost } from "./registry";
 export type { PostContext, PostDef, PostInstance } from "./registry";
+import "./fx1";
+import "./fx2";

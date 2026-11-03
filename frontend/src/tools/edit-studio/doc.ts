@@ -39,6 +39,8 @@ export function newClip(over: Partial<EditClip> & Pick<EditClip, "kind" | "start
     masks: "",
     effects: "",
     in: "",
+    text: "",
+    visual: "",
     pinned: false,
     auto: false,
     ...over,
@@ -46,7 +48,7 @@ export function newClip(over: Partial<EditClip> & Pick<EditClip, "kind" | "start
 }
 
 export function newTrack(kind: "video" | "adjust", name: string): EditTrack {
-  return { id: newId("t"), kind, name, muted: false, locked: false, clips: [] };
+  return { id: newId("t"), kind, name, muted: false, locked: false, matte: "", clips: [] };
 }
 
 export interface ClipRef {

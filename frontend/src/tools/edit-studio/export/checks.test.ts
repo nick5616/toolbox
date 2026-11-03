@@ -28,6 +28,7 @@ function project(): NormalProject {
       name: "V",
       muted: false,
       locked: false,
+      matte: "",
       clips: [
         newClip({ id: "a", kind: "video", path: "/a.mov", startMs: 0, endMs: 2000, matte: matte("m1") }),
         newClip({ id: "b", kind: "image", path: "/b.jpg", startMs: 2000, endMs: 4000 }),
@@ -35,7 +36,7 @@ function project(): NormalProject {
         newClip({ id: "late", kind: "video", path: "/late.mov", startMs: 10_000, endMs: 11_000 }),
       ],
     },
-    { id: "t2", kind: "video", name: "M", muted: true, locked: false, clips: [newClip({ id: "m", kind: "video", path: "/muted.mov", startMs: 0, endMs: 1000 })] },
+    { id: "t2", kind: "video", name: "M", muted: true, locked: false, matte: "", clips: [newClip({ id: "m", kind: "video", path: "/muted.mov", startMs: 0, endMs: 1000 })] },
   ];
   return normalizeProject(p);
 }

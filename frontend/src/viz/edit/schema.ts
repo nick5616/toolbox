@@ -8,7 +8,7 @@
 import type { TextLine, TextWord } from "../analysis";
 import "../post";
 import { postDef } from "../post/registry";
-import { POST_TYPES, SECTION_LABELS, SIGNAL_IDS, type ModShape, type PostType, type SectionLabel, type TextStyle, type TransitionKind } from "../types";
+import { LAYER_TYPES, PALETTE_IDS, POST_TYPES, SECTION_LABELS, SIGNAL_IDS, type LayerType, type ModShape, type PaletteId, type PostType, type SectionLabel, type TextStyle, type TransitionKind } from "../types";
 import {
   MARKER_LANES,
   type ClipTransform,
@@ -19,6 +19,8 @@ import {
   type EditTransition,
   type Key,
   type Mask,
+  type TextClip,
+  type VisualClip,
 } from "./types";
 
 export interface Parsed<T> {
@@ -54,7 +56,10 @@ export const MAX_TRANSITION_MS = 2000;
 export const SPEED_MIN = 0;
 export const SPEED_MAX = 4;
 
-export const TRANSITION_KINDS: readonly TransitionKind[] = ["cut", "crossfade", "flash", "zoom", "sweep", "glitch"];
+export const TRANSITION_KINDS: readonly TransitionKind[] = [
+  "cut", "crossfade", "flash", "zoom", "sweep", "glitch",
+  "zoomout", "spin", "whip", "slide", "blur", "rgbsplit", "shake", "warp", "luma", "iris", "stripes", "flashblack",
+];
 const SHAPES: readonly ModShape[] = ["linear", "ease", "exp", "gate"];
 const EASES: readonly Key["ease"][] = ["linear", "ease", "hold"];
 
@@ -165,7 +170,7 @@ export function baseOf(p: EditParam): number {
 
 // ---- transform ----
 
-export const TRANSFORM_RULES: Record<keyof ClipTransform, ParamRules & { def: number }> = {
+export const TRANSFORM_RULES: Record<Exclude<keyof ClipTransform, "edges">, ParamRules & { def: number }> = {
   x: { min: -2, max: 2, def: 0 },
   y: { min: -2, max: 2, def: 0 },
   scale: { min: 0.05, max: 8, def: 1 },
@@ -181,15 +186,17 @@ export function parseTransform(raw: string): Parsed<ClipTransform> {
   if (v === undefined) return done({ ...IDENTITY_TRANSFORM }, problems);
   if (!isObj(v)) return done({ ...IDENTITY_TRANSFORM }, [...problems, "transform: not an object"]);
   const out = { ...IDENTITY_TRANSFORM };
-  for (const k of Object.keys(TRANSFORM_RULES) as Array<keyof ClipTransform>) {
+  for (const k of Object.keys(TRANSFORM_RULES) as Array<keyof typeof TRANSFORM_RULES>) {
     const r = TRANSFORM_RULES[k];
     out[k] = parseEditParam(v[k], r.def, r, `transform.${k}`, problems);
   }
+  if (v.edges === "mirror") out.edges = "mirror";
+  else if (v.edges !== undefined && v.edges !== "clear") problems.push("transform.edges: unknown");
   return done(out, problems);
 }
 
 export function serializeTransform(t: ClipTransform): string {
-  const identity = (Object.keys(IDENTITY_TRANSFORM) as Array<keyof ClipTransform>).every((k) => t[k] === IDENTITY_TRANSFORM[k]);
+  const identity = (Object.keys(IDENTITY_TRANSFORM) as Array<keyof ClipTransform>).every((k) => t[k] === IDENTITY_TRANSFORM[k]) && (t.edges ?? "clear") === "clear";
   return identity ? "" : JSON.stringify(t);
 }
 
@@ -469,4 +476,58 @@ export function parseCaptionLines(raw: string): Parsed<TextLine[] | null> {
 
 export function serializeCaptionLines(lines: TextLine[] | null): string {
   return lines ? JSON.stringify(lines.map((l) => ({ startMs: l.startMs, endMs: l.endMs, text: l.text, words: l.words }))) : "";
+}
+
+// ---- Part B: text and visual clips ----
+
+export const MAX_CLIP_TEXT = 500;
+
+export function defaultTextClip(text = "TEXT"): TextClip {
+  return { text, style: { ...DEFAULT_TEXT_STYLE, preset: "pop", size: 9, weight: 900, uppercase: true, position: "center", emphasis: { ...DEFAULT_TEXT_STYLE.emphasis }, react: { ...DEFAULT_TEXT_STYLE.react } }, reveal: "all", wordMs: 250, lane: "beat", every: 1 };
+}
+
+export function parseTextClip(raw: string): Parsed<TextClip> {
+  const problems: string[] = [];
+  const v = parseJSON(raw, "text", problems);
+  const d = defaultTextClip("");
+  if (!isObj(v)) return done(d, v === undefined ? problems : [...problems, "text: not an object"]);
+  const text = typeof v.text === "string" ? Array.from(v.text).slice(0, MAX_CLIP_TEXT).join("") : "";
+  if (typeof v.text !== "string") problems.push("text.text: missing");
+  const st = parseTextStyle(v.style === undefined ? "" : JSON.stringify(v.style));
+  for (const m of st.problems) problems.push(m.replace(/^captions\.style/, "text.style"));
+  const reveal = v.reveal === "words" || v.reveal === "beats" ? v.reveal : "all";
+  const wordMs = isNum(v.wordMs) ? clamp(v.wordMs, 40, 2000) : d.wordMs;
+  const lane = typeof v.lane === "string" && (MARKER_LANES as readonly string[]).includes(v.lane) ? (v.lane as TextClip["lane"]) : "beat";
+  const every = isNum(v.every) ? clamp(Math.round(v.every), 1, 16) : 1;
+  return done({ text, style: st.value, reveal, wordMs, lane, every }, problems);
+}
+
+export function serializeTextClip(t: TextClip): string {
+  return JSON.stringify(t);
+}
+
+export function defaultVisualClip(layer: LayerType = "lightrays"): VisualClip {
+  return { layer, params: {}, palette: "neon" };
+}
+
+export function parseVisualClip(raw: string): Parsed<VisualClip> {
+  const problems: string[] = [];
+  const v = parseJSON(raw, "visual", problems);
+  const d = defaultVisualClip();
+  if (!isObj(v)) return done(d, v === undefined ? problems : [...problems, "visual: not an object"]);
+  const layer = typeof v.layer === "string" && (LAYER_TYPES as readonly string[]).includes(v.layer) ? (v.layer as LayerType) : d.layer;
+  if (layer !== v.layer) problems.push("visual.layer: unknown");
+  const palette = typeof v.palette === "string" && (PALETTE_IDS as readonly string[]).includes(v.palette) ? (v.palette as PaletteId) : d.palette;
+  const params: VisualClip["params"] = {};
+  if (isObj(v.params)) {
+    for (const [k, x] of Object.entries(v.params)) {
+      if (typeof x === "string" || typeof x === "boolean") params[k] = x;
+      else if (x !== undefined) params[k] = parseEditParam(x, 0, { min: -1e6, max: 1e6 }, `visual.params.${k}`, problems);
+    }
+  }
+  return done({ layer, params, palette }, problems);
+}
+
+export function serializeVisualClip(v: VisualClip): string {
+  return JSON.stringify(v);
 }

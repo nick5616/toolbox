@@ -94,6 +94,39 @@ export interface ClipTransform {
   scale: EditParam; // × the fitted size (0.05..8), 1
   rotation: EditParam; // degrees (−3600..3600), 0
   opacity: EditParam; // 0..1, 1
+  /** Part B: what shows where a moved/zoomed clip leaves the frame: nothing (default) or the picture mirrored (motion tile). */
+  edges?: "clear" | "mirror";
+}
+
+// ---- Part B: generated clips, blend modes, track mattes ----
+
+export const BLEND_MODES = ["normal", "add", "screen", "multiply", "overlay", "softlight", "hardlight", "difference", "exclusion", "lighten", "darken", "colordodge"] as const;
+export type EditBlendMode = (typeof BLEND_MODES)[number];
+
+export const TRACK_MATTES = ["", "alpha", "alpha-inverted", "luma", "luma-inverted"] as const;
+export type TrackMatte = (typeof TRACK_MATTES)[number];
+
+/** Clip.Text JSON (kind "text"). */
+export interface TextClip {
+  /** 1..500 characters; line breaks allowed. */
+  text: string;
+  /** The captions' style (its preset animates the words: pop, rise, typewriter, wave…). */
+  style: import("../types").TextStyle;
+  /** "all": the whole text at once; "words": words appear one after another over `wordMs` each; "beats": one word per marker of `lane`. */
+  reveal: "all" | "words" | "beats";
+  /** "words": ms per word (40..2000). */
+  wordMs: number;
+  /** "beats": the marker lane words land on, every Nth. */
+  lane: MarkerLane;
+  every: number; // 1..16
+}
+
+/** Clip.Visual JSON (kind "visual"): a Visualizer layer drawn as a clip, reacting to the song. */
+export interface VisualClip {
+  layer: import("../types").LayerType;
+  /** Partial layer params (defaults fill the rest); numbers may be EditParams (keys/mods). */
+  params: Record<string, EditParam | string | boolean>;
+  palette: import("../types").PaletteId;
 }
 
 export interface Mask {

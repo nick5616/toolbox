@@ -2,6 +2,8 @@
 import type { CSSProperties } from "react";
 import type { EditClip, EditSourceState } from "@/lib/api";
 import { speedAt } from "../doc";
+import { parseTextClip, parseVisualClip } from "@/viz/edit/schema";
+import { visualLabel } from "../visual/visualInfo";
 
 export type ClipStatus = "ok" | "missing" | "preparing";
 
@@ -24,9 +26,14 @@ export function hasSpeedChange(clip: Pick<EditClip, "speed">): boolean {
 }
 
 /** A short label: the file name, "Colour" or "Adjustment". */
-export function clipLabel(clip: Pick<EditClip, "kind" | "path">): string {
+export function clipLabel(clip: Pick<EditClip, "kind" | "path"> & Partial<Pick<EditClip, "text" | "visual">>): string {
   if (clip.kind === "color") return "Colour";
   if (clip.kind === "adjust") return "Adjustment";
+  if (clip.kind === "text") {
+    const t = parseTextClip(clip.text ?? "").value.text.replace(/\s+/g, " ").trim();
+    return t ? `“${t.slice(0, 40)}”` : "Text";
+  }
+  if (clip.kind === "visual") return visualLabel(parseVisualClip(clip.visual ?? "").value.layer);
   return clip.path.split(/[\\/]/).pop() ?? clip.path;
 }
 

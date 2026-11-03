@@ -12,6 +12,18 @@ export const TRANSITION_LABELS: Record<TransitionKind, string> = {
   zoom: "Zoom",
   sweep: "Sweep",
   glitch: "Glitch",
+  zoomout: "Zoom out",
+  spin: "Spin",
+  whip: "Whip pan",
+  slide: "Slide",
+  blur: "Blur",
+  rgbsplit: "RGB split",
+  shake: "Shake",
+  warp: "Warp",
+  luma: "Luma fade",
+  iris: "Iris",
+  stripes: "Stripes",
+  flashblack: "Black flash",
 };
 
 export const DEFAULT_TRANSITION_MS = 300;

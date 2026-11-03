@@ -81,6 +81,8 @@ export function fixtureProject(): EditProject {
     masks: "",
     effects: "",
     in: "",
+    text: "",
+    visual: "",
     pinned: false,
     auto: false,
     ...over,
@@ -92,6 +94,7 @@ export function fixtureProject(): EditProject {
       name: "Video 1",
       muted: false,
       locked: false,
+      matte: "",
       clips: [
         clip({
           id: "c1",
@@ -114,6 +117,7 @@ export function fixtureProject(): EditProject {
       name: "Adjust 1",
       muted: false,
       locked: false,
+      matte: "",
       clips: [clip({ id: "c4", kind: "adjust", startMs: 16_000, endMs: 24_000, effects: JSON.stringify([{ id: "fx2", type: "grade", enabled: true, params: { saturation: 1.4 } }]) })],
     },
   ];

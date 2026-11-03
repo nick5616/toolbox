@@ -86,7 +86,10 @@ uniform vec2 u_featherUV; uniform vec2 u_strokeUV; uniform vec2 u_glowUV;
 uniform float u_strokeOn; uniform vec3 u_strokeColor; uniform float u_glowAmt; uniform vec3 u_glowColor;
 uniform int u_part;       // 0 whole, 1 subject only, 2 background only
 uniform float u_decor;    // stroke and glow wanted
+uniform int u_gen;        // 1: the source is a generated target (premultiplied, bottom-up)
+uniform int u_edges;      // 1: mirror the picture past its edges (motion tile)
 ${GLSL_MASKS}
+vec2 mirrorUV(vec2 t) { return 1.0 - abs(mod(t, 2.0) - 1.0); }
 float edgeAA(vec2 pos, vec2 size) { vec2 m = min(pos, size - pos); return clamp(min(m.x, m.y) * u_scale + 0.5, 0.0, 1.0); }
 float subj(vec2 st) {
   float m = mix(texture(u_matte, st).r, texture(u_matte2, st).r, u_mblend);
@@ -105,7 +108,7 @@ void main() {
   float cs = cos(u_rot), sn = sin(u_rot);
   d = vec2(cs * d.x + sn * d.y, -sn * d.x + cs * d.y) / u_scale;
   vec2 rb = d + u_box * 0.5;
-  float inBox = edgeAA(rb, u_box);
+  float inBox = u_edges == 1 ? 1.0 : edgeAA(rb, u_box);
   vec4 col = vec4(0.0);
   if (u_kind == 1) {
     col = vec4(u_color, 1.0) * inBox;
@@ -114,10 +117,11 @@ void main() {
     return;
   }
   vec2 ri = d / u_img + 0.5;
-  float inImg = edgeAA(ri * u_img, u_img);
-  vec2 st = vec2(u_flip > 0.5 ? 1.0 - ri.x : ri.x, ri.y);
+  float inImg = u_edges == 1 ? 1.0 : edgeAA(ri * u_img, u_img);
+  if (u_edges == 1) ri = mirrorUV(ri);
+  vec2 st = vec2(u_flip > 0.5 ? 1.0 - ri.x : ri.x, u_gen == 1 ? 1.0 - ri.y : ri.y);
   vec4 s = mix(texture(u_src, st), texture(u_src2, st), u_blend);
-  s.rgb *= s.a;
+  if (u_gen == 0) s.rgb *= s.a;
   vec4 img = s * inImg;
   float a = 1.0;
   if (u_hasMatte == 1) a = feathered(st);
@@ -255,4 +259,51 @@ void main() {
   c = toSrgb(c);
   c += (n - 0.5) / 255.0;
   o = vec4(clamp(c, 0.0, 1.0), 1.0);
+}`;
+
+/**
+ * Part B: blend modes GL's blend equations can't do. Premultiplied source over
+ * premultiplied destination (W3C compositing: separable modes on unpremultiplied
+ * colours clamped to 0..1, then source-over).
+ * u_mode: 0 overlay, 1 softlight, 2 hardlight, 3 difference, 4 exclusion, 5 lighten, 6 darken, 7 colordodge.
+ */
+export const BLEND_FS = `${PRECISION}
+uniform sampler2D u_src; uniform sampler2D u_dst; uniform int u_mode;
+vec3 hardlight(vec3 b, vec3 s) { return mix(b * 2.0 * s, 1.0 - 2.0 * (1.0 - b) * (1.0 - s), step(0.5, s)); }
+vec3 softlight(vec3 b, vec3 s) {
+  vec3 d = mix(sqrt(b), ((16.0 * b - 12.0) * b + 4.0) * b, step(b, vec3(0.25)));
+  return mix(b - (1.0 - 2.0 * s) * b * (1.0 - b), b + (2.0 * s - 1.0) * (d - b), step(0.5, s));
+}
+vec3 blendOf(vec3 b, vec3 s) {
+  if (u_mode == 0) return hardlight(s, b);
+  if (u_mode == 1) return softlight(b, s);
+  if (u_mode == 2) return hardlight(b, s);
+  if (u_mode == 3) return abs(b - s);
+  if (u_mode == 4) return b + s - 2.0 * b * s;
+  if (u_mode == 5) return max(b, s);
+  if (u_mode == 6) return min(b, s);
+  return min(vec3(1.0), b / max(vec3(1e-4), 1.0 - s));
+}
+void main() {
+  vec4 S = texture(u_src, uv);
+  vec4 D = texture(u_dst, uv);
+  vec3 cs = S.a > 1e-5 ? clamp(S.rgb / S.a, 0.0, 1.0) : vec3(0.0);
+  vec3 cb = D.a > 1e-5 ? clamp(D.rgb / D.a, 0.0, 1.0) : vec3(0.0);
+  vec3 rgb = (1.0 - S.a) * D.rgb + (1.0 - D.a) * S.rgb + S.a * D.a * blendOf(cb, cs);
+  o = vec4(rgb, S.a + D.a - S.a * D.a);
+}`;
+
+/**
+ * Part B: a track matte. Keeps u_src where the matte (premultiplied) is
+ * opaque (alpha) or bright (luma, Rec. 709 of the premultiplied colour).
+ * u_mode: 0 alpha, 1 alpha inverted, 2 luma, 3 luma inverted.
+ */
+export const TRACKMATTE_FS = `${PRECISION}
+uniform sampler2D u_src; uniform sampler2D u_matte; uniform int u_mode;
+void main() {
+  vec4 m = texture(u_matte, uv);
+  float a = m.a;
+  if (u_mode >= 2) a = clamp(dot(m.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+  if (u_mode == 1 || u_mode == 3) a = 1.0 - a;
+  o = texture(u_src, uv) * a;
 }`;

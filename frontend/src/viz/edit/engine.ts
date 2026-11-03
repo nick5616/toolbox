@@ -17,11 +17,14 @@ import { Transitions } from "../transitions";
 import type { FrameInput } from "../layers/registry";
 import type { Analysis } from "../analysis";
 import { ClipRenderer, buildMaskUniforms, evalTransform, fitGeometry, resolvePostParams, type ClipDraw, type MatteDraw, type TexEntry } from "./clip";
-import { clipAt, clipFramePlan, frameAtTime, isCompiled, needsAt, outgoingOf, transitionMix, type BlendMode, type CompiledClip, type CompiledEditFull, type PlanRef } from "./compile";
+import { clipAt, clipFramePlan, frameAtTime, isCompiled, needsAt, outgoingOf, transitionMix, type BlendMode, type CompiledClip, type CompiledEditFull, type CompiledTrack, type PlanRef } from "./compile";
 import { EditOutput, NO_OUTPUT, type EditOutputParams } from "./output";
 import { ImageLRU, Pool } from "./pool";
 import { evalEditParam, type ParamContext } from "./params";
-import { BLIT_FS, MIX_FS } from "./shaders";
+import { BLEND_FS, BLIT_FS, MIX_FS, TRACKMATTE_FS } from "./shaders";
+import { generatorFor, generatorKey, type GeneratorInstance } from "./generated";
+import "./textClip";
+import "./visualClip";
 import type { CompiledEdit, EditEngineOptions, EditPost, FrameKey, FrameProvider } from "./types";
 import { fallBackToBitmap, imageSize, initUploadMode, isClosed, isVideoFrame, uploadFrameImage } from "../frames/upload";
 import type { FrameImage } from "../frames/types";
@@ -56,6 +59,10 @@ export class EditEngine {
   private readonly texSrgb: ImageLRU<TexEntry>;
   private readonly texLinear: ImageLRU<TexEntry>;
   private readonly posts = new Map<string, PostEntry>();
+  /** Part B: generated-clip instances by clip id. */
+  private readonly gens = new Map<string, { key: string; inst: GeneratorInstance }>();
+  private readonly blendP: Program;
+  private readonly matteP: Program;
   private readonly palette: ResolvedPalette;
   private edit: CompiledEditFull | null = null;
   private frameT: Target;
@@ -81,6 +88,8 @@ export class EditEngine {
     this.text = createTextLayer({ gl, fullscreen: this.fs, w: opts.width, h: opts.height, inWorker: opts.inWorker });
     this.blit = new Program(gl, FULLSCREEN_VS, BLIT_FS);
     this.mix = new Program(gl, FULLSCREEN_VS, MIX_FS);
+    this.blendP = new Program(gl, FULLSCREEN_VS, BLEND_FS);
+    this.matteP = new Program(gl, FULLSCREEN_VS, TRACKMATTE_FS);
     this.pool = new Pool<Target>(
       (w, h) => new Target(gl, w, h),
       (t) => t.dispose(),
@@ -114,6 +123,29 @@ export class EditEngine {
         this.posts.delete(k);
       }
     }
+    // Generated clips: keep instances whose clip (and its kind/JSON) is still there.
+    const gk = new Map<string, string>();
+    if (this.edit) for (const t of this.edit.tracks) for (const cl of t.clips) if (cl.kind === "text" || cl.kind === "visual") gk.set(cl.id, generatorKey(cl));
+    for (const [id, g] of this.gens) {
+      if (gk.get(id) !== g.key) {
+        g.inst.dispose();
+        this.gens.delete(id);
+      }
+    }
+  }
+
+  /** The generator instance of a text/visual clip (built on first use), or null when its kind isn't registered. */
+  private generator(cl: CompiledClip): GeneratorInstance | null {
+    const key = generatorKey(cl);
+    const hit = this.gens.get(cl.id);
+    if (hit && hit.key === key) return hit.inst;
+    hit?.inst.dispose();
+    const make = generatorFor(cl.kind);
+    if (!make) return null;
+    const { width: w, height: h, inWorker } = this.opts;
+    const inst = make({ gl: this.gl, fullscreen: this.fs, w, h, seed: (this.opts.seed ^ fnv(`g:${cl.id}`)) >>> 0, inWorker }, cl);
+    this.gens.set(cl.id, { key, inst });
+    return inst;
   }
 
   /** The stream frames (and images) the frame at tMs (timeline ms) uses. */
@@ -192,13 +224,24 @@ export class EditEngine {
     this.fs.draw();
   }
 
-  /** Draws src over dst with a blend mode. */
+  /** Draws src over dst with a blend mode (GL blending for the simple ones, a shader for the rest). */
   private composite(src: Target, dst: Target, blend: BlendMode): void {
+    const mode = SHADER_BLENDS.indexOf(blend);
+    if (mode < 0) {
+      dst.bind();
+      this.setBlend(blend);
+      this.blit.use().tex("u_src", 0, src.tex);
+      this.fs.draw();
+      this.gl.disable(this.gl.BLEND);
+      return;
+    }
+    const under = this.pool.acquire(dst.w, dst.h);
+    this.copy(dst, under);
     dst.bind();
-    this.setBlend(blend);
-    this.blit.use().tex("u_src", 0, src.tex);
-    this.fs.draw();
     this.gl.disable(this.gl.BLEND);
+    this.blendP.use().tex("u_src", 0, src.tex).tex("u_dst", 1, under.tex).i1("u_mode", mode);
+    this.fs.draw();
+    this.pool.release(under);
   }
 
   private input(params: ParamValues, songMs: number, w: number, h: number, seed: number, analysis?: Analysis): FrameInput {
@@ -284,7 +327,19 @@ export class EditEngine {
     let matte: MatteDraw | null = null;
     let srcW = W;
     let srcH = H;
-    if (cl.kind !== "color") {
+    let genT: Target | null = null;
+    const generated = cl.kind === "text" || cl.kind === "visual";
+    if (generated) {
+      const g = this.generator(cl);
+      if (!g) return;
+      genT = this.pool.acquire(W, H);
+      genT.clear(0, 0, 0, 0);
+      genT.bind();
+      this.gl.disable(this.gl.BLEND);
+      g.render(genT, { clip: cl, clipMs, songMs, markers: c.markers, input: this.input({}, songMs, W, H, this.opts.seed), params: ctx, palette: this.palette });
+      this.gl.disable(this.gl.BLEND);
+      src0 = { tex: genT.tex, w: W, h: H };
+    } else if (cl.kind !== "color") {
       const plan = clipFramePlan(cl, k, c.fps);
       const main = plan.main ? this.refTex(plan.main, frames, true) : null;
       if (!main) return; // not decoded yet: draw nothing rather than the wrong frame
@@ -311,14 +366,14 @@ export class EditEngine {
         } else if (cl.matte.cutout || subjectOnly) return; // the matte frame isn't here yet
       }
     }
-    const geo = cl.kind === "color" ? fitGeometry("fit", W, H, W, H) : fitGeometry(cl.fit, srcW, srcH, W, H);
+    const geo = cl.kind === "color" ? fitGeometry("fit", W, H, W, H) : generated ? fitGeometry("fill", W, H, W, H) : fitGeometry(cl.fit, srcW, srcH, W, H);
     const masks = cl.masks.length > 0 ? buildMaskUniforms(cl.masks, geo.box, clipMs, songMs, ctx) : null;
     const decor = !!matte && (matte.cutout || cl.fxTarget === "subject") && (matte.strokePx > 0 || matte.glowAmount > 0);
     const split = !!matte && !subjectOnly && cl.fxTarget !== "clip" && this.hasEffects(cl.effects);
 
     let bg: Target | null = null;
     let bgTmp: Target | null = null;
-    if (cl.kind !== "color" && cl.fit === "fit-blur" && src0 && !matte?.cutout && !subjectOnly) {
+    if (!generated && cl.kind !== "color" && cl.fit === "fit-blur" && src0 && !matte?.cutout && !subjectOnly) {
       const hw = Math.max(1, W >> 1);
       const hh = Math.max(1, H >> 1);
       bg = this.pool.acquire(hw, hh);
@@ -347,6 +402,8 @@ export class EditEngine {
       part: subjectOnly ? 1 : 0,
       decor,
       bg,
+      generated,
+      edges: cl.transform.edges ?? "clear",
     };
     if (!split) {
       this.clipR.draw(into, draw);
@@ -366,10 +423,43 @@ export class EditEngine {
     }
     if (bg) this.pool.release(bg);
     if (bgTmp) this.pool.release(bgTmp);
+    if (genT) this.pool.release(genT);
   }
 
   /** A video-track clip (with its In transition) onto the frame. */
   private drawVideoClip(track: CompiledEditFull["tracks"][number], cl: CompiledClip, k: number, tMs: number, songMs: number, frames: FrameProvider): void {
+    const out = this.trackPicture(track, cl, k, tMs, songMs, frames);
+    this.composite(out, this.frameT, cl.blend);
+    this.pool.release(out);
+  }
+
+  /**
+   * Part B: a track whose picture shows only where the video track above it
+   * (the matte) is opaque or bright. With no matte clip at this frame, an
+   * inverted matte shows the track as is and a normal one shows nothing.
+   */
+  private drawMatted(track: CompiledTrack, cl: CompiledClip, matteTrack: CompiledTrack, k: number, tMs: number, songMs: number, frames: FrameProvider): void {
+    const mcl = clipAt(matteTrack, k);
+    if (!mcl) {
+      if (track.matte.endsWith("inverted")) this.drawVideoClip(track, cl, k, tMs, songMs, frames);
+      return;
+    }
+    const pic = this.trackPicture(track, cl, k, tMs, songMs, frames);
+    const mat = this.trackPicture(matteTrack, mcl, k, tMs, songMs, frames);
+    const out = this.pool.acquire(pic.w, pic.h);
+    out.bind();
+    this.gl.disable(this.gl.BLEND);
+    const mode = ["alpha", "alpha-inverted", "luma", "luma-inverted"].indexOf(track.matte);
+    this.matteP.use().tex("u_src", 0, pic.tex).tex("u_matte", 1, mat.tex).i1("u_mode", Math.max(0, mode));
+    this.fs.draw();
+    this.composite(out, this.frameT, cl.blend);
+    this.pool.release(out);
+    this.pool.release(pic);
+    this.pool.release(mat);
+  }
+
+  /** A track's clip (with its In transition) as a premultiplied picture in a pooled target (the caller releases it). */
+  private trackPicture(track: CompiledTrack, cl: CompiledClip, k: number, tMs: number, songMs: number, frames: FrameProvider): Target {
     const { width: W, height: H } = this.opts;
     const mix = transitionMix(cl, tMs, k);
     const out = this.pool.acquire(W, H);
@@ -386,8 +476,7 @@ export class EditEngine {
       this.pool.release(ta);
       this.pool.release(tb);
     }
-    this.composite(out, this.frameT, cl.blend);
-    this.pool.release(out);
+    return out;
   }
 
   /** An adjustment clip: its effects on the frame so far, mixed back by opacity and masks. */
@@ -425,13 +514,17 @@ export class EditEngine {
     const bg = c.background;
     this.frameT.clear(bg[0], bg[1], bg[2], 1);
 
-    for (const t of c.tracks) {
-      if (t.muted) continue;
+    c.tracks.forEach((t, i) => {
+      if (t.muted) return;
+      const below = c.tracks[i - 1];
+      if (t.isMatte && below && below.matte && !below.muted) return; // drawn as the matte of the track below
       const cl = clipAt(t, k);
-      if (!cl) continue;
+      if (!cl) return;
+      const above = c.tracks[i + 1];
       if (t.kind === "adjust") this.drawAdjust(cl, tMs, songMs);
+      else if (t.matte && above && !above.muted) this.drawMatted(t, cl, above, k, tMs, songMs, frames);
       else this.drawVideoClip(t, cl, k, tMs, songMs, frames);
-    }
+    });
 
     const gl = this.gl;
     if (c.captions) {
@@ -503,11 +596,16 @@ export class EditEngine {
     this.output.resize(width, height);
     this.text.resize(width, height);
     for (const e of this.posts.values()) e.inst.resize?.(width, height);
+    for (const g of this.gens.values()) g.inst.resize?.(width, height);
   }
 
   dispose(): void {
     for (const e of this.posts.values()) e.inst.dispose();
     this.posts.clear();
+    for (const g of this.gens.values()) g.inst.dispose();
+    this.gens.clear();
+    this.blendP.dispose();
+    this.matteP.dispose();
     this.pool.release(this.frameT);
     this.pool.trim();
     this.texSrgb.clear();
@@ -522,6 +620,9 @@ export class EditEngine {
     this.edit = null;
   }
 }
+
+/** Blend modes drawn with BLEND_FS (index = its u_mode). */
+const SHADER_BLENDS: readonly BlendMode[] = ["overlay", "softlight", "hardlight", "difference", "exclusion", "lighten", "darken", "colordodge"];
 
 function postKey(prefix: string, p: EditPost): string {
   return `${prefix}/${p.id}/${p.type}`;

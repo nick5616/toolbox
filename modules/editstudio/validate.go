@@ -22,7 +22,8 @@ var (
 	exportHeights = []int{720, 1080, 1440}
 	fits          = []string{"fill", "fit", "fit-blur", "fit-color"}
 	slows         = []string{"blend", "none", "interpolate"}
-	blends        = []string{"normal", "add", "screen", "multiply"}
+	blends        = []string{"normal", "add", "screen", "multiply", "overlay", "softlight", "hardlight", "difference", "exclusion", "lighten", "darken", "colordodge"}
+	trackMattes   = []string{"", "alpha", "alpha-inverted", "luma", "luma-inverted"}
 	fxTargets     = []string{"clip", "subject", "background"}
 	matteModes    = []string{MattePeople, MatteSelect, MatteImage}
 	textKinds     = []string{TextMarkersCSV, TextMarkersJSON, TextSRT}
@@ -118,6 +119,9 @@ func validateShape(doc EditProject) error {
 		}
 		if utf8.RuneCountInString(t.Name) > 40 {
 			return vErr(f+".name", "Track names are at most 40 characters")
+		}
+		if !slices.Contains(trackMattes, t.Matte) || (t.Matte != "" && t.Kind != "video") {
+			return vErr(f+".matte", "Unknown track matte")
 		}
 		var prevEnd int64 = -1
 		for ci, c := range t.Clips {
@@ -230,7 +234,7 @@ func validateMarkers(m MarkerState) error {
 
 func validateClip(f, trackKind string, c Clip) error {
 	switch c.Kind {
-	case "video", "image", "color":
+	case "video", "image", "color", "text", "visual":
 		if trackKind != "video" {
 			return vErr(f+".kind", "Adjustment tracks only hold adjustment clips")
 		}
@@ -246,6 +250,12 @@ func validateClip(f, trackKind string, c Clip) error {
 	}
 	if c.Kind == "color" && !colorRe.MatchString(c.Color) {
 		return vErr(f+".color", "Pick a colour")
+	}
+	if c.Kind == "text" && c.Text == "" {
+		return vErr(f+".text", "This text clip has no text")
+	}
+	if c.Kind == "visual" && c.Visual == "" {
+		return vErr(f+".visual", "Pick a visual")
 	}
 	if c.StartMs < 0 || c.EndMs <= c.StartMs {
 		return vErr(f+".endMs", "A clip must end after it starts")
@@ -271,7 +281,7 @@ func validateClip(f, trackKind string, c Clip) error {
 		return vErr(f+".fitColor", "Pick a colour")
 	}
 	for _, j := range []struct{ field, v string }{
-		{"speed", c.Speed}, {"transform", c.Transform}, {"masks", c.Masks}, {"effects", c.Effects}, {"in", c.In},
+		{"speed", c.Speed}, {"transform", c.Transform}, {"masks", c.Masks}, {"effects", c.Effects}, {"in", c.In}, {"text", c.Text}, {"visual", c.Visual},
 	} {
 		if err := jsonField(f+"."+j.field, j.v, MaxFieldBytes); err != nil {
 			return err

@@ -1847,3 +1847,238 @@ A new section, **"Edit Studio (Phase 9)"**:
 11. **Dialogs:** `useEditStudio().openDialog({kind: "autofill", range} | {kind: "export"} | null)`. Any package (section band menu, palette commands) can open the Auto-fill or Export dialog; the view renders them.
 12. **`tools/edit-studio/matte/split.ts` `splitSubject(p, clipId)`** is a WP-ES7 stub. WP-ES2's clip menu calls it.
 13. **Thumbnails:** the view saves the preview as `thumb.jpg` after saves, at most every 30 s. No package does it.
+
+---
+
+## 23. Part B: Edit Studio FX (2026-11-03)
+
+The user asked for "as many cool video effect features as you can": text masked over video, images/videos as masks, and the looks of TikTok and anime edits (AMV / velocity / flow edits). The research (summarised in DECISIONS) found that these edits are mostly a beat- or kick-triggered envelope on some parameter. The engine already has that envelope (`EditParam` mods on `marker.<lane>`). What's missing is:
+- the **effects themselves**;
+- **compositing**: track mattes, more blend modes, text and generated layers;
+- **transitions**;
+- **one-click recipes**.
+
+### 23.1 Goals
+
+1. **Compositing:**
+   - track mattes (alpha / luma / inverted: "this track shows through the track above");
+   - text clips;
+   - visual clips (Visualizer layers as clips: light rays, embers, shockwaves, tunnels…);
+   - eight more blend modes;
+   - mirror edges ("motion tile"), so shakes and zooms never show black.
+2. **22 new effects** (§23.4). Each can be used on clips, adjustment clips and the Look, and markers modulate them like the existing ones.
+3. **12 new transitions** (§23.5).
+4. **Presets:**
+   - one-click FX stacks ("Anime hit", "Velocity punch"…);
+   - a searchable effect picker with categories;
+   - velocity (speed-ramp) presets;
+   - two auto-fill recipes ("Anime drop", "Velocity edit").
+
+**Non-goals:**
+- optical-flow slow motion beyond the existing interpolation;
+- pixel sorting and datamosh (too costly for the gain);
+- echo trails (they need past frames, so they can't be deterministic as a post effect);
+- stutter (it needs source time to run backwards).
+
+### 23.2 Contract changes (foundation, committed on main before the builders start)
+
+- **Go document** (`modules/editstudio/document.go`):
+  - `Track.Matte`: `"" | "alpha" | "alpha-inverted" | "luma" | "luma-inverted"`, video tracks only.
+  - `Clip.Kind` adds `"text"` and `"visual"` (video tracks only).
+  - `Clip.Text` holds `TextClip` JSON; `Clip.Visual` holds `VisualClip` JSON.
+  - `Clip.Blend` adds `overlay, softlight, hardlight, difference, exclusion, lighten, darken, colordodge`.
+  - Validation is updated to match and the bindings are regenerated.
+- **TS** (`viz/edit/types.ts`, `schema.ts`):
+  - types and lists: `BLEND_MODES`, `TRACK_MATTES`, `TextClip`, `VisualClip`, `ClipTransform.edges?: "clear" | "mirror"`;
+  - parsers: `parseTextClip`/`serializeTextClip`/`defaultTextClip` and `parseVisualClip`/`serializeVisualClip`/`defaultVisualClip`;
+  - `TRANSITION_KINDS` includes the new kinds;
+  - `viz/types.ts`: `POST_TYPES` and `TransitionKind` list the new ids.
+- **TextClip:**
+  - `text`: 1..500 chars;
+  - `style`: a `TextStyle` (the same as the captions'; its preset animates the words);
+  - `reveal`: `"all"|"words"|"beats"`;
+  - `wordMs`: 40..2000;
+  - `lane`: a `MarkerLane`;
+  - `every`: 1..16.
+- **VisualClip:**
+  - `layer`: a `LayerType`;
+  - `params`: partial layer params (numbers may be EditParams);
+  - `palette`: a `PaletteId`.
+- **Compile** (`compile.ts`):
+  - `CompiledClip.text` / `.visual`. Text clips that are only whitespace are skipped.
+  - `CompiledTrack.matte` / `.isMatte`: the track directly above a matted track is its matte. A matte with no video track above it is dropped and reported as a problem.
+  - `CompiledEditFull.markers`.
+- **Engine** (`engine.ts`), implemented in the foundation:
+  - **Generated sources** (`viz/edit/generated.ts`: `registerGenerator(kind, factory)` and `GeneratorInstance.render(target, frame)`). Each frame, a text or visual clip renders a frame-sized, premultiplied picture. That picture then goes through the normal clip path: transform, masks, effects, blend, transitions and track mattes. The clip shader takes `u_gen` (premultiplied, bottom-up) and `u_edges` (mirror).
+  - **Track mattes:** `drawMatted` multiplies the track's picture by the alpha or luma of the matte track (`TRACKMATTE_FS`). The matte track isn't drawn on its own. Muting the matte track turns the matte off.
+  - **Shader blend modes:** `BLEND_FS` handles the eight new modes; the old four keep GL blending.
+- **Effects plumbing:**
+  - `viz/post/fx1.ts` and `fx2.ts` are aggregators imported by `post/index.ts`.
+  - Each effect is one file under `viz/post/` that calls `registerPost` (kind `"pass"`, never stateful), using `simplePass` (`post/pass.ts`) or its own programs.
+- **UI** (foundation):
+  - Track inspector: a "Track matte" select.
+  - Clip blend select: all 12 modes.
+  - Tracks toolbar: **Text** and **Visual** buttons.
+  - Stubs `text/addText.ts` and `visual/addVisual.ts` place a clip at the playhead, on the topmost free video track or on a new track (`timeline/placeGenerated.ts`).
+  - Clip view: icons and colours for the new kinds; `clipLabel` names them.
+  - Clip inspector: shows `TextSection` / `VisualSection` (stubs) for those kinds.
+  - `engine.ts` imports `./textClip` and `./visualClip` (stub files from the foundation) so the preview and the export worker both register them.
+
+### 23.3 Work packages and file ownership
+
+| WP | Owns (only these) |
+|---|---|
+| FX1 Motion, blur, glow, warps | `viz/post/{zoomblur,dirblur,glow,swing,twirl,wave,bulge,shockwave,kaleido,slice}.ts`, `viz/post/fx1.ts`, `viz/post/fx1.test.ts` |
+| FX2 Stylize | `viz/post/{pixelate,halftone,posterize,duotone,mono,colorpop,vhs,letterbox,lightleak,speedlines,sharpen,outline}.ts`, `viz/post/fx2.ts`, `viz/post/fx2.test.ts` |
+| FX3 Transitions | `viz/transitions.ts`, `viz/transitions.test.ts` |
+| FX4 Text clips | `viz/edit/textClip.ts` (+ test), `tools/edit-studio/text/**` |
+| FX5 Visual clips | `viz/edit/visualClip.ts` (+ test), `tools/edit-studio/visual/**` |
+| FX6 Presets and picker | `tools/edit-studio/inspector/{EffectsStack.tsx,templates.ts,ClipInspector.tsx,FxStacks.ts,velocity.ts}` (+ tests), `tools/edit-studio/autofill/recipes.ts` (+ its golden tests), `tools/edit-studio/inspector/effectCatalog.ts` |
+
+All six depend only on the foundation and run in parallel. FX6 uses the effect ids and param names from §23.4.
+
+### 23.4 Effects
+
+Notation: id "Label": param min..max default. Every number param is an `EditParam`.
+
+Shaders work in premultiplied linear HDR (`PASS_HEAD`, `u_src`, `u_res`) and must be deterministic: no `Math.random`, no clocks. Time comes from `f.tMs`; randomness comes from `f.seed` and GLSL hashes (`GLSL_COMMON`). With every amount at its default, an effect must leave the image unchanged. The FX1/FX2 tests check that identity with a pure-math model, as `px1math.ts`/`px2math.ts` do for the existing effects.
+
+**FX1**
+
+- `zoomblur` "Zoom blur": amount 0..1 0; cx 0..1 0.5; cy 0..1 0.5. A radial blur towards the centre, 24 taps, length amount·0.35 of the distance.
+- `dirblur` "Motion blur": amount 0..1 0; angle −180..180 0. A directional blur, 24 taps, length amount·0.12 of the short side.
+- `glow` "Deep glow": amount 0..3 0; threshold 0..2 0.6; radius 0..1 0.5; tint colour "#ffffff". A bright pass, then a downsample/blur pyramid of 4–5 levels scaled by radius, added back × amount × tint. Uses its own programs and half-res or smaller targets.
+- `swing` "3D swing": rotX −70..70 0; rotY −70..70 0; persp 0..1 0.5; mirror bool true. A perspective rotation around the centre. Samples outside the frame are mirrored when `mirror` is on, otherwise transparent.
+- `twirl` "Twirl": amount −1..1 0; radius 0..1 0.5; cx, cy 0.5. Angle = amount·2π·(1 − r/R)².
+- `wave` "Wave": amount 0..1 0; freq 1..40 8; speed 0..8 1; dir enum ["horizontal","vertical"] "horizontal". A sine offset of up to amount·0.05 of the frame.
+- `bulge` "Bulge / pinch": amount −1..1 0 (negative pinches); radius 0..1 0.5; cx, cy 0.5.
+- `shockwave` "Shockwave": amount 0..1 0; width 0.01..0.3 0.08; strength 0..1 0.5; cx, cy 0.5. A refracting ring with radius (1 − amount)·1.2 of the half-diagonal and strength amount·strength. Driven by a decaying marker mod, the ring expands as the pulse fades.
+- `kaleido` "Kaleidoscope": amount 0..1 0 (mix); segments 2..16 6; rotation −180..180 0; zoom 0.5..2 1.
+- `slice` "Slice shift": amount 0..1 0; bands 2..64 12; rgb 0..1 0.3. Horizontal bands, each shifted by a hashed amount, plus an RGB split. The shifts change every 2 frames (hash of `floor(tMs/66)` and the seed).
+
+**FX2**
+
+- `pixelate` "Pixelate": amount 0..1 0. Block size = 1 + amount·0.08·(short side) px.
+- `halftone` "Halftone": amount 0..1 0 (mix); dots 20..240 90 (across the short side); angle −90..90 45; mode enum ["mono","color"] "mono".
+- `posterize` "Posterize": amount 0..1 0 (mix); levels 2..16 5.
+- `duotone` "Duotone": amount 0..1 0; shadows colour "#1b0436"; highlights colour "#ff4fd8". A luma gradient map.
+- `mono` "Black and white": amount 0..1 0; contrast 0..3 1; hard bool false. `hard` thresholds at 50 %, for manga frames.
+- `colorpop` "Colour pop": amount 0..1 0; hue 0..360 0; range 5..180 30. Desaturates everything outside the hue range.
+- `vhs` "VHS": amount 0..1 0; scanlines 0..1 0.5; bleed 0..1 0.5; wobble 0..1 0.3; noise 0..1 0.3.
+- `letterbox` "Letterbox": amount 0..1 0 (0 is none, 1 is bars for 2.39:1); color colour "#000000".
+- `lightleak` "Light leak": amount 0..1 0; color colour "#ff8a3d"; speed 0..2 0.5. Soft procedural blobs that drift with tMs, screen-blended.
+- `speedlines` "Speed lines": amount 0..1 0; density 20..240 90; inner 0..0.9 0.35 (clear radius); color colour "#ffffff"; cx, cy 0.5. Anime radial lines that change every 2 frames.
+- `sharpen` "Sharpen": amount 0..2 0.
+- `outline` "Ink outline": amount 0..1 0; thickness 0.5..4 1; color colour "#000000"; mode enum ["ink","neon"] "ink". Sobel edges drawn over the picture. `neon` draws additive glowing edges in the colour.
+
+### 23.5 Transitions (FX3)
+
+New `TransitionKind`s. Each is an `(a, b, mix, tMs)` shader in `viz/transitions.ts`, like the existing ones:
+- `zoomout`: zoom out of a while b scales in, with radial blur;
+- `spin`: rotate 180° with blur, cutting at mix 0.5;
+- `whip`: a fast pan with directional blur;
+- `slide`: push left;
+- `blur`: blur out, then in;
+- `rgbsplit`: channel offsets that peak at 0.5;
+- `shake`: a shaking cut at 0.5;
+- `warp`: a twirl into b;
+- `luma`: b appears through a's luma, dark parts first;
+- `iris`: a circle reveal;
+- `stripes`: a diagonal-stripes reveal;
+- `flashblack`: a dip to black.
+
+Requirements:
+- At mix 0 a transition shows exactly a; at mix 1, exactly b. The tests use a math model of the endpoints.
+- Sampling past the edges is mirrored, so there are never black borders.
+
+### 23.6 Text clips (FX4)
+
+- **Generator** (`viz/edit/textClip.ts`, `registerGenerator("text", …)`):
+  - It draws the clip's text with the existing text engine (`viz/text`, `createTextLayer`), from a `TextDoc` with one line, or several when the text has `\n`.
+  - The word times implement `reveal`:
+    - `all`: every word at the clip start;
+    - `words`: word i at i·wordMs;
+    - `beats`: word i at the i-th marker of `lane` inside the clip (taking every Nth); words left over go at the clip end.
+  - The style's preset animates each word as it appears.
+  - The picture is full-frame and premultiplied; the clip transform positions it.
+  - It works in the export worker, using the same fonts as captions.
+- **UI** (`tools/edit-studio/text/`):
+  - `TextSection` edits:
+    - the text: multi-line, with a 500-char counter;
+    - the style: preset, font (the fonts captions offer), weight, size, colour, highlight, outline, glow, uppercase, position;
+    - the reveal, plus wordMs / lane / every.
+  - Quick styles (one click each):
+    - "Big punch": pop, 900, uppercase, outline 0.08;
+    - "Glow": glow 1;
+    - "Typewriter";
+    - "Subtitle";
+    - "Outline only": outline, no fill.
+  - **Text through video** button: makes this clip's track the matte of a new video track below it. That new track holds the clip that is under the playhead, so the text reveals that video.
+  - **Text behind subject**: when the clip below has a cut-out, put the subject above the text by duplicating it with its subject-only cut-out, as Split subject does.
+  - `addText.ts`, refined: on an empty spot the clip runs from the playhead to the next downbeat (at least 1 s).
+- **Tests:**
+  - word timing for each reveal mode (a pure function);
+  - parse/serialize through the UI.
+
+### 23.7 Visual clips (FX5)
+
+- **Generator** (`viz/edit/visualClip.ts`, `registerGenerator("visual", …)`):
+  - It creates the Visualizer layer with `layerDef(type).create(ctx)`. The `LayerContext` provides gl, fullscreen, size and seed, a deterministic `rng(key)`, no textures, and `previous()` returning null.
+  - Each frame it renders the layer with a `FrameInput` whose params are the layer defaults merged with the clip's params. Those are evaluated with `evalEditParam`, so marker mods work.
+  - The palette is the clip's: `resolvePalette({mode:"fixed", ids:[palette]}, …)`.
+  - Stateful layers are not offered.
+- **UI** (`tools/edit-studio/visual/`):
+  - `VisualSection` has:
+    - a grid of layers, grouped as in the Visualizer (background, shape, particles, accent);
+    - the palette select;
+    - every layer param: numbers through `EditParamEditor` (with keys and mods), enums, bools and colours through `Select` / `Switch` / `ColorSwatchPicker`.
+  - A "Suggested" row: lightrays, embers, shockwave, bursts, starfield, tunnel, sweep, ripples, fireflies, frame.
+  - `addVisual.ts`, refined: visual clips default to blend "screen" and run to the end of the section (at least 2 s).
+- **Tests:**
+  - a param-merge function;
+  - a check that every non-stateful layer can be configured.
+
+### 23.8 Presets and picker (FX6)
+
+- **Effect picker:** "Add effect" opens a searchable list grouped as Camera & motion · Blur & glow · Distort · Stylize · Colour & light · Glitch. Each effect has a one-line description (`effectCatalog.ts`). The picker serves clip, adjustment and Look stacks.
+- **FX stacks** (`inspector/FxStacks.ts`): one click adds several effects with their marker mods filled in. At least these:
+  - "Anime hit": shake + punch + chromatic + flash, on kick;
+  - "Drop impact": shockwave + zoomblur + flash, on drop;
+  - "Velocity punch": punch + dirblur, on kick;
+  - "Glow pump": glow amount, on kick;
+  - "Strobe build": flash on every beat, gated to lift/build sections;
+  - "Manga": mono hard + halftone + outline;
+  - "VHS intro": vhs + letterbox;
+  - "Speed lines on drop";
+  - "3D swing on downbeats";
+  - "Slice glitch on hats";
+  - "Duotone pulse";
+  - "Light leak".
+
+  The existing single-effect templates stay.
+- **Velocity presets** (`inspector/velocity.ts`), written as speed keys (0..4) on the clip:
+  - "Ramp into the beat": 2× → 0.4× centred on the nearest kick/beat inside the clip → 1.5×;
+  - "Slow on the drop";
+  - "Fast to slow";
+  - "Freeze on the beat": speed 0 held for one beat.
+- **ClipInspector:**
+  - a "Velocity" group in the clip actions menu;
+  - an "Edges" switch in Transform ("Mirror past the edges").
+- **Recipes** (`autofill/recipes.ts`, with golden tests on the fixture, like the existing ones):
+  - "Anime drop":
+    - downbeat cuts in verses;
+    - kick cuts in drops, with the Anime hit stack;
+    - shockwave + flash on the drop clip.
+  - "Velocity edit": beat cuts, each clip ramped into its beat (speed keys), with punch + dirblur on kicks.
+
+### 23.9 Acceptance
+
+- `npm run check` passes, and so does `go build ./... && go vet ./... && go test ./...`.
+- In the real app (Edit Studio):
+  - Every new effect visibly changes the preview when its amount is raised. None changes the frame at its defaults.
+  - Text clip on the top track, track 1 set to "alpha": video shows only inside the letters, over the clip on the bottom track.
+  - The same works with a photo as the matte (luma).
+  - A visual clip (embers, screen) reacts to the song.
+  - Every new transition renders without black borders.
+  - Each FX stack applies in one click.
+- An export containing all of the above matches the preview (spot-checked frames).

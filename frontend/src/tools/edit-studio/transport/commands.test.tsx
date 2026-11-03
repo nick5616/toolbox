@@ -36,8 +36,8 @@ function openEdit(): void {
   const doc = emptyEditProject("9:16", 30, 1) as NormalProject;
   doc.song = { path: "/s.mp3", startMs: 0, endMs: 20_000, gainDb: 0, fadeInMs: 0, fadeOutMs: 0 };
   doc.tracks = [
-    { id: "t1", kind: "video", name: "Video 1", muted: false, locked: false, clips: [newClip({ id: "a", kind: "video", path: "/a.mp4", startMs: 0, endMs: 4000 }), newClip({ id: "b", kind: "video", path: "/b.mp4", startMs: 5000, endMs: 6000 })] },
-    { id: "t2", kind: "adjust", name: "Adjust 1", muted: false, locked: false, clips: [] },
+    { id: "t1", kind: "video", name: "Video 1", muted: false, locked: false, matte: "", clips: [newClip({ id: "a", kind: "video", path: "/a.mp4", startMs: 0, endMs: 4000 }), newClip({ id: "b", kind: "video", path: "/b.mp4", startMs: 5000, endMs: 6000 })] },
+    { id: "t2", kind: "adjust", name: "Adjust 1", muted: false, locked: false, matte: "", clips: [] },
   ];
   useEditStudio.getState().open("p1", "Edit", doc);
   useEditStudio.getState().setAnalysis(null, {} as never, "ready");

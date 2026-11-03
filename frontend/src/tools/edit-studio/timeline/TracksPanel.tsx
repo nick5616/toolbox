@@ -25,6 +25,8 @@ import { TrackHeader } from "./TrackHeader";
 import { withClip } from "../doc";
 import styles from "./TracksPanel.module.css";
 import { TimeScrollbar } from "./TimeScrollbar";
+import { addTextClip } from "../text/addText";
+import { addVisualClip } from "../visual/addVisual";
 
 export const VIDEO_ROW_PX = 56;
 export const ADJUST_ROW_PX = 36;
@@ -343,6 +345,12 @@ function Tracks({ project }: { project: NormalProject }) {
         </Button>
         <Button size="sm" icon="sliders-horizontal" disabled={project.tracks.length >= 8} onClick={() => edit(addTrack(project, "adjust"))}>
           Adjustment track
+        </Button>
+        <Button size="sm" icon="type" onClick={() => addTextClip()}>
+          Text
+        </Button>
+        <Button size="sm" icon="sparkles" onClick={() => addVisualClip()}>
+          Visual
         </Button>
         <span className={styles.toolbarHint}>{project.tracks.length} of 8 tracks</span>
       </div>

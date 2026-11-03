@@ -57,7 +57,7 @@ export interface TransformValues {
 
 export function evalTransform(t: ClipTransform, W: number, H: number, clipMs: number, songMs: number, ctx: ParamContext | null): TransformValues {
   const r = TRANSFORM_RULES;
-  const v = (k: keyof ClipTransform) => evalEditParam(t[k], r[k].min, r[k].max, clipMs, songMs, ctx);
+  const v = (k: keyof typeof TRANSFORM_RULES) => evalEditParam(t[k], r[k].min, r[k].max, clipMs, songMs, ctx);
   return { offX: v("x") * W, offY: v("y") * H, scale: v("scale"), rot: (v("rotation") * Math.PI) / 180, opacity: v("opacity") };
 }
 
@@ -207,6 +207,10 @@ export interface ClipDraw {
   decor: boolean;
   /** The blurred fit background (half-size target), for fit-blur. */
   bg: Target | null;
+  /** Part B: src0 is a generated target (text/visual clips): premultiplied and bottom-up. */
+  generated?: boolean;
+  /** Part B: mirror the picture past its edges (ClipTransform.edges). */
+  edges?: "clear" | "mirror";
 }
 
 export class ClipRenderer {
@@ -285,7 +289,9 @@ export class ClipRenderer {
       .i1("u_hasMatte", m ? 1 : 0)
       .f1("u_mblend", m && m.tex1 ? m.w : 0)
       .f1("u_minv", m?.invert ? 1 : 0)
-      .f1("u_cutout", m?.cutout ? 1 : 0);
+      .f1("u_cutout", m?.cutout ? 1 : 0)
+      .i1("u_gen", d.generated ? 1 : 0)
+      .i1("u_edges", d.edges === "mirror" ? 1 : 0);
     const uvr = (px: number): [number, number] => (px <= 0 ? [0, 0] : [px / (geo.img[0] * tr.scale), px / (geo.img[1] * tr.scale)]);
     const fe = uvr(m ? m.feather * 0.01 * short : 0);
     const sk = uvr(m ? m.strokePx * outScale : 0);

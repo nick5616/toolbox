@@ -38,8 +38,8 @@ function open(clips: EditClip[], tweak: (d: NormalProject) => void = () => undef
   const doc = emptyEditProject("9:16", 30, 1) as NormalProject;
   doc.song = { path: "/song.mp3", startMs: 0, endMs: 20_000, gainDb: 0, fadeInMs: 0, fadeOutMs: 500 };
   doc.tracks = [
-    { id: "t1", kind: "video", name: "Video 1", muted: false, locked: false, clips },
-    { id: "t2", kind: "adjust", name: "Adjust 1", muted: false, locked: false, clips: [] },
+    { id: "t1", kind: "video", name: "Video 1", muted: false, locked: false, matte: "", clips },
+    { id: "t2", kind: "adjust", name: "Adjust 1", muted: false, locked: false, matte: "", clips: [] },
   ];
   tweak(doc);
   useEditStudio.getState().open("p1", "Edit", doc);
@@ -240,7 +240,7 @@ describe("dragging", () => {
 
   it("moves a clip onto another track", () => {
     open([vid("a", 0, 1000)], (d) => {
-      d.tracks.push({ id: "t3", kind: "video", name: "Video 2", muted: false, locked: false, clips: [] });
+      d.tracks.push({ id: "t3", kind: "video", name: "Video 2", muted: false, locked: false, matte: "", clips: [] });
     });
     // Rows: t1 36..92 (mocked); t3 has no mocked rect, so drag within t1 only; moving across needs a rect.
     const orig = Element.prototype.getBoundingClientRect;

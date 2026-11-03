@@ -27,22 +27,24 @@ import {
   parseTextStyle,
   parseTransform,
   parseTransition,
+  parseTextClip,
+  parseVisualClip,
   IDENTITY_TRANSFORM,
   SPEED_MAX,
   SPEED_MIN,
   CUT,
 } from "./schema";
 import { normalizeProject } from "./defaults";
-import type { ClipTransform, CompiledEdit, EditEngineOptions, EditInputs, EditParam, EditPost, EditTransition, FrameKey, Mask } from "./types";
-import { editLength } from "./types";
+import type { ClipTransform, CompiledEdit, EditBlendMode, Marker, EditEngineOptions, EditInputs, EditParam, EditPost, EditTransition, FrameKey, Mask, TextClip, TrackMatte, VisualClip } from "./types";
+import { BLEND_MODES, TRACK_MATTES, editLength } from "./types";
 
 export const MAX_TRANSITION_MS = 2000;
 const EPS = 1e-6;
 const ceilF = (x: number) => Math.ceil(x - EPS) + 0; // + 0 turns -0 into 0
 
-export type ClipKind = "video" | "image" | "color" | "adjust";
+export type ClipKind = "video" | "image" | "color" | "adjust" | "text" | "visual";
 export type FitMode = "fill" | "fit" | "fit-color" | "fit-blur";
-export type BlendMode = "normal" | "add" | "screen" | "multiply";
+export type BlendMode = EditBlendMode;
 export type SlowMode = "blend" | "none" | "interpolate";
 export type FxTarget = "clip" | "subject" | "background";
 
@@ -111,6 +113,10 @@ export interface CompiledClip {
   matteMissing: boolean;
   /** The clip's speed is not a plain 1 (the UI may show badges). */
   speed: EditParam;
+  /** Part B: kind "text". */
+  text: TextClip | null;
+  /** Part B: kind "visual". */
+  visual: VisualClip | null;
 }
 
 export interface CompiledTrack {
@@ -118,6 +124,10 @@ export interface CompiledTrack {
   id: string;
   kind: "video" | "adjust";
   muted: boolean;
+  /** Part B: this track shows only where the video track above it is opaque/bright; that track is the matte. */
+  matte: TrackMatte;
+  /** Part B: the track below uses this one as its matte (it isn't drawn by itself). */
+  isMatte: boolean;
   /** Sorted by k0. */
   clips: CompiledClip[];
 }
@@ -144,6 +154,8 @@ export interface CompiledEditFull extends CompiledEdit {
   analysis: Analysis;
   signals: Signals;
   markerSignals: MarkerSignals;
+  /** Part B: the timeline markers (generated clips read them, e.g. words on beats). */
+  markers: readonly Marker[];
 }
 
 export function isCompiled(c: CompiledEdit | null | undefined): c is CompiledEditFull {
@@ -302,7 +314,7 @@ export function needsAt(c: CompiledEditFull, k: number): FrameKey[] {
 // ---- compile ----
 
 const FIT_MODES: readonly FitMode[] = ["fill", "fit", "fit-color", "fit-blur"];
-const BLENDS: readonly BlendMode[] = ["normal", "add", "screen", "multiply"];
+const BLENDS: readonly BlendMode[] = BLEND_MODES;
 const SLOWS: readonly SlowMode[] = ["blend", "none", "interpolate"];
 const TARGETS: readonly FxTarget[] = ["clip", "subject", "background"];
 
@@ -363,7 +375,20 @@ export function compileEdit(inputs: EditInputs, opts: CompileOptions): CompiledE
       const note = (r: { problems: string[] }) => {
         for (const m of r.problems) problems.push(`${where}.${m}`);
       };
-      const ck: ClipKind = cl.kind === "image" || cl.kind === "color" || cl.kind === "adjust" ? cl.kind : "video";
+      const ck: ClipKind = cl.kind === "image" || cl.kind === "color" || cl.kind === "adjust" || cl.kind === "text" || cl.kind === "visual" ? cl.kind : "video";
+      if (kind === "adjust" && ck !== "adjust") return;
+      let text: TextClip | null = null;
+      let visual: VisualClip | null = null;
+      if (ck === "text") {
+        const t = parseTextClip(cl.text);
+        note(t);
+        if (!t.value.text.trim()) return; // nothing to draw
+        text = t.value;
+      } else if (ck === "visual") {
+        const v = parseVisualClip(cl.visual);
+        note(v);
+        visual = v.value;
+      }
       const span = frameSpan(cl.startMs, cl.endMs, fps, offset);
       const k0 = Math.max(0, span.k0);
       const k1 = Math.min(frames, span.k1);
@@ -438,10 +463,24 @@ export function compileEdit(inputs: EditInputs, opts: CompileOptions): CompiledE
         matte,
         matteMissing,
         speed: speed.value,
+        text,
+        visual,
       });
     });
     clips.sort((a, b) => a.k0 - b.k0);
-    tracks.push({ index: ti, id: tr.id, kind, muted: tr.muted, clips });
+    const tm = (TRACK_MATTES as readonly string[]).includes(tr.matte ?? "") ? (tr.matte as TrackMatte) : "";
+    tracks.push({ index: ti, id: tr.id, kind, muted: tr.muted, matte: kind === "video" ? tm : "", isMatte: false, clips });
+  });
+  // A matte needs a video track directly above; that track then only serves as the matte.
+  tracks.forEach((t, i) => {
+    const above = tracks[i + 1];
+    if (!t.matte) return;
+    if (!above || above.kind !== "video") {
+      problems.push(`tracks[${i}].matte: there's no video track above to use as the matte`);
+      t.matte = "";
+      return;
+    }
+    above.isMatte = true;
   });
 
   // Transitions: window, outgoing clip, and the tail its source continues for.
@@ -516,6 +555,7 @@ export function compileEdit(inputs: EditInputs, opts: CompileOptions): CompiledE
     analysis: inputs.analysis,
     signals: new Signals(inputs.analysis),
     markerSignals: new MarkerSignals(inputs.analysis, inputs.markers, songStartMs),
+    markers: inputs.markers,
   };
 }
 

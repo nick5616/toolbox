@@ -90,7 +90,7 @@ export interface Clip {
     "id": string;
 
     /**
-     * "video" | "image" | "color" (video tracks) | "adjust" (adjust tracks)
+     * "video" | "image" | "color" | "text" | "visual" (video tracks) | "adjust" (adjust tracks)
      */
     "kind": string;
 
@@ -146,7 +146,7 @@ export interface Clip {
     "flipX": boolean;
 
     /**
-     * "normal" | "add" | "screen" | "multiply"
+     * "normal" | "add" | "screen" | "multiply" | "overlay" | "softlight" | "hardlight" | "difference" | "exclusion" | "lighten" | "darken" | "colordodge"
      */
     "blend": string;
 
@@ -179,6 +179,16 @@ export interface Clip {
      * EditTransition JSON into this clip; "" = cut
      */
     "in": string;
+
+    /**
+     * text clips: TextClip JSON (Part B); "" otherwise
+     */
+    "text": string;
+
+    /**
+     * visual clips: VisualClip JSON (a Visualizer layer, Part B); "" otherwise
+     */
+    "visual": string;
 
     /**
      * auto-fill never touches it
@@ -735,6 +745,13 @@ export interface Track {
      * no edits; auto-fill skips it
      */
     "locked": boolean;
+
+    /**
+     * Matte (video tracks, Part B): "" | "alpha" | "alpha-inverted" | "luma" | "luma-inverted".
+     * The track shows only where the video track directly above it is opaque (alpha) or
+     * bright (luma); that track becomes the matte and isn't drawn itself.
+     */
+    "matte": string;
 
     /**
      * sorted by StartMs, non-overlapping; ≤ 500 clips per project

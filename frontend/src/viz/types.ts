@@ -40,6 +40,10 @@ export const POST_TYPES = [
   "bloom", "vignette", "grain", "chromatic", "feedback", "mirror", "shake", "zoompulse", "glitch", "grade",
   // Phase 9 (Edit Studio, WP-ES5): unregistered types are skipped by the engine until their files land.
   "punch", "flash", "blurpulse", "exposure", "invert",
+  // Phase 9 Part B (Edit Studio FX). FX1: motion, blur, glow and warps.
+  "zoomblur", "dirblur", "glow", "swing", "twirl", "wave", "bulge", "shockwave", "kaleido", "slice",
+  // FX2: stylize.
+  "pixelate", "halftone", "posterize", "duotone", "mono", "colorpop", "vhs", "letterbox", "lightleak", "speedlines", "sharpen", "outline",
 ] as const;
 export type PostType = (typeof POST_TYPES)[number];
 
@@ -97,7 +101,10 @@ export interface Scene {
   post: PostConfig[];
 }
 
-export type TransitionKind = "cut" | "crossfade" | "flash" | "zoom" | "sweep" | "glitch";
+export type TransitionKind =
+  | "cut" | "crossfade" | "flash" | "zoom" | "sweep" | "glitch"
+  // Phase 9 Part B (FX3)
+  | "zoomout" | "spin" | "whip" | "slide" | "blur" | "rgbsplit" | "shake" | "warp" | "luma" | "iris" | "stripes" | "flashblack";
 export interface Transition {
   kind: TransitionKind;
   ms: number;

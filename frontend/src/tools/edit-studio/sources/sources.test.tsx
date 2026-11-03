@@ -188,7 +188,7 @@ describe("SourcesPanel", () => {
   it("relinks a missing file in the sources and every clip", async () => {
     open(["/c/gone.mp4"], [st("/c/gone.mp4", { info: { error: "no such file" } })]);
     const doc = project();
-    useEditStudio.getState().edit({ ...doc, tracks: [{ ...(doc.tracks[0] as NormalProject["tracks"][number]), clips: [{ id: "k1", kind: "video", path: "/c/gone.mp4", color: "", startMs: 0, endMs: 1000, inMs: 0, speed: "", slow: "", volume: 0, fit: "fill", fitColor: "#000000", flipX: false, blend: "normal", transform: "", matte: null, fxTarget: "clip", masks: "", effects: "", in: "", pinned: false, auto: false }] }] });
+    useEditStudio.getState().edit({ ...doc, tracks: [{ ...(doc.tracks[0] as NormalProject["tracks"][number]), clips: [{ id: "k1", kind: "video", path: "/c/gone.mp4", color: "", startMs: 0, endMs: 1000, inMs: 0, speed: "", slow: "", volume: 0, fit: "fill", fitColor: "#000000", flipX: false, blend: "normal", transform: "", matte: null, fxTarget: "clip", masks: "", effects: "", in: "", text: "", visual: "", pinned: false, auto: false }] }] });
     h.pickWith.mockResolvedValue(["/new/found.mp4"]);
     h.probe.mockResolvedValue([{ path: "/new/found.mp4", kind: "video", durationMs: 5000, error: "" }]);
     render(<SourcesPanel />);
@@ -209,7 +209,7 @@ describe("SourcesPanel", () => {
   it("shows a used-count badge", () => {
     open(["/c/a.mp4"], [st("/c/a.mp4")]);
     const doc = project();
-    const clip = (id: string, s: number) => ({ id, kind: "video", path: "/c/a.mp4", color: "", startMs: s, endMs: s + 500, inMs: 0, speed: "", slow: "", volume: 0, fit: "fill", fitColor: "#000000", flipX: false, blend: "normal", transform: "", matte: null, fxTarget: "clip", masks: "", effects: "", in: "", pinned: false, auto: false });
+    const clip = (id: string, s: number) => ({ id, kind: "video", path: "/c/a.mp4", color: "", startMs: s, endMs: s + 500, inMs: 0, speed: "", slow: "", volume: 0, fit: "fill", fitColor: "#000000", flipX: false, blend: "normal", transform: "", matte: null, fxTarget: "clip", masks: "", effects: "", in: "", text: "", visual: "", pinned: false, auto: false });
     useEditStudio.getState().edit({ ...doc, tracks: [{ ...(doc.tracks[0] as NormalProject["tracks"][number]), clips: [clip("x", 0), clip("y", 1000)] }] });
     render(<SourcesPanel />);
     expect(within(screen.getByRole("button", { name: "a.mp4" })).getByTitle("Used in 2 clips")).toBeTruthy();

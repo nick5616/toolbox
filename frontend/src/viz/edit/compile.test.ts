@@ -25,6 +25,8 @@ function clip(over: Partial<EditClip> & { id: string; startMs: number; endMs: nu
     masks: "",
     effects: "",
     in: "",
+    text: "",
+    visual: "",
     pinned: false,
     auto: false,
     ...over,
@@ -33,7 +35,7 @@ function clip(over: Partial<EditClip> & { id: string; startMs: number; endMs: nu
 
 function project(clips: EditClip[], extra: Partial<EditProject> = {}): EditProject {
   const p = fixtureProject();
-  p.tracks = [{ id: "t1", kind: "video", name: "V", muted: false, locked: false, clips }];
+  p.tracks = [{ id: "t1", kind: "video", name: "V", muted: false, locked: false, matte: "", clips }];
   p.captions = null;
   return { ...p, ...extra };
 }
@@ -235,7 +237,7 @@ describe("transitions", () => {
 
 describe("problems and dropped fields", () => {
   it("reports invalid JSON with the field path and falls back", () => {
-    const c = build(project([clip({ id: "a", startMs: 0, endMs: 1000, effects: "{nope", transform: '{"scale": 99}', masks: "[1]", in: '{"kind":"spin"}', speed: "[" })]));
+    const c = build(project([clip({ id: "a", startMs: 0, endMs: 1000, effects: "{nope", transform: '{"scale": 99}', masks: "[1]", in: '{"kind":"spiral"}', speed: "[" })]));
     const text = c.problems.join("\n");
     expect(text).toContain("tracks[0].clips[0].effects");
     expect(text).toContain("tracks[0].clips[0].transform");
