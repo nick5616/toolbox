@@ -16,6 +16,7 @@ import { DepsGate } from "@/tools/_kit";
 import { EditCanvas, type EditCanvasStats } from "@/viz/edit/EditCanvas";
 import { normalizeProject } from "@/viz/edit/defaults";
 import { editLength, previewSize } from "@/viz/edit/types";
+import { useEditorComposition } from "./constituents/useEditorComposition";
 import { ExportDialog } from "./export/ExportDialog";
 import { enterVideoFocus, hasFocusSwitch, leaveVideoFocus, useEffectiveFocus } from "./focus";
 import { HEADER_PX, xToMs } from "./geometry";
@@ -119,6 +120,7 @@ function Editor({ moduleId, profile }: { moduleId: string; profile: EditorProfil
   useEditData();
   useEditorBridgeHost(moduleId); // WP-E4: hosts the store bridge for pop-out parts
   useEditCommands();
+  useEditorComposition(profile);
   const project = useProject();
   const name = useEditStudio((s) => s.name);
   const saveState = useEditStudio((s) => s.saveState);
