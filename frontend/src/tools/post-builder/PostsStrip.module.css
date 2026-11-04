@@ -70,3 +70,25 @@
   color: var(--fg-subtle);
   font-size: var(--text-xs);
 }
+
+/* The Posts panel: a vertical list under the New post button. */
+.stripColumn {
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--space-3);
+}
+
+.listColumn {
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.listColumn .item {
+  min-width: 0;
+}
+
+.listColumn .open {
+  flex: 1;
+  min-width: 0;
+}

@@ -604,7 +604,8 @@ describe("new post from a folder", () => {
     h.pickFolder.mockResolvedValue("/photos/trip-2026");
     await open();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "New post" }));
+    await user.click(screen.getByRole("button", { name: /^Posts/ }));
+    await user.click(await screen.findByRole("button", { name: "New post" }));
     const dlg = await screen.findByRole("dialog", { name: "New post" });
     expect(within(dlg).getByRole("radio", { name: "From a folder" }).getAttribute("aria-checked")).toBe("true");
     expect((within(dlg).getByRole("button", { name: "Create" }) as HTMLButtonElement).disabled).toBe(true);
@@ -660,7 +661,7 @@ describe("Sources click-in", () => {
     h.doc.current = { ...h.post([]), folder: "C:/Photos/Trip", extra: ["/x/y.jpg"] } as never;
     render(<PostBuilderView moduleId="post-builder" />);
     await screen.findByRole("region", { name: "Slides" });
-    const text = screen.getByRole("button", { name: /^Sources/ }).textContent ?? "";
+    const text = screen.getByRole("button", { name: /^Sources/ }).getAttribute("data-tip") ?? "";
     expect(text).toContain("Trip + 1 file");
     expect(text).not.toContain("Photos");
   });

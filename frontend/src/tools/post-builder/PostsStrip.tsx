@@ -11,15 +11,17 @@ export interface PostsStripProps {
   onDuplicate: (id: string) => void;
   onRename: (id: string) => void;
   onDelete: (id: string) => void;
+  /** A vertical list (the Posts panel) instead of a row. */
+  column?: boolean;
 }
 
-export function PostsStrip({ posts, currentId, onSelect, onNew, onDuplicate, onRename, onDelete }: PostsStripProps) {
+export function PostsStrip({ posts, currentId, onSelect, onNew, onDuplicate, onRename, onDelete, column }: PostsStripProps) {
   return (
-    <nav className={styles.strip} aria-label="Posts">
+    <nav className={cx(styles.strip, column && styles.stripColumn)} aria-label="Posts">
       <Button icon="plus" size="sm" variant="primary" data-tip="Start a new post: a carousel, a reel or a story" onClick={onNew}>
         New post
       </Button>
-      <ul className={styles.list}>
+      <ul className={cx(styles.list, column && styles.listColumn)}>
         {posts.map((p) => (
           <li key={p.id} className={cx(styles.item, p.id === currentId && styles.current)}>
             <button type="button" className={styles.open} onClick={() => onSelect(p.id)} aria-current={p.id === currentId || undefined} aria-label={`Open ${p.name}`} data-tip="Open this post">

@@ -66,7 +66,7 @@ vi.mock("@/lib/api", async (orig) => {
     LibraryService: { RevealPath: (p: string) => h.reveal(p), OpenLibraryFolder: async () => undefined },
     SettingsService: { ModuleState: async () => h.savedState.current, SetModuleState: (...a: unknown[]) => h.setState(...a) },
     JobsService: { Cancel: async () => undefined },
-    DesktopService: { PopOut: (r: unknown) => h.popOut(r), OpenWindows: async () => [] },
+    DesktopService: { PopOut: (r: unknown) => h.popOut(r), OpenWindows: async () => [], Relay: async () => undefined },
     ModulesService: { Match: async () => ({ matches: [] }) },
   };
 });
@@ -211,6 +211,7 @@ describe("caption and alt text", () => {
   it("counts characters, hashtags and mentions", async () => {
     await open();
     const user = userEvent.setup();
+    await showPanel("Caption");
     expect(screen.getByTestId("chars-left").textContent).toContain("2,200");
     await user.click(screen.getByRole("textbox", { name: "Caption" }));
     await user.paste("Hello @bob #one #two");
@@ -223,7 +224,7 @@ describe("caption and alt text", () => {
 
   it("edits the alt text of the selected slide", async () => {
     await open();
-    expect(screen.getByRole("button", { name: /^Alt text/ }).textContent).toContain("Slide 1 · empty");
+    expect(screen.getByRole("button", { name: /^Alt text/ }).getAttribute("data-tip")).toContain("Slide 1 · empty");
     await showPanel("Alt text");
     const user = userEvent.setup();
     await user.click(screen.getByRole("textbox", { name: "Alt text" }));
@@ -231,13 +232,11 @@ describe("caption and alt text", () => {
     expect((screen.getByRole("textbox", { name: "Alt text" }) as HTMLTextAreaElement).value).toBe("A beach");
   });
 
-  it("keeps the caption and the phone preview at the top level", async () => {
+  it("shows the phone preview beside the stage and keeps the rest in the rail with summaries", async () => {
     await open();
-    expect(screen.getByRole("textbox", { name: "Caption" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Phone preview" })).toBeTruthy();
-    // Everything else is a click-in with a summary.
-    for (const [name, text] of [["Format", "Carousel · 4:5"], ["Sources", "No folder"], ["Checks", "All clear"]] as const) {
-      expect(screen.getByRole("button", { name: new RegExp(`^${name}`) }).textContent).toContain(text);
+    for (const [name, text] of [["Format", "Carousel · 4:5"], ["Sources", "No folder"], ["Checks", "All clear"], ["Caption", "Empty"]] as const) {
+      expect(screen.getByRole("button", { name: new RegExp(`^${name}`) }).getAttribute("data-tip")).toContain(text);
     }
   });
 });
@@ -249,7 +248,7 @@ describe("checks", () => {
       { level: "note", slideId: "", message: "Location will be removed" },
     ];
     await open();
-    await waitFor(() => expect(screen.getByRole("button", { name: /^Checks/ }).textContent).toContain("2 notes"));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Checks/ }).getAttribute("data-tip")).toContain("2 notes"));
     await showPanel("Checks");
     const checks = await screen.findByRole("region", { name: "Checks" });
     const item = await within(checks).findByRole("button", { name: /May look soft/ });
@@ -264,7 +263,7 @@ describe("export", () => {
     h.issues.current = [{ level: "error", slideId: "", message: "Add at least one slide" }];
     await open();
     await waitFor(() => expect((screen.getByRole("button", { name: "Export" }) as HTMLButtonElement).disabled).toBe(true));
-    expect(screen.getByTestId("export-blocker").textContent).toBe("Add at least one slide");
+    expect(screen.getByTestId("export-blocker").getAttribute("data-blocked")).toBe("true");
   });
 
   it("starts the export and announces the finished folder with Open folder", async () => {
@@ -326,7 +325,7 @@ describe("composition and video slides", () => {
     h.doc.current = h.post([h.slide("a", { kind: "composition", path: "", projectId: "proj-9" })]);
     await open();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: /Edit composition/ }));
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
     await user.click(await screen.findByRole("menuitem", { name: "Edit here" }));
     await waitFor(() => expect(useUI.getState().handoff?.moduleId).toBe("photo-composer"));
     expect(useUI.getState().handoff?.postSlide).toEqual({ postId: "p1", slideId: "a", aspect: "4:5", projectId: "proj-9" });
@@ -337,7 +336,7 @@ describe("composition and video slides", () => {
     h.doc.current = h.post([h.slide("a", { kind: "video", path: "", projectId: "vid-3" })]);
     await open();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: /Edit video/ }));
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
     await user.click(await screen.findByRole("menuitem", { name: "Edit in its own window" }));
     await waitFor(() => expect(h.popOut).toHaveBeenCalledTimes(1));
     const req = h.popOut.mock.calls[0]![0] as { key: string; query: string; handoff: string };
@@ -356,7 +355,7 @@ describe("composition and video slides", () => {
     h.doc.current = h.post([h.slide("a", { kind: "composition", path: "", projectId: "proj-9" })]);
     await open();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: /Edit composition/ }));
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
     await user.click(await screen.findByRole("menuitem", { name: "Edit in its own window" }));
     await waitFor(() => expect(h.popOut).toHaveBeenCalled());
     const before = h.getCalls.mock.calls.length;
@@ -455,6 +454,7 @@ describe("posts", () => {
     h.posts.current = [h.info("p1"), h.info("p2", "Market")];
     h.savedState.current = JSON.stringify({ lastPostId: "p2", exports: {} });
     await open();
+    await showPanel("Posts");
     expect(screen.getByRole("button", { name: "Open Market" }).getAttribute("aria-current")).toBe("true");
     expect(screen.getByRole("button", { name: "New post" })).toBeTruthy();
   });
@@ -463,6 +463,7 @@ describe("posts", () => {
     h.create.mockResolvedValue(h.info("p3", "Reel"));
     await open();
     const user = userEvent.setup();
+    await showPanel("Posts");
     await user.click(screen.getByRole("button", { name: "New post" }));
     const dlg = await screen.findByRole("dialog", { name: "New post" });
     await user.click(within(dlg).getByRole("radio", { name: "Empty post" }));

@@ -1,11 +1,16 @@
 .root {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
   height: 100%;
   min-height: 0;
-  padding: var(--space-3) var(--space-4);
   overflow: hidden;
+}
+
+.fill {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
 .center {
@@ -16,29 +21,6 @@
   min-height: 160px;
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-.stripSlot {
-  flex: 1;
-  min-width: 0;
-}
-
-.save {
-  flex: none;
-  color: var(--fg-subtle);
-  font-size: var(--text-sm);
-}
-
-.save[data-state="error"] {
-  color: var(--danger);
-}
-
 .empty {
   display: flex;
   flex-direction: column;
@@ -46,41 +28,21 @@
   gap: var(--space-3);
   max-width: 560px;
   margin: var(--space-8) auto 0;
+  overflow: auto;
 }
 
 .stripWrap {
   width: 100%;
 }
 
-.body {
-  display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) 280px;
-  gap: var(--space-4);
-  flex: 1;
-  min-height: 0;
-}
-
-.left,
-.centre,
-.right {
-  min-height: 0;
-  min-width: 0;
-}
-
-.left {
-  overflow: hidden;
-}
-
-.centre {
-  overflow: auto;
-}
-
-.right {
+/* The stage's content fills it; never a fixed height. */
+.stage {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  overflow: auto;
-  padding-right: var(--space-1);
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
 }
 
 .dropArea {
@@ -88,69 +50,25 @@
   height: 100%;
   align-items: center;
   justify-content: center;
+  padding: var(--space-4);
 }
 
-.spacer {
-  flex: 1;
-}
-
-
-
-
-.blocker {
-  flex: 0 1 220px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--danger);
-  font-size: var(--text-sm);
-}
-
-.progress {
+.side {
   display: flex;
   flex: 1;
-  align-items: center;
   gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-3);
 }
 
-.progress > :first-child {
-  flex: 1;
-}
-
-.progressMsg {
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
-}
-
-@media (min-width: 1280px) {
-  .body {
-    grid-template-columns: 170px minmax(0, 1fr) 320px;
-  }
-}
-
-/* The click-in launchers: one line, never wrapping; summaries ellipsize. */
-.dock {
+.strip {
   flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--line);
+  min-height: 0;
 }
 
-.chips {
+.phone {
   flex: 1;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
   min-width: 0;
-  overflow: hidden;
-}
-
-.dockItem {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 220px;
+  min-height: 0;
+  overflow: auto;
 }
