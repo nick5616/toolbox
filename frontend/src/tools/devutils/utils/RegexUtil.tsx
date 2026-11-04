@@ -1,14 +1,15 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { TextArea, TextField } from "@/components";
 import { runRegex, segments } from "./regex.logic";
 import { CopyButton, OutputBox, useDebounced } from "./shared";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 export default function RegexUtil() {
-  const [pattern, setPattern] = useState("");
-  const [flags, setFlags] = useState("g");
-  const [text, setText] = useState("");
-  const [replacement, setReplacement] = useState("");
+  const [pattern, setPattern] = useUtilState("regex", "pattern", "");
+  const [flags, setFlags] = useUtilState("regex", "flags", "g");
+  const [text, setText] = useUtilState("regex", "text", "");
+  const [replacement, setReplacement] = useUtilState("regex", "replacement", "");
   const dPattern = useDebounced(pattern);
   const dFlags = useDebounced(flags);
   const dText = useDebounced(text);

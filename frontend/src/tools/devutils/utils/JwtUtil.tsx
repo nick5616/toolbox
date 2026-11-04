@@ -1,13 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Badge, TextArea } from "@/components";
 import { decodeJwt } from "./jwt.logic";
 import { OutputBox, useDebounced } from "./shared";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 const CLAIM_LABEL = { iat: "Issued at (iat)", nbf: "Not before (nbf)", exp: "Expires (exp)" } as const;
 
 export default function JwtUtil() {
-  const [token, setToken] = useState("");
+  const [token, setToken] = useUtilState("jwt", "token", "");
   const debounced = useDebounced(token);
   const r = useMemo(() => {
     if (debounced.trim() === "") return null;

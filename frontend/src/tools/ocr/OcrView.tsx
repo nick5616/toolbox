@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, EmptyState, Section, SegmentedControl, Select, Switch, toast } from "@/components";
+import { Button, EmptyState, Section, SegmentedControl, Select, Switch, ToolClickIn, toast } from "@/components";
 import {
+  FilesService,
   JobStatus,
   LibraryService,
   OcrImageOutput,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/api";
 import { copyText } from "@/lib/copy";
 import { toAppError } from "@/lib/errors";
+import { useCompositionInputs } from "@/state/composition";
 import { useToolJobs } from "@/tools/_kit/session";
 import { FileActions, FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -25,6 +27,34 @@ const PDF_LABEL: Record<string, string> = {
   [OcrPdfOutput.PDFText]: "PDFs as text",
   [OcrPdfOutput.PDFBoth]: "PDF + text",
 };
+
+const CHAT_PROMPTS = ["Summarise", "Extract a table", "Fix typos"];
+const MAX_CHAT_TEXT = 200_000;
+
+/** "Ask Local Chat" on a result: the recognised text goes to the chat as context. */
+function AskChat({ item, textPath }: { item: OcrResultItem; textPath: string }) {
+  const [body, setBody] = useState(item.preview);
+  useEffect(() => {
+    if (textPath === "") return;
+    let live = true;
+    FilesService.ReadText(textPath, MAX_CHAT_TEXT)
+      .then((t) => live && setBody(t))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [textPath]);
+  const fileName = item.title;
+  return (
+    <ToolClickIn
+      host="ocr"
+      module="llm-chat"
+      title="Ask Local Chat"
+      extra={{ text: { title: `Text of ${fileName}`, body, prompts: CHAT_PROMPTS } }}
+      disabledReason={body.trim() === "" ? "No text was found to ask about" : undefined}
+    />
+  );
+}
 
 function ResultCard({ item }: { item: OcrResultItem }) {
   const textFile = item.files.find((f) => f.path.toLowerCase().endsWith(".txt")) ?? item.files[0];
@@ -53,6 +83,7 @@ function ResultCard({ item }: { item: OcrResultItem }) {
       ))}
       {item.preview !== "" && (
         <>
+          <AskChat item={item} textPath={textFile && textFile.path.toLowerCase().endsWith(".txt") && !textFile.missing ? textFile.path : ""} />
           <pre className={styles.preview} aria-label="Text preview" data-tip="The text that was read, as it will be copied">
             {item.preview}
           </pre>
@@ -77,6 +108,7 @@ export default function OcrView({ moduleId }: ToolViewProps) {
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
   const jobs = useToolJobs(moduleId);
+  useCompositionInputs(moduleId, { "llm-chat": [] });
 
   useEffect(() => {
     let cancelled = false;

@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Badge, TextField } from "@/components";
 import { contrastRatio, formatHex, formatHsl, formatOklch, formatRgb, parseColor, wcag, type Rgb } from "./color.logic";
 import { OutputBox, useDebounced } from "./shared";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 function Swatch({ color }: { color: Rgb | null }) {
@@ -21,9 +22,9 @@ function Pass({ label, ok }: { label: string; ok: boolean }) {
 }
 
 export default function ColorUtil() {
-  const [text, setText] = useState("#3366cc");
-  const [fg, setFg] = useState("#1a1a1a");
-  const [bg, setBg] = useState("#ffffff");
+  const [text, setText] = useUtilState("color", "text", "#3366cc");
+  const [fg, setFg] = useUtilState("color", "fg", "#1a1a1a");
+  const [bg, setBg] = useUtilState("color", "bg", "#ffffff");
   const dText = useDebounced(text);
   const dFg = useDebounced(fg);
   const dBg = useDebounced(bg);

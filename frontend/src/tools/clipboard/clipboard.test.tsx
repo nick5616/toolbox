@@ -30,7 +30,10 @@ vi.mock("@/lib/events", () => ({
   },
 }));
 
-import { ClipKind, type ClipItem } from "@/lib/api";
+import { ClipKind, ModuleStatus, type ClipItem, type Descriptor } from "@/lib/api";
+import { useEmbed } from "@/lib/embed";
+import { registerToolViews } from "@/lib/toolActions";
+import { useModules } from "@/state/modules";
 import { useDesktop } from "@/state/desktop";
 import { defaultSettings, useSettings } from "@/state/settings";
 import { useToastStore } from "@/components/toast";
@@ -359,5 +362,22 @@ describe("ClipboardPopup", () => {
     expect(await screen.findByText("Clipboard history is off — enable it in Toolbox")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Open Toolbox" }));
     expect(desktop.ShowMain).toHaveBeenCalledWith("clipboard");
+  });
+
+  it("opens the selected text item in Dev Utilities, with the text as the hand-off", async () => {
+    function FakeUtils() {
+      const t = useEmbed()?.handoff.text;
+      return <p>utils: {t?.title} | {t?.body}</p>;
+    }
+    registerToolViews({ "dev-utils": FakeUtils });
+    const d = (id: string, name: string) => ({ id, name, icon: "box", status: ModuleStatus.StatusReady, accepts: { extensions: [], urls: false, any: false } }) as unknown as Descriptor;
+    useModules.getState().setAll([d("dev-utils", "Dev Utilities"), d("clipboard", "Clipboard History")]);
+    svc.List.mockResolvedValue(page(clip("a", { text: "{\"k\":1}" }), clip("b")));
+    const user = userEvent.setup();
+    render(<ClipboardView moduleId="clipboard" />);
+    await screen.findByText("preview a");
+    await user.click(screen.getByRole("button", { name: /Open in Dev Utilities/ }));
+    expect(await screen.findByText(/^utils:/)).toBeTruthy();
+    expect(screen.getByText(/^utils:/).textContent).toBe("utils: Copied text | {\"k\":1}");
   });
 });
