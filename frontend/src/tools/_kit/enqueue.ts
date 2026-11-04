@@ -1,6 +1,7 @@
 import { toast } from "@/components";
 import type { Job } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { recordSubmitted } from "./session";
 
 /** Maps validation fields `inputs.N` onto the submitted paths. */
 export function mapInputErrors(fields: Record<string, string> | undefined, paths: readonly string[]): Record<string, string> {
@@ -24,6 +25,8 @@ export interface SubmitResult {
   ok: boolean;
   /** Per-path messages when the failure was input validation. */
   inputErrors: Record<string, string>;
+  /** Ids of the jobs the call queued (empty on failure). */
+  jobIds: string[];
 }
 
 /**
@@ -39,7 +42,9 @@ export async function submitJobs(
   try {
     const jobs = await call();
     toast({ title: queuedMessage(jobs?.length ?? paths.length, noun[0], noun[1]), tone: "success" });
-    return { ok: true, inputErrors: {} };
+    const jobIds = (jobs ?? []).map((j) => j.id);
+    recordSubmitted(jobIds);
+    return { ok: true, inputErrors: {}, jobIds };
   } catch (e) {
     const err = toAppError(e);
     const inputErrors = mapInputErrors(err.fields, paths);
@@ -48,7 +53,7 @@ export async function submitJobs(
     } else {
       toast({ title: err.message, description: err.hint, tone: "danger" });
     }
-    return { ok: false, inputErrors };
+    return { ok: false, inputErrors, jobIds: [] };
   }
 }
 

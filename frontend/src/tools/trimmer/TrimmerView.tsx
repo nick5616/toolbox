@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Banner, Button, ClickIn, ClickInHost, DropZone, Field, IconButton, MenuButton, Meter, Section, SegmentedControl, Select, Switch, TextField, TimecodeInput, cx, toast, type MenuItem } from "@/components";
+import { Banner, Button, ClickIn, ClickInHost, DropZone, Field, IconButton, Meter, Section, SegmentedControl, Select, Switch, TextField, TimecodeInput, cx, toast } from "@/components";
 import { CropOverlay, MediaPlayer, Timeline, formatMs, parseTimecodeMs, useMediaSource, type MediaPlayerHandle, type Range } from "@/components/media";
-import { JobsService, MediaService, ModulesService, TrimAspect, TrimJoin, TrimMode, TrimmerService, type Job } from "@/lib/api";
+import { JobsService, MediaService, TrimAspect, TrimJoin, TrimMode, TrimmerService, type Job } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
-import { openToolItems } from "@/lib/openTool";
 import { formatBytes } from "@/lib/format";
 import { useShortcut, isEditableTarget } from "@/lib/shortcuts";
 import { isActive, useJob } from "@/state/jobs";
-import { isReady } from "@/state/modules";
 import { useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { FileActions } from "@/tools/_kit/FileActions";
+import { recordSubmitted } from "@/tools/_kit/session";
+import { useEmbedFocus } from "@/tools/_kit/useEmbedFocus";
 import type { ToolViewProps } from "@/tools";
 import { onTrimmerAction, type TrimmerAction } from "./commands";
 import {
@@ -65,20 +65,6 @@ const SIZE_OPTIONS = [
   { value: "custom", label: "Custom…" },
 ];
 
-async function sendToItems(path: string): Promise<MenuItem[]> {
-  const res = await ModulesService.Match([path]);
-  return (res.matches ?? [])
-    .filter((m) => isReady(m.module) && m.module.id !== "trimmer")
-    .flatMap((m) =>
-      openToolItems(m.module.id, [path], "send").map((it, i) => ({
-        id: it.id,
-        label: i === 0 ? m.module.name : `${m.module.name} (new window)`,
-        icon: m.module.icon,
-        onSelect: it.onSelect,
-      })),
-    );
-}
-
 interface TimeFieldProps {
   label: string;
   valueMs: number;
@@ -130,6 +116,7 @@ function parseShift(resultJson: string): number {
 
 export default function TrimmerView({ moduleId }: ToolViewProps) {
   const inputs = useFileInputs(moduleId);
+  const embedFocus = useEmbedFocus<HTMLElement>();
   const { files, remove } = inputs;
   const file = files.length > 0 ? files[files.length - 1] : undefined;
   const path = file?.path ?? null;
@@ -249,6 +236,7 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
     setSubmitError(null);
     try {
       const jobs: Job[] | null = await TrimmerService.Enqueue([path], buildOptions(segs, settings, hasVideo, durationMs));
+      recordSubmitted((jobs ?? []).map((j) => j.id));
       setJobId(jobs?.[0]?.id ?? "");
     } catch (e) {
       const a = toAppError(e);
@@ -274,9 +262,9 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
     });
   }, [hasFile]);
 
-  useShortcut("Mod+Enter", () => void doExport(), { when: canExport, allowInInputs: true });
+  useShortcut("Mod+Enter", () => void doExport(), { when: canExport && embedFocus.active, allowInInputs: true });
   useEffect(() => {
-    if (!hasFile) return;
+    if (!hasFile || !embedFocus.active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || isEditableTarget(e.target)) return;
       const k = e.key.toLowerCase();
@@ -288,7 +276,7 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [hasFile]);
+  }, [hasFile, embedFocus.active]);
 
   // ---- settings ----
 
@@ -337,7 +325,7 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
   if (!file) {
     return (
       <ClickInHost className={styles.host}>
-      <section className={styles.root} aria-label="Video Trimmer">
+      <section ref={embedFocus.ref} className={styles.root} aria-label="Video Trimmer">
         <div className={styles.empty}>
           <DropZone id="trimmer-drop" label="Drop a video or audio file" hint="Cut one or more ranges, losslessly or frame-accurately." icon="scissors">
             <Button variant="secondary" icon="folder-open" data-tip="Choose a video or audio file to trim" onClick={() => void inputs.pick()}>
@@ -355,7 +343,7 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
 
   return (
     <ClickInHost className={styles.host}>
-    <section className={styles.root} aria-label="Video Trimmer">
+    <section ref={embedFocus.ref} className={styles.root} aria-label="Video Trimmer">
       {title}
 
       {media.status === "error" && (
@@ -582,7 +570,6 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
               </span>
               <span className={styles.resultMeta} data-tip="Size of the exported file">{formatBytes(o.sizeBytes)}</span>
               <FileActions outputId={o.id} path={o.path} />
-              <span data-tip="Open this result in another tool" style={{ display: "contents" }}><MenuButton size="sm" variant="ghost" icon="send" label="Send to…" emptyLabel="No tools accept this file" items={() => sendToItems(o.path)} /></span>
             </div>
           ))}
           {shift > 500 && <p className={styles.hint}>Fast mode moved a cut up to {(shift / 1000).toFixed(1)} s earlier to land on a keyframe.</p>}

@@ -13,6 +13,7 @@ import { ToolsFolderBanner } from "@/views/setup/ToolsFolderBanner";
 import { SettingsView } from "@/views/SettingsView";
 import { CommandPalette } from "./CommandPalette";
 import { CompositionBar } from "./CompositionBar";
+import { ConstituentDrawer } from "./ConstituentDrawer";
 import { DropOverlay } from "./DropOverlay";
 import { PoppedOutPlaceholder } from "./PoppedOutPlaceholder";
 import { JobTray } from "./JobTray";
@@ -101,6 +102,7 @@ export function Shell() {
           <main className={styles.view}>
             <ViewRouter view={shown} />
           </main>
+          <ConstituentDrawer view={shown} />
         </ClickInHost>
         <JobTray />
       </div>

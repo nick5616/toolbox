@@ -3,7 +3,8 @@ import { Badge, Button, EmptyState, Icon, Section, SegmentedControl, cx, toast }
 import { JobStatus, LibraryService, StemsFormat, StemsService, type PresetInfo, type StemsPreset } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
-import { useOrderedJobs, type JobView } from "@/state/jobs";
+import { type JobView } from "@/state/jobs";
+import { useToolJobs } from "@/tools/_kit/session";
 import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
@@ -136,7 +137,7 @@ export default function StemsView({ moduleId }: ToolViewProps) {
   const [presets, setPresets] = useState<PresetInfo[]>([]);
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
   const done = useMemo(
     () => jobs.filter((j) => j.status === JobStatus.JobDone && parseStemsResult(j.resultJson)).slice(0, MAX_GROUPS),
     [jobs],

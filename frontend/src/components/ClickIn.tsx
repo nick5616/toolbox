@@ -29,24 +29,42 @@ interface HostCtx {
   el: HTMLElement | null;
   openId: string | null;
   setOpenId: (id: string | null) => void;
+  /** "inline": click-ins open as disclosures in place (an embedded tool never opens a drawer in a drawer). */
+  mode: "drawer" | "inline";
 }
 
 const HostContext = createContext<HostCtx | null>(null);
+
+/**
+ * Open click-ins, innermost last. Esc closes only the top one: every open
+ * click-in listens on `document` and the outer one registered first, so
+ * without this stack Esc would close the outer drawer before the inner.
+ */
+const openStack: symbol[] = [];
 
 export interface ClickInHostProps {
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
+  /**
+   * "drawer" (default): click-ins slide over the host's right edge.
+   * "inline": they expand in place under their launcher. A host without a
+   * `mode` inherits "inline" from an enclosing inline host, so a tool's own
+   * root host stays inline when the tool is embedded in another.
+   */
+  mode?: "drawer" | "inline";
 }
 
 /** The area drawers slide over (a tool's root). Drawers fill its height and live at its right edge. */
-export function ClickInHost({ children, className, style }: ClickInHostProps) {
+export function ClickInHost({ children, className, style, mode }: ClickInHostProps) {
+  const parent = useContext(HostContext);
+  const effective = mode ?? (parent?.mode === "inline" ? "inline" : "drawer");
   const [el, setEl] = useState<HTMLElement | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const ctx = useMemo<HostCtx>(() => ({ el, openId, setOpenId }), [el, openId]);
+  const ctx = useMemo<HostCtx>(() => ({ el, openId, setOpenId, mode: effective }), [el, openId, effective]);
   return (
     <HostContext.Provider value={ctx}>
-      <div ref={setEl} className={cx(styles.host, className)} style={style} data-click-in-host>
+      <div ref={setEl} className={cx(styles.host, effective === "inline" && styles.hostInline, className)} style={style} data-click-in-host data-mode={effective}>
         {children}
       </div>
     </HostContext.Provider>
@@ -91,6 +109,8 @@ export interface ClickInProps {
   onPopOut?: () => void | Promise<void>;
   /** The launcher is shown but can't open (with the reason as its tooltip). */
   disabledReason?: string;
+  /** No launcher: the drawer is opened from elsewhere with `useClickIn().open(id)` (the shell's constituent drawer). */
+  headless?: boolean;
   children: ReactNode;
   className?: string;
 }
@@ -113,6 +133,7 @@ export function ClickIn({
   popOutSize,
   onPopOut,
   disabledReason,
+  headless = false,
   children,
   className,
 }: ClickInProps) {
@@ -122,6 +143,8 @@ export function ClickIn({
   const openId = host ? host.openId : localOpen;
   const setOpenId = host ? host.setOpenId : setLocalOpen;
   const isOpen = openId === myId;
+  // Inline disclosures replace the drawer (the icon variant has no row to expand under, so it keeps the drawer).
+  const inline = host?.mode === "inline" && variant === "row";
 
   const launcherRef = useRef<HTMLElement | null>(null);
   const drawerRef = useRef<HTMLElement | null>(null);
@@ -136,13 +159,13 @@ export function ClickIn({
   useEffect(() => {
     if (isOpen) {
       wasOpen.current = true;
-      drawerRef.current?.focus();
+      if (!inline) drawerRef.current?.focus();
     } else if (wasOpen.current) {
       wasOpen.current = false;
       const a = document.activeElement;
       if (!a || a === document.body) launcherRef.current?.focus();
     }
-  }, [isOpen]);
+  }, [isOpen, inline]);
 
   // Closing on unmount keeps a stale id from blocking the host's one drawer.
   const openRef = useRef(isOpen);
@@ -156,12 +179,14 @@ export function ClickIn({
     [],
   );
 
-  // Esc and a click in the host outside the drawer close it.
+  // Esc closes the innermost open click-in; a click in the host outside a drawer closes it.
   const hostEl = host?.el ?? null;
   useEffect(() => {
     if (!isOpen) return;
+    const token = Symbol(myId);
+    openStack.push(token);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !e.defaultPrevented) {
+      if (e.key === "Escape" && !e.defaultPrevented && openStack[openStack.length - 1] === token) {
         e.preventDefault();
         close();
       }
@@ -174,12 +199,14 @@ export function ClickIn({
     };
     document.addEventListener("keydown", onKey);
     const target = hostEl ?? document;
-    target.addEventListener("pointerdown", onDown, true);
+    if (!inline) target.addEventListener("pointerdown", onDown, true);
     return () => {
+      const i = openStack.indexOf(token);
+      if (i >= 0) openStack.splice(i, 1);
       document.removeEventListener("keydown", onKey);
-      target.removeEventListener("pointerdown", onDown, true);
+      if (!inline) target.removeEventListener("pointerdown", onDown, true);
     };
-  }, [isOpen, close, hostEl]);
+  }, [isOpen, close, hostEl, myId, inline]);
 
   const launch = () => {
     if (disabledReason) return;
@@ -253,11 +280,32 @@ export function ClickIn({
         <span className={styles.rowTitle}>{title}</span>
         {summary ? <span className={styles.rowSummary}>{summary}</span> : null}
         {badge ? <span className={styles.badge}>{badge}</span> : null}
-        <Icon name={windowOpen ? "app-window" : "chevron-right"} size={14} className={styles.chevron} />
+        <Icon name={windowOpen ? "app-window" : inline && isOpen ? "chevron-down" : "chevron-right"} size={14} className={styles.chevron} />
       </button>
     );
 
-  const drawer = isOpen ? (
+  const canPopOut = !!onPopOut || !!(part && spec);
+
+  const inlinePanel =
+    inline && isOpen ? (
+      <div
+        ref={(el) => {
+          drawerRef.current = el;
+        }}
+        className={styles.inlinePanel}
+        role="group"
+        aria-label={title}
+      >
+        {canPopOut ? (
+          <div className={styles.inlineBar}>
+            <IconButton size="sm" icon="picture-in-picture-2" label="Pop out" data-tip="Open this in its own window" onClick={() => void popOut()} />
+          </div>
+        ) : null}
+        <div className={cx(styles.inlineBody, flush && styles.flush)}>{children}</div>
+      </div>
+    ) : null;
+
+  const drawer = isOpen && !inline ? (
     <aside
       ref={(el) => {
         drawerRef.current = el;
@@ -271,16 +319,24 @@ export function ClickIn({
       <header className={styles.header}>
         <Icon name={icon} size={16} className={styles.headerIcon} />
         <h3 className={styles.headerTitle}>{title}</h3>
-        {onPopOut || (part && spec) ? <IconButton size="sm" icon="picture-in-picture-2" label="Pop out" data-tip="Open this in its own window" onClick={() => void popOut()} /> : null}
+        {canPopOut ? <IconButton size="sm" icon="picture-in-picture-2" label="Pop out" data-tip="Open this in its own window" onClick={() => void popOut()} /> : null}
         <IconButton size="sm" icon="x" label="Close" onClick={close} />
       </header>
       <div className={cx(styles.body, flush && styles.flush)}>{children}</div>
     </aside>
   ) : null;
 
+  if (inline) {
+    return (
+      <>
+        {headless ? null : launcher}
+        {inlinePanel}
+      </>
+    );
+  }
   return (
     <>
-      {launcher}
+      {headless ? null : launcher}
       {drawer ? createPortal(drawer, hostEl ?? document.body) : null}
     </>
   );

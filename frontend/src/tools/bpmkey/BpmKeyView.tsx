@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Button, ConfirmDialog, EmptyState, Section } from "@/components";
 import { BpmKeyService, JobStatus } from "@/lib/api";
-import { isActive, useJobs, useOrderedJobs } from "@/state/jobs";
+import { isActive, useJobs } from "@/state/jobs";
+import { useToolJobs } from "@/tools/_kit/session";
 import { FileToolLayout, ResultTable, runLabel, useFileInputs } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -13,7 +14,7 @@ export default function BpmKeyView({ moduleId }: ToolViewProps) {
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
   const [confirmClear, setConfirmClear] = useState(false);
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
 
   const rows = useMemo(() => {
     const out: BpmRow[] = [];

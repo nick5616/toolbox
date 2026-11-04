@@ -3,7 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import type { Descriptor } from "@/lib/api";
 import { POP_OUT_FLUSH_MS, runBeforePopOut, useBeforePopOut } from "@/lib/popout";
 import { useModules } from "./modules";
-import { openToolWindow, toolFamily, useToolPoppedOut, useWindowOpen, useWindows } from "./windows";
+import { openToolWindow, registerSharedStoreFamily, sharedStoreFamily, toolFamily, useToolPoppedOut, useWindowOpen, useWindows } from "./windows";
 
 function mod(id: string, base = ""): Descriptor {
   return { id, name: id, tagline: "", description: "", icon: "box", status: "ready", accepts: { extensions: [], urls: false }, requires: null, recommends: null, base, parts: [] } as unknown as Descriptor;
@@ -20,12 +20,24 @@ describe("tool families", () => {
     expect(toolFamily("stems", byId)).toEqual(["stems"]);
   });
 
-  it("finds the open window of any family member", () => {
-    expect(openToolWindow("video-studio", ["tool:edit-studio"], byId)).toBe("tool:edit-studio");
-    expect(openToolWindow("edit-studio", ["tool:video-studio"], byId)).toBe("tool:video-studio");
-    expect(openToolWindow("subtitles", ["tool:transcribe"], byId)).toBe("tool:transcribe");
-    expect(openToolWindow("stems", ["tool:edit-studio"], byId)).toBeNull();
-    expect(openToolWindow("stems", ["tool:stems"], byId)).toBe("tool:stems");
+  it("finds the open window of a tool sharing its store, only", () => {
+    expect(openToolWindow("video-studio", ["tool:edit-studio"])).toBe("tool:edit-studio");
+    expect(openToolWindow("edit-studio", ["tool:video-studio"])).toBe("tool:video-studio");
+    expect(openToolWindow("subtitles", ["tool:transcribe"])).toBeNull(); // built on Transcribe, but its own store
+    expect(openToolWindow("transcribe", ["tool:subtitles"])).toBeNull();
+    expect(openToolWindow("stems", ["tool:edit-studio"])).toBeNull();
+    expect(openToolWindow("stems", ["tool:stems"])).toBe("tool:stems");
+  });
+});
+
+describe("shared-store families", () => {
+  it("includes the editors by default and any registered group", () => {
+    expect(sharedStoreFamily("edit-studio").sort()).toEqual(["edit-studio", "video-studio"]);
+    expect(sharedStoreFamily("subtitles")).toEqual(["subtitles"]);
+    registerSharedStoreFamily(["a-tool", "b-tool"]);
+    registerSharedStoreFamily(["b-tool", "a-tool"]);
+    expect(sharedStoreFamily("b-tool").sort()).toEqual(["a-tool", "b-tool"]);
+    expect(openToolWindow("a-tool", ["tool:b-tool"])).toBe("tool:b-tool");
   });
 });
 

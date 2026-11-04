@@ -76,20 +76,55 @@ export function useToolHandoff(moduleId: string, onHandoff: (h: Handoff) => void
 export const EMBED_CHANNEL = "embed";
 
 interface EmbedUse {
+  /** "use" (default when absent) carries results; "ack" is the host's reply (SPEC §8). */
+  t?: "use" | "ack";
   token: string;
-  paths: string[];
+  paths?: string[];
 }
 
 /** Tool window side: sends "Use" results back to the click-in that opened it. */
 export function sendEmbedUse(link: EmbedLink, paths: string[]): Promise<void> {
-  const msg: EmbedUse = { token: link.token, paths };
+  const msg: EmbedUse = { t: "use", token: link.token, paths };
   return relaySend(EMBED_CHANNEL, msg, link.hostWindow);
 }
 
-/** Host side: receives results for one click-in's token. Returns unsubscribe. */
+/** How long a popped-out embed waits for the host's acknowledgement. */
+export const EMBED_ACK_MS = 1000;
+
+/**
+ * Like `sendEmbedUse`, but resolves whether the host answered with an ack
+ * (the relay is fire-and-forget: a closed host never replies). `false` after
+ * `timeoutMs` without an ack.
+ */
+export async function sendEmbedUseAcked(link: EmbedLink, paths: string[], timeoutMs = EMBED_ACK_MS): Promise<boolean> {
+  let off: () => void = () => undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const acked = new Promise<boolean>((resolve) => {
+    off = relayOn<EmbedUse>(EMBED_CHANNEL, (m) => {
+      if (m.payload.t === "ack" && m.payload.token === link.token) resolve(true);
+    });
+    timer = setTimeout(() => resolve(false), timeoutMs);
+  });
+  try {
+    await sendEmbedUse(link, paths);
+  } catch {
+    off();
+    if (timer) clearTimeout(timer);
+    return false;
+  }
+  const ok = await acked;
+  off();
+  if (timer) clearTimeout(timer);
+  return ok;
+}
+
+/** Host side: receives results for one click-in's token and acknowledges them. Returns unsubscribe. */
 export function onEmbedUse(token: string, cb: (paths: string[]) => void): () => void {
   return relayOn<EmbedUse>(EMBED_CHANNEL, (m) => {
-    if (m.payload.token === token && Array.isArray(m.payload.paths)) cb(m.payload.paths.filter((p): p is string => typeof p === "string"));
+    if (m.payload.t === "ack" || m.payload.token !== token || !Array.isArray(m.payload.paths)) return;
+    cb(m.payload.paths.filter((p): p is string => typeof p === "string"));
+    const ack: EmbedUse = { t: "ack", token };
+    Promise.resolve(relaySend(EMBED_CHANNEL, ack, m.from)).catch(() => undefined);
   });
 }
 

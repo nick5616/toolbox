@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ColorSwatchPicker, Section, SegmentedControl, Stepper, Switch } from "@/components";
 import { BgOutput, BgRemoveService, JobStatus, type PresetInfo } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
-import { useOrderedJobs } from "@/state/jobs";
+import { useToolJobs } from "@/tools/_kit/session";
 import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import type { ToolViewProps } from "../index";
@@ -38,7 +38,7 @@ export default function BgRemoveView({ moduleId }: ToolViewProps) {
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<string | null>(null);
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
 
   useEffect(() => {
     let cancelled = false;

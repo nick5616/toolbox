@@ -3,7 +3,8 @@ import { Button, EmptyState, Icon, Section, cx, toast } from "@/components";
 import { JobStatus, LibraryService, PdfAction } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
-import { useOrderedJobs, type JobView } from "@/state/jobs";
+import { type JobView } from "@/state/jobs";
+import { useToolJobs } from "@/tools/_kit/session";
 import { FileActions } from "@/tools/_kit/FileActions";
 import shared from "@/tools/_kit/results.module.css";
 import { basename, parsePdfResult } from "./options";
@@ -87,7 +88,7 @@ function Group({ job }: { job: JobView }) {
 }
 
 export function Results({ moduleId }: { moduleId: string }) {
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
   const done = useMemo(
     () => jobs.filter((j) => j.status === JobStatus.JobDone && parsePdfResult(j.resultJson)).slice(0, MAX_GROUPS),
     [jobs],
