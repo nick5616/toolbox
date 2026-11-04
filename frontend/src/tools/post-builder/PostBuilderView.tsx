@@ -190,7 +190,7 @@ function Workspace() {
         }
         stage={stage}
         side={side}
-        sideWidth={wide ? STRIP_PX + PHONE_PX + 24 : STRIP_PX + 12}
+        sideWidth={wide ? STRIP_PX + PHONE_PX + 40 : STRIP_PX + 28}
         bottom={doc ? <SelectionBar /> : undefined}
       />
       {pick && (
