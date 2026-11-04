@@ -14,6 +14,7 @@ import { EditCanvas, type EditCanvasStats } from "@/viz/edit/EditCanvas";
 import { normalizeProject } from "@/viz/edit/defaults";
 import { previewSize } from "@/viz/edit/types";
 import { AutofillDialog } from "./autofill/AutofillDialog";
+import { SectionStyleDialog } from "./sectionstyle/SectionStyleDialog";
 import { CaptionsPanel } from "./captions/CaptionsPanel";
 import { exportSrt } from "./captions/exportSrt";
 import { ExportDialog } from "./export/ExportDialog";
@@ -268,6 +269,7 @@ function Editor({ moduleId }: { moduleId: string }) {
       )}
 
       <AutofillDialog open={dialog?.kind === "autofill"} range={dialog?.kind === "autofill" ? dialog.range : null} onClose={() => useEditStudio.getState().openDialog(null)} />
+      <SectionStyleDialog />
       <ExportDialog open={dialog?.kind === "export"} onClose={() => useEditStudio.getState().openDialog(null)} />
     </div>
   );
