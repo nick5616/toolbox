@@ -33,20 +33,20 @@ export function DiskBar({ disk, add, location }: DiskBarProps) {
 
   return (
     <section className={styles.disk} aria-label="Disk space">
-      <div className={styles.bar} role="img" aria-label={disk ? `${formatSize(free)} free of ${formatSize(total)}` : "Disk space unknown"}>
+      <div className={styles.bar} data-tip="Used space, space these packs will take, and what is left" role="img" aria-label={disk ? `${formatSize(free)} free of ${formatSize(total)}` : "Disk space unknown"}>
         <span className={styles.used} style={{ width: `${pct(used)}%` }} />
         <span className={styles.added} style={{ width: `${pct(Math.min(add, free))}%` }} />
       </div>
       <div className={styles.row}>
-        <span className={styles.legend}>
+        <span className={styles.legend} data-tip="Space already taken on this drive">
           <i className={styles.dotUsed} />
           Used
         </span>
-        <span className={styles.legend}>
+        <span className={styles.legend} data-tip="Space the selected packs will add">
           <i className={styles.dotAdded} />
           These packs
         </span>
-        <span className={styles.legend}>
+        <span className={styles.legend} data-tip="Space still free on this drive">
           <i className={styles.dotFree} />
           Free
         </span>
@@ -58,7 +58,7 @@ export function DiskBar({ disk, add, location }: DiskBarProps) {
         ) : null}
         <span className={styles.spacer} />
         {disk ? (
-          <span className={styles.free}>
+          <span className={styles.free} data-tip="Free space on the drive where tools are installed">
             <strong>{formatSize(free)}</strong> free of {formatSize(total)}
             {add > 0 ? ` · ${formatSize(Math.max(0, free - add))} after` : ""}
           </span>

@@ -66,7 +66,7 @@ export function JobRow({ job, compact = false }: JobRowProps) {
   return (
     <div className={cx(styles.wrap, compact && styles.compact)} data-status={job.status}>
       <div className={styles.row}>
-        <span className={styles.icon}>
+        <span className={styles.icon} data-tip="The tool running this job">
           <Icon name={icon} size={16} />
         </span>
         <span className={styles.title} title={title}>
@@ -77,7 +77,7 @@ export function JobRow({ job, compact = false }: JobRowProps) {
           <button
             type="button"
             className={styles.runChip}
-            title="Show this pipeline run"
+            data-tip="Open the pipeline run this job belongs to"
             onClick={() => {
               useUI.getState().navigate("pipelines");
               usePipelines.getState().showRun(job.pipelineRunId);
@@ -92,29 +92,31 @@ export function JobRow({ job, compact = false }: JobRowProps) {
         )}
         {/* --- end pipelines --- */}
         <StatusChip status={status} />
-        <Meter className={styles.meter} value={job.progress} status={status} size="sm" label={`Progress: ${title}`} />
+        <Meter tip="Progress of this job" className={styles.meter} value={job.progress} status={status} size="sm" label={`Progress: ${title}`} />
         <span className={styles.message} title={message}>
           {message}
         </span>
-        <span className={styles.time}>{time}</span>
+        <span className={styles.time} data-tip={running ? "Time since it started" : "When it finished"}>{time}</span>
         <span className={styles.actions}>
           {active && (
             <IconButton
               size="sm"
               icon="x"
               label="Cancel"
+              data-tip={job.cancelRequested ? "Already stopping" : "Stop this job; partly made files are cleaned up"}
               disabled={job.cancelRequested}
               onClick={run(() => useJobs.getState().cancel(job.id))}
             />
           )}
           {canRetry && (
-            <IconButton size="sm" icon="rotate-ccw" label="Retry" onClick={run(() => useJobs.getState().retry(job.id))} />
+            <IconButton size="sm" icon="rotate-ccw" label="Retry" data-tip="Run this job again with the same settings" onClick={run(() => useJobs.getState().retry(job.id))} />
           )}
           {job.status === JobStatus.JobDone && firstOutput && (
             <IconButton
               size="sm"
               icon="folder-open"
               label={revealLabel}
+              data-tip="Show the finished file in your file manager"
               onClick={run(() => LibraryService.Reveal(firstOutput.id))}
             />
           )}
@@ -123,6 +125,7 @@ export function JobRow({ job, compact = false }: JobRowProps) {
               size="sm"
               icon="trash-2"
               label="Remove"
+              data-tip="Remove this job from the list (the files it made stay in your library)"
               className={styles.remove}
               onClick={run(() => useJobs.getState().remove(job.id))}
             />
@@ -132,6 +135,7 @@ export function JobRow({ job, compact = false }: JobRowProps) {
               size="sm"
               icon={expanded ? "chevron-up" : "chevron-down"}
               label={expanded ? "Hide log" : "Show log"}
+              data-tip={expanded ? "Hide the technical output of this job" : "Show the technical output of this job, useful when something fails"}
               pressed={expanded}
               onClick={() => setExpanded(expanded ? null : job.id)}
             />

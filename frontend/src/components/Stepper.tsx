@@ -11,6 +11,8 @@ export interface StepperProps {
   /** Accessible name for the number field. */
   "aria-label"?: string;
   "aria-labelledby"?: string;
+  /** Tooltip for the number field (default explains the range). */
+  "data-tip"?: string;
   id?: string;
   /** Small unit text after the number, e.g. "px". */
   unit?: string;
@@ -66,6 +68,7 @@ export function Stepper({
         type="button"
         className={styles.btn}
         aria-label="Decrease"
+        data-tip={`Decrease by ${step}`}
         tabIndex={-1}
         disabled={disabled || value <= min}
         onClick={() => set(value - step)}
@@ -85,6 +88,7 @@ export function Stepper({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={onKeyDown}
+        data-tip={aria["data-tip"] ?? (Number.isFinite(min) && Number.isFinite(max) ? `Type a number from ${min} to ${max}, or use the arrow keys` : "Type a number, or use the arrow keys")}
         {...aria}
       />
       {unit && <span className={styles.unit}>{unit}</span>}
@@ -92,6 +96,7 @@ export function Stepper({
         type="button"
         className={styles.btn}
         aria-label="Increase"
+        data-tip={`Increase by ${step}`}
         tabIndex={-1}
         disabled={disabled || value >= max}
         onClick={() => set(value + step)}

@@ -29,17 +29,18 @@ export default function RegexUtil() {
           invalid={!outcome.ok}
           onChange={(e) => setPattern(e.target.value)}
           aria-label="Pattern"
+          data-tip="The regular expression, without the surrounding slashes"
           placeholder="pattern"
           icon="regex"
           wrapperClassName={styles.col}
           spellCheck={false}
         />
-        <TextField mono value={flags} invalid={!outcome.ok} onChange={(e) => setFlags(e.target.value)} aria-label="Flags" placeholder="flags" size="md" spellCheck={false} style={{ width: 96 }} />
+        <TextField mono value={flags} invalid={!outcome.ok} onChange={(e) => setFlags(e.target.value)} aria-label="Flags" data-tip="Letters that change matching: g all matches, i ignore case, m multiline, s dot matches newline, u unicode" placeholder="flags" size="md" spellCheck={false} style={{ width: 96 }} />
       </div>
       {!outcome.ok && <p className={styles.error}>{outcome.message}</p>}
       <div className={styles.col}>
         <span className={styles.label}>Test text</span>
-        <TextArea mono minRows={5} maxRows={14} value={text} onChange={(e) => setText(e.target.value)} aria-label="Test text" spellCheck={false} />
+        <TextArea mono minRows={5} maxRows={14} value={text} onChange={(e) => setText(e.target.value)} aria-label="Test text" data-tip="Sample text to run the pattern against" spellCheck={false} />
       </div>
       {outcome.ok && dText !== "" && (
         <div className={styles.col}>
@@ -48,7 +49,7 @@ export default function RegexUtil() {
               {outcome.matches.length === 0 ? "No matches" : `${outcome.matches.length}${outcome.truncated ? "+" : ""} ${outcome.matches.length === 1 ? "match" : "matches"}`}
             </span>
           </div>
-          <pre className={styles.out} aria-label="Highlighted matches">
+          <pre className={styles.out} aria-label="Highlighted matches" data-tip="Matches are highlighted; alternating colours separate neighbours">
             {segs.map((s, i) => (s.match ? <mark key={i} className={(s.n ?? 0) % 2 === 0 ? styles.match : styles.matchAlt}>{s.text}</mark> : <span key={i}>{s.text}</span>))}
           </pre>
         </div>
@@ -58,8 +59,8 @@ export default function RegexUtil() {
           <thead>
             <tr>
               <th>#</th>
-              <th>Index</th>
-              <th>Match</th>
+              <th data-tip="Where the match starts in the text, counting from 0">Index</th>
+              <th data-tip="The text that matched">Match</th>
               {Array.from({ length: groupCount }, (_, i) => (
                 <th key={i}>${i + 1}</th>
               ))}
@@ -91,7 +92,7 @@ export default function RegexUtil() {
       )}
       <div className={styles.col}>
         <span className={styles.label}>Replace with</span>
-        <TextField mono value={replacement} onChange={(e) => setReplacement(e.target.value)} aria-label="Replacement" placeholder="$1-$2, $<name>, $&" spellCheck={false} />
+        <TextField mono value={replacement} onChange={(e) => setReplacement(e.target.value)} aria-label="Replacement" data-tip="Text to replace each match with. Use $1 for a group and $& for the whole match" placeholder="$1-$2, $<name>, $&" spellCheck={false} />
       </div>
       {outcome.ok && outcome.replaced !== null && <OutputBox label="Replace preview" value={outcome.replaced} />}
       {outcome.ok && outcome.matches.length > 0 && (

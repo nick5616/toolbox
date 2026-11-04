@@ -46,7 +46,7 @@ function renderInline(text: string, key: string): ReactNode[] {
           <button
             type="button"
             className={styles.linkCopy}
-            title={url}
+            data-tip={`Copy the link ${url}`}
             aria-label={`Copy link ${url}`}
             onClick={() => void copyText(url, "Link copied")}
           >
@@ -91,7 +91,7 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
     <div className={styles.codeBlock}>
       <div className={styles.codeHead}>
         <span className={styles.codeLang}>{lang || "text"}</span>
-        <button type="button" className={styles.codeCopy} onClick={() => void copyText(code, "Code copied")}>
+        <button type="button" className={styles.codeCopy} data-tip="Copy this code to the clipboard" onClick={() => void copyText(code, "Code copied")}>
           <Icon name="copy" size={12} />
           Copy
         </button>

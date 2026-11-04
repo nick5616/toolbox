@@ -11,10 +11,12 @@ export interface MeterProps {
   /** Accessible name (default "Progress"). */
   label?: string;
   className?: string;
+  /** Tooltip override (default describes status and percentage). */
+  tip?: string;
 }
 
 /** Segmented DAW-style meter (SPEC 8.4 signature element 1). */
-export function Meter({ value, status = "running", size = "md", label = "Progress", className }: MeterProps) {
+export function Meter({ value, status = "running", size = "md", label = "Progress", className, tip }: MeterProps) {
   const indeterminate = value < 0 && status === "running";
   let ratio: number;
   if (indeterminate) ratio = 0.3;
@@ -29,6 +31,7 @@ export function Meter({ value, status = "running", size = "md", label = "Progres
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={indeterminate ? undefined : Math.round(ratio * 100)}
+      data-tip={tip ?? (indeterminate ? `${label}: ${status}, working…` : `${label}: ${status}, ${Math.round(ratio * 100)}%`)}
       aria-busy={status === "running" || undefined}
       className={cx(styles.meter, styles[size], styles[status], indeterminate && styles.indeterminate, className)}
     >

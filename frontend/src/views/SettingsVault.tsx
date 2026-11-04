@@ -44,13 +44,13 @@ function PassphraseChange({ onClose }: { onClose: () => void }) {
       body={
         <div className={styles.body}>
           <Field label="Current passphrase">
-            {(c) => <TextField {...c} type="password" autoFocus value={oldPass} onChange={(e) => setOldPass(e.target.value)} />}
+            {(c) => <TextField {...c} data-tip="The passphrase you unlock the vault with" type="password" autoFocus value={oldPass} onChange={(e) => setOldPass(e.target.value)} />}
           </Field>
           <Field label="New passphrase">
-            {(c) => <TextField {...c} type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} />}
+            {(c) => <TextField {...c} data-tip={`At least ${MIN_PASSPHRASE} characters; longer is safer`} type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} />}
           </Field>
           <Field label="Confirm new passphrase">
-            {(c) => <TextField {...c} type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />}
+            {(c) => <TextField {...c} data-tip="Type the new passphrase again" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />}
           </Field>
           {error && (
             <p className={styles.error} role="alert">
@@ -90,7 +90,7 @@ function ShowRecoveryKey({ onClose }: { onClose: () => void }) {
         key === null ? (
           <div className={styles.body}>
             <Field label="Passphrase" error={error || undefined}>
-              {(c) => <TextField {...c} type="password" autoFocus value={pass} onChange={(e) => setPass(e.target.value)} />}
+              {(c) => <TextField {...c} data-tip="Your vault passphrase proves it is you" type="password" autoFocus value={pass} onChange={(e) => setPass(e.target.value)} />}
             </Field>
           </div>
         ) : (
@@ -127,27 +127,28 @@ export function SettingsVault() {
   };
 
   return (
-    <Section label="Vault">
+    <Section label="Vault" tip="Encrypted storage for private files">
       <div className={styles.stack}>
         <div className={styles.row}>
-          <span id="vault-autolock-label" className={styles.label}>
+          <span id="vault-autolock-label" className={styles.label} data-tip="How long the vault stays unlocked while you are not using it">
             Auto-lock
           </span>
           <Select
             aria-labelledby="vault-autolock-label"
+            data-tip="Lock the vault automatically after this much time"
             value={String(vault.autoLockMinutes)}
             options={AUTO_LOCK_OPTIONS}
             onChange={setAutoLock}
           />
         </div>
         <div className={styles.row}>
-          <Button size="sm" variant="secondary" disabled={!exists} onClick={() => setDialog("passphrase")}>
+          <Button size="sm" variant="secondary" disabled={!exists} data-tip={exists ? "Pick a new passphrase; your files stay encrypted" : "Create a vault first"} onClick={() => setDialog("passphrase")}>
             Change passphrase…
           </Button>
-          <Button size="sm" variant="secondary" disabled={!exists} onClick={() => setDialog("key")}>
+          <Button size="sm" variant="secondary" disabled={!exists} data-tip={exists ? "Show the key that opens the vault if you forget the passphrase" : "Create a vault first"} onClick={() => setDialog("key")}>
             Show recovery key…
           </Button>
-          <Button size="sm" variant="secondary" disabled={!exists} onClick={reveal}>
+          <Button size="sm" variant="secondary" disabled={!exists} data-tip={exists ? "Show the encrypted vault folder in the file manager" : "Create a vault first"} onClick={reveal}>
             Reveal vault folder
           </Button>
         </div>

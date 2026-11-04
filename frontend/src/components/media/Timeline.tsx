@@ -252,6 +252,7 @@ export function Timeline({
       <div
         ref={track}
         className={cx(styles.track, dragging && styles.dragging)}
+        data-tip="Click or drag to move the playhead. Drag a range edge to trim it"
         onPointerDown={onTrackDown}
         onPointerMove={onMove}
         onPointerUp={endDrag}
@@ -262,7 +263,7 @@ export function Timeline({
           <Waveform peaks={visibleWave} height={filmstripUrl ? 56 : 56} className={cx(styles.wave, filmstripUrl && styles.waveOver)} />
         )}
         {kfTicks.map((k) => (
-          <span key={k} className={styles.keyframe} style={{ left: msToPx(k, view, width) }} />
+          <span key={k} data-tip="Keyframe: a point where the video can be cut without re-encoding" className={styles.keyframe} style={{ left: msToPx(k, view, width) }} />
         ))}
         {list.map((r) => {
           const left = msToPx(r.startMs, view, width);
@@ -294,6 +295,7 @@ export function Timeline({
                   role="slider"
                   tabIndex={0}
                   aria-label={`${edge === "start" ? "Start" : "End"} of ${r.label ?? "range"}`}
+                  data-tip={edge === "start" ? "Drag, or use the arrow keys, to move where this range starts" : "Drag, or use the arrow keys, to move where this range ends"}
                   aria-valuemin={0}
                   aria-valuemax={durationMs}
                   aria-valuenow={Math.round(edge === "start" ? r.startMs : r.endMs)}
@@ -326,7 +328,7 @@ export function Timeline({
               <button
                 key={m.id}
                 type="button"
-                title={m.label}
+                data-tip={m.label ? `${m.label}: click to jump here` : "Marker: click to jump here"}
                 aria-label={m.label ?? "Marker"}
                 className={cx(styles.marker, styles[`tone_${m.tone ?? "neutral"}`])}
                 style={{ left, width: w }}

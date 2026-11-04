@@ -46,6 +46,7 @@ export function PathText({ path, copy = false, className }: PathTextProps) {
           size="sm"
           icon={copied ? "check" : "copy"}
           label={copied ? "Copied" : "Copy path"}
+          data-tip="Copy the full path to the clipboard"
           onClick={onCopy}
         />
       )}

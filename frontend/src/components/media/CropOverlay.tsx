@@ -74,6 +74,7 @@ export function CropOverlay({ rect, aspect, sourceAspect, x, y, onChange }: Crop
         role="slider"
         tabIndex={0}
         aria-label="Crop position"
+        data-tip="Drag the frame, or use the arrow keys, to choose which part is kept"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(c.x * 100)}

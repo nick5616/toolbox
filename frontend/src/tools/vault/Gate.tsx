@@ -18,11 +18,11 @@ export function RecoveryKeyBox({ recoveryKey }: { recoveryKey: string }) {
   };
   return (
     <>
-      <div className={styles.keyBox} data-testid="recovery-key">
+      <div className={styles.keyBox} data-testid="recovery-key" data-tip="Your recovery key: it opens the vault if you forget the passphrase">
         {recoveryKey}
       </div>
       <div className={styles.actions}>
-        <Button size="sm" variant="secondary" icon="copy" onClick={() => void copy()}>
+        <Button size="sm" variant="secondary" icon="copy" data-tip="Copy the recovery key so you can store it in a password manager" onClick={() => void copy()}>
           Copy
         </Button>
       </div>
@@ -64,21 +64,21 @@ export function CreateForm({ onCreated }: { onCreated: (recoveryKey: string) => 
       </ul>
       <form className={styles.narrow} onSubmit={(e) => void submit(e)}>
         <Field label="Passphrase">
-          {(c) => <TextField {...c} type="password" autoComplete="new-password" value={pass} onChange={(e) => setPass(e.target.value)} />}
+          {(c) => <TextField {...c} data-tip={`Choose a passphrase of at least ${MIN_PASSPHRASE} characters; a few random words work well`} type="password" autoComplete="new-password" value={pass} onChange={(e) => setPass(e.target.value)} />}
         </Field>
         {pass !== "" && (
-          <p className={`${styles.strength} ${styles[`strength${strength.level}`]}`} aria-live="polite">
+          <p data-tip="A rough guess of how hard this passphrase is to crack" className={`${styles.strength} ${styles[`strength${strength.level}`]}`} aria-live="polite">
             {strength.label}
           </p>
         )}
         <Field label="Confirm passphrase" error={mismatch ? "Passphrases don't match" : undefined}>
           {(c) => (
-            <TextField {...c} type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            <TextField {...c} data-tip="Type the same passphrase again to be sure it is right" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
           )}
         </Field>
         {error && <Banner tone="danger">{error}</Banner>}
         <div className={styles.actions}>
-          <Button type="submit" variant="primary" icon="lock" loading={busy} disabled={!canCreate}>
+          <Button type="submit" variant="primary" icon="lock" loading={busy} disabled={!canCreate} data-tip={canCreate ? "Create the encrypted vault with this passphrase" : pass.length < MIN_PASSPHRASE ? `The passphrase needs at least ${MIN_PASSPHRASE} characters` : "Both passphrases must match"}>
             Create vault
           </Button>
         </div>
@@ -96,9 +96,9 @@ export function RecoveryScreen({ recoveryKey, onDone }: { recoveryKey: string; o
         Save this somewhere safe. It's the only way in if you forget your passphrase.
       </Banner>
       <RecoveryKeyBox recoveryKey={recoveryKey} />
-      <Switch checked={saved} onChange={setSaved} label="I've saved it" />
+      <Switch checked={saved} onChange={setSaved} label="I've saved it" tip="Confirm you stored the recovery key; you cannot see it again without your passphrase" />
       <div className={styles.actions}>
-        <Button variant="primary" disabled={!saved} onClick={onDone}>
+        <Button variant="primary" disabled={!saved} data-tip={saved ? "Continue to your vault" : "Save the recovery key and switch on \"I've saved it\" first"} onClick={onDone}>
           Open vault
         </Button>
       </div>
@@ -139,6 +139,7 @@ export function LockedForm() {
             autoFocus
             autoComplete="current-password"
             mono={useKey}
+            data-tip={useKey ? "Paste the recovery key you saved when you created the vault" : "The passphrase you chose when you created the vault"}
             value={secret}
             onChange={(e) => {
               setSecret(e.target.value);
@@ -148,12 +149,13 @@ export function LockedForm() {
         )}
       </Field>
       <div className={styles.actions}>
-        <Button type="submit" variant="primary" icon="lock" loading={busy} disabled={secret === ""}>
+        <Button type="submit" variant="primary" icon="lock" loading={busy} disabled={secret === ""} data-tip="Decrypt and open the vault">
           Unlock
         </Button>
         <button
           type="button"
           className={styles.linkButton}
+          data-tip={useKey ? "Go back to unlocking with your passphrase" : "Forgot your passphrase? Unlock with the recovery key instead"}
           onClick={() => {
             setUseKey((v) => !v);
             setSecret("");

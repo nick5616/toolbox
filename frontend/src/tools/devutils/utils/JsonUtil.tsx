@@ -54,11 +54,11 @@ export default function JsonUtil() {
           value={mode}
           onChange={setMode}
           options={[
-            { value: "format", label: "Format" },
-            { value: "minify", label: "Minify" },
-            { value: "sort", label: "Sort keys" },
-            { value: "to-yaml", label: "JSON to YAML" },
-            { value: "from-yaml", label: "YAML to JSON" },
+            { value: "format", label: "Format", tip: "Re-indent the JSON so it is easy to read" },
+            { value: "minify", label: "Minify", tip: "Remove all spaces and line breaks to make it as short as possible" },
+            { value: "sort", label: "Sort keys", tip: "Put object keys in alphabetical order, at every level" },
+            { value: "to-yaml", label: "JSON to YAML", tip: "Convert the JSON you paste into YAML" },
+            { value: "from-yaml", label: "YAML to JSON", tip: "Convert the YAML you paste into JSON" },
           ]}
         />
         {(mode === "format" || mode === "sort" || mode === "from-yaml") && (
@@ -67,13 +67,13 @@ export default function JsonUtil() {
             value={indent}
             onChange={setIndent}
             options={[
-              { value: "2", label: "2 spaces" },
-              { value: "4", label: "4 spaces" },
-              { value: "tab", label: "Tab" },
+              { value: "2", label: "2 spaces", tip: "Indent each level by two spaces" },
+              { value: "4", label: "4 spaces", tip: "Indent each level by four spaces" },
+              { value: "tab", label: "Tab", tip: "Indent each level with a tab character" },
             ]}
           />
         )}
-        {r.valid !== null && <Badge tone={r.valid ? "ok" : "danger"}>{r.valid ? "Valid" : "Invalid"}</Badge>}
+        {r.valid !== null && <Badge tone={r.valid ? "ok" : "danger"} tip={r.valid ? "The input parsed without errors" : "The input could not be parsed; see the message below"}>{r.valid ? "Valid" : "Invalid"}</Badge>}
       </div>
       <div className={styles.col}>
         <span className={styles.label}>{mode === "from-yaml" ? "YAML input" : "JSON input"}</span>
@@ -86,10 +86,11 @@ export default function JsonUtil() {
           onChange={(e) => setInput(e.target.value)}
           placeholder={mode === "from-yaml" ? "name: value" : '{"name": "value"}'}
           aria-label={mode === "from-yaml" ? "YAML input" : "JSON input"}
+          data-tip="Paste your text here; the result updates as you type"
           spellCheck={false}
         />
         {r.error && <p className={styles.error}>{r.error}</p>}
-        {r.caret && <pre className={styles.caret}>{r.caret}</pre>}
+        {r.caret && <pre className={styles.caret} data-tip="The spot where parsing failed">{r.caret}</pre>}
       </div>
       <OutputBox label={mode === "to-yaml" ? "YAML" : "JSON"} value={r.output} />
     </div>

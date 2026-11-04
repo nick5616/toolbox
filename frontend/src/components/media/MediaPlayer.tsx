@@ -343,11 +343,12 @@ export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(funct
         )}
       </div>
       <div className={styles.controls}>
-        <IconButton label={playing ? "Pause" : "Play"} icon={playing ? "pause" : "play"} kbd="Space" onClick={toggle} />
-        <IconButton label="Previous frame" icon="step-back" kbd="," onClick={() => step(-1)} />
-        <IconButton label="Next frame" icon="step-forward" kbd="." onClick={() => step(1)} />
+        <IconButton label={playing ? "Pause" : "Play"} icon={playing ? "pause" : "play"} kbd="Space" data-tip={playing ? "Pause playback" : "Play from the current position"} onClick={toggle} />
+        <IconButton label="Previous frame" icon="step-back" kbd="," data-tip="Go back one frame (or a fraction of a second for audio)" onClick={() => step(-1)} />
+        <IconButton label="Next frame" icon="step-forward" kbd="." data-tip="Go forward one frame (or a fraction of a second for audio)" onClick={() => step(1)} />
         <TimecodeInput
           aria-label="Current time"
+          data-tip="Current position. Click, type a time such as 1:05.5, and press Enter to jump there"
           className={styles.time}
           value={editing ?? formatMs(curMs)}
           invalid={timecodeInvalid}
@@ -371,10 +372,11 @@ export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(funct
             }
           }}
         />
-        <span className={styles.duration}>/ {durText}</span>
+        <span className={styles.duration} data-tip="Total length">/ {durText}</span>
         <span className={styles.spacer} />
         <IconButton
           label={muted || volume === 0 ? "Unmute" : "Mute"}
+          data-tip="Silence or restore the preview sound (does not change the file)"
           icon={muted || volume === 0 ? "volume-x" : "volume-2"}
           onClick={() => {
             const next = !muted;
@@ -386,6 +388,7 @@ export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(funct
           type="range"
           className={styles.volume}
           aria-label="Volume"
+          data-tip="Preview volume (does not change the file)"
           min={0}
           max={1}
           step={0.05}
@@ -403,6 +406,7 @@ export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(funct
         <Select
           size="sm"
           aria-label="Playback speed"
+          data-tip="How fast the preview plays; the file is not changed"
           value={speed}
           options={SPEEDS.map((s) => ({ value: s, label: `${s}×` }))}
           onChange={(v) => {

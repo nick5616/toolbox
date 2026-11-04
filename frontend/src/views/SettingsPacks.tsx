@@ -69,11 +69,11 @@ export function ManagedDepActions({ dep }: { dep: DepView }) {
   };
   return (
     <span className={styles.actionGroup}>
-      <Button size="sm" variant="secondary" loading={queuing || busy} onClick={() => void install()}>
+      <Button size="sm" variant="secondary" loading={queuing || busy} data-tip={managed ? `Download the latest ${cfg.name}` : `Download ${cfg.name}; tools that need it will work`} onClick={() => void install()}>
         {managed ? "Update" : "Install"}
       </Button>
       {managed ? (
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirm(true)}>
+        <Button size="sm" variant="ghost" disabled={busy} data-tip={`Delete the copy Toolbox downloaded; a ${cfg.name} already on your computer is used instead`} onClick={() => setConfirm(true)}>
           Remove
         </Button>
       ) : null}
@@ -139,13 +139,13 @@ function ToolsFolder() {
   return (
     <div className={styles.folder}>
       <div className={styles.folderRow}>
-        <span className={styles.folderLabel}>Tools folder</span>
+        <span className={styles.folderLabel} data-tip="Where engines, Python and models are stored. Move it to a bigger drive if space is tight">Tools folder</span>
         <PathText path={toolsDir?.path ?? ""} copy className={styles.folderPath} />
-        {disk ? <span className={styles.free}>{formatSize(disk.free)} free</span> : null}
+        {disk ? <span className={styles.free} data-tip="Free space on the drive holding the tools folder">{formatSize(disk.free)} free</span> : null}
         {toolsDir?.fromEnv ? (
-          <span className={styles.note}>Set by TOOLBOX_TOOLS_DIR</span>
+          <span className={styles.note} data-tip="An environment variable fixes this location, so it cannot be changed here">Set by TOOLBOX_TOOLS_DIR</span>
         ) : (
-          <Button size="sm" variant="secondary" loading={busy || moving} disabled={!toolsDir} onClick={() => void pick()}>
+          <Button size="sm" variant="secondary" loading={busy || moving} disabled={!toolsDir} data-tip="Copy the tools folder to another location, then restart" onClick={() => void pick()}>
             Move…
           </Button>
         )}
@@ -155,7 +155,7 @@ function ToolsFolder() {
         <Banner
           tone="info"
           action={
-            <Button size="sm" variant="primary" onClick={() => void PacksService.Relaunch().catch(fail)}>
+            <Button size="sm" variant="primary" data-tip="Close and reopen Toolbox so it uses the new tools folder" onClick={() => void PacksService.Relaunch().catch(fail)}>
               Restart now
             </Button>
           }
@@ -219,8 +219,9 @@ export function SettingsPacks() {
     <div id="settings-packs">
       <Section
         label="Tool packs"
+        tip="Groups of tools that each download their own engines and models"
         action={
-          <Button size="sm" variant="ghost" onClick={() => useUI.getState().navigate("setup")}>
+          <Button size="sm" variant="ghost" data-tip="Open the first-run screen to pick which packs to install" onClick={() => useUI.getState().navigate("setup")}>
             Show setup screen
           </Button>
         }
@@ -250,17 +251,17 @@ export function SettingsPacks() {
                     progress ? null : (
                       <>
                         {canInstall ? (
-                          <Button size="sm" variant="secondary" icon="download" loading={queuing === p.id} onClick={() => void install(p)}>
+                          <Button size="sm" variant="secondary" icon="download" loading={queuing === p.id} data-tip={`Download and set up the ${p.name} pack`} onClick={() => void install(p)}>
                             Install
                           </Button>
                         ) : null}
                         {p.state === PackState.PackOutdated ? (
-                          <Button size="sm" variant="primary" loading={queuing === p.id} onClick={() => void install(p)}>
+                          <Button size="sm" variant="primary" loading={queuing === p.id} data-tip={`Update the ${p.name} pack to the versions this app expects`} onClick={() => void install(p)}>
                             Update
                           </Button>
                         ) : null}
                         {installed ? (
-                          <Button size="sm" variant="ghost" onClick={() => void askRemove(p)}>
+                          <Button size="sm" variant="ghost" data-tip={`Delete the ${p.name} pack to free disk space (you will see how much first)`} onClick={() => void askRemove(p)}>
                             Remove
                           </Button>
                         ) : null}

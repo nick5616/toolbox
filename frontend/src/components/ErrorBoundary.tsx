@@ -42,7 +42,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, State> {
     const { error } = this.state;
     if (!error) return this.props.children;
     const retry = (
-      <Button size="sm" icon="rotate-ccw" onClick={() => this.setState({ error: null })}>
+      <Button size="sm" icon="rotate-ccw" data-tip="Load this part of the app again; if it keeps failing, restart Toolbox" onClick={() => this.setState({ error: null })}>
         Try again
       </Button>
     );

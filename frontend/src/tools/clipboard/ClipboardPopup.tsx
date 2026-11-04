@@ -115,6 +115,7 @@ export default function ClipboardPopup() {
           placeholder="Search clipboard history"
           aria-label="Search clipboard history"
           aria-controls="clip-popup-list"
+          data-tip="Type to filter. Press 1 to 9 to pick an item, Enter for the highlighted one"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -126,7 +127,7 @@ export default function ClipboardPopup() {
           icon="clipboard"
           title="Clipboard history is off — enable it in Toolbox"
           action={
-            <Button variant="primary" size="sm" onClick={() => void DesktopService.ShowMain("clipboard")}>
+            <Button variant="primary" size="sm" data-tip="Open the main window where you can turn clipboard history on" onClick={() => void DesktopService.ShowMain("clipboard")}>
               Open Toolbox
             </Button>
           }

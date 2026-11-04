@@ -23,9 +23,9 @@ export function ComingSoonView({ moduleId }: ComingSoonViewProps) {
         <div className={styles.accepts}>
           <span className={styles.label}>Accepts</span>
           <div className={styles.chips}>
-            {urls ? <Badge>Links</Badge> : null}
+            {urls ? <Badge tip="This tool will accept web links">Links</Badge> : null}
             {extensions.map((ext) => (
-              <Badge key={ext} mono>
+              <Badge key={ext} mono tip={`This tool will accept ${ext} files`}>
                 {ext}
               </Badge>
             ))}

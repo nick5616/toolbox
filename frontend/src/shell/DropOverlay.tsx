@@ -87,13 +87,13 @@ function DropContent({
                   <div className={styles.matchFiles}>{mp.map(baseName).join(", ")}</div>
                 </div>
                 {ready ? (
-                  <Button size="sm" variant="primary" onClick={() => onPick(m.module.id, mp)}>
+                  <Button size="sm" variant="primary" data-tip={`Send these files to ${m.module.name}`} onClick={() => onPick(m.module.id, mp)}>
                     Open
                   </Button>
                 ) : (
                   <>
-                    <Badge>SOON</Badge>
-                    <Button size="sm" disabled>
+                    <Badge tip="Not available yet">SOON</Badge>
+                    <Button size="sm" disabled data-tip="This tool is not ready yet">
                       Open
                     </Button>
                   </>
@@ -119,6 +119,7 @@ function DropContent({
                   size="sm"
                   variant="primary"
                   aria-label={`Run ${m.entry.pipeline.name}`}
+                  data-tip="Start this pipeline with the dropped files"
                   onClick={() => {
                     setDrop(null);
                     openPipelineRunSheet(m.entry.pipeline.id, m.paths);
@@ -134,7 +135,7 @@ function DropContent({
       {/* --- end pipelines --- */}
       {unmatched.length > 0 && <div className={styles.unsupported}>Unsupported: {unmatched.map(baseName).join(", ")}</div>}
       <div className={styles.foot}>
-        <Button size="sm" variant="ghost" onClick={onClose}>
+        <Button size="sm" variant="ghost" data-tip="Dismiss without using the files" onClick={onClose}>
           Close
         </Button>
       </div>

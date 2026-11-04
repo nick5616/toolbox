@@ -45,22 +45,23 @@ export function RunFileRow({ file, sendTo = true }: { file: RunFile; sendTo?: bo
   return (
     <li className={cx(styles.file, file.missing && styles.missing)}>
       <Icon name={KIND_ICON[file.kind] ?? "file"} size={14} className={styles.fileIcon} />
-      <span className={styles.fileName} title={file.path}>
+      <span className={styles.fileName} data-tip={file.path}>
         {file.name || file.path}
       </span>
-      {file.roleLabel && <span className={styles.role}>{file.roleLabel}</span>}
+      {file.roleLabel && <span className={styles.role} data-tip="What kind of result this file is">{file.roleLabel}</span>}
       {file.missing ? (
-        <span className={styles.gone}>deleted</span>
+        <span className={styles.gone} data-tip="This file was deleted, for example as an in-between file">deleted</span>
       ) : (
         <span className={styles.fileActions}>
-          <IconButton size="sm" icon="external-link" label={`Open ${file.name}`} disabled={!file.outputId} onClick={() => openRunFile(file)} />
-          <IconButton size="sm" icon="folder-open" label={`${revealLabel}: ${file.name}`} onClick={() => revealRunFile(file)} />
+          <IconButton size="sm" icon="external-link" label={`Open ${file.name}`} data-tip={file.outputId ? "Open with your default app" : "This file is not in the Library, so it cannot be opened from here"} disabled={!file.outputId} onClick={() => openRunFile(file)} />
+          <IconButton size="sm" icon="folder-open" label={`${revealLabel}: ${file.name}`} data-tip="Show this file in your file manager" onClick={() => revealRunFile(file)} />
           {sendTo && (
             <MenuButton
               size="sm"
               variant="ghost"
               icon="arrow-left-right"
               label={`Send ${file.name} to…`}
+              tip="Send this file to another tool"
               emptyLabel="No tools accept this file"
               items={() => toolSendToItems(file.path)}
             />

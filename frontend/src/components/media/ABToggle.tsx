@@ -39,8 +39,8 @@ export function ABToggle({ a, b, labels = ["Original", "Cleaned"], className, pa
           onSideChange?.(v);
         }}
         options={[
-          { value: "a", label: labels[0] },
-          { value: "b", label: labels[1] },
+          { value: "a", label: labels[0], tip: `Play the ${labels[0].toLowerCase()} version` },
+          { value: "b", label: labels[1], tip: `Play the ${labels[1].toLowerCase()} version, keeping your place` },
         ]}
       />
       <MediaPlayer ref={player} source={source} kind="audio" {...(path ? { path } : {})} />

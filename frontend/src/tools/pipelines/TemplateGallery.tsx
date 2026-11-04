@@ -69,13 +69,13 @@ export function TemplateGallery({ open, onClose }: TemplateGalleryProps) {
           <h2 id={titleId} className={styles.title}>
             New pipeline
           </h2>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="sm" data-tip="Close without creating a pipeline" data-tip-kbd="Esc" onClick={onClose}>
             Cancel
           </Button>
         </div>
         <div className={styles.grid}>
           <div className={cx(styles.card, styles.blank)}>
-            <button type="button" className={styles.main} disabled={busy !== null} onClick={() => void choose(null)}>
+            <button type="button" className={styles.main} disabled={busy !== null} data-tip="Create an empty pipeline to build step by step" onClick={() => void choose(null)}>
               <span className={styles.cardHead}>
                 <Icon name="plus" size={18} className={styles.icon} />
                 <span className={styles.name}>Blank pipeline</span>
@@ -90,14 +90,14 @@ export function TemplateGallery({ open, onClose }: TemplateGalleryProps) {
             const missing = needs.some((p) => p !== undefined && p.state !== PackState.PackInstalled);
             return (
               <div key={t.id} className={styles.card}>
-                <button type="button" className={styles.main} disabled={busy !== null} onClick={() => void choose(t.id)} aria-label={t.pipeline.name}>
+                <button type="button" className={styles.main} disabled={busy !== null} onClick={() => void choose(t.id)} aria-label={t.pipeline.name} data-tip={missing ? `Create this pipeline; install the ${names.join(", ")} pack to run it` : "Create a pipeline from this template; you can change every step"}>
                   <span className={styles.cardHead}>
                     <Icon name={t.icon} size={18} className={styles.icon} />
                     <span className={styles.name}>{t.pipeline.name}</span>
                     {busy === t.id && <Spinner size={14} label="Creating" />}
                   </span>
                   <span className={styles.blurb}>{t.blurb}</span>
-                  <span className={styles.steps} aria-hidden="true">
+                  <span className={styles.steps} aria-hidden="true" data-tip="The tools this template uses, in order">
                     {stepIcons(t, catalog).map((icon, i) => (
                       <Icon key={i} name={icon} size={14} />
                     ))}
@@ -105,9 +105,9 @@ export function TemplateGallery({ open, onClose }: TemplateGalleryProps) {
                 </button>
                 {names.length > 0 && (
                   <div className={styles.needs}>
-                    <span className={cx(styles.chip, missing && styles.missing)}>Needs: {names.join(", ")} pack</span>
+                    <span className={cx(styles.chip, missing && styles.missing)} data-tip={missing ? "A tool pack this template uses is not installed yet" : "The tool packs this template uses are installed"}>Needs: {names.join(", ")} pack</span>
                     {missing && (
-                      <Button size="sm" variant="ghost" onClick={openToolPacks}>
+                      <Button size="sm" variant="ghost" data-tip="Open Settings to install the missing tool pack" onClick={openToolPacks}>
                         Install
                       </Button>
                     )}

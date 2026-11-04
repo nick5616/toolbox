@@ -57,6 +57,7 @@ function ToastItem({ data }: { data: ToastItemData }) {
           <button
             type="button"
             className={styles.action}
+            data-tip={`${action.label} (this also closes the notification)`}
             onClick={() => {
               action.onClick();
               dismissToast(id);
@@ -66,7 +67,7 @@ function ToastItem({ data }: { data: ToastItemData }) {
           </button>
         )}
       </div>
-      <IconButton size="sm" icon="x" label="Dismiss" onClick={() => dismissToast(id)} />
+      <IconButton size="sm" icon="x" label="Dismiss" data-tip="Close this notification" onClick={() => dismissToast(id)} />
     </div>
   );
 }

@@ -263,6 +263,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
             <Select<string>
               size="sm"
               aria-label="Model"
+              data-tip="The model that answers in this conversation"
               value={modelId}
               options={modelOptions}
               onChange={(v) => void changeModel(v)}
@@ -272,6 +273,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
           <IconButton
             icon="settings"
             label="Chat settings"
+            data-tip="Edit the system prompt (standing instructions) for this conversation"
             pressed={showPrompt}
             onClick={togglePrompt}
             disabled={noModel}
@@ -284,6 +286,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
             </label>
             <TextArea
               id="chat-system-prompt"
+              data-tip="Instructions the assistant follows for the whole conversation"
               value={promptText}
               minRows={3}
               maxLength={4000}
@@ -292,7 +295,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
             />
             <div className={styles.promptFoot}>
               <span className={styles.hint}>Temperature is set in Settings → Chat.</span>
-              <Button size="sm" variant="primary" onClick={() => void savePrompt()}>
+              <Button size="sm" variant="primary" data-tip="Use this system prompt for this conversation" onClick={() => void savePrompt()}>
                 Save
               </Button>
             </div>
@@ -331,7 +334,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
           />
         )}
 
-        {thread.trimmed && <p className={styles.trimmed}>Older messages were left out to fit the context</p>}
+        {thread.trimmed && <p className={styles.trimmed} data-tip="The model can only read so much; the oldest messages were skipped when answering">Older messages were left out to fit the context</p>}
         <Composer
           loading={loading}
           blocked={blocked}

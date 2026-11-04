@@ -41,11 +41,11 @@ export function RunGrid({ run }: { run: RunView }) {
       <table className={styles.grid} aria-label="Run progress">
         <thead>
           <tr>
-            <th className={styles.corner} scope="col">
+            <th className={styles.corner} scope="col" data-tip="Each row is one file or link; each column is a step">
               File
             </th>
             {run.steps.map((s, i) => (
-              <th key={s.id} scope="col" className={styles.stepHead} title={stepName(s, toolName(s.type))}>
+              <th key={s.id} scope="col" className={styles.stepHead} data-tip={`Step ${i + 1}: ${stepName(s, toolName(s.type))}`}>
                 <Icon name={toolIcon(s.type)} size={14} />
                 <span className={styles.stepNo}>{i + 1}</span>
               </th>
@@ -57,7 +57,7 @@ export function RunGrid({ run }: { run: RunView }) {
             const merged = isMergedItem(item);
             return (
               <tr key={item.index} className={cx(merged && styles.mergedRow)}>
-                <th scope="row" className={styles.rowHead} title={item.label}>
+                <th scope="row" className={styles.rowHead} data-tip={merged ? `${item.label} (several files combined into one)` : item.label}>
                   {merged && <Icon name="merge" size={12} className={styles.mergeIcon} />}
                   <span className={styles.rowLabel}>{item.label}</span>
                 </th>
@@ -74,7 +74,7 @@ export function RunGrid({ run }: { run: RunView }) {
                         className={cx(styles.cell, styles[look.tone], open?.item === item.index && open.step === i && styles.selected)}
                         data-status={cell.status}
                         aria-label={`${name}, ${item.label}: ${look.label}`}
-                        title={look.label}
+                        data-tip={`${look.label}. Click for details, files and logs`}
                         onClick={(e) => {
                           const r = e.currentTarget.getBoundingClientRect();
                           setOpen({ item: item.index, step: i, left: r.left, bottom: r.bottom });

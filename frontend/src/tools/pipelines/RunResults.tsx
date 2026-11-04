@@ -37,9 +37,9 @@ export function RunResults({ run }: { run: RunView }) {
   return (
     <section className={styles.results} aria-label="Results">
       <div className={styles.head}>
-        <h3 className={styles.heading}>Results</h3>
+        <h3 className={styles.heading} data-tip="Files from the steps set to be kept, grouped by input file">Results</h3>
         {groups.length > 0 && (
-          <Button size="sm" icon="folder-open" onClick={openFolder}>
+          <Button size="sm" icon="folder-open" data-tip="Open the folder in your library where this run saved its files" onClick={openFolder}>
             Open folder
           </Button>
         )}
@@ -58,9 +58,9 @@ export function RunResults({ run }: { run: RunView }) {
         <table className={styles.vars} aria-label="Variables">
           <thead>
             <tr>
-              <th>File</th>
+              <th data-tip="The input file or link">File</th>
               {varKeys.map((k) => (
-                <th key={k}>{k}</th>
+                <th key={k} data-tip={`Value of {${k}} made for each file`}>{k}</th>
               ))}
             </tr>
           </thead>

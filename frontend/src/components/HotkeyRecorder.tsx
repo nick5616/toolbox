@@ -107,6 +107,7 @@ export function HotkeyRecorder({ value, onChange, label, disabled }: HotkeyRecor
       type="button"
       className={cx(styles.root, recording && styles.recording)}
       aria-label={label}
+      data-tip={recording ? "Press the new shortcut (needs Ctrl/Cmd or Alt). Esc cancels, Backspace clears it" : "Click, then press the key combination you want. Backspace while recording clears it"}
       disabled={disabled}
       onClick={() => setRecording(true)}
       onKeyDown={onKeyDown}

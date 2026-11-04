@@ -50,12 +50,12 @@ export default function Base64Util() {
           value={dir}
           onChange={setDir}
           options={[
-            { value: "encode", label: "Encode text" },
-            { value: "decode", label: "Decode text" },
+            { value: "encode", label: "Encode text", tip: "Turn text into Base64 characters" },
+            { value: "decode", label: "Decode text", tip: "Turn Base64 back into the original text" },
           ]}
         />
-        <Switch checked={urlSafe} onChange={setUrlSafe} label="URL-safe" />
-        <Switch checked={padding} onChange={setPadding} label="Padding" />
+        <Switch checked={urlSafe} onChange={setUrlSafe} label="URL-safe" tip="Use - and _ instead of + and /, so the result is safe inside URLs and file names" />
+        <Switch checked={padding} onChange={setPadding} label="Padding" tip="End the result with = signs so its length is a multiple of four" />
       </div>
       <div className={styles.col}>
         <span className={styles.label}>{dir === "encode" ? "Text" : "Base64"}</span>
@@ -67,6 +67,7 @@ export default function Base64Util() {
           invalid={result.error !== ""}
           onChange={(e) => setInput(e.target.value)}
           aria-label={dir === "encode" ? "Text to encode" : "Base64 to decode"}
+          data-tip={dir === "encode" ? "Text to turn into Base64" : "Base64 to turn back into text"}
           spellCheck={false}
         />
         {result.error && <p className={styles.error}>{result.error}</p>}
@@ -76,10 +77,10 @@ export default function Base64Util() {
       <div className={styles.col}>
         <span className={styles.label}>File (up to 10 MiB)</span>
         <div className={styles.row}>
-          <Button variant="secondary" icon="file" loading={busy} onClick={() => void pickFile()}>
+          <Button variant="secondary" icon="file" loading={busy} data-tip="Pick a file (up to 10 MiB) to see it as Base64 and as a data URL" onClick={() => void pickFile()}>
             Choose a file
           </Button>
-          {fileB64 && <span className={styles.mono}>{fileB64.path}</span>}
+          {fileB64 && <span className={styles.mono} data-tip="The file that was encoded">{fileB64.path}</span>}
         </div>
       </div>
       {fileB64 && (

@@ -54,13 +54,13 @@ export function LogPanel({ jobId }: { jobId: string }) {
   return (
     <div className={styles.panel}>
       <div className={styles.toolbar}>
-        <Button size="sm" variant="ghost" icon="copy" onClick={copy}>
+        <Button size="sm" variant="ghost" icon="copy" onClick={copy} data-tip="Copy the whole log to the clipboard, handy for bug reports">
           Copy
         </Button>
       </div>
-      <div ref={ref} className={styles.scroll} onScroll={onScroll} role="log" aria-label="Job log">
+      <div ref={ref} className={styles.scroll} onScroll={onScroll} role="log" aria-label="Job log" data-tip="Output of the tool. Red lines are errors, dimmed lines are from the app">
         {hidden > 0 && (
-          <button type="button" className={styles.showAll} onClick={() => setShowAll(true)}>
+          <button type="button" className={styles.showAll} data-tip="Only the newest lines are shown; click to load the rest" onClick={() => setShowAll(true)}>
             Show all {total} lines
           </button>
         )}
@@ -75,7 +75,7 @@ export function LogPanel({ jobId }: { jobId: string }) {
         ))}
       </div>
       {!atBottom && (
-        <button type="button" className={styles.jump} onClick={jump}>
+        <button type="button" className={styles.jump} data-tip="Scroll to the newest line and follow new output" onClick={jump}>
           Jump to latest
         </button>
       )}

@@ -108,16 +108,17 @@ export function SettingsChat() {
   if (!choices.some((m) => m.id === chat.defaultModel)) modelOptions.unshift({ value: chat.defaultModel, label: chat.defaultModel });
 
   return (
-    <Section label="Chat">
+    <Section label="Chat" tip="Defaults for the local chat assistant">
       <div className={styles.stack}>
         <Field label="Default model">
-          {(c) => <Select<string> {...c} value={chat.defaultModel} options={modelOptions} onChange={(v) => void save({ defaultModel: v })} />}
+          {(c) => <Select<string> {...c} data-tip="The model new conversations start with" value={chat.defaultModel} options={modelOptions} onChange={(v) => void save({ defaultModel: v })} />}
         </Field>
 
         <Field label="System prompt" hint="Used for new conversations. Up to 4,000 characters.">
           {(c) => (
             <TextArea
               {...c}
+              data-tip="Standing instructions the assistant follows, e.g. its tone or role"
               value={prompt}
               minRows={3}
               maxLength={4000}
@@ -128,13 +129,14 @@ export function SettingsChat() {
         </Field>
 
         <Field label="Temperature">
-          {(c) => <Slider id={c.id} min={0} max={2} step={0.05} value={temp} onChange={changeTemp} format={(v) => v.toFixed(2)} />}
+          {(c) => <Slider id={c.id} data-tip="Lower gives steadier, more predictable answers; higher gives more varied, creative ones" min={0} max={2} step={0.05} value={temp} onChange={changeTemp} format={(v) => v.toFixed(2)} />}
         </Field>
 
         <Field label="Context size">
           {(c) => (
             <Select<string>
               {...c}
+              data-tip="How much conversation the model can remember at once. Larger uses more memory"
               value={String(chat.contextSize)}
               options={CONTEXT_SIZES}
               onChange={(v) => void save({ contextSize: Number(v) })}
@@ -142,7 +144,7 @@ export function SettingsChat() {
           )}
         </Field>
 
-        <Switch checked={chat.gpu} onChange={(gpu) => void save({ gpu })} label="Use GPU" />
+        <Switch checked={chat.gpu} onChange={(gpu) => void save({ gpu })} label="Use GPU" tip="Run the model on your graphics chip when possible; much faster, but needs enough video memory" />
 
         <Field label="Ollama URL" error={urlError} hint="Optional. Leave empty to use only the built-in models.">
           {(c) => (
@@ -150,6 +152,7 @@ export function SettingsChat() {
               <TextField
                 {...c}
                 mono
+                data-tip="Address of a local Ollama server, e.g. http://127.0.0.1:11434"
                 placeholder="http://127.0.0.1:11434"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
@@ -158,7 +161,7 @@ export function SettingsChat() {
                   if (e.key === "Enter") void saveUrl();
                 }}
               />
-              <Button size="sm" variant="secondary" loading={testing} onClick={() => void testOllama()}>
+              <Button size="sm" variant="secondary" loading={testing} data-tip="Save the address and check that Ollama answers and lists models" onClick={() => void testOllama()}>
                 Test
               </Button>
             </div>
@@ -172,7 +175,7 @@ export function SettingsChat() {
         <p className={styles.note}>Ollama has no access control; any app on this computer can use it.</p>
 
         <div className={styles.models}>
-          <h4 className={styles.subtitle}>Installed models</h4>
+          <h4 className={styles.subtitle} data-tip="Models downloaded to this computer">Installed models</h4>
           {installed.length === 0 ? (
             <p className={styles.note}>No models downloaded yet.</p>
           ) : (
@@ -180,8 +183,8 @@ export function SettingsChat() {
               {installed.map((m) => (
                 <li key={m.id} className={styles.modelRow}>
                   <span className={styles.modelName}>{m.label}</span>
-                  <span className={styles.size}>{formatSize(m.bytes)}</span>
-                  <Button size="sm" variant="ghost" aria-label={`Delete ${m.label}`} onClick={() => setDeleting(m)}>
+                  <span className={styles.size} data-tip="Disk space this model uses">{formatSize(m.bytes)}</span>
+                  <Button size="sm" variant="ghost" aria-label={`Delete ${m.label}`} data-tip="Delete this model file to free disk space; you can download it again" onClick={() => setDeleting(m)}>
                     Delete
                   </Button>
                 </li>

@@ -44,7 +44,7 @@ export function ColorSwatchPicker({ value, onChange, allowTransparent, className
           type="button"
           aria-label={s.label}
           aria-pressed={value.toLowerCase() === s.id}
-          title={s.label}
+          data-tip={s.color ? `${s.label} (${s.color})` : "No colour: fully see-through"}
           className={cx(
             styles.swatch,
             s.id === TRANSPARENT && styles.transparent,
@@ -60,6 +60,7 @@ export function ColorSwatchPicker({ value, onChange, allowTransparent, className
         wrapperClassName={styles.hex}
         aria-label="Hex colour"
         placeholder="#rrggbb"
+        data-tip="Type a hex colour such as #ff8800"
         maxLength={7}
         value={draft}
         invalid={invalid}

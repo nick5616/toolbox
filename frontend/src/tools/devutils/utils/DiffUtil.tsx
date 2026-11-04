@@ -37,11 +37,11 @@ export default function DiffUtil() {
       <div className={styles.cols}>
         <div className={styles.col}>
           <span className={styles.label}>Original</span>
-          <TextArea mono minRows={8} maxRows={18} value={left} onChange={(e) => setLeft(e.target.value)} aria-label="Original text" spellCheck={false} />
+          <TextArea mono minRows={8} maxRows={18} value={left} onChange={(e) => setLeft(e.target.value)} aria-label="Original text" data-tip="The older or reference version" spellCheck={false} />
         </div>
         <div className={styles.col}>
           <span className={styles.label}>Changed</span>
-          <TextArea mono minRows={8} maxRows={18} value={right} onChange={(e) => setRight(e.target.value)} aria-label="Changed text" spellCheck={false} />
+          <TextArea mono minRows={8} maxRows={18} value={right} onChange={(e) => setRight(e.target.value)} aria-label="Changed text" data-tip="The newer version to compare against the original" spellCheck={false} />
         </div>
       </div>
       <div className={styles.row}>
@@ -50,17 +50,17 @@ export default function DiffUtil() {
           value={view}
           onChange={setView}
           options={[
-            { value: "unified", label: "Unified" },
-            { value: "side", label: "Side by side" },
+            { value: "unified", label: "Unified", tip: "One list: removed lines marked - and added lines marked +" },
+            { value: "side", label: "Side by side", tip: "Original on the left, changed on the right" },
           ]}
         />
-        <Switch checked={ignoreWhitespace} onChange={setIgnoreWhitespace} label="Ignore whitespace" />
-        <Switch checked={ignoreCase} onChange={setIgnoreCase} label="Ignore case" />
+        <Switch checked={ignoreWhitespace} onChange={setIgnoreWhitespace} label="Ignore whitespace" tip="Treat lines that differ only in spaces or tabs as equal" />
+        <Switch checked={ignoreCase} onChange={setIgnoreCase} label="Ignore case" tip="Treat upper and lower case letters as the same" />
         {any && (
           <>
-            <Badge tone="ok">+{stats.added}</Badge>
-            <Badge tone="danger">-{stats.removed}</Badge>
-            <CopyButton text={unifiedText(ops)} label="Copy diff" />
+            <Badge tone="ok" tip="Lines added in the changed text">+{stats.added}</Badge>
+            <Badge tone="danger" tip="Lines removed from the original">-{stats.removed}</Badge>
+            <CopyButton text={unifiedText(ops)} label="Copy diff" what="the diff" />
           </>
         )}
       </div>

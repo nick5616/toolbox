@@ -56,6 +56,7 @@ export function Composer({ loading, blocked, blockedReason, generating, busy, on
         <TextArea
           ref={ref}
           aria-label="Message"
+          data-tip={disabled ? (loading ? "The model is loading" : blockedReason ?? "Chat is not ready yet") : "Enter sends, Shift+Enter adds a new line"}
           value={text}
           minRows={1}
           maxRows={8}
@@ -67,11 +68,11 @@ export function Composer({ loading, blocked, blockedReason, generating, busy, on
         {loading && <Spinner size={14} label="Loading model" className={styles.composerSpin} />}
       </div>
       {generating ? (
-        <Button variant="secondary" icon="square" onClick={onStop}>
+        <Button variant="secondary" icon="square" data-tip="Stop the answer where it is" data-tip-kbd="Esc" onClick={onStop}>
           Stop
         </Button>
       ) : (
-        <Button variant="primary" disabled={disabled || text.trim() === ""} onClick={() => void send()}>
+        <Button variant="primary" disabled={disabled || text.trim() === ""} data-tip={disabled ? (loading ? "The model is still loading" : blockedReason ?? "Chat is not ready yet") : text.trim() === "" ? "Type a message first" : "Send this message"} data-tip-kbd="Enter" onClick={() => void send()}>
           Send
         </Button>
       )}

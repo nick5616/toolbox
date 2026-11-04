@@ -81,6 +81,7 @@ export function CompareSlider({
       role="slider"
       tabIndex={0}
       aria-label={aria["aria-label"] ?? `Compare ${beforeLabel.toLowerCase()} and ${afterLabel.toLowerCase()}`}
+      data-tip="Drag the divider, or use the arrow keys, to compare before and after"
       aria-orientation="horizontal"
       aria-valuemin={0}
       aria-valuemax={100}
@@ -105,9 +106,9 @@ export function CompareSlider({
           imageRendering: pixelatedBefore ? "pixelated" : "auto",
         }}
       />
-      <span className={cx(styles.tag, styles.tagBefore)}>{beforeLabel}</span>
-      <span className={cx(styles.tag, styles.tagAfter)}>{afterLabel}</span>
-      <div className={styles.divider} style={{ left: `${pos}%` }}>
+      <span data-tip="The left side of the divider shows this version" className={cx(styles.tag, styles.tagBefore)}>{beforeLabel}</span>
+      <span data-tip="The right side of the divider shows this version" className={cx(styles.tag, styles.tagAfter)}>{afterLabel}</span>
+      <div className={styles.divider} data-tip="Drag to reveal more of one side" style={{ left: `${pos}%` }}>
         <span className={styles.handle} aria-hidden="true">
           ⇔
         </span>

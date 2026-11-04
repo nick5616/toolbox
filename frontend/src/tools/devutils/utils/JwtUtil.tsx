@@ -31,6 +31,7 @@ export default function JwtUtil() {
           invalid={r?.ok === false}
           onChange={(e) => setToken(e.target.value)}
           aria-label="JWT"
+          data-tip="Paste a token (three parts separated by dots); it is decoded here and never sent anywhere"
           spellCheck={false}
           placeholder="eyJhbGciOi..."
         />
@@ -43,12 +44,12 @@ export default function JwtUtil() {
               <tbody>
                 {r.jwt.claims.map((c) => (
                   <tr key={c.name}>
-                    <th scope="row">{CLAIM_LABEL[c.name]}</th>
+                    <th scope="row" data-tip="A time stored in the token as seconds since 1970">{CLAIM_LABEL[c.name]}</th>
                     <td className={styles.mono}>{c.seconds}</td>
                     <td>{c.local}</td>
                     <td>
-                      {c.status === "expired" && <Badge tone="danger">Expired</Badge>}
-                      {c.status === "not-yet-valid" && <Badge tone="warn">Not yet valid</Badge>}
+                      {c.status === "expired" && <Badge tone="danger" tip="The expiry time has passed, so servers will reject this token">Expired</Badge>}
+                      {c.status === "not-yet-valid" && <Badge tone="warn" tip="The token only becomes valid at a later time">Not yet valid</Badge>}
                     </td>
                   </tr>
                 ))}

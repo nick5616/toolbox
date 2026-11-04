@@ -122,7 +122,7 @@ export function AddStepMenu({ index, catalog, check, onPick, variant }: AddStepM
 
   const trigger =
     variant === "end" ? (
-      <button ref={triggerRef} type="button" className={styles.endButton} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
+      <button ref={triggerRef} type="button" className={styles.endButton} aria-haspopup="menu" aria-expanded={open} data-tip="Choose a tool or action to add as the next step" onClick={toggle}>
         <Icon name="plus" size={14} />
         <span>Add step</span>
       </button>
@@ -153,6 +153,7 @@ export function AddStepMenu({ index, catalog, check, onPick, variant }: AddStepM
             size="sm"
             placeholder="Search steps"
             aria-label="Search steps"
+            data-tip="Type a tool name or what you want to do"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />

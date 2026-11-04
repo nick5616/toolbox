@@ -304,6 +304,7 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
           <input
             className={styles.name}
             aria-label="Pipeline name"
+            data-tip="The name shown in the list and the command palette"
             value={draft.name}
             maxLength={80}
             placeholder="Name this pipeline"
@@ -312,6 +313,7 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
           <input
             className={styles.description}
             aria-label="Description"
+            data-tip="A note for yourself about what this pipeline is for"
             value={draft.description}
             maxLength={300}
             placeholder="Add a description"
@@ -319,7 +321,7 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
           />
         </div>
         <div className={styles.actions}>
-          <span className={styles.saveState} role="status" aria-live="polite">
+          <span className={styles.saveState} role="status" aria-live="polite" data-tip="Changes save automatically a moment after you make them">
             {saveState.kind === "saving" && "Saving…"}
             {saveState.kind === "saved" && "Saved"}
             {saveState.kind === "error" && <span className={styles.saveError}>Couldn&apos;t save: {saveState.message}</span>}
@@ -331,11 +333,12 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
           </Tooltip>
           <MenuButton
             label="Pipeline actions"
+            tip="Duplicate or delete this pipeline"
             icon="ellipsis"
             variant="ghost"
             items={() => [
-              { id: "duplicate", label: "Duplicate", icon: "copy", onSelect: () => void duplicatePipeline() },
-              { id: "delete", label: "Delete…", icon: "trash-2", onSelect: () => setConfirmDelete(true) },
+              { id: "duplicate", label: "Duplicate", icon: "copy", tip: "Make a copy of this pipeline to change without touching the original", onSelect: () => void duplicatePipeline() },
+              { id: "delete", label: "Delete…", icon: "trash-2", tip: "Remove this pipeline; files from earlier runs stay", onSelect: () => setConfirmDelete(true) },
             ]}
           />
         </div>
@@ -343,8 +346,8 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
 
       <div className={styles.scroll}>
         <div className={styles.status}>
-          <span>Takes: {describeAccepts(check.accepts)}</span>
-          <span className={cx(styles.statusDot, check.ready ? styles.ok : missing.length > 0 ? styles.warn : styles.bad)}>● {status}</span>
+          <span data-tip="The kinds of files you can start this pipeline with">Takes: {describeAccepts(check.accepts)}</span>
+          <span data-tip={check.ready ? "Every step is set up and its tools are installed" : missing.length > 0 ? "Install the missing tool packs to run this" : "Fix the problems listed to run this"} className={cx(styles.statusDot, check.ready ? styles.ok : missing.length > 0 ? styles.warn : styles.bad)}>● {status}</span>
         </div>
 
         {pipelineProblems.length > 0 && (
@@ -361,7 +364,7 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
             tone="warn"
             title="Some tools aren't installed"
             action={
-              <Button size="sm" variant="secondary" onClick={openToolPacks}>
+              <Button size="sm" variant="secondary" data-tip="Open Settings to install the packs that contain these tools" onClick={openToolPacks}>
                 Tool packs
               </Button>
             }
@@ -412,15 +415,15 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
         </div>
 
         <section className={styles.section} aria-label="Triggers">
-          <h3 className={styles.sectionTitle}>Triggers</h3>
+          <h3 className={styles.sectionTitle} data-tip="Ways a run can start besides pressing Run">Triggers</h3>
           <div className={styles.watch}>
-            <Switch checked={draft.watch.enabled} onChange={toggleWatch} label="Watch a folder" />
+            <Switch checked={draft.watch.enabled} onChange={toggleWatch} label="Watch a folder" tip="Run this pipeline automatically on every new file that appears in a folder" />
             {draft.watch.folder && <PathText path={draft.watch.folder} />}
-            <Button size="sm" variant="secondary" onClick={() => void chooseFolder()}>
+            <Button size="sm" variant="secondary" data-tip="Pick the folder to watch for new files" onClick={() => void chooseFolder()}>
               Choose…
             </Button>
           </div>
-          {watchMessage && <p className={styles.watchMessage}>{watchMessage}</p>}
+          {watchMessage && <p className={styles.watchMessage} data-tip="Status of the folder watcher">{watchMessage}</p>}
           <p className={styles.muted}>Also: drop files on this pipeline, Library → Send to, or the command palette.</p>
         </section>
 
@@ -434,6 +437,7 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
               <Button
                 size="sm"
                 variant="ghost"
+                data-tip="See this pipeline's runs in the Runs tab"
                 onClick={() => {
                   setRunFilter(pipelineId);
                   setTab("runs");

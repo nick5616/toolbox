@@ -12,10 +12,10 @@ const HOTKEY_ROWS: Array<{ action: string; label: string }> = [
 ];
 
 function StatusBadge({ accelerator, status }: { accelerator: string; status: HotkeyStatus | undefined }) {
-  if (!accelerator) return <Badge>Disabled</Badge>;
-  if (!status) return <Badge>Pending</Badge>;
-  if (status.registered) return <Badge tone="ok">Active</Badge>;
-  const badge = <Badge tone="warn">In use by another app</Badge>;
+  if (!accelerator) return <Badge tip="No shortcut is set for this action">Disabled</Badge>;
+  if (!status) return <Badge tip="Waiting for the shortcut to be registered with the system">Pending</Badge>;
+  if (status.registered) return <Badge tone="ok" tip="The shortcut works from any app">Active</Badge>;
+  const badge = <Badge tone="warn" tip="Another app already owns this shortcut; pick a different one">In use by another app</Badge>;
   return status.error ? <Tooltip label={status.error}>{badge}</Tooltip> : badge;
 }
 
@@ -54,12 +54,13 @@ export function SettingsGeneral() {
   const isDefault = HOTKEY_ROWS.every((r) => (hotkeys[r.action] ?? "") === (DEFAULT_HOTKEYS[r.action] ?? ""));
 
   return (
-    <Section label="General">
+    <Section label="General" tip="Tray, start-up and global shortcuts">
       <div className={styles.stack}>
         <Switch
           checked={settings.keepInTray}
           onChange={(v) => void apply({ keepInTray: v }, ["keepInTray"])}
           label="Keep Toolbox running in the tray when the window is closed"
+          tip="Closing the window hides it instead of quitting, so downloads and watch folders keep working"
         />
         {errors.keepInTray && (
           <p className={styles.error} role="alert">
@@ -70,6 +71,7 @@ export function SettingsGeneral() {
           checked={settings.startAtLogin}
           onChange={(v) => void apply({ startAtLogin: v }, ["startAtLogin"])}
           label="Start Toolbox at login"
+          tip="Open Toolbox quietly in the tray each time you sign in to your computer"
         />
         {errors.startAtLogin && (
           <p className={styles.error} role="alert">
@@ -78,11 +80,12 @@ export function SettingsGeneral() {
         )}
 
         <div className={styles.shortcutsHead}>
-          <h3 className={styles.subtitle}>Global shortcuts</h3>
+          <h3 className={styles.subtitle} data-tip="Key combinations that work even when Toolbox is in the background">Global shortcuts</h3>
           <Button
             size="sm"
             variant="ghost"
             disabled={isDefault}
+            data-tip={isDefault ? "Shortcuts already have their default keys" : "Put every global shortcut back to its original keys"}
             onClick={() => void apply({ hotkeys: { ...DEFAULT_HOTKEYS } }, HOTKEY_ROWS.map((r) => `hotkeys.${r.action}`))}
           >
             Reset to defaults
@@ -94,7 +97,7 @@ export function SettingsGeneral() {
             const err = errors[`hotkeys.${action}`];
             return (
               <li key={action} className={styles.shortcut}>
-                <span className={styles.shortcutLabel}>{label}</span>
+                <span className={styles.shortcutLabel} data-tip={action === "clipboard" ? "Opens the clipboard history popup from anywhere" : "Opens the search palette from anywhere"}>{label}</span>
                 <HotkeyRecorder
                   label={`${label} shortcut`}
                   value={accel}

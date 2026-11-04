@@ -12,6 +12,14 @@ const labels: Record<ChipStatus, string> = {
   cancelled: "Cancelled",
 };
 
+const tips: Record<ChipStatus, string> = {
+  queued: "Waiting for its turn to start",
+  running: "In progress right now",
+  done: "Finished successfully",
+  failed: "Stopped with an error; open the details for why",
+  cancelled: "Stopped before it finished",
+};
+
 export interface StatusChipProps {
   status: ChipStatus;
   /** Override the text (rendered uppercase). */
@@ -20,5 +28,5 @@ export interface StatusChipProps {
 }
 
 export function StatusChip({ status, label, className }: StatusChipProps) {
-  return <span className={cx(styles.chip, styles[status], className)}>{label ?? labels[status]}</span>;
+  return <span data-tip={tips[status]} className={cx(styles.chip, styles[status], className)}>{label ?? labels[status]}</span>;
 }

@@ -25,7 +25,7 @@ export interface DropZoneProps {
  */
 export function DropZone({ id, label = "Drop files here", hint, icon = "arrow-down-to-line", children, className }: DropZoneProps) {
   return (
-    <div id={id} data-file-drop-target="" className={cx(styles.zone, className)}>
+    <div id={id} data-file-drop-target="" data-tip="Drop files here from your computer, or use the choose button if there is one" className={cx(styles.zone, className)}>
       <Icon name={icon} size={20} className={styles.icon} />
       <div className={styles.label}>{label}</div>
       {hint && <div className={styles.hint}>{hint}</div>}

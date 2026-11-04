@@ -81,17 +81,19 @@ export function JobTray() {
       style={{ height: px }}
       aria-label="Job tray"
     >
-      {open && <div className={styles.handle} onPointerDown={startResize} role="separator" aria-orientation="horizontal" />}
+      {open && <div className={styles.handle} onPointerDown={startResize} role="separator" aria-orientation="horizontal" data-tip="Drag up or down to resize the job tray" />}
       <button
         type="button"
         className={styles.strip}
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label="Toggle job tray"
+        data-tip={open ? "Hide the list of jobs" : "Show running, queued and finished jobs"}
+        data-tip-kbd="Mod+J"
       >
-        <Meter className={styles.meter} value={aggregate.value} status={aggregate.status} size="sm" label="Overall progress" />
+        <Meter tip="Average progress of all running jobs" className={styles.meter} value={aggregate.value} status={aggregate.status} size="sm" label="Overall progress" />
         <span className={styles.summary}>{summary}</span>
-        {counts.failed > 0 && <span className={cx(styles.summary, styles.failed)}>{counts.failed} failed</span>}
+        {counts.failed > 0 && <span data-tip="Jobs that stopped with an error; open the tray to see why or retry" className={cx(styles.summary, styles.failed)}>{counts.failed} failed</span>}
         <span className={styles.spacer} />
         <Kbd combo="Mod+J" />
         <span className={styles.chev}>
@@ -101,14 +103,14 @@ export function JobTray() {
       {open && (
         <>
           <div className={styles.header}>
-            <span>
+            <span data-tip="Jobs in this list, including finished ones">
               {counts.total} {counts.total === 1 ? "job" : "jobs"}
             </span>
             <span className={styles.spacer} />
-            <Button size="sm" variant="ghost" onClick={clear} disabled={counts.done + counts.failed + counts.cancelled === 0}>
+            <Button size="sm" variant="ghost" onClick={clear} disabled={counts.done + counts.failed + counts.cancelled === 0} data-tip={counts.done + counts.failed + counts.cancelled === 0 ? "Nothing finished to clear yet" : "Remove finished, failed and cancelled jobs from this list (your files stay)"}>
               Clear finished
             </Button>
-            <IconButton size="sm" icon="chevron-down" label="Collapse" onClick={() => setOpen(false)} />
+            <IconButton size="sm" icon="chevron-down" label="Collapse" data-tip="Close the job list" onClick={() => setOpen(false)} />
           </div>
           <div className={styles.list}>
             {jobs.length === 0 ? (

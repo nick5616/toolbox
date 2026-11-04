@@ -3,7 +3,7 @@ import { EmptyState, Icon, Spinner, TextField } from "@/components";
 import { useUI } from "@/state/ui";
 import { useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "../index";
-import { UTILS, filterUtils, isUtilId, useDevUtilsNav, type UtilId } from "./registry";
+import { UTILS, UTIL_TIPS, filterUtils, isUtilId, useDevUtilsNav, type UtilId } from "./registry";
 import styles from "./DevUtils.module.css";
 
 interface Saved {
@@ -48,11 +48,11 @@ export default function DevUtilsView({ moduleId }: ToolViewProps) {
   return (
     <section className={styles.root} aria-label="Dev Utilities">
       <nav className={styles.nav} aria-label="Utilities">
-        <TextField size="sm" icon="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search utilities" aria-label="Search utilities" />
+        <TextField size="sm" icon="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search utilities" aria-label="Search utilities" data-tip="Filter by name or keyword, e.g. sha, epoch, yaml" />
         <ul className={styles.navList}>
           {visible.map((u) => (
             <li key={u.id}>
-              <button type="button" className={styles.navItem} aria-current={u.id === current.id} onClick={() => choose(u.id)}>
+              <button type="button" className={styles.navItem} aria-current={u.id === current.id} data-tip={UTIL_TIPS[u.id]} data-tip-side="right" onClick={() => choose(u.id)}>
                 <Icon name={u.icon} size={16} />
                 {u.name}
               </button>
@@ -63,7 +63,7 @@ export default function DevUtilsView({ moduleId }: ToolViewProps) {
       </nav>
       <div className={styles.main}>
         <h1 className={styles.title}>{current.name}</h1>
-        <p className={styles.note}>Everything here runs on this computer. Nothing is sent anywhere.</p>
+        <p className={styles.note} data-tip="No network calls are made by these utilities">Everything here runs on this computer. Nothing is sent anywhere.</p>
         <Suspense fallback={<Spinner />}>
           <Active key={current.id} />
         </Suspense>

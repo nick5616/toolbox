@@ -119,7 +119,7 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
           hint={accepts.urls ? "or paste links below" : undefined}
           className={styles.drop}
         >
-          <Button size="sm" icon="folder-open" onClick={() => void choose()}>
+          <Button size="sm" icon="folder-open" data-tip="Pick the files to run this pipeline on" onClick={() => void choose()}>
             Choose files
           </Button>
         </DropZone>
@@ -129,6 +129,7 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
             <span className={styles.fieldLabel}>Links</span>
             <TextArea
               aria-label="Links"
+              data-tip="Web addresses to run on, one per line"
               placeholder="One link per line"
               value={linksText}
               minRows={2}
@@ -147,11 +148,11 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
               return (
                 <li key={i} className={cx(styles.input, !ok && styles.struck)} data-accepted={ok}>
                   <Icon name={link ? "link" : "file"} size={14} className={styles.inputIcon} />
-                  <span className={styles.inputName} title={i}>
+                  <span className={styles.inputName} data-tip={i}>
                     {link ? i : baseName(i)}
                   </span>
-                  {!ok && <span className={styles.notFor}>not for this pipeline</span>}
-                  {!link && <IconButton size="sm" icon="x" label={`Remove ${baseName(i)}`} onClick={() => setInputs(inputs.filter((x) => x !== i))} />}
+                  {!ok && <span className={styles.notFor} data-tip="This pipeline cannot start with this kind of file, so it will be skipped">not for this pipeline</span>}
+                  {!link && <IconButton size="sm" icon="x" label={`Remove ${baseName(i)}`} data-tip="Take this file out of the run (the file itself is untouched)" onClick={() => setInputs(inputs.filter((x) => x !== i))} />}
                 </li>
               );
             })}
@@ -169,6 +170,7 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
                   <TextField
                     type="password"
                     aria-label={s.label}
+                    data-tip="Needed by a step to open protected files; kept in memory for this run only, never saved"
                     autoComplete="off"
                     value={secrets[key] ?? ""}
                     onChange={(e) => setSecrets((cur) => ({ ...cur, [key]: e.target.value }))}
@@ -187,10 +189,10 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
         )}
 
         <div className={styles.footer}>
-          <Button variant="secondary" onClick={close}>
+          <Button variant="secondary" data-tip="Close without starting" data-tip-kbd="Esc" onClick={close}>
             Cancel
           </Button>
-          <Button variant="primary" icon="play" disabled={!canStart} onClick={() => void start()}>
+          <Button variant="primary" icon="play" disabled={!canStart} data-tip={!ready ? "The pipeline cannot run yet; see the message above" : accepted.length === 0 ? "Add at least one file or link this pipeline accepts" : tooMany ? `Remove some inputs; a run takes at most ${MAX_INPUTS}` : missingSecret ? "Enter the passwords the steps need" : "Start the run on the listed inputs"} onClick={() => void start()}>
             {accepted.length > 1 ? `Start with ${accepted.length} files` : "Start"}
           </Button>
         </div>

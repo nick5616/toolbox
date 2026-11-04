@@ -135,27 +135,28 @@ export function StepCard({
           type="button"
           className={styles.handle}
           aria-label={`Move step ${index + 1} (Alt+Up or Alt+Down)`}
+          data-tip="Drag to reorder this step, or press Alt+Up / Alt+Down"
           data-step-handle={step.id}
           onPointerDown={onHandlePointerDown}
         >
           <Icon name="grip-vertical" size={14} />
         </button>
-        <button type="button" className={styles.toggle} aria-expanded={expanded} aria-controls={bodyId} onClick={onToggle}>
-          <span className={styles.number}>{index + 1}</span>
+        <button type="button" className={styles.toggle} aria-expanded={expanded} aria-controls={bodyId} data-tip={expanded ? "Collapse this step" : "Show this step's options"} onClick={onToggle}>
+          <span className={styles.number} data-tip="Position in the pipeline; steps run from top to bottom">{index + 1}</span>
           <Icon name={type?.icon ?? "box"} size={16} className={styles.icon} />
           <span className={styles.name}>{name}</span>
-          <span className={styles.summary}>{step.manual ? "" : summary}</span>
+          <span className={styles.summary} data-tip={step.manual ? undefined : "What this step will do with its current settings"}>{step.manual ? "" : summary}</span>
           <span className={styles.chips}>
             {showFromChip && (
-              <Badge>
+              <Badge tip="Where this step gets its files, and which ones it takes">
                 from {fromLabel}
                 {filterLabel ? ` · ${filterLabel}` : ""}
               </Badge>
             )}
-            {step.manual && <Badge tone="accent">I&apos;ll do this myself</Badge>}
-            <Badge tone={step.keep ? "ok" : "neutral"}>{step.keep ? "Kept" : "In-between"}</Badge>
+            {step.manual && <Badge tone="accent" tip="The pipeline pauses here and waits for you to do this step in the tool">I&apos;ll do this myself</Badge>}
+            <Badge tone={step.keep ? "ok" : "neutral"} tip={step.keep ? "Its files stay in your Library after the run" : "Its files are temporary and are deleted when the run finishes cleanly"}>{step.keep ? "Kept" : "In-between"}</Badge>
             {problems.length > 0 && (
-              <Badge tone="danger">
+              <Badge tone="danger" tip="This step has problems that stop the pipeline; expand it to read them">
                 <span aria-hidden="true">⚠ </span>
                 {problems.length}
                 <span className={styles.srOnly}> {problems.length === 1 ? "problem" : "problems"}</span>
@@ -165,8 +166,8 @@ export function StepCard({
           <Icon name={expanded ? "chevron-down" : "chevron-right"} size={14} className={styles.chevron} />
         </button>
         <span className={styles.moves}>
-          <IconButton size="sm" icon="arrow-up" label={`Move step ${index + 1} up`} disabled={index === 0} onClick={() => onMove(-1)} />
-          <IconButton size="sm" icon="arrow-down" label={`Move step ${index + 1} down`} disabled={isLast} onClick={() => onMove(1)} />
+          <IconButton size="sm" icon="arrow-up" label={`Move step ${index + 1} up`} data-tip={index === 0 ? "This is already the first step" : "Run this step earlier"} disabled={index === 0} onClick={() => onMove(-1)} />
+          <IconButton size="sm" icon="arrow-down" label={`Move step ${index + 1} down`} data-tip={isLast ? "This is already the last step" : "Run this step later"} disabled={isLast} onClick={() => onMove(1)} />
         </span>
       </div>
 
@@ -185,6 +186,7 @@ export function StepCard({
               {(c) => (
                 <Select
                   {...c}
+                  data-tip="Which files this step works on: the ones you start the run with, or what an earlier step made"
                   size="sm"
                   value={step.from}
                   options={fromOptions}
@@ -196,19 +198,20 @@ export function StepCard({
 
           {step.from !== FROM_NONE && (
             <div className={styles.only}>
-              <span className={styles.onlyLabel}>Only</span>
+              <span className={styles.onlyLabel} data-tip="Limit this step to certain kinds of files from its source">Only</span>
               {roleChips.map((r) => (
                 <button
                   key={r.role}
                   type="button"
                   className={cx(styles.chip, filter.roles.includes(r.role) && styles.chipOn)}
                   aria-pressed={filter.roles.includes(r.role)}
+                  data-tip={filter.roles.includes(r.role) ? `Stop limiting to ${r.label}` : `Only take the "${r.label}" files from the source step`}
                   onClick={() => toggleRole(r.role)}
                 >
                   {r.label}
                 </button>
               ))}
-              {roleChips.length === 0 && isFilterEmpty(filter) && <span className={styles.muted}>everything it gets</span>}
+              {roleChips.length === 0 && isFilterEmpty(filter) && <span className={styles.muted} data-tip="No filter: this step takes all files from its source">everything it gets</span>}
               <FiltersPopover filter={filter} onChange={(filter) => onChange({ filter })} />
             </div>
           )}
@@ -224,6 +227,7 @@ export function StepCard({
                     maxLength={200}
                     value={step.note}
                     placeholder="What should you look for?"
+                    data-tip="A reminder shown when the pipeline pauses, e.g. what to check"
                     onChange={(e) => onChange({ note: e.target.value })}
                   />
                 )}
@@ -239,8 +243,8 @@ export function StepCard({
                     value={step.manual ? "manual" : "auto"}
                     onChange={(v) => setManual(v === "manual")}
                     options={[
-                      { value: "auto", label: "Automatically" },
-                      { value: "manual", label: `I'll do it myself in ${toolName}` },
+                      { value: "auto", label: "Automatically", tip: "Toolbox runs this step for you with the options below" },
+                      { value: "manual", label: `I'll do it myself in ${toolName}`, tip: `The pipeline pauses and opens ${toolName} with the files; you set it up and run it` },
                     ]}
                   />
                 </div>
@@ -252,6 +256,7 @@ export function StepCard({
                     checked={step.autoContinue}
                     onChange={(autoContinue) => onChange({ autoContinue })}
                     label={`Continue when ${toolName} finishes`}
+                    tip={`Carry on automatically once your ${toolName} job is done, instead of waiting for you to press Continue`}
                   />
                   <Field label="Note">
                     {(c) => (
@@ -261,6 +266,7 @@ export function StepCard({
                         maxLength={200}
                         value={step.note}
                         placeholder="Shown on the “needs you” card"
+                        data-tip="A reminder shown on the waiting card, e.g. what settings to use"
                         onChange={(e) => onChange({ note: e.target.value })}
                       />
                     )}
@@ -298,6 +304,7 @@ export function StepCard({
                 onChange({ keep });
               }}
               label="Keep its files in the Library"
+              tip="On: this step's results stay in your Library. Off: they are temporary and deleted after a clean run"
             />
             <p className={styles.help}>Off: deleted when the run finishes without problems.</p>
           </div>
@@ -311,14 +318,15 @@ export function StepCard({
                   maxLength={60}
                   value={step.label}
                   placeholder={toolName}
+                  data-tip="A custom name for this step in the list and in run results"
                   onChange={(e) => onChange({ label: e.target.value })}
                 />
               )}
             </Field>
-            <Button size="sm" variant="secondary" icon="copy" onClick={onDuplicate}>
+            <Button size="sm" variant="secondary" icon="copy" data-tip="Add a copy of this step right after it, with the same options" onClick={onDuplicate}>
               Duplicate
             </Button>
-            <Button size="sm" variant="danger" icon="trash-2" onClick={onRemove}>
+            <Button size="sm" variant="danger" icon="trash-2" data-tip="Take this step out of the pipeline" onClick={onRemove}>
               Remove
             </Button>
           </div>

@@ -24,9 +24,9 @@ export default function UuidUtil() {
             regenerate(k);
           }}
           options={[
-            { value: "v4", label: "UUID v4" },
-            { value: "v7", label: "UUID v7" },
-            { value: "ulid", label: "ULID" },
+            { value: "v4", label: "UUID v4", tip: "Fully random ID; the most common kind" },
+            { value: "v7", label: "UUID v7", tip: "Random ID that starts with the time, so new ones sort after older ones" },
+            { value: "ulid", label: "ULID", tip: "Shorter time-sortable ID made of letters and digits" },
           ]}
         />
         <Stepper
@@ -39,6 +39,7 @@ export default function UuidUtil() {
             regenerate(kind, c);
           }}
           aria-label="Count"
+          data-tip="How many IDs to make (1 to 1000)"
         />
         <Switch
           checked={upper}
@@ -47,8 +48,9 @@ export default function UuidUtil() {
             regenerate(kind, count, u);
           }}
           label="Upper case"
+          tip="Show letters in the IDs as capitals"
         />
-        <Button variant="primary" icon="rotate-cw" onClick={() => regenerate()}>
+        <Button variant="primary" icon="rotate-cw" data-tip="Make a fresh set of IDs" onClick={() => regenerate()}>
           Generate
         </Button>
       </div>

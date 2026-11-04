@@ -77,7 +77,7 @@ export default function HashUtil() {
     <div className={styles.util}>
       <div className={styles.col}>
         <span className={styles.label}>Text (UTF-8)</span>
-        <TextArea mono minRows={4} maxRows={12} value={text} onChange={(e) => setText(e.target.value)} aria-label="Text to hash" spellCheck={false} />
+        <TextArea mono minRows={4} maxRows={12} value={text} onChange={(e) => setText(e.target.value)} aria-label="Text to hash" data-tip="Text whose hashes are shown below as you type" spellCheck={false} />
       </div>
       <table className={styles.table} aria-label="Text hashes">
         <tbody>
@@ -88,9 +88,9 @@ export default function HashUtil() {
               <tr key={a}>
                 <th scope="row">{ALGO_LABEL[a]}</th>
                 <td className={[styles.mono, hit ? styles.highlight : ""].join(" ")}>{v || "—"}</td>
-                <td>{hit && <Badge tone="ok">Match</Badge>}</td>
+                <td>{hit && <Badge tone="ok" tip="This hash equals the one you pasted to compare">Match</Badge>}</td>
                 <td>
-                  <CopyButton text={v} />
+                  <CopyButton text={v} what={`the ${ALGO_LABEL[a]} hash`} />
                 </td>
               </tr>
             );
@@ -100,13 +100,13 @@ export default function HashUtil() {
 
       <div className={styles.col}>
         <span className={styles.label}>Compare</span>
-        <TextField mono value={compare} onChange={(e) => setCompare(e.target.value)} placeholder="Paste an expected hash to highlight the matching value" aria-label="Compare" spellCheck={false} />
+        <TextField mono value={compare} onChange={(e) => setCompare(e.target.value)} placeholder="Paste an expected hash to highlight the matching value" aria-label="Compare" data-tip="Paste a hash you expect; matching values light up" spellCheck={false} />
       </div>
 
       <div className={styles.col}>
         <span className={styles.label}>Files</span>
         <DropZone id={`tool-drop:${DEV_UTILS_ID}`} className={styles.drop} label="Drop files to hash" hint="Up to 100 files. They are read once and never changed.">
-          <Button size="sm" variant="secondary" onClick={() => void inputs.pick()}>
+          <Button size="sm" variant="secondary" data-tip="Choose up to 100 files to hash" onClick={() => void inputs.pick()}>
             Choose files
           </Button>
         </DropZone>
@@ -121,7 +121,7 @@ export default function HashUtil() {
         />
         <div className={styles.row}>
           {HASH_ALGOS.map((a) => (
-            <Switch key={a} checked={algos.includes(a)} onChange={(on) => toggle(a, on)} label={ALGO_LABEL[a]} />
+            <Switch key={a} checked={algos.includes(a)} onChange={(on) => toggle(a, on)} label={ALGO_LABEL[a]} tip={a === "crc32" ? "Fast checksum for spotting accidental changes; not secure" : a === "md5" || a === "sha1" ? "Common but no longer secure; fine for matching published checksums" : "Strong modern hash; good for verifying downloads"} />
           ))}
         </div>
         <div className={styles.row}>
@@ -130,6 +130,7 @@ export default function HashUtil() {
             icon="hash"
             loading={running || working}
             disabled={inputs.files.length === 0 || algos.length === 0}
+            data-tip={inputs.files.length === 0 ? "Add files first" : algos.length === 0 ? "Switch on at least one algorithm" : "Compute the chosen hashes for these files; files are only read"}
             onClick={() => void run()}
           >
             {inputs.files.length === 0 ? "Hash files" : `Hash ${inputs.files.length} ${inputs.files.length === 1 ? "file" : "files"}`}
@@ -146,8 +147,8 @@ export default function HashUtil() {
               <div key={f.path} className={styles.col}>
                 <div className={styles.row}>
                   <span className={styles.mono}>{f.path}</span>
-                  <Badge>{formatBytes(f.size)}</Badge>
-                  {compareHit && <Badge tone={hit ? "ok" : "neutral"}>{hit ? `Matches ${ALGO_LABEL[hit as HashAlgo] ?? hit}` : "No match"}</Badge>}
+                  <Badge tip="File size">{formatBytes(f.size)}</Badge>
+                  {compareHit && <Badge tone={hit ? "ok" : "neutral"} tip={hit ? "One of this file's hashes equals the one you pasted" : "None of this file's hashes equal the one you pasted"}>{hit ? `Matches ${ALGO_LABEL[hit as HashAlgo] ?? hit}` : "No match"}</Badge>}
                 </div>
                 <table className={styles.table} aria-label={`Hashes of ${f.path}`}>
                   <tbody>
@@ -158,7 +159,7 @@ export default function HashUtil() {
                           <th scope="row">{ALGO_LABEL[a]}</th>
                           <td className={[styles.mono, hit === a ? styles.highlight : ""].join(" ")}>{f.hashes[a]}</td>
                           <td>
-                            <CopyButton text={f.hashes[a] ?? ""} />
+                            <CopyButton text={f.hashes[a] ?? ""} what={`the ${ALGO_LABEL[a]} hash`} />
                           </td>
                         </tr>
                       ))}
