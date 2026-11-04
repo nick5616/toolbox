@@ -57,7 +57,7 @@ export function PhonePreview({ slides, aspect, caption, projects, currentId, onC
 
   return (
     <section className={styles.root} aria-label="Phone preview">
-      <h3 className={styles.h}>Phone preview</h3>
+      <h3 className={styles.h} data-tip="Roughly how the post will look in Instagram on a phone">Phone preview</h3>
       <div className={styles.phone} tabIndex={0} onKeyDown={onKeyDown} aria-roledescription="carousel" aria-label="Swipe with the arrow keys">
         <div className={styles.bar} aria-hidden="true">
           <span className={styles.avatar} />
@@ -67,24 +67,24 @@ export function PhonePreview({ slides, aspect, caption, projects, currentId, onC
           {slide ? <Page key={slide.id} slide={slide} aspect={aspect} project={projects.get(slide.projectId)} /> : <div className={styles.none}>No slides</div>}
           {slides.length > 1 && (
             <>
-              <IconButton className={cx(styles.nav, styles.prev)} size="sm" variant="secondary" icon="chevron-left" label="Previous slide" disabled={index === 0} onClick={() => go(index - 1)} />
-              <IconButton className={cx(styles.nav, styles.next)} size="sm" variant="secondary" icon="chevron-right" label="Next slide" disabled={index === slides.length - 1} onClick={() => go(index + 1)} />
+              <IconButton className={cx(styles.nav, styles.prev)} size="sm" variant="secondary" icon="chevron-left" label="Previous slide" data-tip="Show the previous slide (Left arrow)" disabled={index === 0} onClick={() => go(index - 1)} />
+              <IconButton className={cx(styles.nav, styles.next)} size="sm" variant="secondary" icon="chevron-right" label="Next slide" data-tip="Show the next slide (Right arrow)" disabled={index === slides.length - 1} onClick={() => go(index + 1)} />
             </>
           )}
         </div>
         {slides.length > 1 && (
           <div className={styles.dots} role="tablist" aria-label="Slides">
             {slides.map((s, i) => (
-              <button key={s.id} type="button" role="tab" aria-selected={i === index} aria-label={`Slide ${i + 1}`} className={cx(styles.dot, i === index && styles.dotOn)} onClick={() => onCurrent(s.id)} />
+              <button key={s.id} type="button" role="tab" aria-selected={i === index} aria-label={`Slide ${i + 1}`} data-tip={`Show slide ${i + 1}`} className={cx(styles.dot, i === index && styles.dotOn)} onClick={() => onCurrent(s.id)} />
             ))}
           </div>
         )}
-        <p className={styles.caption} data-testid="phone-caption">
+        <p className={styles.caption} data-testid="phone-caption" data-tip="Instagram shows only the first lines of a caption until you tap more">
           {expanded || !cap.truncated ? caption : cap.text}
           {cap.truncated && !expanded && (
             <>
               {"… "}
-              <button type="button" className={styles.more} onClick={() => setExpanded(true)}>
+              <button type="button" className={styles.more} data-tip="Show the whole caption" onClick={() => setExpanded(true)}>
                 more
               </button>
             </>

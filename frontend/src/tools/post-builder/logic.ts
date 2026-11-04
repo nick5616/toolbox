@@ -33,6 +33,12 @@ export const CAROUSEL_ASPECTS = [
 ] as const;
 
 export const FORMAT_LABELS: Record<PostFormat, string> = { carousel: "Carousel", reel: "Reel", story: "Story" };
+/** Tooltips for the format choices. */
+export const FORMAT_TIPS: Record<PostFormat, string> = {
+  carousel: "A swipeable post of photos and videos in one frame shape",
+  reel: "One vertical 9:16 video, up to 3 minutes",
+  story: "Vertical 9:16 slides that vanish after a day; videos up to 60 seconds",
+};
 
 export function aspectFor(format: string, current: string): string {
   if (format === "reel" || format === "story") return "9:16";

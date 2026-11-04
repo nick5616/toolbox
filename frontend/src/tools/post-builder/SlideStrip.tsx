@@ -91,12 +91,12 @@ export function SlideStrip({ slides, selectedId, aspect, issues, projects, addIt
     <section ref={root} className={styles.root} aria-label="Slides">
       <header className={styles.head}>
         <h2 className={styles.title}>
-          Slides <span className={styles.count}>{slides.length}/{maxSlides}</span>
+          Slides <span className={styles.count} data-tip="Slides in the post / the most Instagram allows for this format">{slides.length}/{maxSlides}</span>
         </h2>
-        <MenuButton label="Add" icon="plus" size="sm" items={addItems} />
+        <span data-tip="Add a slide: photos and clips, or a composition or video" style={{ display: "contents" }}><MenuButton label="Add" icon="plus" size="sm" items={addItems} /></span>
       </header>
       {slides.length === 0 ? (
-        <p className={styles.empty}>No slides yet. Add photos and clips, or drop them here.</p>
+        <p className={styles.empty} data-tip="Use Add or drop files onto this list">No slides yet. Add photos and clips, or drop them here.</p>
       ) : (
         <ol ref={list} className={styles.list}>
           {slides.map((s, i) => {
@@ -112,11 +112,11 @@ export function SlideStrip({ slides, selectedId, aspect, issues, projects, addIt
                 onPointerUp={up}
                 onPointerCancel={up}
               >
-                <button type="button" className={styles.select} onClick={() => onSelect(s.id)} aria-label={`Slide ${i + 1}, ${KIND_LABEL[s.kind] ?? s.kind}`} aria-current={selected || undefined}>
+                <button type="button" className={styles.select} onClick={() => onSelect(s.id)} aria-label={`Slide ${i + 1}, ${KIND_LABEL[s.kind] ?? s.kind}`} data-tip="Select this slide; drag a slide up or down to change the order" aria-current={selected || undefined}>
                   <span className={styles.thumbWrap}>
                     <SlideThumb slide={s} aspect={aspect} project={projects.get(s.projectId)} />
                   </span>
-                  <span className={styles.badge}>{i + 1}</span>
+                  <span className={styles.badge} data-tip="Position in the post">{i + 1}</span>
                   <span className={styles.kind} title={KIND_LABEL[s.kind]}>
                     <Icon name={KIND_ICON[s.kind] ?? "image"} size={12} />
                   </span>
@@ -125,14 +125,14 @@ export function SlideStrip({ slides, selectedId, aspect, issues, projects, addIt
                       <Icon name="triangle-alert" size={12} />
                     </span>
                   )}
-                  {isPending(s) && <span className={styles.pending}>Not made yet</span>}
+                  {isPending(s) && <span className={styles.pending} data-tip="Open it to make the picture or video for this slide">Not made yet</span>}
                 </button>
                 {selected && (
                   <span className={styles.actions}>
-                    <IconButton size="sm" icon="chevron-up" label="Move earlier" disabled={i === 0} onClick={() => onReorder(i, i - 1)} />
-                    <IconButton size="sm" icon="chevron-down" label="Move later" disabled={i === slides.length - 1} onClick={() => onReorder(i, i + 1)} />
-                    <IconButton size="sm" icon="copy" label="Duplicate slide" disabled={slides.length >= maxSlides} onClick={() => onDuplicate(s.id)} />
-                    <IconButton size="sm" icon="trash-2" label="Delete slide" variant="danger" onClick={() => onDelete(s.id)} />
+                    <IconButton size="sm" icon="chevron-up" label="Move earlier" data-tip="Move this slide one place earlier in the post" disabled={i === 0} onClick={() => onReorder(i, i - 1)} />
+                    <IconButton size="sm" icon="chevron-down" label="Move later" data-tip="Move this slide one place later in the post" disabled={i === slides.length - 1} onClick={() => onReorder(i, i + 1)} />
+                    <IconButton size="sm" icon="copy" label="Duplicate slide" data-tip={slides.length >= maxSlides ? "The post is full" : "Add a copy of this slide right after it"} disabled={slides.length >= maxSlides} onClick={() => onDuplicate(s.id)} />
+                    <IconButton size="sm" icon="trash-2" label="Delete slide" data-tip="Remove this slide from the post; the file is not deleted" variant="danger" onClick={() => onDelete(s.id)} />
                   </span>
                 )}
               </li>

@@ -111,8 +111,8 @@ function Tile({ source, id, size, selected, highlighted, active, used, onPointer
         <Icon name={kind === "clip" ? "film" : "image"} size={11} />
         {kind === "clip" && duration > 0 && <span data-testid="duration">{formatDuration(duration)}</span>}
       </span>
-      {missing && <span className={styles.flag}>Missing</span>}
-      {used.length > 0 && <span className={styles.used}>Used in {used.join(", ")}</span>}
+      {missing && <span className={styles.flag} data-tip="This file was moved or deleted">Missing</span>}
+      {used.length > 0 && <span className={styles.used} data-tip="The slide numbers that already use this source">Used in {used.join(", ")}</span>}
     </div>
   );
 }

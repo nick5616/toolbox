@@ -348,11 +348,11 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
   const addItems = (): MenuItem[] => {
     const full = !doc || roomLeft(doc, limits) === 0;
     return [
-      { id: "files", label: "Photos & clips…", icon: "image", disabled: full, onSelect: () => void pickFiles().then(addPaths) },
-      { id: "new-comp", label: "New composition", icon: "layers", disabled: full, onSelect: () => void newProjectSlide("composition") },
-      { id: "new-video", label: "New video", icon: "clapperboard", disabled: full, onSelect: () => void newProjectSlide("video") },
-      { id: "old-comp", label: "Existing composition…", icon: "layers", disabled: full, onSelect: () => setDialog({ kind: "pick", project: "composition" }) },
-      { id: "old-video", label: "Existing video…", icon: "clapperboard", disabled: full, onSelect: () => setDialog({ kind: "pick", project: "video" }) },
+      { id: "files", label: "Photos & clips…", tip: full ? "This post is full" : "Pick photos and videos from your computer; each becomes a slide", icon: "image", disabled: full, onSelect: () => void pickFiles().then(addPaths) },
+      { id: "new-comp", label: "New composition", tip: full ? "This post is full" : "Design a collage or graphic in Photo Composer and use it as a slide", icon: "layers", disabled: full, onSelect: () => void newProjectSlide("composition") },
+      { id: "new-video", label: "New video", tip: full ? "This post is full" : "Edit a video in Video Editor and use it as a slide", icon: "clapperboard", disabled: full, onSelect: () => void newProjectSlide("video") },
+      { id: "old-comp", label: "Existing composition…", tip: full ? "This post is full" : "Use a composition you already made in Photo Composer", icon: "layers", disabled: full, onSelect: () => setDialog({ kind: "pick", project: "composition" }) },
+      { id: "old-video", label: "Existing video…", tip: full ? "This post is full" : "Use a video you already made in Video Editor", icon: "clapperboard", disabled: full, onSelect: () => setDialog({ kind: "pick", project: "video" }) },
     ];
   };
 
@@ -617,6 +617,7 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
           <Button
             variant="primary"
             icon="plus"
+            data-tip="Start a post from a folder of photos and clips, or empty"
             onClick={() => {
               setNewFiles([]);
               setDialog({ kind: "new" });
@@ -636,7 +637,7 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
     <div className={styles.root}>
       <header className={styles.header}>
         <h1 className={styles.title}>Post Builder</h1>
-        <span className={styles.save} role="status" data-state={editor.saveState}>
+        <span className={styles.save} role="status" data-state={editor.saveState} data-tip="Changes are saved automatically as you edit">
           {SAVE_LABEL[editor.saveState]}
         </span>
       </header>
@@ -716,7 +717,7 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
               <div className={styles.progress}>
                 <Meter value={job.progress} status="running" label="Export progress" />
                 <span className={styles.progressMsg}>{job.message || "Exporting…"}</span>
-                <Button size="sm" variant="ghost" onClick={() => void useJobs.getState().cancel(job.id)}>
+                <Button size="sm" variant="ghost" data-tip="Stop exporting this post" onClick={() => void useJobs.getState().cancel(job.id)}>
                   Cancel
                 </Button>
               </div>
@@ -724,21 +725,21 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
               <>
                 {exportFolder && (
                   <span className={styles.last}>
-                    <span className={styles.lastLabel}>Last export</span>
+                    <span className={styles.lastLabel} data-tip="The folder this post was last exported to">Last export</span>
                     <span className={styles.lastPath} title={exportFolder}>
                       {exportFolder}
                     </span>
-                    <Button size="sm" variant="ghost" icon="folder-open" onClick={() => openFolder(exportFolder)}>
+                    <Button size="sm" variant="ghost" icon="folder-open" data-tip="Show the exported folder in your file manager" onClick={() => openFolder(exportFolder)}>
                       Open folder
                     </Button>
-                    <Button size="sm" variant="ghost" icon="copy" onClick={() => void copyText(doc.caption, "Caption copied")}>
+                    <Button size="sm" variant="ghost" icon="copy" data-tip="Copy the caption to paste into Instagram" onClick={() => void copyText(doc.caption, "Caption copied")}>
                       Copy caption
                     </Button>
                   </span>
                 )}
                 <span className={styles.spacer} />
                 {blocking && (
-                  <span className={styles.blocker} data-testid="export-blocker">
+                  <span className={styles.blocker} data-testid="export-blocker" data-tip="Fix this in the Checks panel to enable Export">
                     {blocking.message}
                   </span>
                 )}

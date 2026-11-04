@@ -1,9 +1,9 @@
 import { Badge, Button, Field, Icon, SegmentedControl, Select, Switch, TextArea, cx, toast } from "@/components";
 import type { PostIssue, PostLimits, PostSlide } from "@/lib/api";
-import { CAROUSEL_ASPECTS, FORMAT_LABELS, aspectFor, captionStats, countChars, type PostDoc, type PostFormat } from "./logic";
+import { CAROUSEL_ASPECTS, FORMAT_LABELS, FORMAT_TIPS, aspectFor, captionStats, countChars, type PostDoc, type PostFormat } from "./logic";
 import styles from "./SidePanel.module.css";
 
-const FORMAT_OPTIONS = (Object.keys(FORMAT_LABELS) as PostFormat[]).map((value) => ({ value, label: FORMAT_LABELS[value] }));
+const FORMAT_OPTIONS = (Object.keys(FORMAT_LABELS) as PostFormat[]).map((value) => ({ value, label: FORMAT_LABELS[value], tip: FORMAT_TIPS[value] }));
 
 export async function copyText(text: string, done: string): Promise<void> {
   try {
@@ -21,7 +21,7 @@ export interface ShapePanelProps {
 
 export function ShapePanel({ doc, onChange }: ShapePanelProps) {
   return (
-    <section className={styles.section} aria-label="Format">
+    <section className={styles.section} aria-label="Format" data-tip="What kind of post this is and its shape">
       <Field label="Format">
         <SegmentedControl
           size="sm"
@@ -37,6 +37,7 @@ export function ShapePanel({ doc, onChange }: ShapePanelProps) {
           {(c) => (
             <Select
               id={c.id}
+              data-tip="Frame shape for every slide: 4:5 portrait is the tallest feed shape, 1:1 square, 1.91:1 landscape"
               size="sm"
               value={doc.aspect}
               onChange={(aspect) => onChange({ aspect })}
@@ -45,9 +46,9 @@ export function ShapePanel({ doc, onChange }: ShapePanelProps) {
           )}
         </Field>
       ) : (
-        <p className={styles.hint}>9:16 (1080 × 1920)</p>
+        <p className={styles.hint} data-tip="Reels and stories always use this vertical size">9:16 (1080 × 1920)</p>
       )}
-      <Switch checked={doc.keepLocation} onChange={(keepLocation) => onChange({ keepLocation })} label="Keep location and other metadata" />
+      <Switch checked={doc.keepLocation} onChange={(keepLocation) => onChange({ keepLocation })} label="Keep location and other metadata" tip="Off by default: exports strip GPS location and camera details from your photos" />
     </section>
   );
 }
@@ -63,20 +64,20 @@ export function CaptionPanel({ caption, limits, onChange }: CaptionPanelProps) {
   return (
     <section className={styles.section} aria-label="Caption">
       <div className={styles.rowHead}>
-        <h3 className={styles.h}>Caption</h3>
-        <Button size="sm" variant="ghost" icon="copy" disabled={!caption} onClick={() => void copyText(caption, "Caption copied")}>
+        <h3 className={styles.h} data-tip="The text under the post on Instagram">Caption</h3>
+        <Button size="sm" variant="ghost" icon="copy" data-tip={caption ? "Copy the caption to paste into Instagram" : "Write a caption first"} disabled={!caption} onClick={() => void copyText(caption, "Caption copied")}>
           Copy
         </Button>
       </div>
-      <TextArea aria-label="Caption" value={caption} minRows={4} maxRows={10} invalid={st.left < 0} onChange={(e) => onChange(e.target.value)} placeholder="Write a caption…" />
+      <TextArea aria-label="Caption" data-tip="Hashtags and @mentions count toward Instagram's limits shown below" value={caption} minRows={4} maxRows={10} invalid={st.left < 0} onChange={(e) => onChange(e.target.value)} placeholder="Write a caption…" />
       <div className={styles.counters}>
-        <span className={cx(styles.counter, st.left < 0 && styles.over)} data-testid="chars-left">
+        <span className={cx(styles.counter, st.left < 0 && styles.over)} data-testid="chars-left" data-tip="Instagram allows a limited number of characters in a caption">
           {st.left.toLocaleString("en-US")} characters left
         </span>
-        <span className={cx(styles.counter, st.hashtags > limits.maxHashtags && styles.over)} data-testid="hashtags">
+        <span className={cx(styles.counter, st.hashtags > limits.maxHashtags && styles.over)} data-testid="hashtags" data-tip="Hashtags used / the most Instagram allows">
           {st.hashtags}/{limits.maxHashtags} hashtags
         </span>
-        <span className={cx(styles.counter, st.mentions > limits.maxMentions && styles.over)} data-testid="mentions">
+        <span className={cx(styles.counter, st.mentions > limits.maxMentions && styles.over)} data-testid="mentions" data-tip="People tagged with @ in the caption">
           {st.mentions} {st.mentions === 1 ? "mention" : "mentions"}
         </span>
       </div>
@@ -96,13 +97,14 @@ export function AltPanel({ slide, index, limits, onChange }: AltPanelProps) {
   return (
     <section className={styles.section} aria-label="Alt text">
       <div className={styles.rowHead}>
-        <h3 className={styles.h}>Alt text{slide ? ` for slide ${index + 1}` : ""}</h3>
-        <span className={cx(styles.counter, n > limits.maxAltTextChars && styles.over)}>
+        <h3 className={styles.h} data-tip="A description of the picture for screen readers and when images fail to load">Alt text{slide ? ` for slide ${index + 1}` : ""}</h3>
+        <span className={cx(styles.counter, n > limits.maxAltTextChars && styles.over)} data-tip="Characters used / the most Instagram allows for alt text">
           {n}/{limits.maxAltTextChars}
         </span>
       </div>
       <TextArea
         aria-label="Alt text"
+        data-tip={slide ? "Describe what is in this slide for people who can't see it" : "Select a slide to write its alt text"}
         value={slide?.altText ?? ""}
         disabled={!slide}
         minRows={2}
@@ -128,8 +130,8 @@ export function ChecksPanel({ issues, slides, onSelect }: ChecksPanelProps) {
   return (
     <section className={styles.section} aria-label="Checks">
       <div className={styles.rowHead}>
-        <h3 className={styles.h}>Checks</h3>
-        {issues.length === 0 ? <Badge tone="ok">All clear</Badge> : errors > 0 ? <Badge tone="danger" mono>{errors} to fix</Badge> : <Badge tone="warn" mono>{issues.length}</Badge>}
+        <h3 className={styles.h} data-tip="Problems that would stop Instagram accepting the post, or make it look wrong">Checks</h3>
+        {issues.length === 0 ? <Badge tone="ok" tip="Nothing to fix; the post is ready to export">All clear</Badge> : errors > 0 ? <Badge tone="danger" mono tip="Errors must be fixed before you can export">{errors} to fix</Badge> : <Badge tone="warn" mono tip="Warnings and notes; you can still export">{issues.length}</Badge>}
       </div>
       {issues.length > 0 && (
         <ul className={styles.issues}>
@@ -147,7 +149,7 @@ export function ChecksPanel({ issues, slides, onSelect }: ChecksPanelProps) {
             return (
               <li key={`${n}-${i.slideId}-${i.message}`}>
                 {idx >= 0 ? (
-                  <button type="button" className={cx(styles.issue, styles.issueButton)} onClick={() => onSelect(i.slideId)}>
+                  <button type="button" className={cx(styles.issue, styles.issueButton)} data-tip="Go to this slide" onClick={() => onSelect(i.slideId)}>
                     {body}
                   </button>
                 ) : (
