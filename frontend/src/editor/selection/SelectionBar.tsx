@@ -4,9 +4,10 @@
  * replaces the permanent Inspector column.
  */
 import { useMemo, useState } from "react";
-import { IconButton, MenuButton, SegmentedControl, Select, Slider, ColorSwatchPicker, useClickIn, cx } from "@/components";
+import { IconButton, MenuButton, SegmentedControl, Select, Slider, ColorSwatchPicker, ToolClickIn, toolDrawerId, useClickIn, cx } from "@/components";
 import type { EditClip } from "@/lib/api";
 import { useElementSize } from "@/lib/useElementSize";
+import { useModules } from "@/state/modules";
 import { parseSpeed, serializeSpeed } from "@/viz/edit/schema";
 import { findClip } from "../doc";
 import { FIT_OPTIONS, FIT_TIPS } from "../inspector/SourceSection";
@@ -18,6 +19,8 @@ import { useEditorProfile } from "../profileContext";
 import { useEditStudio } from "../store";
 import { clipLabel } from "../timeline/clipInfo";
 import { deleteSelection, duplicateSelection } from "../timeline/actions";
+import { clipToolChips, type ToolChip } from "../constituents/toolChips";
+import { useReplaceClipSource } from "../constituents/useUseResult";
 import { CLIP_CHIPS, clipSummary } from "./summaries";
 import styles from "./SelectionBar.module.css";
 
@@ -156,9 +159,9 @@ const SUMMARY_PX = (summary: string) => (summary ? 8 + 6 * summary.length : 0);
 const MORE_PX = 72;
 
 /** Which chips fit in `width` px: all with summaries, else all without, else as many as fit plus "Moreâ€¦". Unknown width (0) shows everything. */
-export function fitChips(chips: { panel: string; summary: string }[], width: number): { shown: number; summaries: boolean } {
+export function fitChips(chips: { panel: string; summary: string; title?: string }[], width: number): { shown: number; summaries: boolean } {
   if (width <= 0) return { shown: chips.length, summaries: true };
-  const label = (c: { panel: string }) => CHIP_PX(getEditorPanel(c.panel)?.title ?? c.panel);
+  const label = (c: { panel: string; title?: string }) => CHIP_PX(c.title ?? getEditorPanel(c.panel)?.title ?? c.panel);
   const withSummary = chips.reduce((n, c) => n + label(c) + SUMMARY_PX(c.summary) + 4, 0);
   if (withSummary <= width) return { shown: chips.length, summaries: true };
   let used = 0;
@@ -173,14 +176,43 @@ export function fitChips(chips: { panel: string; summary: string }[], width: num
   return { shown, summaries: false };
 }
 
+/** A launcher chip in the bar: an editor panel, or a constituent tool (Upscale, Clean audio). */
+type BarChip = { panel: string; summary: string; title?: string; tool?: ToolChip };
+
 function SingleClip({ clip }: { clip: EditClip }) {
-  const chips = useClipChips(clip);
+  const profile = useEditorProfile();
+  const panelChips = useClipChips(clip);
+  const known = useModules((s) => s.byId);
+  const { onUse, dialog } = useReplaceClipSource(clip.id);
   const { open } = useClickIn();
   const [box, setBox] = useState<HTMLSpanElement | null>(null);
   const { width } = useElementSize(box);
+  const chips = useMemo<BarChip[]>(() => {
+    const tools = clipToolChips(clip)
+      .filter((t) => !!known[t.module])
+      .map((t): BarChip => ({ panel: toolDrawerId(t.module), summary: "", title: t.title, tool: t }));
+    return [...panelChips, ...tools];
+  }, [panelChips, clip, known]);
   const { shown: n, summaries } = fitChips(chips, width);
   const shown = chips.slice(0, n);
   const overflow = chips.slice(n);
+  const chipView = (c: BarChip, compact: boolean) =>
+    c.tool ? (
+      <ToolClickIn
+        key={c.panel}
+        host={profile.moduleId}
+        module={c.tool.module}
+        title={c.tool.title}
+        icon={c.tool.icon}
+        tip={c.tool.tip}
+        inputs={clip.path ? [clip.path] : []}
+        useLabel="Use for this clip"
+        onUse={onUse}
+        className={styles.chip}
+      />
+    ) : (
+      <PanelClickIn key={c.panel} panel={c.panel} summary={c.summary} showSummary={!compact && summaries} className={styles.chip} />
+    );
   return (
     <>
       <span className={styles.name} title={clip.path || undefined}>
@@ -188,28 +220,29 @@ function SingleClip({ clip }: { clip: EditClip }) {
       </span>
       <ClipQuickControls clip={clip} />
       <span className={styles.chips} ref={setBox}>
-        {shown.map((c) => (
-          <PanelClickIn key={c.panel} panel={c.panel} summary={c.summary} showSummary={summaries} className={styles.chip} />
-        ))}
+        {shown.map((c) => chipView(c, false))}
         {overflow.length > 0 && (
           <>
             <MenuButton
-              label="Moreâ€¦"
+              label="More…"
               size="sm"
               variant="ghost"
               data-tip="The rest of this clip's settings"
-              items={() => overflow.map((c) => ({ id: c.panel, label: `${getEditorPanel(c.panel)?.title ?? c.panel}${c.summary ? ` Â· ${c.summary}` : ""}`, onSelect: () => open(panelDrawerId(c.panel)) }))}
+              items={() =>
+                overflow.map((c) => ({
+                  id: c.panel,
+                  label: `${c.title ?? getEditorPanel(c.panel)?.title ?? c.panel}${c.summary ? ` · ${c.summary}` : ""}`,
+                  onSelect: () => open(c.tool ? toolDrawerId(c.tool.module) : panelDrawerId(c.panel)),
+                }))
+              }
             />
             {/* Their drawers stay mounted; the menu opens them. */}
-            <span hidden>
-              {overflow.map((c) => (
-                <PanelClickIn key={c.panel} panel={c.panel} summary={c.summary} />
-              ))}
-            </span>
+            <span hidden>{overflow.map((c) => chipView(c, true))}</span>
           </>
         )}
       </span>
       <IconButton size="sm" icon="trash-2" label="Delete" data-tip="Remove the selected clip from the edit (you can undo it)" onClick={() => void deleteSelection()} />
+      {dialog}
     </>
   );
 }

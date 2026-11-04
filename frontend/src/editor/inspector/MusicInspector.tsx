@@ -1,9 +1,11 @@
 /** The plain music-bed inspector (SPEC §5.3): which part of the file plays, its volume and fades, and Remove. Edit Studio replaces it with the song inspector. */
 import { useEffect, useState } from "react";
-import { Button, Section, Slider, Stepper } from "@/components";
+import { Button, Section, Slider, Stepper, ToolClickIn } from "@/components";
 import type { EditSong } from "@/lib/api";
 import { editLength } from "@/viz/edit/types";
 import { useProject } from "@/editor/store";
+import { useAsMusic } from "../constituents/useUseResult";
+import { useEditorProfile } from "../profileContext";
 import { addMusic, fileDuration, removeMusic } from "../timeline/songFile";
 import { editDoc } from "./inspectorState";
 import styles from "./inspector.module.css";
@@ -13,6 +15,7 @@ const MIN_BED_MS = 1000;
 
 export function MusicInspector() {
   const project = useProject();
+  const profile = useEditorProfile();
   const path = project?.song?.path ?? "";
   const [fileMs, setFileMs] = useState(0);
   useEffect(() => {
@@ -83,6 +86,10 @@ export function MusicInspector() {
           <Slider data-tip="Fade the music down to silence over this many seconds at the end" aria-label="Fade out" min={0} max={fadeMax} step={100} value={Math.min(song.fadeOutMs, fadeMax)} onChange={(fadeOutMs) => setSong({ fadeOutMs }, "song-fade-out")} format={(v) => `${(v / 1000).toFixed(1)} s`} />
         </div>
       </Section>
+      {/* Edit Studio's song is the analysed one: swapping it would invalidate the analysis. */}
+      {profile.song === "optional" && (
+        <ToolClickIn host={profile.moduleId} module="stems" inputs={[song.path]} useLabel="Use as music" onUse={(paths) => void useAsMusic(paths)} title="Split into stems" tip="Split this music into vocals, drums, bass and more; Use makes the chosen stem the music" />
+      )}
       <Button variant="danger" size="sm" icon="trash-2" data-tip="Take the music out of this video (you can undo it)" onClick={removeMusic}>
         Remove music
       </Button>
