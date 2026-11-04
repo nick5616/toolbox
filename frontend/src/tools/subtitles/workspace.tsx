@@ -27,7 +27,7 @@ export const subtitlesWorkspace = defineWorkspace({
   isOpen: (s) => s.mediaPath !== null || s.editor.tabs.length > 0,
   panels: [
     { id: "source", title: "Source", icon: "film", tip: "The file, a subtitle file, and subtitle tracks already inside the video", component: SourcePanel, width: 420, height: 640 },
-    { id: "transcription", title: "Transcription", icon: "mic", tip: "Model, spoken language and how the text is split, then generate the subtitles", component: TranscriptionPanel, width: 420, height: 640 },
+    { id: "transcription", title: "Transcription", short: "Speech", icon: "mic", tip: "Model, spoken language and how the text is split, then generate the subtitles", component: TranscriptionPanel, width: 420, height: 640 },
     { id: "translate", title: "Translate", icon: "languages", tip: "Translate the subtitles into another language with Local Chat", component: TranslatePanel, width: 420, height: 560 },
     { id: "style", title: "Style", icon: "palette", tip: "How the burned-in text looks, and the visuals behind or over the picture", component: StylePanel, drawerWidth: 460, width: 520, height: 720 },
     { id: "export", title: "Export", icon: "download", tip: "Save .srt or .vtt files, add a track to the video or burn the text in", component: ExportPanel, width: 420, height: 720 },
