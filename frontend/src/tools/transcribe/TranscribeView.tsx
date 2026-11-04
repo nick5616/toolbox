@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
-import { Badge, Button, EmptyState, Icon, Section, cx } from "@/components";
+import { useEffect, useMemo, useState } from "react";
+import { Badge, Button, EmptyState, Icon, Section, ToolClickIn, cx } from "@/components";
 import { LanguageField, ModelCards, SkipSilence, TaskField, useSpeechData } from "@/blocks/speech";
-import { JobStatus, TranscribeService, TranscribeTask, type Language, type TranscribeModel } from "@/lib/api";
+import { FilesService, JobStatus, TranscribeService, TranscribeTask, type Language, type TranscribeModel } from "@/lib/api";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useOrderedJobs, type JobView } from "@/state/jobs";
 import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
@@ -29,6 +29,37 @@ const FORMAT_TIPS: Record<string, string> = {
   vtt: "WebVTT subtitles for web video and HTML players",
   json: "Full detail with word timings, for scripts and other programs",
 };
+
+/** The most text handed to Local Chat (the chat trims further to its model's context). */
+const CHAT_TEXT_MAX = 200_000;
+
+/** "Ask Local Chat" about a transcript (Phase 11 §6): Local Chat opens here with the text attached. */
+function AskChat({ path, title }: { path: string; title: string }) {
+  const [body, setBody] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    FilesService.ReadText(path, CHAT_TEXT_MAX)
+      .then((t) => live && setBody(t))
+      .catch(() => live && setBody(""));
+    return () => {
+      live = false;
+    };
+  }, [path]);
+  return (
+    <ToolClickIn
+      host="transcribe"
+      module="llm-chat"
+      variant="icon"
+      icon="message-square"
+      title="Ask Local Chat"
+      tip="Ask Local Chat about this transcript: summarise it, pull out key points or action items"
+      id={`chat:${path}`}
+      width={520}
+      disabledReason={body === null ? "Reading the transcript…" : body === "" ? "The transcript is empty or unreadable" : undefined}
+      extra={body ? { text: { title: `Transcript of ${title}`, body, prompts: ["Summarise", "Key points", "Action items"] } } : undefined}
+    />
+  );
+}
 
 function TranscriptGroup({
   job,
@@ -72,6 +103,7 @@ function TranscriptGroup({
           >
             Preview
           </Button>
+          {preview && <AskChat path={preview} title={job.title} />}
         </span>
       </div>
       <ul className={shared.list}>
