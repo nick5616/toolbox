@@ -3,7 +3,7 @@ import { WordsSource } from "@/lib/api";
 import { buildFixture } from "@/viz/fixture";
 import { presetById, showFromPreset } from "@/viz/presets";
 import { DEFAULT_ANALYZE } from "./store";
-import { layersSummary, lookSummary, reactionsSummary, timelineSummary } from "./designer/summaries";
+import { layersSummary, lookSummary, reactionsSummary, timelineSummary } from "@/blocks/visuals/designer/summaries";
 import { instrumentsSummary, moodSummary, wordsSummary } from "./source/summaries";
 import { startVisualizerReplica, visualizerBridgeSpec } from "./bridge";
 import { useVisualizer } from "./store";

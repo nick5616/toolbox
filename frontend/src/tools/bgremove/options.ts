@@ -1,6 +1,6 @@
 import { BgModel, BgOutput, type BgRemoveOptions } from "@/lib/api";
-import { basename, num, parseJson, str } from "../image/common";
-import type { ResultItem } from "../image/ResultCards";
+import { basename, num, parseJson, str } from "@/tools/_kit/image/common";
+import type { ResultItem } from "@/tools/_kit/image/ResultCards";
 import type { JobView } from "@/state/jobs";
 
 /** Mirrors Go's DefaultOptions() (modules/bgremove). */

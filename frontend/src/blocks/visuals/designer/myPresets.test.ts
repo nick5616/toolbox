@@ -30,7 +30,7 @@ vi.mock("@/lib/api", async (orig) => {
 });
 
 import { PRESETS, showFromPreset } from "@/viz/presets";
-import { MAX_MY_PRESETS, useMyPresets } from "./designer/myPresets";
+import { MAX_MY_PRESETS, useMyPresets } from "./myPresets";
 
 beforeEach(() => {
   store.list = [];

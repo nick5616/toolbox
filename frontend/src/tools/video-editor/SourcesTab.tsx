@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Banner, Button } from "@/components";
 import { PostsService, type PostSourceFile } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
-import { SourceGrid } from "@/tools/post-builder/SourceGrid";
+import { SourceGrid } from "@/blocks/sources/SourceGrid";
 import styles from "./VideoEditorView.module.css";
 
 export function SourcesTab({ postId, onAdd }: { postId: string; onAdd: (paths: string[]) => void }) {

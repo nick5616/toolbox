@@ -1,328 +1,239 @@
-# Toolbox — Phase 10 Spec: Composable tools
+# Toolbox — Phase 11 Spec: Composable everything
 
-Status: **BUILT 2026-11-04, uncommitted for review** — written and executed overnight on the user's request ("use your best judgement and don't commit any of it, I will test it in the morning"). Nothing is committed to `main`; the result is left as uncommitted changes in `main`'s working tree.
-Author: architect session (Opus). Phase 9 (Edit Studio) is archived in `docs/specs/phase-9.md`; every earlier contract still holds unless changed here.
+Status: **IN PROGRESS 2026-11-04**. Written and executed without a review stop because the user asked to keep going ("i love it. keep going for the whole app and all the tools in it") right after testing Phase 10. Like Phase 10, the result is left **uncommitted on `main`** for the user to test (see DECISIONS 2026-11-04).
+Author: architect session (Opus). Phase 10 (composable tools) is archived in `docs/specs/phase-10.md`; every Phase 10 contract still holds unless changed here.
 
-## 0. The brief, in the user's words, and what it means here
+## 0. The brief
 
-> "Composable building blocks that achieve greater outcomes and are all easy to understand. Each tool should be its baseline self, and have an additional composition on top of it in a different variant. Like edit maker and video editor should be one tool composed on top of the other and as its own tool. That will make the UI a whole lot cleaner. Cleaner engineering, cleaner UX, maintainable code, separation of concerns in the UI and the code. In the UI you click into the video to edit it more in-depth, or it pops out. We should support pop outs for each constituent tool."
+Phase 10 took the video/edit path all the way: the Video Editor as a baseline, Edit Studio composed on it through slots, a minimal top level with every constituent in a click-in that pops out, live store-backed pop-outs, a poppable preview, and a node-graph pipeline builder. The other tools only got the light sweep (an Advanced click-in, a tidier header, CompositionBar chips that *navigate* to a constituent).
 
-A follow-up message the same night sharpened it:
+Phase 11 gives **every tool** the depth the editor got:
 
-> "Go all the way through the video and edit path decoupling these things, expressing the top-level controls of that top-level tool and only that, and hide the rest of the constituent tools in click-in menus that can pop out. Keep the tools really, really clean and minimal. Test it for yourself, take the overall learnings (UX and engineering) and bring them into the entire app. Also make sure each and every tool, even the glue/pipes/junctions, is available in a custom pipeline generator with a UI like ComfyUI: a little tool store you drag and drop tools from and wire them up."
-
-So, on top of the three ideas below: **(4) minimal top-level surfaces**: a tool shows only its own top-level controls; everything that belongs to a constituent lives behind a *click-in* (a launcher that opens a drawer in place, which can pop out into a window); **(5) a node-graph pipeline builder** (§12); **(6) an app-wide sweep** applying the same rules to every tool (§13).
-
-Three ideas, made concrete:
-
-1. **Baselines and variants.** A *baseline* tool is a core that stands on its own. A *variant* is the same core with a composition layered on top, and is still its own tool. The flagship case: **Edit Studio = Video Editor + the music layer.** Both edit the same document; the Video Editor's code never imports the music layer; the music layer plugs into named slots (an `EditorProfile`).
-2. **Parts.** Composed tools are built from other tools (*parts*, "constituents"). The UI shows what a tool is built from and lets you open any part — inline, in depth ("click into the video"), or **popped out into its own window**.
-3. **Pop-outs.** Any tool can pop out into its own window. Panels of a composed tool (the editor's preview, its inspector) can pop out too and stay live, because the host's state is mirrored into the pop-out through a store bridge.
+1. **Tools inside tools.** A composite opens a constituent *inside itself*: the constituent's own view in a click-in drawer, preloaded with the host's files, poppable into its own window, and its results come back with **Use** (an erased photo replaces the layer, a cleaned clip replaces the clip, a stem becomes the music). The CompositionBar's "Uses" chips open constituents this way instead of navigating away. This is "hide the constituent tools in click-in menus that can pop out", applied to every composition in the app, and "outputs feed inputs" inside the UI.
+2. **Workspaces.** Every tool that is a workspace (Photo Composer, Post Builder, Subtitles, Lyric Video, Visualizer, Pipelines, Dev Utilities) gets the editor's shape: a store, panels that take no props (inline click-in or popped out, live), a poppable preview, a rail, one-line bars and one primary action. The step wizards (Subtitles, Lyric Video, Visualizer) become workspaces.
+3. **Real composition in code.** Building blocks shared by several tools live in `blocks/` and never import a tool; tools never import each other (a variant may import its base). A test enforces it for the whole app, as Phase 10's test did for the editor.
+4. **Send to everywhere.** Every result row in every file tool can be sent to any tool that accepts it (or that tool in its own window).
 
 ## 1. Goals
 
-1. One multitrack editor (`frontend/src/editor/`) with two tools on it: **Video Editor** (`video-studio`, baseline) and **Edit Studio** (`edit-studio`, variant). An Edit Studio project opens in the Video Editor and vice versa; a Video Editor project becomes a music edit by picking and analysing a song.
-2. The Video Editor works **without a song**: the edit's length comes from its clips; music is an optional bed. It exports through the same GPU render path.
-3. **Composition is data**: `Descriptor.Base` and `Descriptor.Parts`. The sidebar nests variants under their base; the top bar shows "Built on" and "Uses" chips; every chip can open or pop out that tool.
-4. **Pop-outs everywhere**: every tool view has a Pop out button; the main window shows a placeholder while it's out ("Bring back"). Handoffs (inputs, seeds) work across windows. Files dropped on a pop-out go to that window's tool.
-5. **Live panel pop-outs** in the editor: the preview and the inspector can live in their own windows (second monitor) and stay in sync with the editor.
-6. **Click into the video**: Edit Studio has a *Music* focus (lanes, sections, recipes) and a *Video* focus (the Video Editor in depth: tracks and inspector big, lanes as one thin strip). Double-clicking a clip or the preview goes to Video focus.
-7. **Constituent pop-outs with inputs**: composed tools open their parts with inputs in a window (Post Builder slides in Photo Composer / Sequence Editor; an editor clip in Background Remover or Trimmer).
+1. `<ToolClickIn>` works for every constituent listed in §6, from a drawer and from its own window, with Use returning results.
+2. CompositionBar "Uses" chips open the constituent in a drawer over the current tool with the host's files (Shift+click: its own window; the chip's menu still offers "Go to <tool>").
+3. Every file-tool view renders well embedded (compact, click-ins expand inline, Use buttons on results).
+4. Every result row offers **Send to** (tools that accept the file, each also "in its own window").
+5. Photo Composer, Post Builder, Subtitles, Lyric Video, Visualizer, Pipelines and Dev Utilities are workspaces: their panels pop out and stay live, their previews pop out.
+6. Subtitles, Lyric Video and the Visualizer lose their steppers: once a source is chosen the tool is one workspace screen.
+7. Subtitles is built on Transcribe in code: one transcription block (`blocks/speech`) used by both.
+8. `src/architecture.test.ts` passes with no allowlist beyond the documented composition roots.
+9. Everything works at 960 × 600; nothing is lost (move, don't delete).
 
 ## 2. Non-goals
 
-- No document migration from the old sequence editor (`video-editor`, kind `video`) to edit projects. The old editor stays (renamed **Sequence Editor**, hidden from the sidebar) because Post Builder's video slides and Quick vlog depend on its FFmpeg pipeline. The Video Editor's home links to it.
-- No new tools, models or dependencies. No network listeners (pop-outs are Wails windows and Go events).
-- No cross-window drag and drop of clips. No persisted window positions across launches (this session only).
-- No change to the Visualizer/Lyric Video/Subtitles engines; their composition is metadata + chips + pop-outs.
+- No new tools, models, Go services or dependencies. No network listeners. Go changes are descriptor metadata only (`Parts`), done in the foundation.
+- The Sequence Editor stays (Post Builder's video slides); no project migration.
+- No cross-window drag and drop. Window bounds still persist for the session only.
+- Chat conversations don't become a part (the whole Local Chat tool can already pop out).
+- No change to engines (viz, edit, FFmpeg plans), job semantics or outputs.
 
-## 3. Composition model (FOUNDATION, done)
+## 3. Foundation (done by the architect, committed before the builders start)
 
-`core.Descriptor` gains:
+### 3.1 `blocks/`: shared building blocks
 
-```go
-Base  string   `json:"base"`  // the baseline this tool is a variant of ("" = baseline)
-Parts []string `json:"parts"` // constituent tools, display order; never includes Base; never nil on the wire
-```
-
-| Tool | Base | Parts |
+| Block | From | Used by |
 |---|---|---|
-| Video Editor `video-studio` (new) | — | bg-remover |
-| Edit Studio `edit-studio` | **video-studio** | visualizer, stems, transcribe, bg-remover |
-| Subtitles `subtitles` | **transcribe** | trimmer |
-| Post Builder `post-builder` | — | photo-composer, video-editor (Sequence Editor), bg-remover |
-| Photo Composer `photo-composer` | — | bg-remover |
-| Visualizer `visualizer` | — | stems, bpm-key |
-| Lyric Video `lyric-video` | — | stems, transcribe, visualizer |
+| `blocks/visuals/designer/` (VisualDesigner, model, history, presets) | `tools/visualizer/designer/` | Visualizer, Lyric Video, Subtitles |
+| `blocks/visuals/songmap/` (SongMap + draw/model) | `tools/visualizer/SongMap*`, `songmap/` | Visualizer, the designer, Edit Studio lanes |
+| `blocks/sources/` (SourceGrid, sourceDrag, sourceThumbs, selection) | `tools/post-builder/` | Post Builder, Photo Composer, Sequence Editor, the editor |
+| `blocks/media/useThumbs.ts` | `tools/video-editor/useThumbs.ts` | the editor, Sequence Editor |
+| `tools/_kit/image/` (ResultCards, RadioCards) | `tools/image/` | the image file tools |
 
-- `video-studio` is registered by `editstudio.Register` as `VideoModule`, a wrapper that runs Edit Studio's jobs (same `Validate`/`Run`). It's in the **Media** pack (needs FFmpeg only).
-- The old `video-editor` module is now **"Sequence Editor"**, `Hidden: true`, Order 16. Its view still opens by id (Post Builder handoffs, the Video Editor home).
-- `core.ProjectInfo.Flags []string`: edit projects report `"music"` (has a song) and `"music-edit"` (song + analysis). `projectdocs.Docs.Flags` fills it.
+`VisualDesigner` no longer reads the Visualizer's store: hosts pass `selection`/`onSelect`, `onPlayhead`, `previewPart`, `windowPlayheadMs` (all optional; without them it keeps its own selection and has no pop-out). A block never imports a tool.
 
-## 4. Windows, parts and the store bridge
+### 3.2 The workspace kit (`src/workspace/`)
 
-### 4.1 Go (FOUNDATION, done: `core/windows.go`, `desktop/windows.go`, `api/desktop.go`)
-
-`DesktopService` methods (bindings generated):
-
-| Method | Does |
-|---|---|
-| `PopOut(req PopOutRequest)` | Opens a framed, resizable window loading `/?<query>&key=<key>`, or shows/focuses it if open. A non-empty `Handoff` is kept for `TakeHandoff`; for an open window `windows:handoff {key}` is emitted. ≤ 12 pop-outs. |
-| `CloseWindow(key)` / `FocusWindow(key)` | `FocusWindow("main")` shows the main window. |
-| `OpenWindows() []string` | Open pop-out keys (also pushed as `windows:changed {open}`). |
-| `TakeHandoff(key) string` | The waiting handoff JSON, once. |
-| `Relay(WindowRelay)` | Fans `{channel, from, to, payload}` out as `windows:relay` to every window. Payload ≤ 8 MiB, opaque to Go. |
-
-Keys: `tool:<moduleId>` or `part:<partId>[@<instance>]` (`[a-z0-9._-]`). Query must start with `window=tool&` or `window=part&` and may not contain `key=`. Files dropped on a pop-out arrive as `app:files-dropped` with `window: <key>` (main = `""`). Window bounds are remembered per key for the session.
-
-### 4.2 Frontend contract (FOUNDATION, done: `lib/windows.ts`)
-
-`currentWindow()` → `{kind: "main"|"tool"|"part"|"popup"|"vizlab", key, view, part, params}`; `popOutTool(moduleId, opts)`, `popOutPart(partId, opts)`, `closeWindow`, `focusWindow`, `takeWindowHandoff()`, `relaySend(channel, payload, to?)`, `relayOn(channel, cb)` (ignores its own messages and ones addressed elsewhere).
-
-### 4.3 Tool windows (WP-W1)
-
-- **`App.tsx`** routes by `currentWindow().kind`: `main` → today's MainWindow; `tool` → `ToolWindowShell`; `part` → `PartWindowShell`; `popup`/`vizlab` unchanged.
-- **Bootstrap per window kind** (`state/bootstrap.ts`): tool and part windows run the full data bootstrap (jobs, library, deps, settings, modules) but:
-  - only the main window handles `app:navigate` and `app:hidden-to-tray`;
-  - `app:files-dropped` is routed only by the window whose key equals `drop.window` (main ⇔ `""`); in a tool window a drop hands off to that tool;
-  - only the main window shows job toasts (`useJobToasts`) and mounts `RenderHost` (the export worker) — the render broker must see exactly one host.
-- **`useUI` persistence** (`toolbox.ui` in localStorage, shared by all windows of the origin) is written only by the main window. A tool window's initial view is its `view` parameter.
-- **`ToolWindowShell`**: a slim top bar (tool icon + name, `<CompositionBar>`, and a **Bring back** button = `DesktopService.ShowMain(view)` then `closeWindow(myKey)`), the tool view (ErrorBoundary + Suspense, same `toolViews`), `JobTray`, `Toaster`, `TooltipLayer`, `DropOverlay`. No sidebar and no command palette. On start it calls `takeWindowHandoff()` and, if it's a Handoff for this tool, `useUI.getState().handOff(h)`; it does the same on `windows:handoff` for its key.
-- **Main window — Pop out button**: the top bar shows an `IconButton` (icon `picture-in-picture-2`, label "Pop out", tip "Open this tool in its own window") for module views (not library/settings/pipelines/gallery). It awaits `runBeforePopOut(view)` (below), then `popOutTool(view, {title: "<Name> — Toolbox"})`.
-- **`runBeforePopOut` / `useBeforePopOut(moduleId, fn)`** (`lib/popout.ts`): tools register async flushers (the editor registers `flushEdit`). The shell awaits them (max 3 s) before popping out.
-- **Placeholder**: while `tool:<id>` is open — or the tool of the same **family** (base + its variants: `video-studio` ⇔ `edit-studio`, because they share one document store) — the main window renders `PoppedOutPlaceholder` instead of the tool: EmptyState "<Name> is open in its own window" with **Show window** (`focusWindow`) and **Bring back** (`closeWindow`; the tool mounts again when `windows:changed` drops the key).
-- **`state/windows.ts`**: a zustand store `{open: string[]}` loaded from `OpenWindows()` and kept by `windows:changed`; hooks `useWindowOpen(key)`, `useToolPoppedOut(moduleId)` (family-aware, via `useModules` descriptors' `base`).
-- **Sequence**: pop out → main unmounts the tool (placeholder) → new window bootstraps and opens the tool, which reopens its last project from module state (the flusher saved it). Bring back → reverse.
-
-### 4.4 Parts (WP-W1 implements; any package defines parts)
-
-Types are in `parts/types.ts` (FOUNDATION). WP-W1 adds:
-
-- `parts/registry.ts`: `definePart(spec)`, `getPart(id)`, `listParts()`.
-- `parts/index.ts`: imports each tool's `parts.ts` for side effects (`tools/<tool>/parts.ts` or `editor/parts.ts`). W1 ships it with no imports but the comment; E3 adds the editor's.
-- `parts/PartFrame.tsx`: `<PartFrame part="<id>" instance? params? chrome="overlay"|"header">{children}</PartFrame>`. Inline it renders children plus a pop-out IconButton (overlay: top-right, visible on hover/focus; header: a 28 px header with title + button). Clicking pops the part out (`popOutPart`, size from the spec, `params` added to the URL, plus `view=<current tool>`). While that part window is open it renders a compact placeholder (icon, "Open in its own window", **Show**, **Bring back**) instead of children.
-- `shell/PartWindowShell.tsx`: full bootstrap, then `spec.connect?.(params)` (await), then renders `spec.component` with `placement="window"` (ErrorBoundary, Suspense, Toaster, TooltipLayer), with a slim title bar (part title + "Bring back" = `closeWindow(myKey)`). Unknown part → EmptyState. When the bridge reports `lost` (host gone), show a Banner "The <host> window closed this panel's project" and stop rendering the part.
-
-### 4.5 Store bridge (WP-W1: `state/bridge.ts`)
-
-Generic mirroring of a zustand store from a host window into replicas in other windows.
+`defineWorkspace(spec)` (types in `workspace/types.ts`) is the editor's pattern extracted:
 
 ```ts
-export interface BridgeSpec<S, V extends Record<string, unknown>> {
-  name: string;                         // channel "bridge:<name>"
-  pick(state: S): V;                    // host: the shared values (each key compared by reference)
-  apply(store: StoreApi<S>, values: Partial<V>): void; // replica: write received values
-  actions: readonly (keyof S & string)[]; // replica calls these → run on the host
-}
-export interface BridgeTransport { send(payload: unknown, to?: string): void; on(cb: (payload: unknown, from: string) => void): () => void; }
-export function hostBridge<S, V>(store: StoreApi<S>, spec: BridgeSpec<S, V>, transport?: BridgeTransport): () => void;
-export function replicaBridge<S, V>(store: StoreApi<S>, spec: BridgeSpec<S, V>, opts?: { transport?: BridgeTransport; onStatus?(s: BridgeStatus): void }): () => void;
-export type BridgeStatus = "connecting" | "live" | "lost";
-export function useBridgeStatus(name: string): BridgeStatus | "none";
+const ws = defineWorkspace({
+  moduleId: "photo-composer",
+  store: useComposer,                    // the tool's zustand store
+  bridge: { pick, apply, actions },      // JSON-serialisable values; channel "ws:<moduleId>"
+  isOpen: (s) => s.doc !== null,         // host bridges only while a document is open
+  panels: [{ id: "layers", title: "Layers", icon: "layers", tip: "…", component: LayersPanel }],
+  preview: { component: ComposerPreview, width: 900, height: 900 },
+  useReplica() { /* part windows: load images locally, forward keys */ },
+});
+// in the view:  ws.useHost();  <WorkspacePanel ws={ws} panel="layers" summary="3 layers" />
 ```
 
-Protocol on `bridge:<name>` (default transport = `relaySend`/`relayOn`):
-- replica → host `{t:"hello"}` on start and every 2 s until a snapshot arrives;
-- host → that replica `{t:"snap", seq, values}` (all of `pick`);
-- host → all `{t:"patch", seq, values}` with only changed keys, coalesced to at most one per 16 ms; nothing is sent while no replica has said hello (replicas are dropped when their window closes, from `windows:changed`);
-- replica → host `{t:"call", action, args}` — the replica's listed actions are replaced by forwarders; the host runs `store.getState()[action](...args)` only for listed actions;
-- host → all `{t:"bye"}` on dispose (replica status `lost`).
-Values and args must be JSON-serialisable (no Maps, typed arrays, functions). Tests use a fake in-memory transport (two stores, one host, two replicas, patch coalescing with fake timers, action forwarding, bye).
+- Registers parts `<moduleId>.panel` (`?panel=<id>`, one window per panel) and `<moduleId>.preview`; part windows connect a replica and render once it's live and `isOpen`.
+- Chrome (`workspace/components.tsx`): `WorkspacePanel` (a panel's click-in launcher; Pop out unless `poppable: false`), `WorkspaceRail` (icon launchers with captions; never scrolls, overflow → More), `OneLineBar` (never wraps: items that don't fit go to a More menu; `fitBar` is pure), `StudioLayout` (header / rail | stage | side / bottom), `Spacer`, `WorkspacePreviewFrame` (wraps the preview in a `PartFrame` when the workspace has a preview), `panelDrawerId(id)` for `useClickIn().open`.
+- Define a tool's workspace in `tools/<id>/workspace.ts(x)` at module load; `parts/index.ts` discovers `tools/*/parts.ts` and `tools/*/workspace.ts(x)` by glob (no edit needed).
+- Panels take **no props**; replicas never save, submit jobs or open documents (`ws.isReplica()`); heavy data (bitmaps, analyses) is loaded locally in `useReplica`, never bridged. The editor keeps its own (identical) implementation from Phase 10.
 
-## 5. The editor: Video Editor as the base, Edit Studio on top
+### 3.3 Tools inside tools: contract (`lib/embed.ts`, `components/ToolClickIn.tsx`)
 
-### 5.1 Layout (FOUNDATION: the move is done)
+- `EmbedContext` `{host, hostName, placement: "drawer"|"window", handoff, useLabel, onUse?}`; `useEmbed()`, `useIsEmbedded()`.
+- **`useToolHandoff(moduleId, cb)` replaces every `useUI().takeHandoff` call in tool views**: embedded it delivers the embed's handoff once per handoff object and leaves the global handoff alone; standalone it behaves exactly as before. `useFileInputs` (kit) must use it.
+- `Handoff` gains `text?: TextSeed` (`{title, body, prompts?}`: Local Chat starts a conversation about it; Dev Utilities opens it in the matching utility) and `embed?: EmbedLink` (`{token, host, hostName, hostWindow, useLabel}`).
+- `sendEmbedUse(link, paths)` / `onEmbedUse(token, cb)` on relay channel `embed`; `newEmbedLink(...)`.
+- `<ToolClickIn host module inputs extra onUse useLabel title icon summary tip variant width id disabledReason />`: a `ClickIn` whose drawer renders `getToolView(module)` inside an `EmbedContext` (placement `drawer`); its Pop out opens `popOutTool(module, {handoff: {...handoff, embed: link}})` and listens for that link's results. Disabled (with the reason) when the module isn't ready.
+- `ClickIn` gained `onPopOut` (custom pop-out) and `disabledReason`.
 
-```
-frontend/src/editor/          the Video Editor core (moved from tools/edit-studio/)
-  store.ts doc.ts geometry.ts useEditAutosave.ts useEditData.ts profile.ts (contract)
-  timeline/ sources/ inspector/ overlays/ matte/ text/ visual/ export/ transport/ home/
-  EditorShell.tsx (+ .module.css)   WP-E1
-  focus.ts                           WP-E1
-frontend/src/tools/video-studio/    VideoEditorView.tsx + profile.ts (WP-E1)
-frontend/src/tools/edit-studio/     the music layer only: EditStudioView.tsx, profile.tsx,
-                                    lanes/ setup/ beatsync/ autofill/ sectionstyle/ moments/ captions/
-                                    (+ song/ for the moved SongInspector/SongTrack if E1 moves them)
-```
+### 3.4 Dependency rules and wiring (`src/architecture.test.ts`, `lib/toolActions.ts`)
 
-**Rule (enforced by a test, WP-E1):** nothing under `src/editor/` imports from `src/tools/edit-studio/` (or any `src/tools/`). The music layer reaches the editor only through `EditorProfile` (`editor/profile.ts`). The store keeps the analysis and the derived markers as *render inputs* (an Edit Studio project opened in the Video Editor must render identically), but no editor UI reads markers except through profile slots.
+1. A tool imports no other tool, except `tools/_kit`, the index types (`@/tools`) and, for a variant, its base (`edit-studio → video-studio`, `subtitles → transcribe`).
+2. Shared code (`blocks/ components/ editor/ lib/ state/ viz/ workspace/ parts/`) imports no tool (the editor may use `@/tools/_kit` and `@/tools/_kit/accepts`).
+3. Composition roots may: `tools/index.ts`, `parts/index.ts`, `shell/`, `views/`, `pipelines/`, `App.tsx`, `main.tsx`.
 
-### 5.2 Shared store, two lenses
+`tools/index.ts` registers the tool views and cross-tool actions (`registerToolViews`, `registerToolActions({ addToPost })`, dynamic imports); shared code calls `getToolView(id)` / `toolAction("addToPost")(path)`. To add a cross-tool action: a key in `ToolActions`, its registration in `tools/index.ts`.
 
-`useEditStudio` (editor/store.ts) is one store per window. Both tools render it: navigating Edit Studio → Video Editor keeps the open project open; "back to all" closes it for both. Each tool still remembers its own `lastProjectId` (module state) for cold starts.
+### 3.5 Composition inputs (`state/composition.ts`)
 
-### 5.3 EditorShell (WP-E1)
+`useCompositionInputs(host, { stems: [song], "bpm-key": [song] })` — a host tool reports what each constituent would be opened with; `useCompositionInputsFor(host, part)` / `compositionInputs(host, part)` read it (the CompositionBar's drawer uses it).
 
-`EditorShell({ moduleId, profile })` is today's `EditStudioView` + `Editor` generalised:
+### 3.6 Descriptor `Parts` (Go, done)
 
-- Routes projects home ↔ editor (open, reopen last, handoff) exactly as today, passing `profile` to `ProjectsHome`.
-- Header: back, name, save state, `profile.HeaderStart`, spacer, undo/redo, `profile.HeaderEnd`, More (profile items + "Open in <other tool>"), Export.
-- Panels: Sources | Preview | right panel (Inspector + `profile.rightTabs`). Bottom: Transport + timeline (`profile.TimelineTop` above the tracks, then tracks). Setup replaces the bottom only for `song: "analyzed"` profiles when `!project.song || analysisState !== "ready" || setupOpen`.
-- **Focus** (`editor/focus.ts`, its own small zustand store `{focus: EditorFocus, setFocus}`): profiles with a `TimelineTop` show a header SegmentedControl **Music | Video** (tips: "Song, markers and recipes" / "The video in depth: tracks, clips and effects"). *Video* focus: the timeline area gives the tracks the room (lanes render compact: `TimelineTop` receives `focus`), the right panel switches to the Inspector, and a breadcrumb "Edit Studio › Video" with a back arrow appears left of the name. **Double-click on a clip or on the preview** enters Video focus; **Esc** (when no dialog, menu or text input has focus) returns to Music. The Video Editor profile is always in video focus (no control).
-- **Open in the other tool** (More menu): `flushEdit()`, write the other tool's `lastProjectId` module state, `navigate(otherModuleId)`. Labels: "Open in Video Editor" / "Open in Edit Studio" (the latter tip: "Add the song layer: markers, beat sync and recipes").
-- Registers `useBeforePopOut(moduleId, flushEdit)` once W1's `lib/popout.ts` exists — W1 and E1 run in parallel, so E1 **creates `lib/popout.ts` only if absent at merge**; to avoid conflict, **W1 owns `lib/popout.ts`** and E1 calls it after Wave 1 integration (the architect wires the one call).
-- Music bed (Video Editor): a song row in the timeline with **Add music** (file picker for audio; the song's duration from `EditStudioService.Probe`), and a music inspector (range start/end within the song, gain, fade in/out, Remove music). Adding music sets `song = {path, startMs: 0, endMs: min(duration, max(clipsEnd, 1000), 600000)}` (if no clips: `min(duration, 600000)`). Edit Studio's profile replaces the song inspector with its own (`profile.inspector.Song`).
-- **Timeline length without a song**: the tracks show `max(editLength + 30 s, 60 s)` of room so clips can be dropped past the end; the end marker follows the last clip.
-- Profile slots replace today's direct imports: TracksPanel → `ClipOverlay` (moments), clip menu items (CutButton/section style), `useSnapTargets` (markers); inspector → `ClipExtras` (HitOn, VelocityControl, MomentsSection), `Song`, `Markers`; transport/commands → profile `useCommands` / `moreItems` (export markers/SRT); EditSignalSelect offers `marker.*` signals only when `profile.markerSignals`.
+| Tool | Base | Parts (Phase 11 additions in bold) |
+|---|---|---|
+| Video Editor `video-studio` | — | bg-remover, **upscaler, audio-cleanup, stems** |
+| Edit Studio | video-studio | visualizer, stems, transcribe, bg-remover |
+| Photo Composer | — | bg-remover, **object-eraser, upscaler** |
+| Post Builder | — | photo-composer, video-editor, bg-remover, **upscaler** |
+| Subtitles | transcribe | trimmer, **visualizer** |
+| Lyric Video | — | stems, transcribe, visualizer |
+| Visualizer | — | stems, bpm-key |
+| Transcribe | — | **llm-chat** |
+| OCR | — | **llm-chat** |
+| PDF Toolkit | — | **ocr** |
+| Audio → MIDI | — | **stems** |
+| Clipboard History | — | **dev-utils** |
 
-### 5.4 Song-optional data, engine and export (WP-E2)
+## 4. Tools inside tools (WP-K1)
 
-- `editLength(p)` (viz/edit/types.ts): song ? `song.endMs − song.startMs` : `max(1000, last clip end over all tracks)` (0 clips → 1000). Go mirrors it (`editLen(doc)`); both are tested with the same cases (a table in each).
-- **Empty analysis**: `emptyAnalysis()` (viz/edit, new) returns an `Analysis` whose curves read 0 at any time and which has no events, beats, sections, chords or words. `useEditInputs` returns inputs whenever the project is open and its sources resolve: `analysis ?? emptyAnalysis()`, markers `[]` without an analysis. A song without an analysis is just audio.
-- `useEditData`: loads the analysis only when `analysisKey` is set; otherwise `analysisState = "none"` and no Setup is forced (the shell decides by profile).
-- Timeline ops (`timeline/ops.ts`): never clamp clip placement to `editLength` when there's no song (the length follows the clips).
-- **Go** (`modules/editstudio`):
-  - `validateDoc`: a song is optional; if present its file must exist. The analysis is required only when `AnalysisKey != ""` (then it must be cached, as today). Visible-clip check uses `editLen`.
-  - Render plan: `StartMs/EndMs` = song range, or `0..editLen` without a song. Without an analysis the plan's `Analysis` is the zero `AnalysisRef` and the edit worker uses `emptyAnalysis()` (`viz/edit/worker.ts`). Check `core/viz` plan validation accepts it (change it additively if not).
-  - Audio mix: without a song, the base is silence (`anullsrc=r=48000:cl=stereo`, length D) plus clip audio; with a song, as today.
-  - **Job attribution**: `Service.submit` files a job under `video-studio` when the project has no `AnalysisKey` and the action isn't `analyze`/`text`; otherwise under `edit-studio`. (The job tray then says "Video Editor — Export" for plain videos.)
-- **Home** (`editor/home/`, `ProjectsHome` with `profile`):
-  - Video Editor: all edit projects, newest first; a **Music edit** badge for `music-edit` projects; **New video** opens a dialog (name, aspect, fps 30/60, optional files to add as clips one after another on track 1 — images 3 s each; audio files become the music bed) — no song required. Below the grid, an **"Older sequence projects"** section listing `VideoEditorService.List()` (kind `video`) with Open (sets the Sequence Editor's last project the way that view expects and navigates to `video-editor`) and a **Quick vlog…** button that opens the Sequence Editor's Quick vlog dialog (via a handoff or module state — whatever that view already supports; add the smallest hook needed in `tools/video-editor/` if none exists).
-  - Edit Studio: `music-edit` projects first; other edit projects in a collapsed "Videos without a song analysis" section whose Open opens them in Edit Studio (Setup then asks for the song). New edit = today's NewEditDialog.
-  - Handoffs (`home/handoff.ts`): Edit Studio unchanged; Video Editor: files → new video with those files (as above).
+### 4.1 Embedded rendering
+- `ClickInHost` gains `mode?: "drawer" | "inline"`. Under an inline host, `ClickIn`s render as an in-place disclosure (launcher row + content below it when open, no portal, no Pop out of the inner ones unless they are parts) so an embedded tool never opens a drawer inside a drawer. Esc closes only the innermost open click-in (fix the shared-document listener order: the innermost handles it and stops propagation).
+- `ToolClickIn` wraps the embedded view in `<ClickInHost mode="inline">`.
+- `FileToolLayout` embedded (`useEmbed()`): no tagline; compact paddings; the drop zone is replaced by the file list with "Add files…" when inputs were handed over; Mod+Enter fires only when focus is inside the embed; the Active jobs list shows only jobs submitted from this embed session (track the job ids `submitJobs` returns: extend `submitJobs` to return them), and the results list puts those first.
+- Every `useUI().takeHandoff` call site in tool views moves to `useToolHandoff` (K1 converts the kit and every tool it doesn't otherwise own today: downloader, vault, eraser, trimmer, redact, and any other file tool; tools owned by another wave-1 package are converted by that package).
+- Every tool view must render embedded. Workspace tools (the editors, Photo Composer, Post Builder) are never embedded by §6; they open in their own windows instead.
 
-### 5.5 Minimal surfaces, click-ins and panel pop-outs (Wave 2: WP-E3 layout, WP-E4 windows)
+### 4.2 Use and Send to (kit)
+- `FileActions` (every result row) gains: **Use** (primary small button, label `embed.useLabel`) when `useEmbed()?.onUse` — calls it with `[path]` and toasts "Sent to <host>"; and a **Send to** menu button (icon `send`): every ready, visible module whose `accepts` matches the file (`_kit/accepts.ts`), excluding the current tool, as `openToolItems` (normal + "(new window)"), plus "Add to post…" for images/videos (`toolAction("addToPost")`). Multi-file results (stems) put Use per row.
+- In a tool window opened with `handoff.embed`, `ToolWindowShell` provides `EmbedContext` (placement `window`, `onUse` = `sendEmbedUse(link, paths)` then a toast "Sent to <host>"); the window title bar shows "for <host>".
 
-Checked in the real app after Wave 1: both tools work on the same project, but each screen still shows everything at once (Sources grid with tag chips, a permanent inspector, transport with lane/cut-offset controls, a toolbar of add buttons), and the Video Editor still shows music controls (Lane, Cut offset, Visual). The user's rule: **the top level shows only the top-level tool's controls; constituents live in click-ins that can pop out; really clean and minimal.**
+### 4.3 Constituent drawer in the shell
+- `shell/ConstituentDrawer.tsx`: a drawer over the main tool area (the Shell wraps the tool area in a `ClickInHost`), opened by the CompositionBar. It renders `<ToolClickIn>`-equivalent content for `{host: current view, module}` with `useCompositionInputsFor(host, module)` and no `onUse` unless the host registered one (`useCompositionInputs` carries files only; Use goes through tool-specific click-ins).
+- CompositionBar "Uses" chips: click = open the constituent drawer; Shift+click = its own window with the same inputs; the chip's hover menu: "Open here", "Open in its own window", "Go to <tool>". "Built on" / "Variants" chips keep navigating (they're the same work, another lens).
+- In a tool window, Uses chips open the drawer inside that window.
 
-**Panels** (`editor/panels.ts`, contract): every constituent surface is an `EditorPanel` (id, title, icon, tip, component). A panel reads only the store/profile (no props), so it renders the same in a drawer and in its own window. Inline: `<ClickIn part={panelPartId(moduleId)} params={{ panel: id }} …>`. Popped out: part `<moduleId>.panel` with `?panel=<id>` (WP-E4).
+### 4.4 Families
+- The Phase 10 "family" placeholder (popping out Edit Studio also shows the placeholder for the Video Editor) applies only to tools that **share a store**: add `sharedStoreFamilies` (a set of module ids registered by tools: `video-studio`, `edit-studio`) in `state/windows.ts`; Transcribe/Subtitles are independent windows.
 
-**Video Editor (baseline) — top level only:**
-- Header: ← · name · quiet save state | spacer | undo · redo · ⋯ · **Export**. Nothing else.
-- Centre: the **preview**, as large as the space allows, wrapped in `<PartFrame part={previewPartId(moduleId)} chrome="overlay">` (pop out to a second screen).
-- Left: a slim **rail** of icon click-in launchers (`variant="icon"`, label under the icon, ≤ 56 px wide): **Media** (the sources panel; badge = count), **Text** (add a title/text clip; styles), **Music** (music bed: Add music / range / gain / fades), **Project** (aspect, fps, background, look, export size). Profiles add rail items.
-- Bottom: a minimal transport (play/pause, time, zoom −/+, Fit, Snap) and the tracks. Track adding collapses into one **+** menu (Track, Adjustment track, Text; Visual only with `markerSignals`).
-- **Selection bar**: when clips are selected, a compact bar (above the tracks or under the preview) with the clip's name and its few top-level controls (volume for video, a speed preset 0.5×/1×/2×, Fit, Delete) plus click-in launchers (`variant="row"` compact chips with summaries) for its constituents: **Transform**, **Effects** (n), **Masks** (n), **Cut-out** (status), **Speed** (ramp/velocity), **Transition**, **Text style** (text clips), **Visual** (visual clips), and profile extras. No permanent inspector column; the old InspectorPanel sections become these panels.
-- Nothing music-related at all in the Video Editor profile: no Lane select, no Cut offset, no marker signals, no Visual layers.
+## 5. Workspaces
 
-**Edit Studio — Music focus top level:**
-- Header: ← · name · save | **Music | Video** · song chip (file name → Song click-in) · undo · redo · **Auto-fill** · ⋯ · **Export**.
-- Centre preview (same PartFrame). Rail: Media, **Song** (range, analysis, re-analyse), **Markers** (lanes visibility/threshold/nudge, active lane, cut offset — all that left the transport), **Captions**, **Style** (section styles), Project.
-- Bottom: transport + the song lanes and section bands shown prominently, tracks compact (thin rows).
-- **Video focus** = exactly the Video Editor surface (+ a one-line marker strip), with Edit Studio's clip extras (Hit on, Velocity, Moments) as extra click-ins in the selection bar.
+Every workspace follows one shape (the editor's):
 
-**WP-E4 (windows):** `editor/bridge.ts` (BridgeSpec per §4.5: pick = projectId, name, project = history.present, undo/redo depths, saveState, selection, playheadMs, playing, activeLane, snap, pps, scrollMs, rightPanel, safeZones, analysisRef, analysisState, sources, mattes, interps, urls, dialog, + focus store; apply builds history {past: [], present, future: []}; actions edit, undo, redo, select, setPlayhead, setPlaying, setActiveLane, setSnap, zoom/scroll setters, openDialog, setSafeZones, setName), the host started by EditorShell while a project is open, replica mode for `useEditData` (loads analysis/sources locally from the replicated refs, never submits jobs), and the part factory `editor/editorParts.tsx` `makeEditorParts(moduleId, profile)` registering `<moduleId>.preview` (EditCanvas + overlays + mini transport, 960×600) and `<moduleId>.panel` (renders `getEditorPanel(params.panel)` inside `EditorProfileProvider`, 380×720 or the panel's size), called from `tools/video-studio/parts.ts` and `tools/edit-studio/parts.ts` (imported by `parts/index.ts`). In part windows space/arrow keys forward to the host (play/pause, frame step); undo/redo shortcuts forward too.
+- `StudioLayout` header (one line): back/source chip · name · quiet state | spacer | undo · redo · ⋯ · **one primary action**.
+- `WorkspaceRail` of panels (left), the preview in `WorkspacePreviewFrame` (centre), an optional side list (the main editing surface), an optional bottom bar (`OneLineBar`).
+- A **selection bar** (`OneLineBar`) when something is selected: its name, two or three quick controls, then click-ins for its constituents.
+- Panels via `defineWorkspace`; launchers carry summaries; nothing appears twice; empty states stay as today (drop zone first).
 
-### 5.6 Job attribution and outputs
+### 5.1 Photo Composer (WP-PC)
+- Lift `Editor.tsx`'s state (composition, selection, zoom, pending jobs, name) into `tools/photo-composer/store.ts` with undo/redo (`lib/history`). Images (`ImageBitmap`s) stay local, loaded per window (`useReplica`).
+- Panels: **Layers**, **Layer** (properties of the selection: position/size/rotation, outline, shadow, opacity; text style for text layers), **Background**, **Layouts**, **Sources**, **Canvas** (aspect, export size). Preview part: the live canvas render (read-only in its window, with the current selection outline).
+- Header: ← · name · save state | undo · redo · ⋯ · **Export**. Rail: Sources, Layers, Layouts, Background, Canvas. Add photo / Add text move into a `+` menu in the header (or the Layers panel's header).
+- Selection bar for a photo layer: name · opacity · Delete | click-ins **Layer**, **Crop**, **Remove background** (the existing one-click job stays, as a button), `ToolClickIn` **Erase object** (`object-eraser`, Use "Use as this layer" → replace the layer's source, keep its transform) and **Upscale** (`upscaler`, same Use). Text layer: Layer, Text style.
+- `useCompositionInputs("photo-composer", { "bg-remover": [selected photo], "object-eraser": [...], upscaler: [...] })`.
 
-Both tools write exports to `<library>/Edits`. Analysis and text exports stay Edit Studio's.
+### 5.2 Post Builder (WP-PB, wave 2)
+- Lift `usePostEditor` state (post doc, selection, saving) into a store; panels **Format**, **Sources**, **Framing**, **Alt text**, **Caption**, **Checks** (the existing bottom click-ins become panels); preview part: the phone preview.
+- Layout: header (posts strip chip → a **Posts** panel; name; save state | ⋯ · **Export**); rail: Sources, Format, Caption, Checks; stage: slide stage; side: slide strip + phone preview stay as today if they fit, else the phone preview moves to its part.
+- Slide selection bar: slide n · kind | Framing, Alt text, **Edit** (Composer/Sequence Editor, existing, with "in its own window"), `ToolClickIn` **Remove background** (`bg-remover`) and **Upscale** (`upscaler`) for photo slides (Use "Use for this slide" → replace the slide's photo, keep framing).
 
-## 6. Composition in the shell (WP-C1)
+### 5.3 Subtitles on Transcribe (WP-SP)
+- `blocks/speech/`: the transcription options block (model, spoken language, task) and its helpers, used by Transcribe's view and by Subtitles (which today duplicates them). Transcribe's view keeps its file-tool shape, using the block.
+- Subtitles becomes a workspace once a source is chosen: header: source chip (file name; opens the **Source** panel: change file, use a subtitle file, `ToolClickIn` **Trim first** (`trimmer`, Use "Use this cut" → the cut becomes the source)) · language chip | undo · redo · ⋯ · **Export**. Rail: **Transcription** (the speech block + Generate/Regenerate + status), **Translate**, **Style** (burn-in look and the visuals designer from `blocks/visuals`), **Export** (formats, add as track, burn in). Stage: the video with the current cue (preview part `subtitles.preview`). Side: the **cue list** (the main surface; also a poppable panel `cues`). Before any cues exist the stage shows the video and a centred primary **Generate subtitles** with the Transcription summary ("Small · Auto-detect") and "Use a subtitle file…".
+- The stepper is removed; every capability of the four steps is reachable from the workspace.
+- `useCompositionInputs("subtitles", { trimmer: [source], visualizer: [source] })`.
 
-- **Sidebar** (`shell/Sidebar.tsx`, `shell/nav.ts`): a ready, visible module whose `base` is a ready, visible module is listed directly under its base, indented with a thin connector, slightly smaller label. Rail mode: variants follow their base with a small corner badge. Mod+1..9 follow the visual order. `NavItem` gains `variantOf?: string`.
-- **CompositionBar** (`shell/CompositionBar.tsx`, rendered by Shell and ToolWindowShell next to the title): for module views:
-  - "Built on" chip for `base` (icon + name);
-  - "Variants" chips for visible modules whose base is this one (e.g. the Video Editor shows "Edit Studio");
-  - "Uses" chips for `parts` (hidden parts like the Sequence Editor show too).
-  - Click = navigate (in a tool window: `DesktopService.ShowMain(id)`); each chip has a pop-out affordance (Shift+click, and a small icon button on hover) = `popOutTool(id)`. Tooltips say what happens. Below `NARROW_QUERY` chips are icon-only with the name in the tooltip; the bar never wraps the title.
-- **Command palette** (`shell/useBuiltinCommands.ts`): for every visible tool, "Open <Name> in its own window".
-- Composition helpers in `state/composition.ts`: `variantsOf(id)`, `familyOf(id)` (base + variants), `partsOf(id)`, used by Sidebar, CompositionBar and W1's placeholder (W1 may import it after merge; until then W1 computes the family inline from descriptors).
+### 5.4 Lyric Video (WP-LV, wave 2)
+- Workspace once a song is chosen: header: song chip ("Title — Artist"; opens **Song**) | undo · redo · ⋯ · **Render**. Rail: **Song** (title/artist, original/instrumental audio), **Lyrics** (detect from vocals / paste / file; timing), **Visuals** (classic or the visuals designer), **Look** (font, colours, karaoke, position). Stage: the preview (part `lyric-video.preview`). Side: the lyric sheet (timed lines; panel `lines`). The stepper is removed.
+- `useCompositionInputs("lyric-video", { stems: [song], transcribe: [song], visualizer: [song] })`.
 
-## 7. Constituent pop-outs with inputs (WP-P1, Wave 2)
+### 5.5 Visualizer (WP-VZ)
+- Workspace once a source is chosen: header: source chip (opens **Source**) · design name | undo · redo · ⋯ · **Export** (opens the **Export** panel: size, quality, range — the "quality row" lives there, merged with the player row issue from Phase 10). Rail: **Analysis** (words, instruments, mood, re-analyse; summary "Words · 4 stems · mood"), then the designer's own panels. Stage: the designer (preview + Song Map). Analysis runs automatically as today; while it runs the stage shows its progress.
+- Port the Visualizer's bridge (`tools/visualizer/bridge.ts`) and preview part onto `defineWorkspace` (keep channel name compatibility not required).
+- `useCompositionInputs("visualizer", { stems: [input], "bpm-key": [input] })`.
 
-- `lib/openTool.ts`: `openTool(moduleId, handoff?, { window?: boolean })` — in the main window without `window`: `useUI.handOff` / `navigate`; with `window: true` (or from a tool window): `popOutTool(moduleId, {handoff})`.
-- **Post Builder**: a slide's Edit action gets "Edit in its own window" (Photo Composer / Sequence Editor with the `postSlide` handoff). Post Builder refreshes the slide's visual when that window closes (`windows:changed`) and on window focus.
-- **Editor clip context menu**: "Open in Background Remover" (image clips), "Open in Trimmer" (video clips), each with an "…in its own window" variant.
-- **Library**: the Send to menu gets "in its own window" variants (or a modifier) for tools.
-- Photo Composer, Visualizer, Lyric Video, Subtitles: their CompositionBar chips cover it; add a pop-out variant wherever a tool already hands off to another (`handOff(` call sites) when cheap.
+### 5.6 Pipelines (WP-N2)
+- The pipeline draft moves into a store (`tools/pipelines/draftStore.ts`) with undo/redo (graph and list edits, Mod+Z / Mod+Shift+Z); `defineWorkspace("pipelines")` with panels **Step** (options of the selected node, today's side drawer), **Triggers**, **Runs**, **About** (name, description: editable in Graph mode now); no preview part.
+- The Pipelines tool can pop out (`useBeforePopOut` saves a valid draft; the window reopens it). The architect removes `pipelines` from the shell's pop-out exclusion at merge.
 
-## 7b. Click-ins (WP-W1 builds the primitive; E3 and the sweep use it)
+### 5.7 Dev Utilities and Local Chat (WP-SW, wave 2)
+- Dev Utilities: a workspace whose panels are the utilities (each utility's input/output state in the devutils store), so any utility pops out into a small window; honours `handoff.text` (detects JSON / JWT / Base64 / URL / timestamp / colour and opens that utility with the text).
+- Local Chat: honours `handoff.text`: starts a new conversation, shows the text as an attached context card ("Transcript of interview.mp3 · 12 k characters", expandable), offers `prompts` as one-click chips above the composer, and sends the text with the first message (trimmed to the model's context with the existing notice).
 
-`components/ClickIn.tsx` (exported from `components/index.ts`):
+## 6. Constituent wiring (who embeds whom)
 
-```tsx
-<ClickIn icon="sparkles" title="Effects" summary="2 on this clip" tip="Effects on the selected clips" part="editor.effects" params={{}}>
-  {content}
-</ClickIn>
-<ClickInHost>{tool layout}</ClickInHost>   // the area drawers slide over (a tool's root); default: the nearest host
-const { open, close, isOpen } = useClickIn(); // open(id) programmatically; a ClickIn's id defaults to its part or title
-```
+| Host | Where | Constituent | Inputs | Use |
+|---|---|---|---|---|
+| Photo Composer | photo layer selection bar | object-eraser, upscaler | the layer's source | replace the layer's source |
+| Post Builder | photo slide selection bar | bg-remover, upscaler | the slide's photo | replace the slide's photo |
+| Video Editor / Edit Studio (WP-ED) | image clip selection bar | upscaler | the clip's source | replace the clip's source (all clips using it ask) |
+| Video Editor / Edit Studio | video/audio clip selection bar | audio-cleanup | the clip's source | replace the clip's source |
+| Video Editor | Music panel | stems | the music bed's file | set the bed to the chosen stem (instrumental) |
+| Subtitles | Source panel | trimmer | the source | the cut becomes the source |
+| Transcribe (WP-SW) | each result | llm-chat | `text`: the transcript (`FilesService.ReadText` of the .txt, ≤ 200 k chars), prompts Summarise / Key points / Action items | — |
+| OCR (WP-SW) | each result | llm-chat | `text`: the recognised text, prompts Summarise / Extract a table / Fix typos | — |
+| PDF Toolkit (WP-SW) | rail action **Make searchable** | ocr | the chosen PDFs | — (results stay) |
+| Audio → MIDI (WP-SW) | primary row "Split into stems first" | stems | the inputs | the chosen stem becomes the input |
+| Clipboard History (WP-SW) | a text item's actions | dev-utils | `text`: the item | — |
+| Visualizer, Lyric Video, Subtitles, Edit Studio | CompositionBar Uses chips | their parts | via `useCompositionInputs` | — |
 
-- Closed, it renders a compact launcher: a row (`variant="row"`, default: icon, title, muted summary, chevron) or an icon button (`variant="icon"`, title in tooltip). A `badge` prop shows a count.
-- Open, the content renders in a **drawer** over the right side of the nearest `ClickInHost` (width 360 px default, `width` prop; full height of the host; slides in 120 ms; respects `prefers-reduced-motion`), with a header: icon, title, **Pop out** (only when `part` is set and registered; pops the part via `popOutPart` with `params`, then closes the drawer) and Close. Esc, the close button or a click in the host outside the drawer closes it. One drawer open per host. Focus moves into the drawer and back to the launcher on close.
-- While the part's window is open, the launcher shows a window glyph and clicking it focuses that window.
-- Works at 960 × 600 (the drawer caps at 90 % of the host width).
+The Phase 10 context-menu entries ("Open in Background Remover / Trimmer") stay as navigation shortcuts; nothing else duplicates a click-in.
 
-**UX rules for every tool (the learnings applied app-wide, §13):**
-1. The top level shows the tool's job: its input, its one or two primary settings, its preview/result and its primary action.
-2. Everything else is a click-in, grouped by the constituent it belongs to ("Effects", "Cut-out", "Speed", "Advanced"), with a one-line summary of its current state so nothing is hidden silently.
-3. A click-in that edits live state can pop out (it's a part, bridged); a click-in with a few fields doesn't need to.
-4. Composite tools link to their parts (CompositionBar) instead of duplicating their UI.
-5. No control appears twice on one screen.
+## 7. UX rules (Phase 10 §7b/§13 still hold), plus
+
+1. A constituent opens **inside** its host first; its own window second; navigating away last.
+2. Use buttons name the destination ("Use as this layer", "Use for this slide", "Use as music").
+3. An embedded tool is the same tool: same options (shared module state), same jobs, same outputs in the Library.
+4. Wizards become workspaces: the stepper's steps become rail panels; the last step's action becomes the header's primary action.
+5. Every result can go somewhere: Send to on every row.
 
 ## 8. Error handling
 
-- PopOut failures (too many windows, invalid key) toast the AppError message.
-- A part window whose host isn't there (no hello answer in 6 s) shows "Open <tool> in the main window first" with a button that focuses main.
-- A tool window bootstrap failure shows BootError as the main window does.
+- A constituent that isn't installed: the launcher is disabled with "<Tool> needs setup first: open it from the sidebar".
+- Use with a missing file (deleted meanwhile): toast "That file is gone" and do nothing.
+- A popped-out embed whose host closed: Use toasts "<Host> isn't open any more" (no listener answered: the relay is fire-and-forget, so the host replies `{t:"ack"}`; no ack in 1 s → the toast).
+- Part windows of a workspace without an open document show "Open a project in <tool> first" with Show main window.
 
 ## 9. Tests
 
-- Go: `core/windows_test.go` (done), `modules/editstudio/base_test.go` (done); E2 adds `editLen`, no-song validate/plan/mix-graph tests.
-- Frontend: bridge (fake transport), windows identity parsing, popout placeholder + family, ToolWindowShell drop/handoff routing, Sidebar nesting, CompositionBar chips, editor architecture test (no imports from tools/), EditorShell with both profiles (Video Editor without song shows the editor, not Setup; Edit Studio without analysis shows Setup), focus switching, emptyAnalysis, editLength cases, home per profile.
-- `go build ./... && go vet ./... && go test ./...`, `gofmt -l .` (repo files), `cd frontend && npm run check`.
-
-## 12. Node-graph pipeline builder (WP-N1)
-
-A ComfyUI-style canvas over the existing pipeline model; no runner changes required.
-
-- **Mapping.** A node per step plus one **Input** node (the files a run starts with). Each step node has one input port and one output port per `StepProduct` (role) from its `StepCheck.info.produces`, plus an "all files" port. A wire from a role port into a step sets `from` = that step and `filter.roles = [role]`; from the "all" port clears roles; from Input sets `from: "input"`; an unwired `NoFiles` step has `from: "none"`. Every step has at most one incoming wire (the model's rule); an output port may fan out to many steps (branches). Steps are saved in topological order (`from` must reference an earlier step).
-- **Layout** is saved in `Pipeline.layout` (FOUNDATION, done; ≤ 32 KiB). Nodes without a position get an automatic layered layout (left to right by depth).
-- **Tool store**: a left panel listing every step type in the catalog (modules + built-ins rename, chat, table, zip, copy, check: the glue), grouped by category, searchable, icon + one line. Drag onto the canvas to add, or double-click the canvas for a quick-add search. Tools that aren't steps (creator tools, clipboard, vault, …) are listed in a "Not available as steps" group, disabled, with the reason, unless the runner can support them cleanly as manual steps (decide by reading `core/pipeline`; record the decision).
-- **Canvas**: pan (drag empty space, middle button, wheel), zoom (Ctrl+wheel, buttons, fit), select (click, Shift-drag box), move, Delete, Mod+D duplicate, bezier wires coloured by file kind. Invalid connections (a step that can't accept that kind, per `pipelines/compat.ts`) are refused with a tooltip. Node body: icon, label, summary, problems in red, and an options button opening the existing step options UI (`frontend/src/pipelines/steps/*`) in a side drawer.
-- **Integration**: PipelineEditor gets a **List | Graph** switch (Graph default; remembered). Both edit the same `Pipeline`; save, run, watch folder and templates work unchanged. While a run of the pipeline is active, nodes show live status counts.
-- Pure logic (`graphModel.ts`: pipeline ⇄ graph, topo sort, connect validation, auto layout) is table-tested; the canvas gets interaction tests. No new dependency: SVG wires + positioned DOM nodes, CSS Modules + tokens.
-
-## 13. App-wide sweep (Wave 3)
-
-### 13.1 What the editor path taught (checked in the real app, 2026-11-04)
-
-UX:
-1. **One job per screen.** The top level is: the tool's input, its one or two primary settings, the preview/result, and the primary action. The Video Editor went from five dense regions to header + rail + preview + one-line bar + tracks, and nothing was lost — everything moved into panels.
-2. **Click-ins carry a summary.** A launcher says what's inside right now ("2 effects", "Cut-out ready", "Watching Inbox", "no runs yet"), so hiding a control never hides its state.
-3. **Bars never wrap.** A toolbar/selection bar is one line; measure its width (`useElementSize`) and send what doesn't fit to a "More…" menu. Wrapping chips pushed the timeline off screen in testing.
-4. **Rails never scroll.** Icon rails use compact items (≈44 px, small label) and an overflow "⋯".
-5. **Names, not paths.** Show a file's name (ellipsized); the full path goes in the tooltip.
-6. **No duplicate headers.** A page title plus an inner editor title with the same words (Pipelines) is noise; keep one.
-7. **Big canvases get the room.** When a tool is a canvas (pipeline graph, editor preview), side lists collapse to a switcher.
-8. **Composites link to parts.** Use the CompositionBar and `openTool(moduleId, inputs, extra, {window})` (`lib/openTool.ts`, or `openToolItems` for menus) instead of re-implementing a constituent's UI; every hand-off can also open in its own window.
-
-Engineering:
-1. **Composition by slots and registries**, not imports: profiles (`EditorProfile`), panel registries (`registerEditorPanel`), part registries (`definePart`). A test enforces the dependency direction (`editor/architecture.test.ts`).
-2. **Panels take no props**: they read their state from a store, which makes them render the same inline, in a drawer and in a pop-out window over the store bridge.
-3. **Pop-out-able state lives in a zustand store** with serialisable values; component-local state can't be bridged (the pipeline editor's draft couldn't be popped out for this reason).
-4. **WebGL in React**: never `loseContext()` on dispose when the canvas element can be reused (StrictMode remounts painted a canvas white).
-
-### 13.2 Rules for each tool in the sweep
-
-- Apply §7b and 13.1. Keep every capability — move, don't delete. Each builder reports, per tool, a short before → after list ("Advanced options → Advanced click-in (summary: 'MP3 · 320k')").
-- File tools (`_kit/FileToolLayout`): the kit gets an `advanced` slot rendered as one **Advanced** ClickIn row with a summary (`summary` prop) and a `primary` slot for the 1–2 options shown at the top level; tools move their secondary options into it.
-- Where a tool hands files to another tool, use `openTool`/`openToolItems` so "…in its own window" is offered.
-- Tools that are workspaces register their side panels as parts only when their state is already in a store (don't refactor state just for pop-outs in this wave).
-- Screens must work at 960×600; check by reasoning about widths; screenshots of today's state are in `.dev/p10-qa/shots/all-<moduleId>.png`.
+- Foundation: architecture test (done), `fitBar`/`railFit` tables, `defineWorkspace` host/replica with a fake transport (panel renders on replica, action forwards), `useToolHandoff` (embedded vs global), `ToolClickIn` (renders the registered view with the embed handoff; disabled when not ready; pop-out passes `embed`).
+- K1: inline host mode, Esc innermost, FileToolLayout embedded, FileActions Use/Send to, ToolWindowShell embed relay (fake relay), CompositionBar chip → drawer, family placeholder only for shared-store families.
+- Each workspace package: store + bridge round trip, panels render with no props, the stepper's capabilities reachable (one test per old step), the selection bar fits (one line), ToolClickIn Use updates the document.
+- `go build/vet/test`, gofmt, `npm run check` (typecheck, ≈2.6 k tests, check:any).
 
 ## 10. Work packages
 
 | WP | Wave | Owns | Depends on |
 |---|---|---|---|
-| **W1** windows + parts + bridge + ClickIn | 1 | `components/ClickIn.*` (+ its export in `components/index.ts`), `App.tsx`, `shell/Shell.tsx`, `shell/ToolWindowShell*`, `shell/PartWindowShell*`, `shell/PoppedOutPlaceholder*`, `shell/dropRouting.ts`, `state/bootstrap.ts`, `state/ui.ts`, `state/windows.ts`, `state/bridge.ts`, `lib/popout.ts`, `lib/windows.ts` (additive), `parts/**` (not types.ts semantics), their tests | foundation |
-| **C1** composition in the shell | 1 | `shell/Sidebar.*`, `shell/nav.ts`, `shell/CompositionBar.*`, `shell/useBuiltinCommands.ts`, `state/composition.ts`, their tests | foundation |
-| **E1** editor shell + profiles | 1 | `editor/EditorShell*`, `editor/focus.ts`, `editor/profile.ts` (additive), `editor/timeline/**` except `ops.ts`, `editor/inspector/**`, `editor/transport/**`, `editor/overlays/**`, `editor/sources/**`, `editor/matte/**`, `editor/text/**`, `editor/visual/**`, `tools/edit-studio/**`, `tools/video-studio/**`, the architecture test | foundation |
-| **E2** song-optional data, engine, Go, homes | 1 | `viz/edit/**`, `editor/store.ts`, `editor/useEditData.ts`, `editor/useEditAutosave.ts`, `editor/doc.ts`, `editor/home/**`, `editor/export/**`, `editor/timeline/ops.ts`, `modules/editstudio/**`, `core/viz/**` (additive), `tools/video-editor/**` (only the smallest hook for Quick vlog/open), `viz/worker/**` if needed | foundation |
-| **N1** node-graph pipeline builder | 1 | `tools/pipelines/**`, `frontend/src/pipelines/**`, `core/pipeline/**` (additive, only if needed), their tests | foundation |
-| **E3** minimal editor surfaces + click-ins (layout) | 2 | `editor/**` UI except E4's files, `tools/edit-studio/**` except `parts.ts`, `tools/video-studio/**` except `parts.ts` | W1, E1, E2 |
-| **E4** editor pop-out windows (bridge, parts, replica data) | 2 | `editor/bridge.ts`, `editor/editorParts.tsx`, `editor/useEditData.ts`, `tools/*/parts.ts`, `parts/index.ts`, the bridge start/stop hook in EditorShell (one line) | W1, E1, E2 |
-| **P1** constituent pop-outs with inputs | 2 | `lib/openTool.ts`, `tools/post-builder/**`, editor clip context menu, `views/LibraryView.tsx`, small handoff call-site edits | W1, C1, E1 |
+| **K1** tools inside tools, Send to, constituent drawer | 1 | `lib/embed.ts` (additive), `components/ToolClickIn*`, `components/ClickIn*`, `tools/_kit/**`, `shell/ToolWindowShell*`, `shell/Shell.tsx`, `shell/ConstituentDrawer*`, `shell/CompositionBar*`, `state/windows.ts`, `state/composition.ts` (additive), `lib/openTool.ts`, and the `useToolHandoff` conversion in `tools/{downloader,vault,eraser,trimmer,redact,bgremove,upscale,stems,bpmkey,midi,converter,exif,ocr,audiocleanup,pdf}/**` (handoff code only) | foundation |
+| **PC** Photo Composer workspace | 1 | `tools/photo-composer/**` | foundation |
+| **SP** speech block + Subtitles workspace | 1 | `blocks/speech/**`, `tools/transcribe/**`, `tools/subtitles/**` | foundation |
+| **VZ** Visualizer workspace | 1 | `tools/visualizer/**`, `blocks/visuals/**` | foundation |
+| **N2** Pipelines workspace | 1 | `tools/pipelines/**`, `pipelines/**` | foundation |
+| **PB** Post Builder workspace | 2 | `tools/post-builder/**` | K1 |
+| **LV** Lyric Video workspace | 2 | `tools/lyricvideo/**` | K1, VZ (blocks/visuals) |
+| **ED** editor constituents | 2 | `editor/selection/**`, `editor/panelDefs.tsx`, `editor/timeline/musicBed*`/music panel files, `tools/video-studio/**`, `tools/edit-studio/profile.tsx` (composition inputs only) | K1 |
+| **SW** constituents sweep (chat, dev utils, transcribe/ocr/pdf/midi/clipboard) | 2 | `tools/{chat,devutils,clipboard,midi,ocr,pdf}/**`, `tools/transcribe/**` (results only) | K1, SP |
 
 ## 11. Acceptance
 
-1. Sidebar: "Video Editor" with "Edit Studio" nested under it; "Transcribe" with "Subtitles" under it; no "Sequence Editor".
-2. Video Editor: New video → add clips and photos → play → export an MP4 without any song or AI engine.
-3. Video Editor: add music → the length follows the music range; export has the music.
-4. Edit Studio: an existing edit works exactly as before (setup, lanes, auto-fill, export).
-5. Edit Studio ⇄ Video Editor: "Open in Video Editor" shows the same project; "Open in Edit Studio" on a plain video asks for the song (Setup).
-6. Music | Video focus; double-click a clip → Video focus; Esc → Music.
-7. Any tool: Pop out → own window, main shows the placeholder; Bring back works both ways; a drop on the pop-out goes to its tool.
-8. Editor preview and inspector pop out and stay in sync (play, scrub, edit, undo).
-9. Post Builder: edit a slide in its own window; the slide updates after saving/closing.
-10. `go build/vet/test`, gofmt, `npm run check` all pass.
+1. Photo Composer: select a photo layer → Erase object opens Object Eraser in a drawer with the photo → erase → Use → the layer shows the erased photo; the same from the popped-out Object Eraser window.
+2. Visualizer with a song: the "Uses: Stem Splitter" chip opens the Stem Splitter in a drawer with the song loaded.
+3. Any file tool result: Send to → Stem Splitter (new window) opens that window with the file.
+4. Transcribe result → Ask Local Chat → a conversation with the transcript attached and Summarise as a chip.
+5. Subtitles and Lyric Video and Visualizer: no stepper; every former step's controls reachable; preview pops out and stays in sync.
+6. Photo Composer, Post Builder, Pipelines, Dev Utilities: a panel pops out, edits in it reach the main window (undo picks them up).
+7. `src/architecture.test.ts` passes; `go build/vet/test`, gofmt and `npm run check` pass.

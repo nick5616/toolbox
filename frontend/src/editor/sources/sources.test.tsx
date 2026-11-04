@@ -10,7 +10,7 @@ const h = vi.hoisted(() => ({
   drag: vi.fn(),
 }));
 
-vi.mock("@/tools/post-builder/sourceDrag", () => ({
+vi.mock("@/blocks/sources/sourceDrag", () => ({
   startSourceDrag: (...a: unknown[]) => h.drag(...a),
   useSourceDropTarget: () => undefined,
   useSourceDrag: () => undefined,

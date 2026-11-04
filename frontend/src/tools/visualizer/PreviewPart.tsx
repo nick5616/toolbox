@@ -8,7 +8,7 @@ import { Banner, Spinner } from "@/components";
 import type { MediaPlayerHandle } from "@/components/media";
 import { useVisualsAnalysis } from "@/components/viz";
 import { useShortcut } from "@/lib/shortcuts";
-import { Preview } from "./designer/Preview";
+import { Preview } from "@/blocks/visuals/designer/Preview";
 import { useVisualizer } from "./store";
 import styles from "./PreviewPart.module.css";
 

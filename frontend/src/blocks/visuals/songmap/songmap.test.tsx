@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildFixture } from "@/viz/fixture";
 import { SongMap } from "./SongMap";
-import { blockIndexAt, clampPxPerSec, rulerStepSec, scrollForAnchor, sectionBlocks, selectionFromDrag, timeAtX, visibleLanes } from "./songmap/model";
+import { blockIndexAt, clampPxPerSec, rulerStepSec, scrollForAnchor, sectionBlocks, selectionFromDrag, timeAtX, visibleLanes } from "./model";
 
 const calls: string[] = [];
 const ctxStub = new Proxy(

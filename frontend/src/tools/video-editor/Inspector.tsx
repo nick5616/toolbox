@@ -27,7 +27,7 @@ import {
   transitionSummary,
   trimSummary,
 } from "./summaries";
-import { useThumb } from "./useThumbs";
+import { useThumb } from "@/blocks/media/useThumbs";
 import styles from "./Inspector.module.css";
 
 export interface InspectorProps {

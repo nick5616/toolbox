@@ -30,10 +30,12 @@ func Accepts() []string { return slices.Concat(core.AudioExtensions, core.VideoE
 func (m *Module) Descriptor() core.Descriptor {
 	return core.Descriptor{
 		ID: ModuleID, Name: "Audio → MIDI", Icon: "piano", Category: core.CategoryAudio,
-		Tagline:      "Transcribe melodies and chords into MIDI",
-		Description:  "Turn recorded melodies and chords into editable MIDI clips with Spotify's Basic Pitch model.",
-		Status:       core.StatusReady,
-		Accepts:      core.Accepts{Extensions: Accepts()},
+		Tagline:     "Transcribe melodies and chords into MIDI",
+		Description: "Turn recorded melodies and chords into editable MIDI clips with Spotify's Basic Pitch model.",
+		Status:      core.StatusReady,
+		Accepts:     core.Accepts{Extensions: Accepts()},
+		// Phase 11: split a song first, then transcribe one stem.
+		Parts:        []string{"stems"},
 		Requires:     []string{sidecar.DepID},
 		OutputSubdir: "MIDI", Order: 120, SplitInputs: true, MaxInputs: 100,
 	}

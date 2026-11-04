@@ -16,9 +16,6 @@ const files = import.meta.glob("./**/*.{ts,tsx}", { eager: true, query: "?raw", 
 const SHARED_UTILITIES = [
   "@/tools/_kit", // DepsGate
   "@/tools/_kit/accepts",
-  "@/tools/post-builder/sourceDrag",
-  "@/tools/post-builder/AddToPostDialog",
-  "@/tools/video-editor/useThumbs",
 ];
 
 const SPECIFIER = /(?:\bfrom|\bimport\(|\bvi\.mock\(|\bvi\.importActual(?:<[^>]*>)?\()\s*["']([^"']+)["']/g;

@@ -15,10 +15,10 @@ import { FileToolLayout, runLabel, setRequiresOverride, summarize, useFileInputs
 import { AUDIO_ENGINE_ID } from "@/tools/_kit/DepsGate";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import type { ToolViewProps } from "../index";
-import { basename, isHeic } from "../image/common";
-import { RadioCards } from "../image/RadioCards";
-import { ResultCards } from "../image/ResultCards";
-import imageStyles from "../image/image.module.css";
+import { basename, isHeic } from "@/tools/_kit/image/common";
+import { RadioCards } from "@/tools/_kit/image/RadioCards";
+import { ResultCards } from "@/tools/_kit/image/ResultCards";
+import imageStyles from "@/tools/_kit/image/image.module.css";
 import {
   DEFAULT_UPSCALE_OPTIONS,
   cpuEstimateSeconds,

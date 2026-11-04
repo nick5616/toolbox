@@ -55,7 +55,7 @@ func (m *Module) Descriptor() core.Descriptor {
 		Recommends:  []string{sidecar.DepID},
 		Order:       172, OutputSubdir: "Subtitles",
 		Base:      "transcribe",
-		Parts:     []string{"trimmer"},
+		Parts:     []string{"trimmer", "visualizer"},
 		MaxInputs: 1,
 	}
 }

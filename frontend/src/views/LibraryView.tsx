@@ -14,7 +14,7 @@ import { inputAccepted } from "@/tools/pipelines/RunSheetModel";
 import { openPipelineRunSheet } from "@/shell/dropRouting";
 // --- end pipelines ---
 // --- add to post ---
-import { openAddToPostDialog } from "@/tools/post-builder/AddToPostDialog";
+import { toolAction } from "@/lib/toolActions";
 import { acceptsPath } from "@/tools/_kit/accepts";
 // --- end add to post ---
 import styles from "./LibraryView.module.css";
@@ -62,7 +62,7 @@ export async function sendToItems(path: string): Promise<MenuItem[]> {
       id: "add-to-post",
       label: "Add to post…",
       icon: "gallery-horizontal-end",
-      onSelect: () => void openAddToPostDialog(path),
+      onSelect: () => void toolAction("addToPost")(path),
     });
   }
   // --- end add to post ---

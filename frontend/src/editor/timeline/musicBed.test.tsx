@@ -12,7 +12,7 @@ vi.mock("@/lib/api", async (orig) => {
     FilesService: { PickWith: (...a: unknown[]) => h.pick(...a) },
   };
 });
-vi.mock("@/tools/video-editor/useThumbs", () => ({ useThumb: () => "", useWaveform: () => [] }));
+vi.mock("@/blocks/media/useThumbs", () => ({ useThumb: () => "", useWaveform: () => [] }));
 
 import { emptyEditProject, type NormalProject } from "@/viz/edit/defaults";
 import { newClip } from "@/editor/doc";

@@ -2,8 +2,8 @@
 import { PackComponentState, type AnalyzeOptions, type TimedLine, type VisualsSpec } from "@/lib/api";
 import { pickerAnalyzeOptions, parseShow } from "@/components/viz/pickerModel";
 import type { ToolSeed } from "@/state/ui";
-import { withoutText } from "@/tools/visualizer/designer/model";
-import { applyTemplate } from "@/tools/visualizer/designer/model";
+import { withoutText } from "@/blocks/visuals/designer/model";
+import { applyTemplate } from "@/blocks/visuals/designer/model";
 import { PRESETS, presetById, showFromPreset } from "@/viz/presets";
 import type { Show } from "@/viz/types";
 import type { PackView } from "@/views/setup/packSizes";

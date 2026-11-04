@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent } from "react";
 import { cx, Icon } from "@/components";
 import type { PostSourceFile } from "@/lib/api";
-import { clickSelection, usedNumbers } from "./pool";
+import { clickSelection, usedNumbers } from "./selection";
 import { formatDuration, loadClipDuration, loadSourceThumb } from "./sourceThumbs";
 import { startSourceDrag } from "./sourceDrag";
 import styles from "./SourceGrid.module.css";

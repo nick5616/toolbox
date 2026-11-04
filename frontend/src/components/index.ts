@@ -40,3 +40,4 @@ export { ColorSwatchPicker, normalizeHex, type ColorSwatchPickerProps } from "./
 export { Markdown, type MarkdownProps } from "./Markdown";
 export { TemplateField, type TemplateFieldProps, type TemplateVar } from "./TemplateField";
 export { ClickIn, ClickInHost, useClickIn, type ClickInHostProps, type ClickInProps } from "./ClickIn";
+export { ToolClickIn, toolDrawerId, type ToolClickInProps } from "./ToolClickIn";

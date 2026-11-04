@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge, Banner, Button, Icon, Meter, Spinner } from "@/components";
 import { TranscribeService } from "@/lib/api";
 import { useVisualizer } from "./store";
-import { SongMap } from "./SongMap";
+import { SongMap } from "@/blocks/visuals/songmap/SongMap";
 import { useAnalyzeRun } from "./source/analyzeRun";
 import { languageName, stageRows, type StageState } from "./source/logic";
 import styles from "./AnalyzeStep.module.css";

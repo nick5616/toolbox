@@ -3,7 +3,8 @@
  * base tool; parts are the tools a tool is made of. Pure functions over the
  * module descriptors, plus hooks with stable references.
  */
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { create } from "zustand";
 import { useModules, type ModuleView } from "./modules";
 
 const byOrder = (a: ModuleView, b: ModuleView) => a.order - b.order;
@@ -55,4 +56,47 @@ export function useFamily(id: string): ModuleView[] {
 export function useParts(id: string): ModuleView[] {
   const list = useModules((s) => s.list);
   return useMemo(() => partsOf(id, list), [id, list]);
+}
+
+/**
+ * What each part of a tool would be opened with (Phase 11, SPEC §4.4): a host
+ * tool reports its current files per constituent ("stems" → the song), and
+ * the CompositionBar's "Uses" chips open that constituent inside the host
+ * (or in its own window) already loaded with them.
+ */
+interface CompositionInputsState {
+  byHost: Record<string, Record<string, string[]>>;
+  set(host: string, inputs: Record<string, string[]> | null): void;
+}
+
+const useCompositionInputsStore = create<CompositionInputsState>((set) => ({
+  byHost: {},
+  set: (host, inputs) =>
+    set((s) => {
+      const byHost = { ...s.byHost };
+      if (inputs) byHost[host] = inputs;
+      else delete byHost[host];
+      return { byHost };
+    }),
+}));
+
+const NO_INPUTS: string[] = [];
+
+/** Host tools: report the files each part would get (`{ stems: [song], "bpm-key": [song] }`). Cleared on unmount. */
+export function useCompositionInputs(host: string, inputs: Readonly<Record<string, readonly string[]>>): void {
+  const key = JSON.stringify(inputs);
+  useEffect(() => {
+    useCompositionInputsStore.getState().set(host, JSON.parse(key) as Record<string, string[]>);
+    return () => useCompositionInputsStore.getState().set(host, null);
+  }, [host, key]);
+}
+
+/** The files `part` gets when opened from `host` (empty when the host reported none). */
+export function useCompositionInputsFor(host: string, part: string): string[] {
+  return useCompositionInputsStore((s) => s.byHost[host]?.[part] ?? NO_INPUTS);
+}
+
+/** Non-hook read (tests, commands). */
+export function compositionInputs(host: string, part: string): string[] {
+  return useCompositionInputsStore.getState().byHost[host]?.[part] ?? NO_INPUTS;
 }

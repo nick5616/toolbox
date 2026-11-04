@@ -9,7 +9,7 @@ import { JobStatus, JobsService, LibraryService, type EditResult } from "@/lib/a
 import { toAppError } from "@/lib/errors";
 import { revealLabel } from "@/lib/platform";
 import { useJob, type JobView } from "@/state/jobs";
-import { openAddToPostDialog } from "@/tools/post-builder/AddToPostDialog";
+import { toolAction } from "@/lib/toolActions";
 import { useEditStudio } from "@/editor/store";
 import { baseName } from "./checks";
 import styles from "./ExportBanner.module.css";
@@ -48,7 +48,7 @@ function Done({ job, onDismiss }: { job: JobView; onDismiss(): void }) {
           <Button size="sm" data-tip="Show the exported file in your file manager" disabled={!path} onClick={() => void run(out ? LibraryService.Reveal(out.id) : LibraryService.RevealPath(path))}>
             {revealLabel}
           </Button>
-          <Button size="sm" data-tip="Use this video as a slide in an Instagram post" disabled={!path || !!out?.missing} onClick={() => void openAddToPostDialog(path)}>
+          <Button size="sm" data-tip="Use this video as a slide in an Instagram post" disabled={!path || !!out?.missing} onClick={() => void toolAction("addToPost")(path)}>
             Add to post…
           </Button>
           <IconButton size="sm" icon="x" label="Dismiss" data-tip="Hide this message; the exported file stays in your library" onClick={onDismiss} />

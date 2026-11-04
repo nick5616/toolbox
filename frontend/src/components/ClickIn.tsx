@@ -87,6 +87,10 @@ export interface ClickInProps {
   flush?: boolean;
   /** Size of the pop-out window (default: the part's own size). */
   popOutSize?: { width: number; height: number };
+  /** A custom pop-out (Phase 11: <ToolClickIn> opens a whole tool window); shows the Pop out button without a `part`. */
+  onPopOut?: () => void | Promise<void>;
+  /** The launcher is shown but can't open (with the reason as its tooltip). */
+  disabledReason?: string;
   children: ReactNode;
   className?: string;
 }
@@ -107,6 +111,8 @@ export function ClickIn({
   width = DEFAULT_WIDTH,
   flush = false,
   popOutSize,
+  onPopOut,
+  disabledReason,
   children,
   className,
 }: ClickInProps) {
@@ -176,6 +182,7 @@ export function ClickIn({
   }, [isOpen, close, hostEl]);
 
   const launch = () => {
+    if (disabledReason) return;
     if (windowOpen) {
       focusWindow(windowKey).catch((e: unknown) => toast({ tone: "danger", title: toAppError(e).message }));
       return;
@@ -184,6 +191,15 @@ export function ClickIn({
   };
 
   const popOut = async () => {
+    if (onPopOut) {
+      try {
+        await onPopOut();
+        close();
+      } catch (e) {
+        toast({ tone: "danger", title: toAppError(e).message });
+      }
+      return;
+    }
     if (!part) return;
     try {
       await popOutPart(part, {
@@ -199,7 +215,7 @@ export function ClickIn({
     }
   };
 
-  const launcherTip = windowOpen ? `${title} is open in its own window. Click to show it.` : (tip ?? title);
+  const launcherTip = disabledReason || (windowOpen ? `${title} is open in its own window. Click to show it.` : (tip ?? title));
   const glyph = windowOpen ? "app-window" : icon;
 
   const launcher =
@@ -213,6 +229,7 @@ export function ClickIn({
           label={windowOpen ? `${title} (open in its own window)` : title}
           data-tip={launcherTip}
           pressed={isOpen}
+          disabled={!!disabledReason}
           aria-haspopup="dialog"
           aria-expanded={isOpen}
           onClick={launch}
@@ -226,6 +243,7 @@ export function ClickIn({
         }}
         type="button"
         className={cx(styles.row, isOpen && styles.rowOpen, className)}
+        disabled={!!disabledReason}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         data-tip={launcherTip}
@@ -253,7 +271,7 @@ export function ClickIn({
       <header className={styles.header}>
         <Icon name={icon} size={16} className={styles.headerIcon} />
         <h3 className={styles.headerTitle}>{title}</h3>
-        {part && spec ? <IconButton size="sm" icon="picture-in-picture-2" label="Pop out" data-tip="Open this in its own window" onClick={() => void popOut()} /> : null}
+        {onPopOut || (part && spec) ? <IconButton size="sm" icon="picture-in-picture-2" label="Pop out" data-tip="Open this in its own window" onClick={() => void popOut()} /> : null}
         <IconButton size="sm" icon="x" label="Close" onClick={close} />
       </header>
       <div className={cx(styles.body, flush && styles.flush)}>{children}</div>

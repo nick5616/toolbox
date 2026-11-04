@@ -6,9 +6,9 @@ import { useOrderedJobs } from "@/state/jobs";
 import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import type { ToolViewProps } from "../index";
-import { RadioCards } from "../image/RadioCards";
-import { ResultCards } from "../image/ResultCards";
-import imageStyles from "../image/image.module.css";
+import { RadioCards } from "@/tools/_kit/image/RadioCards";
+import { ResultCards } from "@/tools/_kit/image/ResultCards";
+import imageStyles from "@/tools/_kit/image/image.module.css";
 import { DEFAULT_BG_OPTIONS, sanitizeBgOptions, submitOptions, toResultItem } from "./options";
 
 const MAX_RESULTS = 24;

@@ -11,7 +11,7 @@ import { useUI } from "@/state/ui";
 import { PRESETS } from "@/viz/presets";
 import { showFromPreset } from "@/viz/presets";
 import type { Show } from "@/viz/types";
-import { applyTemplate, defaultTextStyle } from "./designer/model";
+import { applyTemplate, defaultTextStyle } from "@/blocks/visuals/designer/model";
 import { useVisualizer, type SeedLook } from "./store";
 
 export const SEED_PRESET: Record<SeedLook["from"], string> = { "lyric-video": "lyric-stage", subtitles: "clean-captions" };

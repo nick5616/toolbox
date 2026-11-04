@@ -19,7 +19,7 @@ import {
   type SourceSort,
   type SourceView,
 } from "./pool";
-import { SourceGrid } from "./SourceGrid";
+import { SourceGrid } from "@/blocks/sources/SourceGrid";
 import styles from "./SourcesPanel.module.css";
 
 export const MEDIA_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic", ".heif", ".mp4", ".mov", ".mkv", ".webm", ".m4v"];

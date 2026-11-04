@@ -10,11 +10,12 @@ import { useMediaSource } from "@/components/media";
 import { useVisualsAnalysis } from "@/components/viz";
 import { PRESETS, presetById, showFromPreset } from "@/viz/presets";
 import type { Show } from "@/viz/types";
-import { useMyPresets } from "./designer/myPresets";
-import { applyTemplate } from "./designer/model";
-import { useShowHistory, useUndoKeys } from "./designer/useShowHistory";
-import { VisualDesigner } from "./designer/VisualDesigner";
+import { useMyPresets } from "@/blocks/visuals/designer/myPresets";
+import { applyTemplate } from "@/blocks/visuals/designer/model";
+import { useShowHistory, useUndoKeys } from "@/blocks/visuals/designer/useShowHistory";
+import { VisualDesigner } from "@/blocks/visuals/designer/VisualDesigner";
 import { aspectValue, type Aspect } from "./exportPrefs";
+import { PREVIEW_PART } from "./parts";
 import { useVisualizer } from "./store";
 import { seededShow } from "./useSeed";
 import styles from "./DesignStep.module.css";
@@ -44,6 +45,10 @@ export default function DesignStep({ lastShow, aspect, onExport, onBack }: Desig
   const seedLook = useVisualizer((s) => s.seedLook);
   const setStore = useVisualizer((s) => s.setShow);
   const setSeedLook = useVisualizer((s) => s.setSeedLook);
+  const selection = useVisualizer((s) => s.selection);
+  const setSelection = useVisualizer((s) => s.setSelection);
+  const storePlayhead = useVisualizer((s) => s.playheadMs);
+  const setPlayheadMs = useVisualizer((s) => s.setPlayheadMs);
 
   // The analysis normally comes from the Analyze step; coming back to a file loads it from the cache.
   const loaded = useVisualsAnalysis(stored ? null : input, { analyze, auto: false });
@@ -121,7 +126,11 @@ export default function DesignStep({ lastShow, aspect, onExport, onBack }: Desig
         mode={mode}
         player={null}
         text="engine"
-        popOutPreview
+        selection={selection}
+        onSelect={setSelection}
+        onPlayhead={setPlayheadMs}
+        previewPart={PREVIEW_PART}
+        windowPlayheadMs={storePlayhead}
         onSavePreset={(s) => void savePreset(s)}
       />
     </div>

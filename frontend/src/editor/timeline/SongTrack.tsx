@@ -1,7 +1,7 @@
 /** The song track (Phase 9 SPEC §14.5): the range's waveform with draggable fade ramps. Locked: it can't be moved. */
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Icon, Tooltip, cx } from "@/components";
-import { useWaveform } from "@/tools/video-editor/useThumbs";
+import { useWaveform } from "@/blocks/media/useThumbs";
 import { editLength } from "@/viz/edit/types";
 import { msToX, xToMs } from "@/editor/geometry";
 import { useEditStudio, useProject } from "@/editor/store";

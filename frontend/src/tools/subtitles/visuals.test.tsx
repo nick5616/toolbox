@@ -63,7 +63,7 @@ vi.mock("@/components/viz", () => ({
   ),
 }));
 
-vi.mock("@/tools/visualizer/designer/VisualDesigner", () => ({
+vi.mock("@/blocks/visuals/designer/VisualDesigner", () => ({
   VisualDesigner: (p: { show: { name: string }; onChange(s: unknown): void; text: { overlay: (rect: unknown, ms: number) => unknown } | string; mode: string }) => (
     <div data-testid="designer" data-mode={p.mode} data-text={typeof p.text === "string" ? p.text : "overlay"}>
       <button type="button" onClick={() => p.onChange({ ...p.show, name: "Edited" })}>

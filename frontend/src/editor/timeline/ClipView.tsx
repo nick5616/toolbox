@@ -3,7 +3,7 @@ import { memo, useMemo, type CSSProperties, type PointerEvent as ReactPointerEve
 import { Icon, Tooltip, cx } from "@/components";
 import type { EditClip } from "@/lib/api";
 import { parseEffects } from "@/viz/edit/schema";
-import { useThumb } from "@/tools/video-editor/useThumbs";
+import { useThumb } from "@/blocks/media/useThumbs";
 import { hasFocusSwitch } from "../focus";
 import { useEditorProfile } from "../profileContext";
 import { clipLabel, hasSpeedChange, stripStyle, sourceWindow, type ClipStatus } from "./clipInfo";

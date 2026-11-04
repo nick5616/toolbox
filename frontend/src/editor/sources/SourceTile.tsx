@@ -3,7 +3,7 @@ import { memo, type CSSProperties, type PointerEvent as ReactPointerEvent } from
 import { Badge, Button, Icon, MenuButton, Tooltip, cx, type MenuItem } from "@/components";
 import type { EditSourceState } from "@/lib/api";
 import { formatDuration } from "@/lib/format";
-import { useThumb } from "@/tools/video-editor/useThumbs";
+import { useThumb } from "@/blocks/media/useThumbs";
 import { TAG_PRESETS, toggleTag } from "./tags";
 import styles from "./SourcesPanel.module.css";
 

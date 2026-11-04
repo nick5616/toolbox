@@ -37,7 +37,7 @@ func (v *VideoModule) Descriptor() core.Descriptor {
 		Accepts:      core.Accepts{Extensions: slices.Concat(media.VideoExtensions(), media.ImageExtensions(), media.AudioExtensions())},
 		Requires:     []string{"ffmpeg", "ffprobe"},
 		OutputSubdir: "Edits", Order: 13, MaxConcurrent: 2, NotAStep: true,
-		Parts: []string{"bg-remover"},
+		Parts: []string{"bg-remover", "upscaler", "audio-cleanup", "stems"},
 	}
 }
 

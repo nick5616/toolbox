@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components";
 import { PostsService, type PostSourceFile } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
-import { SourceGrid } from "../post-builder/SourceGrid";
+import { SourceGrid } from "@/blocks/sources/SourceGrid";
 import styles from "./SourcesPanel.module.css";
 
 export interface SourcesPanelProps {

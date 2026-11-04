@@ -34,7 +34,7 @@ vi.mock("@/lib/api", async (orig) => {
     MediaService: { URLFor: async (p: string) => p },
   };
 });
-vi.mock("@/tools/post-builder/AddToPostDialog", () => ({ openAddToPostDialog: (...a: unknown[]) => h.addToPost(...a) }));
+vi.mock("@/lib/toolActions", () => ({ toolAction: () => (...a: unknown[]) => h.addToPost(...a) }));
 
 import { JobStatus, type EditMatteState, type EditSourceState, type Job } from "@/lib/api";
 import { useJobs } from "@/state/jobs";

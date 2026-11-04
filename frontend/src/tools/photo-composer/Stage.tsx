@@ -4,7 +4,7 @@ import type { ComposerLayer, Composition } from "@/lib/api";
 import { boxCorners, hitHandle, hitLayer, handlePositions, layerBox, type Box, type Guide, type Handle, type Point } from "@/composer/hittest";
 import { imageSize, layerSize, renderComposition, textFont } from "@/composer/render";
 import { findLayer, updateLayer } from "@/composer/model";
-import { useSourceDropTarget, type SourceDropInfo } from "../post-builder/sourceDrag";
+import { useSourceDropTarget, type SourceDropInfo } from "@/blocks/sources/sourceDrag";
 import { canvasFraction, fitScale, handleGeometry, moveWithSnap, panBackground, pointsOf, rotateByHandle, scaleByHandle, SNAP_SCREEN_PX, zoomBackground } from "./logic";
 import styles from "./Stage.module.css";
 

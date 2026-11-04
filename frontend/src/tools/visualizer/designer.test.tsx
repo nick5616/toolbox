@@ -40,17 +40,17 @@ vi.mock("@/components/viz", () => ({
   VisualsPicker: () => null,
 }));
 
-vi.mock("./SongMap", () => ({ SongMap: () => <div data-testid="songmap" /> }));
+vi.mock("@/blocks/visuals/songmap/SongMap", () => ({ SongMap: () => <div data-testid="songmap" /> }));
 
 import type { ReactNode } from "react";
 import { buildFixture } from "@/viz/fixture";
 import { PRESETS, presetById, showFromPreset } from "@/viz/presets";
 import type { Show } from "@/viz/types";
 import { validateShow } from "@/viz/validate";
-import { HEADLINE_CONTROLS, VisualDesigner } from "./designer/VisualDesigner";
-import { deleteLayer, moveLayer, removeReaction, setReactionAmount } from "./designer/model";
-import { useShowHistory, useUndoKeys, type ShowHistory } from "./designer/useShowHistory";
-import { whyFacts } from "./designer/why";
+import { HEADLINE_CONTROLS, VisualDesigner } from "@/blocks/visuals/designer/VisualDesigner";
+import { deleteLayer, moveLayer, removeReaction, setReactionAmount } from "@/blocks/visuals/designer/model";
+import { useShowHistory, useUndoKeys, type ShowHistory } from "@/blocks/visuals/designer/useShowHistory";
+import { whyFacts } from "@/blocks/visuals/designer/why";
 import { Signals } from "@/viz/signals";
 import { seededShow } from "./useSeed";
 import { useVisualizer } from "./store";

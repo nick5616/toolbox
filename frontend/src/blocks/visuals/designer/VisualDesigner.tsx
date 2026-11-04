@@ -6,6 +6,12 @@
  * hosts it with `text: "engine"` (and its preview can pop out); Lyric Video and
  * Subtitles host it with their own words overlay. The host owns the design and
  * its undo (`useShowHistory`); every edit goes through `onChange`.
+ *
+ * A shared building block (Phase 11, `blocks/visuals`): it never imports a
+ * tool. Hosts that keep the Song Map selection or the playhead in their own
+ * store pass them in (`selection`/`onSelect`, `onPlayhead`); hosts with a
+ * pop-out preview pass its part id (`previewPart`) and the time the popped-out
+ * preview plays (`windowPlayheadMs`).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Banner, ClickIn, ClickInHost, Slider } from "@/components";
@@ -20,9 +26,7 @@ import { timelineFor } from "@/viz/director";
 import { Signals } from "@/viz/signals";
 import type { Show } from "@/viz/types";
 import { validateShow } from "@/viz/validate";
-import { PREVIEW_PART } from "../parts";
-import { SongMap, type SongMapLane } from "../SongMap";
-import { useVisualizer } from "../store";
+import { SongMap, type SongMapLane } from "../songmap/SongMap";
 import { DesignerContext, useThrottled, type DesignerContextValue } from "./context";
 import { LayersTab } from "./LayersTab";
 import { LookTab } from "./LookTab";
@@ -49,9 +53,18 @@ export interface VisualDesignerProps {
   text: DesignerText; // engine text (Visualizer) or the host's preview text
   tabs?: DesignerTab[]; // default: all
   onSavePreset?(show: Show): void; // "Save as my preset"
-  /** The Visualizer's own designer: the preview can pop out into a window (it needs the store bridge of the Visualizer view). */
-  popOutPreview?: boolean;
+  /** The Song Map selection (the export range); without it the designer keeps its own. */
+  selection?: DesignerSelection;
+  onSelect?(selection: DesignerSelection): void;
+  /** Reports the (throttled) playhead, e.g. into the host's store for a popped-out preview. */
+  onPlayhead?(ms: number): void;
+  /** A registered part that shows this preview in its own window (the host bridges its store); omit for no pop-out. */
+  previewPart?: string;
+  /** While `previewPart`'s window is open, the time it plays (it drives the playhead). */
+  windowPlayheadMs?: number;
 }
+
+export type DesignerSelection = { startMs: number; endMs: number } | null;
 
 const ALL_TABS: Array<{ id: DesignerTab; label: string; icon: string }> = [
   { id: "presets", label: "Presets", icon: "sparkles" },
@@ -83,7 +96,7 @@ export function VisualDesigner(props: VisualDesignerProps) {
   );
 }
 
-function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, text, tabs, onSavePreset, popOutPreview }: VisualDesignerProps) {
+function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, text, tabs, onSavePreset, selection: hostSelection, onSelect, onPlayhead, previewPart, windowPlayheadMs }: VisualDesignerProps) {
   const engineText = text === "engine";
   const visible = useMemo(() => ALL_TABS.filter((t) => !tabs || tabs.includes(t.id)), [tabs]);
   const short = useMediaQuery(SHORT_QUERY);
@@ -91,15 +104,15 @@ function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, t
   const [section, setSection] = useState(0);
   const ownPlayer = useRef<MediaPlayerHandle>(null);
   const toggleFs = useRef<(() => void) | null>(null);
-  const selection = useVisualizer((s) => s.selection);
-  const setSelection = useVisualizer((s) => s.setSelection);
+  const [ownSelection, setOwnSelection] = useState<DesignerSelection>(null);
+  const selection = onSelect ? (hostSelection ?? null) : ownSelection;
+  const setSelection = onSelect ?? setOwnSelection;
 
-  // While the preview is in its own window, its player drives the playhead (through the store).
-  const previewOut = useWindowOpen(partWindowKey(PREVIEW_PART));
-  const storePlayhead = useVisualizer((s) => s.playheadMs);
+  // While the preview is in its own window, its player drives the playhead (through the host's store).
+  const previewOut = useWindowOpen(previewPart ? partWindowKey(previewPart) : "");
   useEffect(() => {
-    if (popOutPreview && previewOut) setPlayheadMs(storePlayhead);
-  }, [popOutPreview, previewOut, storePlayhead]);
+    if (previewPart && previewOut && windowPlayheadMs !== undefined) setPlayheadMs(windowPlayheadMs);
+  }, [previewPart, previewOut, windowPlayheadMs]);
 
   // A host that draws its own words never gets text in the design.
   const emit = useCallback((next: Show) => onChange(engineText ? next : withoutText(next)), [onChange, engineText]);
@@ -132,8 +145,8 @@ function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, t
   );
 
   useEffect(() => {
-    useVisualizer.getState().setPlayheadMs(liveMs);
-  }, [liveMs]);
+    onPlayhead?.(liveMs);
+  }, [liveMs, onPlayhead]);
 
   useShortcut("f", () => toggleFs.current?.());
 
@@ -205,8 +218,8 @@ function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, t
           </Banner>
         )}
         <div className={styles.previewSlot}>
-          {popOutPreview ? (
-            <PartFrame part={PREVIEW_PART} chrome="overlay">
+          {previewPart ? (
+            <PartFrame part={previewPart} chrome="overlay">
               {previewEl}
             </PartFrame>
           ) : (

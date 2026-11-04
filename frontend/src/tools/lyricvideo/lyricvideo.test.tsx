@@ -31,7 +31,7 @@ vi.mock("@/components/viz", () => ({
   VisualsCanvas: () => <div data-testid="visuals-canvas" />,
 }));
 
-vi.mock("@/tools/visualizer/designer/VisualDesigner", () => ({
+vi.mock("@/blocks/visuals/designer/VisualDesigner", () => ({
   VisualDesigner: (p: {
     show: { name: string };
     onChange: (s: unknown) => void;

@@ -95,6 +95,8 @@ core/imaging  pure-Go image sizes + scaled previews (jpg/png/gif/webp/bmp/tiff; 
 core/media ffprobe probing, keyframes, webview playability, FFmpeg progress, ASS writer, fonts, preview copies
 modules/   one folder per module (downloader, placeholders, …)
 frontend/src/editor/  the multitrack Video Editor core; tools/edit-studio is the music layer on it (Phase 10)
+frontend/src/blocks/  shared building blocks several tools compose (visual designer, Song Map, source grid); never import a tool (Phase 11)
+frontend/src/workspace/  defineWorkspace: store-backed panels + preview parts + rail/bars/studio layout for workspace tools (Phase 11)
 sidecar/   Python "AI engine" (stems, BPM/key, MIDI, transcription, background removal, CPU upscaling, HEIC decoding) over stdio JSON lines
 ```
 
@@ -273,6 +275,13 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Opening another tool with inputs:** `openTool(moduleId, inputs, extra, { window })` / `openToolItems(...)` in `lib/openTool.ts` — never call `handOff` directly for a new hand-off.
 - **Icons:** add any new lucide icon to `components/Icon.tsx`; `components/iconNames.test.ts` fails on unregistered names.
 - **Dev handles for QA:** `window.__ui` and `window.__edit` (dev builds only).
+
+## Composable everything (Phase 11)
+
+- **Tools never import each other.** Shared pieces live in `blocks/` (never import a tool); a variant may import its base; composition roots (`tools/index.ts`, `parts/index.ts`, `shell/`, `views/`, `pipelines/`) may import tools. `src/architecture.test.ts` enforces it. Cross-tool actions go through `lib/toolActions.ts` (register in `tools/index.ts`); tool views are looked up with `getToolView(id)`.
+- **Constituents open inside their host**: `<ToolClickIn host module inputs onUse useLabel />` (components) renders the constituent's own view in a drawer and pops it out with the same handoff; results return through `onUse` (also from the popped-out window, over the `embed` relay channel). Tool views take hand-offs only through `useToolHandoff(moduleId, cb)` (`lib/embed.ts`), never `useUI().takeHandoff` directly, and check `useEmbed()` to render compactly. Hosts report what each part would get with `useCompositionInputs(host, {...})` so the CompositionBar's "Uses" chips open the part inside the host.
+- **Workspaces** (`src/workspace/`): a workspace tool keeps its document in a zustand store and calls `defineWorkspace({moduleId, store, bridge, isOpen, panels, preview, useReplica})` in `tools/<id>/workspace.ts(x)` (auto-discovered by `parts/index.ts`); its view calls `ws.useHost()` and lays out with `StudioLayout`, `WorkspaceRail`, `WorkspacePanel`, `OneLineBar`, `WorkspacePreviewFrame`. Panels take no props; replicas (`ws.isReplica()`) never save or submit jobs; bitmaps/analyses load locally in `useReplica`.
+- **Every result row can be sent on**: the kit's `FileActions` offers Send to (tools that accept the file, also in a new window) and Use when embedded.
 
 ## Conventions
 

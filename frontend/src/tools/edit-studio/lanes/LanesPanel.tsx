@@ -12,7 +12,7 @@ import { useShortcut } from "@/lib/shortcuts";
 import { laneSettings } from "@/viz/edit/defaults";
 import { TAP_LATENCY_MS } from "@/viz/edit/markers";
 import { MARKER_LANES, editLength } from "@/viz/edit/types";
-import { drawLane, readTheme } from "@/tools/visualizer/songmap/draw";
+import { drawLane, readTheme } from "@/blocks/visuals/songmap/draw";
 import { HEADER_PX, LANE_ROW_PX, msToX, RULER_PX, useTimelinePan, useTimelineWheel } from "@/editor/geometry";
 import { useEditStudio, useMarkers, useProject } from "@/editor/store";
 import { cssColor, drawPeaks, prepCanvas } from "./draw";

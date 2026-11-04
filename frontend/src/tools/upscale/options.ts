@@ -1,7 +1,7 @@
 import { UpscaleDevice, UpscaleFormat, UpscaleModel, type UpscaleLimits, type UpscaleOptions } from "@/lib/api";
 import type { JobView } from "@/state/jobs";
-import { basename, num, parseJson, str } from "../image/common";
-import type { ResultItem } from "../image/ResultCards";
+import { basename, num, parseJson, str } from "@/tools/_kit/image/common";
+import type { ResultItem } from "@/tools/_kit/image/ResultCards";
 
 /** Mirrors Go's DefaultOptions() (modules/upscale). */
 export const DEFAULT_UPSCALE_OPTIONS: UpscaleOptions = {

@@ -25,7 +25,7 @@ const h = vi.hoisted(() => ({
   dropHandler: null as null | ((info: { paths: string[]; x: number; y: number }) => void),
 }));
 
-vi.mock("@/tools/post-builder/sourceDrag", () => ({
+vi.mock("@/blocks/sources/sourceDrag", () => ({
   useSourceDropTarget: (_ref: unknown, onDrop: (info: { paths: string[]; x: number; y: number }) => void) => {
     h.dropHandler = onDrop;
   },
@@ -33,7 +33,7 @@ vi.mock("@/tools/post-builder/sourceDrag", () => ({
   useSourceDrag: () => undefined,
 }));
 
-vi.mock("@/tools/post-builder/SourceGrid", () => ({
+vi.mock("@/blocks/sources/SourceGrid", () => ({
   SourceGrid: (p: { sources: { path: string; name: string }[]; onActivate?: (path: string) => void }) => (
     <ul aria-label="Sources grid">
       {p.sources.map((s) => (

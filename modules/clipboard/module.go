@@ -31,6 +31,8 @@ func (Module) Descriptor() core.Descriptor {
 		Tagline:     "Everything you copied, one hotkey away",
 		Description: "A searchable, local-only history of copied text and images with a global hotkey popup.",
 		Status:      core.StatusReady, Order: 300, JobLess: true,
+		// Phase 11: a copied snippet opens in Dev Utilities (format, decode) inside this tool.
+		Parts: []string{"dev-utils"},
 	}
 }
 

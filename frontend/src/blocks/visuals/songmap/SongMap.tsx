@@ -19,7 +19,7 @@ import { IconButton, cx } from "@/components";
 import { formatMs } from "@/components/media";
 import type { Analysis } from "@/viz/analysis";
 import type { TimelineEntry } from "@/viz/types";
-import { drawLane, readTheme } from "./songmap/draw";
+import { drawLane, readTheme } from "./draw";
 import {
   blockIndexAt,
   clampPxPerSec,
@@ -36,7 +36,7 @@ import {
   viewFor,
   visibleLanes,
   xAtTime,
-} from "./songmap/model";
+} from "./model";
 import styles from "./SongMap.module.css";
 import { useMiddleDragScroll } from "@/lib/useDragScroll";
 

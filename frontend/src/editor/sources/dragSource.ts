@@ -4,7 +4,7 @@
  * a record of whether Shift was held, so the drop can choose "source length"
  * instead of "fill to the next marker".
  */
-import { startSourceDrag, useSourceDropTarget, type SourceDropInfo } from "@/tools/post-builder/sourceDrag";
+import { startSourceDrag, useSourceDropTarget, type SourceDropInfo } from "@/blocks/sources/sourceDrag";
 
 export { useSourceDropTarget };
 export type { SourceDropInfo };

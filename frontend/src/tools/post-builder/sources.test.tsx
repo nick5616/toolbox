@@ -120,12 +120,12 @@ import type { PostSourceFile } from "@/lib/api";
 import { routeFilesDropped } from "@/shell/dropRouting";
 import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
-import { cancelSourceDrag } from "./sourceDrag";
+import { cancelSourceDrag } from "@/blocks/sources/sourceDrag";
 import { CollageDialog, StitchDialog } from "./buildDialogs";
 import { DEFAULT_SOURCE_VIEW, clickSelection, hideFromPool, stripDrop, viewSources } from "./pool";
 import PostBuilderView from "./PostBuilderView";
-import { SourceGrid } from "./SourceGrid";
-import { clearSourceCaches } from "./sourceThumbs";
+import { SourceGrid } from "@/blocks/sources/SourceGrid";
+import { clearSourceCaches } from "@/blocks/sources/sourceThumbs";
 import { useAddToPost, usePostDrop } from "./store";
 import { clearVisualCache } from "./useSlideVisual";
 
