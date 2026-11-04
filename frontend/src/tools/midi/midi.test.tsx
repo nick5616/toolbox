@@ -18,6 +18,10 @@ vi.mock("@/lib/api", async (orig) => {
   };
 });
 
+import { ModuleStatus, type Descriptor } from "@/lib/api";
+import { useEmbed } from "@/lib/embed";
+import { registerToolViews } from "@/lib/toolActions";
+import { useModules } from "@/state/modules";
 import MidiView from "./MidiView";
 import { DEFAULT_MIDI_OPTIONS, formatPitchRange, noteName, parseMidiResult, sanitizeMidiOptions } from "./options";
 
@@ -85,5 +89,32 @@ describe("MidiView", () => {
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
     await user.click(btn);
     expect(await screen.findByText("Too long")).toBeTruthy();
+  });
+
+  it("Split into stems first gets the inputs, and Use replaces them with the chosen stem", async () => {
+    function FakeStems() {
+      const e = useEmbed();
+      return (
+        <div>
+          <p>stems of {e?.handoff.inputs.join(",")}</p>
+          <button type="button" onClick={() => e?.onUse?.(["/vocals.flac"])}>{e?.useLabel}</button>
+        </div>
+      );
+    }
+    registerToolViews({ stems: FakeStems });
+    const d = (id: string, name: string) => ({ id, name, icon: "box", status: ModuleStatus.StatusReady, accepts: { extensions: [], urls: false, any: false } }) as unknown as Descriptor;
+    useModules.getState().setAll([d("stems", "Stem Splitter"), d("audio-to-midi", "Audio to MIDI")]);
+    enqueue.mockResolvedValue([{}]);
+    const user = userEvent.setup();
+    render(<MidiView moduleId="audio-to-midi" />);
+    await user.click(await screen.findByRole("button", { name: "Add files…" }));
+    await screen.findByRole("button", { name: /Transcribe 1 file/ });
+    await user.click(screen.getByRole("button", { name: /Split into stems first/ }));
+    expect(await screen.findByText("stems of /a.wav")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Use this stem" }));
+    const btn = await screen.findByRole("button", { name: /Transcribe 1 file/ });
+    await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
+    await user.click(btn);
+    await waitFor(() => expect(enqueue).toHaveBeenCalledWith(["/vocals.flac"], expect.anything()));
   });
 });

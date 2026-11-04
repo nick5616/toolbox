@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Badge, Button, EmptyState, Field, Icon, SegmentedControl, Section, Slider, Stepper, Switch, cx } from "@/components";
+import { Badge, Button, EmptyState, Field, Icon, SegmentedControl, Section, Slider, Stepper, Switch, ToolClickIn, cx } from "@/components";
 import { JobStatus, MidiRange, MidiService } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
+import { useCompositionInputs } from "@/state/composition";
 import { useToolJobs } from "@/tools/_kit/session";
 import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
@@ -25,9 +26,17 @@ export default function MidiView({ moduleId }: ToolViewProps) {
     [jobs],
   );
 
+  const paths = useMemo(() => inputs.files.map((f) => f.path), [inputs.files]);
+  useCompositionInputs(moduleId, { stems: paths });
+  const { clear, add } = inputs;
+  // A chosen stem replaces the files to transcribe.
+  const useStem = (stems: string[]) => {
+    clear();
+    void add(stems.slice(0, 1));
+  };
+
   const n = inputs.files.length;
   const onRun = async () => {
-    const paths = inputs.files.map((f) => f.path);
     setRunning(true);
     const res = await submitJobs(() => MidiService.Enqueue(paths, opts), paths, ["transcription", "transcriptions"]);
     setRunning(false);
@@ -44,6 +53,7 @@ export default function MidiView({ moduleId }: ToolViewProps) {
       running={running}
       inputErrors={inputErrors}
       primary={
+        <div className={styles.primaryRow}>
         <Field label="Range">
           <SegmentedControl
             aria-label="Range"
@@ -56,6 +66,17 @@ export default function MidiView({ moduleId }: ToolViewProps) {
             ]}
           />
         </Field>
+        <ToolClickIn
+          host={moduleId}
+          module="stems"
+          title="Split into stems first"
+          inputs={paths}
+          useLabel="Use this stem"
+          onUse={useStem}
+          tip="Separate the song into vocals, bass, drums and the rest, then transcribe just one of them"
+          disabledReason={paths.length === 0 ? "Add a song first" : undefined}
+        />
+        </div>
       }
       advancedSummary={summarize(`sensitivity ${pct(opts.sensitivity)}`, `floor ${pct(opts.noteFloor)}`, `min ${opts.minNoteMs} ms`, opts.melodiaTrick && "Melodia")}
       advanced={

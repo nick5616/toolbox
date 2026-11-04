@@ -8,3 +8,9 @@
   display: flex;
   margin-top: var(--space-1);
 }
+
+.primaryRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
