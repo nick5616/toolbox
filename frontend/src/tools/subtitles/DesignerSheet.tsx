@@ -5,7 +5,7 @@ import { parseShow } from "@/components/viz/pickerModel";
 import type { TimedLine, VisualsSpec } from "@/lib/api";
 import { useShortcut } from "@/lib/shortcuts";
 import { useShowHistory, useUndoKeys } from "@/blocks/visuals/designer/useShowHistory";
-import { VisualDesigner } from "@/blocks/visuals/designer/VisualDesigner";
+import { VisualDesigner, type DesignerSelection } from "@/blocks/visuals/designer/VisualDesigner";
 import { PRESETS, showFromPreset } from "@/viz/presets";
 import type { Show } from "@/viz/types";
 import { CueOverlay } from "./CueOverlay";
@@ -22,6 +22,10 @@ export interface DesignerSheetProps {
   mode: "background" | "overlay";
   aspect: number;
   prefs: Prefs;
+  /** The Song Map selection and the designer's playhead live in Subtitles' own store (never the Visualizer's). */
+  selection: DesignerSelection | null;
+  onSelect(selection: DesignerSelection | null): void;
+  onPlayhead(ms: number): void;
   /** Keeps the design. */
   onDone(spec: VisualsSpec): void;
   /** Closes without keeping it. */
@@ -37,7 +41,7 @@ function startShow(value: VisualsSpec): Show {
 }
 
 /** The full designer in a sheet over the Subtitles view; the cues are drawn as the burn-style text (SPEC.md 9.3). */
-export function DesignerSheet({ inputPath, rows, lines, value, mode, aspect, prefs, onDone, onClose }: DesignerSheetProps) {
+export function DesignerSheet({ inputPath, rows, lines, value, mode, aspect, prefs, selection, onSelect, onPlayhead, onDone, onClose }: DesignerSheetProps) {
   const analyze = useAnalyzeOptions(value, lines);
   const listening = useVisualsAnalysis(inputPath, { analyze, auto: true });
   const initial = useMemo(() => startShow(value), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -94,6 +98,9 @@ export function DesignerSheet({ inputPath, rows, lines, value, mode, aspect, pre
             mode={mode === "overlay" ? "overlay" : "full"}
             player={null}
             text={text}
+            selection={selection}
+            onSelect={onSelect}
+            onPlayhead={onPlayhead}
           />
         ) : listening.status === "error" ? (
           <Banner tone="danger" title={listening.error?.message ?? "Couldn't listen to the file"} action={<Button size="sm" onClick={listening.start} data-tip="Listen to the file again">Try again</Button>}>

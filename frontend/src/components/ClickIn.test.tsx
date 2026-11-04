@@ -174,4 +174,39 @@ describe("ClickIn inline hosts", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("stacks a click-in opened from inside a drawer over it; closing it shows the drawer beneath", async () => {
+    const user = userEvent.setup();
+    function Closer() {
+      const { close } = useClickIn();
+      return (
+        <button type="button" onClick={close}>
+          close outer
+        </button>
+      );
+    }
+    render(
+      <ClickInHost>
+        <ClickIn icon="box" title="Outer" width={300}>
+          <p>outer body</p>
+          <Closer />
+          <ClickIn icon="box" title="Inner" width={700}>
+            <p>inner body</p>
+          </ClickIn>
+        </ClickIn>
+      </ClickInHost>,
+    );
+    await user.click(screen.getByRole("button", { name: /Outer/ }));
+    await user.click(screen.getByRole("button", { name: /Inner/ }));
+    expect(screen.getByRole("dialog", { name: "Outer" })).toBeTruthy();
+    const inner = screen.getByRole("dialog", { name: "Inner" });
+    expect(inner.getAttribute("data-click-in-depth")).toBe("1");
+    await user.click(screen.getByText("inner body"));
+    expect(screen.queryByRole("dialog", { name: "Outer" })).toBeTruthy();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Inner" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Outer" })).toBeTruthy();
+    await user.click(screen.getByText("close outer"));
+    expect(screen.queryByRole("dialog", { name: "Outer" })).toBeNull();
+  });
 });
