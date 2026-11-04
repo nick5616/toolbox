@@ -192,7 +192,7 @@ export function MatteDialog({ clipId, onClose, onMake }: MatteDialogProps) {
           </Banner>
         )}
 
-        <div ref={frameRef} className={styles.frame} onClick={onFrameClick} data-testid="matte-frame" aria-label="Frame. Click the subject.">
+        <div ref={frameRef} className={styles.frame} onClick={onFrameClick} data-testid="matte-frame" aria-label="Frame. Click the subject." data-tip="Click the subject to keep it; Alt-click marks what to leave out">
           {frameUrl && !frameFailed ? <img className={styles.img} src={frameUrl} alt="" draggable={false} /> : <div className={styles.placeholder}>{frameFailed ? "Couldn't load this frame" : "Loading the frame…"}</div>}
           {showTry && <img key={tryJobId} className={styles.mask} src={tryUrl} alt="Selection preview" draggable={false} />}
           {here.map((c, i) => (
@@ -202,6 +202,7 @@ export function MatteDialog({ clipId, onClose, onMake }: MatteDialogProps) {
               className={c.positive ? styles.dotOn : styles.dotOff}
               style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%` }}
               aria-label={`${DOT_REMOVE_LABEL} (${c.positive ? "subject" : "not this"})`}
+              data-tip={c.positive ? "A point on the subject; click to remove it" : "A point marking what to leave out; click to remove it"}
               onClick={() => removeClick(c)}
             />
           ))}
@@ -209,6 +210,7 @@ export function MatteDialog({ clipId, onClose, onMake }: MatteDialogProps) {
 
         <div className={styles.scrub}>
           <Slider
+            data-tip="Scrub to another frame of the clip to add corrections there"
             aria-label="Frame"
             value={ms}
             min={span.fromMs}
@@ -226,17 +228,17 @@ export function MatteDialog({ clipId, onClose, onMake }: MatteDialogProps) {
             value={negative}
             onChange={setNegative}
             options={[
-              { value: "no", label: "The subject" },
-              { value: "yes", label: "Not this" },
+              { value: "no", label: "The subject", tip: "Your next click marks the thing to keep" },
+              { value: "yes", label: "Not this", tip: "Your next click marks something to leave out (same as Alt-click)" },
             ]}
           />
-          <span className={styles.count} data-testid="matte-points">
+          <span className={styles.count} data-testid="matte-points" data-tip="Points you have clicked; more points on other frames improve the result">
             {clicks.length === 0 ? "No points yet" : `${clicks.length} point${clicks.length === 1 ? "" : "s"}${elsewhere ? `, ${elsewhere} on other frames` : ""}`}
           </span>
-          <Button size="sm" variant="ghost" disabled={clicks.length === 0} onClick={() => setClicks(clicks.slice(0, -1))}>
+          <Button size="sm" variant="ghost" data-tip="Remove the last point you added" disabled={clicks.length === 0} onClick={() => setClicks(clicks.slice(0, -1))}>
             Undo point
           </Button>
-          <Button size="sm" variant="ghost" disabled={clicks.length === 0} onClick={() => setClicks([])}>
+          <Button size="sm" variant="ghost" data-tip="Remove all points and start again" disabled={clicks.length === 0} onClick={() => setClicks([])}>
             Clear
           </Button>
         </div>
@@ -248,13 +250,13 @@ export function MatteDialog({ clipId, onClose, onMake }: MatteDialogProps) {
         )}
 
         <div className={styles.footer}>
-          <span className={styles.estimate}>
+          <span className={styles.estimate} data-tip="A rough guess of how long the full cut-out will take">
             {!hasPositive(clicks) ? "Click the subject to begin." : `Making the cut-out takes ${describeEstimate(seconds)} on this computer.`}
           </span>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" data-tip="Close without keeping your changes to the cut-out" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="secondary" disabled={here.length === 0 || !hasPositive(clicks) || trying || missingModel || tooLong} onClick={() => void tryIt()}>
+          <Button variant="secondary" data-tip={missingModel ? "Subject select isn't ready; download its models first" : tooLong ? "Trim the clip to 60 seconds or less first" : !hasPositive(clicks) ? "Click the subject first" : here.length === 0 ? "Add a point on this frame to try it here" : "Preview the selection on this one frame before making the whole cut-out"} disabled={here.length === 0 || !hasPositive(clicks) || trying || missingModel || tooLong} onClick={() => void tryIt()}>
             {trying ? (
               <>
                 <Spinner size={12} label="Trying" /> Trying…
@@ -263,7 +265,7 @@ export function MatteDialog({ clipId, onClose, onMake }: MatteDialogProps) {
               "Try on this frame"
             )}
           </Button>
-          <Button variant="primary" disabled={!hasPositive(clicks) || missingModel || tooLong} onClick={make}>
+          <Button variant="primary" data-tip={missingModel ? "Subject select isn't ready; download its models first" : tooLong ? "Trim the clip to 60 seconds or less first" : !hasPositive(clicks) ? "Click the subject first" : "Cut the subject out across the whole clip; it runs in the background"} disabled={!hasPositive(clicks) || missingModel || tooLong} onClick={make}>
             {rebuild ? "Rebuild cut-out" : "Make cut-out"}
           </Button>
         </div>

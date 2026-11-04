@@ -24,7 +24,7 @@ export interface WordListRow {
   line: TextLine;
 }
 
-function TimeField({ value, label, onCommit }: { value: number; label: string; onCommit: (ms: number) => void }) {
+function TimeField({ value, label, tip, onCommit }: { value: number; label: string; tip: string; onCommit: (ms: number) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
   const commit = (revert: boolean) => {
@@ -44,6 +44,7 @@ function TimeField({ value, label, onCommit }: { value: number; label: string; o
   return (
     <TimecodeInput
       aria-label={label}
+      data-tip={tip}
       className={styles.time}
       value={draft ?? formatMs(value)}
       invalid={invalid}
@@ -91,32 +92,33 @@ const Row = memo(function Row({ row, n, offset, active, last, open, onToggle, on
   const { index, line } = row;
   const tl = (songMs: number) => Math.max(0, songMs - offset);
   const items = (): MenuItem[] => [
-    { id: "split", label: "Split at cursor", icon: "scissors", onSelect: () => onAction("split", index, -1) },
-    { id: "merge", label: "Merge with next", icon: "arrow-left-right", disabled: last, onSelect: () => onAction("merge", index, -1) },
-    { id: "insert", label: "Insert after", icon: "plus", onSelect: () => onAction("insert", index, -1) },
-    { id: "start", label: "Start at playhead", icon: "skip-back", onSelect: () => onAction("startAtPlayhead", index, -1) },
-    { id: "end", label: "End at playhead", icon: "skip-forward", onSelect: () => onAction("endAtPlayhead", index, -1) },
-    { id: "delete", label: "Delete", icon: "trash-2", onSelect: () => onAction("delete", index, -1) },
+    { id: "split", label: "Split at cursor", icon: "scissors", tip: "Cut this line in two where the text cursor is (Ctrl+Enter in the text)", onSelect: () => onAction("split", index, -1) },
+    { id: "merge", label: "Merge with next", icon: "arrow-left-right", tip: last ? "This is the last line" : "Join this line and the next one into one line", disabled: last, onSelect: () => onAction("merge", index, -1) },
+    { id: "insert", label: "Insert after", icon: "plus", tip: "Add an empty line after this one", onSelect: () => onAction("insert", index, -1) },
+    { id: "start", label: "Start at playhead", icon: "skip-back", tip: "Make this line appear at the playhead", onSelect: () => onAction("startAtPlayhead", index, -1) },
+    { id: "end", label: "End at playhead", icon: "skip-forward", tip: "Make this line disappear at the playhead", onSelect: () => onAction("endAtPlayhead", index, -1) },
+    { id: "delete", label: "Delete", icon: "trash-2", tip: "Remove this line from the captions", onSelect: () => onAction("delete", index, -1) },
   ];
   const caret = (e: { currentTarget: HTMLInputElement }) => onCaret(index, e.currentTarget.selectionStart ?? -1);
   return (
     <div className={cx(styles.row, active && styles.active)} data-testid="caption-row" data-active={active || undefined}>
       <div className={styles.main} style={{ height: ROW_HEIGHT }}>
         <div className={styles.head}>
-          <IconButton size="sm" variant="ghost" icon={open ? "chevron-down" : "chevron-right"} label={open ? `Hide words of line ${n}` : `Show words of line ${n}`} onClick={() => onToggle(index)} />
-          <span className={styles.index}>{n}</span>
-          <TimeField value={tl(line.startMs)} label={`Line ${n} start`} onCommit={(ms) => onTime(index, { startMs: ms + offset })} />
-          <span className={styles.arrow} aria-hidden>
+          <IconButton size="sm" variant="ghost" icon={open ? "chevron-down" : "chevron-right"} label={open ? `Hide words of line ${n}` : `Show words of line ${n}`} data-tip={open ? "Hide the individual words of this line" : "Show each word of this line to fix its text and timing"} onClick={() => onToggle(index)} />
+          <span className={styles.index} data-tip="Line number">{n}</span>
+          <TimeField value={tl(line.startMs)} label={`Line ${n} start`} tip="When this line appears (minutes:seconds); type a new time and press Enter" onCommit={(ms) => onTime(index, { startMs: ms + offset })} />
+          <span className={styles.arrow} aria-hidden data-tip="From start to end">
             →
           </span>
-          <TimeField value={tl(line.endMs)} label={`Line ${n} end`} onCommit={(ms) => onTime(index, { endMs: ms + offset })} />
+          <TimeField value={tl(line.endMs)} label={`Line ${n} end`} tip="When this line disappears (minutes:seconds); type a new time and press Enter" onCommit={(ms) => onTime(index, { endMs: ms + offset })} />
           <span className={styles.menu}>
-            <MenuButton label={`Line ${n} actions`} icon="chevron-down" variant="ghost" size="sm" items={items} />
+            <MenuButton data-tip="Split, merge, insert, set times from the playhead or delete this line" label={`Line ${n} actions`} icon="chevron-down" variant="ghost" size="sm" items={items} />
           </span>
         </div>
         <TextField
           size="sm"
           aria-label={`Line ${n} text`}
+          data-tip="The words shown for this line; clicking jumps the playhead to it"
           data-line-text={index}
           value={line.text}
           onChange={(e) => onText(index, e.target.value)}
@@ -134,12 +136,12 @@ const Row = memo(function Row({ row, n, offset, active, last, open, onToggle, on
       </div>
       {open && (
         <div className={styles.words} style={{ height: wordsHeight(line) }}>
-          {line.words.length === 0 && <span className={styles.none}>No word times for this line.</span>}
+          {line.words.length === 0 && <span className={styles.none} data-tip="Words without timing can't be shown one by one">No word times for this line.</span>}
           {line.words.map((w, k) => (
             <div key={k} className={styles.word} style={{ height: WORD_HEIGHT }}>
-              <TextField size="sm" aria-label={`Line ${n} word ${k + 1}`} value={w.text} onChange={(e) => onWordText(index, k, e.target.value)} />
-              <TimeField value={tl(w.startMs)} label={`Line ${n} word ${k + 1} start`} onCommit={(ms) => onWordTime(index, k, { startMs: ms + offset })} />
-              <TimeField value={tl(w.endMs)} label={`Line ${n} word ${k + 1} end`} onCommit={(ms) => onWordTime(index, k, { endMs: ms + offset })} />
+              <TextField size="sm" data-tip="The text of this word" aria-label={`Line ${n} word ${k + 1}`} value={w.text} onChange={(e) => onWordText(index, k, e.target.value)} />
+              <TimeField value={tl(w.startMs)} label={`Line ${n} word ${k + 1} start`} tip="When this word starts being sung (minutes:seconds)" onCommit={(ms) => onWordTime(index, k, { startMs: ms + offset })} />
+              <TimeField value={tl(w.endMs)} label={`Line ${n} word ${k + 1} end`} tip="When this word ends (minutes:seconds)" onCommit={(ms) => onWordTime(index, k, { endMs: ms + offset })} />
             </div>
           ))}
         </div>

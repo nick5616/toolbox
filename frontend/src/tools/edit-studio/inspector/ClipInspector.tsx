@@ -105,7 +105,7 @@ export function ClipInspector({ clip }: { clip: EditClip }) {
         <h2 className={styles.title} title={clip.path || undefined}>
           {title}
         </h2>
-        <MenuButton label="Clip actions" icon="ellipsis" variant="ghost" size="sm" items={menu} />
+        <MenuButton data-tip="Ken Burns, velocity presets and reset transform" label="Clip actions" icon="ellipsis" variant="ghost" size="sm" items={menu} />
       </div>
 
       {clip.kind === "text" && <TextSection clip={clip} />}
@@ -113,7 +113,7 @@ export function ClipInspector({ clip }: { clip: EditClip }) {
 
       <SourceSection clip={clip} fps={fps} clipTimeMs={clipTimeMs} onChange={(patch, key) => commit(patch, scoped(key))} />
 
-      <Section label="Transform">
+      <Section label="Transform" tip="Move, scale, rotate and fade the clip; diamonds add keyframes, the wave button adds music reactions">
         <div className={styles.stack}>
           {TRANSFORM_ORDER.map((k) => {
             const r = TRANSFORM_RULES[k];
@@ -133,6 +133,7 @@ export function ClipInspector({ clip }: { clip: EditClip }) {
           })}
           <Switch
             label="Mirror past the edges"
+            tip="When the clip is moved or scaled down, mirror its edges instead of showing empty space"
             checked={transform.edges === "mirror"}
             onChange={(on) => commit({ transform: serializeTransform({ ...transform, edges: on ? "mirror" : undefined }) }, "")}
           />
@@ -151,7 +152,7 @@ export function ClipInspector({ clip }: { clip: EditClip }) {
         <div className={styles.stack}>
           <div className={styles.row}>
             <span className={styles.label}>Effects apply to</span>
-            <Select size="sm" aria-label="Effects apply to" value={clip.fxTarget || "clip"} onChange={(fxTarget) => commit({ fxTarget }, "")} options={FX_TARGETS} />
+            <Select size="sm" data-tip="Apply effects to the whole clip, only the cut-out subject, or only the background" aria-label="Effects apply to" value={clip.fxTarget || "clip"} onChange={(fxTarget) => commit({ fxTarget }, "")} options={FX_TARGETS} />
           </div>
           {(clip.fxTarget === "subject" || clip.fxTarget === "background") && !matteReady && (
             <p className={styles.warn}>This clip has no cut-out yet, so the effects apply to the whole clip.</p>
@@ -165,8 +166,8 @@ export function ClipInspector({ clip }: { clip: EditClip }) {
 
       <MasksSection clipId={clip.id} raw={clip.masks} clipTimeMs={clipTimeMs} onChange={(raw, key) => commit({ masks: raw }, scoped(key))} />
 
-      <Section label="Auto-fill">
-        <Switch label="Pinned" checked={clip.pinned} onChange={(pinned) => commit({ pinned }, "")} />
+      <Section label="Auto-fill" tip="Controls how Auto-fill treats this clip">
+        <Switch tip="Keep this clip as it is when Auto-fill rebuilds the edit" label="Pinned" checked={clip.pinned} onChange={(pinned) => commit({ pinned }, "")} />
         <p className={styles.hint}>Auto-fill never moves, replaces or removes a pinned clip.</p>
       </Section>
     </div>

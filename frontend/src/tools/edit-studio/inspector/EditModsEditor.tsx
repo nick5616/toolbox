@@ -23,7 +23,7 @@ export function ModMeter({ mod, label }: { mod: EditMod; label: string }) {
   const ms = useLivePlayheadMs();
   const v = src ? modLevel(src, mod, ms) : 0;
   return (
-    <span className={styles.liveMeter} role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={1} aria-valuenow={Math.round(v * 100) / 100}>
+    <span className={styles.liveMeter} data-tip="Live level of this reaction at the playhead" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={1} aria-valuenow={Math.round(v * 100) / 100}>
       <span className={styles.liveFill} style={{ width: `${Math.round(v * 100)}%` }} />
     </span>
   );
@@ -63,36 +63,36 @@ export function EditModsEditor({ mods, onChange, label }: EditModsEditorProps) {
           <div className={styles.modTop}>
             <EditSignalSelect label="Driver" value={m.signal} onChange={(s) => setSignal(i, s)} />
             <ModMeter mod={m} label={`${signalLabel(m.signal)} level`} />
-            <IconButton size="sm" icon="x" label="Remove reaction" onClick={() => onChange(mods.filter((_, k) => k !== i))} />
+            <IconButton size="sm" icon="x" label="Remove reaction" data-tip="Stop this signal from driving the parameter" onClick={() => onChange(mods.filter((_, k) => k !== i))} />
           </div>
-          <Select size="sm" aria-label="Shape" value={m.shape} onChange={(shape) => patch(i, { shape })} options={SHAPES} />
-          <Slider aria-label="Amount" min={-2} max={2} step={0.05} value={m.amount} onChange={(amount) => patch(i, { amount })} format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`} />
+          <Select size="sm" data-tip="How the signal turns into movement: smooth, punchy (sharp hit, fast fade) or on/off" aria-label="Shape" value={m.shape} onChange={(shape) => patch(i, { shape })} options={SHAPES} />
+          <Slider data-tip="How far the signal pushes the value, as a share of its range; negative pushes the other way" aria-label="Amount" min={-2} max={2} step={0.05} value={m.amount} onChange={(amount) => patch(i, { amount })} format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`} />
           <div className={styles.modTimes}>
-            <label className={styles.inline}>
+            <label className={styles.inline} data-tip="How fast the value rises when the signal hits, in milliseconds">
               <span>Attack</span>
               <Stepper aria-label="Attack" unit="ms" min={0} max={5000} step={5} value={m.attackMs ?? DEFAULT_ATTACK_MS} onChange={(attackMs) => patch(i, { attackMs })} />
             </label>
-            <label className={styles.inline}>
+            <label className={styles.inline} data-tip="How slowly the value falls back after a hit, in milliseconds">
               <span>Release</span>
               <Stepper aria-label="Release" unit="ms" min={0} max={5000} step={10} value={m.releaseMs ?? DEFAULT_RELEASE_MS} onChange={(releaseMs) => patch(i, { releaseMs })} />
             </label>
             {isMarkerSignal(m.signal) && (
-              <label className={styles.inline}>
+              <label className={styles.inline} data-tip="React to every Nth marker only, e.g. 4 = every fourth beat">
                 <span>Every</span>
                 <Stepper aria-label="Every" min={1} max={16} step={1} value={m.every ?? 1} onChange={(every) => patch(i, { every })} />
               </label>
             )}
           </div>
-          <div className={styles.chips} role="group" aria-label="Only in these sections">
+          <div className={styles.chips} role="group" aria-label="Only in these sections" data-tip="Limit this reaction to chosen song sections; none selected means everywhere">
             {SECTION_LABELS.map((s) => (
-              <button key={s} type="button" className={styles.chip} aria-pressed={m.sections?.includes(s) ?? false} onClick={() => toggleSection(i, s)}>
+              <button key={s} type="button" data-tip={`React only during ${s} sections (click again to remove)`} className={styles.chip} aria-pressed={m.sections?.includes(s) ?? false} onClick={() => toggleSection(i, s)}>
                 {s}
               </button>
             ))}
           </div>
         </div>
       ))}
-      <button type="button" className={styles.linkBtn} disabled={mods.length >= MAX_MODS} onClick={() => onChange([...mods, { ...DEFAULT_EDIT_MOD }])}>
+      <button type="button" data-tip={mods.length >= MAX_MODS ? "This parameter has the most reactions it can take" : "Add another signal that drives this parameter"} className={styles.linkBtn} disabled={mods.length >= MAX_MODS} onClick={() => onChange([...mods, { ...DEFAULT_EDIT_MOD }])}>
         + Add a reaction
       </button>
     </div>

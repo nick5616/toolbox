@@ -29,6 +29,7 @@ export function InspectorPanel() {
             <h2 className={styles.title}>{`${clips.length} clips selected`}</h2>
           </div>
           <Switch
+            tip="Keep all selected clips as they are when Auto-fill rebuilds the edit"
             label="Pinned"
             checked={allPinned}
             onChange={(pinned) => editDoc((p) => ids.reduce((acc, id) => withClip(acc, id, { pinned }), p))}

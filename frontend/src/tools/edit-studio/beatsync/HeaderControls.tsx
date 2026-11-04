@@ -32,10 +32,11 @@ export function HeaderControls({ disabled }: { disabled: boolean }) {
 
   return (
     <span className={styles.badges}>
-      <Select size="sm" aria-label="Aspect" value={project.aspect} onChange={(aspect) => editDoc((p) => ({ ...p, aspect }), "")} options={ASPECTS.map((a) => ({ value: a, label: ASPECT_LABELS[a] ?? a }))} />
+      <Select size="sm" data-tip="Video shape: 9:16 for TikTok and Reels, 4:5 feed, 1:1 square, 16:9 YouTube" aria-label="Aspect" value={project.aspect} onChange={(aspect) => editDoc((p) => ({ ...p, aspect }), "")} options={ASPECTS.map((a) => ({ value: a, label: ASPECT_LABELS[a] ?? a }))} />
       <Select
         size="sm"
         aria-label="Frame rate"
+        data-tip="Frames per second; 60 is smoother but takes longer to prepare and export"
         value={String(project.fps)}
         onChange={(v) => editDoc((p) => ({ ...p, fps: Number(v) }), "")}
         options={[
@@ -44,17 +45,19 @@ export function HeaderControls({ disabled }: { disabled: boolean }) {
         ]}
       />
       <MenuButton
+        data-tip="Song: change it, pick which part to use, analyze again or split into stems"
         size="sm"
         label={songName}
         icon="music"
         items={() => [
-          { id: "change", label: "Change song…", icon: "music", onSelect: () => void changeSong() },
-          { id: "range", label: "Change the part of the song…", icon: "scissors", disabled, onSelect: openRangePicker },
-          { id: "analyze", label: "Analyze again (beats, stems, lyrics)…", icon: "refresh-cw", disabled: !project.song, onSelect: () => useEditStudio.getState().setReanalyze(true) },
+          { id: "change", label: "Change song…", icon: "music", tip: "Pick a different song; you choose whether to keep your clips", onSelect: () => void changeSong() },
+          { id: "range", label: "Change the part of the song…", icon: "scissors", tip: "Choose which start and end of the song the edit uses", disabled, onSelect: openRangePicker },
+          { id: "analyze", label: "Analyze again (beats, stems, lyrics)…", icon: "refresh-cw", tip: "Find beats, stems and lyrics again; your clips and markers are kept", disabled: !project.song, onSelect: () => useEditStudio.getState().setReanalyze(true) },
           {
             id: "stems",
             label: "Split into stems (vocals, drums, bass, other)…",
             icon: "audio-lines",
+            tip: "Open the Stems tool to separate the song into vocals, drums, bass and other",
             disabled: !project.song,
             onSelect: () => project.song && useUI.getState().handOff({ moduleId: "stems", inputs: [project.song.path] }),
           },

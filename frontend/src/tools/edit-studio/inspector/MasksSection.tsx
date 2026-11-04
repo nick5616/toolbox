@@ -40,7 +40,7 @@ export function MasksSection({ clipId, raw, clipTimeMs, onChange }: MasksSection
   const items = () => (["rect", "ellipse", "path"] as const).map((s) => ({ id: s, label: SHAPE_LABELS[s], disabled: full, onSelect: () => add(s) }));
 
   return (
-    <Section label="Masks" action={<MenuButton label="Add mask" icon="plus" variant="ghost" size="sm" items={items} />}>
+    <Section label="Masks" tip="Show or hide only part of the clip using a shape" action={<MenuButton data-tip="Add a rectangle, ellipse or free-drawn path mask" label="Add mask" icon="plus" variant="ghost" size="sm" items={items} />}>
       <div className={styles.stack}>
         {masks.length === 0 && <p className={styles.hint}>A mask keeps only part of the clip (or hides it). Add a rectangle, ellipse or path.</p>}
         {masks.map((m, i) => {
@@ -59,13 +59,14 @@ export function MasksSection({ clipId, raw, clipTimeMs, onChange }: MasksSection
           return (
             <div key={m.id} className={styles.item} data-testid="mask">
               <div className={styles.itemHead}>
-                <button type="button" className={styles.itemName} aria-pressed={selected} onClick={() => select(clipId, selected ? null : m.id)}>
+                <button type="button" data-tip="Select this mask to edit it and see its handles on the preview" className={styles.itemName} aria-pressed={selected} onClick={() => select(clipId, selected ? null : m.id)}>
                   {`${i + 1}. ${SHAPE_LABELS[m.shape]}`}
                 </button>
                 <IconButton
                   size="sm"
                   icon="trash-2"
                   label={`Remove mask ${i + 1}`}
+                  data-tip="Delete this mask"
                   onClick={() => {
                     if (selected) select(clipId, null);
                     commit(masks.filter((x) => x.id !== m.id), "");
@@ -81,13 +82,14 @@ export function MasksSection({ clipId, raw, clipTimeMs, onChange }: MasksSection
                   {field("rotation")}
                   {m.shape === "path" && (
                     <>
-                      <Switch label="Smooth curve" checked={m.smooth === true} onChange={(smooth) => patch(m.id, { smooth }, "")} />
+                      <Switch tip="Round the path into a curve instead of straight edges" label="Smooth curve" checked={m.smooth === true} onChange={(smooth) => patch(m.id, { smooth }, "")} />
                       <p className={styles.hint}>Drag the points on the preview. Double-click an edge to add a point, Alt-click a point to remove it.</p>
                     </>
                   )}
                   <div className={styles.stack}>
                     <span className={styles.label}>Feather</span>
                     <Slider
+                      data-tip="Soften the mask edge; 0% is a hard edge"
                       aria-label="Feather"
                       min={0}
                       max={0.5}
@@ -97,8 +99,8 @@ export function MasksSection({ clipId, raw, clipTimeMs, onChange }: MasksSection
                       format={(v) => `${Math.round(v * 100)}%`}
                     />
                   </div>
-                  <Switch label="Invert" checked={m.invert} onChange={(invert) => patch(m.id, { invert }, "")} />
-                  <div className={styles.row}>
+                  <Switch tip="Keep what is outside the shape and hide what is inside" label="Invert" checked={m.invert} onChange={(invert) => patch(m.id, { invert }, "")} />
+                  <div className={styles.row} data-tip="How this mask combines with the masks above it: add, subtract or keep only the overlap">
                     <span className={styles.label}>Combine</span>
                     <Select
                       size="sm"

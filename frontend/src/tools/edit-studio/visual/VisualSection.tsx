@@ -16,9 +16,18 @@ const COLOR_REFS = ["c0", "c1", "c2", "c3", "accent", "glow", "bg"] as const;
 const COLOR_REF_LABEL: Record<string, string> = { c0: "Palette 1", c1: "Palette 2", c2: "Palette 3", c3: "Palette 4", accent: "Accent", glow: "Glow", bg: "Background", custom: "Custom colour" };
 const optionLabel = (o: string) => (o ? o.charAt(0).toUpperCase() + o.slice(1).replace(/[-_]/g, " ") : o);
 
+const GROUP_TIP: Record<LayerDef["group"], string> = {
+  background: "a backdrop that fills the frame",
+  shape: "a shape drawn on the frame",
+  particles: "moving specks and sparks",
+  accent: "a flourish that adds energy",
+  highway: "notes scrolling along a lane",
+  motif: "a themed decorative pattern",
+};
+
 function LayerButton({ def, current, onPick, scope }: { def: LayerDef; current: LayerType; onPick: (t: LayerType) => void; scope: string }) {
   return (
-    <button type="button" className={cx(styles.layer, def.type === current && styles.layerOn)} aria-pressed={def.type === current} aria-label={`${scope}: ${def.label}`} onClick={() => onPick(def.type)}>
+    <button type="button" className={cx(styles.layer, def.type === current && styles.layerOn)} aria-pressed={def.type === current} aria-label={`${scope}: ${def.label}`} data-tip={`${def.label}: ${GROUP_TIP[def.group]}, driven by the music. Click to use it for this clip`} onClick={() => onPick(def.type)}>
       <Icon name={def.icon} size={14} />
       <span>{def.label}</span>
     </button>
@@ -47,10 +56,10 @@ export function VisualSection({ clip }: { clip: EditClip }) {
   };
 
   return (
-    <Section label="Visual">
+    <Section label="Visual" tip="A music-driven picture made by the app, used as this clip's image">
       <div className={styles.stack}>
         {suggested.length > 0 && (
-          <div className={styles.stack} role="group" aria-label="Suggested layers">
+          <div className={styles.stack} role="group" aria-label="Suggested layers" data-tip="Visuals that work well in a music video edit">
             <p className={styles.groupLabel}>Suggested</p>
             <div className={styles.grid}>
               {suggested.map((d) => (
@@ -60,7 +69,7 @@ export function VisualSection({ clip }: { clip: EditClip }) {
           </div>
         )}
         {groups.map((g) => (
-          <div key={g.group} className={styles.stack} role="group" aria-label={g.label}>
+          <div key={g.group} className={styles.stack} role="group" aria-label={g.label} data-tip={`${g.label} visuals: ${GROUP_TIP[g.group]}`}>
             <p className={styles.groupLabel}>{g.label}</p>
             <div className={styles.grid}>
               {g.layers.map((d) => (
@@ -69,7 +78,7 @@ export function VisualSection({ clip }: { clip: EditClip }) {
             </div>
           </div>
         ))}
-        <div className={styles.row}>
+        <div className={styles.row} data-tip="The set of colours this visual draws with">
           <span className={styles.label}>Palette</span>
           <Select size="sm" aria-label="Palette" value={visual.palette} onChange={(palette: PaletteId) => edit((v) => ({ ...v, palette }))} options={PALETTE_OPTIONS} />
         </div>
@@ -92,7 +101,7 @@ export function VisualSection({ clip }: { clip: EditClip }) {
             }
             if (spec.kind === "enum") {
               return (
-                <div key={`${visual.layer}:${name}`} className={styles.row}>
+                <div key={`${visual.layer}:${name}`} className={styles.row} data-tip={`${spec.label}: choose one of the options`}>
                   <span className={styles.label}>{spec.label}</span>
                   <Select
                     size="sm"
@@ -105,13 +114,13 @@ export function VisualSection({ clip }: { clip: EditClip }) {
               );
             }
             if (spec.kind === "bool") {
-              return <Switch key={`${visual.layer}:${name}`} label={spec.label} checked={typeof v === "boolean" ? v : spec.default} onChange={(b) => setParam(name, b)} />;
+              return <Switch key={`${visual.layer}:${name}`} tip={`${spec.label}: turn on or off`} label={spec.label} checked={typeof v === "boolean" ? v : spec.default} onChange={(b) => setParam(name, b)} />;
             }
             const str = typeof v === "string" ? v : spec.default;
             const isRef = (COLOR_REFS as readonly string[]).includes(str);
             const hex = /^#[0-9a-f]{6}$/i.test(str) ? str : "#ffffff";
             return (
-              <div key={`${visual.layer}:${name}`} className={styles.colorRow} role="group" aria-label={spec.label}>
+              <div key={`${visual.layer}:${name}`} className={styles.colorRow} role="group" aria-label={spec.label} data-tip={`${spec.label}: take it from the palette or set your own colour`}>
                 <div className={styles.row}>
                   <span className={styles.label}>{spec.label}</span>
                   <Select

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, SegmentedControl, Select, toast } from "@/components";
 import { useEditStudio, useMarkers, useProject } from "../store";
 import { cutToBeat, readySources, type CutOptions } from "./cutLogic";
-import { HIT_LANES } from "./hits";
+import { HIT_LANES, HIT_LANE_TIPS } from "./hits";
 import styles from "./beatsync.module.css";
 
 const CUT_LANES = HIT_LANES.filter((l) => l.value !== "section" && l.value !== "word" && l.value !== "drop");
@@ -23,7 +23,7 @@ export function CutToBeat() {
   };
   return (
     <>
-      <Button ref={btn} size="sm" icon="scissors" variant={open ? "primary" : "secondary"} onClick={toggle}>
+      <Button ref={btn} size="sm" icon="scissors" data-tip="Switch clips on the music: pick beats, downbeats, kicks or snares and how often" variant={open ? "primary" : "secondary"} onClick={toggle}>
         Cut to beat
       </Button>
       {open && <CutPopover left={pos.left} bottom={window.innerHeight - pos.top} onClose={() => setOpen(false)} />}
@@ -93,29 +93,29 @@ function CutPopover({ left, bottom, onClose }: { left: number; bottom: number; o
     <div ref={box} className={styles.popover} style={{ left, bottom }} role="dialog" aria-label="Cut to beat">
       <div className={styles.cut}>
         <h3 className={styles.cutTitle}>Switch clips on…</h3>
-        <div className={styles.chips} role="group" aria-label="Switch on">
+        <div className={styles.chips} role="group" aria-label="Switch on" data-tip="The musical moment where clips switch">
           {CUT_LANES.map((l) => (
-            <button key={l.value} type="button" className={styles.chip} aria-pressed={lane === l.value} onClick={() => setLane(l.value)}>
+            <button key={l.value} type="button" data-tip={HIT_LANE_TIPS[l.value]} className={styles.chip} aria-pressed={lane === l.value} onClick={() => setLane(l.value)}>
               {l.label}
             </button>
           ))}
         </div>
         <div className={styles.row}>
           <span className={styles.label}>How often</span>
-          <Select size="sm" aria-label="How often" value={String(every)} onChange={(v) => setEvery(Number(v))} options={EVERY} />
+          <Select size="sm" data-tip="Cut on every marker, or only every 2nd, 4th or 8th for a slower pace" aria-label="How often" value={String(every)} onChange={(v) => setEvery(Number(v))} options={EVERY} />
         </div>
         <div className={styles.row}>
           <span className={styles.label}>Order</span>
-          <SegmentedControl size="sm" aria-label="Order" value={order} onChange={(v) => setOrder(v as CutOptions["order"])} options={[{ value: "sequential", label: "In order" }, { value: "shuffleNoRepeat", label: "Shuffled" }]} />
+          <SegmentedControl size="sm" aria-label="Order" value={order} onChange={(v) => setOrder(v as CutOptions["order"])} options={[{ value: "sequential", label: "In order", tip: "Use the sources one after another in the order they were added" }, { value: "shuffleNoRepeat", label: "Shuffled", tip: "Use the sources in a random order without repeating one until all are used" }]} />
         </div>
         <p className={styles.note}>
           On {where}. Uses all {sources.length} sources; pinned clips stay. Undo with Ctrl+Z.
         </p>
         <div className={styles.foot}>
-          <Button size="sm" variant="ghost" onClick={onClose}>
+          <Button size="sm" variant="ghost" data-tip="Close without changing anything" onClick={onClose}>
             Cancel
           </Button>
-          <Button size="sm" variant="primary" icon="scissors" onClick={apply}>
+          <Button size="sm" variant="primary" icon="scissors" data-tip="Place clips on the chosen markers; one Undo reverts it" onClick={apply}>
             Cut
           </Button>
         </div>
