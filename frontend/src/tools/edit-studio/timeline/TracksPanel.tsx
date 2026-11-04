@@ -29,6 +29,7 @@ import { addTextClip } from "../text/addText";
 import { addVisualClip } from "../visual/addVisual";
 import { startScrub } from "./scrub";
 import { CutToBeat } from "../beatsync/CutButton";
+import { MomentsOverlay } from "../moments/MomentsOverlay";
 
 export const VIDEO_ROW_PX = 56;
 export const ADJUST_ROW_PX = 36;
@@ -419,6 +420,7 @@ function Tracks({ project }: { project: NormalProject }) {
           </div>
         ))}
         <SongTrack timeWidth={timeWidth} />
+        <MomentsOverlay />
         <Playhead durationMs={D} timeLeft={() => (rootRef.current?.getBoundingClientRect().left ?? 0) + HEADER_PX} />
         {hint && (
           <div className={styles.hint} style={{ left: HEADER_PX + msToX(hint.ms, pps, scrollMs) }} role="status">
