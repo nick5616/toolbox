@@ -1,594 +1,276 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { ClickInHost, ConfirmDialog, Icon, cx, toast } from "@/components";
-import { openTool } from "@/lib/openTool";
-import { useMediaSource, type MediaPlayerHandle } from "@/components/media";
-import {
-  FilesService,
-  type VisualsSpec,
-  LyricVideoService,
-  MediaService,
-  SubtitlesAction,
-  SubtitlesService,
-  TranscribeService,
-  type Language,
-  type SubtitleLanguage,
-  type SubtitleStyleInfo,
-  type TranslatorStatus,
-} from "@/lib/api";
-import { toAppError } from "@/lib/errors";
+/**
+ * Subtitles (Phase 11, SPEC §5.3): a drop zone until a source is chosen, then
+ * one workspace screen: header (source, language, undo/redo, Export), a rail of
+ * panels (Transcription, Translate, Style, Export), the picture with the
+ * current subtitle, and the cue list. All state is in `store.ts`.
+ */
+import { useMemo } from "react";
+import { Banner, Button, ClickInHost, ConfirmDialog, DropZone, Icon, IconButton, MenuButton, ToolClickIn, toolDrawerId, useClickIn, type MenuItem } from "@/components";
+import { languageName, speechSummary } from "@/blocks/speech";
+import { useToolHandoff } from "@/lib/embed";
 import { useShortcut } from "@/lib/shortcuts";
-import type { JobView } from "@/state/jobs";
-import { useModules } from "@/state/modules";
-import { useUI } from "@/state/ui";
-import { useModuleOptions } from "@/tools/_kit";
-import { DesignerSheet } from "./DesignerSheet";
-import { canvasAspect } from "./options";
-import { cuesToLines, defaultVisuals, handoffSeed } from "./visuals";
+import { useCompositionInputs } from "@/state/composition";
 import type { ToolViewProps } from "@/tools";
-import type { RowAction } from "./CueList";
-import { EditStep } from "./EditStep";
-import { ExportStep } from "./ExportStep";
-import { EMPTY_EDITOR, activeTab, anyDirty, editorReducer, isDirty, makeTab } from "./editor";
-import {
-  activeCueIndex,
-  cuesKey,
-  defaultSplitCaret,
-  deleteCue,
-  documentIssues,
-  findReplace,
-  insertAfter,
-  isSubtitlePath,
-  mergeWithNext,
-  shiftAll,
-  splitCue,
-  toCues,
-  toRows,
-  updateCue,
-  type CueRow,
-} from "./logic";
-import { DEFAULT_PREFS, buildOptions, parseResult, sanitizePrefs } from "./options";
-import { SourceStep } from "./SourceStep";
-import { TranslateStep } from "./TranslateStep";
-import { useJobRun } from "./useJobRun";
+import { OneLineBar, Spacer, StudioLayout, WorkspacePanel, WorkspacePreviewFrame, WorkspaceRail, panelDrawerId } from "@/workspace";
+import { PartFrame } from "@/parts/PartFrame";
+import { CuesPanel } from "./CuesPanel";
+import { DesignerSheet } from "./DesignerSheet";
+import { MediaCtx, useHostMedia, useJobWatcher, usePrefsPersistence } from "./host";
+import { useBlocker, useRows } from "./hooks";
+import { anyDirty } from "./editor";
+import { basename } from "./logic";
+import { canvasAspect, speechOf } from "./options";
+import { SubtitlesPreview } from "./Preview";
+import { RunStatus } from "./RunStatus";
+import { useRun } from "./runs";
+import { MODULE_ID, useSubtitles } from "./store";
+import { cuesToLines, defaultVisuals } from "./visuals";
+import { subtitlesWorkspace as ws } from "./workspace";
 import styles from "./SubtitlesView.module.css";
 
-type Step = "source" | "edit" | "translate" | "export";
-const STEP_TIP: Record<Step, string> = {
-  source: "Generate subtitles from speech, or open ones you already have",
-  edit: "Fix the words and timing against the video",
-  translate: "Translate the subtitles into another language",
-  export: "Save files, add a track to the video or burn the text into the picture",
-};
-const STEPS: Array<{ id: Step; label: string }> = [
-  { id: "source", label: "Source" },
-  { id: "edit", label: "Edit" },
-  { id: "translate", label: "Translate" },
-  { id: "export", label: "Export" },
-];
+function EmptyDrop() {
+  const loadError = useSubtitles((s) => s.loadError);
+  const pickMedia = useSubtitles((s) => s.pickMedia);
+  const pickSubtitleFile = useSubtitles((s) => s.pickSubtitleFile);
+  return (
+    <div className={styles.sourceEmpty}>
+      {loadError && (
+        <Banner tone="danger" title="Couldn't read the subtitles">
+          {loadError}
+        </Banner>
+      )}
+      <DropZone id="tool-drop:subtitles" icon="captions" label="Drop a video, an audio file, or an .srt / .vtt" hint="Generate subtitles from speech, or edit ones you already have.">
+        <div className={styles.buttonRow}>
+          <Button icon="plus" onClick={() => void pickMedia()} data-tip="Pick a video or audio file to generate subtitles from its speech">
+            Choose a video or audio file…
+          </Button>
+          <Button variant="secondary" icon="file-text" onClick={() => void pickSubtitleFile()} data-tip="Open an .srt or .vtt file you already have to edit it">
+            Use a subtitle file…
+          </Button>
+        </div>
+      </DropZone>
+    </div>
+  );
+}
 
-const SUBTITLE_EXTS = [".srt", ".vtt"];
+/** What the stage shows before any subtitles exist: the primary action over the picture. */
+function GenerateCta() {
+  const prefs = useSubtitles((s) => s.prefs);
+  const spoken = useSubtitles((s) => s.spoken);
+  const mediaPath = useSubtitles((s) => s.mediaPath);
+  const mediaStatus = useSubtitles((s) => s.media.status);
+  const generate = useSubtitles((s) => s.generate);
+  const pickSubtitleFile = useSubtitles((s) => s.pickSubtitleFile);
+  const gen = useRun("gen");
+  const extract = useRun("extract");
+  const busy = gen.busy || extract.busy;
+  return (
+    <div className={styles.cta}>
+      <div className={styles.ctaCard}>
+        <Button icon="captions" onClick={generate} loading={gen.busy} disabled={!mediaPath || busy || mediaStatus === "error"} data-tip={busy ? "Wait for the current task to finish" : "Listen to the speech and write subtitles for it"}>
+          Generate subtitles
+        </Button>
+        <span className={styles.ctaSummary} data-tip="Change these in the Transcription panel">
+          {speechSummary(speechOf(prefs), spoken)}
+        </span>
+        <Button variant="ghost" size="sm" icon="file-text" disabled={busy} onClick={() => void pickSubtitleFile()} data-tip="Open an .srt or .vtt file you already have, to edit it">
+          Use a subtitle file…
+        </Button>
+        <RunStatus run={gen} runningLabel="Listening for speech…" showResult={false} />
+      </div>
+    </div>
+  );
+}
 
-function srtOutput(job: JobView): string | undefined {
-  const result = parseResult(job.resultJson);
-  const paths = result?.outputs?.length ? result.outputs : job.outputs.map((o) => o.path);
-  return paths.find((p) => /\.srt$/i.test(p)) ?? paths.find(isSubtitlePath);
+function Workspace() {
+  const { open } = useClickIn();
+  const prefs = useSubtitles((s) => s.prefs);
+  const spoken = useSubtitles((s) => s.spoken);
+  const languages = useSubtitles((s) => s.languages);
+  const styleInfos = useSubtitles((s) => s.styleInfos);
+  const mediaPath = useSubtitles((s) => s.mediaPath);
+  const subPath = useSubtitles((s) => s.subPath);
+  const editor = useSubtitles((s) => s.editor);
+  const sourceLang = useSubtitles((s) => s.sourceLang);
+  const undo = useSubtitles((s) => s.undo);
+  const redo = useSubtitles((s) => s.redo);
+  const save = useSubtitles((s) => s.save);
+  const startOver = useSubtitles((s) => s.startOver);
+  const pickMedia = useSubtitles((s) => s.pickMedia);
+  const pickSubtitleFile = useSubtitles((s) => s.pickSubtitleFile);
+  const openInVisualizer = useSubtitles((s) => s.openInVisualizer);
+  const useCut = useSubtitles((s) => s.useCut);
+  const hasCues = editor.tabs.length > 0;
+  const tab = editor.tabs.find((t) => t.id === editor.activeId);
+  const dirty = anyDirty(editor);
+  const canUndo = (tab?.history.past.length ?? 0) > 0;
+  const canRedo = (tab?.history.future.length ?? 0) > 0;
+  const blocker = useBlocker();
+  const saveRun = useRun("save");
+
+  const sourceName = mediaPath ? basename(mediaPath) : subPath ? basename(subPath) : "Choose a file";
+  const sourceTip = mediaPath ?? subPath ?? "Choose the video, audio or subtitle file";
+  const languageText = tab ? (tab.language ? languageName(tab.language, languages.length > 0 ? languages : spoken) : tab.label) : languageName(prefs.language, spoken);
+
+  const summaries = useMemo(() => {
+    const from = sourceLang ?? editor.tabs[0]?.language ?? "";
+    const fromName = from ? (languages.find((l) => l.code === from)?.name ?? from.toUpperCase()) : "Unknown";
+    const toName = prefs.targetLanguage ? (languages.find((l) => l.code === prefs.targetLanguage)?.name ?? prefs.targetLanguage.toUpperCase()) : "";
+    return {
+      transcription: speechSummary(speechOf(prefs), spoken),
+      translate: toName ? `${fromName} → ${toName}` : "Not set",
+      style: styleInfos.find((s) => s.id === prefs.style)?.label ?? prefs.style,
+      export: prefs.formats.map((f) => f.toUpperCase()).join(" + "),
+    };
+  }, [prefs, spoken, languages, styleInfos, sourceLang, editor.tabs]);
+
+  const state = saveRun.busy ? "Saving…" : dirty ? "Unsaved" : "";
+
+  // The designer sheet has its own undo and Esc handling while it is open.
+  const designerOpen = useSubtitles((s) => s.designerOpen);
+  useShortcut("Mod+Z", undo, { when: hasCues && !designerOpen, allowInInputs: true });
+  useShortcut(["Mod+Shift+Z", "Mod+Y"], redo, { when: hasCues && !designerOpen, allowInInputs: true });
+  useShortcut("Mod+S", () => save(), { when: hasCues && !designerOpen, allowInInputs: true });
+
+  const menu = (): MenuItem[] => [
+    { id: "save", label: "Save subtitles", icon: "check", tip: blocker ?? "Write the subtitles to a file in your Library", disabled: !hasCues || blocker !== null || saveRun.busy, onSelect: () => save() },
+    { id: "file", label: "Use a subtitle file…", icon: "file-text", tip: "Open an .srt or .vtt file to edit", onSelect: () => void pickSubtitleFile() },
+    { id: "media", label: mediaPath ? "Choose a different video or audio file…" : "Pick the video…", icon: "film", tip: "Choose the picture to preview and burn the subtitles onto", onSelect: () => void pickMedia() },
+    { id: "viz", label: "Make it fully reactive in Visualizer", icon: "sparkles", tip: "Open Visualizer with this audio and these words", disabled: !mediaPath, onSelect: () => openInVisualizer() },
+    { id: "vizw", label: "Open Visualizer in its own window", icon: "app-window", tip: "Open Visualizer with this in its own window", disabled: !mediaPath, onSelect: () => openInVisualizer(true) },
+    { id: "over", label: "Start over", icon: "trash-2", tip: "Discard these subtitles and begin again", onSelect: startOver },
+  ];
+
+  const header = (
+    <>
+      <OneLineBar aria-label="Source" widths={{ source: 220, language: 150 }}>
+        <button key="source" type="button" className={styles.headChip} onClick={() => open(panelDrawerId("source"))} data-tip={`${sourceTip} (opens the Source panel)`}>
+          <Icon name={mediaPath ? "film" : "file-text"} size={14} />
+          <span className={styles.headChipText}>{sourceName}</span>
+        </button>
+        <button key="language" type="button" className={styles.headChip} onClick={() => open(panelDrawerId("translate"))} data-tip="The language of these subtitles (opens Translate)">
+          <Icon name="languages" size={14} />
+          <span className={styles.headChipText}>{languageText}</span>
+        </button>
+      </OneLineBar>
+      {state && (
+        <span className={styles.state}>
+          {dirty && !saveRun.busy && <span className={styles.dot} role="img" aria-label="Unsaved changes" data-tip="You have edits that aren't saved yet" />}
+          {state}
+        </span>
+      )}
+      <Spacer />
+      <IconButton size="sm" icon="undo-2" label="Undo" data-tip="Undo the last subtitle edit" kbd="Mod+Z" disabled={!canUndo} onClick={undo} />
+      <IconButton size="sm" icon="redo-2" label="Redo" data-tip="Redo the edit you just undid" kbd="Mod+Shift+Z" disabled={!canRedo} onClick={redo} />
+      <MenuButton label="More" icon="ellipsis" variant="ghost" tip="Save, change the file, open in Visualizer, start over" items={menu} />
+      <Button size="sm" icon="download" onClick={() => open(panelDrawerId("export"))} data-tip="Save files, add a track to the video or burn the text into the picture">
+        Export
+      </Button>
+      {/* The panels with no rail launcher stay mounted so their drawers open by id. */}
+      <span hidden>
+        <WorkspacePanel ws={ws} panel="source" variant="icon" />
+        <ToolClickIn
+          host={MODULE_ID}
+          module="trimmer"
+          inputs={mediaPath ? [mediaPath] : []}
+          useLabel="Use this cut"
+          onUse={useCut}
+          width={760}
+          title="Trim first"
+          id={toolDrawerId("trimmer")}
+        />
+      </span>
+    </>
+  );
+
+  return (
+    <StudioLayout
+      header={header}
+      rail={<WorkspaceRail ws={ws} panels={["transcription", "translate", "style", "export"]} summaries={summaries} />}
+      stage={
+        <div className={styles.stage}>
+          <WorkspacePreviewFrame ws={ws}>
+            <SubtitlesPreview />
+          </WorkspacePreviewFrame>
+          {!hasCues && <GenerateCta />}
+        </div>
+      }
+      side={
+        hasCues ? (
+          <PartFrame part={ws.panelPart} instance="cues" params={{ panel: "cues" }}>
+            <CuesPanel />
+          </PartFrame>
+        ) : undefined
+      }
+      sideWidth={360}
+    />
+  );
 }
 
 export default function SubtitlesView({ moduleId }: ToolViewProps) {
-  const [prefs, setPrefs] = useModuleOptions(moduleId, DEFAULT_PREFS, sanitizePrefs);
-  const [step, setStep] = useState<Step>("source");
-  const [mediaPath, setMediaPath] = useState<string | null>(null);
-  const [subPath, setSubPath] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [editor, dispatch] = useReducer(editorReducer, EMPTY_EDITOR);
-  const [playheadMs, setPlayheadMs] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [focusId, setFocusId] = useState<string | undefined>(undefined);
-  const [confirm, setConfirm] = useState<{ title: string; body: string; label: string; run: () => void } | null>(null);
-  const [languages, setLanguages] = useState<SubtitleLanguage[]>([]);
-  const [spoken, setSpoken] = useState<Language[]>([]);
-  const [styleInfos, setStyleInfos] = useState<SubtitleStyleInfo[]>([]);
-  const [fonts, setFonts] = useState<string[]>([]);
-  const [translator, setTranslator] = useState<TranslatorStatus | null>(null);
-  const [sourceLang, setSourceLang] = useState<string | null>(null);
-  const [filmstripUrl, setFilmstripUrl] = useState<string | undefined>(undefined);
-  const [waveform, setWaveform] = useState<number[] | undefined>(undefined);
+  ws.useHost();
+  useJobWatcher();
+  usePrefsPersistence();
+  const media = useHostMedia();
+  useToolHandoff(moduleId, (h) => useSubtitles.getState().handleInputs(h.inputs));
 
-  const playerRef = useRef<MediaPlayerHandle>(null);
-  const media = useMediaSource(mediaPath);
-  const tab = activeTab(editor);
-  const rows = useMemo<CueRow[]>(() => tab?.history.present ?? [], [tab]);
-  const original = editor.tabs[0];
-  const dirty = anyDirty(editor);
-  const tabDirty = tab ? isDirty(tab) : false;
-  const issues = useMemo(() => documentIssues(rows, prefs.maxLineChars), [rows, prefs.maxLineChars]);
-  const blocker = issues.tooMany ? "There are too many subtitles (the limit is 20,000)." : issues.firstError;
-  const originalIssues = useMemo(() => (original ? documentIssues(original.history.present, prefs.maxLineChars) : null), [original, prefs.maxLineChars]);
-  const activeIndex = useMemo(() => activeCueIndex(rows, playheadMs), [rows, playheadMs]);
-  const hasCues = editor.tabs.length > 0;
-
-  // ---- static data ----
-  useEffect(() => {
-    let cancelled = false;
-    SubtitlesService.TranslationLanguages().then((l) => !cancelled && setLanguages(l ?? [])).catch(() => undefined);
-    SubtitlesService.Styles().then((s) => !cancelled && setStyleInfos(s ?? [])).catch(() => undefined);
-    TranscribeService.Languages().then((l) => !cancelled && setSpoken(l ?? [])).catch(() => undefined);
-    LyricVideoService.Fonts().then((f) => !cancelled && setFonts(f ?? [])).catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const refreshTranslator = useCallback(() => {
-    setTranslator(null);
-    SubtitlesService.TranslatorStatus()
-      .then(setTranslator)
-      .catch((e: unknown) => setTranslator({ ready: false, model: "", error: toAppError(e).message }));
-  }, []);
-  useEffect(() => {
-    if (step === "translate") refreshTranslator();
-  }, [step, refreshTranslator]);
-
-  // ---- timeline decorations ----
-  const mediaReady = media.status === "ready" && !!media.source;
-  const isVideo = !!media.source?.info.video;
-  useEffect(() => {
-    setFilmstripUrl(undefined);
-    setWaveform(undefined);
-    if (!mediaPath || !mediaReady) return;
-    let cancelled = false;
-    if (isVideo) {
-      MediaService.Filmstrip(mediaPath, 24, 48).then((u) => !cancelled && setFilmstripUrl(u)).catch(() => undefined);
-    } else {
-      MediaService.Waveform(mediaPath, 800).then((w) => !cancelled && setWaveform(w ?? undefined)).catch(() => undefined);
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [mediaPath, mediaReady, isVideo]);
-
-  // ---- opening cues ----
-  const openCues = useCallback(async (path: string, label: string, language: string, kind: "open" | "add", savedPath?: string) => {
-    try {
-      const cues = await SubtitlesService.Load(path);
-      const t = makeTab(kind === "open" ? "original" : `tr-${language || label}`, label, language, toRows(cues), savedPath);
-      dispatch({ type: kind === "open" ? "open" : "addTab", tab: t });
-      setLoadError(null);
-      setPlayheadMs(0);
-      setStep("edit");
-    } catch (e) {
-      const err = toAppError(e);
-      setLoadError(err.hint ? `${err.message} ${err.hint}` : err.message);
-      toast({ title: "Couldn't read the subtitles", description: err.message, tone: "danger" });
-    }
-  }, []);
-
-  const gen = useJobRun((job) => {
-    const out = srtOutput(job);
-    if (out) void openCues(out, "Original", parseResult(job.resultJson)?.language ?? "", "open", out);
-  });
-  const extract = useJobRun((job) => {
-    const out = srtOutput(job);
-    if (out) void openCues(out, "Original", parseResult(job.resultJson)?.language ?? "", "open", out);
-  });
-  const pendingSave = useRef<{ tabId: string; key: string } | null>(null);
-  const save = useJobRun((job) => {
-    const p = pendingSave.current;
-    pendingSave.current = null;
-    const result = parseResult(job.resultJson);
-    const out = result?.outputs?.find((o) => /\.srt$/i.test(o)) ?? result?.outputs?.[0];
-    if (p) dispatch({ type: "saved", id: p.tabId, key: p.key, path: out });
-  });
-  const translate = useJobRun((job) => {
-    const out = srtOutput(job);
-    const code = parseResult(job.resultJson)?.language || prefs.targetLanguage;
-    const name = languages.find((l) => l.code === code)?.name ?? code.toUpperCase();
-    if (out) void openCues(out, name, code, "add", out);
-  });
-  const burn = useJobRun();
-  const embed = useJobRun();
-
-  // ---- visuals for the burn (SPEC.md 9.3) ----
-  const [addVisuals, setAddVisuals] = useState(false);
-  const [designerOpen, setDesignerOpen] = useState(false);
-  const [chosen, setChosen] = useState<VisualsSpec | null>(null);
-  const visualsMode = isVideo ? "overlay" : "background";
-  const visuals = useMemo(() => chosen ?? defaultVisuals(visualsMode), [chosen, visualsMode]);
-  useEffect(() => setChosen(null), [visualsMode, mediaPath]); // a design belongs to one kind of input
-  const burnsVisuals = isVideo ? addVisuals : prefs.background === "visualizer";
-  const cueLines = useMemo(() => cuesToLines(rows), [rows]);
-
-  // ---- sources ----
-  const guard = useCallback(
-    (run: () => void) => {
-      if (!dirty) return run();
-      setConfirm({
-        title: "Discard unsaved changes?",
-        body: "Your edits haven't been saved. Opening something else will lose them.",
-        label: "Discard",
-        run,
-      });
-    },
-    [dirty],
-  );
-
-  const loadSubtitleFile = useCallback(
-    (path: string) => {
-      guard(() => {
-        setSubPath(path);
-        void openCues(path, "Original", "", "open");
-      });
-    },
-    [guard, openCues],
-  );
-
-  const takeMedia = useCallback((path: string) => {
-    setMediaPath(path);
-    setPlayheadMs(0);
-    setPlaying(false);
-    gen.clear();
-    extract.clear();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleInputs = useCallback(
-    (paths: string[]) => {
-      const first = paths[0];
-      if (!first) return;
-      if (isSubtitlePath(first)) loadSubtitleFile(first);
-      else takeMedia(first);
-    },
-    [loadSubtitleFile, takeMedia],
-  );
-
-  const handoff = useUI((s) => s.handoff);
-  useEffect(() => {
-    if (handoff?.moduleId !== moduleId) return;
-    const h = useUI.getState().takeHandoff(moduleId);
-    if (h) handleInputs(h.inputs);
-  }, [handoff, moduleId, handleInputs]);
-
-  const mediaExts = useModules((s) => s.byId[moduleId]?.accepts.extensions);
-  const onPickMedia = useCallback(async () => {
-    try {
-      const exts = (mediaExts ?? []).filter((e) => !SUBTITLE_EXTS.includes(e.toLowerCase()));
-      const paths = (await FilesService.PickWith("Choose a video or audio file", exts.length > 0 ? exts : null, false)) ?? [];
-      if (paths[0]) takeMedia(paths[0]);
-    } catch (e) {
-      toast({ title: toAppError(e).message, tone: "danger" });
-    }
-  }, [mediaExts, takeMedia]);
-
-  const onPickSubtitleFile = useCallback(async () => {
-    try {
-      const paths = (await FilesService.PickWith("Choose a subtitle file", SUBTITLE_EXTS, false)) ?? [];
-      if (paths[0]) loadSubtitleFile(paths[0]);
-    } catch (e) {
-      toast({ title: toAppError(e).message, tone: "danger" });
-    }
-  }, [loadSubtitleFile]);
-
-  const startOver = useCallback(() => {
-    guard(() => {
-      dispatch({ type: "reset" });
-      setMediaPath(null);
-      setSubPath(null);
-      setLoadError(null);
-      setStep("source");
-      gen.clear();
-      extract.clear();
-      save.clear();
-      translate.clear();
-      burn.clear();
-      embed.clear();
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [guard]);
-
-  // ---- running jobs ----
-  const onGenerate = () => {
-    if (!mediaPath) return;
-    const run = () =>
-      void gen.start([mediaPath], buildOptions(SubtitlesAction.ActionGenerate, prefs, { formats: ["srt"] }));
-    if (dirty) guard(run);
-    else run();
-  };
-  const onExtract = (streamIndex: number) => {
-    if (!mediaPath) return;
-    const run = () => void extract.start([mediaPath], buildOptions(SubtitlesAction.ActionExtract, prefs, { streamIndex }));
-    if (dirty) guard(run);
-    else run();
-  };
-
-  const doSave = useCallback(
-    (formats?: string[]) => {
-      if (!tab || blocker || save.busy) return;
-      const input = tab.savedPath ?? subPath ?? mediaPath;
-      if (!input) {
-        toast({ title: "Nothing to name the file after", description: "Pick the video or a subtitle file first.", tone: "warn" });
-        return;
-      }
-      pendingSave.current = { tabId: tab.id, key: cuesKey(tab.history.present) };
-      void save.start(
-        [input],
-        buildOptions(SubtitlesAction.ActionSave, prefs, { cues: toCues(tab.history.present), formats: formats ?? prefs.formats }),
-      );
-    },
-    [tab, blocker, save, subPath, mediaPath, prefs],
-  );
-
-  const onTranslate = () => {
-    if (!original || originalIssues?.firstError) return;
-    const input = original.savedPath ?? subPath ?? mediaPath;
-    if (!input) return;
-    void translate.start(
-      [input],
-      buildOptions(SubtitlesAction.ActionTranslate, prefs, {
-        cues: toCues(original.history.present),
-        sourceLanguage: sourceLang ?? original.language,
-        targetLanguage: prefs.targetLanguage,
-      }),
-    );
-  };
-
-  const onBurn = () => {
-    if (!mediaPath || !tab || blocker) return;
-    void burn.start(
-      [mediaPath],
-      buildOptions(SubtitlesAction.ActionBurn, prefs, { cues: toCues(rows), visuals: burnsVisuals ? visuals : null }),
-    );
-  };
-  const onOpenInVisualizer = (inWindow?: boolean) => {
-    if (!mediaPath) return;
-    void openTool("visualizer", [mediaPath], { seed: handoffSeed(cueLines, isVideo, prefs) }, { window: inWindow === true });
-  };
-  const onEmbed = () => {
-    if (!mediaPath || !tab || blocker) return;
-    void embed.start(
-      [mediaPath],
-      buildOptions(SubtitlesAction.ActionEmbed, prefs, { cues: toCues(rows), trackLanguage: prefs.trackLanguage || tab.language }),
-    );
-  };
-
-  const openChat = useCallback(() => useUI.getState().navigate("llm-chat"), []);
-
-  // ---- editing ----
-  const edit = useCallback((fn: (r: CueRow[]) => CueRow[], key?: string) => dispatch({ type: "edit", fn, key, at: Date.now() }), []);
-  const onPatch = useCallback(
-    (id: string, patch: Partial<Omit<CueRow, "id">>, key?: string) => edit((r) => updateCue(r, id, patch), key),
-    [edit],
-  );
-  const onSeek = useCallback((ms: number) => {
-    setPlayheadMs(ms);
-    playerRef.current?.seek(ms);
-  }, []);
-
-  const onRowAction = (action: RowAction, id: string, caret: number) => {
-    const index = rows.findIndex((r) => r.id === id);
-    const row = rows[index];
-    if (!row) return;
-    const now = playerRef.current?.currentMs() ?? playheadMs;
-    switch (action) {
-      case "split": {
-        const at = caret >= 0 ? caret : defaultSplitCaret(row.text);
-        const next = splitCue(rows, index, at, mediaReady ? now : undefined);
-        if (!next) {
-          toast({ title: "Put the cursor inside the text to split", tone: "warn" });
-          return;
-        }
-        edit(() => next);
-        return;
-      }
-      case "merge": {
-        const next = mergeWithNext(rows, index, prefs.maxLineChars);
-        if (next) edit(() => next);
-        return;
-      }
-      case "insert": {
-        const res = insertAfter(rows, index);
-        edit(() => res.rows);
-        setFocusId(res.id);
-        return;
-      }
-      case "delete":
-        edit((r) => deleteCue(r, id));
-        return;
-      case "startAtPlayhead":
-        if (now >= row.endMs) toast({ title: "The playhead is after this subtitle's end", tone: "warn" });
-        else onPatch(id, { startMs: Math.round(now) });
-        return;
-      case "endAtPlayhead":
-        if (now <= row.startMs) toast({ title: "The playhead is before this subtitle's start", tone: "warn" });
-        else onPatch(id, { endMs: Math.round(now) });
-        return;
-    }
-  };
-
-  const onInsertFirst = () => {
-    const res = insertAfter(rows, -1);
-    edit(() => res.rows);
-    setFocusId(res.id);
-  };
-
-  const onReplace = (find: string, replacement: string, matchCase: boolean): number => {
-    const res = findReplace(rows, find, replacement, matchCase);
-    if (res.count > 0) edit(() => res.rows);
-    return res.count;
-  };
-
-  const canUndo = (tab?.history.past.length ?? 0) > 0;
-  const canRedo = (tab?.history.future.length ?? 0) > 0;
-  const inEditing = step === "edit" || step === "export";
-  useShortcut("Mod+Z", () => dispatch({ type: "undo" }), { when: step === "edit", allowInInputs: true });
-  useShortcut(["Mod+Shift+Z", "Mod+Y"], () => dispatch({ type: "redo" }), { when: step === "edit", allowInInputs: true });
-  useShortcut("Mod+S", () => doSave(), { when: inEditing && hasCues, allowInInputs: true });
-
-  // ---- header ----
-  const reachable = (s: Step) => s === "source" || hasCues;
-  const sampleText = rows[activeIndex]?.text ?? "";
-  const sourceLanguage = sourceLang ?? original?.language ?? "";
+  const mediaPath = useSubtitles((s) => s.mediaPath);
+  const open = useSubtitles((s) => s.mediaPath !== null || s.editor.tabs.length > 0);
+  const designerOpen = useSubtitles((s) => s.designerOpen);
+  const pendingConfirm = useSubtitles((s) => s.pendingConfirm);
+  const confirmPending = useSubtitles((s) => s.confirmPending);
+  const cancelPending = useSubtitles((s) => s.cancelPending);
+  useCompositionInputs(MODULE_ID, { trimmer: mediaPath ? [mediaPath] : [], visualizer: mediaPath ? [mediaPath] : [] });
 
   return (
-    <ClickInHost>
-    <div className={styles.root}>
-      <nav className={styles.steps} aria-label="Steps">
-        {STEPS.map((s, i) => (
-          <button
-            key={s.id}
-            type="button"
-            className={cx(styles.step, step === s.id && styles.stepOn)}
-            aria-current={step === s.id ? "step" : undefined}
-            data-tip={reachable(s.id) ? STEP_TIP[s.id] : STEP_TIP[s.id] + " (add or generate subtitles first)"}
-            disabled={!reachable(s.id)}
-            onClick={() => setStep(s.id)}
-          >
-            <span className={styles.stepNum}>{i + 1}</span>
-            {s.label}
-            {s.id === "edit" && dirty && <span className={styles.dot} role="img" aria-label="Unsaved changes" data-tip="You have edits that aren't saved yet" />}
-            {i < STEPS.length - 1 && <Icon name="chevron-right" size={12} className={styles.stepSep} />}
-          </button>
-        ))}
-        {tabDirty && step === "edit" && <span className={styles.unsaved}>Unsaved changes</span>}
-      </nav>
-
-      <div className={styles.body}>
-        {step === "source" && (
-          <SourceStep
-            mediaPath={mediaPath}
-            subPath={subPath}
-            media={media}
-            cueCount={original?.history.present.length ?? 0}
-            prefs={prefs}
-            setPrefs={setPrefs}
-            languages={spoken}
-            gen={gen}
-            extract={extract}
-            loadError={loadError}
-            onPickMedia={() => void onPickMedia()}
-            onPickSubtitleFile={() => void onPickSubtitleFile()}
-            onGenerate={onGenerate}
-            onExtract={onExtract}
-            onContinue={() => setStep("edit")}
-            onStartOver={startOver}
-          />
-        )}
-        {step === "edit" && (
-          <EditStep
-            mediaPath={mediaPath}
-            media={media}
-            playerRef={playerRef}
-            playheadMs={playheadMs}
-            playing={playing}
-            filmstripUrl={filmstripUrl}
-            waveform={waveform}
-            tabs={editor.tabs}
-            activeId={editor.activeId}
-            rows={rows}
-            activeIndex={activeIndex}
-            prefs={prefs}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            dirty={tabDirty}
-            blocker={blocker}
-            save={save}
-            focusId={focusId}
-            onFocused={() => setFocusId(undefined)}
-            onSelectTab={(id) => dispatch({ type: "select", id })}
-            onTime={setPlayheadMs}
-            onPlayingChange={setPlaying}
-            onSeek={onSeek}
-            onPatch={onPatch}
-            onRowAction={onRowAction}
-            onInsertFirst={onInsertFirst}
-            onShift={(d) => edit((r) => shiftAll(r, d))}
-            onReplace={onReplace}
-            onUndo={() => dispatch({ type: "undo" })}
-            onRedo={() => dispatch({ type: "redo" })}
-            onSave={() => doSave()}
-            onPickMedia={() => void onPickMedia()}
-          />
-        )}
-        {step === "translate" && (
-          <TranslateStep
-            languages={languages}
-            status={translator}
-            cueCount={original?.history.present.length ?? 0}
-            blocker={originalIssues?.firstError ?? null}
-            sourceLanguage={sourceLanguage}
-            targetLanguage={prefs.targetLanguage}
-            run={translate}
-            onSource={setSourceLang}
-            onTarget={(targetLanguage) => setPrefs((o) => ({ ...o, targetLanguage }))}
-            onTranslate={onTranslate}
-            onRefreshStatus={refreshTranslator}
-            onOpenChat={openChat}
-          />
-        )}
-        {step === "export" && (
-          <ExportStep
-            tabs={editor.tabs}
-            activeId={editor.activeId}
-            onSelectTab={(id) => dispatch({ type: "select", id })}
-            cueCount={rows.length}
-            sampleText={sampleText}
-            playheadMs={playheadMs}
-            blocker={blocker}
-            prefs={prefs}
-            setPrefs={setPrefs}
-            styleInfos={styleInfos}
-            fonts={fonts}
-            languages={languages}
-            mediaPath={mediaPath}
-            media={media}
-            save={save}
-            burn={burn}
-            embed={embed}
-            onSave={() => doSave()}
-            onBurn={onBurn}
-            onEmbed={onEmbed}
-            onPickMedia={() => void onPickMedia()}
-            visuals={visuals}
-            onVisuals={setChosen}
-            addVisuals={addVisuals}
-            onAddVisuals={setAddVisuals}
-            lines={cueLines}
-            onOpenDesigner={() => setDesignerOpen(true)}
-            onOpenInVisualizer={onOpenInVisualizer}
-          />
-        )}
-      </div>
-
-      {designerOpen && mediaPath && visuals && (
-        <DesignerSheet
-          inputPath={mediaPath}
-          rows={rows}
-          lines={cueLines}
-          value={visuals}
-          mode={visualsMode}
-          aspect={isVideo ? (media.source?.info.video ? media.source.info.video.width / Math.max(1, media.source.info.video.height) : 16 / 9) : canvasAspect(prefs.canvas)}
-          prefs={prefs}
-          onDone={(spec) => {
-            setChosen(spec);
-            setDesignerOpen(false);
-          }}
-          onClose={() => setDesignerOpen(false)}
+    <MediaCtx.Provider value={media}>
+      <ClickInHost className={styles.root}>
+        {open ? <Workspace /> : <EmptyDrop />}
+        {designerOpen && mediaPath && <Designer path={mediaPath} />}
+        <ConfirmDialog
+          open={pendingConfirm !== null}
+          title={pendingConfirm?.title ?? ""}
+          body={pendingConfirm?.body}
+          confirmLabel={pendingConfirm?.label ?? "OK"}
+          tone="danger"
+          onConfirm={confirmPending}
+          onCancel={cancelPending}
         />
-      )}
+      </ClickInHost>
+    </MediaCtx.Provider>
+  );
+}
 
-      <ConfirmDialog
-        open={confirm !== null}
-        title={confirm?.title ?? ""}
-        body={confirm?.body}
-        confirmLabel={confirm?.label ?? "OK"}
-        tone="danger"
-        onConfirm={() => {
-          const run = confirm?.run;
-          setConfirm(null);
-          run?.();
-        }}
-        onCancel={() => setConfirm(null)}
-      />
-    </div>
-    </ClickInHost>
+/** The full designer in a sheet over the workspace; the cues are drawn as the burn-style text (SPEC.md 9.3). */
+function Designer({ path }: { path: string }) {
+  const rows = useRows();
+  const prefs = useSubtitles((s) => s.prefs);
+  const media = useSubtitles((s) => s.media);
+  const chosen = useSubtitles((s) => s.chosen);
+  const selection = useSubtitles((s) => s.designerSelection);
+  const setSelection = useSubtitles((s) => s.setDesignerSelection);
+  const setPlayhead = useSubtitles((s) => s.setDesignerPlayhead);
+  const designerDone = useSubtitles((s) => s.designerDone);
+  const closeDesigner = useSubtitles((s) => s.closeDesigner);
+  const mode = media.isVideo ? "overlay" : "background";
+  const value = useMemo(() => chosen ?? defaultVisuals(mode), [chosen, mode]);
+  const lines = useMemo(() => cuesToLines(rows), [rows]);
+  if (!value) return null;
+  const aspect = media.isVideo ? (media.height > 0 ? media.width / media.height : 16 / 9) : canvasAspect(prefs.canvas);
+  return (
+    <DesignerSheet
+      inputPath={path}
+      rows={rows}
+      lines={lines}
+      value={value}
+      mode={mode}
+      aspect={aspect}
+      prefs={prefs}
+      selection={selection}
+      onSelect={setSelection}
+      onPlayhead={setPlayhead}
+      onDone={designerDone}
+      onClose={closeDesigner}
+    />
   );
 }

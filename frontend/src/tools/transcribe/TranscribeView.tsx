@@ -1,13 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Badge, Button, EmptyState, Icon, Section, SegmentedControl, Select, Switch, cx } from "@/components";
-import {
-  JobStatus,
-  TranscribeService,
-  TranscribeTask,
-  type Language,
-  type PresetInfo,
-  type TranscribeModel,
-} from "@/lib/api";
+import { useMemo, useState } from "react";
+import { Badge, Button, EmptyState, Icon, Section, cx } from "@/components";
+import { LanguageField, ModelCards, SkipSilence, TaskField, useSpeechData } from "@/blocks/speech";
+import { JobStatus, TranscribeService, TranscribeTask, type Language, type TranscribeModel } from "@/lib/api";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useOrderedJobs, type JobView } from "@/state/jobs";
 import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
@@ -35,66 +29,6 @@ const FORMAT_TIPS: Record<string, string> = {
   vtt: "WebVTT subtitles for web video and HTML players",
   json: "Full detail with word timings, for scripts and other programs",
 };
-const SPEED_LABEL: Record<string, string> = { fast: "Fastest", balanced: "Balanced", best: "Best quality" };
-
-function ModelCards({ presets, value, onChange }: { presets: PresetInfo[]; value: string; onChange: (id: string) => void }) {
-  const refs = useRef<Array<HTMLButtonElement | null>>([]);
-  const selected = presets.findIndex((p) => p.id === value);
-  const tabbable = selected >= 0 ? selected : 0;
-
-  const move = (from: number, dir: 1 | -1) => {
-    const i = (from + dir + presets.length) % presets.length;
-    const p = presets[i];
-    if (!p) return;
-    onChange(p.id);
-    refs.current[i]?.focus();
-  };
-  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-      e.preventDefault();
-      move(i, 1);
-    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-      e.preventDefault();
-      move(i, -1);
-    }
-  };
-
-  return (
-    <div role="radiogroup" aria-label="Model" className={styles.cards}>
-      {presets.map((p, i) => (
-        <button
-          key={p.id}
-          ref={(el) => {
-            refs.current[i] = el;
-          }}
-          type="button"
-          role="radio"
-          aria-checked={p.id === value}
-          tabIndex={i === tabbable ? 0 : -1}
-          className={cx(styles.card, p.id === value && styles.selected)}
-          onClick={() => onChange(p.id)}
-          onKeyDown={(e) => onKeyDown(e, i)}
-          data-tip={`${p.label}: ${p.speed === "fast" ? "fastest, least accurate" : p.speed === "best" ? "most accurate, slowest" : "a good balance of speed and accuracy"}; ${formatBytes(p.downloadBytes)} model download on first use`}
-        >
-          <span className={styles.cardHead}>
-            <span className={styles.label}>{p.label}</span>
-            <Badge tone={p.speed === "best" ? "accent" : "neutral"} tip="How this model trades speed against accuracy">
-              {SPEED_LABEL[p.speed] ?? p.speed}
-            </Badge>
-          </span>
-          <span className={styles.note} data-tip="The model is downloaded once and then works offline">
-            {formatBytes(p.downloadBytes)} first-use download
-          </span>
-          {p.id === "turbo" && (
-            <span className={styles.note} data-tip="Fast on a GPU, but much slower when only a CPU is available">
-              Slower on CPU
-            </span>
-          )}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function TranscriptGroup({
   job,
@@ -168,8 +102,7 @@ function TranscriptGroup({
 export default function TranscribeView({ moduleId }: ToolViewProps) {
   const inputs = useFileInputs(moduleId);
   const [opts, setOpts] = useModuleOptions(moduleId, DEFAULT_TRANSCRIBE_OPTIONS, sanitizeTranscribeOptions);
-  const [presets, setPresets] = useState<PresetInfo[]>([]);
-  const [languages, setLanguages] = useState<Language[]>([]);
+  const { presets, languages } = useSpeechData();
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<{ path: string; title: string } | null>(null);
@@ -177,24 +110,6 @@ export default function TranscribeView({ moduleId }: ToolViewProps) {
   const done = useMemo(
     () => jobs.filter((j) => j.status === JobStatus.JobDone && parseTranscriptResult(j.resultJson)).slice(0, MAX_GROUPS),
     [jobs],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    TranscribeService.Presets()
-      .then((p) => !cancelled && setPresets(p ?? []))
-      .catch(() => undefined);
-    TranscribeService.Languages()
-      .then((l) => !cancelled && setLanguages(l ?? []))
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const languageOptions = useMemo(
-    () => [{ value: "", label: "Auto-detect" }, ...languages.map((l) => ({ value: l.code, label: l.name }))],
-    [languages],
   );
 
   const n = inputs.files.length;
@@ -222,13 +137,7 @@ export default function TranscribeView({ moduleId }: ToolViewProps) {
               <label className={styles.optLabel} htmlFor="transcribe-language">
                 Language
               </label>
-              <Select
-                id="transcribe-language"
-                data-tip="The language spoken; auto-detect works well but a fixed choice is safer for short or noisy clips"
-                value={opts.language}
-                options={languageOptions}
-                onChange={(language) => setOpts((o) => ({ ...o, language }))}
-              />
+              <LanguageField id="transcribe-language" value={opts.language} languages={languages} onChange={(language) => setOpts((o) => ({ ...o, language }))} />
             </div>
             <div className={styles.optRow}>
               <span className={styles.optLabel} id="transcribe-formats" data-tip="Which transcript files to save; pick at least one">
@@ -262,32 +171,15 @@ export default function TranscribeView({ moduleId }: ToolViewProps) {
         advanced={
           <div className={styles.options}>
             <Section label="Model" tip="Speed versus accuracy of the speech model">
-              <ModelCards
-                presets={presets}
-                value={opts.model}
-                onChange={(id) => setOpts((o) => ({ ...o, model: id as TranscribeModel }))}
-              />
+              <ModelCards presets={presets} value={opts.model} onChange={(id) => setOpts((o) => ({ ...o, model: id as TranscribeModel }))} />
             </Section>
             <Section label="Speech" tip="What to write and how to treat quiet parts">
               <div className={styles.options}>
                 <div className={styles.optRow}>
                   <span className={styles.optLabel} data-tip="Keep the original language or translate to English">Task</span>
-                  <SegmentedControl
-                    aria-label="Task"
-                    value={opts.task}
-                    onChange={(task) => setOpts((o) => ({ ...o, task }))}
-                    options={[
-                      { value: TranscribeTask.TaskTranscribe, label: "Transcribe", tip: "Write down what is said in the original language" },
-                      { value: TranscribeTask.TaskTranslate, label: "Translate to English", tip: "Write the speech out translated into English, whatever language it is in" },
-                    ]}
-                  />
+                  <TaskField task={opts.task} onChange={(task) => setOpts((o) => ({ ...o, task }))} />
                 </div>
-                <Switch
-                  checked={opts.vad}
-                  onChange={(vad) => setOpts((o) => ({ ...o, vad }))}
-                  label="Skip silence"
-                  tip="Cut long silent stretches before transcribing; faster and avoids made-up text in quiet parts"
-                />
+                <SkipSilence checked={opts.vad} onChange={(vad) => setOpts((o) => ({ ...o, vad }))} />
               </div>
             </Section>
           </div>
