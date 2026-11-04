@@ -102,23 +102,24 @@ function Sources({ project }: { project: NormalProject }) {
   return (
     <div className={styles.panel}>
       <div className={styles.bar}>
-        <span className={styles.title}>Sources</span>
-        <span className={styles.count}>
+        <span className={styles.title} data-tip="Your photos and videos for this edit. Drag them onto a video track, or double-click to drop them at the playhead">Sources</span>
+        <span className={styles.count} data-tip={`${project.sources.length} of at most ${MAX_SOURCES} sources in this edit`}>
           {project.sources.length} / {MAX_SOURCES}
         </span>
-        <Button size="sm" icon="plus" onClick={() => void pickAndAddSources()} disabled={project.sources.length >= MAX_SOURCES}>
+        <Button size="sm" icon="plus" data-tip={project.sources.length >= MAX_SOURCES ? `An edit can have at most ${MAX_SOURCES} sources` : "Pick photos and videos to use in this edit; they are prepared for smooth editing"} onClick={() => void pickAndAddSources()} disabled={project.sources.length >= MAX_SOURCES}>
           Add
         </Button>
-        <IconButton size="sm" icon="folder-plus" label="Add a folder" onClick={() => void pickFolderAndAddSources()} disabled={project.sources.length >= MAX_SOURCES} />
+        <IconButton size="sm" icon="folder-plus" label="Add a folder" data-tip={project.sources.length >= MAX_SOURCES ? `An edit can have at most ${MAX_SOURCES} sources` : "Add every photo and video in a folder at once"} onClick={() => void pickFolderAndAddSources()} disabled={project.sources.length >= MAX_SOURCES} />
       </div>
       {project.sources.length > 0 && (
-        <div className={styles.filters} role="group" aria-label="Filter by tag">
+        <div className={styles.filters} role="group" aria-label="Filter by tag" data-tip="Tags you gave your sources; click one to show only those sources">
           {tags.map((t) => (
             <button
               key={t}
               type="button"
               className={cx(styles.filterChip, filter.includes(t) && styles.filterOn)}
               aria-pressed={filter.includes(t)}
+              data-tip={filter.includes(t) ? `Stop filtering by "${t}"` : `Show only sources tagged "${t}"`}
               onClick={() => setFilter((f) => (f.includes(t) ? f.filter((x) => x !== t) : [...f, t]))}
             >
               {t}
@@ -127,7 +128,9 @@ function Sources({ project }: { project: NormalProject }) {
         </div>
       )}
       {project.sources.length === 0 ? (
-        <DropZone id="tool-drop:edit-studio" label="Drop clips and photos here" hint="Or use Add. They're prepared for the editor." />
+        <div data-tip="Drop video and photo files here to add them as sources">
+          <DropZone id="tool-drop:edit-studio" label="Drop clips and photos here" hint="Or use Add. They're prepared for the editor." />
+        </div>
       ) : (
         <div className={styles.grid} role="list" aria-label="Sources">
           {shown.map((s) => (
@@ -148,7 +151,7 @@ function Sources({ project }: { project: NormalProject }) {
               onPrepare={onPrepare}
             />
           ))}
-          {shown.length === 0 && <p className={styles.none}>No sources with those tags.</p>}
+          {shown.length === 0 && <p className={styles.none} data-tip="Clear a tag filter above to see the rest">No sources with those tags.</p>}
         </div>
       )}
       <ConfirmDialog
@@ -158,6 +161,7 @@ function Sources({ project }: { project: NormalProject }) {
         body={
           <TextField
             aria-label="Tag"
+            data-tip="A short word to group sources, up to 24 characters (e.g. night, crowd)"
             placeholder="e.g. night"
             value={newTag?.text ?? ""}
             maxLength={24}

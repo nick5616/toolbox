@@ -4,7 +4,7 @@
  * Meter and Cancel; failed → the error; done → Open, Reveal, Add to post….
  * Mounted by ExportDialog, so it stays visible after the dialog closes.
  */
-import { Banner, Button, IconButton, Meter, toast } from "@/components";
+import { Banner, Button, IconButton, Meter, Tooltip, toast } from "@/components";
 import { JobStatus, JobsService, LibraryService, type EditResult } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { revealLabel } from "@/lib/platform";
@@ -42,16 +42,16 @@ function Done({ job, onDismiss }: { job: JobView; onDismiss(): void }) {
       title={path ? `Exported ${baseName(path)}` : "Export finished"}
       action={
         <div className={styles.actions}>
-          <Button size="sm" disabled={!out || out.missing} onClick={() => out && void run(LibraryService.Open(out.id))}>
+          <Button size="sm" data-tip="Open the exported video in your default player" disabled={!out || out.missing} onClick={() => out && void run(LibraryService.Open(out.id))}>
             Open
           </Button>
-          <Button size="sm" disabled={!path} onClick={() => void run(out ? LibraryService.Reveal(out.id) : LibraryService.RevealPath(path))}>
+          <Button size="sm" data-tip="Show the exported file in your file manager" disabled={!path} onClick={() => void run(out ? LibraryService.Reveal(out.id) : LibraryService.RevealPath(path))}>
             {revealLabel}
           </Button>
-          <Button size="sm" disabled={!path || !!out?.missing} onClick={() => void openAddToPostDialog(path)}>
+          <Button size="sm" data-tip="Use this video as a slide in an Instagram post" disabled={!path || !!out?.missing} onClick={() => void openAddToPostDialog(path)}>
             Add to post…
           </Button>
-          <IconButton size="sm" icon="x" label="Dismiss" onClick={onDismiss} />
+          <IconButton size="sm" icon="x" label="Dismiss" data-tip="Hide this message; the exported file stays in your library" onClick={onDismiss} />
         </div>
       }
     >
@@ -73,22 +73,22 @@ export function ExportBanner() {
       <div className={styles.run} role="status" aria-live="polite">
         <div className={styles.head}>
           <span>{queued ? "Waiting to export…" : "Exporting"}</span>
-          <Button size="sm" variant="ghost" onClick={() => void run(JobsService.Cancel(jobId))}>
+          <Button size="sm" variant="ghost" data-tip="Stop the export; nothing is kept" onClick={() => void run(JobsService.Cancel(jobId))}>
             Cancel
           </Button>
         </div>
-        <Meter value={queued ? 0 : job.progress} status={queued ? "queued" : "running"} label="Export progress" />
+        <Tooltip label="How much of the video has been rendered"><Meter value={queued ? 0 : job.progress} status={queued ? "queued" : "running"} label="Export progress" /></Tooltip>
         <div className={styles.msg}>{job.message}</div>
       </div>
     );
   } else if (job.status === JobStatus.JobFailed) {
     body = (
-      <Banner tone="danger" title={job.error || "The export didn't work"} action={<IconButton size="sm" icon="x" label="Dismiss" onClick={dismiss} />}>
+      <Banner tone="danger" title={job.error || "The export didn't work"} action={<IconButton size="sm" icon="x" label="Dismiss" data-tip="Hide this message" onClick={dismiss} />}>
         {job.errorHint}
       </Banner>
     );
   } else if (job.status === JobStatus.JobCancelled) {
-    body = <Banner tone="info" title="Export cancelled" action={<IconButton size="sm" icon="x" label="Dismiss" onClick={dismiss} />} />;
+    body = <Banner tone="info" title="Export cancelled" action={<IconButton size="sm" icon="x" label="Dismiss" data-tip="Hide this message" onClick={dismiss} />} />;
   } else {
     body = <Done job={job} onDismiss={dismiss} />;
   }

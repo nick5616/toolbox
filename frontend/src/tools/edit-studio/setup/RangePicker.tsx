@@ -25,6 +25,15 @@ export interface RangePickerProps {
   barOffset?: number;
 }
 
+const QUICK_TIPS: Record<string, string> = {
+  whole: "Use the entire song (up to 10 minutes)",
+  "first-chorus": "Use the first chorus the analysis found",
+  "last-chorus": "Use the last chorus the analysis found",
+  drop: "Use the first drop the analysis found",
+  "30s": "Use 30 seconds starting at the current start",
+  "15s": "Use 15 seconds starting at the current start",
+};
+
 const MAP_H = 96;
 const EDGE_PX = 7;
 
@@ -195,6 +204,7 @@ export function RangePicker({ analysis, songPath, value, onChange, barOffset = 0
           ref={cv}
           className={styles.mapCanvas}
           aria-label="Song range"
+          data-tip="Whole song: drag the edges or the middle to choose the part to edit, or drag outside to start over. Edges snap to bars (Alt to place freely)"
           onPointerDown={onDown}
           onPointerMove={onMove}
           onPointerUp={onUp}
@@ -203,13 +213,13 @@ export function RangePicker({ analysis, songPath, value, onChange, barOffset = 0
       </div>
       <div className={styles.row} role="group" aria-label="Quick picks">
         {picks.map((p) => (
-          <Button key={p.id} size="sm" variant="secondary" disabled={!p.range} onClick={() => p.range && onChange(p.range)}>
+          <Button key={p.id} size="sm" variant="secondary" data-tip={p.range ? QUICK_TIPS[p.id] : `${QUICK_TIPS[p.id]} (not found in this song)`} disabled={!p.range} onClick={() => p.range && onChange(p.range)}>
             {p.label}
           </Button>
         ))}
       </div>
       <div className={styles.times}>
-        <label className={styles.time}>
+        <label className={styles.time} data-tip="Where the edit starts in the song (m:ss.s)">
           Start
           <TimecodeInput
             aria-label="Start"
@@ -220,7 +230,7 @@ export function RangePicker({ analysis, songPath, value, onChange, barOffset = 0
             onKeyDown={(e) => e.key === "Enter" && commit("start")}
           />
         </label>
-        <label className={styles.time}>
+        <label className={styles.time} data-tip="Where the edit ends in the song (m:ss.s); a range is 1 s to 10 min long">
           End
           <TimecodeInput
             aria-label="End"
@@ -231,10 +241,10 @@ export function RangePicker({ analysis, songPath, value, onChange, barOffset = 0
             onKeyDown={(e) => e.key === "Enter" && commit("end")}
           />
         </label>
-        <span className={`${styles.length} ${length > MAX_RANGE_MS ? styles.lengthBad : ""}`} aria-label="Length">
+        <span className={`${styles.length} ${length > MAX_RANGE_MS ? styles.lengthBad : ""}`} aria-label="Length" data-tip={length > MAX_RANGE_MS ? "Too long: an edit can be at most 10 minutes" : "How long the edit will be"}>
           {formatMs(length)}
         </span>
-        <span className={styles.hint}>Edges snap to bars. Hold Alt to place them freely.</span>
+        <span className={styles.hint} data-tip="Hold Alt while dragging for frame-level control">Edges snap to bars. Hold Alt to place them freely.</span>
       </div>
     </div>
   );

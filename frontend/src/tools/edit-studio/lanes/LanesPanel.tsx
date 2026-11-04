@@ -90,8 +90,8 @@ function Playhead({ width, durationMs }: { width: number; durationMs: number }) 
   return (
     <div ref={layer} className={styles.playheadLayer}>
       <div ref={line} className={styles.playhead}>
-        <div className={styles.playheadHead} title="Drag to move the playhead" onPointerDown={(e) => startScrub(e, () => layer.current?.getBoundingClientRect().left ?? 0, durationMs)} />
-        <div className={styles.playheadGrip} title="Drag to move the playhead" onPointerDown={(e) => startScrub(e, () => layer.current?.getBoundingClientRect().left ?? 0, durationMs)} />
+        <div className={styles.playheadHead} data-tip="Drag to move the playhead along the song" onPointerDown={(e) => startScrub(e, () => layer.current?.getBoundingClientRect().left ?? 0, durationMs)} />
+        <div className={styles.playheadGrip} data-tip="Drag to move the playhead along the song" onPointerDown={(e) => startScrub(e, () => layer.current?.getBoundingClientRect().left ?? 0, durationMs)} />
       </div>
     </div>
   );
@@ -231,12 +231,12 @@ export function LanesPanel() {
           <>
             <div className={styles.row} style={{ height: LANE_ROW_PX }}>
               <div className={styles.header}>
-                <button type="button" className={styles.iconBtn} aria-expanded={stemsOpen} aria-label={stemsOpen ? "Collapse instruments" : "Expand instruments"} onClick={() => setStemsOpen(!stemsOpen)}>
+                <button type="button" className={styles.iconBtn} aria-expanded={stemsOpen} aria-label={stemsOpen ? "Collapse instruments" : "Expand instruments"} data-tip={stemsOpen ? "Hide the drums, bass, vocals and other level rows" : "Show how loud the drums, bass, vocals and other parts are over time"} onClick={() => setStemsOpen(!stemsOpen)}>
                   <Icon name={stemsOpen ? "chevron-down" : "chevron-right"} size={12} />
                 </button>
-                <span className={styles.name}>Instruments</span>
+                <span className={styles.name} data-tip="Loudness of each separated part of the song (needs the AI engine analysis)">Instruments</span>
               </div>
-              <div className={styles.area} />
+              <div className={styles.area} data-tip="Expand to see the loudness of each instrument" />
             </div>
             {stemsOpen && STEMS.map((s) => <StemRow key={s.id} stem={s.id} label={s.label} width={width} pps={pps} scrollMs={scrollMs} songStartMs={song.startMs} />)}
           </>
@@ -265,6 +265,7 @@ export function LanesPanel() {
         role="separator"
         aria-orientation="horizontal"
         aria-label="Resize lanes"
+        data-tip="Drag to make the lanes taller or shorter"
         onPointerDown={(e) => {
           resize.current = { y: e.clientY, h: height };
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -286,6 +287,7 @@ export function LanesPanel() {
           autoFocus
           maxLength={40}
           aria-label="Marker name"
+          data-tip="Name for this marker (up to 40 characters); Enter saves, Esc cancels"
           value={rename.value}
           onChange={(e) => {
             const r = { ...rename, value: e.target.value };
@@ -328,7 +330,7 @@ function RulerRow({ width, pps, scrollMs, hiddenLanes, seek }: RowCommon & { hid
   return (
     <div className={styles.row} style={{ height: RULER_PX }}>
       <div className={styles.header}>
-        <span className={styles.name}>Lanes</span>
+        <span className={styles.name} data-tip="Marker lanes: beats, kicks, snares and sections found in the song. Click one to make it the active lane">Lanes</span>
         <MenuButton
           label="Show more lanes"
           icon="plus"
@@ -348,7 +350,7 @@ function RulerRow({ width, pps, scrollMs, hiddenLanes, seek }: RowCommon & { hid
         />
       </div>
       <div className={styles.area}>
-        <canvas ref={cv} className={`${styles.canvas} ${styles.ruler}`} aria-label="Ruler" {...seek} />
+        <canvas ref={cv} className={`${styles.canvas} ${styles.ruler}`} aria-label="Ruler" data-tip="Time ruler: click or drag to move the playhead; scroll to pan, Ctrl+scroll to zoom" {...seek} />
       </div>
     </div>
   );
@@ -368,10 +370,10 @@ function WaveRow(props: RowCommon & { peaks: number[]; songStartMs: number; song
     <div className={styles.row} style={{ height: WAVE_ROW_PX }}>
       <div className={styles.header}>
         <Icon name="audio-waveform" size={12} />
-        <span className={styles.name}>Song</span>
+        <span className={styles.name} data-tip="The song's waveform, trimmed to the range you chose">Song</span>
       </div>
       <div className={styles.area}>
-        <canvas ref={cv} className={`${styles.canvas} ${styles.wave}`} aria-label="Song waveform" {...seek} />
+        <canvas ref={cv} className={`${styles.canvas} ${styles.wave}`} aria-label="Song waveform" data-tip="Song waveform: click or drag to move the playhead" {...seek} />
       </div>
     </div>
   );
@@ -391,10 +393,10 @@ function StemRow({ stem, label, width, pps, scrollMs, songStartMs }: RowCommon &
   return (
     <div className={styles.row} style={{ height: STEM_ROW_PX }}>
       <div className={styles.header}>
-        <span className={styles.name}>{label}</span>
+        <span className={styles.name} data-tip={`How loud the ${label.toLowerCase()} part is over time`}>{label}</span>
       </div>
       <div className={styles.area}>
-        <canvas ref={cv} className={styles.canvas} aria-label={`${label} level`} />
+        <canvas ref={cv} className={styles.canvas} aria-label={`${label} level`} data-tip={`${label} loudness over time (read-only)`} />
       </div>
     </div>
   );

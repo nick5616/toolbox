@@ -19,6 +19,13 @@ export interface NewEditDialogProps {
   onCancel(): void;
 }
 
+const SHAPE_TIPS: Record<string, string> = {
+  "9:16": "Tall: Reels, TikTok and Shorts",
+  "4:5": "Portrait: Instagram feed posts",
+  "1:1": "Square: works anywhere",
+  "16:9": "Wide: YouTube and TV",
+};
+
 const SHAPE: Record<string, { w: number; h: number }> = { "9:16": { w: 9, h: 16 }, "4:5": { w: 4, h: 5 }, "1:1": { w: 1, h: 1 }, "16:9": { w: 16, h: 9 } };
 
 export function NewEditDialog({ open, song: songIn = "", sources: sourcesIn = [], onCreated, onCancel }: NewEditDialogProps) {
@@ -80,6 +87,7 @@ export function NewEditDialog({ open, song: songIn = "", sources: sourcesIn = []
             {(c) => (
               <TextField
                 {...c}
+                data-tip="What this edit is called (up to 80 characters); it starts as the song's name"
                 value={name}
                 placeholder={song ? baseName(song) : "Untitled edit"}
                 maxLength={80}
@@ -92,26 +100,26 @@ export function NewEditDialog({ open, song: songIn = "", sources: sourcesIn = []
           </Field>
           <Field label="Song" hint="Audio or a video's sound. Up to 10 minutes are used.">
             <div className={styles.row}>
-              <Button size="sm" icon="music" onClick={() => void pickSong()}>
+              <Button size="sm" icon="music" data-tip="Choose the song to cut to; an audio file or a video's sound works" onClick={() => void pickSong()}>
                 {song ? "Change song" : "Pick a song"}
               </Button>
               {song && (
                 <>
-                  <span className={styles.muted} title={song}>
+                  <span className={styles.muted} data-tip={song}>
                     {song.split(/[\\/]/).pop()}
                   </span>
-                  <IconButton size="sm" icon="x" label="Remove the song" onClick={() => setSong("")} />
+                  <IconButton size="sm" icon="x" label="Remove the song" data-tip="Clear the song choice; an edit needs one before it can be cut" onClick={() => setSong("")} />
                 </>
               )}
             </div>
           </Field>
           <Field label="Shape">
-            <div className={styles.shapes} role="radiogroup" aria-label="Shape">
+            <div className={styles.shapes} role="radiogroup" aria-label="Shape" data-tip="The picture shape of the finished video">
               {ASPECTS.map((a) => {
                 const s = SHAPE[a] ?? { w: 1, h: 1 };
                 const k = 18 / Math.max(s.w, s.h);
                 return (
-                  <button key={a} type="button" role="radio" aria-checked={aspect === a} className={cx(styles.shape, aspect === a && styles.shapeOn)} onClick={() => setAspect(a)}>
+                  <button key={a} type="button" role="radio" aria-checked={aspect === a} data-tip={SHAPE_TIPS[a] ?? `${a} video`} className={cx(styles.shape, aspect === a && styles.shapeOn)} onClick={() => setAspect(a)}>
                     <span className={styles.shapeBox} style={{ width: s.w * k, height: s.h * k }} aria-hidden="true" />
                     {a}
                   </button>
@@ -125,8 +133,8 @@ export function NewEditDialog({ open, song: songIn = "", sources: sourcesIn = []
               size="sm"
               value={fps}
               options={[
-                { value: "30", label: "30 fps" },
-                { value: "60", label: "60 fps" },
+                { value: "30", label: "30 fps", tip: "30 frames per second: standard, smaller files and faster exports" },
+                { value: "60", label: "60 fps", tip: "60 frames per second: smoother motion, but exports take longer" },
               ]}
               onChange={setFps}
             />
@@ -136,7 +144,7 @@ export function NewEditDialog({ open, song: songIn = "", sources: sourcesIn = []
               <span className={styles.muted}>
                 {sources.length} {sources.length === 1 ? "clip or photo" : "clips and photos"} will be added to Sources.
               </span>
-              <IconButton size="sm" icon="x" label="Don't add them" onClick={() => setSources([])} />
+              <IconButton size="sm" icon="x" label="Don't add them" data-tip="Create the edit without adding those clips and photos to Sources" onClick={() => setSources([])} />
             </div>
           )}
         </div>

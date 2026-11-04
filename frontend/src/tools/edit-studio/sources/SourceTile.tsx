@@ -1,6 +1,6 @@
 /** One source in the Sources panel (Phase 9 SPEC §14.6). */
 import { memo, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { Badge, Button, Icon, MenuButton, cx, type MenuItem } from "@/components";
+import { Badge, Button, Icon, MenuButton, Tooltip, cx, type MenuItem } from "@/components";
 import type { EditSourceState } from "@/lib/api";
 import { formatDuration } from "@/lib/format";
 import { useThumb } from "@/tools/video-editor/useThumbs";
@@ -57,6 +57,7 @@ function TileImpl(p: SourceTileProps) {
     ...TAG_PRESETS.map((t) => ({
       id: t,
       label: `${p.tags.includes(t) ? "✓ " : ""}${t}`,
+      tip: p.tags.includes(t) ? `Remove the "${t}" tag` : `Tag this source "${t}"; Auto-fill can pick sources by tag`,
       onSelect: () => {
         const next = toggleTag(p.tags, t);
         if (next) p.onTags(p.path, next);
@@ -64,8 +65,8 @@ function TileImpl(p: SourceTileProps) {
     })),
     ...p.tags
       .filter((t) => !(TAG_PRESETS as readonly string[]).includes(t))
-      .map((t) => ({ id: `x-${t}`, label: `✓ ${t}`, onSelect: () => p.onTags(p.path, p.tags.filter((x) => x !== t)) })),
-    { id: "new", label: "New tag…", icon: "plus", onSelect: () => p.onNewTag(p.path) },
+      .map((t) => ({ id: `x-${t}`, label: `✓ ${t}`, tip: `Remove the "${t}" tag`, onSelect: () => p.onTags(p.path, p.tags.filter((x) => x !== t)) })),
+    { id: "new", label: "New tag…", icon: "plus", tip: "Make up your own tag for this source", onSelect: () => p.onNewTag(p.path) },
   ];
   return (
     <div
@@ -74,7 +75,7 @@ function TileImpl(p: SourceTileProps) {
       tabIndex={0}
       aria-pressed={p.selected}
       aria-label={name}
-      title={p.path}
+      data-tip={`${p.path}: drag onto a track to use it, double-click to insert it at the playhead, Shift/Ctrl+click to select several`}
       data-source-path={p.path}
       onPointerDown={(e) => p.onPointerDown(e, p.path)}
       onClick={(e) => p.onClick(e, p.path)}
@@ -82,46 +83,46 @@ function TileImpl(p: SourceTileProps) {
     >
       <div className={styles.thumb}>
         <Thumb path={p.path} kind={kind} />
-        {p.state && kind === "video" && <span className={styles.duration}>{formatDuration(p.state.info.durationMs / 1000)}</span>}
-        <Icon name={kind === "image" ? "image" : "film"} size={12} className={styles.kindIcon} />
+        {p.state && kind === "video" && <span className={styles.duration} data-tip="Length of this video">{formatDuration(p.state.info.durationMs / 1000)}</span>}
+        <Tooltip label={kind === "image" ? "A photo" : "A video"}><Icon name={kind === "image" ? "image" : "film"} size={12} className={styles.kindIcon} /></Tooltip>
         {p.used > 0 && (
-          <span className={styles.used} title={`Used in ${p.used} ${p.used === 1 ? "clip" : "clips"}`}>
+          <span className={styles.used} data-tip={`Used in ${p.used} ${p.used === 1 ? "clip" : "clips"} on the timeline`}>
             {p.used}
           </span>
         )}
       </div>
-      <div className={styles.tileName}>{name}</div>
+      <div className={styles.tileName} data-tip={p.path}>{name}</div>
       <div className={styles.status}>
-        {status === "checking" && <span className={styles.muted}>Checking…</span>}
-        {status === "ready" && <span className={styles.muted}>Ready</span>}
-        {status === "preparing" && <Badge tone="warn">{p.progress >= 0 ? `Preparing ${Math.round(p.progress * 100)}%` : "Preparing"}</Badge>}
+        {status === "checking" && <span className={styles.muted} data-tip="Looking at the file to see its length and format">Checking…</span>}
+        {status === "ready" && <span className={styles.muted} data-tip="Prepared for smooth preview and export">Ready</span>}
+        {status === "preparing" && <Badge tone="warn" tip="Making a fast copy of this source so the preview scrubs smoothly">{p.progress >= 0 ? `Preparing ${Math.round(p.progress * 100)}%` : "Preparing"}</Badge>}
         {status === "missing" && (
           <>
-            <Badge tone="danger">Missing</Badge>
-            <Button size="sm" variant="ghost" onClick={(e) => (e.stopPropagation(), p.onRelink(p.path))}>
+            <Badge tone="danger" tip="The file was moved or deleted. Clips using it stay on the timeline">Missing</Badge>
+            <Button size="sm" variant="ghost" data-tip="Point this source at the file's new location" onClick={(e) => (e.stopPropagation(), p.onRelink(p.path))}>
               Relink
             </Button>
           </>
         )}
         {status === "error" && (
           <>
-            <span title={p.state?.error}>
+            <span data-tip={p.state?.error || "Preparing this source failed"}>
               <Badge tone="danger">Error</Badge>
             </span>
-            <Button size="sm" variant="ghost" onClick={(e) => (e.stopPropagation(), p.onPrepare(p.path))}>
+            <Button size="sm" variant="ghost" data-tip="Try preparing this source again" onClick={(e) => (e.stopPropagation(), p.onPrepare(p.path))}>
               Retry
             </Button>
           </>
         )}
         {status === "notReady" && (
-          <Button size="sm" variant="ghost" onClick={(e) => (e.stopPropagation(), p.onPrepare(p.path))}>
+          <Button size="sm" variant="ghost" data-tip="Make the fast copy of this source the editor needs for preview" onClick={(e) => (e.stopPropagation(), p.onPrepare(p.path))}>
             Prepare
           </Button>
         )}
       </div>
       <div className={styles.tags} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
         {p.tags.map((t) => (
-          <button key={t} type="button" className={styles.chip} aria-label={`Remove tag ${t}`} onClick={() => p.onTags(p.path, p.tags.filter((x) => x !== t))}>
+          <button key={t} type="button" className={styles.chip} aria-label={`Remove tag ${t}`} data-tip={`Tag "${t}": click to remove it`} onClick={() => p.onTags(p.path, p.tags.filter((x) => x !== t))}>
             {t}
           </button>
         ))}

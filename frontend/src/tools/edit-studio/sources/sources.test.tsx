@@ -212,6 +212,6 @@ describe("SourcesPanel", () => {
     const clip = (id: string, s: number) => ({ id, kind: "video", path: "/c/a.mp4", color: "", startMs: s, endMs: s + 500, inMs: 0, speed: "", slow: "", volume: 0, fit: "fill", fitColor: "#000000", flipX: false, blend: "normal", transform: "", matte: null, fxTarget: "clip", masks: "", effects: "", in: "", text: "", visual: "", pinned: false, auto: false });
     useEditStudio.getState().edit({ ...doc, tracks: [{ ...(doc.tracks[0] as NormalProject["tracks"][number]), clips: [clip("x", 0), clip("y", 1000)] }] });
     render(<SourcesPanel />);
-    expect(within(screen.getByRole("button", { name: "a.mp4" })).getByTitle("Used in 2 clips")).toBeTruthy();
+    expect(within(screen.getByRole("button", { name: "a.mp4" })).getByText("2").getAttribute("data-tip")).toMatch(/Used in 2 clips/);
   });
 });

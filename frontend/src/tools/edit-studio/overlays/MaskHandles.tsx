@@ -133,10 +133,10 @@ export function MaskHandles({ ctx, mask }: { ctx: OverlayCtx; mask: Mask }) {
     };
     body = (
       <>
-        <polygon data-testid="mask-body" className={styles.maskShape} points={polyPts} {...handlers({ t: "move" })} />
-        <polygon data-testid="mask-edges" className={styles.edgeHit} points={polyPts} onDoubleClick={addPoint} />
+        <polygon data-testid="mask-body" className={styles.maskShape} points={polyPts} data-tip="Drag to move the whole mask shape" {...handlers({ t: "move" })} />
+        <polygon data-testid="mask-edges" className={styles.edgeHit} points={polyPts} data-tip="Double-click an edge to add a point to the mask" onDoubleClick={addPoint} />
         {pts.map((p, i) => (
-          <circle key={i} data-testid={`mask-point-${i}`} aria-label={`Mask point ${i + 1}`} className={`${styles.handle} ${styles.pointHandle}`} cx={p.x} cy={p.y} r={r} {...handlers({ t: "point", i })} />
+          <circle key={i} data-testid={`mask-point-${i}`} aria-label={`Mask point ${i + 1}`} data-tip="Drag to reshape the mask; Alt+click removes the point (a mask keeps at least 3)" className={`${styles.handle} ${styles.pointHandle}`} cx={p.x} cy={p.y} r={r} {...handlers({ t: "point", i })} />
         ))}
       </>
     );
@@ -153,16 +153,17 @@ export function MaskHandles({ ctx, mask }: { ctx: OverlayCtx; mask: Mask }) {
           rx={Math.max(0.5, (v.w * bw) / 2)}
           ry={Math.max(0.5, (v.h * bh) / 2)}
           transform={`rotate(${box.rotation + v.rotation} ${c.x} ${c.y})`}
+          data-tip="Drag to move the mask"
           {...handlers({ t: "move" })}
         />
       ) : (
-        <polygon data-testid="mask-body" className={styles.maskShape} points={corners.map((p) => `${p.x},${p.y}`).join(" ")} {...handlers({ t: "move" })} />
+        <polygon data-testid="mask-body" className={styles.maskShape} points={corners.map((p) => `${p.x},${p.y}`).join(" ")} data-tip="Drag to move the mask" {...handlers({ t: "move" })} />
       );
     body = (
       <>
         {shape}
         {corners.map((p, i) => (
-          <circle key={i} data-testid={`mask-corner-${i}`} aria-label={`Resize mask, corner ${i + 1}`} className={`${styles.handle} ${styles.cornerHandle}`} cx={p.x} cy={p.y} r={r} {...handlers({ t: "corner" })} />
+          <circle key={i} data-testid={`mask-corner-${i}`} aria-label={`Resize mask, corner ${i + 1}`} data-tip="Drag to resize the mask around its centre" className={`${styles.handle} ${styles.cornerHandle}`} cx={p.x} cy={p.y} r={r} {...handlers({ t: "corner" })} />
         ))}
       </>
     );

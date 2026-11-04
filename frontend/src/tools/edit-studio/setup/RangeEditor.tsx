@@ -40,10 +40,11 @@ export function RangeEditor({ onDone }: RangeEditorProps) {
     <div className={styles.group}>
       <RangePicker analysis={analysis} songPath={song.path} value={value} onChange={setDraft} barOffset={project.markers.barOffset} />
       <div className={styles.row}>
-        {hasClips && moves && <Switch label="Keep clips on the music" checked={keep} onChange={setKeep} />}
+        {hasClips && moves && <Switch label="Keep clips on the music" tip="Shift every clip with the new start so each stays on the same beat of the song" checked={keep} onChange={setKeep} />}
         <span className={styles.spacer} />
         {hasClips && onDone && (
           <Button
+            data-tip="Close without changing the range"
             onClick={() => {
               setDraft(null);
               onDone();
@@ -52,7 +53,7 @@ export function RangeEditor({ onDone }: RangeEditorProps) {
             Cancel
           </Button>
         )}
-        <Button variant="primary" onClick={apply}>
+        <Button variant="primary" data-tip="Cut the edit to this part of the song (at most 10 minutes)" onClick={apply}>
           Use this range
         </Button>
       </div>

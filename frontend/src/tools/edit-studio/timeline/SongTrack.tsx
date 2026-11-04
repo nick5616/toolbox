@@ -1,6 +1,6 @@
 /** The song track (Phase 9 SPEC §14.5): the range's waveform with draggable fade ramps. Locked: it can't be moved. */
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Icon, cx } from "@/components";
+import { Icon, Tooltip, cx } from "@/components";
 import { EditStudioService } from "@/lib/api";
 import { useWaveform } from "@/tools/video-editor/useThumbs";
 import { editLength } from "@/viz/edit/types";
@@ -117,22 +117,22 @@ export function SongTrack({ timeWidth }: { timeWidth: number }) {
   const name = song.path.split(/[\\/]/).pop() ?? song.path;
   return (
     <div className={cx(styles.row, styles.songRow)} style={{ height: SONG_ROW_PX }} data-song-row>
-      <div className={cx(styles.header, selected && styles.headerSelected)} onPointerDown={() => useEditStudio.getState().select({ kind: "song" })}>
+      <div className={cx(styles.header, selected && styles.headerSelected)} data-tip="The song track: click to select it and set its volume and fades" onPointerDown={() => useEditStudio.getState().select({ kind: "song" })}>
         <Icon name="music" size={14} className={styles.headerIcon} />
-        <span className={styles.trackName} title={name}>
+        <span className={styles.trackName} data-tip={`${name}: the song this edit is cut to`}>
           {name}
         </span>
-        <Icon name="lock" size={12} title="The song track is locked" />
+        <Tooltip label="The song track is locked: it always starts at 0 and can't be moved"><Icon name="lock" size={12} title="The song track is locked" /></Tooltip>
       </div>
       <div className={styles.timeArea} ref={area} onPointerDown={() => useEditStudio.getState().select({ kind: "song" })}>
-        <canvas ref={canvas} className={styles.songCanvas} style={{ width: timeWidth, height: SONG_ROW_PX }} />
+        <canvas ref={canvas} className={styles.songCanvas} data-tip="Waveform of the song range used by this edit; click to select the song track" style={{ width: timeWidth, height: SONG_ROW_PX }} />
         <div className={styles.songRange} style={{ left: Math.max(0, x0), width: Math.max(0, Math.min(timeWidth, x1) - Math.max(0, x0)) }} aria-hidden="true" />
         <svg className={styles.fades} width={timeWidth} height={SONG_ROW_PX} aria-hidden="true">
           {fin > 1 && <polygon points={`${x0},0 ${x0 + fin},0 ${x0},${SONG_ROW_PX}`} className={styles.fadeShape} />}
           {fout > 1 && <polygon points={`${x1},0 ${x1 - fout},0 ${x1},${SONG_ROW_PX}`} className={styles.fadeShape} />}
         </svg>
-        <button type="button" className={styles.fadeHandle} style={{ left: x0 + fin - 5, top: 2 }} aria-label="Fade in length" title="Drag to set the fade in" onPointerDown={(e) => dragFade(e, "in")} />
-        <button type="button" className={styles.fadeHandle} style={{ left: x1 - fout - 5, top: 2 }} aria-label="Fade out length" title="Drag to set the fade out" onPointerDown={(e) => dragFade(e, "out")} />
+        <button type="button" className={styles.fadeHandle} style={{ left: x0 + fin - 5, top: 2 }} aria-label="Fade in length" data-tip="Drag right to fade the song in over this long (up to 10 s)" onPointerDown={(e) => dragFade(e, "in")} />
+        <button type="button" className={styles.fadeHandle} style={{ left: x1 - fout - 5, top: 2 }} aria-label="Fade out length" data-tip="Drag left to fade the song out over this long (up to 10 s)" onPointerDown={(e) => dragFade(e, "out")} />
       </div>
     </div>
   );

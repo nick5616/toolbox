@@ -64,6 +64,7 @@ export function SectionBands({ className }: SectionBandsProps) {
                   className={styles.rename}
                   autoFocus
                   aria-label="Section name"
+                  data-tip="Name for this section; Enter saves, Esc cancels"
                   maxLength={MAX_SECTION_LABEL}
                   value={renaming.value}
                   onChange={(e) => setRenaming({ id: m.id, value: e.target.value })}
@@ -75,7 +76,7 @@ export function SectionBands({ className }: SectionBandsProps) {
                   onBlur={commit}
                 />
               ) : (
-                <button type="button" className={styles.chipLabel} title={`Select ${name}`} onClick={select}>
+                <button type="button" className={styles.chipLabel} data-tip={`Select this section's time range (${name || "Section"}) to auto-fill it or edit inside it`} onClick={select}>
                   {name || "Section"}
                 </button>
               )}

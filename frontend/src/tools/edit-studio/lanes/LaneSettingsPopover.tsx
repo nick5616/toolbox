@@ -20,10 +20,10 @@ export interface LaneSettingsPopoverProps {
 }
 
 const BEATS = [
-  { value: "0", label: "1" },
-  { value: "1", label: "2" },
-  { value: "2", label: "3" },
-  { value: "3", label: "4" },
+  { value: "0", label: "1", tip: "Bars start on beat 1 (as detected)" },
+  { value: "1", label: "2", tip: "Bars start on beat 2 (shifts every bar by one beat)" },
+  { value: "2", label: "3", tip: "Bars start on beat 3 (shifts every bar by two beats)" },
+  { value: "3", label: "4", tip: "Bars start on beat 4 (shifts every bar by three beats)" },
 ] as const;
 
 export function LaneSettingsPopover({ lane, count, anchor, stems, onClose }: LaneSettingsPopoverProps) {
@@ -65,11 +65,11 @@ export function LaneSettingsPopover({ lane, count, anchor, stems, onClose }: Lan
     <div ref={ref} className={styles.popover} style={{ left, top: Math.max(8, top) }} role="dialog" aria-label={`${LANE_LABELS[lane]} settings`}>
       <div className={styles.popTitle}>
         <span>{LANE_LABELS[lane]}</span>
-        <span className={styles.count}>{count} markers</span>
+        <span className={styles.count} data-tip="How many markers this lane has with the current settings">{count} markers</span>
       </div>
       {lane === "downbeat" && (
         <div className={styles.popRow}>
-          <span className={styles.popLabel}>Bar starts on beat</span>
+          <span className={styles.popLabel} data-tip="Which detected beat counts as the first of each bar">Bar starts on beat</span>
           <SegmentedControl
             aria-label="Bar starts on beat"
             size="sm"
@@ -86,28 +86,28 @@ export function LaneSettingsPopover({ lane, count, anchor, stems, onClose }: Lan
         <>
           <div className={styles.popRow}>
             <span className={styles.popLabel}>
-              <span>Strength threshold</span>
+              <span data-tip="Hide markers weaker than this; raise it to keep only the strongest hits">Strength threshold</span>
             </span>
             <Slider aria-label="Strength threshold" min={0} max={1} step={0.01} value={s.minStrength} format={(v) => v.toFixed(2)} onChange={(v) => change({ minStrength: v }, "min")} />
             {finer && <span className={styles.popHint}>Picking every hit from the drum track.</span>}
           </div>
           <div className={styles.popRow}>
-            <span className={styles.popLabel}>Keep every</span>
+            <span className={styles.popLabel} data-tip="Keep every 1st, 2nd, 3rd… marker and drop the ones between">Keep every</span>
             <Stepper aria-label="Keep every Nth marker" min={1} max={16} step={1} value={s.every} onChange={(v) => change({ every: Math.round(v) }, "every")} unit="th" />
           </div>
-          <Switch label="Only the first in each bar" checked={s.firstOfBar} onChange={(v) => change({ firstOfBar: v }, "first")} />
+          <Switch label="Only the first in each bar" tip="Keep only the first marker of every bar, e.g. just the downbeat kick" checked={s.firstOfBar} onChange={(v) => change({ firstOfBar: v }, "first")} />
           <div className={styles.popRow}>
-            <span className={styles.popLabel}>Nudge</span>
+            <span className={styles.popLabel} data-tip="Shift every marker in this lane earlier (negative) or later (positive), in milliseconds">Nudge</span>
             <Slider aria-label="Nudge" min={-200} max={200} step={5} value={s.nudgeMs} format={(v) => `${v} ms`} onChange={(v) => change({ nudgeMs: v }, "nudge")} />
           </div>
         </>
       )}
       <div className={styles.popActions}>
-        <Button size="sm" variant="secondary" onClick={() => reset(resetLaneOverrides)} title="Brings back hidden markers and clears moved ones">
+        <Button size="sm" variant="secondary" onClick={() => reset(resetLaneOverrides)} data-tip="Bring back deleted markers and undo moves in this lane">
           Reset lane
         </Button>
         {!customLane && (
-          <Button size="sm" variant="ghost" onClick={() => reset(resetLaneSettings)}>
+          <Button size="sm" variant="ghost" data-tip="Put threshold, every-Nth, first-of-bar and nudge back to their defaults" onClick={() => reset(resetLaneSettings)}>
             Defaults
           </Button>
         )}

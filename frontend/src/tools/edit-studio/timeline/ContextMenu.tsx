@@ -10,6 +10,8 @@ export interface ContextItem {
   disabled?: boolean;
   /** A divider is drawn above it. */
   separator?: boolean;
+  /** Tooltip text for the item. */
+  tip?: string;
   onSelect: () => void;
 }
 
@@ -61,6 +63,8 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
             role="menuitem"
             className={styles.item}
             disabled={it.disabled}
+            data-tip={it.tip}
+            data-tip-side="right"
             onClick={() => {
               onClose();
               it.onSelect();

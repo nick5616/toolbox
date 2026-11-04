@@ -54,8 +54,8 @@ export function TimeScrollbar({ width, durationMs }: { width: number; durationMs
   };
   return (
     <div className={styles.wrap} style={{ paddingLeft: HEADER_PX + 4 }}>
-      <div className={styles.bar} style={{ width: barPx }} onPointerDown={onBar} data-tip="Drag to pan along the song (or Shift+wheel, or hold the middle mouse button). Wheel over the timeline zooms" role="scrollbar" aria-orientation="horizontal" aria-label="Scroll the timeline" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((g.left / Math.max(1, barPx - g.width)) * 100)} aria-controls="es-tracks">
-        <div className={styles.thumb} style={{ left: g.left, width: g.width }} onPointerDown={onThumbDown} onPointerMove={onThumbMove} onPointerUp={onThumbUp} onPointerCancel={onThumbUp} />
+      <div className={styles.bar} style={{ width: barPx }} onPointerDown={onBar} data-tip="Click to jump there, or drag the handle to pan. The wheel over the timeline zooms; Shift+wheel or the middle button pans" role="scrollbar" aria-orientation="horizontal" aria-label="Scroll the timeline" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((g.left / Math.max(1, barPx - g.width)) * 100)} aria-controls="es-tracks">
+        <div className={styles.thumb} data-tip="Drag to pan along the song; zoom with the wheel over the timeline" style={{ left: g.left, width: g.width }} onPointerDown={onThumbDown} onPointerMove={onThumbMove} onPointerUp={onThumbUp} onPointerCancel={onThumbUp} />
       </div>
     </div>
   );
