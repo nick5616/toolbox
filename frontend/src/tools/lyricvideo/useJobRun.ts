@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { JobStatus, JobsService, LyricVideoService, type LyricVideoOptions } from "@/lib/api";
+import { useCallback } from "react";
+import { JobsService, LyricVideoService, type LyricVideoOptions } from "@/lib/api";
 import { toAppError, type AppErrorShape } from "@/lib/errors";
 import { isActive, useJob, type JobView } from "@/state/jobs";
+import { useLyricVideo, type JobSlot } from "./store";
 
 export interface JobRun {
   job: JobView | undefined;
@@ -15,45 +16,44 @@ export interface JobRun {
   clear: () => void;
 }
 
-/** Submits one Lyric Video job and follows it; `onDone` runs once when it reaches `done`. */
-export function useJobRun(onDone?: (job: JobView) => void): JobRun {
-  const [id, setId] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<AppErrorShape | null>(null);
+/**
+ * One Lyric Video job slot ("gen", "lrc", "preview", "render"), kept in the
+ * store so a panel that closes and opens again still shows its job.
+ */
+export function useJobRun(slot: JobSlot): JobRun {
+  const id = useLyricVideo((s) => s.jobIds[slot]);
+  const submitting = useLyricVideo((s) => s.submitting[slot]);
+  const error = useLyricVideo((s) => s.jobErrors[slot]);
   const job = useJob(id);
-  const handled = useRef("");
-  const doneRef = useRef(onDone);
-  doneRef.current = onDone;
 
-  useEffect(() => {
-    if (job && job.status === JobStatus.JobDone && handled.current !== job.id) {
-      handled.current = job.id;
-      doneRef.current?.(job);
-    }
-  }, [job]);
-
-  const start = useCallback(async (inputs: string[], opts: LyricVideoOptions) => {
-    setError(null);
-    setSubmitting(true);
-    try {
-      const jobs = await LyricVideoService.Enqueue(inputs, opts);
-      const first = jobs?.[0];
-      if (first) setId(first.id);
-    } catch (e) {
-      setError(toAppError(e));
-    } finally {
-      setSubmitting(false);
-    }
-  }, []);
+  const start = useCallback(
+    async (inputs: string[], opts: LyricVideoOptions) => {
+      const st = useLyricVideo.getState();
+      st.setJobError(slot, null);
+      st.setSubmitting(slot, true);
+      try {
+        const jobs = await LyricVideoService.Enqueue(inputs, opts);
+        const first = jobs?.[0];
+        if (first) useLyricVideo.getState().setJob(slot, first.id);
+      } catch (e) {
+        useLyricVideo.getState().setJobError(slot, toAppError(e));
+      } finally {
+        useLyricVideo.getState().setSubmitting(slot, false);
+      }
+    },
+    [slot],
+  );
 
   const cancel = useCallback(() => {
     if (id) JobsService.Cancel(id).catch(() => undefined);
   }, [id]);
 
   const clear = useCallback(() => {
-    setId("");
-    setError(null);
-  }, []);
+    const st = useLyricVideo.getState();
+    st.setJob(slot, "");
+    st.setJobError(slot, null);
+  }, [slot]);
 
   return { job, busy: submitting || (job !== undefined && isActive(job)), error, start, cancel, clear };
 }
+
