@@ -28,6 +28,16 @@
   white-space: nowrap;
 }
 
+.forHost {
+  flex: none;
+  max-width: 220px;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .spacer {
   flex: 1;
 }

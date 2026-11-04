@@ -37,6 +37,7 @@ export function FileActions({ outputId, path, disabled, moduleId }: FileActionsP
   const modules = useModules((s) => s.list);
   const onUse = embed?.onUse;
   const hostName = embed?.hostName ?? "";
+  const placement = embed?.placement;
 
   const use = useCallback(async () => {
     if (!onUse) return;
@@ -50,8 +51,9 @@ export function FileActions({ outputId, path, disabled, moduleId }: FileActionsP
       /* can't tell: hand it over anyway */
     }
     onUse([path]);
-    toast({ title: `Sent to ${hostName}`, tone: "success" });
-  }, [onUse, path, hostName]);
+    // A tool window toasts after the host's ack (or its absence), so it can say the truth.
+    if (placement !== "window") toast({ title: `Sent to ${hostName}`, tone: "success" });
+  }, [onUse, path, hostName, placement]);
 
   return (
     <>

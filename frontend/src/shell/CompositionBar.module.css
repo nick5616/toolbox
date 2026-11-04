@@ -82,3 +82,19 @@
   background: var(--bg-hover);
   color: var(--fg);
 }
+
+/* The Uses chip hover menu (Open here / its own window / Go to). */
+.popMenu {
+  display: inline-flex;
+  width: 0;
+  height: 22px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.chipWrap:hover .popMenu,
+.chipWrap:focus-within .popMenu {
+  width: 22px;
+  opacity: 1;
+}
