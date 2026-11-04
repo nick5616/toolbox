@@ -56,16 +56,16 @@ export function CollageDialog({ photos, onConfirm, onClose }: CollageDialogProps
           onChange={setBg}
           aria-label="Background"
           options={[
-            { value: "photo", label: first ? `First photo (${first.name})` : "First photo" },
-            { value: "color", label: "A colour" },
+            { value: "photo", label: first ? `First photo (${first.name})` : "First photo", tip: "Use the first selected photo as the backdrop and place the others on it" },
+            { value: "color", label: "A colour", tip: "Use a plain colour as the backdrop" },
           ]}
         />
       </Field>
       {bg === "color" && (
-        <Field label="Colour">{(c) => <input {...c} type="color" value={color} onChange={(e) => setColor(e.target.value)} />}</Field>
+        <Field label="Colour">{(c) => <input {...c} type="color" data-tip="Backdrop colour" value={color} onChange={(e) => setColor(e.target.value)} />}</Field>
       )}
-      <Switch checked={cutouts} onChange={setCutouts} label="Cut out the others" aria-label="Cut out the others" />
-      <Field label="Layout">{(c) => <Select id={c.id} value={layout} onChange={setLayout} options={COLLAGE_LAYOUTS} />}</Field>
+      <Switch checked={cutouts} onChange={setCutouts} label="Cut out the others" aria-label="Cut out the others" tip="Remove the background from the other photos so only the subjects sit on the backdrop" />
+      <Field label="Layout">{(c) => <Select id={c.id} data-tip="How the photos are arranged: scatter, grid, stack or polaroids" value={layout} onChange={setLayout} options={COLLAGE_LAYOUTS} />}</Field>
     </Modal>
   );
 }
@@ -108,13 +108,13 @@ export function StitchDialog({ count, onConfirm, onClose }: StitchDialogProps) {
           onChange={setOrder}
           aria-label="Order"
           options={[
-            { value: "date-taken", label: "Date taken" },
-            { value: "as-given", label: "As selected" },
+            { value: "date-taken", label: "Date taken", tip: "Order the clips and photos by when they were taken" },
+            { value: "as-given", label: "As selected", tip: "Keep the order you selected them in" },
           ]}
         />
       </Field>
       <div className={styles.files}>
-        <Button size="sm" variant="secondary" icon="music" onClick={() => void pickSong()}>
+        <Button size="sm" variant="secondary" icon="music" data-tip="Choose a song to play under the video" onClick={() => void pickSong()}>
           {music ? "Change song…" : "Choose a song…"}
         </Button>
         {music ? (
@@ -122,7 +122,7 @@ export function StitchDialog({ count, onConfirm, onClose }: StitchDialogProps) {
             <span className={styles.note} title={music}>
               {fileName(music)}
             </span>
-            <Button size="sm" variant="ghost" onClick={() => setMusic("")}>
+            <Button size="sm" variant="ghost" data-tip="Make the video without music" onClick={() => setMusic("")}>
               No song
             </Button>
           </>
@@ -130,8 +130,8 @@ export function StitchDialog({ count, onConfirm, onClose }: StitchDialogProps) {
           <span className={styles.note}>No song</span>
         )}
       </div>
-      <Switch checked={music ? beatCut : false} disabled={!music} onChange={setBeatCut} label="Cut on the beat" aria-label="Cut on the beat" />
-      <Field label="Transition">{(c) => <Select id={c.id} value={transition} onChange={setTransition} options={TRANSITIONS} />}</Field>
+      <Switch checked={music ? beatCut : false} disabled={!music} onChange={setBeatCut} label="Cut on the beat" aria-label="Cut on the beat" tip={music ? "Switch clips on the beats of the song" : "Choose a song first"} />
+      <Field label="Transition">{(c) => <Select id={c.id} data-tip="How one clip changes into the next: cut, fade, dip to black or slide" value={transition} onChange={setTransition} options={TRANSITIONS} />}</Field>
     </Modal>
   );
 }

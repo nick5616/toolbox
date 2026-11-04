@@ -597,37 +597,41 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   return (
     <div ref={root} className={styles.editor} onKeyDown={onKeyDown}>
       <div className={styles.toolbar} role="toolbar" aria-label="Composer tools">
-        <IconButton icon="arrow-left" label="Back to projects" onClick={() => void closeEditor()} />
+        <IconButton icon="arrow-left" label="Back to projects" data-tip="Save and go back to your list of compositions" onClick={() => void closeEditor()} />
         <TextField
           size="sm"
           aria-label="Project name"
+          data-tip="Name of this composition (shown in the list and used for the exported file)"
           wrapperClassName={styles.name}
           value={name}
           maxLength={120}
           onChange={(e) => setName(e.target.value)}
         />
         <span className={styles.sep} />
-        <Button size="sm" variant="secondary" collapsible icon="image" onClick={() => void pickPhotos()}>
+        <Button size="sm" variant="secondary" collapsible icon="image" data-tip="Add photos from your computer as new layers" onClick={() => void pickPhotos()}>
           Add photo
         </Button>
-        <Button size="sm" variant="secondary" collapsible icon="type" onClick={addText}>
+        <Button size="sm" variant="secondary" collapsible icon="type" data-tip="Add a text layer you can type into, style and move" onClick={addText}>
           Add text
         </Button>
+        <span data-tip="Arrange all the photos automatically in a ready-made layout" style={{ display: "contents" }}>
         <MenuButton
           size="sm"
           label="Layouts"
           icon="grid-3x3"
           collapsible
           items={() => [
-            ...LAYOUTS.map((l) => ({ id: l.id, label: `${l.label} - ${l.hint}`, onSelect: () => doLayout(l.id) })),
-            { id: "shuffle", label: "Shuffle (same layout, new arrangement)", icon: "refresh-cw", onSelect: () => doLayout(layoutKind.current) },
+            ...LAYOUTS.map((l) => ({ id: l.id, label: `${l.label} - ${l.hint}`, tip: `Arrange the photos as ${l.label.toLowerCase()}: ${l.hint.toLowerCase()}`, onSelect: () => doLayout(l.id) })),
+            { id: "shuffle", label: "Shuffle (same layout, new arrangement)", tip: "Re-roll the current layout for a different arrangement", icon: "refresh-cw", onSelect: () => doLayout(layoutKind.current) },
           ]}
         />
+        </span>
         <Button
           size="sm"
           variant="secondary"
           icon="wand-sparkles"
           collapsible
+          data-tip={canRemove ? "Cut the subject out of the selected photo(s) with the AI engine, leaving a transparent background" : "Select one or more photos to cut out"}
           disabled={!canRemove}
           loading={anyBusy && !canRemove}
           onClick={() => void removeBackgrounds(removable)}
@@ -635,29 +639,31 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
           {multiSelected ? `Remove background (${removable.length})` : "Remove background"}
         </Button>
         <span className={styles.sep} />
-        <IconButton icon="undo-2" label="Undo" kbd="Ctrl+Z" disabled={!hist.canUndo} onClick={hist.undo} />
-        <IconButton icon="redo-2" label="Redo" kbd="Ctrl+Shift+Z" disabled={!hist.canRedo} onClick={hist.redo} />
-        <IconButton icon="maximize-2" label="Zoom to fit" onClick={() => setZoom(1)} />
+        <IconButton icon="undo-2" label="Undo" data-tip="Undo the last change" kbd="Ctrl+Z" disabled={!hist.canUndo} onClick={hist.undo} />
+        <IconButton icon="redo-2" label="Redo" data-tip="Redo the change you just undid" kbd="Ctrl+Shift+Z" disabled={!hist.canRedo} onClick={hist.redo} />
+        <IconButton icon="maximize-2" label="Zoom to fit" data-tip="Reset the canvas zoom so the whole picture fits" onClick={() => setZoom(1)} />
         <span className={styles.grow} />
-        <span className={styles.status} role="status" data-state={autosave.state}>
+        <span className={styles.status} role="status" data-state={autosave.state} data-tip="Changes are saved automatically as you work">
           {SAVE_LABEL[autosave.state]}
         </span>
         {exporting && <Spinner size={14} label="Exporting" />}
         {postSlide && (
-          <Button size="sm" variant="secondary" icon="arrow-left" collapsible onClick={() => void backToPost()}>
+          <Button size="sm" variant="secondary" icon="arrow-left" collapsible data-tip="Save and return to the post this composition belongs to" onClick={() => void backToPost()}>
             Back to post
           </Button>
         )}
+        <span data-tip="Render the finished picture into your library" style={{ display: "contents" }}>
         <MenuButton
           size="sm"
           label="Export"
           icon="download"
           collapsible
           items={() => [
-            { id: "jpg", label: "Export as JPG", onSelect: () => void exportAs("jpg") },
-            { id: "png", label: "Export as PNG", onSelect: () => void exportAs("png") },
+            { id: "jpg", label: "Export as JPG", tip: "Smaller file, best for photos and Instagram", onSelect: () => void exportAs("jpg") },
+            { id: "png", label: "Export as PNG", tip: "Lossless file, keeps transparency; larger", onSelect: () => void exportAs("png") },
           ]}
         />
+        </span>
       </div>
 
       <div className={styles.main}>
@@ -695,8 +701,8 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
                 value={sideTab}
                 onChange={setSideTab}
                 options={[
-                  { value: "edit", label: "Layers" },
-                  { value: "sources", label: "Sources" },
+                  { value: "edit", label: "Layers", tip: "The layers and the properties of the selected one" },
+                  { value: "sources", label: "Sources", tip: "Photos in this post that you can add to the canvas" },
                 ]}
               />
             </div>
@@ -706,7 +712,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
           ) : (
             <>
           <div className={styles.layers}>
-            <h2 className={styles.sideTitle}>Layers</h2>
+            <h2 className={styles.sideTitle} data-tip="Everything on the canvas, top layer first; drag a row to reorder">Layers</h2>
             <LayersPanel
               layers={layerList(doc)}
               selectedId={selectedId}
@@ -728,12 +734,13 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
                   size="sm"
                   variant="secondary"
                   icon="wand-sparkles"
+                  data-tip={canRemove ? "Cut the subject out of every selected photo" : "None of the selected layers is a photo that can be cut out"}
                   disabled={!canRemove}
                   onClick={() => void removeBackgrounds(removable)}
                 >
                   Cut out all
                 </Button>
-                <Button size="sm" variant="secondary" icon="undo-2" disabled={restorable.length === 0} onClick={() => restoreOriginals(restorable)}>
+                <Button size="sm" variant="secondary" icon="undo-2" data-tip={restorable.length === 0 ? "None of the selected photos has been cut out" : "Bring back the original photos, undoing the cut-outs"} disabled={restorable.length === 0} onClick={() => restoreOriginals(restorable)}>
                   Restore originals
                 </Button>
               </div>

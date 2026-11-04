@@ -51,11 +51,12 @@ function NewDialog({ aspects, initialAspect, exts, onCreate, onCancel }: NewDial
   };
   return (
     <Modal title="New composition" confirmLabel="Create" confirmDisabled={!name.trim()} onConfirm={() => onCreate(name.trim(), aspect, bg)} onCancel={onCancel}>
-      <Field label="Name">{(c) => <TextField {...c} value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />}</Field>
+      <Field label="Name">{(c) => <TextField {...c} data-tip="What to call this composition (up to 120 characters)" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />}</Field>
       <Field label="Shape">
         {(c) => (
           <Select
             {...c}
+            data-tip="Canvas shape and size in pixels, for example 4:5 portrait or a 9:16 story"
             value={aspect}
             options={aspects.map((a) => ({ value: a.id, label: `${a.label} (${a.width}×${a.height})` }))}
             onChange={setAspect}
@@ -65,12 +66,12 @@ function NewDialog({ aspects, initialAspect, exts, onCreate, onCancel }: NewDial
       <Field label="Background photo" hint="Optional. You can change it later.">
         {() => (
           <div className={styles.bgPick}>
-            <Button size="sm" variant="secondary" icon="image" onClick={() => void pick()}>
+            <Button size="sm" variant="secondary" icon="image" data-tip="Pick a photo to fill the canvas background" onClick={() => void pick()}>
               {bg ? "Replace…" : "Choose photo…"}
             </Button>
-            {bg && <span className={styles.bgName}>{baseName(bg)}</span>}
+            {bg && <span className={styles.bgName} data-tip={bg}>{baseName(bg)}</span>}
             {bg && (
-              <Button size="sm" variant="ghost" onClick={() => setBg("")}>
+              <Button size="sm" variant="ghost" data-tip="Use a plain colour background instead" onClick={() => setBg("")}>
                 Clear
               </Button>
             )}
@@ -287,7 +288,7 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
             title={projects.length === 0 ? "Make your first composition" : "Open a composition"}
             body="Arrange photos and text on a canvas shaped for Instagram, cut out subjects, and export a finished picture."
             action={
-              <Button variant="primary" icon="plus" onClick={startNew}>
+              <Button variant="primary" icon="plus" data-tip="Start a new composition: pick a name, shape and optional background photo" onClick={startNew}>
                 New composition
               </Button>
             }
@@ -314,6 +315,7 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
               <TextField
                 {...c}
                 autoFocus
+                data-tip="New name for this composition"
                 value={renaming.name}
                 maxLength={120}
                 onChange={(e) => setRenaming({ ...renaming, name: e.target.value })}

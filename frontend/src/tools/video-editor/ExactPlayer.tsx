@@ -81,7 +81,7 @@ export const ExactPlayer = forwardRef<PlayerHandle, ExactPlayerProps>(function E
 
   return (
     <div className={styles.stage}>
-      <div className={styles.frame} style={{ "--ar": String(aspectRatio(aspect)) } as CSSProperties}>
+      <div className={styles.frame} data-tip="Exact preview: the rendered video, with transitions, titles and music" style={{ "--ar": String(aspectRatio(aspect)) } as CSSProperties}>
         <video ref={el} src={url} className={`${styles.media} ${styles.contain}`} playsInline preload="auto" data-testid="exact-video" />
       </div>
     </div>

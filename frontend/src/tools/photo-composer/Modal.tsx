@@ -43,10 +43,10 @@ export function Modal({ title, children, confirmLabel, confirmDisabled, onConfir
         </h2>
         <div className={styles.body}>{children}</div>
         <div className={styles.footer}>
-          <Button variant="secondary" onClick={onCancel}>
+          <Button variant="secondary" data-tip="Close without making changes" kbd="Esc" onClick={onCancel}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={confirmDisabled} onClick={onConfirm}>
+          <Button variant="primary" data-tip={confirmDisabled ? "Fill in the missing details first" : undefined} disabled={confirmDisabled} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </div>

@@ -736,7 +736,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
                 {planJob?.message ? ` ${planJob.message}` : ""}
               </p>
               <Meter value={planJob?.progress ?? -1} label="Building your video" className={styles.buildingMeter} />
-              {planJobId && <Button onClick={() => void JobsService.Cancel(planJobId).catch(() => undefined)}>Cancel</Button>}
+              {planJobId && <Button data-tip="Stop building the video" onClick={() => void JobsService.Cancel(planJobId).catch(() => undefined)}>Cancel</Button>}
             </>
           ) : (
             <>
@@ -745,6 +745,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
               </Banner>
               <Button
                 variant="primary"
+                data-tip="Go to the Quick vlog form with your choices so you can adjust them and build again"
                 onClick={() => {
                   setVlog(stitch.form);
                   setVlogOpen(true);
@@ -805,9 +806,10 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
     <div className={styles.root}>
       <DepsGate moduleId={moduleId} />
       <div className={styles.header}>
-        <IconButton icon="arrow-left" label="All videos" onClick={() => void closeProject()} />
+        <IconButton icon="arrow-left" label="All videos" data-tip="Save and go back to the list of your video projects" onClick={() => void closeProject()} />
         <TextField
           aria-label="Project name"
+          data-tip="Rename this project (shown in the list; the exported file uses it too)"
           size="sm"
           wrapperClassName={styles.nameField}
           value={name}
@@ -820,33 +822,34 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
         <Select
           size="sm"
           aria-label="Shape"
+          data-tip="Frame shape of the video: 9:16 for Reels and Stories, 1:1 square, 4:5 portrait, 16:9 landscape"
           value={doc.aspect}
           options={ASPECTS.map((a) => ({ value: a, label: a }))}
           onChange={(aspect) => edit({ ...doc, aspect })}
         />
-        <span className={styles.length} data-testid="total-length">
+        <span className={styles.length} data-testid="total-length" data-tip="Total length of the video">
           {formatMs(totalMs)}
         </span>
-        <span className={styles.saveState} role="status" data-state={saveState} title={saveError}>
+        <span className={styles.saveState} role="status" data-state={saveState} data-tip={saveState === "error" ? saveError || "The project could not be saved" : "Changes are saved automatically as you edit"}>
           {saveState === "saving" ? "Saving…" : saveState === "error" ? "Couldn't save" : saveState === "saved" ? "Saved" : ""}
         </span>
         {warnings.length > 0 && (
-          <Badge tone="warn" mono>
+          <Badge tone="warn" mono tip={warnings.join(" · ")}>
             {warnings.length} {warnings.length === 1 ? "warning" : "warnings"}
           </Badge>
         )}
         <span className={styles.spacer} />
-        <IconButton icon="undo-2" label="Undo" kbd="Mod+Z" disabled={!hist || hist.past.length === 0} onClick={doUndo} />
-        <IconButton icon="redo-2" label="Redo" kbd="Mod+Shift+Z" disabled={!hist || hist.future.length === 0} onClick={doRedo} />
+        <IconButton icon="undo-2" label="Undo" data-tip="Undo the last edit" kbd="Mod+Z" disabled={!hist || hist.past.length === 0} onClick={doUndo} />
+        <IconButton icon="redo-2" label="Redo" data-tip="Redo the edit you just undid" kbd="Mod+Shift+Z" disabled={!hist || hist.future.length === 0} onClick={doRedo} />
         {postSlide && (
-          <Button size="sm" icon="arrow-left" onClick={() => void backToPost()}>
+          <Button size="sm" icon="arrow-left" data-tip="Save and return to the post this video belongs to" onClick={() => void backToPost()}>
             Back to post
           </Button>
         )}
-        <Button size="sm" icon="play" loading={busyPreview} disabled={blocked || clips.length === 0} onClick={() => void submit("preview")}>
+        <Button size="sm" icon="play" data-tip={blocked ? "Install the missing tools first" : clips.length === 0 ? "Add a clip first" : "Render a short exact preview with titles, transitions and music, as the export will look"} loading={busyPreview} disabled={blocked || clips.length === 0} onClick={() => void submit("preview")}>
           Render preview
         </Button>
-        <Button size="sm" variant="primary" icon="download" loading={busyExport} disabled={blocked || clips.length === 0} onClick={() => void submit("export")}>
+        <Button size="sm" variant="primary" icon="download" data-tip={blocked ? "Install the missing tools first" : clips.length === 0 ? "Add a clip first" : "Render the final video file into your library"} loading={busyExport} disabled={blocked || clips.length === 0} onClick={() => void submit("export")}>
           Export
         </Button>
       </div>
@@ -866,16 +869,16 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
           title={`Exported ${exported.name}`}
           action={
             <div className={styles.exportActions}>
-              <Button size="sm" onClick={() => void LibraryService.RevealPath(exported.path).catch(() => undefined)}>
+              <Button size="sm" data-tip="Show the exported file in your file manager" onClick={() => void LibraryService.RevealPath(exported.path).catch(() => undefined)}>
                 {revealLabel}
               </Button>
-              <Button size="sm" onClick={() => useUI.getState().handOff({ moduleId: "subtitles", inputs: [exported.path] })}>
+              <Button size="sm" data-tip="Open the exported video in Subtitles to transcribe and add captions" onClick={() => useUI.getState().handOff({ moduleId: "subtitles", inputs: [exported.path] })}>
                 Add captions with Subtitles
               </Button>
-              <Button size="sm" onClick={() => useUI.getState().handOff({ moduleId: "post-builder", inputs: [exported.path] })}>
+              <Button size="sm" data-tip="Add the exported video to an Instagram post in Post Builder" onClick={() => useUI.getState().handOff({ moduleId: "post-builder", inputs: [exported.path] })}>
                 Add to post…
               </Button>
-              <IconButton size="sm" icon="x" label="Dismiss" onClick={() => setExported(null)} />
+              <IconButton size="sm" icon="x" label="Dismiss" data-tip="Hide this message" onClick={() => setExported(null)} />
             </div>
           }
         />
@@ -887,11 +890,11 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
           action={
             <div className={styles.exportActions}>
               {exactStale && (
-                <Button size="sm" onClick={() => void submit("preview")}>
+                <Button size="sm" data-tip="Render the exact preview again with your latest edits" onClick={() => void submit("preview")}>
                   Render again
                 </Button>
               )}
-              <IconButton size="sm" icon="x" label="Dismiss exact preview" onClick={() => setExact(null)} />
+              <IconButton size="sm" icon="x" label="Dismiss exact preview" data-tip="Go back to the quick preview of your edits" onClick={() => setExact(null)} />
             </div>
           }
         >
@@ -917,12 +920,12 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
             />
           )}
           <div className={styles.transport}>
-            <IconButton icon={playing ? "pause" : "play"} label={playing ? "Pause" : "Play"} kbd="Space" disabled={totalMs <= 0} onClick={() => player.current?.toggle()} />
-            <span className={styles.time} data-testid="time-readout">
+            <IconButton icon={playing ? "pause" : "play"} label={playing ? "Pause" : "Play"} data-tip={playing ? "Pause playback" : "Play the video from the playhead"} kbd="Space" disabled={totalMs <= 0} onClick={() => player.current?.toggle()} />
+            <span className={styles.time} data-testid="time-readout" data-tip="Playhead time / total length">
               {formatMs(timeMs)} / {formatMs(totalMs)}
             </span>
-            <Slider aria-label="Position" min={0} max={Math.max(totalMs, 1)} step={10} value={Math.min(timeMs, Math.max(totalMs, 1))} format={() => ""} onChange={seek} disabled={totalMs <= 0} />
-            <IconButton icon="scissors" label="Split at the playhead" kbd="S" disabled={clips.length === 0} onClick={split} />
+            <span data-tip="Drag to move the playhead through the video" style={{ display: "contents" }}><Slider aria-label="Position" min={0} max={Math.max(totalMs, 1)} step={10} value={Math.min(timeMs, Math.max(totalMs, 1))} format={() => ""} onChange={seek} disabled={totalMs <= 0} /></span>
+            <IconButton icon="scissors" label="Split at the playhead" data-tip="Cut the clip under the playhead into two clips" kbd="S" disabled={clips.length === 0} onClick={split} />
           </div>
         </div>
         <div className={styles.inspector}>
@@ -935,8 +938,8 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
                 value={sideTab}
                 onChange={setSideTab}
                 options={[
-                  { value: "inspector", label: "Inspector" },
-                  { value: "sources", label: "Sources" },
+                  { value: "inspector", label: "Inspector", tip: "Settings for the selected clip, title or song" },
+                  { value: "sources", label: "Sources", tip: "Photos and videos in this post that you can add to the timeline" },
                 ]}
               />
             </div>

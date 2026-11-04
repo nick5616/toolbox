@@ -43,16 +43,16 @@ const MODE_OPTIONS = [
 ] as const;
 
 const JOIN_OPTIONS = [
-  { value: TrimJoin.JoinMerge, label: "One file" },
-  { value: TrimJoin.JoinSeparate, label: "Separate files" },
+  { value: TrimJoin.JoinMerge, label: "One file", tip: "Join all the segments, in order, into a single video" },
+  { value: TrimJoin.JoinSeparate, label: "Separate files", tip: "Save each segment as its own file" },
 ] as const;
 
 const ASPECT_OPTIONS = [
-  { value: TrimAspect.AspectKeep, label: "Keep" },
-  { value: TrimAspect.AspectPortrait, label: "9:16" },
-  { value: TrimAspect.AspectSquare, label: "1:1" },
-  { value: TrimAspect.AspectFourFive, label: "4:5" },
-  { value: TrimAspect.AspectWide, label: "16:9" },
+  { value: TrimAspect.AspectKeep, label: "Keep", tip: "Keep the original frame shape" },
+  { value: TrimAspect.AspectPortrait, label: "9:16", tip: "Crop to tall 9:16 for reels and stories (re-encodes); drag in the player to choose the area" },
+  { value: TrimAspect.AspectSquare, label: "1:1", tip: "Crop to a square (re-encodes); drag in the player to choose the area" },
+  { value: TrimAspect.AspectFourFive, label: "4:5", tip: "Crop to 4:5 portrait for the Instagram feed (re-encodes); drag in the player to choose the area" },
+  { value: TrimAspect.AspectWide, label: "16:9", tip: "Crop to widescreen 16:9 (re-encodes); drag in the player to choose the area" },
 ] as const;
 
 const HEIGHT_OPTIONS = HEIGHTS.map((h) => ({ value: String(h), label: h === 0 ? "Keep original" : `${h}p` }));
@@ -79,10 +79,11 @@ interface TimeFieldProps {
   label: string;
   valueMs: number;
   onCommit: (ms: number) => void;
+  tip: string;
 }
 
 /** A timecode box that keeps what you type until you leave it. */
-function TimeField({ label, valueMs, onCommit }: TimeFieldProps) {
+function TimeField({ label, valueMs, onCommit, tip }: TimeFieldProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const parsed = draft === null ? null : parseTimecodeMs(draft);
   const invalid = draft !== null && parsed === null;
@@ -91,6 +92,7 @@ function TimeField({ label, valueMs, onCommit }: TimeFieldProps) {
     setDraft(null);
   };
   return (
+    <span data-tip={tip} style={{ display: "contents" }}>
     <TimecodeInput
       aria-label={label}
       value={draft ?? formatMs(valueMs)}
@@ -109,6 +111,7 @@ function TimeField({ label, valueMs, onCommit }: TimeFieldProps) {
         }
       }}
     />
+    </span>
   );
 }
 
@@ -312,11 +315,12 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
     <header className={styles.header}>
       <h1 className={styles.title}>Video Trimmer</h1>
       {file && (
-        <span className={styles.fileName} title={file.path}>
+        <span className={styles.fileName} data-tip={file.path}>
           <span>{file.name}</span>
           <Button
             size="sm"
             variant="ghost"
+            data-tip="Pick a different file to trim; this one is closed"
             onClick={() => {
               inputs.clear();
               void inputs.pick();
@@ -335,7 +339,7 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
         {title}
         <div className={styles.empty}>
           <DropZone id="trimmer-drop" label="Drop a video or audio file" hint="Cut one or more ranges, losslessly or frame-accurately." icon="scissors">
-            <Button variant="secondary" icon="folder-open" onClick={() => void inputs.pick()}>
+            <Button variant="secondary" icon="folder-open" data-tip="Choose a video or audio file to trim" onClick={() => void inputs.pick()}>
               Choose file
             </Button>
           </DropZone>
@@ -356,7 +360,7 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
           tone="danger"
           title={media.error?.message ?? "This file can't be opened"}
           action={
-            <Button size="sm" onClick={media.retry}>
+            <Button size="sm" data-tip="Try opening the file again" onClick={media.retry}>
               Retry
             </Button>
           }
@@ -415,20 +419,20 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
         </div>
 
         <div className={styles.side}>
-          <Section label="Segments">
+          <Section label="Segments" tip="The parts of the file to keep. Each one becomes part of the output">
             <div className={styles.stack}>
               <div className={styles.segActions}>
-                <Button size="sm" onClick={doSetStart} disabled={!selectedSeg || !source} kbd="I">
+                <Button size="sm" data-tip="Start the selected segment at the playhead" onClick={doSetStart} disabled={!selectedSeg || !source} kbd="I">
                   Set start
                 </Button>
-                <Button size="sm" onClick={doSetEnd} disabled={!selectedSeg || !source} kbd="O">
+                <Button size="sm" data-tip="End the selected segment at the playhead" onClick={doSetEnd} disabled={!selectedSeg || !source} kbd="O">
                   Set end
                 </Button>
-                <Button size="sm" icon="plus" onClick={doAdd} disabled={!source} kbd="+">
+                <Button size="sm" icon="plus" data-tip="Add another segment to keep, starting at the playhead" onClick={doAdd} disabled={!source} kbd="+">
                   Add segment
                 </Button>
               </div>
-              <ul className={styles.segList} aria-label="Segments">
+              <ul className={styles.segList} aria-label="Segments" data-tip="Click a segment to select it and jump to its start">
                 {segs.map((s, i) => {
                   const shiftMs = fast && hasVideo ? keyframeShiftMs(keyframes, s.startMs) : 0;
                   return (
@@ -441,24 +445,25 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
                         seek(s.startMs);
                       }}
                     >
-                      <span className={styles.segIndex}>{i + 1}</span>
+                      <span className={styles.segIndex} data-tip="Segment number, matching the numbered ranges on the timeline">{i + 1}</span>
                       <div onClick={(e) => e.stopPropagation()}>
-                        <TimeField label={`Segment ${i + 1} start`} valueMs={s.startMs} onCommit={(ms) => setSegs((l) => setStart(l, s.id, ms))} />
+                        <TimeField tip="Where this segment starts; type a time like 1:23.4 and press Enter" label={`Segment ${i + 1} start`} valueMs={s.startMs} onCommit={(ms) => setSegs((l) => setStart(l, s.id, ms))} />
                       </div>
                       <div onClick={(e) => e.stopPropagation()}>
-                        <TimeField label={`Segment ${i + 1} end`} valueMs={s.endMs} onCommit={(ms) => setSegs((l) => setEnd(l, s.id, ms, durationMs))} />
+                        <TimeField tip="Where this segment ends; type a time like 1:23.4 and press Enter" label={`Segment ${i + 1} end`} valueMs={s.endMs} onCommit={(ms) => setSegs((l) => setEnd(l, s.id, ms, durationMs))} />
                       </div>
-                      <span className={styles.segDuration}>{formatClock(s.endMs - s.startMs)}</span>
+                      <span className={styles.segDuration} data-tip="Length of this segment">{formatClock(s.endMs - s.startMs)}</span>
                       <IconButton
                         size="sm"
                         icon="trash-2"
                         label={`Delete segment ${i + 1}`}
+                        data-tip="Remove this segment from the output"
                         onClick={(e) => {
                           e.stopPropagation();
                           doDelete(s.id);
                         }}
                       />
-                      {shiftMs > 0 && <span className={styles.segNote}>{keyframeNote(shiftMs)}</span>}
+                      {shiftMs > 0 && <span className={styles.segNote} data-tip="Fast mode can only cut on keyframes; switch to Precise for an exact cut">{keyframeNote(shiftMs)}</span>}
                     </li>
                   );
                 })}
@@ -466,7 +471,7 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
             </div>
           </Section>
 
-          <Section label="Export">
+          <Section label="Export" tip="How the trimmed file is made">
             <div className={styles.stack}>
               <Field label="Mode" hint={fast ? "Cuts land on keyframes; the picture isn't re-encoded." : "Frame-accurate cuts; the video is re-encoded."}>
                 {() => (
@@ -475,8 +480,8 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
                     value={settings.mode}
                     onChange={(mode) => patch({ mode })}
                     options={[
-                      { ...MODE_OPTIONS[0], label: "Fast · no quality loss", disabled: needsPrecise(settings) },
-                      { ...MODE_OPTIONS[1], label: "Precise · re-encode" },
+                      { ...MODE_OPTIONS[0], label: "Fast · no quality loss", disabled: needsPrecise(settings), tip: needsPrecise(settings) ? "Unavailable while framing, resizing or a size limit is set" : "Copy the video as it is, with no quality loss; cuts snap to the nearest keyframe" },
+                      { ...MODE_OPTIONS[1], label: "Precise · re-encode", tip: "Cut exactly on the frame you chose; the video is re-encoded, which takes longer" },
                     ]}
                     fullWidth
                     size="sm"
@@ -504,6 +509,7 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
                   <div className={styles.inline}>
                     <Select
                       id={c.id}
+                      data-tip="Shrink the file to fit under a size, for example 25 MB for email; this re-encodes"
                       value={sizeChoice}
                       options={SIZE_OPTIONS}
                       onChange={(v) => {
@@ -519,6 +525,7 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
                     {sizeChoice === "custom" && (
                       <TextField
                         aria-label="Custom size limit (MB)"
+                        data-tip="Largest output size in megabytes (1 to 4000)"
                         type="number"
                         min={1}
                         max={4000}
@@ -536,11 +543,11 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
 
               {hasVideo && (
                 <Field label="Max height">
-                  {(c) => <Select id={c.id} value={String(settings.maxHeight)} options={HEIGHT_OPTIONS} onChange={(v) => patchReencode({ maxHeight: Number(v) })} />}
+                  {(c) => <Select id={c.id} data-tip="Scale the video down so it is no taller than this; smaller files, lower detail" value={String(settings.maxHeight)} options={HEIGHT_OPTIONS} onChange={(v) => patchReencode({ maxHeight: Number(v) })} />}
                 </Field>
               )}
 
-              {hasVideo && <Switch label="Remove audio" checked={settings.removeAudio} onChange={(removeAudio) => patch({ removeAudio })} />}
+              {hasVideo && <Switch label="Remove audio" tip="Export the video without any sound" checked={settings.removeAudio} onChange={(removeAudio) => patch({ removeAudio })} />}
             </div>
           </Section>
         </div>
@@ -561,12 +568,12 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
         <div className={styles.result} aria-label="Result">
           {result.outputs.map((o) => (
             <div key={o.id} className={styles.resultRow}>
-              <span className={styles.resultName} title={o.path}>
+              <span className={styles.resultName} data-tip={o.path}>
                 {o.name}
               </span>
-              <span className={styles.resultMeta}>{formatBytes(o.sizeBytes)}</span>
+              <span className={styles.resultMeta} data-tip="Size of the exported file">{formatBytes(o.sizeBytes)}</span>
               <FileActions outputId={o.id} path={o.path} />
-              <MenuButton size="sm" variant="ghost" icon="send" label="Send to…" emptyLabel="No tools accept this file" items={() => sendToItems(o.path)} />
+              <span data-tip="Open this result in another tool" style={{ display: "contents" }}><MenuButton size="sm" variant="ghost" icon="send" label="Send to…" emptyLabel="No tools accept this file" items={() => sendToItems(o.path)} /></span>
             </div>
           ))}
           {shift > 500 && <p className={styles.hint}>Fast mode moved a cut up to {(shift / 1000).toFixed(1)} s earlier to land on a keyframe.</p>}
@@ -578,14 +585,14 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
           <div className={styles.progress}>
             <Meter value={job.progress} label="Export progress" />
             <span className={styles.progressMsg}>{job.message || "Exporting…"}</span>
-            <Button size="sm" variant="secondary" onClick={() => void JobsService.Cancel(job.id).catch(() => undefined)}>
+            <Button size="sm" variant="secondary" data-tip="Stop exporting" onClick={() => void JobsService.Cancel(job.id).catch(() => undefined)}>
               Cancel
             </Button>
           </div>
         ) : (
           <>
-            <span className={styles.summary}>{source ? summaryText(segs, settings, info?.sizeBytes ?? 0, durationMs) : "Waiting for the file…"}</span>
-            <Button variant="primary" icon="scissors" kbd="Mod+Enter" loading={submitting} disabled={!canExport} title={err ?? undefined} onClick={() => void doExport()}>
+            <span className={styles.summary} data-tip="What the export will produce: segments, total length and estimated size">{source ? summaryText(segs, settings, info?.sizeBytes ?? 0, durationMs) : "Waiting for the file…"}</span>
+            <Button variant="primary" icon="scissors" kbd="Mod+Enter" loading={submitting} disabled={!canExport} data-tip={err ?? "Cut the segments and save the result to your library"} onClick={() => void doExport()}>
               Export
             </Button>
           </>

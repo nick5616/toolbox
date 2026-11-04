@@ -2,13 +2,13 @@ import { useState } from "react";
 import { Button, Field, Icon, SegmentedControl, Select, Switch, TextField, cx, toast } from "@/components";
 import { FilesService, type ProjectInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
-import { CAROUSEL_ASPECTS, FORMAT_LABELS, defaultPostName, type PostFormat } from "./logic";
+import { CAROUSEL_ASPECTS, FORMAT_LABELS, FORMAT_TIPS, defaultPostName, type PostFormat } from "./logic";
 import { folderBaseName } from "./pool";
 import { Modal } from "./Modal";
 import { ProjectThumb } from "./ProjectThumb";
 import styles from "./dialogs.module.css";
 
-const FORMAT_OPTIONS = (Object.keys(FORMAT_LABELS) as PostFormat[]).map((value) => ({ value, label: FORMAT_LABELS[value] }));
+const FORMAT_OPTIONS = (Object.keys(FORMAT_LABELS) as PostFormat[]).map((value) => ({ value, label: FORMAT_LABELS[value], tip: FORMAT_TIPS[value] }));
 
 export interface NewPostDialogProps {
   /** Files that will become the first slides of an empty post. */
@@ -61,13 +61,13 @@ export function NewPostDialog({ fileCount, onPickFiles, onCreate, onCreateFromFo
         onChange={setMode}
         aria-label="Start from"
         options={[
-          { value: "folder", label: "From a folder" },
-          { value: "empty", label: "Empty post" },
+          { value: "folder", label: "From a folder", tip: "Use every photo and clip in a folder as the pool to build slides from" },
+          { value: "empty", label: "Empty post", tip: "Start with no slides and add them yourself" },
         ]}
       />
       {fromFolder ? (
         <div className={styles.files}>
-          <Button size="sm" variant="primary" icon="folder-open" onClick={() => void pickFolder()}>
+          <Button size="sm" variant="primary" icon="folder-open" data-tip="Choose the folder with your photos and clips" onClick={() => void pickFolder()}>
             {folder ? "Change folder…" : "From a folder…"}
           </Button>
           {folder ? (
@@ -77,11 +77,11 @@ export function NewPostDialog({ fileCount, onPickFiles, onCreate, onCreateFromFo
           ) : (
             <span className={styles.note}>Every photo and clip in the folder becomes a source you can use in any slide. Your files are not changed.</span>
           )}
-          <Switch checked={subfolders} onChange={setSubfolders} label="Include subfolders" aria-label="Include subfolders" />
+          <Switch checked={subfolders} onChange={setSubfolders} label="Include subfolders" aria-label="Include subfolders" tip="Also list photos and clips inside folders within the chosen folder" />
         </div>
       ) : (
         <div className={styles.files}>
-          <Button size="sm" variant="secondary" icon="plus" onClick={onPickFiles}>
+          <Button size="sm" variant="secondary" icon="plus" data-tip="Pick photos and clips to start the post with, one slide each" onClick={onPickFiles}>
             Add photos and clips…
           </Button>
           {fileCount > 0 && (
@@ -95,6 +95,7 @@ export function NewPostDialog({ fileCount, onPickFiles, onCreate, onCreateFromFo
         {(c) => (
           <TextField
             {...c}
+            data-tip="A name for you to recognise this post by; it is not posted to Instagram"
             value={name}
             onChange={(e) => {
               setName(e.target.value);
@@ -108,7 +109,7 @@ export function NewPostDialog({ fileCount, onPickFiles, onCreate, onCreateFromFo
       </Field>
       {format === "carousel" ? (
         <Field label="Shape" hint="The first slide's shape applies to every slide.">
-          {(c) => <Select id={c.id} value={aspect} onChange={setAspect} options={CAROUSEL_ASPECTS.map((a) => ({ value: a.value, label: a.label }))} />}
+          {(c) => <Select id={c.id} data-tip="Frame shape for every slide: 4:5 portrait is the tallest feed shape, 1:1 square, 1.91:1 landscape" value={aspect} onChange={setAspect} options={CAROUSEL_ASPECTS.map((a) => ({ value: a.value, label: a.label }))} />}
         </Field>
       ) : (
         <p className={styles.note}>{format === "reel" ? "A reel is one 9:16 video, up to 3 minutes." : "Stories are 9:16 slides; a video slide can run up to 60 seconds."}</p>
@@ -130,7 +131,7 @@ export function NameDialog({ title, initial, confirmLabel, onConfirm, onClose }:
   const trimmed = name.trim();
   return (
     <Modal title={title} confirmLabel={confirmLabel} confirmDisabled={!trimmed} onConfirm={() => onConfirm(trimmed)} onClose={onClose}>
-      <Field label="Name">{(c) => <TextField {...c} value={name} onChange={(e) => setName(e.target.value)} />}</Field>
+      <Field label="Name">{(c) => <TextField {...c} data-tip="New name for this post" value={name} onChange={(e) => setName(e.target.value)} />}</Field>
     </Modal>
   );
 }
@@ -153,7 +154,7 @@ export function ProjectPickerDialog({ title, projects, emptyText, onPick, onClos
         <ul className={styles.grid} aria-label={title}>
           {projects.map((p) => (
             <li key={p.id}>
-              <button type="button" className={styles.card} onClick={() => onPick(p)} aria-label={p.name}>
+              <button type="button" className={styles.card} onClick={() => onPick(p)} aria-label={p.name} data-tip="Use this project as a slide">
                 <ProjectThumb project={p} className={styles.cardThumb} />
                 <span className={styles.cardName}>{p.name}</span>
               </button>
@@ -186,6 +187,7 @@ export function PostChoice({ posts, value, onChange }: PostChoiceProps) {
           role="radio"
           aria-checked={value === r.id}
           className={cx(styles.choice, value === r.id && styles.choiceOn)}
+          data-tip={r.id === "new" ? "Start a new post containing these files" : "Add these files to this post"}
           onClick={() => onChange(r.id)}
         >
           <Icon name={r.icon} size={14} />

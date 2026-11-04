@@ -41,7 +41,7 @@ export function SlideStage({ slide, format, aspect, project, limits, onChange, o
         {pending ? (
           <div className={styles.pending}>
             <p>{slide.kind === "composition" ? "This composition isn't made yet." : "This video isn't made yet."}</p>
-            <Button variant="primary" icon="pencil" onClick={onEdit}>
+            <Button variant="primary" icon="pencil" data-tip={slide.kind === "composition" ? "Open Photo Composer to design this slide" : "Open Video Editor to make this slide"} onClick={onEdit}>
               {slide.kind === "composition" ? "Make it in Photo Composer" : "Make it in Video Editor"}
             </Button>
           </div>
@@ -69,23 +69,23 @@ export function SlideStage({ slide, format, aspect, project, limits, onChange, o
       <div className={styles.controls}>
         {framable && !pending && (
           <>
-            <label className={styles.zoom}>
+            <label className={styles.zoom} data-tip="Zoom into the picture to choose what shows in the frame (or scroll over it)">
               <span className={styles.label}>Zoom</span>
               <Slider aria-label="Zoom" min={1} max={4} step={0.01} value={slide.zoom} onChange={(v) => onChange({ zoom: clampZoom(v) })} format={(v) => `${v.toFixed(2)}×`} />
             </label>
-            <IconButton icon="rotate-ccw" label="Rotate left" onClick={() => rotate(-1)} />
-            <IconButton icon="rotate-cw" label="Rotate right" onClick={() => rotate(1)} />
-            <Button size="sm" variant="ghost" onClick={reset} disabled={slide.zoom === 1 && slide.panX === 0 && slide.panY === 0 && slide.rotation === 0}>
+            <IconButton icon="rotate-ccw" label="Rotate left" data-tip="Turn the picture 90 degrees counter-clockwise" onClick={() => rotate(-1)} />
+            <IconButton icon="rotate-cw" label="Rotate right" data-tip="Turn the picture 90 degrees clockwise" onClick={() => rotate(1)} />
+            <Button size="sm" variant="ghost" data-tip="Undo zoom, position and rotation so the picture fills the frame again" onClick={reset} disabled={slide.zoom === 1 && slide.panX === 0 && slide.panY === 0 && slide.rotation === 0}>
               Reset framing
             </Button>
           </>
         )}
         {isProject && !pending && (
-          <Button icon="pencil" onClick={onEdit}>
+          <Button icon="pencil" data-tip={slide.kind === "composition" ? "Open this composition in Photo Composer" : "Open this video in Video Editor"} onClick={onEdit}>
             Edit {slide.kind === "composition" ? "composition" : "video"}
           </Button>
         )}
-        {isProject && !pending && project && <span className={styles.projectName}>{project.name}</span>}
+        {isProject && !pending && project && <span className={styles.projectName} data-tip="The saved project behind this slide">{project.name}</span>}
       </div>
 
       {isClip && <ClipControls slide={slide} format={format} limits={limits} onChange={onChange} onSeek={setStillMs} />}
@@ -168,17 +168,17 @@ function ClipControls({
             }}
           />
           <div className={styles.trimRow}>
-            <Button size="sm" variant="secondary" onClick={() => onChange({ inMs: Math.min(Math.round(now()), Math.max(0, slide.outMs - 100)) })}>
+            <Button size="sm" variant="secondary" data-tip="Start the clip at the current playback position" onClick={() => onChange({ inMs: Math.min(Math.round(now()), Math.max(0, slide.outMs - 100)) })}>
               Set In
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => onChange({ outMs: Math.max(Math.round(now()), slide.inMs + 100) })}>
+            <Button size="sm" variant="secondary" data-tip="End the clip at the current playback position" onClick={() => onChange({ outMs: Math.max(Math.round(now()), slide.inMs + 100) })}>
               Set Out
             </Button>
-            <span className={styles.mono} data-testid="clip-range">
+            <span className={styles.mono} data-testid="clip-range" data-tip="Where the clip starts and ends in the source video, and how long it will be">
               {formatMs(slide.inMs)} – {formatMs(slide.outMs)} ({(length / 1000).toFixed(1)} s)
             </span>
             <span className={styles.spacer} />
-            <Switch checked={slide.mute} onChange={(mute) => onChange({ mute })} label="Mute" />
+            <Switch checked={slide.mute} onChange={(mute) => onChange({ mute })} label="Mute" tip="Export this clip without its sound" />
           </div>
           {length > limit && (
             <Banner tone="warn" title={`Over the ${limit / 1000} s limit`}>

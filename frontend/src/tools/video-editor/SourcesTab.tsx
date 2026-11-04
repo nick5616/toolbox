@@ -33,10 +33,10 @@ export function SourcesTab({ postId, onAdd }: { postId: string; onAdd: (paths: s
   return (
     <div className={styles.sourcesTab}>
       <div className={styles.sourcesBar}>
-        <Button size="sm" icon="refresh-cw" loading={loading} onClick={() => void load()}>
+        <Button size="sm" icon="refresh-cw" data-tip="Reload the list of photos and videos in this post" loading={loading} onClick={() => void load()}>
           Refresh
         </Button>
-        <Button size="sm" disabled={selected.size === 0} onClick={() => onAdd(sources.filter((s) => selected.has(s.path)).map((s) => s.path))}>
+        <Button size="sm" data-tip={selected.size === 0 ? "Select one or more sources first" : "Add the selected sources to the end of the timeline"} disabled={selected.size === 0} onClick={() => onAdd(sources.filter((s) => selected.has(s.path)).map((s) => s.path))}>
           Add selected
         </Button>
       </div>

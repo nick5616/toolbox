@@ -174,7 +174,7 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width,
   if (collapsed) {
     return (
       <aside className={styles.collapsed} aria-label="Sources (hidden)">
-        <IconButton icon="chevron-right" label="Show sources" size="sm" onClick={() => onCollapsed(false)} />
+        <IconButton icon="chevron-right" label="Show sources" data-tip="Open the panel with the photos and clips for this post" size="sm" onClick={() => onCollapsed(false)} />
         <span className={styles.vertical}>Sources</span>
       </aside>
     );
@@ -187,13 +187,13 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width,
   return (
     <aside ref={rootRef} className={styles.root} style={{ width }} aria-label="Sources">
       <header className={styles.head}>
-        <h2 className={styles.title}>
-          Sources <span className={styles.count}>{sources.length}</span>
+        <h2 className={styles.title} data-tip="All the photos and clips you can use in this post">
+          Sources <span className={styles.count} data-tip="Number of sources">{sources.length}</span>
         </h2>
         {loading && <Spinner />}
         <span className={styles.spacer} />
-        <IconButton icon="refresh-cw" label="Refresh sources" size="sm" onClick={() => setTick((t) => t + 1)} />
-        <IconButton icon="chevron-left" label="Hide sources" size="sm" onClick={() => onCollapsed(true)} />
+        <IconButton icon="refresh-cw" label="Refresh sources" data-tip="Look in the folder again for new or changed files" size="sm" onClick={() => setTick((t) => t + 1)} />
+        <IconButton icon="chevron-left" label="Hide sources" data-tip="Collapse this panel to give the slides more room" size="sm" onClick={() => onCollapsed(true)} />
       </header>
 
       <div className={styles.folder}>
@@ -203,14 +203,14 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width,
             {doc.subfolders ? " (with subfolders)" : ""}
           </span>
         ) : (
-          <span className={styles.path}>No folder</span>
+          <span className={styles.path} data-tip="Choose a folder to list its photos and clips here">No folder</span>
         )}
       </div>
       <div className={styles.row}>
-        <Button size="sm" variant="secondary" icon="folder-open" onClick={() => void changeFolder()}>
+        <Button size="sm" variant="secondary" icon="folder-open" data-tip="Choose the folder whose photos and clips fill this panel; files are not moved or changed" onClick={() => void changeFolder()}>
           {doc.folder ? "Change folder…" : "Choose folder…"}
         </Button>
-        <Button size="sm" variant="secondary" icon="plus" onClick={() => void addFiles()}>
+        <Button size="sm" variant="secondary" icon="plus" data-tip="Add individual photos or clips that are not in the folder" onClick={() => void addFiles()}>
           Add files…
         </Button>
       </div>
@@ -223,15 +223,15 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width,
       )}
 
       <div className={styles.controls}>
-        <TextField placeholder="Search" aria-label="Search sources" value={view.search} onChange={(e) => setView({ ...view, search: e.target.value })} />
+        <TextField placeholder="Search" aria-label="Search sources" data-tip="Type part of a file name to filter the sources" value={view.search} onChange={(e) => setView({ ...view, search: e.target.value })} />
         <div className={styles.row}>
-          <Select size="sm" aria-label="Sort sources" value={view.sort} onChange={(sort) => setView({ ...view, sort })} options={SORTS} />
-          <Select size="sm" aria-label="Show sources" value={view.filter} onChange={(filter) => setView({ ...view, filter })} options={FILTERS} />
+          <Select size="sm" aria-label="Sort sources" data-tip={view.sort === "taken" ? "Sorted by when each photo or clip was taken" : "Sorted by file name"} value={view.sort} onChange={(sort) => setView({ ...view, sort })} options={SORTS} />
+          <Select size="sm" aria-label="Show sources" data-tip="Show all sources, only photos, only clips, or only those not used in a slide yet" value={view.filter} onChange={(filter) => setView({ ...view, filter })} options={FILTERS} />
         </div>
       </div>
 
       <div className={styles.actions}>
-        <Button size="sm" variant="primary" disabled={!canAdd} onClick={() => onAddSlides(selectedInGrid.map((s) => s.path))}>
+        <Button size="sm" variant="primary" data-tip={canAdd ? "Add each selected source to the post as its own slide" : "Select photos or clips in the grid first"} disabled={!canAdd} onClick={() => onAddSlides(selectedInGrid.map((s) => s.path))}>
           Add as slides{canAdd ? ` (${selectedInGrid.length})` : ""}
         </Button>
         <Tooltip label={collageWhy || "Put the selected photos in one composition"}>
@@ -248,7 +248,7 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width,
             </Button>
           </span>
         </Tooltip>
-        <Button size="sm" variant="ghost" icon="eye-off" disabled={!canAdd} onClick={hide}>
+        <Button size="sm" variant="ghost" icon="eye-off" data-tip={canAdd ? "Hide the selected sources from this panel; files are untouched and can be shown again" : "Select photos or clips in the grid first"} disabled={!canAdd} onClick={hide}>
           Hide
         </Button>
       </div>
@@ -267,7 +267,7 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width,
 
       {doc.hidden.length > 0 && (
         <div className={styles.hidden}>
-          <button type="button" className={styles.link} aria-expanded={showHidden} onClick={() => setShowHidden((v) => !v)}>
+          <button type="button" className={styles.link} aria-expanded={showHidden} data-tip="Sources you hid from this panel" onClick={() => setShowHidden((v) => !v)}>
             {showHidden ? "Hide the hidden list" : `Show hidden (${doc.hidden.length})`}
           </button>
           {showHidden && (
@@ -275,7 +275,7 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width,
               {doc.hidden.map((p) => (
                 <li key={p}>
                   <span title={p}>{fileName(p)}</span>
-                  <Button size="sm" variant="ghost" onClick={() => restore(p)} aria-label={`Show ${fileName(p)}`}>
+                  <Button size="sm" variant="ghost" data-tip="Put this source back in the panel" onClick={() => restore(p)} aria-label={`Show ${fileName(p)}`}>
                     Show
                   </Button>
                 </li>
@@ -285,7 +285,7 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width,
         </div>
       )}
 
-      <div className={styles.handle} role="separator" aria-orientation="vertical" aria-label="Resize sources" tabIndex={0} onPointerDown={startResize} onKeyDown={resizeKey} />
+      <div className={styles.handle} role="separator" aria-orientation="vertical" aria-label="Resize sources" data-tip="Drag to make the panel wider or narrower (or use the arrow keys)" tabIndex={0} onPointerDown={startResize} onKeyDown={resizeKey} />
 
       {dialog === "collage" && (
         <CollageDialog

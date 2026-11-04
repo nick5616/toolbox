@@ -102,7 +102,7 @@ export function LayersPanel({ layers, selectedId, busyIds, busyLabels, multi, on
   };
 
   if (display.length === 0) {
-    return <p className={styles.empty}>No layers yet. Add a photo or some text.</p>;
+    return <p className={styles.empty} data-tip="Use Add photo or Add text in the toolbar">No layers yet. Add a photo or some text.</p>;
   }
 
   const lineBefore = drag?.active ? (() => {
@@ -133,6 +133,7 @@ export function LayersPanel({ layers, selectedId, busyIds, busyLabels, multi, on
               size="sm"
               autoFocus
               aria-label="Layer name"
+              data-tip="New layer name; press Enter to keep it"
               defaultValue={l.name}
               wrapperClassName={styles.rename}
               onBlur={(e) => {
@@ -146,21 +147,21 @@ export function LayersPanel({ layers, selectedId, busyIds, busyLabels, multi, on
               }}
             />
           ) : (
-            <span className={styles.name} onDoubleClick={() => setRenaming(l.id)} title="Double-click to rename">
+            <span className={styles.name} onDoubleClick={() => setRenaming(l.id)} title="Click to select (Ctrl or Shift for several), drag to reorder, double-click to rename">
               {l.name}
             </span>
           )}
           {busyIds.has(l.id) && (
             <>
               {busyLabels?.[l.id] && <span className={styles.busyLabel}>{busyLabels[l.id]}</span>}
-              <Spinner size={14} label="Removing background" />
+              <span data-tip="Cutting out the subject" style={{ display: "contents" }}><Spinner size={14} label="Removing background" /></span>
             </>
           )}
           <span className={styles.actions}>
-            <IconButton size="sm" icon={l.hidden ? "eye-off" : "eye"} label={l.hidden ? "Show layer" : "Hide layer"} onClick={() => onPatch(l.id, { hidden: !l.hidden })} />
-            <IconButton size="sm" icon="lock" label={l.locked ? "Unlock layer" : "Lock layer"} pressed={l.locked} onClick={() => onPatch(l.id, { locked: !l.locked })} />
-            <IconButton size="sm" icon="copy" label="Duplicate layer" onClick={() => onDuplicate(l.id)} />
-            <IconButton size="sm" icon="trash-2" label="Delete layer" onClick={() => onDelete(l.id)} />
+            <IconButton size="sm" icon={l.hidden ? "eye-off" : "eye"} label={l.hidden ? "Show layer" : "Hide layer"} data-tip={l.hidden ? "Show this layer on the canvas again" : "Hide this layer from the canvas and the export"} onClick={() => onPatch(l.id, { hidden: !l.hidden })} />
+            <IconButton size="sm" icon="lock" label={l.locked ? "Unlock layer" : "Lock layer"} data-tip={l.locked ? "Allow this layer to be moved and edited again" : "Stop this layer from being moved by accident"} pressed={l.locked} onClick={() => onPatch(l.id, { locked: !l.locked })} />
+            <IconButton size="sm" icon="copy" label="Duplicate layer" data-tip="Make a copy of this layer" kbd="Ctrl+D" onClick={() => onDuplicate(l.id)} />
+            <IconButton size="sm" icon="trash-2" label="Delete layer" data-tip="Remove this layer from the composition" kbd="Delete" onClick={() => onDelete(l.id)} />
           </span>
         </li>
       ))}

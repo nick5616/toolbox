@@ -79,6 +79,7 @@ export function FramedMedia({ url, aspect, framing, onFraming, placeholderIcon =
       className={cx(styles.frame, fit && styles.fit, interactive && styles.interactive, className)}
       style={style}
       data-testid="framed-media"
+      data-tip={interactive ? "Drag to move the picture inside the frame, scroll to zoom" : undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}

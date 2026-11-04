@@ -48,10 +48,10 @@ const TITLE_ROW_H = 24;
 const DRAG_START_PX = 4;
 
 const TRANSITION_OPTIONS = [
-  { value: "cut", label: "Cut" },
-  { value: "fade", label: "Fade" },
-  { value: "dip", label: "Dip" },
-  { value: "slide", label: "Slide" },
+  { value: "cut", label: "Cut", tip: "Jump straight to the next clip with no transition" },
+  { value: "fade", label: "Fade", tip: "Cross-fade: the clips blend into each other" },
+  { value: "dip", label: "Dip", tip: "Dip to black between the clips" },
+  { value: "slide", label: "Slide", tip: "The next clip slides in over the previous one" },
 ] as const;
 
 const TRANSITION_ICON: Record<string, string> = { cut: "scissors", fade: "blend", dip: "moon", slide: "arrow-right" };
@@ -332,19 +332,19 @@ export function TimelinePanel(p: TimelinePanelProps) {
   return (
     <div className={styles.panel} data-testid="timeline-panel">
       <div className={styles.toolbar}>
-        <Button size="sm" variant="ghost" icon="plus" onClick={p.onAddClips}>
+        <Button size="sm" variant="ghost" icon="plus" data-tip="Add videos or photos to the end of the timeline" onClick={p.onAddClips}>
           Clips
         </Button>
-        <Button size="sm" variant="ghost" icon="type" onClick={p.onAddTitle} disabled={clips.length === 0}>
+        <Button size="sm" variant="ghost" icon="type" data-tip={clips.length === 0 ? "Add a clip first, then add text on top of it" : "Add a text title at the playhead"} onClick={p.onAddTitle} disabled={clips.length === 0}>
           Title
         </Button>
-        <Button size="sm" variant="ghost" icon="music" onClick={p.onPickMusic}>
+        <Button size="sm" variant="ghost" icon="music" data-tip={music ? "Replace the background song" : "Add a background song under the whole video"} onClick={p.onPickMusic}>
           {music ? "Change song" : "Song"}
         </Button>
         <span className={styles.spacer} />
-        <IconButton size="sm" icon="zoom-out" label="Zoom out" onClick={() => setPps((v) => clampPps(v / 1.4))} />
-        <IconButton size="sm" icon="zoom-in" label="Zoom in" onClick={() => setPps((v) => clampPps(v * 1.4))} />
-        <IconButton size="sm" icon="maximize" label="Fit the whole video" onClick={fit} />
+        <IconButton size="sm" icon="zoom-out" label="Zoom out" data-tip="Show more time on the timeline (Ctrl + scroll also zooms)" onClick={() => setPps((v) => clampPps(v / 1.4))} />
+        <IconButton size="sm" icon="zoom-in" label="Zoom in" data-tip="Show less time, larger clips (Ctrl + scroll also zooms)" onClick={() => setPps((v) => clampPps(v * 1.4))} />
+        <IconButton size="sm" icon="maximize" label="Fit the whole video" data-tip="Zoom so the whole video fits the timeline" onClick={fit} />
       </div>
       <div className={styles.scroller} ref={scroller}>
         <div
@@ -359,7 +359,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
           onPointerUp={onRulerUp}
           onPointerCancel={onRulerUp}
         >
-          <div className={styles.ruler} onPointerDown={onRulerDown} onPointerMove={onRulerMove} onPointerUp={onRulerUp} onPointerCancel={onRulerUp} data-testid="ruler">
+          <div className={styles.ruler} onPointerDown={onRulerDown} onPointerMove={onRulerMove} onPointerUp={onRulerUp} onPointerCancel={onRulerUp} data-testid="ruler" data-tip="Click or drag to move the playhead">
             {ticks.map((s) => (
               <span key={s} className={styles.tick} style={{ left: s * pps }}>
                 {formatMs(s * 1000)}
@@ -367,7 +367,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
             ))}
           </div>
 
-          <div className={cx(styles.lane, styles.clipLane)} data-testid="clips-lane" ref={clipLane}>
+          <div className={cx(styles.lane, styles.clipLane)} data-testid="clips-lane" ref={clipLane} data-tip="Clips lane: drag to reorder, drag edges to trim, drop post sources here">
             {clips.map((c, i) => {
               const s = spans[i];
               if (!s) return null;
@@ -385,6 +385,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
                   role="button"
                   tabIndex={0}
                   aria-label={`Clip ${i + 1}`}
+                  data-tip={`${c.path.split(/[\/]/).pop()}: click to select, drag to reorder, drag the edges to trim`}
                   aria-pressed={selected}
                   data-testid={`clip-${i}`}
                   className={cx(styles.clip, selected && styles.selected, info?.error && styles.missing)}
@@ -405,8 +406,8 @@ export function TimelinePanel(p: TimelinePanelProps) {
                   <span className={styles.clipLabel}>
                     {c.path.split(/[\\/]/).pop()} · {(s.lenMs / 1000).toFixed(1)}s{c.speed !== 1 ? ` · ${c.speed}×` : ""}
                   </span>
-                  <div className={cx(styles.handle, styles.handleStart)} data-testid={`trim-start-${i}`} onPointerDown={(e) => onTrimDown(e, i, "start")} />
-                  <div className={cx(styles.handle, styles.handleEnd)} data-testid={`trim-end-${i}`} onPointerDown={(e) => onTrimDown(e, i, "end")} />
+                  <div className={cx(styles.handle, styles.handleStart)} data-tip="Drag to trim where the clip starts" data-testid={`trim-start-${i}`} onPointerDown={(e) => onTrimDown(e, i, "start")} />
+                  <div className={cx(styles.handle, styles.handleEnd)} data-tip="Drag to trim where the clip ends" data-testid={`trim-end-${i}`} onPointerDown={(e) => onTrimDown(e, i, "end")} />
                 </div>
               );
             })}
@@ -427,6 +428,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
                   className={cx(styles.chip, kind !== "cut" && styles.chipOn)}
                   style={{ left: (nx.startMs + s.overlapMs / 2) * ppms }}
                   aria-label={`Transition after clip ${i + 1}: ${kind}`}
+                  data-tip={`Transition between clip ${i + 1} and ${i + 2} (${kind}): click to change it`}
                   data-testid={`transition-${i}`}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
@@ -443,7 +445,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
             {clips.length === 0 && <div className={styles.laneEmpty}>Drop clips and photos here, or use + Clips</div>}
           </div>
 
-          <div className={cx(styles.lane, styles.titleLane)} style={{ height: rowCount * TITLE_ROW_H + 8 }} data-testid="titles-lane">
+          <div className={cx(styles.lane, styles.titleLane)} style={{ height: rowCount * TITLE_ROW_H + 8 }} data-testid="titles-lane" data-tip="Titles lane: text shown over the video at these times">
             {titles.map((t) => {
               const selected = selection?.kind === "title" && selection.id === t.id;
               return (
@@ -451,6 +453,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
                   key={t.id}
                   className={cx(styles.title, selected && styles.selected)}
                   data-testid={`title-${t.id}`}
+                  data-tip="Title: drag to move it in time, drag the edges to change how long it shows, double-click to edit the text"
                   style={{ left: t.startMs * ppms, width: Math.max(10, t.durationMs * ppms), top: 4 + (rows.get(t.id) ?? 0) * TITLE_ROW_H, height: TITLE_ROW_H - 4 }}
                   onPointerDown={(e) => onTitleDown(e, t, "move")}
                   onPointerMove={onTitleMove}
@@ -459,15 +462,15 @@ export function TimelinePanel(p: TimelinePanelProps) {
                   onDoubleClick={() => p.onEditTitle(t.id)}
                 >
                   <span className={styles.titleText}>{t.text}</span>
-                  <div className={cx(styles.handle, styles.handleStart)} onPointerDown={(e) => onTitleDown(e, t, "start")} />
-                  <div className={cx(styles.handle, styles.handleEnd)} onPointerDown={(e) => onTitleDown(e, t, "end")} />
+                  <div className={cx(styles.handle, styles.handleStart)} data-tip="Drag to change when the title appears" onPointerDown={(e) => onTitleDown(e, t, "start")} />
+                  <div className={cx(styles.handle, styles.handleEnd)} data-tip="Drag to change when the title disappears" onPointerDown={(e) => onTitleDown(e, t, "end")} />
                 </div>
               );
             })}
             {titles.length === 0 && <div className={styles.laneEmpty}>Titles appear here</div>}
           </div>
 
-          <div className={cx(styles.lane, styles.musicLane)} data-testid="music-lane">
+          <div className={cx(styles.lane, styles.musicLane)} data-testid="music-lane" data-tip="Music lane: the background song under the video">
             {music ? (
               <div
                 className={cx(styles.music, selection?.kind === "music" && styles.selected)}
@@ -479,6 +482,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
                 role="button"
                 tabIndex={0}
                 aria-label="Music"
+                data-tip="Song: drag sideways to choose which part of it plays"
               >
                 {musicPeaks.length > 0 && <Waveform peaks={musicPeaks} height={36} className={styles.wave} />}
                 <span className={styles.clipLabel}>{music.path.split(/[\\/]/).pop()}</span>
@@ -490,7 +494,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
 
           <div className={styles.playhead} style={{ left: Math.min(timeMs, totalMs) * ppms }} data-testid="playhead">
             {/* Drag the playhead (its head or anywhere along the line). */}
-            <div className={styles.playheadGrip} title="Drag to move the playhead" onPointerDown={onRulerDown} onPointerMove={onRulerMove} onPointerUp={onRulerUp} onPointerCancel={onRulerUp} />
+            <div className={styles.playheadGrip} data-tip="Drag to move the playhead" onPointerDown={onRulerDown} onPointerMove={onRulerMove} onPointerUp={onRulerUp} onPointerCancel={onRulerUp} />
           </div>
         </div>
       </div>
@@ -511,6 +515,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
               }}
             />
             {popClip.transition.kind !== "cut" && popLimit >= MIN_TRANSITION_MS && (
+              <span data-tip="How long the transition lasts (limited by the shorter clip)" style={{ display: "contents" }}>
               <Slider
                 aria-label="Transition length"
                 min={MIN_TRANSITION_MS}
@@ -520,6 +525,7 @@ export function TimelinePanel(p: TimelinePanelProps) {
                 format={(v) => `${(v / 1000).toFixed(2)} s`}
                 onChange={(v) => p.onChange(setTransition(doc, popover.index, popClip.transition.kind, v), `tr-${popover.index}`)}
               />
+              </span>
             )}
             {popLimit < MIN_TRANSITION_MS && <div className={styles.popNote}>These clips are too short for a transition.</div>}
           </div>

@@ -258,6 +258,7 @@ export function Stage(props: StageProps) {
         tabIndex={0}
         data-testid="composer-stage"
         aria-label="Canvas"
+        data-tip="Click a layer to select it; drag to move, corners to resize, the top circle to rotate; double-click text to edit; scroll to zoom"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
@@ -312,7 +313,7 @@ export function Stage(props: StageProps) {
           if (!l) return null;
           const box = layerBox(doc, l, sizer);
           return (
-            <span key={id} data-stage-ui>
+            <span key={id} data-stage-ui data-tip="Cutting out the subject, this takes a moment">
               <span
                 className={styles.shimmer}
                 data-testid="cutting-shimmer"
@@ -335,6 +336,7 @@ export function Stage(props: StageProps) {
             data-stage-ui
             className={styles.editor}
             aria-label="Edit text"
+            data-tip="Type the text; click outside to finish"
             autoFocus
             value={editing.text.text}
             style={{
