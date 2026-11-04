@@ -1,0 +1,48 @@
+/* The header line: Posts chip, save state | spacer | undo redo ⋯ Export. Never wraps. */
+.bar {
+  container: toolbar-compact / inline-size;
+  display: flex;
+  flex: 1;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.posts {
+  flex: 0 1 240px;
+  min-width: 0;
+  width: auto;
+}
+
+.save {
+  flex: none;
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.save[data-state="error"] {
+  color: var(--danger);
+}
+
+.progress {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.progress > :first-child {
+  flex: 1;
+}
+
+.progressMsg {
+  overflow: hidden;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

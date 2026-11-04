@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Banner, Button, IconButton, MenuButton, Slider, Spinner, Switch } from "@/components";
+import { Banner, Button, IconButton, Slider, Spinner, Switch } from "@/components";
 import { MediaPlayer, Timeline, formatMs, useMediaSource, type Marker, type MediaPlayerHandle, type Range } from "@/components/media";
 import type { PostLimits, PostSlide, ProjectInfo } from "@/lib/api";
 import { FramedMedia } from "./FramedMedia";
@@ -44,7 +44,6 @@ export function FramingPanel({ slide, onChange }: { slide: PostSlide; onChange: 
 
 export function SlideStage({ slide, aspect, project, onChange, onEdit, stillMs }: SlideStageProps) {
   const isClip = slide.kind === "clip";
-  const isProject = slide.kind === "composition" || slide.kind === "video";
   const stillSlide = useMemo(() => (isClip ? { ...slide, inMs: stillMs } : slide), [slide, isClip, stillMs]);
   const visual = useSlideVisual(stillSlide, project, 1280);
   const framable = slide.kind !== "video";
@@ -85,20 +84,6 @@ export function SlideStage({ slide, aspect, project, onChange, onEdit, stillMs }
         </Banner>
       )}
 
-      {isProject && !pending && (
-        <div className={styles.controls}>
-          <MenuButton
-            size="sm"
-            icon="pencil"
-            label={slide.kind === "composition" ? "Edit composition" : "Edit video"}
-            tip={project ? `Edit "${project.name}"` : slide.kind === "composition" ? "Open this composition in Photo Composer" : "Open this video in the Sequence Editor"}
-            items={() => [
-              { id: "edit-here", label: "Edit here", icon: "pencil", tip: slide.kind === "composition" ? "Open Photo Composer in this window" : "Open the Sequence Editor in this window", onSelect: () => onEdit("here") },
-              { id: "edit-window", label: "Edit in its own window", icon: "app-window", tip: "Open the editor in a separate window; this post refreshes when you close it", onSelect: () => onEdit("window") },
-            ]}
-          />
-        </div>
-      )}
     </section>
   );
 }
