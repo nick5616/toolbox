@@ -3,7 +3,8 @@ import { Button, ClickInHost, DropZone, FileList, Icon, Section, cx } from "@/co
 import { PdfAction, PdfService } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 import { JobRow } from "@/shell/JobRow";
-import { isActive, useOrderedJobs } from "@/state/jobs";
+import { isActive } from "@/state/jobs";
+import { useToolJobs } from "@/tools/_kit/session";
 import { useModules } from "@/state/modules";
 import { useModuleOptions, useFileInputs } from "@/tools/_kit";
 import { DepsGate } from "@/tools/_kit/DepsGate";
@@ -47,7 +48,7 @@ export default function PdfView({ moduleId }: ToolViewProps) {
   const inputs = useFileInputs(moduleId);
   const [ui, setUi, loaded] = useModuleOptions(moduleId, DEFAULT_PDF_UI, sanitizePdfUi);
   const mod = useModules((s) => s.byId[moduleId]);
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
   const active = jobs.filter(isActive);
   const [password, setPassword] = useState("");
   const [order, setOrder] = useState<string[]>([]);

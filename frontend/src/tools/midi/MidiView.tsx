@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Badge, Button, EmptyState, Field, Icon, SegmentedControl, Section, Slider, Stepper, Switch, cx } from "@/components";
 import { JobStatus, MidiRange, MidiService } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
-import { useOrderedJobs } from "@/state/jobs";
+import { useToolJobs } from "@/tools/_kit/session";
 import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
@@ -19,7 +19,7 @@ export default function MidiView({ moduleId }: ToolViewProps) {
   const [opts, setOpts] = useModuleOptions(moduleId, DEFAULT_MIDI_OPTIONS, sanitizeMidiOptions);
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
   const done = useMemo(
     () => jobs.filter((j) => j.status === JobStatus.JobDone).slice(0, MAX_RESULTS),
     [jobs],

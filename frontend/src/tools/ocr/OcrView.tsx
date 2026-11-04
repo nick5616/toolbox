@@ -11,7 +11,7 @@ import {
 } from "@/lib/api";
 import { copyText } from "@/lib/copy";
 import { toAppError } from "@/lib/errors";
-import { useOrderedJobs } from "@/state/jobs";
+import { useToolJobs } from "@/tools/_kit/session";
 import { FileActions, FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import type { ToolViewProps } from "../index";
@@ -76,7 +76,7 @@ export default function OcrView({ moduleId }: ToolViewProps) {
   const [languages, setLanguages] = useState<OcrLanguageInfo[]>([]);
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
 
   useEffect(() => {
     let cancelled = false;

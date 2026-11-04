@@ -116,3 +116,62 @@ describe("ClickIn", () => {
     expect(screen.getByText("is open")).toBeTruthy();
   });
 });
+
+describe("ClickIn inline hosts", () => {
+  it("expands in place with no dialog or portal", async () => {
+    const user = userEvent.setup();
+    render(
+      <ClickInHost mode="inline">
+        <ClickIn icon="gauge" title="Speed">
+          <p>speed content</p>
+        </ClickIn>
+      </ClickInHost>,
+    );
+    await user.click(screen.getByRole("button", { name: /Speed/ }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const group = screen.getByRole("group", { name: "Speed" });
+    expect(group.textContent).toContain("speed content");
+    expect(group.closest("[data-click-in-host]")).not.toBeNull();
+    await user.click(screen.getByRole("button", { name: /Speed/ }));
+    expect(screen.queryByText("speed content")).toBeNull();
+  });
+
+  it("a nested host without a mode inherits inline", async () => {
+    const user = userEvent.setup();
+    render(
+      <ClickInHost mode="inline">
+        <ClickInHost>
+          <ClickIn icon="gauge" title="Speed">
+            <p>speed content</p>
+          </ClickIn>
+        </ClickInHost>
+      </ClickInHost>,
+    );
+    await user.click(screen.getByRole("button", { name: /Speed/ }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("speed content")).toBeTruthy();
+  });
+
+  it("Esc closes only the innermost open click-in", async () => {
+    const user = userEvent.setup();
+    render(
+      <ClickInHost>
+        <ClickIn icon="box" title="Outer">
+          <ClickInHost mode="inline">
+            <ClickIn icon="gauge" title="Inner">
+              <p>inner content</p>
+            </ClickIn>
+          </ClickInHost>
+        </ClickIn>
+      </ClickInHost>,
+    );
+    await user.click(screen.getByRole("button", { name: /Outer/ }));
+    await user.click(screen.getByRole("button", { name: /Inner/ }));
+    expect(screen.getByText("inner content")).toBeTruthy();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByText("inner content")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Outer" })).toBeTruthy();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});

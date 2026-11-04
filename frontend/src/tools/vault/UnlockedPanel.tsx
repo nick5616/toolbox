@@ -14,10 +14,10 @@ import {
   toast,
 } from "@/components";
 import { FilesService, VaultService, type VaultEntry, type VaultState } from "@/lib/api";
+import { useToolHandoff } from "@/lib/embed";
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { isActive, useOrderedJobs } from "@/state/jobs";
-import { useUI } from "@/state/ui";
 import { useClickIn } from "@/components/ClickIn";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import { formatLockIn, useNow } from "./useVaultState";
@@ -153,12 +153,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
   };
 
   // Files dropped onto the Vault while it is unlocked.
-  const handoff = useUI((s) => s.handoff);
-  useEffect(() => {
-    if (handoff?.moduleId !== "vault") return;
-    const h = useUI.getState().takeHandoff("vault");
-    if (h) void addPaths(h.inputs);
-  }, [handoff, addPaths]);
+  useToolHandoff("vault", (h) => void addPaths(h.inputs));
 
   const act = async (fn: () => Promise<unknown>, done?: string) => {
     try {

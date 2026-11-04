@@ -16,7 +16,8 @@ import {
 } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { isOk, useDeps } from "@/state/deps";
-import { isActive, useJob, useJobs, useOrderedJobs } from "@/state/jobs";
+import { isActive, useJob, useJobs } from "@/state/jobs";
+import { useToolJobs } from "@/tools/_kit/session";
 import { usePacks } from "@/state/packs";
 import { FileToolLayout, ResultTable, runLabel, summarize, useFileInputs, useModuleOptions, setRequiresOverride } from "@/tools/_kit";
 import { FileActions } from "@/tools/_kit/FileActions";
@@ -240,7 +241,7 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
   const [running, setRunning] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
 
   const depsLoaded = useDeps((s) => s.list.length > 0);
   const engineOk = useDeps((s) => isOk(s.byId[ENGINE_DEP_ID]));

@@ -6,6 +6,7 @@
   min-height: 0;
   padding: var(--space-5);
   overflow: auto;
+  container-type: inline-size;
 }
 
 .host {
@@ -236,7 +237,8 @@
   color: var(--fg-subtle);
 }
 
-@media (max-width: 900px) {
+/* Container-driven: the same layout in a 520 px drawer as in a narrow window. */
+@container (max-width: 700px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Button, ClickInHost, toast } from "@/components";
 import { DownloaderService, DownloadMode, LibraryService, type DownloaderOptions } from "@/lib/api";
 import { useCommands } from "@/lib/commands";
+import { useToolHandoff } from "@/lib/embed";
 import { toAppError } from "@/lib/errors";
 import { useShortcut } from "@/lib/shortcuts";
 import { useSettings } from "@/state/settings";
-import { useUI } from "@/state/ui";
 import type { ToolViewProps } from "@/tools";
 import { DepsBanner, useDepsBlockReason } from "./DepsBanner";
 import { OptionsPanel } from "./OptionsPanel";
@@ -26,7 +26,6 @@ export default function DownloaderView(_props: ToolViewProps) {
   const [submitting, setSubmitting] = useState(false);
 
   const libraryDir = useSettings((s) => s.settings.libraryDir);
-  const handoff = useUI((s) => s.handoff);
   const blockReason = useDepsBlockReason();
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -34,14 +33,11 @@ export default function DownloaderView(_props: ToolViewProps) {
 
 
   // Handoff from drop/paste.
-  useEffect(() => {
-    if (handoff?.moduleId !== MODULE_ID) return;
-    const h = useUI.getState().takeHandoff(MODULE_ID);
-    if (!h) return;
+  useToolHandoff(MODULE_ID, (h) => {
     setText(h.inputs.join("\n"));
     setServerUrlErrors({});
     requestAnimationFrame(() => submitRef.current?.focus());
-  }, [handoff]);
+  });
 
   const parsed = useMemo(() => parseUrls(text), [text]);
   const urls = useMemo(() => validUrls(parsed), [parsed]);

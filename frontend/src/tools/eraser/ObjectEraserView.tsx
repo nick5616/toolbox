@@ -7,6 +7,7 @@ import { useShortcut } from "@/lib/shortcuts";
 import { isActive, useJob } from "@/state/jobs";
 import { DepsGate, useDepsGate, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { FileActions } from "@/tools/_kit/FileActions";
+import { useEmbedFocus } from "@/tools/_kit/useEmbedFocus";
 import type { ToolViewProps } from "../index";
 import { onEraserAction } from "./commands";
 import { canvasIsEmpty, exportMaskPNG } from "./exportMask";
@@ -65,6 +66,7 @@ interface Loaded {
 
 export default function ObjectEraserView({ moduleId }: ToolViewProps) {
   const inputs = useFileInputs(moduleId);
+  const embedFocus = useEmbedFocus<HTMLElement>();
   const { files, remove } = inputs;
   // (the loader below also clears the mask history when the photo changes)
   const file = files.length > 0 ? files[files.length - 1] : undefined;
@@ -338,17 +340,17 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
     [],
   );
 
-  useShortcut("Enter", () => void erase(), { when: canErase });
-  useShortcut("B", () => setTool("brush"), { when: editing });
-  useShortcut("E", () => setTool("unpaint"), { when: editing });
-  useShortcut("[", () => setSettings((s) => ({ ...s, brush: clampBrush(s.brush * 0.8) })), { when: editing });
-  useShortcut("]", () => setSettings((s) => ({ ...s, brush: clampBrush(s.brush * 1.25 + 1) })), { when: editing });
-  useShortcut("Mod+Backspace", clearMask, { when: editing, allowInInputs: true });
-  useShortcut("Mod+Z", undo, { when: editing, allowInInputs: true });
-  useShortcut(["Mod+Shift+Z", "Mod+Y"], redo, { when: editing, allowInInputs: true });
+  useShortcut("Enter", () => void erase(), { when: canErase && embedFocus.active });
+  useShortcut("B", () => setTool("brush"), { when: editing && embedFocus.active });
+  useShortcut("E", () => setTool("unpaint"), { when: editing && embedFocus.active });
+  useShortcut("[", () => setSettings((s) => ({ ...s, brush: clampBrush(s.brush * 0.8) })), { when: editing && embedFocus.active });
+  useShortcut("]", () => setSettings((s) => ({ ...s, brush: clampBrush(s.brush * 1.25 + 1) })), { when: editing && embedFocus.active });
+  useShortcut("Mod+Backspace", clearMask, { when: editing && embedFocus.active, allowInInputs: true });
+  useShortcut("Mod+Z", undo, { when: editing && embedFocus.active, allowInInputs: true });
+  useShortcut(["Mod+Shift+Z", "Mod+Y"], redo, { when: editing && embedFocus.active, allowInInputs: true });
 
   useEffect(() => {
-    if (!editing) return;
+    if (!editing || !embedFocus.active) return;
     const down = (e: KeyboardEvent) => {
       if (e.key === "Alt") {
         e.preventDefault();
@@ -374,7 +376,7 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [editing]);
+  }, [editing, embedFocus.active]);
 
   // ---- render ----
 
@@ -400,7 +402,7 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
   if (!file) {
     return (
       <ClickInHost>
-        <section className={styles.root} aria-label="Object Eraser">
+        <section ref={embedFocus.ref} className={styles.root} aria-label="Object Eraser">
           <DepsGate moduleId={moduleId} />
           <div className={styles.empty}>
             <DropZone id="eraser-drop" label="Drop a photo" hint="Paint over what you want gone, then erase it." icon="eraser">
@@ -428,7 +430,7 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
 
   return (
     <ClickInHost>
-    <section className={styles.root} aria-label="Object Eraser">
+    <section ref={embedFocus.ref} className={styles.root} aria-label="Object Eraser">
       {header}
       <DepsGate moduleId={moduleId} />
 

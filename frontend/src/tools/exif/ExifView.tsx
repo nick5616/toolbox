@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, EmptyState, Icon, Section, Switch, cx } from "@/components";
 import { ExifAction, ExifService, JobStatus, type ExifOptions } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
-import { useOrderedJobs } from "@/state/jobs";
+import { useToolJobs } from "@/tools/_kit/session";
 import { FileToolLayout, runLabel, summarize, useDepsGate, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
@@ -36,7 +36,7 @@ export default function ExifView({ moduleId }: ToolViewProps) {
   const [selected, setSelected] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [fieldNames, setFieldNames] = useState<string[]>(DEFAULT_EDITABLE_FIELDS);
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
   const done = useMemo(
     () => jobs.filter((j) => j.status === JobStatus.JobDone && parseExifResult(j.resultJson)).slice(0, MAX_RESULTS),
     [jobs],
