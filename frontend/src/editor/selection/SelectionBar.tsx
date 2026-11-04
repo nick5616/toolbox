@@ -224,14 +224,14 @@ function SingleClip({ clip }: { clip: EditClip }) {
         {overflow.length > 0 && (
           <>
             <MenuButton
-              label="More…"
+              label="Moreâ€¦"
               size="sm"
               variant="ghost"
               data-tip="The rest of this clip's settings"
               items={() =>
                 overflow.map((c) => ({
                   id: c.panel,
-                  label: `${c.title ?? getEditorPanel(c.panel)?.title ?? c.panel}${c.summary ? ` · ${c.summary}` : ""}`,
+                  label: `${c.title ?? getEditorPanel(c.panel)?.title ?? c.panel}${c.summary ? ` Â· ${c.summary}` : ""}`,
                   onSelect: () => open(c.tool ? toolDrawerId(c.tool.module) : panelDrawerId(c.panel)),
                 }))
               }
