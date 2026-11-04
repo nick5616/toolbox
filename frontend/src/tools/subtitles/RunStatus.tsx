@@ -4,7 +4,7 @@ import { copyText } from "@/lib/copy";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { basename } from "./logic";
 import { parseResult } from "./options";
-import type { JobRun } from "./useJobRun";
+import type { JobRun } from "./runs";
 import styles from "./SubtitlesView.module.css";
 
 export interface RunStatusProps {
