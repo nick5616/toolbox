@@ -60,6 +60,21 @@ describe("Subtitles store", () => {
     expect(activeRows(s()).length).toBeLessThan(3);
   });
 
+  it("selects the cue being edited, apart from the playhead", () => {
+    withCues();
+    const [a, b] = activeRows(s());
+    s().selectCue(a!.id);
+    expect(s().selectedId).toBe(a!.id);
+    s().patchCue(b!.id, { text: "x" });
+    expect(s().selectedId).toBe(b!.id);
+    s().seek(0);
+    expect(s().selectedId).toBe(b!.id);
+    s().rowAction("delete", b!.id, -1);
+    expect(s().selectedId).toBe("");
+    s().rowAction("insert", a!.id, -1);
+    expect(s().selectedId).toBe(s().focusId);
+  });
+
   it("replaces text everywhere in one undoable step", () => {
     withCues();
     s().replaceAll("o", "0", false);

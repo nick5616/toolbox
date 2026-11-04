@@ -1,6 +1,5 @@
-import { Banner, Button, Icon, Section, Spinner, useClickIn, toolDrawerId } from "@/components";
+import { Banner, Button, Icon, Section, Spinner, ToolClickIn } from "@/components";
 import { formatMs } from "@/components/media";
-import { getWorkspace } from "@/workspace";
 import { basename } from "./logic";
 import { RunStatus } from "./RunStatus";
 import { useRun } from "./runs";
@@ -17,12 +16,11 @@ export function SourcePanel() {
   const pickMedia = useSubtitles((s) => s.pickMedia);
   const pickSubtitleFile = useSubtitles((s) => s.pickSubtitleFile);
   const startOver = useSubtitles((s) => s.startOver);
+  const useCut = useSubtitles((s) => s.useCut);
   const extractTrack = useSubtitles((s) => s.extract);
   const gen = useRun("gen");
   const extract = useRun("extract");
-  const { open } = useClickIn();
   const busy = gen.busy || extract.busy;
-  const replica = getWorkspace(MODULE_ID)?.isReplica() ?? false;
 
   const textStreams = media.subtitles.filter((s) => s.text);
   const otherStreams = media.subtitles.filter((s) => !s.text);
@@ -88,16 +86,18 @@ export function SourcePanel() {
           Use a subtitle file…
         </Button>
         {mediaPath && (
-          <Button
-            size="sm"
-            variant="secondary"
+          <ToolClickIn
+            host={MODULE_ID}
+            module="trimmer"
+            inputs={[mediaPath]}
+            useLabel="Use this cut"
+            onUse={useCut}
+            width={760}
+            title="Trim first"
             icon="scissors"
-            disabled={replica || busy}
-            onClick={() => open(toolDrawerId("trimmer"))}
-            data-tip={replica ? "Trim first from the main window" : "Cut the start or end off before making subtitles"}
-          >
-            Trim first…
-          </Button>
+            tip="Cut the start or end off before making subtitles"
+            disabledReason={busy ? "Wait for the current task to finish" : undefined}
+          />
         )}
       </div>
 

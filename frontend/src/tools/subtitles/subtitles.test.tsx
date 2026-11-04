@@ -506,7 +506,7 @@ describe("Trim first", () => {
     expect(await screen.findByText("trimmer for /in/talk.mp4")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Use this cut" }));
     await waitFor(() => expect(useSubtitles.getState().mediaPath).toBe("/in/cut.mp4"));
-    expect(await screen.findByText("cut.mp4")).toBeTruthy();
+    expect((await screen.findAllByText("cut.mp4")).length).toBeGreaterThan(0);
   });
 
   it("asks before clearing the cues when the cut replaces the source", async () => {

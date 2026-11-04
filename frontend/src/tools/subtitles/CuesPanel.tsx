@@ -40,6 +40,8 @@ export function CuesPanel() {
   const playing = useSubtitles((s) => s.playing);
   const maxLine = useSubtitles((s) => s.prefs.maxLineChars);
   const focusId = useSubtitles((s) => s.focusId);
+  const selectedId = useSubtitles((s) => s.selectedId);
+  const selectCue = useSubtitles((s) => s.selectCue);
   const patchCue = useSubtitles((s) => s.patchCue);
   const rowAction = useSubtitles((s) => s.rowAction);
   const seek = useSubtitles((s) => s.seek);
@@ -122,7 +124,7 @@ export function CuesPanel() {
           }
         />
       ) : (
-        <CueList rows={rows} activeIndex={activeIndex} playing={playing} maxLine={maxLine} onPatch={patchCue} onAction={rowAction} onSeek={seek} focusId={focusId || undefined} onFocused={clearFocus} />
+        <CueList rows={rows} activeIndex={activeIndex} playing={playing} maxLine={maxLine} onPatch={patchCue} onAction={rowAction} onSeek={seek} focusId={focusId || undefined} onFocused={clearFocus} selectedId={selectedId} onSelect={selectCue} />
       )}
     </div>
   );

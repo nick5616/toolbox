@@ -562,7 +562,10 @@ export const useSubtitles = create<SubtitlesState>()((set, get) => {
 
     // ---- editing ----
     edit: (fn, key) => set((s) => ({ editor: editorReducer(s.editor, { type: "edit", fn, key, at: Date.now() }) })),
-    patchCue: (id, patch, key) => get().edit((r) => updateCue(r, id, patch), key),
+    patchCue: (id, patch, key) => {
+      get().edit((r) => updateCue(r, id, patch), key);
+      set({ selectedId: id });
+    },
     rowAction: (action, id, caret) => {
       const s = get();
       const rows = activeRows(s);
@@ -579,11 +582,15 @@ export const useSubtitles = create<SubtitlesState>()((set, get) => {
             return;
           }
           get().edit(() => next);
+          set({ selectedId: id });
           return;
         }
         case "merge": {
           const next = mergeWithNext(rows, index, s.prefs.maxLineChars);
-          if (next) get().edit(() => next);
+          if (next) {
+            get().edit(() => next);
+            set({ selectedId: id });
+          }
           return;
         }
         case "insert": {
@@ -594,6 +601,7 @@ export const useSubtitles = create<SubtitlesState>()((set, get) => {
         }
         case "delete":
           get().edit((r) => deleteCue(r, id));
+          if (get().selectedId === id) set({ selectedId: "" });
           return;
         case "startAtPlayhead":
           if (now >= row.endMs) toast({ title: "The playhead is after this subtitle's end", tone: "warn" });

@@ -485,8 +485,3 @@
   gap: var(--space-3);
   width: 100%;
 }
-
-/* The Trim-first drawer's launcher lives in the Source panel's button; this one is only the drawer. */
-.hiddenLauncher {
-  display: none;
-}
