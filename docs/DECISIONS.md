@@ -398,3 +398,11 @@ Newest last. Format: date — decision — why.
 - 2026-11-04 — **The editor's panel/part/bridge pattern is extracted into `src/workspace/` (`defineWorkspace`)** for every workspace tool; the editor keeps its Phase 10 implementation (working, tested) rather than being ported in the same phase.
 - 2026-11-04 — `parts/index.ts` discovers `tools/*/parts.ts` and `tools/*/workspace.ts(x)` with `import.meta.glob`, so parallel builders never conflict on it.
 - 2026-11-04 — Descriptor `Parts` gained the new compositions (§3.6). Lyric Video doesn't get `Base: visualizer`: its words render through libass, not the viz engine, so it isn't "the same core with a layer"; it lists the Visualizer as a part.
+- 2026-11-04 — Integration notes (Phase 11, checked in the real app):
+  - **Click-ins inside a drawer stack over it** (same host area, their own width; closing shows the drawer beneath), and `useClickIn()` inside a drawer addresses the drawer's own host. Builders had flattened nested click-ins into sections or hidden launchers because a nested one closed its parent (one open drawer per host).
+  - **Embedded tools render inline** (`ClickInHost mode="inline"`, inherited by the tool's own host) so a tool in a drawer never opens a drawer in a drawer; Esc closes only the innermost click-in.
+  - **The studio stage's content fills it** (flex children, `min-height: 0`); Photo Composer's canvas overflowed its selection bar before. Rail captions can be short (`ToolPanel.short`).
+  - **Send to** lists Post Builder only as "Add to post…".
+  - **Panels that pick files or submit jobs are inline-only** (`poppable: false`): a replica must never submit jobs (Visualizer Source/Analysis/Export, Lyric Video's file panels).
+  - **Popping a whole tool out keeps its session** where the document isn't saved to a project: Pipelines saves the draft, Subtitles parks its session in module state for the new window (≤ 60 s old, once).
+  - **Big photos in `<img>`**: media URLs answer ≤ 4 MiB per response and an `<img>` never asks for the rest, so Object Eraser and Redact showed only the top of large photos (pre-existing). `lib/wholeImage.ts` reads the file in ranges into a blob URL.
