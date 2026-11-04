@@ -37,7 +37,7 @@ import { useJobs } from "@/state/jobs";
 import { buildFixture } from "@/viz/fixture";
 import { PRESETS, showFromPreset } from "@/viz/presets";
 import { DEFAULT_EXPORT, outputSize, sanitizeExport, type ExportPrefs } from "./exportPrefs";
-import ExportStep, { exportSoundSummary } from "./ExportStep";
+import ExportPanel, { exportSoundSummary } from "./ExportPanel";
 import { liveSpeed } from "./useVizJob";
 import { useVisualizer } from "./store";
 
@@ -59,10 +59,8 @@ function job(over: Partial<Job>): Job {
 }
 
 function setup(prefs: ExportPrefs = DEFAULT_EXPORT, store: Partial<ReturnType<typeof useVisualizer.getState>> = {}) {
-  useVisualizer.setState({ input: "C:/song.mp3", mode: "full", ref: REF, analysis, show: showFromPreset(PRESETS[0]!), selection: null, playheadMs: 5000, ...store });
-  const onPrefs = vi.fn();
-  render(<ExportStep prefs={prefs} onPrefs={onPrefs} />);
-  return onPrefs;
+  useVisualizer.setState({ input: "C:/song.mp3", mode: "full", ref: REF, analysis, show: showFromPreset(PRESETS[0]!), selection: null, playheadMs: 5000, exportPrefs: prefs, ...store });
+  render(<ExportPanel />);
 }
 
 beforeEach(() => {
@@ -93,7 +91,7 @@ describe("export rules", () => {
   });
 });
 
-describe("ExportStep", () => {
+describe("Export panel", () => {
   it("offers 2160p only when the encoder supports it", async () => {
     h.can2160.value = false;
     setup();
@@ -109,8 +107,8 @@ describe("ExportStep", () => {
 
   it("falls back from a 2160p choice the encoder can't do", async () => {
     h.can2160.value = false;
-    const onPrefs = setup({ ...DEFAULT_EXPORT, height: 2160 });
-    await waitFor(() => expect(onPrefs).toHaveBeenCalledWith({ height: 1440 }));
+    setup({ ...DEFAULT_EXPORT, height: 2160 });
+    await waitFor(() => expect(useVisualizer.getState().exportPrefs.height).toBe(1440));
   });
 
   it("hides the aspect and frame rate in overlay mode", async () => {
@@ -121,20 +119,22 @@ describe("ExportStep", () => {
     expect(screen.getByText(/keeps the video's shape/)).toBeTruthy();
   });
 
-  it("shows aspect and frame rate on top, and background behind its click-in, in full mode", async () => {
-    setup();
+  it("has the size and quality row, the range, sound and background, and the preview in one panel", () => {
+    setup(DEFAULT_EXPORT, { selection: { startMs: 4000, endMs: 20000 } });
     expect(screen.getByRole("radiogroup", { name: "Aspect" })).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: "Quality" })).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "Frame rate" })).toBeTruthy();
-    expect(screen.queryByLabelText("Background")).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: /^Sound and background/ }));
+    expect(screen.getByRole("radiogroup", { name: "Range" })).toBeTruthy();
+    expect(screen.getByRole("radiogroup", { name: "Audio" })).toBeTruthy();
     expect(screen.getByLabelText("Background")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Render 10 s preview" })).toBeTruthy();
   });
 
-  it("summarises the click-ins", () => {
-    setup(DEFAULT_EXPORT, { selection: { startMs: 4000, endMs: 20000 } });
-    expect(screen.getByRole("button", { name: /^Range.*0:04–0:20/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Sound and background.*Original audio · No background/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Preview.*From 0:05/ })).toBeTruthy();
+  it("edits the quality and shape in the store (the view keeps them)", async () => {
+    setup();
+    await userEvent.click(screen.getByRole("radio", { name: "720p" }));
+    await userEvent.click(screen.getByRole("radio", { name: "9:16" }));
+    expect(useVisualizer.getState().exportPrefs).toMatchObject({ height: 720, aspect: "9:16" });
   });
 
   it("describes the sound and background", () => {
@@ -160,7 +160,6 @@ describe("ExportStep", () => {
 
   it("renders a 10 s preview from the playhead", async () => {
     setup();
-    await userEvent.click(screen.getByRole("button", { name: /^Preview/ }));
     await userEvent.click(screen.getByRole("button", { name: "Render 10 s preview" }));
     await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(1));
     const opts = (h.enqueue.mock.calls[0] as [string[], Record<string, unknown>])[1];

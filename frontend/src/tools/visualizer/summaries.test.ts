@@ -5,9 +5,11 @@ import { presetById, showFromPreset } from "@/viz/presets";
 import { DEFAULT_ANALYZE } from "./store";
 import { layersSummary, lookSummary, reactionsSummary, timelineSummary } from "@/blocks/visuals/designer/summaries";
 import { instrumentsSummary, moodSummary, wordsSummary } from "./source/summaries";
-import { startVisualizerReplica, visualizerBridgeSpec } from "./bridge";
+import { visualizerBridge, visualizerWorkspace } from "./workspace";
+import { setWorkspaceTransportForTest } from "@/workspace/defineWorkspace";
+import { getPart } from "@/parts/registry";
 import { useVisualizer } from "./store";
-import { constituentItems } from "./VisualizerView";
+import { constituentItems } from "./constituents";
 import { followHostSeek } from "./PreviewPart";
 import type { BridgeTransport } from "@/state/bridge";
 
@@ -68,13 +70,13 @@ describe("constituents", () => {
 
 describe("store bridge", () => {
   it("shares the design and song but not the analysis, and forwards only the playhead action", () => {
-    const keys = Object.keys(visualizerBridgeSpec.pick(useVisualizer.getState()));
+    const keys = Object.keys(visualizerBridge.pick(useVisualizer.getState()));
     expect(keys).toEqual(expect.arrayContaining(["input", "show", "ref", "aspect", "mode", "analyze", "playheadMs"]));
     expect(keys).not.toContain("analysis");
-    expect(visualizerBridgeSpec.actions).toEqual(["setPlayheadMs"]);
+    expect([...visualizerBridge.actions]).toEqual(["setPlayheadMs"]);
   });
 
-  it("a replica takes the host's snapshot and sends its playhead to the host", () => {
+  it("a replica takes the host's snapshot and sends its playhead to the host", async () => {
     const sent: unknown[] = [];
     let listener: ((p: unknown, from: string) => void) | null = null;
     const transport: BridgeTransport = {
@@ -85,17 +87,25 @@ describe("store bridge", () => {
       },
     };
     useVisualizer.getState().reset();
-    const dispose = startVisualizerReplica(transport);
+    setWorkspaceTransportForTest(() => transport);
+    const dispose = await getPart(visualizerWorkspace.previewPart)!.connect!(new URLSearchParams());
     expect(sent[0]).toEqual({ t: "hello" });
     const s = show();
-    listener!({ t: "snap", seq: 1, values: { ...visualizerBridgeSpec.pick(useVisualizer.getState()), input: "C:/m/song.mp3", show: s, aspect: 9 / 16 } }, "main");
+    listener!({ t: "snap", seq: 1, values: { ...visualizerBridge.pick(useVisualizer.getState()), input: "C:/m/song.mp3", show: s, aspect: 9 / 16 } }, "main");
     expect(useVisualizer.getState().input).toBe("C:/m/song.mp3");
     expect(useVisualizer.getState().show?.name).toBe(s.name);
     expect(useVisualizer.getState().aspect).toBeCloseTo(9 / 16);
     useVisualizer.getState().setPlayheadMs(4200);
     expect(sent.at(-1)).toEqual({ t: "call", action: "setPlayheadMs", args: [4200] });
     dispose();
+    setWorkspaceTransportForTest(null);
     useVisualizer.getState().reset();
+  });
+
+  it("is a workspace: Source, Analysis and Export panels and the preview part", () => {
+    expect(visualizerWorkspace.panels.map((p) => p.id)).toEqual(["source", "analysis", "export"]);
+    expect(visualizerWorkspace.previewPart).toBe("visualizer.preview");
+    expect(visualizerWorkspace.bridgeName).toBe("ws:visualizer");
   });
 });
 

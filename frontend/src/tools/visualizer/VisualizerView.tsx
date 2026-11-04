@@ -1,44 +1,32 @@
 /**
- * Visualizer (SPEC.md §8): Source → Analyze → Design → Export.
+ * Visualizer (SPEC.md §8; Phase 11 §5.5): a drop zone until a song or video is
+ * chosen, then one workspace (`VisualizerWorkspace`): source chip, design name,
+ * undo/redo and Export in the header, the Analysis panel in the rail, the
+ * designer on the stage (or the analysis progress while there is no analysis).
  *
  * Keeps in module state: `visualizer` (the analysis key per input path and the
  * export options) and `visualizer.lastShow` (the design, so it survives a
- * restart). `?vizfixture=1` (TOOLBOX_VIZ_FIXTURE=1) jumps to Design with the
- * synthetic analysis so the designer can be tried without the engine.
+ * restart). `?vizfixture=1` (TOOLBOX_VIZ_FIXTURE=1) opens with the synthetic
+ * analysis so the designer can be tried without the engine.
  */
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { ClickInHost, Icon, MenuButton, Spinner, cx } from "@/components";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { ClickInHost, Spinner } from "@/components";
 import { SettingsService, type AnalysisRef } from "@/lib/api";
-import { openToolItems } from "@/lib/openTool";
+import { useToolHandoff } from "@/lib/embed";
+import { useCompositionInputs } from "@/state/composition";
 import { buildFixture } from "@/viz/fixture";
 import { validateShow } from "@/viz/validate";
 import type { Show } from "@/viz/types";
 import type { ToolViewProps } from "../index";
 import { MAX_STATE_BYTES, patchVizState, readVizState } from "./vizState";
 import { DEFAULT_EXPORT, sanitizeExport, type ExportPrefs } from "./exportPrefs";
-import { useVisualizerBridgeHost } from "./bridge";
-import { useSeed } from "./useSeed";
-import { useVisualizer, type VisualizerStep } from "./store";
+import { EmptySource } from "./SourcePanel";
+import { applyHandoff } from "./useSeed";
+import { useVisualizer } from "./store";
+import { visualizerWorkspace as ws } from "./workspace";
 import styles from "./VisualizerView.module.css";
 
-const SourceStep = lazy(() => import("./SourceStep"));
-const AnalyzeStep = lazy(() => import("./AnalyzeStep"));
-const DesignStep = lazy(() => import("./DesignStep"));
-const ExportStep = lazy(() => import("./ExportStep"));
-
-const STEPS: Array<{ id: VisualizerStep; label: string }> = [
-  { id: "source", label: "Source" },
-  { id: "analyze", label: "Analyze" },
-  { id: "design", label: "Design" },
-  { id: "export", label: "Export" },
-];
-
-const STEP_TIP: Record<VisualizerStep, string> = {
-  source: "Choose the song or video and what to analyse",
-  analyze: "Listen to the song and build its map of beats, sections and words",
-  design: "Choose the look and how the visuals react to the music",
-  export: "Render the visuals to a video file",
-};
+const VisualizerWorkspace = lazy(() => import("./VisualizerWorkspace"));
 
 export const LAST_SHOW_KEY = "visualizer.lastShow";
 const MAX_KEYS = 50;
@@ -72,34 +60,56 @@ function fixtureRef(durationMs: number): AnalysisRef {
   };
 }
 
-/** The view's remembered options, merged into the shared "visualizer" module state (other keys are left alone). */
-function usePrefs(): [Prefs, (next: Prefs | ((p: Prefs) => Prefs)) => void] {
-  const [prefs, setState] = useState<Prefs>(DEFAULT_PREFS);
-  const dirty = useRef(false);
+/**
+ * The remembered options, merged into the shared "visualizer" module state
+ * (other keys are left alone). The export options live in the store (the
+ * Export panel edits them there); the analysis keys are the view's.
+ */
+function usePrefs(): void {
+  const [keys, setKeys] = useState<Record<string, string>>(DEFAULT_PREFS.analysisKeys);
+  const keysDirty = useRef(false);
+  const exportPrefs = useVisualizer((s) => s.exportPrefs);
+  const baseline = useRef<ExportPrefs>(DEFAULT_EXPORT);
+  const loaded = useRef(false);
+  const input = useVisualizer((s) => s.input);
+  const ref = useVisualizer((s) => s.ref);
+
   useEffect(() => {
     let off = false;
     void readVizState().then((st) => {
-      if (!off && !dirty.current) setState(sanitizePrefs(st, DEFAULT_PREFS));
+      if (off) return;
+      const p = sanitizePrefs(st, DEFAULT_PREFS);
+      if (!keysDirty.current) setKeys(p.analysisKeys);
+      const s = useVisualizer.getState();
+      // Options the user already changed before the saved ones arrived win.
+      if (s.exportPrefs === DEFAULT_EXPORT) s.setExportPrefs(p.export);
+      baseline.current = useVisualizer.getState().exportPrefs;
+      loaded.current = true;
     });
     return () => {
       off = true;
     };
   }, []);
-  useEffect(() => {
-    if (!dirty.current) return;
-    const t = setTimeout(() => void patchVizState({ analysisKeys: prefs.analysisKeys, export: prefs.export }), 300);
-    return () => clearTimeout(t);
-  }, [prefs]);
-  const set = useCallback((next: Prefs | ((p: Prefs) => Prefs)) => {
-    dirty.current = true;
-    setState(next);
-  }, []);
-  return [prefs, set];
-}
 
-/** The tools the Visualizer is built from: the song can be opened in either, inline or in its own window. */
-export function constituentItems(input: string) {
-  return [...openToolItems("stems", [input], "viz"), ...openToolItems("bpm-key", [input], "viz")];
+  // The analysis key of each input is remembered.
+  useEffect(() => {
+    if (!input || !ref || ref.key === "fixture") return;
+    if (keys[input] === ref.key) return;
+    keysDirty.current = true;
+    setKeys((p) => {
+      const next = { ...p };
+      delete next[input];
+      next[input] = ref.key;
+      return Object.fromEntries(Object.entries(next).slice(-MAX_KEYS));
+    });
+  }, [input, ref, keys]);
+
+  useEffect(() => {
+    const changed = keysDirty.current || (loaded.current ? exportPrefs !== baseline.current : exportPrefs !== DEFAULT_EXPORT);
+    if (!changed) return;
+    const t = setTimeout(() => void patchVizState({ analysisKeys: keys, export: exportPrefs }), 300);
+    return () => clearTimeout(t);
+  }, [keys, exportPrefs]);
 }
 
 function Loading() {
@@ -111,18 +121,15 @@ function Loading() {
 }
 
 export default function VisualizerView({ moduleId }: ToolViewProps) {
-  const [prefs, setPrefs] = usePrefs();
-  const step = useVisualizer((s) => s.step);
   const input = useVisualizer((s) => s.input);
-  const ref = useVisualizer((s) => s.ref);
-  const show = useVisualizer((s) => s.show);
-  const setStep = useVisualizer((s) => s.setStep);
   const [lastShow, setLastShow] = useState<Show | null>(null);
   const [lastLoaded, setLastLoaded] = useState(false);
   const fixtureDone = useRef(false);
 
-  useSeed(moduleId);
-  useVisualizerBridgeHost();
+  usePrefs();
+  ws.useHost();
+  useToolHandoff(moduleId, applyHandoff);
+  useCompositionInputs(moduleId, input ? { stems: [input], "bpm-key": [input] } : {});
 
   // ---- the design survives a restart ----
   useEffect(() => {
@@ -140,6 +147,7 @@ export default function VisualizerView({ moduleId }: ToolViewProps) {
     };
   }, []);
 
+  const show = useVisualizer((s) => s.show);
   useEffect(() => {
     if (!show) return;
     const t = setTimeout(() => {
@@ -148,19 +156,6 @@ export default function VisualizerView({ moduleId }: ToolViewProps) {
     }, 600);
     return () => clearTimeout(t);
   }, [show]);
-
-  // ---- the analysis key of each input is remembered ----
-  useEffect(() => {
-    if (!input || !ref || ref.key === "fixture") return;
-    if (prefs.analysisKeys[input] === ref.key) return;
-    setPrefs((p) => {
-      const keys = { ...p.analysisKeys };
-      delete keys[input];
-      keys[input] = ref.key;
-      const entries = Object.entries(keys).slice(-MAX_KEYS);
-      return { ...p, analysisKeys: Object.fromEntries(entries) };
-    });
-  }, [input, ref, prefs.analysisKeys, setPrefs]);
 
   // ---- dev: the synthetic analysis ----
   useEffect(() => {
@@ -171,45 +166,21 @@ export default function VisualizerView({ moduleId }: ToolViewProps) {
     const s = useVisualizer.getState();
     s.setInput(FIXTURE_INPUT, false);
     s.setAnalysis(fixtureRef(a.durationMs), a);
-    s.setStep("design");
   }, [lastLoaded]);
-
-  const onPrefs = useCallback((patch: Partial<ExportPrefs>) => setPrefs((p) => ({ ...p, export: { ...p.export, ...patch } })), [setPrefs]);
-
-  const reachable = (id: VisualizerStep): boolean => {
-    switch (id) {
-      case "source":
-        return true;
-      case "analyze":
-        return !!input;
-      case "design":
-        return !!ref && !!input;
-      case "export":
-        return !!ref && !!input && !!show;
-    }
-  };
 
   return (
     <ClickInHost className={styles.root}>
-      <nav className={styles.steps} aria-label="Steps">
-        {STEPS.map((s, i) => (
-          <button key={s.id} type="button" data-tip={reachable(s.id) ? STEP_TIP[s.id] : STEP_TIP[s.id] + " (finish the earlier steps first)"} className={cx(styles.step, step === s.id && styles.stepOn)} aria-current={step === s.id ? "step" : undefined} disabled={!reachable(s.id)} onClick={() => setStep(s.id)}>
-            <span className={styles.stepNum}>{i + 1}</span>
-            {s.label}
-            {i < STEPS.length - 1 && <Icon name="chevron-right" size={12} className={styles.stepSep} />}
-          </button>
-        ))}
-        <span className={styles.spacer} />
-        {input && <MenuButton label="Open this song in another tool" icon="ellipsis" variant="ghost" size="sm" tip="Open this song in Stems or BPM & Key, here or in their own window" items={() => constituentItems(input)} />}
-      </nav>
-      <div className={cx(styles.body, step === "design" && styles.bodyWide)}>
+      {!input ? (
+        <div className={styles.empty}>
+          <EmptySource />
+        </div>
+      ) : lastLoaded ? (
         <Suspense fallback={<Loading />}>
-          {step === "source" && <SourceStep onAnalyze={() => setStep("analyze")} />}
-          {step === "analyze" && <AnalyzeStep onDone={() => setStep("design")} />}
-          {step === "design" && (lastLoaded ? <DesignStep lastShow={lastShow} aspect={prefs.export.aspect} onExport={() => setStep("export")} onBack={() => setStep("analyze")} /> : <Loading />)}
-          {step === "export" && <ExportStep prefs={prefs.export} onPrefs={onPrefs} onBack={() => setStep("design")} />}
+          <VisualizerWorkspace lastShow={lastShow} />
         </Suspense>
-      </div>
+      ) : (
+        <Loading />
+      )}
     </ClickInHost>
   );
 }
