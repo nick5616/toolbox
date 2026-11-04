@@ -30,7 +30,7 @@ export function SetupPanel() {
   return (
     <div className={styles.root}>
       <h2 className={styles.title}>Set up your edit</h2>
-      <div className={styles.song} title={project.song.path}>
+      <div className={styles.song} data-tip={`${project.song.path}: the song this edit is cut to`}>
         {name}
       </div>
       {state === "loading" && (
@@ -46,7 +46,7 @@ export function SetupPanel() {
       )}
       {state === "ready" && reanalyze && (
         <div className={styles.row}>
-          <Button size="sm" variant="ghost" icon="arrow-left" onClick={() => useEditStudio.getState().setSetupOpen(false)}>
+          <Button size="sm" variant="ghost" icon="arrow-left" data-tip="Go back to the analysis this edit already has, without analysing again" onClick={() => useEditStudio.getState().setSetupOpen(false)}>
             Keep the current analysis
           </Button>
         </div>

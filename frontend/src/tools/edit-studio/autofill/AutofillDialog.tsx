@@ -28,11 +28,11 @@ export function AutofillDialog(props: AutofillDialogProps) {
 type SourceMode = "all" | "selected" | "tags";
 type Order = AutofillOptions["order"];
 
-const ORDERS: ReadonlyArray<{ value: Order; label: string }> = [
-  { value: "recipe", label: "Recipe's own" },
-  { value: "sequential", label: "In order" },
-  { value: "shuffleNoRepeat", label: "Shuffled" },
-  { value: "byTag", label: "By tag" },
+const ORDERS: ReadonlyArray<{ value: Order; label: string; tip: string }> = [
+  { value: "recipe", label: "Recipe's own", tip: "Let each recipe decide how to pick sources, e.g. hero shots on drops" },
+  { value: "sequential", label: "In order", tip: "Use the sources one after another in the order of the Sources panel" },
+  { value: "shuffleNoRepeat", label: "Shuffled", tip: "Use the sources in a random order without repeating one until all are used" },
+  { value: "byTag", label: "By tag", tip: "Prefer sources with the tags a recipe asks for, such as hero on a drop" },
 ];
 
 const FALLBACK_SEED = 1;
@@ -180,9 +180,9 @@ function Body({ range, onClose }: { range: AutofillDialogProps["range"]; onClose
           </Banner>
         )}
 
-        <div className={styles.cards} role="radiogroup" aria-label="Recipe">
+        <div className={styles.cards} role="radiogroup" aria-label="Recipe" data-tip="Auto-fill recipes: each lays clips out in its own way, from the song's beats">
           {RECIPES.map((r, i) => (
-            <button key={r.id} type="button" role="radio" aria-checked={r.id === recipeId} className={cx(styles.card, r.id === recipeId && styles.cardOn)} onClick={() => setRecipeId(r.id)}>
+            <button key={r.id} type="button" role="radio" aria-checked={r.id === recipeId} data-tip={`${r.name}: click to pick this style; the strip shows where it would cut`} className={cx(styles.card, r.id === recipeId && styles.cardOn)} onClick={() => setRecipeId(r.id)}>
               <span className={styles.cardName}>{r.name}</span>
               <span className={styles.cardText}>{r.description}</span>
               <Strip starts={runs?.[i]?.clips.map((c) => c.startMs) ?? []} durationMs={D} />
@@ -201,35 +201,36 @@ function Body({ range, onClose }: { range: AutofillDialogProps["range"]; onClose
               value={mode}
               onChange={setMode}
               options={[
-                { value: "all", label: "All" },
-                { value: "selected", label: `Selected (${selected.length})`, disabled: selected.length === 0 },
-                { value: "tags", label: "By tag", disabled: allTags.length === 0 },
+                { value: "all", label: "All", tip: "Use every video and photo in the Sources panel" },
+                { value: "selected", label: `Selected (${selected.length})`, disabled: selected.length === 0, tip: selected.length === 0 ? "Select sources in the Sources panel first" : "Use only the sources selected in the Sources panel" },
+                { value: "tags", label: "By tag", disabled: allTags.length === 0, tip: allTags.length === 0 ? "Tag some sources first to use this" : "Use only sources with the tags you choose below" },
               ]}
             />
           </Field>
           {mode === "tags" && (
             <div className={styles.chips}>
               {allTags.map((t) => (
-                <button key={t} type="button" aria-pressed={tagSel.includes(t)} className={cx(styles.chip, tagSel.includes(t) && styles.chipOn)} onClick={() => setTagSel((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))}>
+                <button key={t} type="button" aria-pressed={tagSel.includes(t)} data-tip={tagSel.includes(t) ? `Stop using sources tagged "${t}"` : `Use sources tagged "${t}"`} className={cx(styles.chip, tagSel.includes(t) && styles.chipOn)} onClick={() => setTagSel((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))}>
                   {t}
                 </button>
               ))}
             </div>
           )}
-          <Field label="Target track">{(c) => <Select id={c.id} size="sm" value={trackId} onChange={setTrackId} options={trackOptions} />}</Field>
+          <Field label="Target track">{(c) => <Select id={c.id} data-tip="The video track the new clips go on; 'New track' adds one on top" size="sm" value={trackId} onChange={setTrackId} options={trackOptions} />}</Field>
           <Field label="Range">
-            <span className={styles.readonly}>{rangeLabel}</span>
+            <span className={styles.readonly} data-tip={range ? "Only this part of the edit is filled; select a range on the timeline to change it" : "The whole edit is filled; select a range or section first to fill only that part"}>{rangeLabel}</span>
           </Field>
           <Field label="Seed" hint="The same seed and inputs give the same clips.">
             {(c) => (
               <TextField
                 id={c.id}
+                data-tip="A number that picks the random choices; use another one for a different arrangement"
                 size="sm"
                 mono
                 type="number"
                 value={String(seed)}
                 onChange={(e) => setSeed(Math.max(0, Math.floor(Number(e.target.value)) || 0))}
-                trailing={<IconButton label="New random seed" icon="refresh-cw" size="sm" onClick={() => setSeed(Math.floor(Math.random() * 1_000_000))} />}
+                trailing={<IconButton label="New random seed" data-tip="Roll a new seed for a different arrangement of the same recipe" icon="refresh-cw" size="sm" onClick={() => setSeed(Math.floor(Math.random() * 1_000_000))} />}
               />
             )}
           </Field>
@@ -247,13 +248,13 @@ function Body({ range, onClose }: { range: AutofillDialogProps["range"]; onClose
         )}
 
         <div className={styles.footer}>
-          <span className={styles.summary} aria-live="polite">
+          <span className={styles.summary} aria-live="polite" data-tip="Preview of the chosen recipe: cuts it makes, sources it uses, and your pinned or hand-made clips it keeps">
             {current ? `≈ ${current.clips.length} cuts · ${usedSources} sources · ${keptCount} pinned clips kept` : "Nothing to preview yet"}
           </span>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" data-tip="Close without changing the edit" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={apply} disabled={!canApply}>
+          <Button variant="primary" data-tip={canApply ? "Replace earlier auto-fill clips with this layout; pinned and hand-made clips stay (you can undo)" : !analysis ? "Analyze the song first" : sources.length === 0 ? "Add sources first" : noSourcesChosen ? "Choose at least one source" : "This recipe makes no clips here"} onClick={apply} disabled={!canApply}>
             Apply
           </Button>
         </div>

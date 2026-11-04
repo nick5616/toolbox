@@ -1,6 +1,6 @@
 /** One clip on a track (Phase 9 SPEC §14.5): filmstrip / photo thumb / colour swatch, name, badges and trim handles. */
 import { memo, useMemo, type CSSProperties, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from "react";
-import { Icon, cx } from "@/components";
+import { Icon, Tooltip, cx } from "@/components";
 import type { EditClip } from "@/lib/api";
 import { parseEffects } from "@/viz/edit/schema";
 import { useThumb } from "@/tools/video-editor/useThumbs";
@@ -51,7 +51,7 @@ function ClipViewImpl({ clip, left, width, selected, status, pastEnd, sourceMs, 
       aria-label={`${label}, ${clip.kind} clip`}
       aria-pressed={selected}
       tabIndex={-1}
-      title={pastEnd ? `${label}: runs past the end of the edit` : label}
+      data-tip={`${label}: drag to move (Alt skips snapping), click to select and seek, double-click to put the playhead here, drag an edge to trim, right-click for more${pastEnd ? ". Runs past the end of the edit" : ""}`}
       onPointerDown={(e) => onPointerDown(e, clip)}
       onContextMenu={(e) => onContextMenu(e, clip)}
     >
@@ -60,21 +60,21 @@ function ClipViewImpl({ clip, left, width, selected, status, pastEnd, sourceMs, 
         {(clip.kind === "text" || clip.kind === "visual") && width > 20 && <Icon name={clip.kind === "text" ? "type" : "sparkles"} size={12} />}
         {width > 40 && <span className={styles.clipName}>{label}</span>}
         <span className={styles.badges}>
-          {clip.pinned && <Icon name="pin" size={11} title="Pinned" />}
-          {status === "missing" && <Icon name="triangle-alert" size={11} title="Missing" />}
-          {status === "preparing" && <Icon name="loader" size={11} title="Preparing" />}
+          {clip.pinned && <Tooltip label="Pinned: Auto-fill and Cut to beat leave this clip alone"><Icon name="pin" size={11} title="Pinned" /></Tooltip>}
+          {status === "missing" && <Tooltip label="The source file is missing; move it back or replace the clip"><Icon name="triangle-alert" size={11} title="Missing" /></Tooltip>}
+          {status === "preparing" && <Tooltip label="Making a fast copy of this source for smooth editing; it will play when ready"><Icon name="loader" size={11} title="Preparing" /></Tooltip>}
           {effects > 0 && (
-            <span className={styles.badge} title={`${effects} effect${effects === 1 ? "" : "s"}`}>
+            <span className={styles.badge} data-tip={`${effects} effect${effects === 1 ? "" : "s"} on this clip; see them in the Inspector`}>
               <Icon name="sparkles" size={11} />
               {effects}
             </span>
           )}
-          {matte !== "none" && <Icon name="scan-face" size={11} title={matte === "ready" ? "Cut-out" : "Cut-out in progress"} />}
-          {hasSpeedChange(clip) && <Icon name="gauge" size={11} title="Speed changes" />}
+          {matte !== "none" && <Tooltip label={matte === "ready" ? "Cut-out ready: the subject is separated from the background" : "Cut-out in progress: the subject is still being separated"}><Icon name="scan-face" size={11} title={matte === "ready" ? "Cut-out" : "Cut-out in progress"} /></Tooltip>}
+          {hasSpeedChange(clip) && <Tooltip label="This clip plays faster, slower or with a speed ramp"><Icon name="gauge" size={11} title="Speed changes" /></Tooltip>}
         </span>
       </div>
-      <div className={cx(styles.trim, styles.trimStart)} data-trim="start" onPointerDown={(e) => onTrimDown(e, clip, "start")} />
-      <div className={cx(styles.trim, styles.trimEnd)} data-trim="end" onPointerDown={(e) => onTrimDown(e, clip, "end")} />
+      <div className={cx(styles.trim, styles.trimStart)} data-trim="start" data-tip="Drag to trim the start of this clip (Alt skips snapping)" onPointerDown={(e) => onTrimDown(e, clip, "start")} />
+      <div className={cx(styles.trim, styles.trimEnd)} data-trim="end" data-tip="Drag to trim the end of this clip (Alt skips snapping)" onPointerDown={(e) => onTrimDown(e, clip, "end")} />
     </div>
   );
 }

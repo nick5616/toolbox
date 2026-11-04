@@ -9,7 +9,7 @@ export function SafeZones({ aspect, width, height, k }: { aspect: string; width:
   return (
     <g data-testid="safe-zones" aria-label="Safe zones">
       {zones.map((z) => (
-        <g key={z.id} data-zone={z.id}>
+        <g key={z.id} data-zone={z.id} data-tip="Instagram covers this part with its own buttons and captions: keep faces and text out of it">
           <rect className={styles.zone} x={z.x} y={z.y} width={z.w} height={z.h} />
           {z.id === "left" || z.id === "right" ? (
             <text className={styles.zoneLabel} fontSize={font} transform={`translate(${z.x + z.w / 2 + font * 0.35} ${z.y + z.h / 2}) rotate(-90)`} textAnchor="middle">

@@ -95,7 +95,7 @@ describe("TracksPanel layout", () => {
   it("flags clips that run past the end of the edit", () => {
     open([vid("a", 19_000, 22_000)]);
     render(<TracksPanel />);
-    expect(clipEl("a").title).toMatch(/past the end/);
+    expect(clipEl("a").getAttribute("data-tip")).toMatch(/past the end/);
   });
 
   it("adds tracks (up to 8) and disables the buttons at the limit", async () => {

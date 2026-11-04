@@ -154,6 +154,7 @@ export function LaneRow(props: LaneRowProps) {
         role="radio"
         aria-checked={active}
         aria-label={`${LANE_LABELS[lane]} lane`}
+        data-tip={active ? `${LANE_LABELS[lane]} is the active lane: marker jumps and Cut to beat use it` : `Make ${LANE_LABELS[lane]} the active lane for marker jumps and cutting`}
         tabIndex={0}
         onClick={() => useEditStudio.getState().setActiveLane(lane)}
         onKeyDown={(e) => {
@@ -163,17 +164,17 @@ export function LaneRow(props: LaneRowProps) {
           }
         }}
       >
-        <span className={styles.swatch} style={{ background: `var(--lane-${lane})` }} />
+        <span className={styles.swatch} style={{ background: `var(--lane-${lane})` }} data-tip={`Colour of the ${LANE_LABELS[lane]} markers`} />
         <span className={styles.name}>{LANE_LABELS[lane]}</span>
-        {lane === "downbeat" && barOffset > 0 && <span className={styles.hint} title="Bar starts on beat">{`bar = beat ${barOffset + 1}`}</span>}
-        <span className={styles.count} aria-label={`${markers.length} markers`}>
+        {lane === "downbeat" && barOffset > 0 && <span className={styles.hint} data-tip="Bars are counted from this beat; change it in the lane settings">{`bar = beat ${barOffset + 1}`}</span>}
+        <span className={styles.count} aria-label={`${markers.length} markers`} data-tip={`${markers.length} markers shown in this lane after its settings are applied`}>
           {markers.length}
         </span>
         <button
           type="button"
           className={styles.iconBtn}
           aria-label={`Hide ${LANE_LABELS[lane]}`}
-          title="Hide lane"
+          data-tip="Hide this lane (bring it back from the + next to Lanes); its markers are kept"
           onClick={(e) => {
             e.stopPropagation();
             toggleVisible();
@@ -185,6 +186,7 @@ export function LaneRow(props: LaneRowProps) {
           type="button"
           className={styles.iconBtn}
           aria-label={`${LANE_LABELS[lane]} settings`}
+          data-tip="Lane settings: strength threshold, keep every Nth, nudge and reset"
           aria-haspopup="dialog"
           data-pop-anchor="1"
           aria-expanded={pop !== null}
@@ -201,6 +203,7 @@ export function LaneRow(props: LaneRowProps) {
           ref={cv}
           className={styles.canvas}
           aria-label={`${LANE_LABELS[lane]} markers`}
+          data-tip={hover ? undefined : lane === "custom" ? "Click to move the playhead; drag a marker to move it; double-click empty space to add one, a marker to rename it" : "Click to move the playhead; drag a marker to move it (Alt skips snapping); Shift+click selects several"}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={(e) => finish(e, true)}

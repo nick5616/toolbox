@@ -39,6 +39,13 @@ import { editLength } from "@/viz/edit/types";
 import { seekTo } from "./transport/player";
 
 const SAVE_LABEL: Record<string, string> = { idle: "", dirty: "Unsaved", saving: "Saving…", saved: "Saved", error: "Couldn't save" };
+const SAVE_TIPS: Record<string, string | undefined> = {
+  idle: undefined,
+  dirty: "Changes are waiting to be saved; this happens automatically",
+  saving: "Saving your changes",
+  saved: "All changes are saved",
+  error: "The last save failed",
+};
 
 export default function EditStudioView({ moduleId }: ToolViewProps) {
   const projectId = useEditStudio((s) => s.projectId);
@@ -135,21 +142,22 @@ function Editor({ moduleId }: { moduleId: string }) {
   return (
     <div className={styles.editor}>
       <header className={styles.header}>
-        <IconButton icon="arrow-left" label="All edits" onClick={() => void close()} />
+        <IconButton icon="arrow-left" label="All edits" data-tip="Save and go back to the list of your edits" onClick={() => void close()} />
         <input
           className={styles.name}
           value={name}
           aria-label="Edit name"
+          data-tip="The name of this edit; changes save automatically"
           onChange={(e) => useEditStudio.getState().setName(e.target.value)}
         />
-        <span className={styles.save} title={saveError ?? undefined}>
+        <span className={styles.save} data-tip={saveError ?? SAVE_TIPS[saveState]}>
           {SAVE_LABEL[saveState]}
         </span>
         <HeaderControls disabled={setup} />
         <div className={styles.spacer} />
-        <IconButton icon="undo-2" label="Undo" kbd="Mod+Z" disabled={!canUndo} onClick={() => useEditStudio.getState().undo()} />
-        <IconButton icon="redo-2" label="Redo" kbd="Mod+Shift+Z" disabled={!canRedo} onClick={() => useEditStudio.getState().redo()} />
-        <Button icon="wand-sparkles" collapsible disabled={setup} onClick={() => useEditStudio.getState().openDialog({ kind: "autofill", range: selection?.kind === "range" ? { fromMs: selection.fromMs, toMs: selection.toMs } : null })}>
+        <IconButton icon="undo-2" label="Undo" data-tip={canUndo ? "Undo the last change" : "Nothing to undo yet"} kbd="Mod+Z" disabled={!canUndo} onClick={() => useEditStudio.getState().undo()} />
+        <IconButton icon="redo-2" label="Redo" data-tip={canRedo ? "Redo the change you undid" : "Nothing to redo"} kbd="Mod+Shift+Z" disabled={!canRedo} onClick={() => useEditStudio.getState().redo()} />
+        <Button icon="wand-sparkles" collapsible data-tip={setup ? "Set up the song first" : "Fill the timeline with clips cut to the music using a recipe (the selected range, if any)"} disabled={setup} onClick={() => useEditStudio.getState().openDialog({ kind: "autofill", range: selection?.kind === "range" ? { fromMs: selection.fromMs, toMs: selection.toMs } : null })}>
           Auto-fill
         </Button>
         <MenuButton
@@ -157,12 +165,12 @@ function Editor({ moduleId }: { moduleId: string }) {
           icon="ellipsis"
           variant="ghost"
           items={() => [
-            { id: "markers-csv", label: "Export markers (CSV)", disabled: setup, onSelect: () => void exportMarkers("csv") },
-            { id: "markers-json", label: "Export markers (JSON)", disabled: setup, onSelect: () => void exportMarkers("json") },
-            { id: "srt", label: "Export captions (SRT)", disabled: setup || !project.captions, onSelect: () => void exportSrt() },
+            { id: "markers-csv", label: "Export markers (CSV)", tip: "Save the beat, kick, snare and other marker times as a spreadsheet file", disabled: setup, onSelect: () => void exportMarkers("csv") },
+            { id: "markers-json", label: "Export markers (JSON)", tip: "Save the marker times as a JSON file for other software", disabled: setup, onSelect: () => void exportMarkers("json") },
+            { id: "srt", label: "Export captions (SRT)", tip: project.captions ? "Save the captions as an SRT subtitle file" : "Turn captions on first", disabled: setup || !project.captions, onSelect: () => void exportSrt() },
           ]}
         />
-        <Button variant="primary" icon="download" collapsible disabled={setup} onClick={() => useEditStudio.getState().openDialog({ kind: "export" })}>
+        <Button variant="primary" icon="download" collapsible data-tip={setup ? "Set up the song first" : "Render the edit to a video file"} disabled={setup} onClick={() => useEditStudio.getState().openDialog({ kind: "export" })}>
           Export
         </Button>
       </header>
@@ -187,14 +195,14 @@ function Editor({ moduleId }: { moduleId: string }) {
           <ErrorBoundary label="The preview overlays" compact>
             <PreviewOverlays canvas={canvas} width={size.width} height={size.height} />
           </ErrorBoundary>
-          {stats && playing && inputs && !setup && <span className={styles.stats}>{`${Math.round(stats.fps)} fps · ${stats.dropped} dropped`}</span>}
+          {stats && playing && inputs && !setup && <span className={styles.stats} data-tip="Preview speed while playing: frames per second and frames that were dropped to keep up">{`${Math.round(stats.fps)} fps · ${stats.dropped} dropped`}</span>}
         </section>
         <aside className={styles.right}>
           <div className={styles.tabs} role="tablist">
-            <button role="tab" aria-selected={rightPanel === "inspector"} className={styles.tab} onClick={() => useEditStudio.getState().setRightPanel("inspector")}>
+            <button role="tab" aria-selected={rightPanel === "inspector"} data-tip="Settings of the selected clip, track, song or marker" className={styles.tab} onClick={() => useEditStudio.getState().setRightPanel("inspector")}>
               Inspector
             </button>
-            <button role="tab" aria-selected={rightPanel === "captions"} className={styles.tab} onClick={() => useEditStudio.getState().setRightPanel("captions")}>
+            <button role="tab" aria-selected={rightPanel === "captions"} data-tip="Words from the song shown on the picture as captions" className={styles.tab} onClick={() => useEditStudio.getState().setRightPanel("captions")}>
               Captions
             </button>
           </div>
@@ -211,6 +219,7 @@ function Editor({ moduleId }: { moduleId: string }) {
         role="separator"
         aria-orientation="horizontal"
         aria-label="Resize the preview"
+        data-tip="Drag up or down to give the preview or the timeline more room"
         onPointerDown={(e) => {
           const box = e.currentTarget.parentElement?.getBoundingClientRect();
           if (!box) return;

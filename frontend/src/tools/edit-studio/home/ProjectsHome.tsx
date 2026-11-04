@@ -99,26 +99,28 @@ export function ProjectsHome({ moduleId, onOpen }: ProjectsHomeProps) {
   return (
     <div className={styles.home}>
       <div className={styles.homeBar}>
-        <Button variant="primary" icon="plus" onClick={() => setCreating({})}>
+        <Button variant="primary" icon="plus" data-tip="Start a new edit: pick a song, a shape and a frame rate" onClick={() => setCreating({})}>
           New edit
         </Button>
       </div>
       {projects.length === 0 && !loading ? (
         <>
           <EmptyState icon="audio-waveform" title="No edits yet" body="Pick a song and cut your clips to its beat: kicks, snares and drops become the places to cut." />
-          <DropZone id={`tool-drop:${moduleId}`} label="Drop a song to start an edit" hint="Clips and photos dropped with it are added as sources" />
+          <div data-tip="Drop a song (and any clips or photos) to start a new edit with them">
+            <DropZone id={`tool-drop:${moduleId}`} label="Drop a song to start an edit" hint="Clips and photos dropped with it are added as sources" />
+          </div>
         </>
       ) : (
         <ul className={styles.cards} aria-label="Edits">
           {projects.map((pr) => (
             <li key={pr.id} className={styles.card}>
-              <button type="button" className={styles.cardMain} onClick={() => onOpen(pr.id)} aria-label={`Open ${pr.name}`}>
+              <button type="button" className={styles.cardMain} onClick={() => onOpen(pr.id)} aria-label={`Open ${pr.name}`} data-tip={`Open this edit and carry on where you left off (${pr.items} ${pr.items === 1 ? "clip" : "clips"})`}>
                 <Thumb path={pr.thumb} />
                 <span className={styles.cardName}>{pr.name}</span>
                 <span className={styles.cardMeta}>
                   {pr.items} {pr.items === 1 ? "clip" : "clips"}
-                  {pr.missing > 0 && <Badge tone="warn">{pr.missing} missing</Badge>}
-                  <span>{formatRelativeTime(pr.updatedAt)}</span>
+                  {pr.missing > 0 && <Badge tone="warn" tip="Source files this edit uses that can no longer be found; open it to relink them">{pr.missing} missing</Badge>}
+                  <span data-tip="When this edit was last saved">{formatRelativeTime(pr.updatedAt)}</span>
                 </span>
               </button>
               <div className={styles.cardMenu}>
@@ -128,18 +130,19 @@ export function ProjectsHome({ moduleId, onOpen }: ProjectsHomeProps) {
                   variant="ghost"
                   size="sm"
                   items={() => [
-                    { id: "open", label: "Open", icon: "folder-open", onSelect: () => onOpen(pr.id) },
-                    { id: "dup", label: "Duplicate", icon: "copy", onSelect: () => void duplicate(pr.id) },
+                    { id: "open", label: "Open", icon: "folder-open", tip: "Open this edit in the editor", onSelect: () => onOpen(pr.id) },
+                    { id: "dup", label: "Duplicate", icon: "copy", tip: "Make a copy to try a different cut without touching this one", onSelect: () => void duplicate(pr.id) },
                     {
                       id: "rename",
                       label: "Rename",
                       icon: "pencil",
+                      tip: "Give this edit another name",
                       onSelect: () => {
                         setRenaming(pr);
                         setDraft(pr.name);
                       },
                     },
-                    { id: "delete", label: "Delete", icon: "trash-2", onSelect: () => setDeleting(pr) },
+                    { id: "delete", label: "Delete", icon: "trash-2", tip: "Remove this edit from the app; your songs, clips and exports stay", onSelect: () => setDeleting(pr) },
                   ]}
                 />
               </div>
@@ -162,7 +165,7 @@ export function ProjectsHome({ moduleId, onOpen }: ProjectsHomeProps) {
         open={!!renaming}
         title="Rename edit"
         confirmLabel="Rename"
-        body={<TextField aria-label="Name" value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />}
+        body={<TextField aria-label="Name" data-tip="A name for this edit" value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />}
         onConfirm={() => {
           if (renaming && draft.trim()) void rename(renaming.id, draft.trim());
           setRenaming(null);

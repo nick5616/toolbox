@@ -163,18 +163,18 @@ export function Transport() {
       <div ref={hiddenRef} hidden>
         {source && <MediaPlayer ref={handle} source={source} kind="audio" keyboard={false} onTime={onTime} onPlayingChange={onPlayingChange} />}
       </div>
-      <IconButton icon={playing ? "pause" : "play"} label={playing ? "Pause" : "Play"} kbd="Space" disabled={!source} onClick={() => ctrl.toggle()} />
-      <span className={styles.time} aria-label="Time">
+      <IconButton icon={playing ? "pause" : "play"} label={playing ? "Pause" : "Play"} data-tip={!source ? "The song isn't loaded yet, or its file is missing" : playing ? "Pause the song and the preview" : "Play the edit with the song from the playhead"} kbd="Space" disabled={!source} onClick={() => ctrl.toggle()} />
+      <span className={styles.time} aria-label="Time" data-tip="Playhead time / total length of the edit (minutes:seconds.tenths)">
         {formatMs(playheadMs)} / {formatMs(D)}
       </span>
-      <label className={styles.field}>
+      <label className={styles.field} data-tip="The marker lane that Snap, marker jumps, Slice and Cut to beat follow">
         <span className={styles.label}>Lane</span>
-        <Select<MarkerLane> size="sm" aria-label="Active lane" value={activeLane} options={laneOptions} onChange={(l) => useEditStudio.getState().setActiveLane(l)} />
+        <Select<MarkerLane> size="sm" aria-label="Active lane" data-tip="The marker lane that Snap, marker jumps, Slice and Cut to beat follow" value={activeLane} options={laneOptions} onChange={(l) => useEditStudio.getState().setActiveLane(l)} />
       </label>
-      <Button size="sm" variant={snap ? "primary" : "secondary"} icon="grid-3x3" aria-pressed={snap} onClick={() => useEditStudio.getState().setSnap(!snap)}>
+      <Button size="sm" variant={snap ? "primary" : "secondary"} icon="grid-3x3" aria-pressed={snap} data-tip={snap ? "Snap is on: clips and the playhead stick to markers and clip edges (Alt skips it while dragging)" : "Snap is off: clips move freely instead of sticking to markers and clip edges"} onClick={() => useEditStudio.getState().setSnap(!snap)}>
         Snap
       </Button>
-      <label className={styles.field} title="Shifts every clip boundary by this many frames">
+      <label className={styles.field} data-tip="Shift every beat-synced cut earlier or later by this many frames (-3 to 3), to feel tighter on the music">
         <span className={styles.label}>Cut offset</span>
         <Stepper
           aria-label="Cut offset in frames"
@@ -185,18 +185,18 @@ export function Transport() {
         />
       </label>
       <span className={styles.spacer} />
-      <IconButton icon="zoom-out" label="Zoom out" size="sm" onClick={() => zoom(1 / 1.5)} disabled={pps <= 6} />
-      <IconButton icon="zoom-in" label="Zoom in" size="sm" onClick={() => zoom(1.5)} disabled={pps >= 800} />
-      <Button size="sm" variant="secondary" onClick={fit}>
+      <IconButton icon="zoom-out" label="Zoom out" size="sm" data-tip={pps <= 6 ? "Fully zoomed out" : "Show more of the timeline (Ctrl+scroll also zooms)"} onClick={() => zoom(1 / 1.5)} disabled={pps <= 6} />
+      <IconButton icon="zoom-in" label="Zoom in" size="sm" data-tip={pps >= 800 ? "Fully zoomed in" : "Show less of the timeline in more detail (Ctrl+scroll also zooms)"} onClick={() => zoom(1.5)} disabled={pps >= 800} />
+      <Button size="sm" variant="secondary" data-tip="Zoom so the whole edit fits the timeline" onClick={fit}>
         Fit
       </Button>
-      <IconButton icon="frame" label="Safe zones" size="sm" pressed={safeZones} onClick={() => useEditStudio.getState().setSafeZones(!safeZones)} />
+      <IconButton icon="frame" label="Safe zones" data-tip="Shade the parts of the picture that Instagram's buttons and captions cover (tall and portrait shapes)" size="sm" pressed={safeZones} onClick={() => useEditStudio.getState().setSafeZones(!safeZones)} />
       {missing && (
         <Banner
           tone="warn"
           title="The song file is missing"
           action={
-            <Button size="sm" onClick={() => void findSong()} disabled={finding}>
+            <Button size="sm" data-tip="Pick the song file again; markers and clips are kept" onClick={() => void findSong()} disabled={finding}>
               Find the song…
             </Button>
           }

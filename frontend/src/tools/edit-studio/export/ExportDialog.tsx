@@ -79,6 +79,7 @@ function Panel({ onClose }: { onClose(): void }) {
   else if (checks.clipCount === 0) blockers.push("Add a clip to the edit first.");
   const blocked = blockers.length > 0 || waitingOnPrep || checks.missing.length > 0 || checks.badMattes.length > 0 || !checked || busy;
   const badCount = checks.badMattes.length;
+  const exportTip = blockers[0] ?? (!checked ? "Still checking your files" : waitingOnPrep ? "Wait for the clips to finish preparing" : checks.missing.length > 0 ? "Some files are missing: put them back or remove those clips" : badCount > 0 ? "Fix the cut-outs above first" : busy ? "Starting the export" : "Render the edit to a video file in your library");
 
   const rebuild = async () => {
     const st = useEditStudio.getState();
@@ -175,6 +176,7 @@ function Panel({ onClose }: { onClose(): void }) {
             <Select
               size="sm"
               aria-label="Size"
+              data-tip="Height of the exported video; the width follows the edit's shape. Bigger is sharper but slower"
               value={String(height)}
               onChange={(v) => setHeight(normalizeHeight(Number(v)))}
               options={EXPORT_HEIGHTS.map((h) => ({ value: String(h), label: `${sizeLabel(project.aspect, h)} (${h}p)` }))}
@@ -182,12 +184,12 @@ function Panel({ onClose }: { onClose(): void }) {
           </div>
           <div className={styles.field}>
             <span className={styles.label}>Frame rate</span>
-            <span className={styles.value}>{project.fps} fps</span>
+            <span className={styles.value} data-tip="Frames per second of the export, fixed when the edit was created">{project.fps} fps</span>
             <span className={styles.hint}>Set in the edit's setup</span>
           </div>
           <div className={styles.field}>
             <span className={styles.label}>Length</span>
-            <span className={styles.value}>
+            <span className={styles.value} data-tip="Length of the edit and how many frames will be rendered">
               {formatLength(d)} · {frames} frames
             </span>
           </div>
@@ -210,7 +212,7 @@ function Panel({ onClose }: { onClose(): void }) {
           <Banner tone="danger" title={`${plural(checks.missing.length, "file is", "files are")} missing`}>
             <ul className={styles.list}>
               {checks.missing.map((m) => (
-                <li key={m.path} title={m.path}>
+                <li key={m.path} data-tip={m.path}>
                   {baseName(m.path)}
                   <span className={styles.hint}> — {m.reason}</span>
                 </li>
@@ -232,10 +234,10 @@ function Panel({ onClose }: { onClose(): void }) {
                 <Spinner size={14} />
               ) : (
                 <div className={styles.actions}>
-                  <Button size="sm" onClick={() => void rebuild()}>
+                  <Button size="sm" data-tip="Make the cut-outs again so they are ready for the export" onClick={() => void rebuild()}>
                     Rebuild
                   </Button>
-                  <Button size="sm" onClick={removeCutouts}>
+                  <Button size="sm" data-tip="Export those clips without their cut-out; the clips stay in the edit" onClick={removeCutouts}>
                     Remove the cut-out from those clips
                   </Button>
                 </div>
@@ -253,10 +255,10 @@ function Panel({ onClose }: { onClose(): void }) {
         {error && <Banner tone="danger" title={error} />}
 
         <div className={styles.footer}>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" data-tip="Close without exporting" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" icon="download" disabled={blocked} onClick={() => void start()}>
+          <Button variant="primary" icon="download" data-tip={exportTip} disabled={blocked} onClick={() => void start()}>
             Export
           </Button>
         </div>

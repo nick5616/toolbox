@@ -98,11 +98,11 @@ export function TransformBox({ ctx }: { ctx: OverlayCtx }) {
     <g data-testid="transform-box" role="group" aria-label="Transform box">
       {guide.x && <line className={styles.guide} x1={frame.w / 2} x2={frame.w / 2} y1={0} y2={frame.h} />}
       {guide.y && <line className={styles.guide} x1={0} x2={frame.w} y1={frame.h / 2} y2={frame.h / 2} />}
-      <polygon data-testid="transform-body" className={styles.body} points={poly} {...handlers("move")} />
+      <polygon data-testid="transform-body" className={styles.body} points={poly} data-tip="Drag to move the clip; it snaps to the centre lines (hold Alt to turn that off)" {...handlers("move")} />
       <line className={styles.stem} x1={rot.from.x} y1={rot.from.y} x2={rot.to.x} y2={rot.to.y} />
-      <circle data-testid="handle-rotate" aria-label="Rotate" className={`${styles.handle} ${styles.rotateHandle}`} cx={rot.to.x} cy={rot.to.y} r={r} {...handlers("rotate")} />
+      <circle data-testid="handle-rotate" aria-label="Rotate" data-tip="Drag to rotate the clip; it snaps to steps (hold Alt for free rotation)" className={`${styles.handle} ${styles.rotateHandle}`} cx={rot.to.x} cy={rot.to.y} r={r} {...handlers("rotate")} />
       {corners.map((c) => (
-        <circle key={c.id} data-testid={`handle-${c.id}`} aria-label={`Scale from ${c.id} corner`} className={`${styles.handle} ${styles.cornerHandle}`} cx={c.p.x} cy={c.p.y} r={r} {...handlers("scale")} />
+        <circle key={c.id} data-testid={`handle-${c.id}`} aria-label={`Scale from ${c.id} corner`} data-tip="Drag to scale the clip evenly around its centre" className={`${styles.handle} ${styles.cornerHandle}`} cx={c.p.x} cy={c.p.y} r={r} {...handlers("scale")} />
       ))}
     </g>
   );

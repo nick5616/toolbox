@@ -53,8 +53,8 @@ export function TimeScrollbar({ width, durationMs }: { width: number; durationMs
   };
   return (
     <div className={styles.wrap} style={{ paddingLeft: HEADER_PX + 4 }}>
-      <div className={styles.bar} style={{ width: barPx }} onPointerDown={onBar} role="scrollbar" aria-orientation="horizontal" aria-label="Scroll the timeline" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((g.left / Math.max(1, barPx - g.width)) * 100)} aria-controls="es-tracks">
-        <div className={styles.thumb} style={{ left: g.left, width: g.width }} onPointerDown={onThumbDown} onPointerMove={onThumbMove} onPointerUp={onThumbUp} onPointerCancel={onThumbUp} />
+      <div className={styles.bar} style={{ width: barPx }} onPointerDown={onBar} data-tip="Scroll the timeline: drag the handle, or click the bar to jump there" role="scrollbar" aria-orientation="horizontal" aria-label="Scroll the timeline" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((g.left / Math.max(1, barPx - g.width)) * 100)} aria-controls="es-tracks">
+        <div className={styles.thumb} data-tip="Drag to scroll; zoom in the transport bar to make it smaller" style={{ left: g.left, width: g.width }} onPointerDown={onThumbDown} onPointerMove={onThumbMove} onPointerUp={onThumbUp} onPointerCancel={onThumbUp} />
       </div>
     </div>
   );

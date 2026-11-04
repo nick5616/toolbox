@@ -5,7 +5,7 @@
  * is set (useEditData then loads it).
  */
 import { useEffect, useRef, useState } from "react";
-import { Banner, Button, Meter, SegmentedControl, Select, TextArea } from "@/components";
+import { Banner, Button, Meter, SegmentedControl, Select, TextArea, Tooltip } from "@/components";
 import { EditStudioService, JobsService, JobStatus, TranscribeService, WordsSource, type AnalysisRef } from "@/lib/api";
 import { toAppError, type AppErrorShape } from "@/lib/errors";
 import { isActive, useJob, useJobs } from "@/state/jobs";
@@ -17,10 +17,10 @@ import styles from "./Setup.module.css";
 const MAX_LYRICS = 20_000;
 
 type Words = "none" | "detect" | "align";
-const WORDS: Array<{ value: Words; label: string }> = [
-  { value: "none", label: "None" },
-  { value: "detect", label: "Detect" },
-  { value: "align", label: "Use my lyrics" },
+const WORDS: Array<{ value: Words; label: string; tip: string }> = [
+  { value: "none", label: "None", tip: "Skip the words: the fastest option, and fine for edits without captions or lyrics" },
+  { value: "detect", label: "Detect", tip: "Listen to the vocals and write out the words, for captions and word markers" },
+  { value: "align", label: "Use my lyrics", tip: "Paste the real lyrics and match them to the singing for exact line and word timing" },
 ];
 const SOURCE: Record<Words, WordsSource> = { none: WordsSource.WordsNone, detect: WordsSource.WordsDetect, align: WordsSource.WordsAlign };
 
@@ -135,11 +135,11 @@ export function AnalysisPanel() {
       <div className={styles.box} role="status" aria-live="polite">
         <div className={styles.head}>
           <span>{job.status === JobStatus.JobQueued ? "Waiting to start…" : "Analyzing the song…"}</span>
-          <Button size="sm" variant="ghost" onClick={cancel}>
+          <Button size="sm" variant="ghost" data-tip="Stop the analysis; you can start it again" onClick={cancel}>
             Cancel
           </Button>
         </div>
-        <Meter value={job.status === JobStatus.JobQueued ? -1 : job.progress} status={job.status === JobStatus.JobQueued ? "queued" : "running"} label="Analysis progress" />
+        <Tooltip label="How far the song analysis has got"><Meter value={job.status === JobStatus.JobQueued ? -1 : job.progress} status={job.status === JobStatus.JobQueued ? "queued" : "running"} label="Analysis progress" /></Tooltip>
         {job.message && <div className={styles.msg}>{job.message}</div>}
       </div>
     );
@@ -152,7 +152,7 @@ export function AnalysisPanel() {
           tone="info"
           title="This song was analysed before"
           action={
-            <Button size="sm" variant="primary" onClick={useOffer}>
+            <Button size="sm" variant="primary" data-tip="Reuse the earlier analysis of this song: no waiting" onClick={useOffer}>
               Use it
             </Button>
           }
@@ -161,15 +161,15 @@ export function AnalysisPanel() {
         </Banner>
       )}
       <div className={styles.group}>
-        <span className={styles.label} id="es-words-label">
+        <span className={styles.label} id="es-words-label" data-tip="Whether to find the sung words, which captions and word markers need">
           Words
         </span>
         <SegmentedControl aria-labelledby="es-words-label" value={words} options={WORDS} onChange={setWords} />
         {words === "detect" && <span className={styles.hint}>Transcribes the vocals. Good for captions and the word markers.</span>}
         {words === "align" && (
           <>
-            <TextArea aria-label="Your lyrics" minRows={5} placeholder="Paste the lyrics, one line per line" value={lyrics} onChange={(e) => setLyrics(e.target.value)} />
-            <span className={styles.count}>{`${lyrics.length.toLocaleString()} / ${MAX_LYRICS.toLocaleString()}`}</span>
+            <TextArea aria-label="Your lyrics" data-tip={`Plain text, one lyric line per line, up to ${MAX_LYRICS.toLocaleString()} characters`} minRows={5} placeholder="Paste the lyrics, one line per line" value={lyrics} onChange={(e) => setLyrics(e.target.value)} />
+            <span className={styles.count} data-tip="Characters used out of the allowed maximum">{`${lyrics.length.toLocaleString()} / ${MAX_LYRICS.toLocaleString()}`}</span>
           </>
         )}
         {words !== "none" && (
@@ -177,6 +177,7 @@ export function AnalysisPanel() {
             <span className={styles.label}>Language</span>
             <Select
               aria-label="Language"
+              data-tip="Language of the vocals; Auto lets the engine work it out"
               value={language}
               onChange={setLanguage}
               options={[{ value: "", label: "Auto" }, ...languages.map((l) => ({ value: l.code, label: l.name }))]}
@@ -189,7 +190,7 @@ export function AnalysisPanel() {
           tone={cancelled && !failed && !error ? "info" : "danger"}
           title={error?.message || (failed ? job?.error || "The analysis didn't work" : "Cancelled")}
           action={
-            <Button size="sm" onClick={() => void start()}>
+            <Button size="sm" data-tip="Run the song analysis again" onClick={() => void start()}>
               {cancelled ? "Start again" : "Retry"}
             </Button>
           }
@@ -198,7 +199,7 @@ export function AnalysisPanel() {
         </Banner>
       )}
       <div className={styles.row}>
-        <Button variant="primary" icon="sparkles" loading={submitting} disabled={lyricsBad} onClick={() => void start()}>
+        <Button variant="primary" icon="sparkles" loading={submitting} disabled={lyricsBad} data-tip={lyricsBad ? (lyrics.trim() === "" ? "Paste your lyrics first, or choose None or Detect" : "Your lyrics are over the maximum length") : "Find the beats, bars, sections and instruments in the song so clips can be cut to them"} onClick={() => void start()}>
           {offer ? "Analyze again" : "Analyze"}
         </Button>
         <span className={styles.hint}>Takes a minute or two. The result is kept for next time.</span>

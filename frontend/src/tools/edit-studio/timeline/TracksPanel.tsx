@@ -54,7 +54,7 @@ function Playhead({ durationMs, timeLeft }: { durationMs: number; timeLeft: () =
   return (
     <div className={styles.playhead} style={{ left: HEADER_PX + x }}>
       {/* A wide invisible grip: drag the playhead anywhere along the tracks. */}
-      <div className={styles.playheadGrip} title="Drag to move the playhead" onPointerDown={(e) => startScrub(e, timeLeft, durationMs)} />
+      <div className={styles.playheadGrip} data-tip="Drag to move the playhead along the edit" onPointerDown={(e) => startScrub(e, timeLeft, durationMs)} />
     </div>
   );
 }
@@ -316,14 +316,15 @@ function Tracks({ project }: { project: NormalProject }) {
     const hasMatte = !!one?.matte && !!mattes[one.matte.id]?.ready;
     const file = one && (one.kind === "video" || one.kind === "image") ? one.path : "";
     return [
-      { id: "split", label: "Split at playhead", icon: "scissors", disabled: !underPlayhead, onSelect: () => void splitAtPlayhead() },
-      { id: "slice", label: `Slice at ${st.activeLane} markers`, icon: "scissors", onSelect: () => void sliceSelection(live.current.markers, false) },
-      { id: "cycle", label: "Slice and cycle sources", icon: "scissors", disabled: live.current.project.sources.length < 2, onSelect: () => void sliceSelection(live.current.markers, true) },
-      { id: "subject", label: "Split subject", icon: "scan-face", disabled: !hasMatte, onSelect: () => void splitSubjectOfSelection() },
+      { id: "split", label: "Split at playhead", icon: "scissors", tip: underPlayhead ? "Cut the clip in two where the playhead is" : "Put the playhead inside the clip to split it", disabled: !underPlayhead, onSelect: () => void splitAtPlayhead() },
+      { id: "slice", label: `Slice at ${st.activeLane} markers`, icon: "scissors", tip: `Cut the selected clips at every ${st.activeLane} marker they cover`, onSelect: () => void sliceSelection(live.current.markers, false) },
+      { id: "cycle", label: "Slice and cycle sources", icon: "scissors", tip: live.current.project.sources.length < 2 ? "Needs at least two sources in the Sources panel" : "Slice at the active lane's markers and give each piece the next source in turn", disabled: live.current.project.sources.length < 2, onSelect: () => void sliceSelection(live.current.markers, true) },
+      { id: "subject", label: "Split subject", icon: "scan-face", tip: hasMatte ? "Separate the cut-out subject onto its own track above the background" : "Needs one clip with a finished cut-out (make one in the Inspector)", disabled: !hasMatte, onSelect: () => void splitSubjectOfSelection() },
       {
         id: "pin",
         label: allPinned ? "Unpin" : "Pin",
         icon: allPinned ? "pin-off" : "pin",
+        tip: allPinned ? "Let Auto-fill and Cut to beat change these clips again" : "Keep these clips as they are when Auto-fill or Cut to beat reshuffles the edit",
         separator: true,
         onSelect: () => {
           let next = doc;
@@ -331,12 +332,13 @@ function Tracks({ project }: { project: NormalProject }) {
           commit(next);
         },
       },
-      { id: "dup", label: "Duplicate", icon: "copy", onSelect: () => void duplicateSelection() },
-      { id: "del", label: "Delete", icon: "trash-2", onSelect: () => void deleteSelection() },
+      { id: "dup", label: "Duplicate", icon: "copy", tip: "Copy the selected clips right after themselves", onSelect: () => void duplicateSelection() },
+      { id: "del", label: "Delete", icon: "trash-2", tip: "Remove the selected clips from the edit (you can undo it)", onSelect: () => void deleteSelection() },
       {
         id: "reveal",
         label: "Reveal source",
         icon: "folder-open",
+        tip: file ? "Show the original file in your file manager" : "Select one video or photo clip to find its file",
         separator: true,
         disabled: !file,
         onSelect: () => void LibraryService.RevealPath(file).catch((err: unknown) => toast({ title: toAppError(err).message, tone: "danger" })),
@@ -354,20 +356,20 @@ function Tracks({ project }: { project: NormalProject }) {
   return (
     <div className={styles.panel}>
       <div className={styles.toolbar}>
-        <Button size="sm" icon="plus" disabled={project.tracks.length >= 8} onClick={() => edit(addTrack(project, "video"))}>
+        <Button size="sm" icon="plus" data-tip={project.tracks.length >= 8 ? "An edit can have at most 8 tracks" : "Add a video track on top: footage, photos, text and visuals layer upwards"} disabled={project.tracks.length >= 8} onClick={() => edit(addTrack(project, "video"))}>
           Track
         </Button>
-        <Button size="sm" icon="sliders-horizontal" disabled={project.tracks.length >= 8} onClick={() => edit(addTrack(project, "adjust"))}>
+        <Button size="sm" icon="sliders-horizontal" data-tip={project.tracks.length >= 8 ? "An edit can have at most 8 tracks" : "Add a track whose effects apply to everything beneath it; double-click it to add an effect clip"} disabled={project.tracks.length >= 8} onClick={() => edit(addTrack(project, "adjust"))}>
           Adjustment track
         </Button>
         <CutToBeat />
-        <Button size="sm" icon="type" onClick={() => addTextClip()}>
+        <Button size="sm" icon="type" data-tip="Add a text clip: a title, a lyric line or any words over the picture" onClick={() => addTextClip()}>
           Text
         </Button>
-        <Button size="sm" icon="sparkles" onClick={() => addVisualClip()}>
+        <Button size="sm" icon="sparkles" data-tip="Add a music-reactive visual (shapes, light, particles) as a clip" onClick={() => addVisualClip()}>
           Visual
         </Button>
-        <span className={styles.toolbarHint}>{project.tracks.length} of 8 tracks</span>
+        <span className={styles.toolbarHint} data-tip="Tracks in this edit; the limit is 8">{project.tracks.length} of 8 tracks</span>
       </div>
       <div className={styles.rows} ref={rootRef} role="region" aria-label="Tracks" id="es-tracks">
         {tracksTopFirst.map(({ t: track, i }) => (
