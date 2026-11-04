@@ -2082,3 +2082,98 @@ Requirements:
   - Every new transition renders without black borders.
   - Each FX stack applies in one click.
 - An export containing all of the above matches the preview (spot-checked frames).
+
+---
+
+## 24. Part C: Section styles and Moments (2026-11-03)
+
+The user asked for two things:
+- **Section styles:** each part of the song should react to a different aspect of the music, e.g. "a section that reacts to the hi-hats and is just quick cuts of the clips". The editor should help lay out, cut and distribute the footage there.
+- **Moments:** detect stand-out events and automatically put a keyframe there, so the user can use it or not and put an effect on it.
+
+### 24.1 Foundation (on main)
+
+- **Accents marker lane** (`"accent"`):
+  - These are the song's stand-out hits (`viz/edit/markers.ts` `deriveAccents`):
+    - onset peaks clearly above the hits in the 4 s around them, whole mix and stems;
+    - strong off-grid hits;
+    - drops;
+    - the return after a stop.
+  - They are at least a beat apart, with about one every two bars at most.
+  - The lane is offered everywhere lanes are: Hits on, Cut to beat, reactions, snapping, Auto-fill rules.
+- **Footage moments:**
+  - `EditStudioService.Moments(path, fps) → Moment[] {ms (source ms), strength 0..1, kind "cut"|"motion"}`.
+  - It measures FFmpeg's per-frame scene score on the preview stream once, caches it in `motion.json`, and returns shot changes plus bursts of movement or light.
+  - Videos only; it may take about a second the first time.
+  - Type: `EditMoment` from `@/lib/api`.
+
+### 24.2 WP-SC1: Section styles (`tools/edit-studio/sectionstyle/**`)
+
+A **Section style** dialog, opened from:
+- the section band chip menu ("Style this section…");
+- the clip context menu, for a selected range or selected clips ("Style this part…");
+- a **Style** button in the tracks toolbar (uses the selection, else the section under the playhead).
+
+The dialog shows the range (from–to, editable, snapped to section edges and bars) and three groups.
+
+1. **Cuts:**
+   - "Switch clips on": Beats / Downbeats / Kicks / Snares / Hi-hats / Accents / Bass / Vocals, or "Keep the current clips";
+   - how often (1, 2, 4, 8);
+   - min clip length.
+   - A live density strip shows the cuts over the range, as Auto-fill's strip does.
+2. **Footage:**
+   - which sources: all, selected in Sources, or by tag;
+   - how to distribute them:
+     - "Cycle through them evenly";
+     - "Shuffle";
+     - "One clip, many moments": uses one source and jumps between its moments/shots;
+     - "Best moments": each cut starts on a footage moment of its source, from `Moments`, with a fallback to shot-aligned;
+   - mirror edges on/off.
+3. **Reacts to:**
+   - an FX stack, or none;
+   - which lane its hits follow (default: the cut lane);
+   - strength;
+   - a transition between cuts (cut, flash, whip, zoom, glitch…).
+
+**Apply** does three things:
+- replaces the non-pinned clips of the target video track inside the range with the new cuts (Cut to beat's logic in `beatsync/cutLogic.ts`, extended locally if needed; don't change `autofill.ts`);
+- adds or replaces an adjustment clip spanning the range on an adjustment track named "Section styles" (created on top when missing). It holds the chosen effects with Hits on set to the chosen lane, so the reaction belongs to the section and survives later re-cuts;
+- sets each new clip's transition.
+
+It is one undoable edit, and pinned clips stay. The dialog remembers its last settings per project in local UI state. A toast summarises the result ("24 clips switching on hi-hats, Anime hit on accents").
+
+Tests:
+- the logic as pure functions on the fixture: density, distribution modes, the adjustment clip placement and replacement, pinned clips kept;
+- dialog rendering and Apply.
+
+### 24.3 WP-SC2: Moments (`tools/edit-studio/moments/**`)
+
+1. **On the timeline:** when a video clip is selected, its footage moments (from `Moments`, cached per path in a small zustand store in this folder) and the song's accents inside the clip show as small ghost ticks on the clip block:
+   - footage moments in one colour, song accents in another;
+   - a tooltip on each tick with its kind and time.
+
+   This is done through an overlay component the builder mounts from `timeline/` via a single import line in `TracksPanel.tsx` (allowed: one line plus one JSX element). If the clip moved in source time (in point / speed), map source ms to timeline ms with the clip's speed table (`doc.ts` / `clipSourceSpan`, or a small helper).
+2. **In the Clip inspector:** a "Moments" section (rendered by `moments/MomentsSection.tsx`, mounted with one import line and one JSX line in `inspector/ClipInspector.tsx`). It lists the moments inside the clip:
+   - time, kind (Song accent / Shot change / Motion burst), strength;
+   - the Hits-style controls for each.
+
+   Each row has a **Use** toggle and an effect choice: Punch, Flash, Shake, Zoom blur, RGB split, Glitch, Shockwave, Freeze (speed 0 for a beat). "Use" writes keyframes:
+   - an attack/decay pulse on that effect's amount, at that clip time (keys at t−1 frame = 0, t = peak, t+decay = 0);
+   - adding the effect if the clip doesn't have one of that type;
+   - for Freeze, speed keys.
+
+   Turning "Use" off removes those keys. A "Use all" button and a strength slider cover the whole list. The keys stay ordinary keyframes the user can then edit.
+3. **Snapping:** footage moments of the selected clip join the snap targets while dragging trims/moves (if `timeline/snapping.ts` allows it through its existing inputs; otherwise skip and report).
+
+Tests:
+- source→timeline mapping;
+- pulse key writing/removal (no duplicate or overlapping keys, ≤ 64 keys, clamped to the clip);
+- Use all;
+- the inspector section with a fake `Moments`.
+
+### 24.4 Acceptance
+
+- In the real app, a section styled "Hi-hats · Shuffle · Anime hit on accents" cuts quickly on the hats and pulses on accents.
+- A selected clip shows its moments.
+- Toggling "Use" on a motion burst adds a visible punch exactly there.
+- `npm run check` and Go tests pass.
