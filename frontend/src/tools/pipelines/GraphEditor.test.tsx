@@ -24,6 +24,8 @@ function checkFor(p: Pipeline) {
   return check(stepsOf(p).map((s) => stepCheck(s.id, {}, prods[s.id] ?? [])));
 }
 
+let opened: string[] = [];
+
 function Harness({ initial }: { initial: Pipeline }) {
   const [p, setP] = useState(initial);
   const touched = useRef(new Set<string>()).current;
@@ -38,6 +40,7 @@ function Harness({ initial }: { initial: Pipeline }) {
       touchedKeep={touched}
       onEdit={(fn) => setP((q) => fn(q))}
       onLayout={(layout) => setP((q) => ({ ...q, layout }))}
+      onOpenStep={(id) => opened.push(id)}
     />
   );
 }
@@ -175,11 +178,10 @@ describe("GraphEditor", () => {
     expect(screen.queryByText("120%")).toBeNull();
   });
 
-  it("opens a step's options in a drawer and edits them", () => {
+  it("asks the app to show a step's options (the Step panel) from the node's gear", () => {
+    opened = [];
     render(<Harness initial={base()} />);
     fireEvent.click(screen.getByRole("button", { name: "Options for Video Trimmer" }));
-    expect(screen.getByRole("complementary", { name: "Options for Video Trimmer" })).toBeTruthy();
-    fireEvent.change(screen.getByPlaceholderText("Video Trimmer"), { target: { value: "Cut" } });
-    expect(stepsOf(current).find((s) => s.id === C)?.label).toBe("Cut");
+    expect(opened).toEqual([C]);
   });
 });

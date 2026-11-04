@@ -11,6 +11,7 @@ import { PipelineEditor } from "./PipelineEditor";
 import { useEditorMode } from "./editorMode";
 import { PipelinesTabs } from "./PipelinesTabs";
 import { PipelineList, usePipelineListEffects } from "./PipelineList";
+import { usePopOutState } from "./popoutState";
 import { RunSheet } from "./RunSheet";
 import { RunsPanel } from "./RunsPanel";
 import { useNewPipeline } from "./useNewPipeline";
@@ -23,6 +24,7 @@ export default function PipelinesView(_props: ToolViewProps) {
   const [mode] = useEditorMode();
   const hasPipelines = usePipelines((s) => s.entries.length > 0);
   usePipelineListEffects();
+  usePopOutState();
   // Graph mode gives the canvas the full width: the list becomes a switcher in the editor header.
   const fullWidth = mode === "graph" && hasPipelines;
 
