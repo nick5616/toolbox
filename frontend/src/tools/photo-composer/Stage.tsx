@@ -16,7 +16,7 @@ export interface StageProps {
   /** Shows doc without recording it (during a drag); null ends the preview. */
   onLive: (doc: Composition | null) => void;
   /** Records a finished edit. */
-  onCommit: (doc: Composition, opts?: { merge?: boolean }) => void;
+  onCommit: (doc: Composition, key?: string) => void;
   editingId: string | null;
   onEditing: (id: string | null) => void;
   onTextChange: (id: string, text: string) => void;
@@ -27,6 +27,8 @@ export interface StageProps {
   onZoom: (z: number) => void;
   /** Post sources dropped on the canvas, at fractions (0..1) of its width and height. */
   onSourceDrop?: (paths: string[], x: number, y: number) => void;
+  /** A popped-out preview: draws the canvas and the selection outline, but nothing can be dragged or typed. */
+  readOnly?: boolean;
 }
 
 type Mode = "move" | "scale" | "rotate" | "bg";
@@ -123,13 +125,14 @@ export function Stage(props: StageProps) {
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       const p = propsRef.current;
+      if (p.readOnly) return;
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         p.onZoom(Math.min(4, Math.max(1, p.zoom * Math.exp(-e.deltaY * 0.002))));
       } else if (p.adjustBg && p.doc.background.kind === "image") {
         e.preventDefault();
         const z = zoomBackground(p.doc.background.zoom || 1, e.deltaY);
-        p.onCommit({ ...p.doc, background: { ...p.doc.background, zoom: z } }, { merge: true });
+        p.onCommit({ ...p.doc, background: { ...p.doc.background, zoom: z } }, "bg-zoom");
       }
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -145,7 +148,7 @@ export function Stage(props: StageProps) {
   const selected = selectedId ? findLayer(doc, selectedId) : undefined;
 
   const onPointerDown = (e: RPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || editingId) return;
+    if (e.button !== 0 || editingId || props.readOnly) return;
     if ((e.target as HTMLElement).closest("[data-stage-ui]")) return;
     const p = toDoc(e);
     wrapRef.current?.focus();
@@ -180,7 +183,7 @@ export function Stage(props: StageProps) {
     const p = toDoc(e);
     const s = session.current;
     if (!s) {
-      if (editingId) return;
+      if (editingId || props.readOnly) return;
       let handle: Handle | null = null;
       if (selected && !selected.locked && !selected.hidden) handle = hitHandle(layerBox(doc, selected, sizer), p, handleGeometry(scale));
       const c = cursorFor(handle, !!hitLayer(doc, p, sizer), adjustBg && doc.background.kind === "image");
@@ -234,7 +237,7 @@ export function Stage(props: StageProps) {
   const onDoubleClick = (e: RMouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest("[data-stage-ui]")) return;
     const hit = hitLayer(doc, toDoc(e), sizer);
-    if (hit?.kind === "text" && !hit.locked) {
+    if (!props.readOnly && hit?.kind === "text" && !hit.locked) {
       props.onSelect(hit.id);
       props.onEditing(hit.id);
     }
@@ -281,7 +284,7 @@ export function Stage(props: StageProps) {
                 points={pointsOf(overlay.corners)}
                 vectorEffect="non-scaling-stroke"
               />
-              {!selected?.locked && !editing && (
+              {!selected?.locked && !editing && !props.readOnly && (
                 <>
                   <line
                     className={styles.stem}
@@ -331,7 +334,7 @@ export function Stage(props: StageProps) {
             </span>
           );
         })}
-        {editing?.text && (
+        {editing?.text && !props.readOnly && (
           <textarea
             data-stage-ui
             className={styles.editor}
