@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Banner, Button, IconButton, Meter, Section, SegmentedControl, Switch, toast } from "@/components";
+import { Banner, Button, ClickIn, IconButton, Meter, SegmentedControl, Switch, toast } from "@/components";
 import { VisualsPicker, type VisualsAnalysis } from "@/components/viz";
 import { PacksService, type LyricLook, type TimedLine, type VisualsSpec } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -11,7 +11,7 @@ import type { Show } from "@/viz/types";
 import type { Row } from "./logic";
 import type { Prefs, RememberedLook, VisualsMode } from "./options";
 import { LyricOverlay } from "./Preview";
-import { aspectNumber, designLabel, initialDesign, lookForMode, showOf } from "./visuals";
+import { aspectNumber, designLabel, initialDesign, instrumentsState, lookForMode, showOf } from "./visuals";
 import styles from "./VisualsStep.module.css";
 
 export interface VisualsStepProps {
@@ -30,7 +30,7 @@ export interface VisualsStepProps {
   onSaveStems: (v: boolean) => void;
   /** The AI engine is needed and missing. */
   engineBlocked: boolean;
-  onMakeInVisualizer: () => void;
+  onMakeInVisualizer: (inWindow?: boolean) => void;
   onContinue: () => void;
 }
 
@@ -68,12 +68,22 @@ export function VisualsStep(p: VisualsStepProps) {
   }, [p.saveStems, stems]);
 
   const label = designLabel(look);
+  const instrumentsSummary = instrumentsState(stems, p.stemsInstalled, p.saveStems);
 
   return (
     <div className={styles.root}>
-      <Section label="Instruments" tip="Splitting the song into instruments gives richer reactions">
-        <div className={styles.panel}>
+      <div className={styles.panel}>
           {p.engineBlocked && <DepsGate moduleId={p.moduleId} />}
+          {!p.stemsInstalled && <StemsModelBanner />}
+          <ClickIn
+            icon="layers"
+            title="Instruments"
+            summary={instrumentsSummary}
+            tip="Splitting the song into instruments gives richer reactions"
+            width={360}
+            className={styles.rowLauncher}
+          >
+          <div className={styles.panel}>
           <Switch
             tip={!p.stemsInstalled ? "Download the instrument separation model first" : busy ? "Wait until the song has been listened to" : "Split the song into drums, bass, vocals and other so each can drive its own visuals"}
             checked={stems}
@@ -81,7 +91,6 @@ export function VisualsStep(p: VisualsStepProps) {
             onChange={setStems}
             label="Separate instruments (drums, bass, vocals, other)"
           />
-          {!p.stemsInstalled && <StemsModelBanner />}
           <span className={styles.hint}>Richer reactions; takes about as long as the song.</span>
           <label className={styles.check} data-tip={stems ? "Keep the separated instrument tracks as audio files in your Library" : "Turn on Separate instruments first"}>
             <input
@@ -95,6 +104,8 @@ export function VisualsStep(p: VisualsStepProps) {
             />
             Also save the stems to the Library
           </label>
+          </div>
+          </ClickIn>
           {listening.status === "running" && (
             <div className={styles.listening} role="status">
               <div className={styles.listeningText}>
@@ -127,8 +138,7 @@ export function VisualsStep(p: VisualsStepProps) {
               {listening.ref.summary.hasStems ? ", instruments separated" : ""}
             </span>
           )}
-        </div>
-      </Section>
+      </div>
 
       <SegmentedControl aria-label="Visuals" data-tip="How to choose the visuals" value={mode} options={MODES} onChange={setMode} />
 
@@ -180,9 +190,10 @@ export function VisualsStep(p: VisualsStepProps) {
           Design: <strong>{label}</strong>
         </span>
         <span className={styles.spacer} />
-        <Button variant="ghost" size="sm" icon="external-link" onClick={p.onMakeInVisualizer} data-tip="Open Visualizer with this song and these lyrics to make the whole video there">
+        <Button variant="ghost" size="sm" icon="external-link" onClick={() => p.onMakeInVisualizer()} data-tip="Open Visualizer with this song and these lyrics to make the whole video there">
           Make the whole video in Visualizer
         </Button>
+        <IconButton size="sm" icon="app-window" label="Open Visualizer in its own window" data-tip="Open Visualizer with this song and these lyrics in its own window" onClick={() => p.onMakeInVisualizer(true)} />
         <Button onClick={p.onContinue} data-tip="Go on to the shape, background and text look">Continue to Look</Button>
       </div>
     </div>

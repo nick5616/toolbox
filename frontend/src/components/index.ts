@@ -39,3 +39,4 @@ export { CompareSlider, type CompareSliderProps } from "./CompareSlider";
 export { ColorSwatchPicker, normalizeHex, type ColorSwatchPickerProps } from "./ColorSwatchPicker";
 export { Markdown, type MarkdownProps } from "./Markdown";
 export { TemplateField, type TemplateFieldProps, type TemplateVar } from "./TemplateField";
+export { ClickIn, ClickInHost, useClickIn, type ClickInHostProps, type ClickInProps } from "./ClickIn";

@@ -13,13 +13,13 @@ import { laneSettings } from "@/viz/edit/defaults";
 import { TAP_LATENCY_MS } from "@/viz/edit/markers";
 import { MARKER_LANES, editLength } from "@/viz/edit/types";
 import { drawLane, readTheme } from "@/tools/visualizer/songmap/draw";
-import { HEADER_PX, LANE_ROW_PX, msToX, RULER_PX, useTimelinePan, useTimelineWheel } from "../geometry";
-import { useEditStudio, useMarkers, useProject } from "../store";
+import { HEADER_PX, LANE_ROW_PX, msToX, RULER_PX, useTimelinePan, useTimelineWheel } from "@/editor/geometry";
+import { useEditStudio, useMarkers, useProject } from "@/editor/store";
 import { cssColor, drawPeaks, prepCanvas } from "./draw";
 import { LaneRow } from "./LaneRow";
 import { addCustomMarker, deleteMarkers, groupByLane, LANE_LABELS, renameCustomMarker, tap, withLane, type TapState } from "./laneLogic";
 import styles from "./Lanes.module.css";
-import { startScrub } from "../timeline/scrub";
+import { startScrub } from "@/editor/timeline/scrub";
 
 const WAVE_ROW_PX = 36;
 const STEM_ROW_PX = 26;
@@ -107,7 +107,8 @@ function useSeek(durationMs: number) {
   };
 }
 
-export function LanesPanel() {
+/** `compact`: only the ruler (Video focus gives the tracks the room). */
+export function LanesPanel({ compact = false }: { compact?: boolean } = {}) {
   const project = useProject();
   const analysis = useEditStudio((s) => s.analysis);
   const markers = useMarkers();
@@ -205,6 +206,17 @@ export function LanesPanel() {
   const lanes = MARKER_LANES.filter((l) => laneSettings(project.markers, l).visible);
   const hiddenLanes = MARKER_LANES.filter((l) => !laneSettings(project.markers, l).visible);
   const hasStems = analysis.audio.stems;
+
+  if (compact) {
+    return (
+      <div ref={setEl} className={styles.root} style={{ height: RULER_PX + 1 }} aria-label="Lanes (compact)" data-compact>
+        <div className={styles.pinned}>
+          <RulerRow width={width} pps={pps} scrollMs={scrollMs} hiddenLanes={[]} seek={seek} />
+        </div>
+        <Playhead width={width} durationMs={duration} />
+      </div>
+    );
+  }
 
   return (
     <div ref={setEl} className={styles.root} style={{ height }} aria-label="Lanes">

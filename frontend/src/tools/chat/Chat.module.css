@@ -110,13 +110,15 @@
   flex: 1;
 }
 
-.promptPanel {
+.drawerBody {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-raised);
+}
+
+.settingsRow {
+  flex: 1;
+  min-width: 0;
 }
 
 .promptLabel {
@@ -128,6 +130,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .hint {

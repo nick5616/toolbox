@@ -11,3 +11,4 @@ export type { ResultColumn, ResultTableProps } from "./ResultTable";
 export { useModuleOptions } from "./useModuleOptions";
 export { runLabel, submitJobs } from "./enqueue";
 export { FileActions } from "./FileActions";
+export { summarize } from "./summary";

@@ -34,7 +34,8 @@ export const toolViews: Record<string, LazyExoticComponent<ComponentType<ToolVie
   visualizer: lazy(() => import("./visualizer/VisualizerView")),
   pipelines: lazy(() => import("./pipelines/PipelinesView")),
   "photo-composer": lazy(() => import("./photo-composer/PhotoComposerView")),
-  "video-editor": lazy(() => import("./video-editor/VideoEditorView")),
+  "video-editor": lazy(() => import("./video-editor/VideoEditorView")), // the Sequence Editor (Post Builder's video slides)
+  "video-studio": lazy(() => import("./video-studio/VideoEditorView")), // the Video Editor (multitrack); Edit Studio is composed on it
   "edit-studio": lazy(() => import("./edit-studio/EditStudioView")),
   "post-builder": lazy(() => import("./post-builder/PostBuilderView")),
 };

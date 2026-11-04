@@ -143,3 +143,18 @@ export const VizRenderCancel = "viz:render-cancel";
  */
 export const WindowShow = "window:show";
 
+/**
+ * Name of the custom event "windows:changed".
+ */
+export const WindowsChanged = "windows:changed";
+
+/**
+ * Name of the custom event "windows:handoff".
+ */
+export const WindowsHandoff = "windows:handoff";
+
+/**
+ * Name of the custom event "windows:relay".
+ */
+export const WindowsRelay = "windows:relay";
+

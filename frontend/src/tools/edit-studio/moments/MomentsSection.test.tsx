@@ -4,8 +4,8 @@ import { normalizeProject } from "@/viz/edit/defaults";
 import { fixtureProject } from "@/viz/edit/fixture";
 import { parseEffects, parseSpeed } from "@/viz/edit/schema";
 import type { EditParam } from "@/viz/edit/types";
-import { findClip } from "../doc";
-import { useEditStudio } from "../store";
+import { findClip } from "@/editor/doc";
+import { useEditStudio } from "@/editor/store";
 
 const mocks = vi.hoisted(() => ({ Moments: vi.fn() }));
 

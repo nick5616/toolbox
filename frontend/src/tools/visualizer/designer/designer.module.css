@@ -1,32 +1,69 @@
 .designer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(300px, 34%, 380px);
+  grid-template-columns: minmax(0, 1fr) var(--rail-w, 248px);
   gap: var(--space-4);
   flex: 1;
   min-height: 0;
   height: 100%;
 }
 
-.left,
-.right {
+.left {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   min-height: 0;
   min-width: 0;
+  overflow: hidden;
 }
 
-.left {
-  overflow-y: auto;
-  padding-right: var(--space-1);
+/* The preview takes what the Song Map leaves; the map keeps its natural height. */
+.previewSlot {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.right {
-  container: designer-panel / inline-size;
+.previewSlot > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* The rail never scrolls: a few headline sliders and one row per section. */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.headline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-1);
   background: var(--bg-panel);
   border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-radius: var(--r-md);
+}
+
+.headlineRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.headlineLabel {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---- preview ---- */
@@ -34,11 +71,13 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  flex-shrink: 0;
+  height: 100%;
+  min-height: 0;
 }
 
 .stageFrame {
-  height: clamp(220px, 44vh, 520px);
+  flex: 1;
+  min-height: 80px;
   background: var(--bg-inset);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
@@ -80,15 +119,35 @@
 
 .videoStage {
   position: relative;
-  height: clamp(220px, 44vh, 520px);
+  flex: 1;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
   background: #000;
   border-radius: var(--r-lg);
   overflow: hidden;
 }
 
-.videoPlayer,
+/* A video source: its player is the one slot (picture + controls); the picture takes the free height. */
+.videoPlayer {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+}
+
+.videoPlayer > :first-child {
+  min-height: 0;
+}
+
+/* An audio source: the design canvas is the picture, so the player is only its controls row (its own stage holds just the hidden <audio>). */
 .audioPlayer {
   width: 100%;
+}
+
+.audioPlayer > :first-child {
+  display: none;
 }
 
 .loading,
@@ -108,6 +167,12 @@
   gap: var(--space-3);
 }
 
+.previewBar,
+.audioPlayer,
+.loadingBar {
+  flex: none;
+}
+
 .fps {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -120,7 +185,7 @@
 }
 
 .songMap {
-  flex-shrink: 0;
+  flex: none;
 }
 
 /* ---- why ---- */
@@ -155,61 +220,6 @@
 .whyList li {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-}
-
-/* ---- tabs ---- */
-.tabs {
-  display: flex;
-  gap: 2px;
-  border-bottom: 1px solid var(--line);
-  margin: 0 calc(var(--space-3) * -1);
-  padding: 0 var(--space-2);
-  flex-shrink: 0;
-}
-
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: var(--space-2) var(--space-2);
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.tab:hover {
-  color: var(--fg);
-}
-
-.tab:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.tabOn {
-  color: var(--fg);
-  border-bottom-color: var(--accent);
-}
-
-/* A narrow panel shows only the open tab's name; the others are icons (their name is the tooltip). */
-@container designer-panel (max-width: 400px) {
-  .tab:not(.tabOn) .tabLabel {
-    display: none;
-  }
-
-  .tab {
-    padding: var(--space-2) 6px;
-  }
-}
-
-.panel {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-top: var(--space-2);
 }
 
 .tabBody {
@@ -672,5 +682,9 @@
   .designer {
     grid-template-columns: 1fr;
     overflow-y: auto;
+  }
+
+  .rail {
+    overflow: visible;
   }
 }

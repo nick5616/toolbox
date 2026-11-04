@@ -65,9 +65,12 @@ describe("ConverterView", () => {
     render(<ConverterView moduleId="converter" />);
     await screen.findByRole("option", { name: "Video · MP4 · H.264" });
     await user.selectOptions(screen.getByLabelText("Preset"), "mp4-h264");
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
     expect(await screen.findByLabelText("Max height")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(JSON.parse(String(setState.mock.calls.at(-1)?.[1]))).toMatchObject({ preset: "mp4-h264" }));
     await user.selectOptions(screen.getByLabelText("Preset"), "mp3-320");
+    expect(screen.getByRole("button", { name: /Advanced/ }).textContent).toContain("keep metadata");
     expect(screen.queryByLabelText("Max height")).toBeNull();
     picked.paths = ["/a.mp3"];
     await user.click(screen.getByRole("button", { name: "Add files…" }));

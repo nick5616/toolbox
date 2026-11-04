@@ -9,7 +9,7 @@
  * Takes dropped inputs and the `timed-text` seed through `takeHandoff`.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Banner, Button, DropZone, Icon, Section, SegmentedControl, Select, Spinner, Switch, TextArea, toast } from "@/components";
+import { Banner, Button, ClickIn, DropZone, Icon, Section, SegmentedControl, Select, Spinner, Switch, TextArea, toast } from "@/components";
 import { formatMs, useMediaSource } from "@/components/media";
 import { FilesService, MediaService, PacksService, TranscribeService, VisualizerService, WordsSource, type Language } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -31,6 +31,7 @@ import {
   wordsSourceOf,
   type WordsChoice,
 } from "./source/logic";
+import { instrumentsSummary, moodSummary, wordsSummary } from "./source/summaries";
 import styles from "./SourceStep.module.css";
 
 export const VISUALIZER_ID = "visualizer";
@@ -273,7 +274,8 @@ export default function SourceStep({ onAnalyze }: SourceStepProps) {
         </Section>
       )}
 
-      <Section label="Words" tip="Where the lyrics come from, so visuals can follow them">
+      <div className={styles.rows}>
+      <ClickIn icon="type" title="Words" summary={wordsSummary(o, seedFrom)} tip="Where the lyrics come from, so visuals can follow them">
         <div className={styles.form}>
           <SegmentedControl
             aria-label="Words"
@@ -313,9 +315,9 @@ export default function SourceStep({ onAnalyze }: SourceStepProps) {
             </label>
           )}
         </div>
-      </Section>
+      </ClickIn>
 
-      <Section label="Instruments" tip="Split the song into drums, bass, vocals and other">
+      <ClickIn icon="audio-lines" title="Instruments" summary={instrumentsSummary(o)} tip="Split the song into drums, bass, vocals and other">
         <div className={styles.form}>
           <Switch tip="Split the song so each instrument can drive its own visuals; takes about as long as the song" label="Separate instruments" checked={o.stems} onChange={(v) => set({ stems: v, saveStems: v && o.saveStems })} />
           <span className={styles.hint}>Lets drums, bass, vocals and other instruments drive different visuals. Takes about as long as the song.</span>
@@ -323,9 +325,9 @@ export default function SourceStep({ onAnalyze }: SourceStepProps) {
             <Switch tip={o.stems ? "Keep the separated instrument tracks as audio files in your Library" : "Turn on Separate instruments first"} label="Also save the stems to the Library" checked={o.stems && o.saveStems} disabled={!o.stems} onChange={(v) => set({ saveStems: v })} />
           </div>
         </div>
-      </Section>
+      </ClickIn>
 
-      <Section label="Mood" tip="Let the meaning of the words shape the visuals">
+      <ClickIn icon="heart-pulse" title="Mood" summary={moodSummary(o)} tip="Let the meaning of the words shape the visuals">
         <div className={styles.form}>
           <Switch tip={words ? "A small local model reads how each line feels and what it pictures" : "Choose a Words option first"} label="Read the mood of the words" checked={words && o.mood} disabled={!words} onChange={(v) => set({ mood: v })} />
           <span className={styles.hint}>
@@ -345,7 +347,8 @@ export default function SourceStep({ onAnalyze }: SourceStepProps) {
             </span>
           </div>
         </div>
-      </Section>
+      </ClickIn>
+      </div>
 
       <div className={styles.gates}>
         <DepsGate moduleId={VISUALIZER_ID} />

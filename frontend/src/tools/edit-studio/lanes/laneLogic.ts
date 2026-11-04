@@ -8,8 +8,8 @@ import type { NormalProject } from "@/viz/edit/defaults";
 import { LANE_DEFAULTS, laneSettings } from "@/viz/edit/defaults";
 import { MAX_CUSTOM_MARKERS, nearestBeat } from "@/viz/edit/markers";
 import type { LaneSettings, Marker, MarkerLane } from "@/viz/edit/types";
-import { msToX } from "../geometry";
-import { newId } from "../doc";
+import { msToX } from "@/editor/geometry";
+import { newId } from "@/editor/doc";
 
 /** Go validation limits on the marker overrides. */
 export const MAX_HIDDEN = 5000;

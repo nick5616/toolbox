@@ -25,6 +25,18 @@ import DownloaderView from "./DownloaderView";
 describe("DownloaderView", () => {
   beforeEach(() => enqueue.mockClear());
 
+  it("keeps secondary options in click-ins that show their state", async () => {
+    const user = userEvent.setup();
+    render(<DownloaderView moduleId="downloader" />);
+    await screen.findByRole("radiogroup", { name: "Mode" });
+    expect(screen.queryByRole("radiogroup", { name: "Audio format" })).toBeNull();
+    const format = screen.getByRole("button", { name: /Format/ });
+    expect(format.textContent).toContain("MP3 · 320k");
+    expect(screen.getByRole("button", { name: /Trim/ }).textContent).toContain("Whole file");
+    await user.click(format);
+    expect(await screen.findByRole("radiogroup", { name: "Audio format" })).toBeTruthy();
+  });
+
   it("counts valid links and enqueues them", async () => {
     const user = userEvent.setup();
     render(<DownloaderView moduleId="downloader" />);

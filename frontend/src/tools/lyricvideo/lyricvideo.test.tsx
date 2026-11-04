@@ -414,6 +414,7 @@ describe("LyricVideoView", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(screen.getAllByTestId("lyric-row")).toHaveLength(3);
 
+    await user.click(screen.getByRole("button", { name: "Shift timing" }));
     await user.type(screen.getByLabelText("Shift all by (ms)"), "500");
     await user.click(screen.getByRole("button", { name: "Shift all later" }));
     expect(startOf(1)).toBe("0:01.500");
@@ -560,6 +561,8 @@ describe("LyricVideoView", () => {
       setPacks(PackComponentState.ComponentMissing);
       await toVisuals(user);
       expect(screen.getByText("The instrument separation model isn't downloaded")).toBeTruthy();
+      expect(screen.getByRole("button", { name: /^Instruments/ }).textContent).toContain("Model not downloaded");
+      await user.click(screen.getByRole("button", { name: /^Instruments/ }));
       expect(screen.getByRole("switch", { name: /Separate instruments/ }).getAttribute("aria-checked")).toBe("false");
       await waitFor(() => expect(lastCall()?.opts.analyze.stems).toBe(false));
     });
@@ -612,6 +615,8 @@ describe("LyricVideoView", () => {
     it("sends saveStems with the analysis and runs the separation again when ticked late", async () => {
       const user = userEvent.setup();
       await toVisuals(user);
+      expect(screen.getByRole("button", { name: /^Instruments/ }).textContent).toContain("Separated");
+      await user.click(screen.getByRole("button", { name: /^Instruments/ }));
       const box = screen.getByRole("checkbox", { name: "Also save the stems to the Library" }) as HTMLInputElement;
       expect(box.checked).toBe(false);
       expect(lastCall()?.opts.analyze.saveStems).toBe(false);
@@ -679,6 +684,8 @@ describe("LyricVideoView", () => {
         expect(screen.queryByRole("radiogroup", { name: "Visualiser" })).toBeNull();
         expect(screen.queryByTestId("preview-visualizer")).toBeNull();
         // The text options and the approximate note stay; the HTML lyrics are over the canvas.
+        expect(screen.getByRole("button", { name: /^Text/ }).textContent).toContain("Arial");
+        await user.click(screen.getByRole("button", { name: /^Text/ }));
         expect(screen.getByLabelText("Font")).toBeTruthy();
         expect(screen.getByText(/Preview is approximate/)).toBeTruthy();
         act(() => h.emitTime.current?.(1750));
@@ -733,12 +740,18 @@ describe("LyricVideoView", () => {
       expect(Number(line.getAttribute("data-progress"))).toBeCloseTo(50, 0);
       expect(screen.getByTestId("preview-next").textContent).toBe("second line");
 
+      expect(screen.getByRole("button", { name: /^Text/ }).textContent).toContain("Arial · karaoke · centre");
+      await user.click(screen.getByRole("button", { name: /^Text/ }));
       await user.click(screen.getByRole("switch", { name: "Show next line" }));
       expect(screen.queryByTestId("preview-next")).toBeNull();
+      expect(screen.getByRole("button", { name: /^Text/ }).textContent).toContain("no next line");
       await user.click(screen.getByRole("radio", { name: "9:16" }));
       expect(screen.getByTestId("lyric-preview").getAttribute("data-aspect")).toBe("9:16");
+      expect(screen.getByRole("button", { name: /^Extras/ }).textContent).toContain("title card");
+      await user.click(screen.getByRole("button", { name: /^Extras/ }));
       await user.click(screen.getByRole("radio", { name: "Wave" }));
       expect(screen.getByTestId("preview-visualizer")).toBeTruthy();
+      expect(screen.getByRole("button", { name: /^Extras/ }).textContent).toContain("title card · wave");
 
       await waitFor(() => expect(h.setState).toHaveBeenCalled());
       const [id, json] = h.setState.mock.calls.at(-1) as [string, string];
@@ -752,9 +765,13 @@ describe("LyricVideoView", () => {
       const user = userEvent.setup();
       await toLook(user);
       h.pickWith.mockResolvedValue(["/in/bg.png"]);
+      expect(screen.getByRole("button", { name: /^Background/ }).textContent).toContain("Blurred cover");
+      await user.click(screen.getByRole("button", { name: /^Background/ }));
       await user.click(screen.getByRole("radio", { name: "Image" }));
+      expect(screen.getByRole("button", { name: /^Background/ }).textContent).toContain("Image · choose a file");
       expect(screen.getByText("Choose a file to use this background.")).toBeTruthy();
       await user.click(screen.getByRole("button", { name: "Choose an image…" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: /^Background/ }).textContent).toContain("Image · bg.png"));
       await screen.findByText("bg.png");
       expect(h.pickWith.mock.calls.at(-1)?.[1]).toContain(".png");
     });
@@ -769,6 +786,7 @@ describe("LyricVideoView", () => {
     it("blocks rendering until a chosen image/video background has a file", async () => {
       const user = userEvent.setup();
       await toLook(user);
+      await user.click(screen.getByRole("button", { name: /^Background/ }));
       await user.click(screen.getByRole("radio", { name: "Video" }));
       await user.click(screen.getByRole("button", { name: "Continue to Render" }));
       expect(await screen.findByText(/Choose a background file/)).toBeTruthy();

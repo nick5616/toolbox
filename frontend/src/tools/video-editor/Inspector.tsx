@@ -1,6 +1,6 @@
 // The inspector (SPEC.md Part B §B6.5): clip, title and music settings.
-import { useRef, useState, type ReactNode, type Ref } from "react";
-import { Button, ColorSwatchPicker, Field, Section, SegmentedControl, Select, Slider, Switch, TextArea, TimecodeInput } from "@/components";
+import { useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
+import { Button, ClickIn, ColorSwatchPicker, Field, IconButton, SegmentedControl, Select, Slider, Switch, TextArea, TimecodeInput, useClickIn } from "@/components";
 import {
   CropOverlay,
   MediaPlayer,
@@ -16,6 +16,17 @@ import type { VideoClip, VideoClipInfo, VideoProject, VideoTitle } from "@/lib/a
 import { clipsOf, deleteClip, deleteTitle, displaySize, setClipRange, setTransition, SPEEDS, titlesOf, updateClip, updateTitle } from "./edit";
 import { MAX_PHOTO_MS, MAX_TRANSITION_MS, MIN_PHOTO_MS, MIN_TRANSITION_MS, aspectRatio, type Span } from "./timeline";
 import type { Selection } from "./types";
+import {
+  pictureSummary,
+  playbackSummary,
+  songSummary,
+  songTimingSummary,
+  titleStyleSummary,
+  titleTextSummary,
+  titleTimingSummary,
+  transitionSummary,
+  trimSummary,
+} from "./summaries";
 import { useThumb } from "./useThumbs";
 import styles from "./Inspector.module.css";
 
@@ -29,6 +40,11 @@ export interface InspectorProps {
   onChange: (next: VideoProject, key?: string) => void;
   onPickMusic: () => void;
   onSelect: (s: Selection) => void;
+  /** A title id whose Text click-in should open and take focus (a new title, or a double-click on one). */
+  titleFocus?: string | null;
+  onTitleFocused?: () => void;
+  /** Extra launchers at the end of the bar (the post's Sources). */
+  trailing?: ReactNode;
 }
 
 /** A tooltip around a control that doesn't forward data-tip (doesn't change the layout). */
@@ -201,6 +217,7 @@ function ClipTrim({ clip, index, info, frameAspect, onChange, doc }: { clip: Vid
   );
 }
 
+/** The clip's settings as click-ins on one line: Trim / Duration, Playback, Picture and the transition into the next clip. */
 function ClipInspector({ clip, index, span, p }: { clip: VideoClip; index: number; span: Span | undefined; p: InspectorProps }) {
   const { doc, onChange } = p;
   const clips = clipsOf(doc);
@@ -214,150 +231,184 @@ function ClipInspector({ clip, index, span, p }: { clip: VideoClip; index: numbe
   const limit = span && nextSpan ? Math.min(MAX_TRANSITION_MS, Math.floor(span.lenMs / 2), Math.floor(nextSpan.lenMs / 2)) : 0;
 
   return (
-    <div className={styles.body} data-testid="clip-inspector">
-      <div className={styles.fileName} data-tip={clip.path}>
+    <div className={styles.bar} data-testid="clip-inspector" role="group" aria-label="Clip settings">
+      <span className={styles.fileName} data-tip={clip.path}>
         {name}
-      </div>
-      {info?.error && <div className={styles.warn} data-tip="This source file has a problem; fix or replace it before exporting">{info.error}</div>}
+      </span>
+      {info?.error && (
+        <span className={styles.warn} data-tip={`${info.error}. Fix or replace this source before exporting.`}>
+          Problem with this file
+        </span>
+      )}
       {isVideo ? (
-        <ClipTrim clip={clip} index={index} info={info} frameAspect={frameAspect} doc={doc} onChange={onChange} />
+        <ClickIn icon="scissors" title="Trim" summary={trimSummary(clip)} tip="Choose where in the source video this clip starts and ends" width={400} className={styles.launcher}>
+          <ClipTrim clip={clip} index={index} info={info} frameAspect={frameAspect} doc={doc} onChange={onChange} />
+        </ClickIn>
       ) : (
-        <Field label="Shown for">
-          <Tip t="How long this photo stays on screen">
-          <Slider
-            aria-label="Duration"
-            min={MIN_PHOTO_MS}
-            max={MAX_PHOTO_MS}
-            step={100}
-            value={clip.durationMs}
-            format={(v) => `${(v / 1000).toFixed(1)} s`}
-            onChange={(v) => patch({ durationMs: v }, `dur-${clip.id}`)}
-          />
-          </Tip>
-        </Field>
-      )}
-      <Section label="Playback" tip="Speed, sound and motion of this clip">
-        {isVideo && (
-          <Field label="Speed">
-            {(c) => (
-              <Select
-                {...c}
-                data-tip="Play the clip slower or faster; the clip gets longer or shorter on the timeline"
-                value={String(clip.speed)}
-                options={SPEEDS.map((s) => ({ value: String(s), label: `${s}×` }))}
-                onChange={(v) => patch({ speed: Number(v) })}
+        <ClickIn icon="timer" title="Duration" summary={trimSummary(clip)} tip="How long this photo stays on screen" className={styles.launcher}>
+          <Field label="Shown for">
+            <Tip t="How long this photo stays on screen">
+              <Slider
+                aria-label="Duration"
+                min={MIN_PHOTO_MS}
+                max={MAX_PHOTO_MS}
+                step={100}
+                value={clip.durationMs}
+                format={(v) => `${(v / 1000).toFixed(1)} s`}
+                onChange={(v) => patch({ durationMs: v }, `dur-${clip.id}`)}
               />
-            )}
-          </Field>
-        )}
-        {isVideo && (
-          <Field label="Volume">
-            <Tip t="Loudness of this clip's own sound; 100% is unchanged, above that boosts it">
-              <Slider aria-label="Volume" min={0} max={2} step={0.05} value={clip.volume} format={pct} onChange={(v) => patch({ volume: v }, `vol-${clip.id}`)} />
             </Tip>
-            <Switch label="Mute" tip="Silence this clip's own sound" checked={clip.volume === 0} onChange={(m) => patch({ volume: m ? 0 : 1 })} />
           </Field>
-        )}
-        {!isVideo && (
-          <Field label="Motion">
-            {(c) => <Select {...c} data-tip="Slow zoom or drift that makes a still photo feel alive" value={clip.motion || "none"} options={MOTION_OPTIONS} onChange={(motion) => patch({ motion })} />}
-          </Field>
-        )}
-      </Section>
-      <Section label="Picture" tip="How the clip fills the frame, and its colour">
-        <Field label="Framing">
-          {(c) => <Select {...c} data-tip="What to do when the clip is a different shape from the video frame" value={clip.fit as "fill"} options={FIT_OPTIONS} onChange={(fit) => patch({ fit })} />}
-        </Field>
-        {clip.fit === "fit-color" && (
-          <Field label="Bar colour">
-            <Tip t="Colour of the bars around the clip"><ColorSwatchPicker aria-label="Bar colour" value={clip.fitColor} onChange={(fitColor) => patch({ fitColor }, `col-${clip.id}`)} /></Tip>
-          </Field>
-        )}
-        {clip.fit === "fill" && (
-          <>
-            <Field label="Zoom">
-              <Tip t="Zoom into the picture; 1× shows the whole cropped frame"><Slider aria-label="Zoom" min={1} max={3} step={0.05} value={clip.zoom || 1} format={(v) => `${v.toFixed(2)}×`} onChange={(zoom) => patch({ zoom }, `zoom-${clip.id}`)} /></Tip>
-            </Field>
-            <Field label="Position across">
-              <Tip t="Slide the crop left or right (you can also drag in the preview)"><Slider aria-label="Pan across" min={-1} max={1} step={0.05} value={clip.panX} format={(v) => v.toFixed(2)} onChange={(panX) => patch({ panX }, `pan-${clip.id}`)} /></Tip>
-            </Field>
-            <Field label="Position up and down">
-              <Tip t="Slide the crop up or down (you can also drag in the preview)"><Slider aria-label="Pan up and down" min={-1} max={1} step={0.05} value={clip.panY} format={(v) => v.toFixed(2)} onChange={(panY) => patch({ panY }, `pan-${clip.id}`)} /></Tip>
-            </Field>
-          </>
-        )}
-        <Field label="Look">
-          {(c) => <Select {...c} data-tip="A colour treatment applied to this clip" value={clip.look || "none"} options={LOOK_OPTIONS} onChange={(look) => patch({ look })} />}
-        </Field>
-      </Section>
-      {!isLast && (
-        <Section label="Into the next clip" tip="How this clip changes into the one after it">
-          <SegmentedControl
-            aria-label="Transition"
-            size="sm"
-            value={(clip.transition.kind || "cut") as "cut"}
-            options={TRANSITION_OPTIONS}
-            onChange={(kind) => {
-              if (kind !== "cut" && limit < MIN_TRANSITION_MS) return;
-              const cur = clip.transition.durationMs;
-              onChange(setTransition(doc, index, kind, cur >= MIN_TRANSITION_MS ? cur : Math.min(500, limit)));
-            }}
-          />
-          {limit < MIN_TRANSITION_MS && <div className={styles.note}>These clips are too short for a transition.</div>}
-          {clip.transition.kind !== "cut" && limit >= MIN_TRANSITION_MS && (
-            <Tip t="How long the transition lasts (limited by the shorter clip)">
-            <Slider
-              aria-label="Transition length"
-              min={MIN_TRANSITION_MS}
-              max={limit}
-              step={50}
-              value={Math.min(Math.max(clip.transition.durationMs, MIN_TRANSITION_MS), limit)}
-              format={(v) => `${(v / 1000).toFixed(2)} s`}
-              onChange={(v) => onChange(setTransition(doc, index, clip.transition.kind, v), `tr-${index}`)}
-            />
-            </Tip>
-          )}
-        </Section>
+        </ClickIn>
       )}
-      <Button variant="danger" size="sm" icon="trash-2" data-tip="Take this clip off the timeline (the source file is not touched)" onClick={() => onChange(deleteClip(doc, index))}>
-        Remove clip
-      </Button>
+      <ClickIn icon="gauge" title="Playback" summary={playbackSummary(clip)} tip="Speed, sound and motion of this clip" className={styles.launcher}>
+        <div className={styles.body}>
+          {isVideo && (
+            <Field label="Speed">
+              {(c) => (
+                <Select
+                  {...c}
+                  data-tip="Play the clip slower or faster; the clip gets longer or shorter on the timeline"
+                  value={String(clip.speed)}
+                  options={SPEEDS.map((s) => ({ value: String(s), label: `${s}×` }))}
+                  onChange={(v) => patch({ speed: Number(v) })}
+                />
+              )}
+            </Field>
+          )}
+          {isVideo && (
+            <Field label="Volume">
+              <Tip t="Loudness of this clip's own sound; 100% is unchanged, above that boosts it">
+                <Slider aria-label="Volume" min={0} max={2} step={0.05} value={clip.volume} format={pct} onChange={(v) => patch({ volume: v }, `vol-${clip.id}`)} />
+              </Tip>
+              <Switch label="Mute" tip="Silence this clip's own sound" checked={clip.volume === 0} onChange={(m) => patch({ volume: m ? 0 : 1 })} />
+            </Field>
+          )}
+          {!isVideo && (
+            <Field label="Motion">
+              {(c) => <Select {...c} data-tip="Slow zoom or drift that makes a still photo feel alive" value={clip.motion || "none"} options={MOTION_OPTIONS} onChange={(motion) => patch({ motion })} />}
+            </Field>
+          )}
+        </div>
+      </ClickIn>
+      <ClickIn icon="frame" title="Picture" summary={pictureSummary(clip)} tip="How the clip fills the frame, and its colour" className={styles.launcher}>
+        <div className={styles.body}>
+          <Field label="Framing">
+            {(c) => <Select {...c} data-tip="What to do when the clip is a different shape from the video frame" value={clip.fit as "fill"} options={FIT_OPTIONS} onChange={(fit) => patch({ fit })} />}
+          </Field>
+          {clip.fit === "fit-color" && (
+            <Field label="Bar colour">
+              <Tip t="Colour of the bars around the clip"><ColorSwatchPicker aria-label="Bar colour" value={clip.fitColor} onChange={(fitColor) => patch({ fitColor }, `col-${clip.id}`)} /></Tip>
+            </Field>
+          )}
+          {clip.fit === "fill" && (
+            <>
+              <Field label="Zoom">
+                <Tip t="Zoom into the picture; 1× shows the whole cropped frame"><Slider aria-label="Zoom" min={1} max={3} step={0.05} value={clip.zoom || 1} format={(v) => `${v.toFixed(2)}×`} onChange={(zoom) => patch({ zoom }, `zoom-${clip.id}`)} /></Tip>
+              </Field>
+              <Field label="Position across">
+                <Tip t="Slide the crop left or right (you can also drag in the preview)"><Slider aria-label="Pan across" min={-1} max={1} step={0.05} value={clip.panX} format={(v) => v.toFixed(2)} onChange={(panX) => patch({ panX }, `pan-${clip.id}`)} /></Tip>
+              </Field>
+              <Field label="Position up and down">
+                <Tip t="Slide the crop up or down (you can also drag in the preview)"><Slider aria-label="Pan up and down" min={-1} max={1} step={0.05} value={clip.panY} format={(v) => v.toFixed(2)} onChange={(panY) => patch({ panY }, `pan-${clip.id}`)} /></Tip>
+              </Field>
+            </>
+          )}
+          <Field label="Look">
+            {(c) => <Select {...c} data-tip="A colour treatment applied to this clip" value={clip.look || "none"} options={LOOK_OPTIONS} onChange={(look) => patch({ look })} />}
+          </Field>
+        </div>
+      </ClickIn>
+      {!isLast && (
+        <ClickIn icon="blend" title="Next clip" summary={transitionSummary(clip)} tip="How this clip changes into the one after it" className={styles.launcher}>
+          <div className={styles.body}>
+            <SegmentedControl
+              aria-label="Transition"
+              size="sm"
+              value={(clip.transition.kind || "cut") as "cut"}
+              options={TRANSITION_OPTIONS}
+              onChange={(kind) => {
+                if (kind !== "cut" && limit < MIN_TRANSITION_MS) return;
+                const cur = clip.transition.durationMs;
+                onChange(setTransition(doc, index, kind, cur >= MIN_TRANSITION_MS ? cur : Math.min(500, limit)));
+              }}
+            />
+            {limit < MIN_TRANSITION_MS && <div className={styles.note}>These clips are too short for a transition.</div>}
+            {clip.transition.kind !== "cut" && limit >= MIN_TRANSITION_MS && (
+              <Tip t="How long the transition lasts (limited by the shorter clip)">
+                <Slider
+                  aria-label="Transition length"
+                  min={MIN_TRANSITION_MS}
+                  max={limit}
+                  step={50}
+                  value={Math.min(Math.max(clip.transition.durationMs, MIN_TRANSITION_MS), limit)}
+                  format={(v) => `${(v / 1000).toFixed(2)} s`}
+                  onChange={(v) => onChange(setTransition(doc, index, clip.transition.kind, v), `tr-${index}`)}
+                />
+              </Tip>
+            )}
+          </div>
+        </ClickIn>
+      )}
+      <IconButton icon="trash-2" label="Remove clip" data-tip="Take this clip off the timeline (the source file is not touched)" onClick={() => onChange(deleteClip(doc, index))} />
+      {p.trailing}
     </div>
   );
+}
+
+/** Opens the Text click-in and focuses its box when the editor asks for it (a new title, or a double-click on one). */
+function useTitleFocus(p: InspectorProps, id: string): void {
+  const { open } = useClickIn();
+  const { titleFocus, onTitleFocused, titleTextRef } = p;
+  useEffect(() => {
+    if (titleFocus !== id) return;
+    open("Text");
+    onTitleFocused?.();
+    // Two frames: the drawer mounts, then takes focus itself, then the box.
+    requestAnimationFrame(() => requestAnimationFrame(() => (titleTextRef as RefObject<HTMLTextAreaElement> | undefined)?.current?.focus()));
+  }, [titleFocus, id, open, onTitleFocused, titleTextRef]);
 }
 
 function TitleInspector({ title, p }: { title: VideoTitle; p: InspectorProps }) {
   const { doc, onChange } = p;
   const patch = (u: Partial<VideoTitle>, key?: string) => onChange(updateTitle(doc, title.id, u), key);
   const fontOptions = [{ value: "", label: "Default" }, ...(title.font && !p.fonts.includes(title.font) ? [{ value: title.font, label: title.font }] : []), ...p.fonts.map((f) => ({ value: f, label: f }))];
+  useTitleFocus(p, title.id);
   return (
-    <div className={styles.body} data-testid="title-inspector">
-      <Field label="Text">
-        {(c) => (
-          <TextArea {...c} ref={p.titleTextRef} maxLength={200} data-tip="The words shown on screen (up to 200 characters)" value={title.text} onChange={(e) => patch({ text: e.target.value }, `text-${title.id}`)} />
-        )}
-      </Field>
-      <Field label="Style">
-        {(c) => <Select {...c} data-tip="The look and size of the text" value={title.style as "title"} options={STYLE_OPTIONS} onChange={(style) => patch({ style })} />}
-      </Field>
-      <Field label="Position">
-        <SegmentedControl aria-label="Position" size="sm" value={title.position as "center"} options={POSITION_OPTIONS} onChange={(position) => patch({ position })} />
-      </Field>
-      <Field label="Font">{(c) => <Select {...c} data-tip="Typeface for the text" value={title.font} options={fontOptions} onChange={(font) => patch({ font })} />}</Field>
-      <Field label="Colour">
-        <Tip t="Colour of the text"><ColorSwatchPicker aria-label="Title colour" value={title.color} onChange={(color) => patch({ color }, `col-${title.id}`)} /></Tip>
-      </Field>
-      <div className={styles.row}>
-        <Field label="Starts at">
-          <TimeField tip="When the title appears on the timeline; type a time and press Enter" label="Starts at" valueMs={title.startMs} onCommit={(startMs) => patch({ startMs })} />
-        </Field>
-        <Field label="Lasts">
-          <TimeField tip="How long the title stays on screen; type a time and press Enter" label="Lasts" valueMs={title.durationMs} onCommit={(durationMs) => patch({ durationMs })} />
-        </Field>
-      </div>
-      <Button variant="danger" size="sm" icon="trash-2" data-tip="Delete this title" onClick={() => { onChange(deleteTitle(doc, title.id)); p.onSelect(null); }}>
-        Remove title
-      </Button>
+    <div className={styles.bar} data-testid="title-inspector" role="group" aria-label="Title settings">
+      <ClickIn icon="type" title="Text" summary={titleTextSummary(title)} tip="The words shown on screen" className={styles.launcher}>
+        <div className={styles.body}>
+          <TextArea ref={p.titleTextRef} aria-label="Text" maxLength={200} data-tip="The words shown on screen (up to 200 characters)" value={title.text} onChange={(e) => patch({ text: e.target.value }, `text-${title.id}`)} />
+        </div>
+      </ClickIn>
+      <ClickIn icon="palette" title="Style" summary={titleStyleSummary(title)} tip="The look, place, font and colour of the text" className={styles.launcher}>
+        <div className={styles.body}>
+          <Field label="Type">
+            {(c) => <Select {...c} data-tip="The look and size of the text" value={title.style as "title"} options={STYLE_OPTIONS} onChange={(style) => patch({ style })} />}
+          </Field>
+          <Field label="Position">
+            <SegmentedControl aria-label="Position" size="sm" value={title.position as "center"} options={POSITION_OPTIONS} onChange={(position) => patch({ position })} />
+          </Field>
+          <Field label="Font">{(c) => <Select {...c} data-tip="Typeface for the text" value={title.font} options={fontOptions} onChange={(font) => patch({ font })} />}</Field>
+          <Field label="Colour">
+            <Tip t="Colour of the text"><ColorSwatchPicker aria-label="Title colour" value={title.color} onChange={(color) => patch({ color }, `col-${title.id}`)} /></Tip>
+          </Field>
+        </div>
+      </ClickIn>
+      <ClickIn icon="clock" title="Timing" summary={titleTimingSummary(title)} tip="When the title appears and how long it stays" className={styles.launcher}>
+        <div className={styles.body}>
+          <div className={styles.row}>
+            <Field label="Starts at">
+              <TimeField tip="When the title appears on the timeline; type a time and press Enter" label="Starts at" valueMs={title.startMs} onCommit={(startMs) => patch({ startMs })} />
+            </Field>
+            <Field label="Lasts">
+              <TimeField tip="How long the title stays on screen; type a time and press Enter" label="Lasts" valueMs={title.durationMs} onCommit={(durationMs) => patch({ durationMs })} />
+            </Field>
+          </div>
+        </div>
+      </ClickIn>
+      <IconButton icon="trash-2" label="Remove title" data-tip="Delete this title" onClick={() => { onChange(deleteTitle(doc, title.id)); p.onSelect(null); }} />
+      {p.trailing}
     </div>
   );
 }
@@ -368,32 +419,41 @@ function MusicInspector({ p }: { p: InspectorProps }) {
   if (!m) return null;
   const patch = (u: Partial<NonNullable<typeof m>>, key?: string) => onChange({ ...doc, music: { ...m, ...u } }, key);
   return (
-    <div className={styles.body} data-testid="music-inspector">
-      <div className={styles.fileName} data-tip={m.path}>
-        {m.path.split(/[\\/]/).pop()}
-      </div>
-      <div className={styles.row}>
-        <Button size="sm" icon="music" data-tip="Pick a different song" onClick={p.onPickMusic}>
-          Change song
-        </Button>
-        <Button size="sm" variant="danger" icon="trash-2" data-tip="Remove the song from the video" onClick={() => { onChange({ ...doc, music: null }); p.onSelect(null); }}>
-          Remove
-        </Button>
-      </div>
-      <Field label="Volume">
-        <Tip t="Loudness of the song; 100% is unchanged"><Slider aria-label="Music volume" min={0} max={1.5} step={0.05} value={m.volume} format={pct} onChange={(volume) => patch({ volume }, "music-volume")} /></Tip>
-      </Field>
-      <Field label="Starts at (in the song)">
-        <TimeField tip="Which point of the song plays at the start of the video; type a time and press Enter" label="Song offset" valueMs={m.offsetMs} onCommit={(offsetMs) => patch({ offsetMs })} />
-      </Field>
-      <Field label="Fade in">
-        <Tip t="Fade the song in over this long at the start"><Slider aria-label="Fade in" min={0} max={5000} step={100} value={m.fadeInMs} format={(v) => `${(v / 1000).toFixed(1)} s`} onChange={(fadeInMs) => patch({ fadeInMs }, "music-fadein")} /></Tip>
-      </Field>
-      <Field label="Fade out">
-        <Tip t="Fade the song out over this long at the end"><Slider aria-label="Fade out" min={0} max={8000} step={100} value={m.fadeOutMs} format={(v) => `${(v / 1000).toFixed(1)} s`} onChange={(fadeOutMs) => patch({ fadeOutMs }, "music-fadeout")} /></Tip>
-      </Field>
-      <Switch label="Lower the music while clips have sound" tip="Duck the song under the clips' own sound so speech stays clear" checked={m.duck} onChange={(duck) => patch({ duck })} />
-      <Switch label="End the video when the song ends" tip="Cut the video off at the end of the song instead of the last clip" checked={m.endWithMusic} onChange={(endWithMusic) => patch({ endWithMusic })} />
+    <div className={styles.bar} data-testid="music-inspector" role="group" aria-label="Song settings">
+      <ClickIn icon="music" title="Song" summary={songSummary(m)} tip="Which song plays and how loud" className={styles.launcher}>
+        <div className={styles.body}>
+          <div className={styles.fileName} data-tip={m.path}>
+            {m.path.split(/[\\/]/).pop()}
+          </div>
+          <div className={styles.row}>
+            <Button size="sm" icon="music" data-tip="Pick a different song" onClick={p.onPickMusic}>
+              Change song
+            </Button>
+            <Button size="sm" variant="danger" icon="trash-2" data-tip="Remove the song from the video" onClick={() => { onChange({ ...doc, music: null }); p.onSelect(null); }}>
+              Remove
+            </Button>
+          </div>
+          <Field label="Volume">
+            <Tip t="Loudness of the song; 100% is unchanged"><Slider aria-label="Music volume" min={0} max={1.5} step={0.05} value={m.volume} format={pct} onChange={(volume) => patch({ volume }, "music-volume")} /></Tip>
+          </Field>
+        </div>
+      </ClickIn>
+      <ClickIn icon="audio-lines" title="Fades and mix" summary={songTimingSummary(m)} tip="Where the song starts, its fades, and how it sits under the clips" className={styles.launcher}>
+        <div className={styles.body}>
+          <Field label="Starts at (in the song)">
+            <TimeField tip="Which point of the song plays at the start of the video; type a time and press Enter" label="Song offset" valueMs={m.offsetMs} onCommit={(offsetMs) => patch({ offsetMs })} />
+          </Field>
+          <Field label="Fade in">
+            <Tip t="Fade the song in over this long at the start"><Slider aria-label="Fade in" min={0} max={5000} step={100} value={m.fadeInMs} format={(v) => `${(v / 1000).toFixed(1)} s`} onChange={(fadeInMs) => patch({ fadeInMs }, "music-fadein")} /></Tip>
+          </Field>
+          <Field label="Fade out">
+            <Tip t="Fade the song out over this long at the end"><Slider aria-label="Fade out" min={0} max={8000} step={100} value={m.fadeOutMs} format={(v) => `${(v / 1000).toFixed(1)} s`} onChange={(fadeOutMs) => patch({ fadeOutMs }, "music-fadeout")} /></Tip>
+          </Field>
+          <Switch label="Lower the music while clips have sound" tip="Duck the song under the clips' own sound so speech stays clear" checked={m.duck} onChange={(duck) => patch({ duck })} />
+          <Switch label="End the video when the song ends" tip="Cut the video off at the end of the song instead of the last clip" checked={m.endWithMusic} onChange={(endWithMusic) => patch({ endWithMusic })} />
+        </div>
+      </ClickIn>
+      {p.trailing}
     </div>
   );
 }
@@ -411,9 +471,11 @@ export function Inspector(p: InspectorProps) {
   }
   if (selection?.kind === "music" && doc.music) return <MusicInspector p={p} />;
   return (
-    <div className={styles.empty}>
-      <p>Select a clip, title or the song on the timeline to change it.</p>
-      <p className={styles.hint} data-tip="Keyboard shortcuts for the editor">Space plays, S splits at the playhead, Delete removes, Ctrl+Z undoes.</p>
+    <div className={styles.bar}>
+      <span className={styles.hint} data-tip="Space plays, S splits at the playhead, Delete removes, Ctrl+Z undoes">
+        Select a clip, title or the song on the timeline to change it.
+      </span>
+      {p.trailing}
     </div>
   );
 }

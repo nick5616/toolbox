@@ -4,8 +4,8 @@ import { ErrorCode, JobStatus, type AnalysisRef, type Job } from "@/lib/api";
 import { useJobs } from "@/state/jobs";
 import { normalizeProject } from "@/viz/edit/defaults";
 import { buildEditFixture, fixtureProject } from "@/viz/edit/fixture";
-import { findClip } from "../doc";
-import { useEditStudio } from "../store";
+import { findClip } from "@/editor/doc";
+import { useEditStudio } from "@/editor/store";
 import { analysisRefOf } from "./AnalysisPanel";
 import { SetupPanel } from "./SetupPanel";
 
@@ -27,7 +27,7 @@ vi.mock("@/lib/api", async (orig) => {
     MediaService: { ...a.MediaService, Waveform: mocks.Waveform },
   };
 });
-vi.mock("../useEditAutosave", () => ({ flushEdit: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/editor/useEditAutosave", () => ({ flushEdit: vi.fn().mockResolvedValue(undefined) }));
 
 const ctxStub = new Proxy(
   {},

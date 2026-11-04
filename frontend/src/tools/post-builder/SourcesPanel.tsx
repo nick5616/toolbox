@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, IconButton, Select, Spinner, TextField, Tooltip, toast } from "@/components";
 import { FilesService, PostsService, type PostSlide, type PostSourceFile } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import type { SlideBuild } from "@/state/ui";
 import { CollageDialog, StitchDialog } from "./buildDialogs";
-import { SOURCES_MAX, SOURCES_MIN, type PostDoc } from "./logic";
+import type { PostDoc } from "./logic";
 import {
   DEFAULT_SOURCE_VIEW,
   addExtras,
   fileName,
+  folderBaseName,
   hideFromPool,
   poolSignature,
   slideNumberMap,
@@ -41,10 +42,6 @@ export interface SourcesPanelProps {
   /** The post is saved: the pool is listed from the stored document. */
   saved: boolean;
   selectedSlide: PostSlide | undefined;
-  width: number;
-  collapsed: boolean;
-  onWidth: (w: number) => void;
-  onCollapsed: (c: boolean) => void;
   update: (fn: (d: PostDoc) => PostDoc) => void;
   /** One slide per path. */
   onAddSlides: (paths: string[]) => void;
@@ -52,7 +49,7 @@ export interface SourcesPanelProps {
   onBuild: (inputs: string[], build: SlideBuild) => void;
 }
 
-export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width, collapsed, onWidth, onCollapsed, update, onAddSlides, onBuild }: SourcesPanelProps) {
+export function SourcesPanel({ postId, doc, format, saved, selectedSlide, update, onAddSlides, onBuild }: SourcesPanelProps) {
   const [sources, setSources] = useState<PostSourceFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; hint: string } | null>(null);
@@ -148,58 +145,25 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width,
 
   const restore = (path: string) => update((d) => ({ ...d, hidden: d.hidden.filter((p) => p !== path) }));
 
-  // ---- resizing ----
-  const startResize = (e: RPointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startW = width;
-    const clamp = (w: number) => Math.min(SOURCES_MAX, Math.max(SOURCES_MIN, w));
-    const move = (ev: PointerEvent) => onWidth(clamp(startW + ev.clientX - startX));
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  };
-  const resizeKey = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "ArrowLeft") onWidth(Math.max(SOURCES_MIN, width - 24));
-      else if (e.key === "ArrowRight") onWidth(Math.min(SOURCES_MAX, width + 24));
-    },
-    [onWidth, width],
-  );
-  const rootRef = useRef<HTMLElement>(null);
-
-  if (collapsed) {
-    return (
-      <aside className={styles.collapsed} aria-label="Sources (hidden)">
-        <IconButton icon="chevron-right" label="Show sources" data-tip="Open the panel with the photos and clips for this post" size="sm" onClick={() => onCollapsed(false)} />
-        <span className={styles.vertical}>Sources</span>
-      </aside>
-    );
-  }
-
   const collageWhy = format === "reel" ? "A reel is one video" : photos.length < 2 ? "Select at least two photos" : "";
   const stitchWhy = selectedInOrder.length < 2 ? "Select at least two clips or photos" : "";
   const canAdd = selectedInGrid.length > 0;
 
   return (
-    <aside ref={rootRef} className={styles.root} style={{ width }} aria-label="Sources">
+    <div className={styles.root} aria-label="Sources">
       <header className={styles.head}>
-        <h2 className={styles.title} data-tip="All the photos and clips you can use in this post">
-          Sources <span className={styles.count} data-tip="Number of sources">{sources.length}</span>
-        </h2>
+        <span className={styles.count} data-tip="Number of photos and clips in this pool">
+          {sources.length} {sources.length === 1 ? "source" : "sources"}
+        </span>
         {loading && <Spinner />}
         <span className={styles.spacer} />
         <IconButton icon="refresh-cw" label="Refresh sources" data-tip="Look in the folder again for new or changed files" size="sm" onClick={() => setTick((t) => t + 1)} />
-        <IconButton icon="chevron-left" label="Hide sources" data-tip="Collapse this panel to give the slides more room" size="sm" onClick={() => onCollapsed(true)} />
       </header>
 
       <div className={styles.folder}>
         {doc.folder ? (
           <span className={styles.path} title={doc.folder}>
-            {doc.folder}
+            {folderBaseName(doc.folder)}
             {doc.subfolders ? " (with subfolders)" : ""}
           </span>
         ) : (
@@ -285,8 +249,6 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width,
         </div>
       )}
 
-      <div className={styles.handle} role="separator" aria-orientation="vertical" aria-label="Resize sources" data-tip="Drag to make the panel wider or narrower (or use the arrow keys)" tabIndex={0} onPointerDown={startResize} onKeyDown={resizeKey} />
-
       {dialog === "collage" && (
         <CollageDialog
           photos={photos.map((p) => ({ path: p.path, name: p.name }))}
@@ -313,6 +275,6 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, width,
           }}
         />
       )}
-    </aside>
+    </div>
   );
 }

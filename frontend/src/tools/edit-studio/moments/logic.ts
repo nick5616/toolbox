@@ -11,8 +11,8 @@ import type { EditParam, EditPost, Key, Marker } from "@/viz/edit/types";
 import "@/viz/post";
 import { postDef } from "@/viz/post/registry";
 import type { PostType } from "@/viz/types";
-import { newEffect } from "../inspector/EffectsStack";
-import { buildParam, KEY_TOL_MS, paramBase, paramKeys, valueAt, withKeys } from "../inspector/paramOps";
+import { newEffect } from "@/editor/inspector/EffectsStack";
+import { buildParam, KEY_TOL_MS, paramBase, paramKeys, valueAt, withKeys } from "@/editor/inspector/paramOps";
 
 // ---- kinds and effects ----
 

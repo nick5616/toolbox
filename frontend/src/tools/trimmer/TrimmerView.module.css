@@ -8,18 +8,22 @@
   overflow: auto;
 }
 
-.header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
+.host {
+  overflow: hidden;
 }
 
-.title {
-  margin: 0;
-  font-size: var(--text-xl);
-  line-height: var(--text-xl-lh);
-  font-weight: 600;
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .fileName {

@@ -1,28 +1,38 @@
 /**
- * The embeddable designer (SPEC.md §8.3, §9.4): preview, Why, Song Map and the
- * five tabs. The Visualizer's Design step hosts it with `text: "engine"`;
- * Lyric Video and Subtitles host it with their own words overlay. The host owns
- * the design and its undo (`useShowHistory`); every edit goes through `onChange`.
+ * The embeddable designer (SPEC.md §8.3, §9.4; Phase 10 layout): the preview
+ * and Song Map get the room; a compact rail beside them holds a few headline
+ * reactions and one click-in per section (Presets, Look, Reactions, Layers,
+ * Timeline, Why), each with a one-line summary. The Visualizer's Design step
+ * hosts it with `text: "engine"` (and its preview can pop out); Lyric Video and
+ * Subtitles host it with their own words overlay. The host owns the design and
+ * its undo (`useShowHistory`); every edit goes through `onChange`.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Banner, Icon, cx } from "@/components";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Banner, ClickIn, ClickInHost, Slider } from "@/components";
 import type { MediaPlayerHandle } from "@/components/media";
+import { SHORT_QUERY, useMediaQuery } from "@/lib/media";
 import { useShortcut } from "@/lib/shortcuts";
+import { partWindowKey } from "@/lib/windows";
+import { PartFrame } from "@/parts/PartFrame";
+import { useWindowOpen } from "@/state/windows";
 import type { Analysis } from "@/viz/analysis";
 import { timelineFor } from "@/viz/director";
 import { Signals } from "@/viz/signals";
 import type { Show } from "@/viz/types";
 import { validateShow } from "@/viz/validate";
-import { SongMap } from "../SongMap";
+import { PREVIEW_PART } from "../parts";
+import { SongMap, type SongMapLane } from "../SongMap";
 import { useVisualizer } from "../store";
 import { DesignerContext, useThrottled, type DesignerContextValue } from "./context";
 import { LayersTab } from "./LayersTab";
 import { LookTab } from "./LookTab";
-import { withoutText } from "./model";
+import { reactionMod, setReactionAmount, withoutText } from "./model";
 import { PresetsTab } from "./PresetsTab";
 import { Preview, type DesignerText } from "./Preview";
 import { ReactionsTab } from "./ReactionsTab";
+import { layersSummary, lookSummary, presetSummary, reactionsSummary, timelineSummary } from "./summaries";
 import { TimelineTab } from "./TimelineTab";
+import { whyFacts } from "./why";
 import { WhyPanel } from "./WhyPanel";
 import styles from "./designer.module.css";
 
@@ -39,6 +49,8 @@ export interface VisualDesignerProps {
   text: DesignerText; // engine text (Visualizer) or the host's preview text
   tabs?: DesignerTab[]; // default: all
   onSavePreset?(show: Show): void; // "Save as my preset"
+  /** The Visualizer's own designer: the preview can pop out into a window (it needs the store bridge of the Visualizer view). */
+  popOutPreview?: boolean;
 }
 
 const ALL_TABS: Array<{ id: DesignerTab; label: string; icon: string }> = [
@@ -57,16 +69,37 @@ const TAB_TIP: Record<DesignerTab, string> = {
   timeline: "Decide which scene plays in each section of the song",
 };
 
-export function VisualDesigner({ inputPath, analysis, show, onChange, aspect, mode, player, text, tabs, onSavePreset }: VisualDesignerProps) {
+/** How many of a design's own reactions the rail shows as sliders. */
+export const HEADLINE_CONTROLS = 3;
+/** Short windows give the Song Map fewer lanes so the preview keeps its room. */
+const SHORT_LANES: SongMapLane[] = ["sections", "drums", "vocals", "chords"];
+export const HEADLINE_CONTROLS_SHORT = 2;
+
+export function VisualDesigner(props: VisualDesignerProps) {
+  return (
+    <ClickInHost className={styles.designer}>
+      <Designer {...props} />
+    </ClickInHost>
+  );
+}
+
+function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, text, tabs, onSavePreset, popOutPreview }: VisualDesignerProps) {
   const engineText = text === "engine";
   const visible = useMemo(() => ALL_TABS.filter((t) => !tabs || tabs.includes(t.id)), [tabs]);
-  const [tab, setTab] = useState<DesignerTab>(visible[0]?.id ?? "presets");
+  const short = useMediaQuery(SHORT_QUERY);
   const [playheadMs, setPlayheadMs] = useState(0);
   const [section, setSection] = useState(0);
   const ownPlayer = useRef<MediaPlayerHandle>(null);
   const toggleFs = useRef<(() => void) | null>(null);
   const selection = useVisualizer((s) => s.selection);
   const setSelection = useVisualizer((s) => s.setSelection);
+
+  // While the preview is in its own window, its player drives the playhead (through the store).
+  const previewOut = useWindowOpen(partWindowKey(PREVIEW_PART));
+  const storePlayhead = useVisualizer((s) => s.playheadMs);
+  useEffect(() => {
+    if (popOutPreview && previewOut) setPlayheadMs(storePlayhead);
+  }, [popOutPreview, previewOut, storePlayhead]);
 
   // A host that draws its own words never gets text in the design.
   const emit = useCallback((next: Show) => onChange(engineText ? next : withoutText(next)), [onChange, engineText]);
@@ -111,87 +144,113 @@ export function VisualDesigner({ inputPath, analysis, show, onChange, aspect, mo
 
   const timeline = useMemo(() => timelineFor(analysis, show), [analysis, show]);
   const manual = show.timeline.mode === "manual";
-  const editSections = tab === "timeline" && manual;
+  const facts = useMemo(() => whyFacts(show, analysis, signals, liveMs), [show, analysis, signals, liveMs]);
 
-  const body = (() => {
-    switch (tab) {
-      case "presets":
-        return <PresetsTab show={show} onChange={emit} analysis={analysis} mode={mode} aspect={aspect} playheadMs={liveMs} engineText={engineText} onSavePreset={onSavePreset} />;
-      case "look":
-        return <LookTab show={show} onChange={emit} engineText={engineText} />;
-      case "reactions":
-        return <ReactionsTab show={show} onChange={emit} />;
-      case "layers":
-        return <LayersTab show={show} onChange={emit} />;
-      case "timeline":
-        return (
-          <TimelineTab
-            show={show}
-            onChange={emit}
-            analysis={analysis}
-            selected={section}
-            onSelect={(i) => {
-              setSection(i);
-              const s = analysis.audio.sections[i];
-              if (s) seek(s.startMs);
-            }}
-            onPreviewTransition={(ms) => {
-              seek(ms);
-              (player ?? ownPlayer.current)?.play();
-            }}
-          />
-        );
-    }
-  })();
+  const previewEl = (
+    <Preview
+      inputPath={inputPath}
+      analysis={analysis}
+      show={show}
+      aspect={aspect}
+      mode={mode}
+      hostPlayer={player}
+      ownPlayer={ownPlayer}
+      text={text}
+      timeMs={playheadMs}
+      onTime={setPlayheadMs}
+      fsRef={toggleFs}
+    />
+  );
+
+  const bodies: Record<DesignerTab, ReactNode> = {
+    presets: <PresetsTab show={show} onChange={emit} analysis={analysis} mode={mode} aspect={aspect} playheadMs={liveMs} engineText={engineText} onSavePreset={onSavePreset} />,
+    look: <LookTab show={show} onChange={emit} engineText={engineText} />,
+    reactions: <ReactionsTab show={show} onChange={emit} />,
+    layers: <LayersTab show={show} onChange={emit} />,
+    timeline: (
+      <TimelineTab
+        show={show}
+        onChange={emit}
+        analysis={analysis}
+        selected={section}
+        onSelect={(i) => {
+          setSection(i);
+          const s = analysis.audio.sections[i];
+          if (s) seek(s.startMs);
+        }}
+        onPreviewTransition={(ms) => {
+          seek(ms);
+          (player ?? ownPlayer.current)?.play();
+        }}
+      />
+    ),
+  };
+  const summary: Record<DesignerTab, string> = {
+    presets: presetSummary(show),
+    look: lookSummary(show),
+    reactions: reactionsSummary(show),
+    layers: layersSummary(show),
+    timeline: timelineSummary(show, analysis),
+  };
+
+  const headline = show.controls.slice(0, short ? HEADLINE_CONTROLS_SHORT : HEADLINE_CONTROLS);
+  const showReactions = !tabs || tabs.includes("reactions");
 
   return (
     <DesignerContext.Provider value={ctx}>
-      <div className={styles.designer}>
-        <div className={styles.left}>
-          <Preview
-            inputPath={inputPath}
-            analysis={analysis}
-            show={show}
-            aspect={aspect}
-            mode={mode}
-            hostPlayer={player}
-            ownPlayer={ownPlayer}
-            text={text}
-            timeMs={playheadMs}
-            onTime={setPlayheadMs}
-            fsRef={toggleFs}
-          />
-          <WhyPanel show={show} />
-          <SongMap
-            analysis={analysis}
-            timeline={timeline}
-            playheadMs={playheadMs}
-            onSeek={seek}
-            selection={selection}
-            onSelect={setSelection}
-            onSectionClick={editSections ? (i) => setSection(i) : undefined}
-            className={styles.songMap}
-          />
-        </div>
-        <div className={styles.right}>
-          <div className={styles.tabs} role="tablist" aria-label="Designer" data-tip="Design sections">
-            {visible.map((t) => (
-              <button key={t.id} type="button" role="tab" id={`vd-tab-${t.id}`} aria-selected={tab === t.id} aria-controls="vd-panel" tabIndex={tab === t.id ? 0 : -1} className={cx(styles.tab, tab === t.id && styles.tabOn)} data-tip={TAB_TIP[t.id]} onClick={() => setTab(t.id)}>
-                <Icon name={t.icon} size={14} />
-                <span className={styles.tabLabel}>{t.label}</span>
-              </button>
-            ))}
-          </div>
-          {problem && (
-            <Banner tone="warn" title="This design has a problem">
-              {problem}
-            </Banner>
+      <div className={styles.left}>
+        {problem && (
+          <Banner tone="warn" title="This design has a problem">
+            {problem}
+          </Banner>
+        )}
+        <div className={styles.previewSlot}>
+          {popOutPreview ? (
+            <PartFrame part={PREVIEW_PART} chrome="overlay">
+              {previewEl}
+            </PartFrame>
+          ) : (
+            previewEl
           )}
-          <div id="vd-panel" role="tabpanel" aria-labelledby={`vd-tab-${tab}`} className={styles.panel}>
-            {body}
-          </div>
         </div>
+        <SongMap
+          analysis={analysis}
+          timeline={timeline}
+          playheadMs={playheadMs}
+          onSeek={seek}
+          selection={selection}
+          onSelect={setSelection}
+          onSectionClick={manual ? (i) => setSection(i) : undefined}
+          lanes={short ? SHORT_LANES : undefined}
+          className={styles.songMap}
+        />
       </div>
+      <nav className={styles.rail} aria-label="Designer">
+        {showReactions && headline.length > 0 && (
+          <div className={styles.headline} role="group" aria-label="Main reactions">
+            {headline.map((slot) => {
+              const i = show.controls.indexOf(slot);
+              const mod = reactionMod(show, slot);
+              return (
+                <label key={slot.target} className={styles.headlineRow} data-tip={`How strongly ${slot.label} follows the music`}>
+                  <span className={styles.headlineLabel}>{slot.label}</span>
+                  <Slider aria-label={`${slot.label} level`} min={-2} max={2} step={0.05} value={mod?.amount ?? 0} onChange={(v) => emit(setReactionAmount(show, i, v))} format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}`} />
+                </label>
+              );
+            })}
+          </div>
+        )}
+        {visible.map((t) => (
+          <ClickIn key={t.id} id={`vd-${t.id}`} icon={t.icon} title={t.label} summary={summary[t.id]} tip={TAB_TIP[t.id]}>
+            {bodies[t.id]}
+          </ClickIn>
+        ))}
+        {facts.length > 0 && (
+          <ClickIn id="vd-why" icon="info" title="Why" summary={facts[0]} tip="What is driving the visuals at the playhead right now">
+            <WhyPanel show={show} />
+          </ClickIn>
+        )}
+      </nav>
     </DesignerContext.Provider>
   );
 }

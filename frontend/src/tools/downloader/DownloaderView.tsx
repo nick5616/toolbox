@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, PathText, toast } from "@/components";
+import { Button, ClickInHost, toast } from "@/components";
 import { DownloaderService, DownloadMode, LibraryService, type DownloaderOptions } from "@/lib/api";
 import { useCommands } from "@/lib/commands";
 import { toAppError } from "@/lib/errors";
@@ -121,24 +121,8 @@ export default function DownloaderView(_props: ToolViewProps) {
   const canSubmit = !!options && urls.length > 0 && !listError && !blockReason && Object.keys(trimErrors).length === 0;
 
   return (
+    <ClickInHost className={styles.host}>
     <div className={styles.root}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Downloader</h1>
-          <p className={styles.tagline}>Save audio or video from links.</p>
-        </div>
-        {destination && (
-          <button
-            type="button"
-            className={styles.destination}
-            data-tip="Open the folder where finished downloads are saved"
-            onClick={() => void LibraryService.OpenLibraryFolder("Downloads").catch((e: unknown) => toast({ title: toAppError(e).message, tone: "danger" }))}
-          >
-            <PathText path={destination} />
-          </button>
-        )}
-      </header>
-
       <DepsBanner />
 
       <UrlInput ref={inputRef} value={text} onChange={onText} parsed={parsed} serverErrors={serverUrlErrors} listError={listError} />
@@ -162,6 +146,16 @@ export default function DownloaderView(_props: ToolViewProps) {
         >
           {urls.length > 0 ? `Download ${urls.length}` : "Download"}
         </Button>
+        {destination && (
+          <Button
+            variant="ghost"
+            icon="folder-open"
+            data-tip={`Open the folder where finished downloads are saved (${destination})`}
+            onClick={() => void LibraryService.OpenLibraryFolder("Downloads").catch((e: unknown) => toast({ title: toAppError(e).message, tone: "danger" }))}
+          >
+            Downloads folder
+          </Button>
+        )}
         {blockReason && (
           <p className={styles.reason} data-tip="Why downloading is unavailable">
             {blockReason}
@@ -171,5 +165,6 @@ export default function DownloaderView(_props: ToolViewProps) {
 
       <RecentDownloads />
     </div>
+    </ClickInHost>
   );
 }

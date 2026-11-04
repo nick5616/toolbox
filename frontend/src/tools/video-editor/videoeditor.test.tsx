@@ -21,6 +21,7 @@ const h = vi.hoisted(() => ({
   setState: vi.fn(),
   revealPath: vi.fn(),
   sources: vi.fn(),
+  closeWindow: vi.fn(async (_k: string) => undefined),
   dropHandler: null as null | ((info: { paths: string[]; x: number; y: number }) => void),
 }));
 
@@ -87,6 +88,7 @@ vi.mock("@/lib/api", async (orig) => {
     },
     SettingsService: { ModuleState: (...a: unknown[]) => h.moduleState(...a), SetModuleState: (...a: unknown[]) => h.setState(...a) },
     JobsService: { Cancel: async () => undefined },
+    DesktopService: { CloseWindow: (k: string) => h.closeWindow(k), OpenWindows: async () => [] },
     LibraryService: { RevealPath: (...a: unknown[]) => h.revealPath(...a), Reveal: async () => undefined, Open: async () => undefined },
   };
 });
@@ -139,7 +141,7 @@ function project(over: Partial<VideoProject> = {}): VideoProject {
 }
 
 function info(id: string, name: string, items = 2): ProjectInfo {
-  return { id, kind: ProjectKind.ProjectVideo, name, thumb: "", items, missing: 0, updatedAt: 1 };
+  return { id, kind: ProjectKind.ProjectVideo, name, thumb: "", items, missing: 0, updatedAt: 1, flags: [] };
 }
 
 function probeResult(path: string, kind = "video") {
@@ -303,12 +305,49 @@ describe("editing", () => {
   it("adds a title at the playhead and edits it in the inspector", async () => {
     await openFirstProject();
     await userEvent.click(screen.getByRole("button", { name: "Title" }));
-    const box = await screen.findByLabelText("Text");
+    // A new title opens its Text click-in with the box focused.
+    const box = await screen.findByRole("textbox", { name: "Text" });
     await userEvent.clear(box);
     await userEvent.type(box, "Hello");
     await waitFor(() => expect(h.save).toHaveBeenCalled(), { timeout: 3000 });
     const d = savedDoc(h.save.mock.calls.length - 1);
     expect(d.titles?.[0]).toMatchObject({ text: "Hello", style: "title", position: "center" });
+  });
+});
+
+describe("click-ins", () => {
+  async function select(testId: string) {
+    fireEvent.pointerDown(screen.getByTestId(testId), { button: 0, clientX: 10 });
+    fireEvent.pointerUp(screen.getByTestId(testId), { button: 0 });
+    await screen.findByTestId("clip-inspector");
+  }
+  const launcher = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) });
+
+  it("shows a clip's settings as click-ins with summaries, and keeps the page free of their controls", async () => {
+    await openFirstProject();
+    await select("clip-0");
+    expect(launcher("Trim").textContent).toContain("0:00.000 – 0:03.000");
+    expect(launcher("Playback").textContent).toContain("1×");
+    expect(launcher("Picture").textContent).toContain("Fill the frame");
+    expect(launcher("Next clip").textContent).toContain("Cut");
+    expect(screen.queryByLabelText("Volume")).toBeNull();
+  });
+
+  it("opens a click-in with the clip's controls and edits through it", async () => {
+    await openFirstProject();
+    await select("clip-0");
+    await userEvent.click(launcher("Playback"));
+    const drawer = await screen.findByRole("dialog", { name: "Playback" });
+    await userEvent.click(within(drawer).getByRole("switch", { name: "Mute" }));
+    await waitFor(() => expect(h.save).toHaveBeenCalled(), { timeout: 3000 });
+    expect(savedDoc().clips?.[0]?.volume).toBe(0);
+    expect(launcher("Playback").textContent).toContain("muted");
+  });
+
+  it("the last clip has no 'Next clip' click-in", async () => {
+    await openFirstProject();
+    await select("clip-1");
+    expect(screen.queryByRole("button", { name: /^Next clip/ })).toBeNull();
   });
 });
 
@@ -447,6 +486,23 @@ describe("post handoff", () => {
   });
 });
 
+describe("post handoff in its own window", () => {
+  it("Back to post closes the window (the post refreshes itself) instead of handing off", async () => {
+    const { setCurrentWindowForTest, parseWindow } = await import("@/lib/windows");
+    setCurrentWindowForTest(parseWindow("?window=tool&view=video-editor&key=tool:video-editor"));
+    try {
+      useUI.setState({ handoff: { moduleId: "video-editor", inputs: [], postSlide: { postId: "post1", slideId: "s1", aspect: "9:16", projectId: "p1" } } });
+      render(<VideoEditorView moduleId="video-editor" />);
+      await screen.findByLabelText("Project name");
+      await userEvent.click(await screen.findByRole("button", { name: "Back to post" }));
+      await waitFor(() => expect(h.closeWindow).toHaveBeenCalledWith("tool:video-editor"));
+      expect(useUI.getState().handoff).toBeNull();
+    } finally {
+      setCurrentWindowForTest(null);
+    }
+  });
+});
+
 describe("stitch build", () => {
   const seed = (over: Record<string, unknown> = {}) => ({
     postId: "post1",
@@ -524,7 +580,7 @@ describe("sources tab", () => {
     useUI.setState({ handoff: { moduleId: "video-editor", inputs: [], postSlide: seed } });
     render(<VideoEditorView moduleId="video-editor" />);
     await screen.findByLabelText("Project name");
-    await userEvent.click(screen.getByRole("radio", { name: "Sources" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Sources/ }));
     await screen.findByText("new.mp4");
   }
   const lastSaved = () => (h.save.mock.calls.at(-1)?.[2] as VideoProject).clips?.map((c) => c.path);
@@ -551,7 +607,7 @@ describe("sources tab", () => {
     useUI.setState({ handoff: { moduleId: "video-editor", inputs: [], postSlide: seed } });
     render(<VideoEditorView moduleId="video-editor" />);
     await screen.findByLabelText("Project name");
-    await userEvent.click(screen.getByRole("radio", { name: "Sources" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Sources/ }));
     await screen.findByText(/not implemented/);
   });
 });

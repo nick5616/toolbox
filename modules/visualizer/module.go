@@ -57,6 +57,7 @@ func (m *Module) Descriptor() core.Descriptor {
 		Accepts:     core.Accepts{Extensions: Accepts()},
 		Requires:    []string{sidecar.DepID, "ffmpeg", "ffprobe"},
 		Order:       110, OutputSubdir: "Visualizer",
+		Parts:     []string{"stems", "bpm-key"},
 		MaxInputs: 1,
 	}
 }

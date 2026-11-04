@@ -3,7 +3,7 @@ import { Badge, Button, EmptyState, Icon, Section, Switch, cx } from "@/componen
 import { ExifAction, ExifService, JobStatus, type ExifOptions } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 import { useOrderedJobs } from "@/state/jobs";
-import { FileToolLayout, runLabel, useDepsGate, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { FileToolLayout, runLabel, summarize, useDepsGate, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -58,10 +58,6 @@ export default function ExifView({ moduleId }: ToolViewProps) {
     return m?.status === "ok" && !m.view.editable;
   });
   const actionable = paths.filter((p) => !readOnly.includes(p));
-  const anyGps = paths.some((p) => {
-    const m = meta[p];
-    return m?.status === "ok" && m.view.hasLocation;
-  });
 
   const submit = async (opts: ExifOptions, noun: [string, string] = ["file", "files"]) => {
     setRunning(true);
@@ -101,7 +97,7 @@ export default function ExifView({ moduleId }: ToolViewProps) {
         runDisabledReason={noActionable ? "RAW files are read-only here" : undefined}
         running={running}
         inputErrors={inputErrors}
-        options={
+        primary={
           <>
             {paths.length > 0 && (
               <Section label="Inspector" tip="Look at the metadata hidden inside a file before you change anything">
@@ -148,48 +144,32 @@ export default function ExifView({ moduleId }: ToolViewProps) {
                 </div>
               </Section>
             )}
-            <Section label="Actions" tip="Changes are saved to new copies; the originals are never modified">
-              <div className={styles.actions}>
-                <Switch
-                  checked={saved.keepOrientation}
-                  onChange={(keepOrientation) => setSaved({ keepOrientation })}
-                  label="Keep orientation & colour profile"
-                  tip="Keep the rotation flag and colour profile so the cleaned photo still looks right; turn off to strip these too"
-                />
-                <div className={styles.actionBtns}>
-                  <Button
-                    variant={anyGps ? "primary" : "secondary"}
-                    disabled={barDisabled}
-                    data-tip={barDisabled ? barReason : "Delete only the GPS location from new copies, keep everything else"}
-                    onClick={() => void submit(base(ExifAction.ActionStripLocation))}
-                  >
-                    Remove location
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    disabled={barDisabled}
-                    data-tip={barDisabled ? barReason : "Strip location, camera, dates and every other tag from new copies"}
-                    onClick={() => void submit(base(ExifAction.ActionStripAll))}
-                  >
-                    Remove all metadata
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    icon="wand-sparkles"
-                    disabled={barDisabled}
-                    data-tip={barDisabled ? barReason : "Set title, author, copyright, keywords or date on new copies"}
-                    onClick={() => setEditOpen(true)}
-                  >
-                    Edit…
-                  </Button>
-                </div>
-                {readOnly.length > 0 && (
-                  <p className={styles.note} data-tip="RAW files cannot be edited here, so they are left out of the actions">
-                    RAW files are read-only here ({readOnly.length} {readOnly.length === 1 ? "file" : "files"} skipped).
-                  </p>
-                )}
+            <div className={styles.actions} data-tip="Changes are saved to new copies; the originals are never modified">
+              <div className={styles.actionBtns}>
+                <Button
+                  variant="secondary"
+                  disabled={barDisabled}
+                  data-tip={barDisabled ? barReason : "Strip location, camera, dates and every other tag from new copies"}
+                  onClick={() => void submit(base(ExifAction.ActionStripAll))}
+                >
+                  Remove all metadata
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon="wand-sparkles"
+                  disabled={barDisabled}
+                  data-tip={barDisabled ? barReason : "Set title, author, copyright, keywords or date on new copies"}
+                  onClick={() => setEditOpen(true)}
+                >
+                  Edit…
+                </Button>
               </div>
-            </Section>
+              {readOnly.length > 0 && (
+                <p className={styles.note} data-tip="RAW files cannot be edited here, so they are left out of the actions">
+                  RAW files are read-only here ({readOnly.length} {readOnly.length === 1 ? "file" : "files"} skipped).
+                </p>
+              )}
+            </div>
             <EditDialog
               open={editOpen}
               fields={fieldNames}
@@ -202,6 +182,15 @@ export default function ExifView({ moduleId }: ToolViewProps) {
               }}
             />
           </>
+        }
+        advancedSummary={summarize(saved.keepOrientation ? "keeps orientation & colour profile" : "strips orientation too")}
+        advanced={
+          <Switch
+            checked={saved.keepOrientation}
+            onChange={(keepOrientation) => setSaved({ keepOrientation })}
+            label="Keep orientation & colour profile"
+            tip="Keep the rotation flag and colour profile so the cleaned photo still looks right; turn off to strip these too"
+          />
         }
         results={
           <Section label="Results" tip="Cleaned copies; the originals are never changed">

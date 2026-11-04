@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EraserModel } from "@/lib/api";
 import {
   BRUSH_MAX,
   BRUSH_MIN,
@@ -17,7 +18,7 @@ import {
   zoomAround,
   type Stroke,
 } from "./mask";
-import { modelHint, sanitizeSettings, DEFAULT_SETTINGS, canPaintOn, needsThumb } from "./options";
+import { modelHint, sanitizeSettings, DEFAULT_SETTINGS, canPaintOn, needsThumb, summarizeModel } from "./options";
 
 const brush = (n = 0): Stroke => ({ kind: "brush", size: 10, points: [{ x: n, y: n }] });
 
@@ -146,6 +147,15 @@ describe("maskIsEmpty", () => {
   it("looks only at alpha", () => {
     expect(maskIsEmpty(new Uint8ClampedArray([255, 255, 255, 0, 9, 9, 9, 0]))).toBe(true);
     expect(maskIsEmpty(new Uint8ClampedArray([0, 0, 0, 0, 0, 0, 0, 1]))).toBe(false);
+  });
+});
+
+describe("summarizeModel", () => {
+  it("says what the model needs", () => {
+    expect(summarizeModel(EraserModel.ModelBest, { present: true, downloadBytes: 0 })).toBe("Best · ready");
+    expect(summarizeModel(EraserModel.ModelBest, undefined)).toBe("Best · ready");
+    expect(summarizeModel(EraserModel.ModelBest, { present: false, downloadBytes: 208 * 1024 * 1024 })).toBe("Best · downloads 208 MB");
+    expect(summarizeModel(EraserModel.ModelFast, { present: true, downloadBytes: 28 * 1024 * 1024 })).toBe("Fast · ready");
   });
 });
 

@@ -8,7 +8,7 @@ import type { NormalProject } from "@/viz/edit/defaults";
 import { interpolateKeys } from "@/viz/edit/params";
 import { parseSpeed, parseTransform, serializeSpeed, serializeTransform } from "@/viz/edit/schema";
 import type { ClipTransform, EditParam, Key, SongRange } from "@/viz/edit/types";
-import { speedAt } from "../doc";
+import { speedAt } from "@/editor/doc";
 
 /** 1 s ≤ D ≤ 10 min (§4). */
 export const MIN_RANGE_MS = 1000;

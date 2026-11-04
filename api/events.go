@@ -38,6 +38,10 @@ func init() {
 	application.RegisterEvent[core.PipelineRun]("pipelines:run")
 	application.RegisterEvent[core.RunsRemoved]("pipelines:runs-removed")
 
+	application.RegisterEvent[core.WindowsChanged]("windows:changed")
+	application.RegisterEvent[core.WindowRelay]("windows:relay")
+	application.RegisterEvent[core.WindowHandoff]("windows:handoff")
+
 	application.RegisterEvent[viz.RenderStart]("viz:render")
 	application.RegisterEvent[viz.RenderAck]("viz:render-ack")
 	application.RegisterEvent[viz.RenderCancel]("viz:render-cancel")

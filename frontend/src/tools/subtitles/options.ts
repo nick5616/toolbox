@@ -143,6 +143,24 @@ export const BACKGROUND_CHOICES = [
   { value: "image", label: "Image", tip: "Your own picture behind the subtitles" },
 ];
 
+/** State of the Source step's "Subtitle text" click-in: "42 characters · 2 lines · to English". */
+export function splitSummary(p: Pick<Prefs, "maxLineChars" | "maxLines" | "translateToEnglish">): string {
+  return `${p.maxLineChars} characters · ${p.maxLines} ${p.maxLines === 1 ? "line" : "lines"}${p.translateToEnglish ? " · to English" : ""}`;
+}
+
+/** State of the Export step's "Text" click-in: "Medium · bottom · Arial". */
+export function textSummary(p: Pick<Prefs, "size" | "position" | "font">): string {
+  const size = SIZE_CHOICES.find((c) => c.value === p.size)?.label ?? p.size;
+  return `${size} · ${p.position} · ${p.font}`;
+}
+
+/** State of the "Video" click-in (audio only): "16:9 · 1080p · Visualizer". */
+export function videoSummary(p: Pick<Prefs, "canvas" | "canvasHeight" | "background" | "backgroundPath">): string {
+  const bg = BACKGROUND_CHOICES.find((c) => c.value === p.background)?.label ?? p.background;
+  const need = p.background === "image" && !p.backgroundPath ? " (choose one)" : "";
+  return `${p.canvas} · ${p.canvasHeight}p · ${bg}${need}`;
+}
+
 /** Canvas shape as width / height. */
 export function canvasAspect(canvas: string): number {
   return canvas === "9:16" ? 9 / 16 : canvas === "1:1" ? 1 : 16 / 9;

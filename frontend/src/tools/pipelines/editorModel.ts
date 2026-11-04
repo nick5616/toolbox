@@ -157,6 +157,7 @@ export function blankPipeline(catalog: readonly StepType[], takenNames: readonly
     name: uniqueName("New pipeline", takenNames),
     description: "",
     templateId: "",
+    layout: "",
     steps: [step],
     watch: { enabled: false, folder: "" },
     createdAt: 0,

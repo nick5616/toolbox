@@ -1,5 +1,5 @@
 import { useMemo, useState, type RefObject } from "react";
-import { Banner, Button, EmptyState, IconButton, Meter, Spinner, Stepper, Switch, TextField, cx } from "@/components";
+import { Banner, Button, ClickIn, EmptyState, IconButton, Meter, Spinner, Stepper, Switch, TextField, cx } from "@/components";
 import { MediaPlayer, Timeline, type ContentRect, type MediaPlayerHandle, type MediaSourceState, type Marker } from "@/components/media";
 import { CueList, type RowAction } from "./CueList";
 import { CueOverlay } from "./CueOverlay";
@@ -71,7 +71,6 @@ export interface EditStepProps {
 /** Step 2: player with cue overlay and timeline on the left, the cue list on the right. */
 export function EditStep(p: EditStepProps) {
   const [lateBy, setLateBy] = useState(0);
-  const [findOpen, setFindOpen] = useState(false);
   const [find, setFind] = useState("");
   const [repl, setRepl] = useState("");
   const [matchCase, setMatchCase] = useState(false);
@@ -171,40 +170,46 @@ export function EditStep(p: EditStepProps) {
           <IconButton size="sm" icon="undo-2" label="Undo" data-tip="Undo the last subtitle edit" kbd="Mod+Z" disabled={!p.canUndo} onClick={p.onUndo} />
           <IconButton size="sm" icon="redo-2" label="Redo" data-tip="Redo the edit you just undid" kbd="Mod+Shift+Z" disabled={!p.canRedo} onClick={p.onRedo} />
           <span className={styles.sep} aria-hidden />
-          <span className={styles.shiftLabel} id="shift-label" data-tip="If every subtitle comes too late, enter by how much and press Shift to move them all earlier (use a negative number if they are early)">
-            Subtitles are late by
-          </span>
-          <Stepper aria-labelledby="shift-label" data-tip="How many milliseconds late the subtitles are" value={lateBy} step={100} min={-600000} max={600000} unit="ms" onChange={setLateBy} />
-          <Button
-            size="sm"
-            variant="secondary"
-            data-tip={lateBy === 0 ? "Enter how late the subtitles are first" : p.rows.length === 0 ? "There are no subtitles to shift" : "Move every subtitle earlier by that amount"}
-            disabled={lateBy === 0 || p.rows.length === 0}
-            onClick={() => {
-              p.onShift(-lateBy);
-              setLateBy(0);
-            }}
-          >
-            Shift
-          </Button>
-          <span className={styles.sep} aria-hidden />
-          <IconButton size="sm" icon="search" label="Find and replace" data-tip="Search the subtitle text and replace it everywhere" pressed={findOpen} onClick={() => setFindOpen((o) => !o)} />
+          <ClickIn variant="icon" icon="clock" title="Shift timing" tip="If every subtitle comes too late or too early, move them all together" width={320}>
+            <div className={styles.drawerForm}>
+              <span className={styles.shiftLabel} id="shift-label" data-tip="If every subtitle comes too late, enter by how much and press Shift to move them all earlier (use a negative number if they are early)">
+                Subtitles are late by
+              </span>
+              <Stepper aria-labelledby="shift-label" data-tip="How many milliseconds late the subtitles are" value={lateBy} step={100} min={-600000} max={600000} unit="ms" onChange={setLateBy} />
+              <div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  data-tip={lateBy === 0 ? "Enter how late the subtitles are first" : p.rows.length === 0 ? "There are no subtitles to shift" : "Move every subtitle earlier by that amount"}
+                  disabled={lateBy === 0 || p.rows.length === 0}
+                  onClick={() => {
+                    p.onShift(-lateBy);
+                    setLateBy(0);
+                  }}
+                >
+                  Shift
+                </Button>
+              </div>
+            </div>
+          </ClickIn>
+          <ClickIn variant="icon" icon="search" title="Find and replace" tip="Search the subtitle text and replace it everywhere" width={320}>
+            <div className={styles.drawerForm}>
+              <TextField size="sm" aria-label="Find" data-tip="The text to look for in the subtitles" placeholder="Find" value={find} onChange={(e) => { setFind(e.target.value); setReplaced(null); }} />
+              <TextField size="sm" aria-label="Replace with" data-tip="What to put instead; leave empty to delete the matches" placeholder="Replace with" value={repl} onChange={(e) => setRepl(e.target.value)} />
+              <Switch tip="Only match text with the same upper and lower case" checked={matchCase} onChange={setMatchCase} label="Match case" />
+              <span className={styles.muted} data-tip="How many places match, or how many were replaced">{replaced !== null ? `Replaced ${replaced}` : find ? `${matches} found` : ""}</span>
+              <div>
+                <Button size="sm" variant="secondary" disabled={matches === 0} data-tip={matches === 0 ? "Nothing matches yet" : "Replace every match in all subtitles; undo brings it back"} onClick={() => setReplaced(p.onReplace(find, repl, matchCase))}>
+                  Replace all
+                </Button>
+              </div>
+            </div>
+          </ClickIn>
           <span className={styles.grow} />
           <Button size="sm" icon="check" kbd="Mod+S" data-tip={p.blocker ? "Fix the problem shown below first" : p.rows.length === 0 ? "There are no subtitles to save" : "Write the subtitles to a file in your Library"} loading={p.save.busy} disabled={p.rows.length === 0 || p.blocker !== null || p.save.busy} onClick={p.onSave}>
             Save
           </Button>
         </div>
-        {findOpen && (
-          <div className={styles.findRow}>
-            <TextField size="sm" aria-label="Find" data-tip="The text to look for in the subtitles" placeholder="Find" value={find} onChange={(e) => { setFind(e.target.value); setReplaced(null); }} />
-            <TextField size="sm" aria-label="Replace with" data-tip="What to put instead; leave empty to delete the matches" placeholder="Replace with" value={repl} onChange={(e) => setRepl(e.target.value)} />
-            <Switch tip="Only match text with the same upper and lower case" checked={matchCase} onChange={setMatchCase} label="Match case" />
-            <span className={styles.muted} data-tip="How many places match, or how many were replaced">{replaced !== null ? `Replaced ${replaced}` : find ? `${matches} found` : ""}</span>
-            <Button size="sm" variant="secondary" disabled={matches === 0} data-tip={matches === 0 ? "Nothing matches yet" : "Replace every match in all subtitles; undo brings it back"} onClick={() => setReplaced(p.onReplace(find, repl, matchCase))}>
-              Replace all
-            </Button>
-          </div>
-        )}
         {p.blocker && (
           <Banner tone="warn" title="Fix this before saving">
             {p.blocker}

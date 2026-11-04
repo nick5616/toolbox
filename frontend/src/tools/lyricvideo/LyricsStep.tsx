@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Banner, Button, IconButton, MenuButton, Section, SegmentedControl, Select, TextArea, TextField, Kbd } from "@/components";
+import { Banner, Button, ClickIn, IconButton, MenuButton, Section, SegmentedControl, Select, TextArea, TextField, Kbd } from "@/components";
 import { Timeline, type Marker } from "@/components/media";
 import { LyricSource, type Language } from "@/lib/api";
 import { DepsGate } from "@/tools/_kit";
@@ -162,22 +162,24 @@ export function LyricsStep(p: LyricsStepProps) {
           </Button>
           <IconButton size="sm" icon="undo-2" label="Undo" data-tip="Undo the last lyric edit" disabled={!p.canUndo} onClick={p.onUndo} />
           <IconButton size="sm" icon="redo-2" label="Redo" data-tip="Redo the edit you just undid" disabled={!p.canRedo} onClick={p.onRedo} />
-          <span className={styles.shiftGroup} data-tip="Move every line earlier or later by the same amount to fix a constant offset">
-            <IconButton size="sm" icon="minus" label="Shift all earlier" data-tip="Move every line earlier by the amount in the box (100 ms if empty)" disabled={!hasRows || p.tapping} onClick={() => applyShift(-1)} />
-            <TextField
-              size="sm"
-              mono
-              aria-label="Shift all by (ms)"
-              data-tip="Milliseconds to shift all lines by; leave empty for 100"
-              wrapperClassName={styles.shiftField}
-              value={shift}
-              placeholder="100"
-              inputMode="numeric"
-              onChange={(e) => setShift(e.target.value)}
-            />
-            <span className={styles.muted}>ms</span>
-            <IconButton size="sm" icon="plus" label="Shift all later" data-tip="Move every line later by the amount in the box (100 ms if empty)" disabled={!hasRows || p.tapping} onClick={() => applyShift(1)} />
-          </span>
+          <ClickIn variant="icon" icon="clock" title="Shift timing" tip="Move every line earlier or later by the same amount to fix a constant offset" width={320}>
+            <span className={styles.shiftGroup} data-tip="Move every line earlier or later by the same amount to fix a constant offset">
+              <IconButton size="sm" icon="minus" label="Shift all earlier" data-tip="Move every line earlier by the amount in the box (100 ms if empty)" disabled={!hasRows || p.tapping} onClick={() => applyShift(-1)} />
+              <TextField
+                size="sm"
+                mono
+                aria-label="Shift all by (ms)"
+                data-tip="Milliseconds to shift all lines by; leave empty for 100"
+                wrapperClassName={styles.shiftField}
+                value={shift}
+                placeholder="100"
+                inputMode="numeric"
+                onChange={(e) => setShift(e.target.value)}
+              />
+              <span className={styles.muted}>ms</span>
+              <IconButton size="sm" icon="plus" label="Shift all later" data-tip="Move every line later by the amount in the box (100 ms if empty)" disabled={!hasRows || p.tapping} onClick={() => applyShift(1)} />
+            </span>
+          </ClickIn>
           <span className={styles.spacer} />
           {p.tapping ? (
             <Button size="sm" icon="square" onClick={p.onTapEnd} data-tip="Stop tapping and keep the times you set" data-tip-kbd="Escape">

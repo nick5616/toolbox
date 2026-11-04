@@ -112,6 +112,8 @@ describe("PdfView", () => {
 
   it("shows live range chips and the file count for split", async () => {
     const user = await open(["/a.pdf"], PdfAction.ActionSplit);
+    expect(screen.getByRole("button", { name: /Options/ }).textContent).toContain("Every 1 page");
+    await user.click(screen.getByRole("button", { name: /Options/ }));
     await user.click(screen.getByRole("radio", { name: "Custom ranges" }));
     await user.type(screen.getByRole("textbox", { name: "Page ranges" }), "1-3, 5, 6-");
     const chips = screen.getByRole("list", { name: "Parsed ranges" });
@@ -161,6 +163,11 @@ describe("PdfView", () => {
       { page: 4, rotate: 0 },
       { page: 5, rotate: 0 },
     ]);
+  });
+
+  it("summarises the per-action options on the click-in row", async () => {
+    await open(["/a.pdf"], PdfAction.ActionPDFToImages);
+    expect(screen.getByRole("button", { name: /Options/ }).textContent).toContain("PNG · 150 dpi · all pages");
   });
 
   it("requires matching passwords when protecting and never puts them in options", async () => {

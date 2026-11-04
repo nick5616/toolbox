@@ -63,9 +63,13 @@ describe("DevUtilsView", () => {
   it("switches utilities from the list and the palette selection", async () => {
     const user = userEvent.setup();
     render(<DevUtilsView moduleId="dev-utils" />);
+    const picker = await screen.findByRole("button", { name: /Utilities/ });
+    expect(picker.textContent).toContain("JSON");
+    await user.click(picker);
     await user.click(await screen.findByRole("button", { name: "UUID" }));
     expect(await screen.findByRole("button", { name: "Generate" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "UUID" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Utilities/ }).textContent).toContain("UUID");
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("highlights a hash that matches the compare field", async () => {

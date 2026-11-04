@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import { Button, DropZone, FileList, Icon, Section, cx } from "@/components";
+import { Button, ClickInHost, DropZone, FileList, Icon, Section, cx } from "@/components";
 import { PdfAction, PdfService } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 import { JobRow } from "@/shell/JobRow";
@@ -134,11 +134,8 @@ export default function PdfView({ moduleId }: ToolViewProps) {
   }
 
   return (
+    <ClickInHost className={styles.host}>
     <section className={styles.root} aria-label={mod?.name ?? "PDF Toolkit"}>
-      <header>
-        <h1 className={styles.title}>{mod?.name ?? "PDF Toolkit"}</h1>
-        {mod?.tagline && <p className={styles.tagline}>{mod.tagline}</p>}
-      </header>
       <DepsGate moduleId={moduleId} />
       <div className={styles.body}>
         <div role="radiogroup" aria-label="PDF action" className={styles.picker}>
@@ -161,11 +158,8 @@ export default function PdfView({ moduleId }: ToolViewProps) {
                 if (n) setUi((u) => ({ ...u, action: n.id }));
               }}
             >
-              <Icon name={a.icon} size={16} className={styles.actionIcon} />
-              <span className={styles.actionText}>
-                <span className={styles.actionTitle}>{a.title}</span>
-                <span className={styles.actionDesc}>{a.desc}</span>
-              </span>
+              <Icon name={a.icon} size={18} className={styles.actionIcon} />
+              <span className={styles.actionTitle}>{a.title}</span>
             </button>
           ))}
         </div>
@@ -274,5 +268,6 @@ export default function PdfView({ moduleId }: ToolViewProps) {
         </div>
       </div>
     </section>
+    </ClickInHost>
   );
 }

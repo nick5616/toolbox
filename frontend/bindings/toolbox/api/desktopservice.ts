@@ -16,6 +16,20 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as core$0 from "../core/models.js";
 
 /**
+ * CloseWindow closes a pop-out window (no-op if it isn't open).
+ */
+export function CloseWindow(key: string): $CancellablePromise<void> {
+    return $Call.ByID(3991062546, key);
+}
+
+/**
+ * FocusWindow shows and focuses a window: a pop-out's key, or "main".
+ */
+export function FocusWindow(key: string): $CancellablePromise<void> {
+    return $Call.ByID(1981114650, key);
+}
+
+/**
  * HidePopup hides the popup window (after copying an item).
  */
 export function HidePopup(): $CancellablePromise<void> {
@@ -27,6 +41,13 @@ export function HidePopup(): $CancellablePromise<void> {
  */
 export function HotkeyStatus(): $CancellablePromise<core$0.HotkeyStatus[] | null> {
     return $Call.ByID(1481807670);
+}
+
+/**
+ * OpenWindows lists the open pop-out windows' keys (also sent as windows:changed).
+ */
+export function OpenWindows(): $CancellablePromise<string[] | null> {
+    return $Call.ByID(3559111391);
 }
 
 /**
@@ -47,6 +68,21 @@ export function PastePermission(): $CancellablePromise<string> {
 }
 
 /**
+ * PopOut opens a tool or part in its own window, or focuses it if open.
+ */
+export function PopOut(req: core$0.PopOutRequest): $CancellablePromise<void> {
+    return $Call.ByID(1988220699, req);
+}
+
+/**
+ * Relay sends a message to every window (windows:relay); windows filter by
+ * channel and To. Payloads are opaque JSON up to 8 MiB.
+ */
+export function Relay(r: core$0.WindowRelay): $CancellablePromise<void> {
+    return $Call.ByID(2758004915, r);
+}
+
+/**
  * RequestPastePermission asks the OS for the permission auto-paste needs
  * (macOS: the Accessibility prompt). No-op elsewhere.
  */
@@ -60,4 +96,11 @@ export function RequestPastePermission(): $CancellablePromise<void> {
  */
 export function ShowMain(view: string): $CancellablePromise<void> {
     return $Call.ByID(2392328166, view);
+}
+
+/**
+ * TakeHandoff returns and clears the handoff JSON waiting for a pop-out ("" = none).
+ */
+export function TakeHandoff(key: string): $CancellablePromise<string> {
+    return $Call.ByID(2420244665, key);
 }

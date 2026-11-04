@@ -79,6 +79,7 @@ export type {
     PipelineStep,
     PipelineTemplate,
     PipelinesChanged,
+    PopOutRequest,
     PresetInfo,
     ProjectInfo,
     RunBrief,
@@ -105,5 +106,8 @@ export type {
     VaultSettings,
     VaultState,
     WatchConfig,
-    WatchState
+    WatchState,
+    WindowHandoff,
+    WindowRelay,
+    WindowsChanged
 } from "./models.js";

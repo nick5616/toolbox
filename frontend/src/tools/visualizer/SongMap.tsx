@@ -261,7 +261,6 @@ export function SongMap({ analysis, timeline, playheadMs, onSeek, selection, onS
   return (
     <div className={cx(styles.root, className)} role="group" aria-label="Song map">
       <div className={styles.toolbar}>
-        <span className={styles.hint} data-tip="Click or drag on the map to move the playhead">Wheel to zoom · Shift+wheel or middle-drag to pan · Shift + drag to select a range</span>
         {selection && onSelect && (
           <button type="button" className={styles.clear} onClick={() => onSelect(null)} data-tip="Remove the selected range so the export covers the whole song" data-tip-kbd="Esc">
             Clear selection
@@ -286,7 +285,7 @@ export function SongMap({ analysis, timeline, playheadMs, onSeek, selection, onS
           tabIndex={0}
           role="slider"
           aria-label="Song position"
-          data-tip="Click or drag to move the playhead; arrow keys step 1 s (Shift 5 s), Home and End jump"
+          data-tip="Click or drag to move the playhead. Wheel zooms; Shift+wheel or middle-drag pans; Shift+drag selects a range. Arrow keys step 1 s (Shift 5 s), Home and End jump."
           aria-valuemin={0}
           aria-valuemax={Math.round(duration)}
           aria-valuenow={Math.round(Math.min(duration, Math.max(0, playheadMs)))}

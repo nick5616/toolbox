@@ -18,7 +18,7 @@ import { toAppError } from "@/lib/errors";
 import { isOk, useDeps } from "@/state/deps";
 import { isActive, useJob, useJobs, useOrderedJobs } from "@/state/jobs";
 import { usePacks } from "@/state/packs";
-import { FileToolLayout, ResultTable, runLabel, useFileInputs, useModuleOptions, setRequiresOverride } from "@/tools/_kit";
+import { FileToolLayout, ResultTable, runLabel, summarize, useFileInputs, useModuleOptions, setRequiresOverride } from "@/tools/_kit";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import type { ResultColumn } from "@/tools/_kit";
@@ -44,6 +44,14 @@ import {
 import styles from "./AudioCleanupView.module.css";
 
 const WAVE_BUCKETS = 800;
+
+const FORMAT_LABEL: Record<string, string> = {
+  [CleanupFormat.FormatSame]: "same format",
+  [CleanupFormat.FormatWAV]: "WAV",
+  [CleanupFormat.FormatFLAC]: "FLAC",
+  [CleanupFormat.FormatMP3]: "MP3",
+  [CleanupFormat.FormatM4A]: "M4A",
+};
 
 function basename(path: string): string {
   const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
@@ -353,7 +361,7 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
       running={running}
       inputErrors={inputErrors}
       runDisabledReason={blockedReason || undefined}
-      options={
+      primary={
         <>
           {modelMissing && (
             <Banner
@@ -385,100 +393,107 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
               DeepFilterNet3 is a small download that runs on your computer.
             </Banner>
           )}
-          <Section label="Options" tip="Pick which problems to fix; they are applied in this order">
-            <div className={styles.options}>
-              <div className={styles.row}>
-                <span className={styles.label} data-tip="Removes very low frequencies such as desk thumps and wind">Rumble filter</span>
-                <div className={styles.control}>
-                  <Switch
-                    checked={opts.highPass}
-                    onChange={(highPass) => setOpts((o) => ({ ...o, highPass }))}
-                    label="Cut below 80 Hz"
-                    tip="Applies a high-pass filter at 80 Hz; voices and most music are unaffected"
-                  />
-                </div>
-              </div>
+          <div className={styles.options}>
+        <div className={styles.row}>
+          <span className={styles.label} data-tip="Reduces steady background noise such as hiss, fans and room tone">Noise reduction</span>
+          <div className={styles.control}>
+            <SegmentedControl
+              aria-label="Noise reduction"
+              value={opts.denoise}
+              onChange={(denoise) => setOpts((o) => ({ ...o, denoise }))}
+              options={[
+                { value: CleanupDenoise.DenoiseOff, label: "Off", tip: "Leave background noise untouched" },
+                { value: CleanupDenoise.DenoiseLight, label: "Light", tip: "Gentle filter that keeps the sound natural; fast" },
+                { value: CleanupDenoise.DenoiseStrong, label: "Strong", tip: "Heavier filter that removes more noise but can sound slightly processed; fast" },
+                { value: CleanupDenoise.DenoiseVoice, label: "Voice isolation (AI)", tip: "AI model keeps the speech and removes everything else; best quality, slower, needs the AI engine and an 8 MB model" },
+              ]}
+            />
+            <p className={styles.hint}>{DENOISE_HINT[opts.denoise]}</p>
+          </div>
+        </div>
 
-              <div className={styles.row}>
-                <span className={styles.label} data-tip="Electrical buzz from mains power">Hum</span>
-                <div className={styles.control}>
-                  <SegmentedControl
-                    aria-label="Hum"
-                    value={opts.hum}
-                    onChange={(hum) => setOpts((o) => ({ ...o, hum }))}
-                    options={[
-                      { value: CleanupHum.HumAuto, label: "Auto", tip: "Detect whether the buzz is 50 or 60 Hz from the file itself" },
-                      { value: CleanupHum.Hum50, label: "50 Hz", tip: "Remove 50 Hz buzz and harmonics (Europe, Asia, Africa)" },
-                      { value: CleanupHum.Hum60, label: "60 Hz", tip: "Remove 60 Hz buzz and harmonics (Americas, parts of Asia)" },
-                      { value: CleanupHum.HumOff, label: "Off", tip: "Do not remove any hum" },
-                    ]}
-                  />
-                  <p className={styles.hint}>Mains buzz and its harmonics. Auto listens to the file and picks 50 or 60 Hz.</p>
-                </div>
-              </div>
+        <div className={styles.row}>
+          <span className={styles.label} data-tip="Normalise the overall volume to a standard level so tracks sound equally loud">Loudness</span>
+          <div className={styles.control}>
+            <SegmentedControl
+              aria-label="Loudness"
+              value={opts.loudness}
+              onChange={(loudness) => setOpts((o) => ({ ...o, loudness }))}
+              options={[
+                { value: CleanupLoudness.LoudnessOff, label: "Off", tip: "Keep the original volume" },
+                { value: CleanupLoudness.LoudnessPodcast, label: "Podcast", tip: "Target about -16 LUFS, the usual level for podcasts and spoken word" },
+                { value: CleanupLoudness.LoudnessStreaming, label: "Streaming", tip: "Target about -14 LUFS, what Spotify and YouTube normalise to" },
+                { value: CleanupLoudness.LoudnessBroadcast, label: "Broadcast", tip: "Target about -23 LUFS, the EBU R128 standard for TV and radio" },
+              ]}
+            />
+            <p className={styles.hint}>{loud?.detail}</p>
+          </div>
+        </div>
 
-              <div className={styles.row}>
-                <span className={styles.label} data-tip="Reduces steady background noise such as hiss, fans and room tone">Noise reduction</span>
-                <div className={styles.control}>
-                  <SegmentedControl
-                    aria-label="Noise reduction"
-                    value={opts.denoise}
-                    onChange={(denoise) => setOpts((o) => ({ ...o, denoise }))}
-                    options={[
-                      { value: CleanupDenoise.DenoiseOff, label: "Off", tip: "Leave background noise untouched" },
-                      { value: CleanupDenoise.DenoiseLight, label: "Light", tip: "Gentle filter that keeps the sound natural; fast" },
-                      { value: CleanupDenoise.DenoiseStrong, label: "Strong", tip: "Heavier filter that removes more noise but can sound slightly processed; fast" },
-                      { value: CleanupDenoise.DenoiseVoice, label: "Voice isolation (AI)", tip: "AI model keeps the speech and removes everything else; best quality, slower, needs the AI engine and an 8 MB model" },
-                    ]}
-                  />
-                  <p className={styles.hint}>{DENOISE_HINT[opts.denoise]}</p>
-                </div>
-              </div>
-
-              <div className={styles.row}>
-                <span className={styles.label} data-tip="Normalise the overall volume to a standard level so tracks sound equally loud">Loudness</span>
-                <div className={styles.control}>
-                  <SegmentedControl
-                    aria-label="Loudness"
-                    value={opts.loudness}
-                    onChange={(loudness) => setOpts((o) => ({ ...o, loudness }))}
-                    options={[
-                      { value: CleanupLoudness.LoudnessOff, label: "Off", tip: "Keep the original volume" },
-                      { value: CleanupLoudness.LoudnessPodcast, label: "Podcast", tip: "Target about -16 LUFS, the usual level for podcasts and spoken word" },
-                      { value: CleanupLoudness.LoudnessStreaming, label: "Streaming", tip: "Target about -14 LUFS, what Spotify and YouTube normalise to" },
-                      { value: CleanupLoudness.LoudnessBroadcast, label: "Broadcast", tip: "Target about -23 LUFS, the EBU R128 standard for TV and radio" },
-                    ]}
-                  />
-                  <p className={styles.hint}>{loud?.detail}</p>
-                </div>
-              </div>
-
-              {!allVideo && (
-                <div className={styles.row}>
-                  <span className={styles.label} data-tip="File type of the cleaned audio">Output format</span>
-                  <div className={styles.control}>
-                    <Select
-                      aria-label="Output format"
-                      data-tip="File type of the cleaned audio; WAV and FLAC are lossless, MP3 and M4A are smaller"
-                      size="sm"
-                      value={opts.format}
-                      onChange={(format) => setOpts((o) => ({ ...o, format }))}
-                      options={[
-                        { value: CleanupFormat.FormatSame, label: "Same as input" },
-                        { value: CleanupFormat.FormatWAV, label: "WAV" },
-                        { value: CleanupFormat.FormatFLAC, label: "FLAC" },
-                        { value: CleanupFormat.FormatMP3, label: "MP3" },
-                        { value: CleanupFormat.FormatM4A, label: "M4A (AAC)" },
-                      ]}
-                    />
-                    <p className={styles.hint}>Videos keep their picture and container; only the audio is re-encoded.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Section>
+          </div>
           {paths.length > 0 && <PreviewCard paths={paths} opts={opts} blocked={blockedReason} />}
         </>
+      }
+      advancedSummary={summarize(
+        opts.highPass && "rumble filter",
+        opts.hum !== CleanupHum.HumOff && `hum ${opts.hum === CleanupHum.HumAuto ? "auto" : opts.hum === CleanupHum.Hum50 ? "50 Hz" : "60 Hz"}`,
+        !allVideo && (FORMAT_LABEL[opts.format] ?? ""),
+      ) || "No extra filters"}
+      advanced={
+        <div className={styles.options}>
+      <div className={styles.row}>
+        <span className={styles.label} data-tip="Removes very low frequencies such as desk thumps and wind">Rumble filter</span>
+        <div className={styles.control}>
+          <Switch
+            checked={opts.highPass}
+            onChange={(highPass) => setOpts((o) => ({ ...o, highPass }))}
+            label="Cut below 80 Hz"
+            tip="Applies a high-pass filter at 80 Hz; voices and most music are unaffected"
+          />
+        </div>
+      </div>
+
+      <div className={styles.row}>
+        <span className={styles.label} data-tip="Electrical buzz from mains power">Hum</span>
+        <div className={styles.control}>
+          <SegmentedControl
+            aria-label="Hum"
+            value={opts.hum}
+            onChange={(hum) => setOpts((o) => ({ ...o, hum }))}
+            options={[
+              { value: CleanupHum.HumAuto, label: "Auto", tip: "Detect whether the buzz is 50 or 60 Hz from the file itself" },
+              { value: CleanupHum.Hum50, label: "50 Hz", tip: "Remove 50 Hz buzz and harmonics (Europe, Asia, Africa)" },
+              { value: CleanupHum.Hum60, label: "60 Hz", tip: "Remove 60 Hz buzz and harmonics (Americas, parts of Asia)" },
+              { value: CleanupHum.HumOff, label: "Off", tip: "Do not remove any hum" },
+            ]}
+          />
+          <p className={styles.hint}>Mains buzz and its harmonics. Auto listens to the file and picks 50 or 60 Hz.</p>
+        </div>
+      </div>
+
+      {!allVideo && (
+        <div className={styles.row}>
+          <span className={styles.label} data-tip="File type of the cleaned audio">Output format</span>
+          <div className={styles.control}>
+            <Select
+              aria-label="Output format"
+              data-tip="File type of the cleaned audio; WAV and FLAC are lossless, MP3 and M4A are smaller"
+              size="sm"
+              value={opts.format}
+              onChange={(format) => setOpts((o) => ({ ...o, format }))}
+              options={[
+                { value: CleanupFormat.FormatSame, label: "Same as input" },
+                { value: CleanupFormat.FormatWAV, label: "WAV" },
+                { value: CleanupFormat.FormatFLAC, label: "FLAC" },
+                { value: CleanupFormat.FormatMP3, label: "MP3" },
+                { value: CleanupFormat.FormatM4A, label: "M4A (AAC)" },
+              ]}
+            />
+            <p className={styles.hint}>Videos keep their picture and container; only the audio is re-encoded.</p>
+          </div>
+        </div>
+      )}
+        </div>
       }
       results={
         <Section label="Results" tip="Cleaned files with loudness before and after">

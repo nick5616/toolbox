@@ -27,6 +27,10 @@ type ProjectInfo struct {
 	Items     int         `json:"items"`   // slides / layers / clips
 	Missing   int         `json:"missing"` // source files that no longer exist
 	UpdatedAt int64       `json:"updatedAt"`
+	// Flags are per-kind facts for listings (Phase 10). Edit projects:
+	// "music" (has a song), "music-edit" (the song is analysed: an Edit
+	// Studio project). Never nil on the wire.
+	Flags []string `json:"flags"`
 }
 
 // StoredProject is one row of the projects table.

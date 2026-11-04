@@ -1,0 +1,41 @@
+.rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  box-sizing: border-box;
+  width: 56px;
+  padding: var(--space-2) 0;
+  overflow: hidden;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 42px;
+  width: 100%;
+}
+
+.item button {
+  width: 36px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+}
+
+.item svg {
+  width: 18px;
+  height: 18px;
+}
+
+.caption {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--fg-subtle);
+  font-size: 10px;
+  line-height: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

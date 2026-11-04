@@ -222,7 +222,13 @@ export function previewSize(aspect: string): { width: number; height: number } {
   return sizeFor(aspect, 540);
 }
 
-/** D (§4): the song range's length, 0 without a song. */
-export function editLength(p: Pick<EditProject, "song">): number {
-  return p.song ? Math.max(0, p.song.endMs - p.song.startMs) : 0;
+/**
+ * D (§4): the song range's length; without a song (Video Editor) the end of
+ * the last clip on any track, at least 1 s.
+ */
+export function editLength(p: { song: EditProject["song"]; tracks?: ReadonlyArray<{ clips: ReadonlyArray<{ endMs: number }> }> }): number {
+  if (p.song) return Math.max(0, p.song.endMs - p.song.startMs);
+  let end = 0;
+  for (const t of p.tracks ?? []) for (const c of t.clips) end = Math.max(end, c.endMs);
+  return Math.max(1000, end);
 }

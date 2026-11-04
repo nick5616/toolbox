@@ -6,7 +6,7 @@
  * t = i·1000/fps, await prepare(needs(t)), render(t), encode. The same
  * EditEngine as the preview draws the frame, so the export matches it.
  */
-import { loadAnalysis } from "../analysis";
+import { loadAnalysis, type Analysis } from "../analysis";
 import { EditFrameProvider } from "../frames/provider";
 import { GLUnavailableError } from "../gl/core";
 import type { PlanForWorker } from "../types";
@@ -15,6 +15,7 @@ import { RenderError } from "../worker/transport";
 import { compileEdit } from "./compile";
 import { normalizeProject } from "./defaults";
 import { EditEngine } from "./engine";
+import { emptyAnalysis } from "./emptyAnalysis";
 import { deriveMarkers } from "./markers";
 import type { EditProject } from "./types";
 
@@ -33,11 +34,14 @@ export async function runEdit(plan: PlanForWorker, forceJpeg: boolean, io: LoopI
   const edit = plan.edit;
   if (!edit) throw new RenderError("The edit couldn't be read", "the render plan has no edit");
   const project = parseProject(edit.projectJson);
-  if (!project.song) throw new RenderError("This edit has no song");
-  const analysis = await loadAnalysis({ audioJsonUrl: plan.analysis.audioJsonUrl, featuresUrl: plan.analysis.featuresUrl, textJsonUrl: plan.analysis.textJsonUrl || undefined });
+  // No analysis (a Video Editor project) renders against an empty one: curves read 0, no markers.
+  const hasAnalysis = Boolean(plan.analysis.audioJsonUrl && plan.analysis.featuresUrl);
+  const analysis: Analysis = hasAnalysis
+    ? await loadAnalysis({ audioJsonUrl: plan.analysis.audioJsonUrl, featuresUrl: plan.analysis.featuresUrl, textJsonUrl: plan.analysis.textJsonUrl || undefined })
+    : emptyAnalysis();
   if (io.flow.cancelled) return void io.post({ type: "cancelled" });
 
-  const markers = deriveMarkers(analysis, project.markers, { startMs: project.song.startMs, endMs: project.song.endMs });
+  const markers = hasAnalysis && project.song ? deriveMarkers(analysis, project.markers, { startMs: project.song.startMs, endMs: project.song.endMs }) : [];
   const provider = new EditFrameProvider({ files: { streams: edit.streams, images: edit.images }, mode: "export" });
   let engine: EditEngine | null = null;
   try {

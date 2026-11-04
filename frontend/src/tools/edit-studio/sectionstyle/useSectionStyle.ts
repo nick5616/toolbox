@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import { EditStudioService, type EditMoment } from "@/lib/api";
 import type { Marker } from "@/viz/edit/types";
-import { useEditStudio } from "../store";
+import { useEditStudio } from "@/editor/store";
 import { DEFAULT_SETTINGS, rangeFromContext, type Range, type StyleSettings } from "./styleLogic";
 
 interface SectionStyleState {

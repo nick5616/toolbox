@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConfirmDialog, Icon, cx, toast } from "@/components";
+import { ClickInHost, ConfirmDialog, Icon, cx, toast } from "@/components";
+import { openTool } from "@/lib/openTool";
 import { MediaPlayer, useMediaSource, type MediaPlayerHandle } from "@/components/media";
 import { fixtureFlag, useVisualsAnalysis } from "@/components/viz/useVisualsAnalysis";
 import {
@@ -438,13 +439,14 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
     dispatch({ type: "reset", rows: FIXTURE_LINES });
   }, [fixture, setSongPath, setMeta, dispatch]);
 
-  const onMakeInVisualizer = () => {
+  const onMakeInVisualizer = (inWindow?: boolean) => {
     if (!songPath) return;
-    useUI.getState().handOff({ moduleId: "visualizer", inputs: [songPath], seed: visualizerSeed(lines, look) });
+    void openTool("visualizer", [songPath], { seed: visualizerSeed(lines, look) }, { window: inWindow === true });
   };
   const renderWarning = look.background === "blur-cover" || look.background === "cover" ? (hasCover ? "" : "This song has no cover art, so the background falls back to a gradient.") : "";
 
   return (
+    <ClickInHost>
     <div className={styles.root}>
       <nav className={styles.steps} aria-label="Steps">
         {STEPS.map((s, i) => (
@@ -607,5 +609,6 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
         onCancel={() => setConfirm(null)}
       />
     </div>
+    </ClickInHost>
   );
 }

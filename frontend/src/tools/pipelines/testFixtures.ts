@@ -64,6 +64,7 @@ export const pipeline = (id: string, steps: PipelineStep[], o: Partial<Pipeline>
   id,
   name: `Pipeline ${id}`,
   description: "",
+  layout: "",
   templateId: "",
   steps,
   watch: { enabled: false, folder: "" },

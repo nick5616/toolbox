@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent } from "react";
-import { Button, IconButton, MenuButton, SegmentedControl, Spinner, TextField, toast } from "@/components";
+import { Button, ClickIn, IconButton, MenuButton, Spinner, TextField, toast, useClickIn } from "@/components";
 import {
   ComposerService,
   FilesService,
@@ -38,7 +38,7 @@ import type { PostSlideSeed } from "@/state/ui";
 import { BackgroundPanel } from "./BackgroundPanel";
 import { CropDialog } from "./CropDialog";
 import { LayersPanel } from "./LayersPanel";
-import { geometryChanged, idRange, nudge } from "./logic";
+import { backgroundSummary, geometryChanged, idRange, layersSummary as layersText, nudge, propertiesSummary } from "./logic";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { SourcesPanel } from "./SourcesPanel";
 import { Stage } from "./Stage";
@@ -116,7 +116,6 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   const [pending, setPending] = useState<Record<string, Pending>>({});
   const pendingRef = useRef<Record<string, Pending>>({});
   const [multi, setMulti] = useState<string[]>([]);
-  const [sideTab, setSideTab] = useState<"edit" | "sources">("edit");
   const [phase, setPhase] = useState<BuildPhase>("idle");
   const buildIds = useRef<string[]>([]);
   const buildStarted = useRef(false);
@@ -127,6 +126,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   const [images, setImages] = useState<ReadonlyMap<string, ImageBitmap>>(() => new Map());
   const exts = useModules((s) => s.byId["photo-composer"]?.accepts.extensions);
   const root = useRef<HTMLDivElement>(null);
+  const clickIn = useClickIn();
 
   const edit = useCallback(
     (fn: (d: Composition) => Composition, opts: { merge?: boolean } = {}) => {
@@ -576,6 +576,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
       setMulti([]);
       setSelectedId(null);
     } else if (e.key === "Escape") {
+      if (clickIn.openId) return;
       setSelectedId(null);
       setMulti([]);
     } else if (e.key.startsWith("Arrow") && selected && !selected.locked) {
@@ -593,6 +594,9 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   const restorable = selectedLayers.filter((l) => !!l.image?.ref.original);
   const anyBusy = selectedLayers.some((l) => busyIds.has(l.id));
   const hasBgPhoto = doc.background.kind === "image" && !!doc.background.image?.path;
+
+  const layersSummary = layersText(layerList(doc).length);
+  const propsSummary = propertiesSummary(selectedLayers);
 
   return (
     <div ref={root} className={styles.editor} onKeyDown={onKeyDown}>
@@ -691,84 +695,65 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
           zoom={zoom}
           onZoom={setZoom}
         />
-        <aside className={styles.side} aria-label="Layers and properties">
-          {postSlide && (
-            <div className={styles.tabs}>
-              <SegmentedControl
+      </div>
+
+      <div className={styles.dock} role="group" aria-label="Composition panels">
+        <ClickIn icon="layers" title="Layers" summary={layersSummary} tip="Everything on the canvas, top layer first; drag a row to reorder" className={styles.dockItem}>
+          <LayersPanel
+            layers={layerList(doc)}
+            selectedId={selectedId}
+            multi={multiSelected ? new Set(multi) : undefined}
+            busyIds={busyIds}
+            busyLabels={busyLabels}
+            onSelect={selectLayer}
+            onPatch={patchLayer}
+            onDuplicate={duplicateById}
+            onDelete={deleteById}
+            onReorder={(id, index) => edit((d) => reorderLayer(d, id, index))}
+          />
+        </ClickIn>
+        <ClickIn icon="sliders-horizontal" title="Properties" summary={propsSummary} tip="Position, size, look and text of the selected layer" className={styles.dockItem}>
+          {multiSelected ? (
+            <div className={styles.multi} role="group" aria-label="Several layers">
+              <p className={styles.multiText}>{multi.length} layers selected</p>
+              <Button
                 size="sm"
-                fullWidth
-                aria-label="Side panel"
-                value={sideTab}
-                onChange={setSideTab}
-                options={[
-                  { value: "edit", label: "Layers", tip: "The layers and the properties of the selected one" },
-                  { value: "sources", label: "Sources", tip: "Photos in this post that you can add to the canvas" },
-                ]}
-              />
+                variant="secondary"
+                icon="wand-sparkles"
+                data-tip={canRemove ? "Cut the subject out of every selected photo" : "None of the selected layers is a photo that can be cut out"}
+                disabled={!canRemove}
+                onClick={() => void removeBackgrounds(removable)}
+              >
+                Cut out all
+              </Button>
+              <Button size="sm" variant="secondary" icon="undo-2" data-tip={restorable.length === 0 ? "None of the selected photos has been cut out" : "Bring back the original photos, undoing the cut-outs"} disabled={restorable.length === 0} onClick={() => restoreOriginals(restorable)}>
+                Restore originals
+              </Button>
             </div>
-          )}
-          {postSlide && sideTab === "sources" ? (
-            <SourcesPanel postId={postSlide.postId} onAdd={(paths) => void addPhotos(paths)} />
-          ) : (
-            <>
-          <div className={styles.layers}>
-            <h2 className={styles.sideTitle} data-tip="Everything on the canvas, top layer first; drag a row to reorder">Layers</h2>
-            <LayersPanel
-              layers={layerList(doc)}
-              selectedId={selectedId}
-              multi={multiSelected ? new Set(multi) : undefined}
-              busyIds={busyIds}
-              busyLabels={busyLabels}
-              onSelect={selectLayer}
-              onPatch={patchLayer}
-              onDuplicate={duplicateById}
-              onDelete={deleteById}
-              onReorder={(id, index) => edit((d) => reorderLayer(d, id, index))}
+          ) : selected ? (
+            <PropertiesPanel
+              layer={selected}
+              docWidth={doc.width}
+              docHeight={doc.height}
+              busy={busyIds.has(selected.id)}
+              onPatch={(patch) => patchLayer(selected.id, patch)}
+              onArrange={(dir: MoveDirection) => edit((d) => moveLayer(d, selected.id, dir))}
+              onCrop={() => setCropId(selected.id)}
+              onRemoveBackground={() => void removeBackground(selected)}
+              onRestoreOriginal={() => restoreOriginal(selected)}
             />
-          </div>
-          <div className={styles.props}>
-            {multiSelected ? (
-              <div className={styles.multi} role="group" aria-label="Several layers">
-                <p className={styles.multiText}>{multi.length} layers selected</p>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  icon="wand-sparkles"
-                  data-tip={canRemove ? "Cut the subject out of every selected photo" : "None of the selected layers is a photo that can be cut out"}
-                  disabled={!canRemove}
-                  onClick={() => void removeBackgrounds(removable)}
-                >
-                  Cut out all
-                </Button>
-                <Button size="sm" variant="secondary" icon="undo-2" data-tip={restorable.length === 0 ? "None of the selected photos has been cut out" : "Bring back the original photos, undoing the cut-outs"} disabled={restorable.length === 0} onClick={() => restoreOriginals(restorable)}>
-                  Restore originals
-                </Button>
-              </div>
-            ) : selected ? (
-              <PropertiesPanel
-                layer={selected}
-                docWidth={doc.width}
-                docHeight={doc.height}
-                busy={busyIds.has(selected.id)}
-                onPatch={(patch) => patchLayer(selected.id, patch)}
-                onArrange={(dir: MoveDirection) => edit((d) => moveLayer(d, selected.id, dir))}
-                onCrop={() => setCropId(selected.id)}
-                onRemoveBackground={() => void removeBackground(selected)}
-                onRestoreOriginal={() => restoreOriginal(selected)}
-              />
-            ) : (
-              <BackgroundPanel
-                background={doc.background}
-                adjust={adjustBg}
-                onAdjust={setAdjustBg}
-                onChange={setBackground}
-                onChoosePhoto={() => void chooseBackground()}
-              />
-            )}
-          </div>
-            </>
+          ) : (
+            <p className={styles.multiText} data-tip="Click a layer on the canvas or in Layers first">Select a layer to edit it.</p>
           )}
-        </aside>
+        </ClickIn>
+        <ClickIn icon="paint-bucket" title="Background" summary={backgroundSummary(doc.background)} tip="What shows behind all the layers" className={styles.dockItem}>
+          <BackgroundPanel background={doc.background} adjust={adjustBg} onAdjust={setAdjustBg} onChange={setBackground} onChoosePhoto={() => void chooseBackground()} />
+        </ClickIn>
+        {postSlide && (
+          <ClickIn icon="images" title="Sources" summary="Photos in this post" tip="Photos in this post that you can add to the canvas" width={380} className={styles.dockItem}>
+            <SourcesPanel postId={postSlide.postId} onAdd={(paths) => void addPhotos(paths)} />
+          </ClickIn>
+        )}
       </div>
 
       {cropLayer?.image && (

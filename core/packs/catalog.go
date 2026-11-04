@@ -210,6 +210,7 @@ func Catalog() []PackSpec {
 				{Module: "downloader", Needs: []string{"ffmpeg", "yt-dlp", "deno"}},
 				{Module: "converter", Needs: []string{"ffmpeg"}},
 				{Module: "trimmer", Needs: []string{"ffmpeg"}},
+				{Module: "video-studio", Needs: []string{"ffmpeg"}},
 			},
 		},
 		{

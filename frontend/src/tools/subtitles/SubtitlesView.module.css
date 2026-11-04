@@ -347,7 +347,7 @@
 
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-2);
   flex-shrink: 0;
@@ -368,12 +368,31 @@
   flex: 1;
 }
 
-.findRow {
+.rows {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
   gap: var(--space-2);
-  flex-shrink: 0;
+  width: 100%;
+  max-width: 420px;
+}
+
+.rowLauncher {
+  max-width: 420px;
+}
+
+.drawerForm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.drawerForm .field {
+  flex-wrap: wrap;
+}
+
+.drawerForm .fieldLabel {
+  min-width: 70px;
 }
 
 .chips {

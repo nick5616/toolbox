@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Banner, Button, Spinner } from "@/components";
+import { Banner, Button, ClickInHost, Spinner } from "@/components";
 import type { ToolViewProps } from "@/tools";
 import { CreateForm, LockedForm, RecoveryScreen } from "./Gate";
 import { UnlockedPanel } from "./UnlockedPanel";
@@ -36,11 +36,8 @@ export default function VaultView(_props: ToolViewProps) {
   }
 
   return (
+    <ClickInHost>
     <section className={styles.root} aria-label="Vault">
-      <header>
-        <h1 className={styles.title}>Vault</h1>
-        <p className={styles.tagline}>Keep private files encrypted on this computer</p>
-      </header>
       {notice && unlocked && (
         <Banner
           tone="info"
@@ -55,5 +52,6 @@ export default function VaultView(_props: ToolViewProps) {
       )}
       {body}
     </section>
+    </ClickInHost>
   );
 }

@@ -154,7 +154,7 @@ describe("TrimmerView", () => {
     await user.click(screen.getByRole("button", { name: /Add segment/ }));
     expect(startField(3).value).toBe("0:08.000");
     expect(endField(3).value).toBe("0:10.000");
-    expect(screen.getByLabelText("Join")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Output/ }).textContent).toContain("One file");
     await user.click(screen.getByRole("button", { name: "Delete segment 3" }));
     expect(screen.queryByLabelText("Segment 3 start")).toBeNull();
   });
@@ -200,7 +200,11 @@ describe("TrimmerView", () => {
     const user = await load();
     await screen.findByTestId("player");
     expect((screen.getByRole("radio", { name: "Fast · no quality loss" }) as HTMLInputElement).getAttribute("aria-checked")).toBe("true");
+    expect(screen.queryByRole("radio", { name: "9:16" })).toBeNull();
+    expect(screen.getByRole("button", { name: /Frame/ }).textContent).toContain("Original shape");
+    await user.click(screen.getByRole("button", { name: /Frame/ }));
     await user.click(screen.getByRole("radio", { name: "9:16" }));
+    expect(screen.getByRole("button", { name: /Frame/ }).textContent).toContain("Crop 9:16");
     expect(screen.getByRole("radio", { name: "Precise · re-encode" }).getAttribute("aria-checked")).toBe("true");
     expect(useToastStore.getState().toasts.map((t) => t.title)).toContain("Switched to Precise — cropping re-encodes");
     await waitFor(() => expect(JSON.parse(String(h.setState.mock.calls.at(-1)?.[1]))).toMatchObject({ mode: "precise", aspect: "9:16" }));
@@ -211,7 +215,9 @@ describe("TrimmerView", () => {
     await screen.findByTestId("player");
     await user.click(screen.getByRole("radio", { name: "Precise · re-encode" }));
     expect(screen.getByText(/size depends on the content/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /Output/ }));
     await user.selectOptions(screen.getByLabelText("Size limit"), "25");
+    expect(screen.getByRole("button", { name: /Output/ }).textContent).toContain("≤ 25 MB");
     expect(screen.getByText(/≈ 25 MB/)).toBeTruthy();
   });
 

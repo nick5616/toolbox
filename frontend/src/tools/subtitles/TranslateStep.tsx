@@ -73,7 +73,6 @@ export function TranslateStep(p: TranslateStepProps) {
               {p.blocker}
             </Banner>
           )}
-          <div className={styles.muted}>Local Chat translates in batches. Chatting there at the same time makes this wait for its turn.</div>
           <div>
             <Button
               icon="languages"

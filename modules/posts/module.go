@@ -99,6 +99,7 @@ func (m *Module) Descriptor() core.Descriptor {
 		Requires:     []string{"ffmpeg", "ffprobe"},
 		Recommends:   []string{sidecar.DepID},
 		OutputSubdir: "Posts", Order: 11, MaxConcurrent: 1, NotAStep: true,
+		Parts: []string{"photo-composer", "video-editor", "bg-remover"},
 	}
 }
 

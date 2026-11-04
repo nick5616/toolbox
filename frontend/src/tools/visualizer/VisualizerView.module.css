@@ -64,6 +64,10 @@
   border-color: var(--accent);
 }
 
+.spacer {
+  flex: 1;
+}
+
 .stepSep {
   color: var(--fg-faint);
   margin-left: var(--space-2);

@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { Button, Switch, toast } from "@/components";
-import { useEditStudio, useProject } from "../store";
+import { useEditStudio, useProject } from "@/editor/store";
 import { RangePicker } from "./RangePicker";
 import { changeRange } from "./rangeLogic";
 import styles from "./Setup.module.css";

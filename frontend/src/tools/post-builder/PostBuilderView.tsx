@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useElementSize } from "@/lib/useElementSize";
-import { Button, ConfirmDialog, DropZone, EmptyState, Meter, Spinner, Tooltip, toast, type MenuItem } from "@/components";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { openTool } from "@/lib/openTool";
+import { Button, ClickIn, ClickInHost, ConfirmDialog, DropZone, EmptyState, MenuButton, Meter, Spinner, Tooltip, toast, type MenuItem } from "@/components";
 import {
   ComposerService,
   FilesService,
@@ -15,6 +15,8 @@ import {
 } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { isActive, useJob, useJobs } from "@/state/jobs";
+import { useWindows } from "@/state/windows";
+import { useElementSize } from "@/lib/useElementSize";
 import { useUI, type Handoff, type SlideBuild } from "@/state/ui";
 import type { ToolViewProps } from "../index";
 import { NameDialog, NewPostDialog, ProjectPickerDialog } from "./dialogs";
@@ -23,10 +25,16 @@ import { MEDIA_EXTS as SOURCE_EXTS, SourcesPanel } from "./SourcesPanel";
 import { PhonePreview } from "./PhonePreview";
 import { PostsStrip } from "./PostsStrip";
 import { AltPanel, CaptionPanel, ChecksPanel, ShapePanel, copyText } from "./SidePanel";
-import { SlideStage } from "./SlideStage";
+import { ClipControls, FramingPanel, SlideStage, trimSummary } from "./SlideStage";
 import { SlideStrip } from "./SlideStrip";
 import {
   DEFAULT_LIMITS,
+  altSummary,
+  framingSummary,
+  checksSummary,
+  editWindowClosed,
+  formatSummary,
+  sourcesSummary,
   PENDING_PROJECT,
   blankSlide,
   defaultPostName,
@@ -38,8 +46,6 @@ import {
   maxClipMs,
   roomLeft,
   sanitizeState,
-  SOURCES_DEFAULT,
-  bodyLayout,
   slidesFromSources,
   type PostBuilderState,
   type PostDoc,
@@ -86,13 +92,14 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
   const [pstate, setPstate] = useState<PostBuilderState>({ lastPostId: "", exports: {} });
   const [selectedId, setSelectedId] = useState("");
   const [dialog, setDialog] = useState<Dialog>(null);
-  const [bodyEl, setBodyEl] = useState<HTMLDivElement | null>(null);
-  const [sourcesForced, setSourcesForced] = useState(false);
-  const bodyWidth = useElementSize(bodyEl).width;
-  const layout = bodyLayout(bodyWidth, { width: pstate.sourcesWidth ?? SOURCES_DEFAULT, collapsed: !!pstate.sourcesCollapsed, forcedOpen: sourcesForced });
   const [newFiles, setNewFiles] = useState<string[]>([]);
   const [jobId, setJobId] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [dockEl, setDockEl] = useState<HTMLDivElement | null>(null);
+  const dockWidth = useElementSize(dockEl).width;
+  const [still, setStill] = useState<{ id: string; ms: number } | null>(null);
+  /** A slide was sent to an editing window: refresh from disk when it closes or this window is focused. */
+  const editingElsewhere = useRef(false);
 
   const onSaved = useCallback((info: ProjectInfo) => {
     setPosts((list) => (list.some((p) => p.id === info.id) ? list.map((p) => (p.id === info.id ? info : p)) : [info, ...list]));
@@ -289,9 +296,12 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
     }
   }, []);
 
-  /** Hands a slide to Photo Composer or Video Editor (after saving, so the editor links to what's on disk). */
+  /**
+   * Hands a slide to Photo Composer or the Sequence Editor (after saving, so the editor links to what's on disk),
+   * in this window or in its own window.
+   */
   const editSlide = useCallback(
-    async (slide: PostSlide) => {
+    async (slide: PostSlide, where: "here" | "window" = "here") => {
       if (!doc) return;
       try {
         await editor.flush();
@@ -299,11 +309,9 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
         fail(e);
         return;
       }
-      useUI.getState().handOff({
-        moduleId: slide.kind === "composition" ? "photo-composer" : "video-editor",
-        inputs: [],
-        postSlide: { postId, slideId: slide.id, aspect: doc.aspect, projectId: isPending(slide) ? "" : slide.projectId },
-      });
+      const target = slide.kind === "composition" ? "photo-composer" : "video-editor";
+      if (where === "window") editingElsewhere.current = true;
+      await openTool(target, [], { postSlide: { postId, slideId: slide.id, aspect: doc.aspect, projectId: isPending(slide) ? "" : slide.projectId } }, { window: where === "window" });
     },
     [doc, editor, postId],
   );
@@ -490,6 +498,36 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
     else void live.current.addPaths(p.paths);
   }, [doc, postId, update]);
 
+  // Edited in another window: pick the changes up when that window closes, and when this one is focused again.
+  const refreshFromDisk = useCallback(async () => {
+    const l = live.current;
+    try {
+      await l.editor.flush();
+      await l.refreshProjects();
+      await l.editor.reload();
+    } catch {
+      // The next focus tries again.
+    }
+  }, []);
+  useEffect(() => {
+    let prev = useWindows.getState().open;
+    return useWindows.subscribe((st) => {
+      const closed = editWindowClosed(prev, st.open);
+      prev = st.open;
+      if (closed) {
+        editingElsewhere.current = false;
+        void refreshFromDisk();
+      }
+    });
+  }, [refreshFromDisk]);
+  useEffect(() => {
+    const onFocus = () => {
+      if (editingElsewhere.current) void refreshFromDisk();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshFromDisk]);
+
   // ---- export ----
   const job = useJob(jobId);
   const running = !!job && isActive(job);
@@ -608,10 +646,7 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
 
   if (posts.length === 0 || !postId) {
     return (
-      <div className={styles.root}>
-        <header className={styles.header}>
-          <h1 className={styles.title}>Post Builder</h1>
-        </header>
+      <ClickInHost className={styles.root}>
         <div className={styles.empty}>
           <EmptyState icon="gallery-horizontal-end" title="Build a post" body="Put photos, clips, compositions and videos in order, write the caption, check it against Instagram's rules and export a folder you can upload from your phone." />
           <Button
@@ -629,19 +664,72 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
           {posts.length > 0 && <div className={styles.stripWrap}>{strip}</div>}
         </div>
         {dialogs}
-      </div>
+      </ClickInHost>
     );
   }
 
+  const issueList = editor.issues;
+  const canFrame = !!selected && selected.kind !== "video" && !isPending(selected);
+  const chips: { title: string; icon: string; summary: string; tip: string; width?: number; body: ReactNode }[] = [
+    {
+      title: "Format",
+      icon: "gallery-horizontal-end",
+      summary: doc ? formatSummary(doc) : "",
+      tip: "What kind of post this is, its shape, and whether photos keep their location",
+      body: doc ? <ShapePanel doc={doc} onChange={(patch) => update((d) => ({ ...d, ...patch }))} /> : null,
+    },
+    {
+      title: "Sources",
+      icon: "images",
+      summary: doc ? sourcesSummary(doc) : "",
+      tip: "The photos and clips you can use in this post; make collages and stitched videos",
+      width: 400,
+      body: doc ? (
+        <SourcesPanel postId={postId} doc={doc} format={doc.format} saved={editor.saveState === "saved"} selectedSlide={selected} update={update} onAddSlides={(paths) => void addPaths(paths)} onBuild={(inputs, build) => void buildSlide(inputs, build)} />
+      ) : null,
+    },
+    ...(selected && canFrame
+      ? [{ title: "Framing", icon: "crop", summary: framingSummary(selected), tip: "Zoom, rotate and reposition the picture inside the frame", body: <FramingPanel slide={selected} onChange={(patch) => patchSlide(selected.id, patch)} /> }]
+      : []),
+    ...(selected && selected.kind === "clip"
+      ? [
+          {
+            title: "Trim",
+            icon: "scissors",
+            summary: trimSummary(selected),
+            tip: "Choose where the clip starts and ends, and whether it has sound",
+            width: 400,
+            body: <ClipControls slide={selected} format={doc?.format ?? "carousel"} limits={limits} onChange={(patch) => patchSlide(selected.id, patch)} onSeek={(ms) => setStill({ id: selected.id, ms })} />,
+          },
+        ]
+      : []),
+    {
+      title: "Alt text",
+      icon: "text",
+      summary: altSummary(selected, selectedIndex),
+      tip: "A description of the selected slide for screen readers",
+      body: doc ? <AltPanel slide={selected} index={selectedIndex} limits={limits} onChange={(altText) => selected && patchSlide(selected.id, { altText })} /> : null,
+    },
+    {
+      title: "Checks",
+      icon: "list-checks",
+      summary: checksSummary(issueList),
+      tip: "Problems that would stop Instagram accepting the post",
+      body: doc ? <ChecksPanel issues={issueList} slides={doc.slides} onSelect={setSelectedId} /> : null,
+    },
+  ];
+  // Each chip needs room for its title and a bit of summary; below that they shrink to icons (summary in the tooltip).
+  const compact = dockWidth > 0 && (dockWidth - 190) / chips.length < 128;
+  const lastExport = exportFolder ? exportFolder.split(/[\\/]+/).filter(Boolean).pop() || exportFolder : "";
+
   return (
-    <div className={styles.root}>
+    <ClickInHost className={styles.root}>
       <header className={styles.header}>
-        <h1 className={styles.title}>Post Builder</h1>
+        <div className={styles.stripSlot}>{strip}</div>
         <span className={styles.save} role="status" data-state={editor.saveState} data-tip="Changes are saved automatically as you edit">
           {SAVE_LABEL[editor.saveState]}
         </span>
       </header>
-      {strip}
 
       {editor.loadError && !doc ? (
         <EmptyState icon="circle-alert" title="This post can't be opened" body={editor.loadError} />
@@ -651,21 +739,7 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
         </div>
       ) : (
         <>
-          <div ref={setBodyEl} className={styles.body} style={{ gridTemplateColumns: `${layout.sources}px ${layout.strip}px minmax(0, 1fr) ${layout.right}px` }}>
-            <SourcesPanel
-              postId={postId}
-              doc={doc}
-              format={doc.format}
-              saved={editor.saveState === "saved"}
-              selectedSlide={selected}
-              width={pstate.sourcesWidth ?? SOURCES_DEFAULT}
-              collapsed={layout.sourcesCollapsed}
-              onWidth={(w) => persist({ ...pstateRef.current, sourcesWidth: w })}
-              onCollapsed={(c) => (layout.autoCollapsed ? setSourcesForced(!c) : persist({ ...pstateRef.current, sourcesCollapsed: c }))}
-              update={update}
-              onAddSlides={(paths) => void addPaths(paths)}
-              onBuild={(inputs, build) => void buildSlide(inputs, build)}
-            />
+          <div className={styles.body}>
             <aside className={styles.left}>
               <SlideStrip
                 slides={doc.slides}
@@ -687,12 +761,11 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
                 <SlideStage
                   key={selected.id}
                   slide={selected}
-                  format={doc.format}
                   aspect={doc.aspect}
                   project={projects.get(selected.projectId)}
-                  limits={limits}
                   onChange={(patch) => patchSlide(selected.id, patch)}
-                  onEdit={() => void editSlide(selected)}
+                  onEdit={(where) => void editSlide(selected, where)}
+                  stillMs={still && still.id === selected.id ? still.ms : selected.inMs}
                 />
               ) : (
                 <div className={styles.dropArea}>
@@ -701,18 +774,12 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
               )}
             </main>
             <aside className={styles.right}>
-              <ShapePanel
-                doc={doc}
-                onChange={(patch) => update((d) => ({ ...d, ...patch }))}
-              />
-              <CaptionPanel caption={doc.caption} limits={limits} onChange={(caption) => update((d) => ({ ...d, caption }))} />
-              <AltPanel slide={selected} index={selectedIndex} limits={limits} onChange={(altText) => selected && patchSlide(selected.id, { altText })} />
-              <ChecksPanel issues={editor.issues} slides={doc.slides} onSelect={setSelectedId} />
               <PhonePreview slides={doc.slides} aspect={doc.aspect} caption={doc.caption} projects={projects} currentId={selectedId} onCurrent={setSelectedId} />
+              <CaptionPanel caption={doc.caption} limits={limits} onChange={(caption) => update((d) => ({ ...d, caption }))} />
             </aside>
           </div>
 
-          <footer className={styles.footer}>
+          <div ref={setDockEl} className={styles.dock} role="group" aria-label="Post options">
             {running && job ? (
               <div className={styles.progress}>
                 <Meter value={job.progress} status="running" label="Export progress" />
@@ -723,26 +790,35 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
               </div>
             ) : (
               <>
-                {exportFolder && (
-                  <span className={styles.last}>
-                    <span className={styles.lastLabel} data-tip="The folder this post was last exported to">Last export</span>
-                    <span className={styles.lastPath} title={exportFolder}>
-                      {exportFolder}
-                    </span>
-                    <Button size="sm" variant="ghost" icon="folder-open" data-tip="Show the exported folder in your file manager" onClick={() => openFolder(exportFolder)}>
-                      Open folder
-                    </Button>
-                    <Button size="sm" variant="ghost" icon="copy" data-tip="Copy the caption to paste into Instagram" onClick={() => void copyText(doc.caption, "Caption copied")}>
-                      Copy caption
-                    </Button>
-                  </span>
-                )}
-                <span className={styles.spacer} />
-                {blocking && (
-                  <span className={styles.blocker} data-testid="export-blocker" data-tip="Fix this in the Checks panel to enable Export">
+                <div className={styles.chips}>
+                  {chips.map((c) => (
+                    <ClickIn key={c.title} variant={compact ? "icon" : "row"} icon={c.icon} title={c.title} summary={c.summary} tip={compact ? `${c.title}: ${c.summary}` : c.tip} width={c.width} className={styles.dockItem}>
+                      {c.body}
+                    </ClickIn>
+                  ))}
+                </div>
+                {blocking && !compact && (
+                  <span className={styles.blocker} data-testid="export-blocker" data-tip="Fix this in Checks to enable Export">
                     {blocking.message}
                   </span>
                 )}
+                <MenuButton
+                  size="sm"
+                  variant="ghost"
+                  icon="ellipsis"
+                  label="More export actions"
+                  tip={lastExport ? `Last export: ${lastExport}` : "Copy the caption or open your exports"}
+                  items={() => [
+                    { id: "copy-caption", label: "Copy caption", icon: "copy", tip: "Copy the caption to paste into Instagram", onSelect: () => void copyText(doc.caption, "Caption copied") },
+                    {
+                      id: "open-folder",
+                      label: lastExport ? `Open last export (${lastExport})` : "Open Posts folder",
+                      icon: "folder-open",
+                      tip: exportFolder || "Show the exported posts in your file manager",
+                      onSelect: () => openFolder(exportFolder),
+                    },
+                  ]}
+                />
                 <Tooltip label={blocking ? blocking.message : "Write the post to a folder"}>
                   <span>
                     <Button variant="primary" icon="download" disabled={!canExport} loading={exporting} onClick={() => void doExport()}>
@@ -752,10 +828,10 @@ export default function PostBuilderView({ moduleId }: ToolViewProps) {
                 </Tooltip>
               </>
             )}
-          </footer>
+          </div>
         </>
       )}
       {dialogs}
-    </div>
+    </ClickInHost>
   );
 }

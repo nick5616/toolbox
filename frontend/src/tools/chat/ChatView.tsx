@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Banner, Button, EmptyState, IconButton, Select, TextArea, toast, type SelectOption } from "@/components";
+import { Banner, ClickInHost, EmptyState, toast, type SelectOption } from "@/components";
 import {
   ChatBackend,
   ChatServerState,
@@ -16,6 +16,7 @@ import { on } from "@/lib/events";
 import { useSettings } from "@/state/settings";
 import type { ToolViewProps } from "@/tools";
 import { DepsGate, setRequiresOverride, useDepsGate } from "../_kit";
+import { ChatSettingsDrawer } from "./ChatSettingsDrawer";
 import { Composer } from "./Composer";
 import { ConversationList } from "./ConversationList";
 import { ModelCards } from "./ModelCards";
@@ -55,8 +56,6 @@ export default function ChatView({ moduleId }: ToolViewProps) {
   const [active, setActive] = useState<ChatConversation | null>(null);
   const [draftModel, setDraftModel] = useState("");
   const [draftPrompt, setDraftPrompt] = useState("");
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [promptText, setPromptText] = useState("");
   const [status, setStatus] = useState<ChatStatus>(EMPTY_STATUS);
 
   const loadList = useCallback(async (q: string, cursor: string) => {
@@ -126,7 +125,6 @@ export default function ChatView({ moduleId }: ToolViewProps) {
 
   const select = async (id: string) => {
     setActiveId(id);
-    setShowPrompt(false);
     try {
       const view = await ChatService.Conversation(id);
       setActive(view.conversation);
@@ -139,7 +137,6 @@ export default function ChatView({ moduleId }: ToolViewProps) {
   const newChat = () => {
     setActiveId(null);
     setActive(null);
-    setShowPrompt(false);
     thread.clear();
   };
 
@@ -188,23 +185,18 @@ export default function ChatView({ moduleId }: ToolViewProps) {
     }
   };
 
-  const savePrompt = async () => {
+  const savePrompt = async (text: string): Promise<boolean> => {
     if (!active) {
-      setDraftPrompt(promptText);
-      setShowPrompt(false);
-      return;
+      setDraftPrompt(text);
+      return true;
     }
     try {
-      setActive(await ChatService.UpdateConversation(active.id, { title: null, model: null, systemPrompt: promptText }));
-      setShowPrompt(false);
+      setActive(await ChatService.UpdateConversation(active.id, { title: null, model: null, systemPrompt: text }));
+      return true;
     } catch (e) {
       fail(e);
+      return false;
     }
-  };
-
-  const togglePrompt = () => {
-    if (!showPrompt) setPromptText(active ? active.systemPrompt : draftPrompt);
-    setShowPrompt((v) => !v);
   };
 
   const rename = async (id: string, title: string) => {
@@ -243,6 +235,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
   if (modelId && !installed.some((m) => m.id === modelId)) modelOptions.unshift({ value: modelId, label: modelId });
 
   return (
+    <ClickInHost>
     <div className={styles.root}>
       <ConversationList
         items={convs}
@@ -258,48 +251,18 @@ export default function ChatView({ moduleId }: ToolViewProps) {
         onMore={() => void loadList(search, nextCursor)}
       />
       <section className={styles.main} aria-label="Chat">
-        <header className={styles.topbar}>
-          {modelOptions.length > 0 && (
-            <Select<string>
-              size="sm"
-              aria-label="Model"
-              data-tip="The model that answers in this conversation"
-              value={modelId}
-              options={modelOptions}
-              onChange={(v) => void changeModel(v)}
+        {!noModel && (
+          <header className={styles.topbar}>
+            <ChatSettingsDrawer
+              modelId={modelId}
+              modelOptions={modelOptions}
+              temperature={defaults.temperature}
+              prompt={active ? active.systemPrompt : draftPrompt}
+              defaultPrompt={defaults.systemPrompt}
+              onModel={(v) => void changeModel(v)}
+              onSavePrompt={savePrompt}
             />
-          )}
-          <span className={styles.spacer} />
-          <IconButton
-            icon="settings"
-            label="Chat settings"
-            data-tip="Edit the system prompt (standing instructions) for this conversation"
-            pressed={showPrompt}
-            onClick={togglePrompt}
-            disabled={noModel}
-          />
-        </header>
-        {showPrompt && (
-          <div className={styles.promptPanel}>
-            <label className={styles.promptLabel} htmlFor="chat-system-prompt">
-              System prompt for this conversation
-            </label>
-            <TextArea
-              id="chat-system-prompt"
-              data-tip="Instructions the assistant follows for the whole conversation"
-              value={promptText}
-              minRows={3}
-              maxLength={4000}
-              placeholder={defaults.systemPrompt}
-              onChange={(e) => setPromptText(e.target.value)}
-            />
-            <div className={styles.promptFoot}>
-              <span className={styles.hint}>Temperature is set in Settings → Chat.</span>
-              <Button size="sm" variant="primary" data-tip="Use this system prompt for this conversation" onClick={() => void savePrompt()}>
-                Save
-              </Button>
-            </div>
-          </div>
+          </header>
         )}
         <div className={styles.gate}>
           <DepsGate moduleId={moduleId} />
@@ -346,5 +309,6 @@ export default function ChatView({ moduleId }: ToolViewProps) {
         />
       </section>
     </div>
+    </ClickInHost>
   );
 }

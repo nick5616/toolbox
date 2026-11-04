@@ -6,7 +6,7 @@
  * Reads the design, analysis and Song Map selection from the Visualizer store.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Banner, Button, Icon, IconButton, Meter, Section, SegmentedControl, Select, Slider, toast } from "@/components";
+import { Banner, Button, ClickIn, Icon, IconButton, Meter, Section, SegmentedControl, Select, Slider, toast } from "@/components";
 import { MediaPlayer, formatMs, useMediaSource } from "@/components/media";
 import { FilesService, JobStatus, VisualizerAction, VisualizerMode, type VisualizerOptions } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -58,6 +58,20 @@ export function useEncoderSupport(fps: number): { can2160: boolean; jpeg: boolea
     };
   }, [fps]);
   return s;
+}
+
+/** m:ss for one-line summaries. */
+export function clock(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** "Original audio · No background" (the background part only when the mode has one). */
+export function exportSoundSummary(prefs: ExportPrefs, showBackground: boolean): string {
+  const audio = prefs.audio === "instrumental" ? "Instrumental" : "Original audio";
+  if (!showBackground) return audio;
+  const bg = { none: "No background", cover: "Cover art", image: "Image", video: "Video" }[prefs.background];
+  return `${audio} · ${bg}`;
 }
 
 function PreviewClip({ path }: { path: string }) {
@@ -154,7 +168,7 @@ function ResultCard({ job }: { job: NonNullable<VizJob["job"]> }) {
   );
 }
 
-export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) {
+export default function ExportStep({ prefs, onPrefs }: ExportStepProps) {
   const input = useVisualizer((s) => s.input);
   const mode = useVisualizer((s) => s.mode);
   const show = useVisualizer((s) => s.show);
@@ -236,6 +250,8 @@ export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) 
   };
 
   const maxStart = Math.max(0, durationMs - 1000);
+  const soundSummary = exportSoundSummary(prefs, rules.showBackground);
+  const previewSummary = preview.busy ? "Rendering…" : previewPath ? "Ready to watch" : `From ${clock(previewStart)}`;
 
   return (
     <div className={styles.root}>
@@ -278,7 +294,8 @@ export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) 
         </div>
       </Section>
 
-      <Section label="Range" tip="Render the whole song or only part of it">
+      <div className={styles.rows}>
+      <ClickIn icon="scissors" title="Range" summary={useSel ? `${clock(startMs)}–${clock(endMs)}` : "Whole song"} tip="Render the whole song or only part of it">
         <div className={styles.form}>
           <SegmentedControl
             size="sm"
@@ -292,9 +309,9 @@ export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) 
           />
           {!selection && <p className={styles.muted}>Shift-drag on the Song Map in Design to pick a part.</p>}
         </div>
-      </Section>
+      </ClickIn>
 
-      <Section label="Sound and background" tip="Which audio goes in the video and what is behind the visuals">
+      <ClickIn icon="image" title="Sound and background" summary={soundSummary} tip="Which audio goes in the video and what is behind the visuals">
         <div className={styles.form}>
           <div className={styles.field}>
             <span className={styles.label} data-tip="Which sound the finished video carries">Audio</span>
@@ -328,9 +345,9 @@ export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) 
             </div>
           )}
         </div>
-      </Section>
+      </ClickIn>
 
-      <Section label="Preview" tip="Render a short sample to check the look before the full render">
+      <ClickIn icon="play" title="Preview" summary={previewSummary} tip="Render a short sample to check the look before the full render">
         <div className={styles.form}>
           <label className={styles.field}>
             <span className={styles.label} data-tip="Where in the song the 10 second preview starts">Starts at {formatMs(previewStart)}</span>
@@ -344,7 +361,8 @@ export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) 
           <Progress run={preview} label="Rendering the preview…" rangeSec={10} outFps={prefs.fps} />
           {previewPath && preview.job?.status === JobStatus.JobDone && <PreviewClip key={previewPath} path={previewPath} />}
         </div>
-      </Section>
+      </ClickIn>
+      </div>
 
       <Section label="Video" tip="Render the finished video">
         <div className={styles.form}>
@@ -352,11 +370,6 @@ export default function ExportStep({ prefs, onPrefs, onBack }: ExportStepProps) 
             <Button icon="film" variant="primary" loading={render.busy} disabled={!!blocker || busy} data-tip={blocker || (busy ? "Wait for the current render to finish" : "Render the full video with these settings and save it to your Library")} onClick={() => go(render, VisualizerAction.ActionRender)}>
               Render video
             </Button>
-            {onBack && (
-              <Button variant="ghost" icon="chevron-left" onClick={onBack} data-tip="Return to the designer">
-                Back to design
-              </Button>
-            )}
           </div>
           <Progress run={render} label="Rendering the video…" rangeSec={rangeSec} outFps={prefs.fps} />
           {render.job?.status === JobStatus.JobDone && <ResultCard job={render.job} />}

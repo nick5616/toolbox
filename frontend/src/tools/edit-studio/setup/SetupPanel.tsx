@@ -5,7 +5,7 @@
  * `RangeEditor` and `RangePicker` are exported for the Song inspector.
  */
 import { Banner, Button, EmptyState, Spinner } from "@/components";
-import { useEditStudio, useProject } from "../store";
+import { useEditStudio, useProject } from "@/editor/store";
 import { AnalysisPanel } from "./AnalysisPanel";
 import { RangeEditor } from "./RangeEditor";
 import styles from "./Setup.module.css";

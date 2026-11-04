@@ -232,13 +232,18 @@ describe("AudioCleanupView", () => {
 
   it("hides the format picker when every input is a video", async () => {
     picked.paths = ["/clip.mp4"];
-    await addFile();
+    const { user } = await addFile();
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
+    expect(await screen.findByRole("radiogroup", { name: "Hum" })).toBeTruthy();
     expect(screen.queryByLabelText("Output format")).toBeNull();
   });
 
   it("shows the format picker for audio inputs", async () => {
-    await addFile();
-    expect(screen.getByLabelText("Output format")).toBeTruthy();
+    const { user } = await addFile();
+    const row = screen.getByRole("button", { name: /Advanced/ });
+    expect(row.textContent).toContain("rumble filter");
+    await user.click(row);
+    expect(await screen.findByLabelText("Output format")).toBeTruthy();
   });
 
   it("offers the model install when Voice isolation lacks its model", async () => {

@@ -20,6 +20,13 @@ export function componentInstalled(packs: readonly PackView[], id: string): bool
   return false;
 }
 
+/** One-line state of the Instruments click-in. */
+export function instrumentsState(stemsOn: boolean, installed: boolean, saved: boolean): string {
+  if (!installed) return "Model not downloaded";
+  if (!stemsOn) return "Off";
+  return saved ? "Separated · saved to Library" : "Separated";
+}
+
 export const ASPECT_VALUE: Record<string, number> = { "16:9": 16 / 9, "9:16": 9 / 16, "1:1": 1 };
 export const aspectNumber = (aspect: string): number => ASPECT_VALUE[aspect] ?? 16 / 9;
 

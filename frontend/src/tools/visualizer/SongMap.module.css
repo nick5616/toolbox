@@ -14,12 +14,6 @@
   gap: var(--space-1);
 }
 
-.hint {
-  margin-right: auto;
-  font-size: var(--text-xs);
-  color: var(--fg-subtle);
-}
-
 .clear {
   padding: 0 var(--space-2);
   height: var(--control-h-compact);

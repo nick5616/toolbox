@@ -60,8 +60,10 @@ describe("OcrView", () => {
     expect(screen.queryByText("downloads ~13 MB on first use")).toBeNull();
     await user.selectOptions(screen.getByLabelText("Language"), "cyrillic");
     expect(screen.getByText("downloads ~13 MB on first use")).toBeTruthy();
-    await user.click(screen.getByRole("radio", { name: "Both" }));
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
+    await user.click(await screen.findByRole("radio", { name: "Both" }));
     await user.click(screen.getByRole("switch", { name: "Skip pages that already have text" }));
+    expect(screen.getByRole("button", { name: /Advanced/ }).textContent).toContain("PDF + text");
 
     await user.click(screen.getByRole("button", { name: "Add files…" }));
     const run = await screen.findByRole("button", { name: /Read text from/ });

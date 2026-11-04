@@ -78,6 +78,11 @@ export default function DesignStep({ lastShow, aspect, onExport, onBack }: Desig
   const vh = info?.video?.height ?? 0;
   const designAspect = mode === "overlay" && vw > 0 && vh > 0 ? vw / vh : aspectValue(aspect);
 
+  const setAspect = useVisualizer((s) => s.setAspect);
+  useEffect(() => {
+    setAspect(designAspect);
+  }, [designAspect, setAspect]);
+
   const savePreset = async (show: Show) => {
     const err = await useMyPresets.getState().add(show);
     toast(err ? { title: err, tone: "danger" } : { title: `Saved "${show.name}" to My presets`, tone: "success" });
@@ -103,11 +108,6 @@ export default function DesignStep({ lastShow, aspect, onExport, onBack }: Desig
         <IconButton icon="redo-2" label="Redo" data-tip="Redo the change you just undid" kbd="Mod+Shift+Z" disabled={!history.canRedo} onClick={history.redo} />
         <span className={styles.name} data-tip="The name of this design">{history.show.name}</span>
         <span className={styles.spacer} />
-        {onBack && (
-          <Button variant="ghost" onClick={onBack} data-tip="Go back to the song map">
-            Back
-          </Button>
-        )}
         <Button variant="primary" icon="film" onClick={onExport} data-tip="Choose the size and quality and render the video">
           Export
         </Button>
@@ -121,6 +121,7 @@ export default function DesignStep({ lastShow, aspect, onExport, onBack }: Desig
         mode={mode}
         player={null}
         text="engine"
+        popOutPreview
         onSavePreset={(s) => void savePreset(s)}
       />
     </div>

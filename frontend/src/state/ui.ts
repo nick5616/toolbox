@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { FilesDropped, TimedLine } from "@/lib/api";
 import { matchesNow, NARROW_QUERY, useMediaQuery } from "@/lib/media";
+import { currentWindow } from "@/lib/windows";
 
 /** View ids: "library", "settings", "setup" (the setup overlay), or a module id. */
 export type ViewId = string;
@@ -99,9 +100,13 @@ function load(): Partial<Persisted> {
 }
 
 function initialView(saved: Partial<Persisted>): ViewId {
+  // A tool window's view is its `view` parameter (never the main window's saved one).
   const fromQuery = new URLSearchParams(window.location.search).get("view");
   return fromQuery || saved.view || "downloader";
 }
+
+/** Only the main window writes the shared `toolbox.ui` entry; pop-outs and popups would clobber it. */
+const persists = currentWindow().kind === "main";
 
 const saved = load();
 
@@ -138,6 +143,7 @@ export const useUI = create<UIState>((set, get) => ({
 }));
 
 useUI.subscribe((s) => {
+  if (!persists) return;
   const p: Persisted = {
     view: s.view,
     sidebarCollapsed: s.sidebarCollapsed,

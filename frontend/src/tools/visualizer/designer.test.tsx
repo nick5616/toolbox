@@ -47,7 +47,7 @@ import { buildFixture } from "@/viz/fixture";
 import { PRESETS, presetById, showFromPreset } from "@/viz/presets";
 import type { Show } from "@/viz/types";
 import { validateShow } from "@/viz/validate";
-import { VisualDesigner } from "./designer/VisualDesigner";
+import { HEADLINE_CONTROLS, VisualDesigner } from "./designer/VisualDesigner";
 import { deleteLayer, moveLayer, removeReaction, setReactionAmount } from "./designer/model";
 import { useShowHistory, useUndoKeys, type ShowHistory } from "./designer/useShowHistory";
 import { whyFacts } from "./designer/why";
@@ -74,9 +74,15 @@ beforeEach(() => {
   useVisualizer.getState().reset();
 });
 
+/** Opens a section's click-in from the rail (one drawer at a time, so the previous one closes). */
 async function openTab(name: string) {
-  await userEvent.click(screen.getByRole("tab", { name: new RegExp(name) }));
+  await userEvent.click(screen.getByRole("button", { name: new RegExp(`^${name}`) }));
 }
+
+const railTitles = () =>
+  within(screen.getByRole("navigation", { name: "Designer" }))
+    .getAllByRole("button")
+    .map((b) => b.querySelector("span")?.textContent);
 
 describe("show editing model", () => {
   it("is pure: edits return new shows", () => {
@@ -229,7 +235,7 @@ describe("Text in the designer", () => {
 
   it("honours the tabs prop", () => {
     render(<Harness tabs={["look", "layers"]} />);
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Look", "Layers"]);
+    expect(railTitles().filter((t) => ["Presets", "Look", "Reactions", "Layers", "Timeline"].includes(t ?? ""))).toEqual(["Look", "Layers"]);
   });
 });
 
@@ -289,5 +295,51 @@ describe("Timed-text seed", () => {
     const sub = seededShow({ from: "subtitles", look: { ...look, karaoke: false, position: "lower" }, overlay: true }, "overlay")!;
     expect(sub.presetId).toBe(presetById("clean-captions") ? "clean-captions" : PRESETS[0]!.id);
     expect(sub.text).toMatchObject({ preset: "subtitle", position: "lower" });
+  });
+});
+
+describe("The rail", () => {
+  it("lists one click-in per section with its summary, and nothing else open", () => {
+    render(<Harness />);
+    const rail = within(screen.getByRole("navigation", { name: "Designer" }));
+    for (const [title, summary] of [
+      ["Presets", "Spectrum Classic"],
+      ["Look", "palette"],
+      ["Reactions", "→"],
+      ["Layers", "2 layers"],
+      ["Timeline", "Auto"],
+    ] as const) {
+      const row = rail.getByRole("button", { name: new RegExp(`^${title}`) });
+      expect(row.textContent).toContain(summary);
+    }
+    // the sections' own controls stay behind their rows
+    expect(screen.queryByRole("list", { name: "Reactions" })).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("shows the design's first reactions as headline sliders that edit every scene", () => {
+    render(<Harness />);
+    const group = screen.getByRole("group", { name: "Main reactions" });
+    expect(within(group).getAllByRole("slider").length).toBe(HEADLINE_CONTROLS);
+    fireEvent.change(within(group).getByLabelText("Bar height level"), { target: { value: "1.5" } });
+    const h = sceneLayers("main").find((l) => l.id === "bars")!.params.height as { mods: Array<{ amount: number }> };
+    expect(h.mods[0]!.amount).toBeCloseTo(1.5);
+  });
+
+  it("keeps a summary in sync with edits", async () => {
+    render(<Harness />);
+    await openTab("Layers");
+    await userEvent.click(screen.getByRole("button", { name: "Delete bg" }));
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: /^Layers/ }).textContent).toContain("1 layer");
+  });
+
+  it("opens one drawer at a time with a header", async () => {
+    render(<Harness />);
+    await openTab("Look");
+    expect(screen.getByRole("dialog", { name: "Look" })).toBeTruthy();
+    await openTab("Layers");
+    expect(screen.queryByRole("dialog", { name: "Look" })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Layers" })).toBeTruthy();
   });
 });

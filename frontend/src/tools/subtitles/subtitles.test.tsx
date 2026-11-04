@@ -228,6 +228,7 @@ describe("SubtitlesView", () => {
   it("shifts all times from the toolbar", async () => {
     const user = userEvent.setup();
     await openSubtitleFile(user);
+    await user.click(screen.getByRole("button", { name: "Shift timing" }));
     const stepper = screen.getByLabelText("Subtitles are late by");
     await user.clear(stepper);
     await user.type(stepper, "500{Enter}");
@@ -275,6 +276,14 @@ describe("SubtitlesView", () => {
     // Streams are listed per text track; picture-based ones can't be used.
     expect(await screen.findByRole("button", { name: "Use this track" })).toBeTruthy();
     expect(screen.getByText(/can't be edited/)).toBeTruthy();
+
+    // Splitting options are a click-in that says what they are set to.
+    expect(screen.queryByLabelText("Characters per line")).toBeNull();
+    expect(screen.getByRole("button", { name: /^Subtitle text/ }).textContent).toContain("42 characters · 2 lines");
+    await user.click(screen.getByRole("button", { name: /^Subtitle text/ }));
+    await user.click(screen.getByRole("radio", { name: "1" }));
+    expect(screen.getByRole("button", { name: /^Subtitle text/ }).textContent).toContain("42 characters · 1 line");
+    await user.click(screen.getByRole("radio", { name: "2" }));
 
     enqueue.mockResolvedValue([job({ id: "g1" })]);
     await user.selectOptions(screen.getByLabelText("Model"), "turbo");
@@ -388,7 +397,10 @@ describe("SubtitlesView", () => {
     await user.click(screen.getByRole("button", { name: /Export/ }));
 
     await user.click(await screen.findByRole("radio", { name: /Boxed/ }));
+    expect(screen.getByRole("button", { name: /^Text/ }).textContent).toContain("Medium · bottom · Arial");
+    await user.click(screen.getByRole("button", { name: /^Text/ }));
     await user.click(screen.getByRole("radio", { name: "Large" }));
+    expect(screen.getByRole("button", { name: /^Text/ }).textContent).toContain("Large · bottom");
     enqueue.mockResolvedValue([job({ id: "b1" })]);
     await user.click(screen.getByRole("button", { name: "Burn into the video" }));
     await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(1));

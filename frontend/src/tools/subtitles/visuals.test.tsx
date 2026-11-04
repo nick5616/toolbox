@@ -107,6 +107,10 @@ async function toExport(user: ReturnType<typeof userEvent.setup>, file: string, 
   await user.click(screen.getByRole("button", { name: /Export/ }));
 }
 
+async function openRow(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(await screen.findByRole("button", { name: new RegExp(`^${name}`) }));
+}
+
 function lastBurn(): Record<string, unknown> {
   const calls = enqueue.mock.calls;
   return (calls[calls.length - 1] as [string[], Record<string, unknown>])[1];
@@ -128,14 +132,19 @@ describe("Subtitles visuals", () => {
     await toExport(user, "/in/talk.mp3", AUDIO);
 
     expect(await screen.findByRole("heading", { name: "Make a video" })).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "Visualizer" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.queryByTestId("picker")).toBeNull();
+    expect(screen.getByRole("button", { name: /^Video/ }).textContent).toContain("16:9 · 1080p · Visualizer");
+    await openRow(user, "Visuals");
     expect(screen.getByTestId("picker").getAttribute("data-mode")).toBe("background");
     expect(screen.getByRole("switch", { name: "Separate instruments" })).toBeTruthy();
     const make = screen.getByRole("button", { name: "Make a video" }) as HTMLButtonElement;
     expect(make.disabled).toBe(false);
 
+    await openRow(user, "Video");
+    expect(screen.getByRole("radio", { name: "Visualizer" }).getAttribute("aria-checked")).toBe("true");
     await user.click(screen.getByRole("radio", { name: "9:16" }));
     await user.click(screen.getByRole("radio", { name: "720p" }));
+    expect(screen.getByRole("button", { name: /^Video/ }).textContent).toContain("9:16 · 720p");
     await user.click(make);
     await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(1));
     const [inputs, opts] = enqueue.mock.calls[0] as [string[], Record<string, unknown>];
@@ -149,6 +158,7 @@ describe("Subtitles visuals", () => {
   it("sends no visuals for a colour background", async () => {
     const user = userEvent.setup();
     await toExport(user, "/in/talk.mp3", AUDIO);
+    await openRow(user, "Video");
     await user.click(await screen.findByRole("radio", { name: "Colour" }));
     expect(screen.queryByTestId("picker")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Make a video" }));
@@ -159,6 +169,7 @@ describe("Subtitles visuals", () => {
   it("needs an image before an image background can be made", async () => {
     const user = userEvent.setup();
     await toExport(user, "/in/talk.mp3", AUDIO);
+    await openRow(user, "Video");
     await user.click(await screen.findByRole("radio", { name: "Image" }));
     expect((screen.getByRole("button", { name: "Make a video" }) as HTMLButtonElement).disabled).toBe(true);
     pickWith.mockResolvedValue(["/in/bg.png"]);
@@ -174,6 +185,8 @@ describe("Subtitles visuals", () => {
     await toExport(user, "/in/talk.mp4", VIDEO);
 
     expect(await screen.findByRole("heading", { name: "Burn into the video" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Visuals/ }).textContent).toContain("None");
+    await openRow(user, "Visuals");
     expect(screen.getByRole("radio", { name: "None" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.queryByTestId("picker")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Burn into the video" }));
@@ -184,6 +197,7 @@ describe("Subtitles visuals", () => {
   it("adds visuals over a video through the overlay picker", async () => {
     const user = userEvent.setup();
     await toExport(user, "/in/talk.mp4", VIDEO);
+    await openRow(user, "Visuals");
     await user.click(await screen.findByRole("radio", { name: "Add visuals over the video" }));
     expect(screen.getByTestId("picker").getAttribute("data-mode")).toBe("overlay");
     await user.click(screen.getByRole("button", { name: "Burn into the video" }));
@@ -194,6 +208,7 @@ describe("Subtitles visuals", () => {
   it("keeps the design when the designer sheet is closed with Done", async () => {
     const user = userEvent.setup();
     await toExport(user, "/in/talk.mp3", AUDIO);
+    await openRow(user, "Visuals");
     await user.click(await screen.findByRole("button", { name: "Open the full designer" }));
     const sheet = await screen.findByRole("dialog", { name: "Visual designer" });
     expect(sheet).toBeTruthy();
@@ -210,6 +225,7 @@ describe("Subtitles visuals", () => {
   it("asks before Esc discards design changes", async () => {
     const user = userEvent.setup();
     await toExport(user, "/in/talk.mp3", AUDIO);
+    await openRow(user, "Visuals");
     await user.click(await screen.findByRole("button", { name: "Open the full designer" }));
 
     // Nothing changed yet: Esc just closes.
@@ -217,6 +233,7 @@ describe("Subtitles visuals", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Visual designer" })).toBeNull();
 
+    await openRow(user, "Visuals");
     await user.click(screen.getByRole("button", { name: "Open the full designer" }));
     await user.click(await screen.findByRole("button", { name: "Edit the design" }));
     await user.keyboard("{Escape}");
@@ -238,6 +255,7 @@ describe("Subtitles visuals", () => {
   it("hands the cues to the Visualizer", async () => {
     const user = userEvent.setup();
     await toExport(user, "/in/talk.mp3", AUDIO);
+    await openRow(user, "Visuals");
     await user.click(await screen.findByRole("button", { name: "Make it fully reactive in Visualizer" }));
     const h = useUI.getState().handoff;
     expect(h).toMatchObject({ moduleId: "visualizer", inputs: ["/in/talk.mp3"], seed: { kind: "timed-text", from: "subtitles", overlay: false } });
@@ -248,6 +266,7 @@ describe("Subtitles visuals", () => {
   it("hands over a video with the overlay flag", async () => {
     const user = userEvent.setup();
     await toExport(user, "/in/talk.mp4", VIDEO);
+    await openRow(user, "Visuals");
     await user.click(await screen.findByRole("radio", { name: "Add visuals over the video" }));
     await user.click(screen.getByRole("button", { name: "Make it fully reactive in Visualizer" }));
     expect(useUI.getState().handoff?.seed?.overlay).toBe(true);

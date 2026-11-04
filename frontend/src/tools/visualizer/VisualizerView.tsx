@@ -7,14 +7,16 @@
  * synthetic analysis so the designer can be tried without the engine.
  */
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { Icon, Spinner, cx } from "@/components";
+import { ClickInHost, Icon, MenuButton, Spinner, cx } from "@/components";
 import { SettingsService, type AnalysisRef } from "@/lib/api";
+import { openToolItems } from "@/lib/openTool";
 import { buildFixture } from "@/viz/fixture";
 import { validateShow } from "@/viz/validate";
 import type { Show } from "@/viz/types";
 import type { ToolViewProps } from "../index";
 import { MAX_STATE_BYTES, patchVizState, readVizState } from "./vizState";
 import { DEFAULT_EXPORT, sanitizeExport, type ExportPrefs } from "./exportPrefs";
+import { useVisualizerBridgeHost } from "./bridge";
 import { useSeed } from "./useSeed";
 import { useVisualizer, type VisualizerStep } from "./store";
 import styles from "./VisualizerView.module.css";
@@ -95,6 +97,11 @@ function usePrefs(): [Prefs, (next: Prefs | ((p: Prefs) => Prefs)) => void] {
   return [prefs, set];
 }
 
+/** The tools the Visualizer is built from: the song can be opened in either, inline or in its own window. */
+export function constituentItems(input: string) {
+  return [...openToolItems("stems", [input], "viz"), ...openToolItems("bpm-key", [input], "viz")];
+}
+
 function Loading() {
   return (
     <div className={styles.loading}>
@@ -115,6 +122,7 @@ export default function VisualizerView({ moduleId }: ToolViewProps) {
   const fixtureDone = useRef(false);
 
   useSeed(moduleId);
+  useVisualizerBridgeHost();
 
   // ---- the design survives a restart ----
   useEffect(() => {
@@ -182,7 +190,7 @@ export default function VisualizerView({ moduleId }: ToolViewProps) {
   };
 
   return (
-    <div className={styles.root}>
+    <ClickInHost className={styles.root}>
       <nav className={styles.steps} aria-label="Steps">
         {STEPS.map((s, i) => (
           <button key={s.id} type="button" data-tip={reachable(s.id) ? STEP_TIP[s.id] : STEP_TIP[s.id] + " (finish the earlier steps first)"} className={cx(styles.step, step === s.id && styles.stepOn)} aria-current={step === s.id ? "step" : undefined} disabled={!reachable(s.id)} onClick={() => setStep(s.id)}>
@@ -191,6 +199,8 @@ export default function VisualizerView({ moduleId }: ToolViewProps) {
             {i < STEPS.length - 1 && <Icon name="chevron-right" size={12} className={styles.stepSep} />}
           </button>
         ))}
+        <span className={styles.spacer} />
+        {input && <MenuButton label="Open this song in another tool" icon="ellipsis" variant="ghost" size="sm" tip="Open this song in Stems or BPM & Key, here or in their own window" items={() => constituentItems(input)} />}
       </nav>
       <div className={cx(styles.body, step === "design" && styles.bodyWide)}>
         <Suspense fallback={<Loading />}>
@@ -200,6 +210,6 @@ export default function VisualizerView({ moduleId }: ToolViewProps) {
           {step === "export" && <ExportStep prefs={prefs.export} onPrefs={onPrefs} onBack={() => setStep("design")} />}
         </Suspense>
       </div>
-    </div>
+    </ClickInHost>
   );
 }

@@ -3,6 +3,7 @@ import type { FilesDropped } from "@/lib/api";
 import { acceptsPath } from "@/tools/_kit/accepts";
 import { isReady, useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
+import { currentWindow } from "@/lib/windows";
 // --- pipelines ---
 import { PipelinesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -116,6 +117,12 @@ function routePostBuilderDrop(d: FilesDropped, paths: string[]): void {
 }
 // --- end post folders ---
 
+/** A drop belongs to the window whose key matches `drop.window` (the main window ⇔ ""). */
+export function ownsDrop(d: Pick<FilesDropped, "window">, myKey: string = currentWindow().key): boolean {
+  const target = d.window ?? "";
+  return target === (myKey === "main" ? "" : myKey);
+}
+
 /**
  * Handles `app:files-dropped` (SPEC §3.5). A drop on a tool's own drop zone,
  * or anywhere on the page of the tool being shown, goes straight to that tool
@@ -123,6 +130,7 @@ function routePostBuilderDrop(d: FilesDropped, paths: string[]): void {
  * Library, Settings, Pipelines, files the tool can't use) opens the chooser.
  */
 export function routeFilesDropped(d: FilesDropped): void {
+  if (!ownsDrop(d)) return;
   const ui = useUI.getState();
   const target = d.targetId ?? "";
   // --- pipelines ---

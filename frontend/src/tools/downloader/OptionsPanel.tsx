@@ -1,7 +1,8 @@
-import { Badge, Field, SegmentedControl, Section, Select, Switch } from "@/components";
+import { Badge, ClickIn, Field, SegmentedControl, Section, Select, Switch } from "@/components";
 import { AudioFormat, AudioQuality, DownloadMode, MaxResolution, type DownloaderOptions } from "@/lib/api";
 import { TrimFields } from "./TrimFields";
 import type { TrimErrors } from "./timecode";
+import { extrasSummary, formatSummary, trimSummary } from "./options";
 import styles from "./OptionsPanel.module.css";
 
 export interface OptionsPanelProps {
@@ -28,11 +29,12 @@ const RESOLUTIONS = [
   { value: MaxResolution.Res360, label: "360p" },
 ];
 
+/** Mode at the top level; format, trim and extras are click-ins with a summary each. */
 export function OptionsPanel({ options, onChange, trimErrors }: OptionsPanelProps) {
   const audio = options.mode === DownloadMode.ModeAudio;
   const wav = options.audioFormat === AudioFormat.FormatWAV;
   return (
-    <div className={styles.grid}>
+    <div className={styles.panel}>
       <Section label="Mode" tip="Save just the sound or the full video">
         <SegmentedControl
           aria-label="Mode"
@@ -45,88 +47,87 @@ export function OptionsPanel({ options, onChange, trimErrors }: OptionsPanelProp
         />
       </Section>
 
-      {audio ? (
-        <Section label="Format" tip="Which audio file type to save">
+      <div className={styles.rows}>
+        <ClickIn icon="music" title="Format" summary={formatSummary(options)} tip={audio ? "Which audio file type and quality to save" : "The tallest picture to download"} width={320}>
           <div className={styles.stack}>
-            <SegmentedControl
-              aria-label="Audio format"
-              value={options.audioFormat}
-              onChange={(audioFormat) => onChange({ audioFormat })}
-              options={[
-                { value: AudioFormat.FormatMP3, label: "mp3", tip: "Small lossy files that play everywhere; pick the bitrate under Quality" },
-                { value: AudioFormat.FormatWAV, label: "wav", tip: "Uncompressed audio; big files, no embedded thumbnail" },
-                { value: AudioFormat.FormatFLAC, label: "flac", tip: "Lossless compressed audio; half the size of WAV" },
-              ]}
-            />
-            {options.audioFormat === AudioFormat.FormatMP3 && (
-              <Field label="Quality">
-                {(c) => (
-                  <Select {...c} data-tip="MP3 bitrate: higher sounds better and makes larger files. Best uses the highest variable quality (V0)" value={options.audioQuality} onChange={(audioQuality) => onChange({ audioQuality })} options={QUALITIES} />
+            {audio ? (
+              <>
+                <SegmentedControl
+                  aria-label="Audio format"
+                  value={options.audioFormat}
+                  onChange={(audioFormat) => onChange({ audioFormat })}
+                  options={[
+                    { value: AudioFormat.FormatMP3, label: "mp3", tip: "Small lossy files that play everywhere; pick the bitrate under Quality" },
+                    { value: AudioFormat.FormatWAV, label: "wav", tip: "Uncompressed audio; big files, no embedded thumbnail" },
+                    { value: AudioFormat.FormatFLAC, label: "flac", tip: "Lossless compressed audio; half the size of WAV" },
+                  ]}
+                />
+                {options.audioFormat === AudioFormat.FormatMP3 && (
+                  <Field label="Quality">
+                    {(c) => (
+                      <Select {...c} data-tip="MP3 bitrate: higher sounds better and makes larger files. Best uses the highest variable quality (V0)" value={options.audioQuality} onChange={(audioQuality) => onChange({ audioQuality })} options={QUALITIES} />
+                    )}
+                  </Field>
                 )}
-              </Field>
+              </>
+            ) : (
+              <div className={styles.inline}>
+                <Select
+                  aria-label="Max resolution"
+                  data-tip="Largest picture height to fetch. If a video is smaller than this you get its own size"
+                  value={options.maxResolution}
+                  onChange={(maxResolution) => onChange({ maxResolution })}
+                  options={RESOLUTIONS}
+                />
+                <Badge mono tip="Videos are saved as MP4, which plays almost everywhere">
+                  MP4
+                </Badge>
+              </div>
             )}
           </div>
-        </Section>
-      ) : (
-        <Section label="Max resolution" tip="The tallest picture to download; lower is smaller and faster">
-          <div className={styles.inline}>
-            <Select
-              aria-label="Max resolution"
-              data-tip="Largest picture height to fetch. If a video is smaller than this you get its own size"
-              value={options.maxResolution}
-              onChange={(maxResolution) => onChange({ maxResolution })}
-              options={RESOLUTIONS}
+        </ClickIn>
+
+        <ClickIn icon="scissors" title="Trim" summary={trimSummary(options)} tip="Download only a section of each video or track" width={320}>
+          <TrimFields
+            enabled={options.trimEnabled}
+            start={options.trimStart}
+            end={options.trimEnd}
+            errors={trimErrors}
+            onEnabled={(trimEnabled) => onChange({ trimEnabled })}
+            onStart={(trimStart) => onChange({ trimStart })}
+            onEnd={(trimEnd) => onChange({ trimEnd })}
+          />
+        </ClickIn>
+
+        <ClickIn icon="sliders-horizontal" title="Extras" summary={extrasSummary(options)} tip="Embedded information and playlists" width={320}>
+          <div className={styles.stack}>
+            <Switch
+              checked={options.embedMetadata}
+              onChange={(embedMetadata) => onChange({ embedMetadata })}
+              label="Embed metadata"
+              tip="Store title, artist and date inside the file so players can show them"
             />
-            <Badge mono tip="Videos are saved as MP4, which plays almost everywhere">
-              MP4
-            </Badge>
+            <Switch
+              checked={options.embedThumbnail && !(audio && wav)}
+              disabled={audio && wav}
+              onChange={(embedThumbnail) => onChange({ embedThumbnail })}
+              label="Embed thumbnail"
+              tip={audio && wav ? "WAV files cannot hold cover art" : "Store the video thumbnail inside the file as cover art"}
+            />
+            {audio && wav && (
+              <p className={styles.hint} data-tip="WAV is a plain format with no place for cover art">
+                Thumbnails are not supported for WAV
+              </p>
+            )}
+            <Switch
+              checked={options.playlist}
+              onChange={(playlist) => onChange({ playlist })}
+              label="Download the whole playlist when a link is a playlist"
+              tip="Off downloads only the single video in the link; on fetches every item in the playlist"
+            />
           </div>
-        </Section>
-      )}
-
-      <Section label="Trim" tip="Download only a section of each video or track">
-        <TrimFields
-          enabled={options.trimEnabled}
-          start={options.trimStart}
-          end={options.trimEnd}
-          errors={trimErrors}
-          onEnabled={(trimEnabled) => onChange({ trimEnabled })}
-          onStart={(trimStart) => onChange({ trimStart })}
-          onEnd={(trimEnd) => onChange({ trimEnd })}
-        />
-      </Section>
-
-      <Section label="Embed" tip="Write extra information into the downloaded file">
-        <div className={styles.stack}>
-          <Switch
-            checked={options.embedMetadata}
-            onChange={(embedMetadata) => onChange({ embedMetadata })}
-            label="Metadata"
-            tip="Store title, artist and date inside the file so players can show them"
-          />
-          <Switch
-            checked={options.embedThumbnail && !(audio && wav)}
-            disabled={audio && wav}
-            onChange={(embedThumbnail) => onChange({ embedThumbnail })}
-            label="Thumbnail"
-            tip={audio && wav ? "WAV files cannot hold cover art" : "Store the video thumbnail inside the file as cover art"}
-          />
-          {audio && wav && (
-            <p className={styles.hint} data-tip="WAV is a plain format with no place for cover art">
-              Not supported for WAV
-            </p>
-          )}
-        </div>
-      </Section>
-
-      <Section label="Playlist" tip="What to do when a link points to a whole playlist">
-        <Switch
-          checked={options.playlist}
-          onChange={(playlist) => onChange({ playlist })}
-          label="Download the whole playlist when a link is a playlist"
-          tip="Off downloads only the single video in the link; on fetches every item in the playlist"
-        />
-      </Section>
+        </ClickIn>
+      </div>
     </div>
   );
 }

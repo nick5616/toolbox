@@ -273,6 +273,9 @@ type FilesDropped struct {
 	// TargetID is the id of the drop-target element ("tool-drop:<moduleId>"
 	// routes straight to that tool).
 	TargetID string `json:"targetId"`
+	// Window is the key of the window the files were dropped on: "" for the
+	// main window, else a pop-out's key (Phase 10). Only that window routes it.
+	Window string `json:"window"`
 }
 
 // FileInfo describes a local file for input lists.

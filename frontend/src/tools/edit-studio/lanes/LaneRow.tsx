@@ -4,8 +4,8 @@ import { Icon } from "@/components";
 import { formatMs } from "@/components/media/logic";
 import type { Analysis } from "@/viz/analysis";
 import type { LaneSettings, Marker, MarkerLane } from "@/viz/edit/types";
-import { LANE_ROW_PX, xToMs } from "../geometry";
-import { useEditStudio } from "../store";
+import { LANE_ROW_PX, xToMs } from "@/editor/geometry";
+import { useEditStudio } from "@/editor/store";
 import { cssColor, drawMarkerLane, laneColor, prepCanvas } from "./draw";
 import {
   addCustomMarker,
@@ -18,8 +18,8 @@ import {
 } from "./laneLogic";
 import { LaneSettingsPopover } from "./LaneSettingsPopover";
 import styles from "./Lanes.module.css";
-import { startScrub } from "../timeline/scrub";
-import { seekTo } from "../transport/player";
+import { startScrub } from "@/editor/timeline/scrub";
+import { seekTo } from "@/editor/transport/player";
 import { editLength } from "@/viz/edit/types";
 
 export interface LaneRowProps {

@@ -11,7 +11,7 @@ import {
 } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 import { useOrderedJobs } from "@/state/jobs";
-import { FileToolLayout, runLabel, setRequiresOverride, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { FileToolLayout, runLabel, setRequiresOverride, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { AUDIO_ENGINE_ID } from "@/tools/_kit/DepsGate";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import type { ToolViewProps } from "../index";
@@ -162,6 +162,10 @@ export default function UpscaleView({ moduleId }: ToolViewProps) {
     tip: `${m.label}: ${m.hint}. Runs on the GPU; the CPU option downloads ${formatBytes(m.cpuDownloadBytes)} of model data on first use`,
   }));
 
+  const modelLabel = models.find((m) => m.id === opts.model)?.label ?? opts.model;
+  const formatLabel = FORMAT_OPTIONS.find((f) => f.value === opts.format)?.label ?? opts.format;
+  const deviceLabel = cpu ? (estimate ? `CPU, est. ${estimate}` : "CPU") : opts.device === UpscaleDevice.DeviceGPU ? "GPU" : "";
+
   return (
     <FileToolLayout
       moduleId={moduleId}
@@ -170,34 +174,57 @@ export default function UpscaleView({ moduleId }: ToolViewProps) {
       onRun={onRun}
       running={running}
       inputErrors={{ ...submitErrors, ...overErrors }}
-      options={
+      primary={
         <>
           {gpuFailed && (
             <Banner tone="warn" title={GPU_ERROR}>
-              The upscaler needs a GPU with Vulkan support. Set Processor to Automatic or CPU (slower) to use the AI
-              engine instead.
+              The upscaler needs a GPU with Vulkan support. Open Advanced and set Processor to Automatic or CPU (slower)
+              to use the AI engine instead.
             </Banner>
           )}
-          <Section label="Options" tip="Pick the model, how much to enlarge, and where the work runs">
+          <div className={imageStyles.optRow}>
+            <span className={imageStyles.optLabel} data-tip="How many times wider and taller the result will be">Scale</span>
+            <SegmentedControl
+              aria-label="Scale"
+              value={String(opts.scale) as "2" | "4"}
+              onChange={(v) => setOpts((o) => ({ ...o, scale: Number(v) }))}
+              options={[
+                { value: "2", label: "2×", tip: "Double the width and height (4 times the pixels); faster and lighter on memory" },
+                { value: "4", label: "4×", tip: "Four times the width and height (16 times the pixels); big files, slower, may exceed the size limit" },
+              ]}
+            />
+          </div>
+          {inputs.files.length > 0 && (
+            <ul className={imageStyles.sizeList} aria-label="Image sizes" data-tip="Each image's size now and after upscaling; red rows exceed the size limit and are skipped">
+              {verdicts.map(({ path, v }) => (
+                <li key={path} className={cx(imageStyles.rowInfo, v.kind === "over" && imageStyles.rowWarn)}>
+                  <span data-tip={path}>{basename(path)}</span>
+                  <span data-tip="Original size, then the size after upscaling">
+                    {v.kind === "heic"
+                      ? "HEIC"
+                      : v.kind === "unknown"
+                        ? "…"
+                        : `${(sizes[path] as ImageDims).w}×${(sizes[path] as ImageDims).h} → ${v.outW}×${v.outH}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      }
+      advancedSummary={summarize(modelLabel, formatLabel, deviceLabel)}
+      advanced={
+        <div className={imageStyles.options}>
+          <Section label="Model" tip="What kind of picture the model is tuned for">
+            <RadioCards
+              aria-label="Model"
+              options={modelOptions}
+              value={opts.model}
+              onChange={(model) => setOpts((o) => ({ ...o, model }))}
+            />
+          </Section>
+          <Section label="Output" tip="File type and where the work runs">
             <div className={imageStyles.options}>
-              <RadioCards
-                aria-label="Model"
-                options={modelOptions}
-                value={opts.model}
-                onChange={(model) => setOpts((o) => ({ ...o, model }))}
-              />
-              <div className={imageStyles.optRow}>
-                <span className={imageStyles.optLabel} data-tip="How many times wider and taller the result will be">Scale</span>
-                <SegmentedControl
-                  aria-label="Scale"
-                  value={String(opts.scale) as "2" | "4"}
-                  onChange={(v) => setOpts((o) => ({ ...o, scale: Number(v) }))}
-                  options={[
-                    { value: "2", label: "2×", tip: "Double the width and height (4 times the pixels); faster and lighter on memory" },
-                    { value: "4", label: "4×", tip: "Four times the width and height (16 times the pixels); big files, slower, may exceed the size limit" },
-                  ]}
-                />
-              </div>
               <div className={imageStyles.optRow}>
                 <label className={imageStyles.optLabel} htmlFor="upscale-format">
                   Format
@@ -221,31 +248,15 @@ export default function UpscaleView({ moduleId }: ToolViewProps) {
                   options={DEVICE_OPTIONS}
                   onChange={(device) => setOpts((o) => ({ ...o, device }))}
                 />
-                {cpu && (
-                  <span className={imageStyles.mono} data-tip="Rough time to finish on the CPU for the images that fit the limit">
-                    {estimate ? `Estimated time ${estimate}` : "Runs on the AI engine, much slower than a GPU"}
-                  </span>
-                )}
               </div>
-              {inputs.files.length > 0 && (
-                <ul className={imageStyles.sizeList} aria-label="Image sizes" data-tip="Each image's size now and after upscaling; red rows exceed the size limit and are skipped">
-                  {verdicts.map(({ path, v }) => (
-                    <li key={path} className={cx(imageStyles.rowInfo, v.kind === "over" && imageStyles.rowWarn)}>
-                      <span data-tip={path}>{basename(path)}</span>
-                      <span data-tip="Original size, then the size after upscaling">
-                        {v.kind === "heic"
-                          ? "HEIC"
-                          : v.kind === "unknown"
-                            ? "…"
-                            : `${(sizes[path] as ImageDims).w}×${(sizes[path] as ImageDims).h} → ${v.outW}×${v.outH}`}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+              {cpu && (
+                <span className={imageStyles.mono} data-tip="Rough time to finish on the CPU for the images that fit the limit">
+                  {estimate ? `Estimated time ${estimate}` : "Runs on the AI engine, much slower than a GPU"}
+                </span>
               )}
             </div>
           </Section>
-        </>
+        </div>
       }
       results={
         <Section label="Results" tip="Finished upscales; drag the slider on a card to compare with the original">

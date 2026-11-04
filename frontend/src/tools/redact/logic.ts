@@ -158,6 +158,21 @@ export function countLabel(boxes: readonly ImageBox[]): string {
   return parts.length ? parts.join(" · ") : "Nothing to hide";
 }
 
+/** One-line state of the Effect click-in: "Blur · strength 6 · 15% padding". */
+export function effectSummary(s: Pick<RedactSettings, "style" | "strength" | "padding" | "stripMetadata">): string {
+  const style = s.style === RedactStyle.StyleSolid ? "Solid" : s.style === RedactStyle.StylePixelate ? "Pixelate" : "Blur";
+  const parts = [style];
+  if (s.style !== RedactStyle.StyleSolid) parts.push(`strength ${s.strength}`);
+  parts.push(`${s.padding}% padding`);
+  if (!s.stripMetadata) parts.push("keeps location");
+  return parts.join(" · ");
+}
+
+/** One-line state of the Sensitivity click-in. */
+export function sensitivitySummary(s: Pick<RedactSettings, "sensitivity">): string {
+  return s.sensitivity === RedactSensitivity.SensitivityHigh ? "High: finds more, more false matches" : "Normal";
+}
+
 export function enabledCount(boxes: readonly ImageBox[]): number {
   return boxes.filter((b) => b.enabled).length;
 }

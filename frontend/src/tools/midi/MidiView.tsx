@@ -3,7 +3,7 @@ import { Badge, Button, EmptyState, Field, Icon, SegmentedControl, Section, Slid
 import { JobStatus, MidiRange, MidiService } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
 import { useOrderedJobs } from "@/state/jobs";
-import { FileToolLayout, runLabel, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -43,54 +43,55 @@ export default function MidiView({ moduleId }: ToolViewProps) {
       onRun={onRun}
       running={running}
       inputErrors={inputErrors}
-      options={
-        <Section label="Options" tip="Tune how audio is turned into MIDI notes">
-          <div className={styles.grid}>
-            <Field label="Sensitivity">
-              {(c) => (
-                <div data-tip="How readily notes are detected; higher finds more notes but adds false ones">
+      primary={
+        <Field label="Range">
+          <SegmentedControl
+            aria-label="Range"
+            value={opts.range}
+            onChange={(range) => setOpts((o) => ({ ...o, range }))}
+            options={[
+              { value: MidiRange.RangeFull, label: "Full", tip: "Look for notes across the whole piano range" },
+              { value: MidiRange.RangeBass, label: "Bass", tip: "Only keep low notes; use for bass lines" },
+              { value: MidiRange.RangeMelody, label: "Melody", tip: "Only keep mid and high notes; use for lead lines and vocals" },
+            ]}
+          />
+        </Field>
+      }
+      advancedSummary={summarize(`sensitivity ${pct(opts.sensitivity)}`, `floor ${pct(opts.noteFloor)}`, `min ${opts.minNoteMs} ms`, opts.melodiaTrick && "Melodia")}
+      advanced={
+        <div className={styles.stack}>
+          <Field label="Sensitivity">
+            {(c) => (
+              <div data-tip="How readily notes are detected; higher finds more notes but adds false ones">
                 <Slider id={c.id} value={opts.sensitivity} min={0.1} max={0.9} step={0.05} format={pct} onChange={(sensitivity) => setOpts((o) => ({ ...o, sensitivity }))} />
-                </div>
-              )}
-            </Field>
-            <Field label="Note floor">
-              {(c) => (
-                <div data-tip="Quietest note kept; raise it to drop faint notes and noise">
+              </div>
+            )}
+          </Field>
+          <Field label="Note floor">
+            {(c) => (
+              <div data-tip="Quietest note kept; raise it to drop faint notes and noise">
                 <Slider id={c.id} value={opts.noteFloor} min={0.1} max={0.6} step={0.05} format={pct} onChange={(noteFloor) => setOpts((o) => ({ ...o, noteFloor }))} />
-                </div>
-              )}
-            </Field>
-            <Field label="Min note length">
-              {(c) => (
-                <div data-tip="Shortest note kept, in milliseconds; raise it to remove blips">
+              </div>
+            )}
+          </Field>
+          <Field label="Min note length">
+            {(c) => (
+              <div data-tip="Shortest note kept, in milliseconds; raise it to remove blips">
                 <Stepper id={c.id} value={opts.minNoteMs} min={30} max={500} step={10} unit="ms" onChange={(minNoteMs) => setOpts((o) => ({ ...o, minNoteMs }))} />
-                </div>
-              )}
-            </Field>
-            <Field label="Range">
-              <SegmentedControl
-                aria-label="Range"
-                value={opts.range}
-                onChange={(range) => setOpts((o) => ({ ...o, range }))}
-                options={[
-                  { value: MidiRange.RangeFull, label: "Full", tip: "Look for notes across the whole piano range" },
-                  { value: MidiRange.RangeBass, label: "Bass", tip: "Only keep low notes; use for bass lines" },
-                  { value: MidiRange.RangeMelody, label: "Melody", tip: "Only keep mid and high notes; use for lead lines and vocals" },
-                ]}
-              />
-            </Field>
-            <Field label="Melodia trick" hint="Cleaner melodies; turn off for chords">
-              {(c) => (
-                <Switch id={c.id} aria-label="Melodia trick" data-tip="Prefers one smooth melody line over scattered notes; turn off for chords and polyphonic music" checked={opts.melodiaTrick} onChange={(melodiaTrick) => setOpts((o) => ({ ...o, melodiaTrick }))} />
-              )}
-            </Field>
-          </div>
+              </div>
+            )}
+          </Field>
+          <Field label="Melodia trick" hint="Cleaner melodies; turn off for chords">
+            {(c) => (
+              <Switch id={c.id} aria-label="Melodia trick" data-tip="Prefers one smooth melody line over scattered notes; turn off for chords and polyphonic music" checked={opts.melodiaTrick} onChange={(melodiaTrick) => setOpts((o) => ({ ...o, melodiaTrick }))} />
+            )}
+          </Field>
           <div className={styles.footer}>
             <Button size="sm" variant="ghost" data-tip="Put all options back to their original values" onClick={() => setOpts({ ...DEFAULT_MIDI_OPTIONS })}>
               Reset to defaults
             </Button>
           </div>
-        </Section>
+        </div>
       }
       results={
         <Section label="Results" tip="Finished MIDI files with note counts">

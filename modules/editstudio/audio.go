@@ -180,20 +180,25 @@ const stereoFormat = "aformat=sample_rates=48000:channel_layouts=stereo"
 // decoded from the start for every clip).
 func buildMixGraph(doc EditProject, hasAudio func(path string) bool) (inputs []mixInput, graph string) {
 	song := doc.Song
-	d := float64(song.EndMs - song.StartMs)
-	inputs = []mixInput{{Pre: []string{"-ss", mixMs(float64(song.StartMs)), "-t", mixMs(d)}, Path: song.Path}}
+	d := float64(editLen(doc))
+	chain := []string{stereoFormat}
+	if song != nil {
+		inputs = []mixInput{{Pre: []string{"-ss", mixMs(float64(song.StartMs)), "-t", mixMs(d)}, Path: song.Path}}
+		if song.GainDb != 0 {
+			chain = append(chain, "volume="+mixSec(song.GainDb)+"dB")
+		}
+		if song.FadeInMs > 0 {
+			chain = append(chain, "afade=t=in:st=0:d="+mixMs(float64(song.FadeInMs)))
+		}
+		if song.FadeOutMs > 0 {
+			chain = append(chain, "afade=t=out:st="+mixMs(d-float64(song.FadeOutMs))+":d="+mixMs(float64(song.FadeOutMs)))
+		}
+	} else {
+		// No song: the base is silence of length D, under the clips' audio.
+		inputs = []mixInput{{Pre: []string{"-f", "lavfi", "-t", mixMs(d)}, Path: "anullsrc=r=48000:cl=stereo"}}
+	}
 
 	var stmts []string
-	chain := []string{stereoFormat}
-	if song.GainDb != 0 {
-		chain = append(chain, "volume="+mixSec(song.GainDb)+"dB")
-	}
-	if song.FadeInMs > 0 {
-		chain = append(chain, "afade=t=in:st=0:d="+mixMs(float64(song.FadeInMs)))
-	}
-	if song.FadeOutMs > 0 {
-		chain = append(chain, "afade=t=out:st="+mixMs(d-float64(song.FadeOutMs))+":d="+mixMs(float64(song.FadeOutMs)))
-	}
 	stmts = append(stmts, "[0:a]"+strings.Join(chain, ",")+"[song]")
 
 	off := float64(doc.CutOffsetFrames) * 1000 / float64(doc.FPS)
@@ -266,8 +271,8 @@ func mixArgs(inputs []mixInput, d int64, dst string) []string {
 // mixAudio writes the song (range, gain, fades) plus clip audio as a WAV of
 // exactly D ms to dst.
 func (m *Module) mixAudio(ctx context.Context, job *core.JobContext, doc EditProject, ffmpeg, dst string) error {
-	if doc.Song == nil || doc.Song.EndMs <= doc.Song.StartMs {
-		return core.ValidationError("Pick a song first", map[string]string{"song": "Pick a song first"})
+	if doc.Song != nil && doc.Song.EndMs <= doc.Song.StartMs {
+		return core.ValidationError("The song's range is empty", map[string]string{"song": "The song's range is empty"})
 	}
 	if doc.FPS <= 0 {
 		return core.Errorf(core.CodeInternal, "Missing frame rate for the audio")
@@ -302,7 +307,7 @@ func (m *Module) mixAudio(ctx context.Context, job *core.JobContext, doc EditPro
 	if err := os.WriteFile(filepath.Join(job.TempDir, "graph.txt"), []byte(graph), 0o600); err != nil {
 		return core.Errorf(core.CodeInternal, "Couldn't write the audio mix").WithCause(err)
 	}
-	d := doc.Song.EndMs - doc.Song.StartMs
+	d := editLen(doc)
 	args := mixArgs(inputs, d, dst)
 
 	tracker := &media.ProgressTracker{Duration: float64(d) / 1000, Label: "Mixing the audio"}

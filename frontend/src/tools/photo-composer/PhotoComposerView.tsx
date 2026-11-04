@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, ConfirmDialog, EmptyState, Field, Select, TextField, toast } from "@/components";
+import { Button, ClickInHost, ConfirmDialog, EmptyState, Field, Select, TextField, toast } from "@/components";
 import { ComposerService, FilesService, SettingsService, type ComposerAspect, type Composition, type ProjectInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { ASPECTS, sanitizeComposition } from "@/composer/model";
+import { closeWindow, currentWindow } from "@/lib/windows";
 import { useModules } from "@/state/modules";
 import { useUI, type Handoff, type PostSlideSeed } from "@/state/ui";
 import type { ToolViewProps } from "../index";
@@ -11,7 +12,6 @@ import { Modal } from "./Modal";
 import { ProjectsStrip } from "./ProjectsStrip";
 import { discardedProjects } from "./useAutosave";
 import styles from "./PhotoComposerView.module.css";
-import { SHORT_QUERY, useMediaQuery } from "@/lib/media";
 
 export const MODULE_ID = "photo-composer";
 const DEFAULT_NAME = "Untitled composition";
@@ -244,9 +244,13 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
     }
   };
 
-  // Short windows give the canvas the strip's height while a composition is open (Back returns to it).
-  const short = useMediaQuery(SHORT_QUERY);
   const backToPost = useCallback((slide: PostSlideSeed) => {
+    // In its own window there is no Post Builder here: closing returns to the post, which refreshes itself.
+    const w = currentWindow();
+    if (w.kind !== "main") {
+      void closeWindow(w.key).catch(() => undefined);
+      return;
+    }
     setOpen(null);
     useUI.getState().handOff({ moduleId: "post-builder", inputs: [], postSlide: slide });
   }, []);
@@ -254,11 +258,11 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
   const startNew = () => setNewOpen({ aspect: open?.doc.aspect ?? "4:5" });
 
   return (
-    <div className={styles.view}>
-      {(projects.length > 0 || open) && !(open && short) && (
+    <ClickInHost className={styles.view}>
+      {projects.length > 0 && !open && (
         <ProjectsStrip
           projects={projects}
-          openId={open?.info.id ?? null}
+          openId={null}
           onOpen={(id) => void openProject(id)}
           onNew={startNew}
           onDuplicate={(i) => void duplicate(i)}
@@ -336,6 +340,6 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
         onConfirm={() => void remove()}
         onCancel={() => setDeleting(null)}
       />
-    </div>
+    </ClickInHost>
   );
 }

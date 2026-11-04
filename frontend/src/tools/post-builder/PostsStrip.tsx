@@ -36,10 +36,12 @@ export function PostsStrip({ posts, currentId, onSelect, onNew, onDuplicate, onR
                 </span>
               </span>
             </button>
-            <span data-tip="Duplicate, rename or delete this post" style={{ display: "contents" }}>
+            <span style={{ display: "contents" }}>
             <MenuButton
               label={`More for ${p.name}`}
+              tip={`More for ${p.name}`}
               icon="ellipsis"
+              variant="ghost"
               size="sm"
               items={() => [
                 { id: "duplicate", label: "Duplicate", tip: "Make a copy of this post to try another version", icon: "copy", onSelect: () => onDuplicate(p.id) },

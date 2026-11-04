@@ -58,7 +58,8 @@ describe("MidiView", () => {
     render(<MidiView moduleId="audio-to-midi" />);
     await user.click(await screen.findByRole("radio", { name: "Bass" }));
     await waitFor(() => expect(JSON.parse(String(setState.mock.calls.at(-1)?.[1]))).toMatchObject({ range: "bass" }));
-    await user.click(screen.getByRole("switch", { name: "Melodia trick" }));
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
+    await user.click(await screen.findByRole("switch", { name: "Melodia trick" }));
     await user.click(screen.getByRole("button", { name: "Add files…" }));
     const btn = await screen.findByRole("button", { name: /Transcribe 1 file/ });
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
@@ -70,7 +71,8 @@ describe("MidiView", () => {
     const user = userEvent.setup();
     render(<MidiView moduleId="audio-to-midi" />);
     await user.click(await screen.findByRole("radio", { name: "Melody" }));
-    await user.click(screen.getByRole("button", { name: "Reset to defaults" }));
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
+    await user.click(await screen.findByRole("button", { name: "Reset to defaults" }));
     expect(screen.getByRole("radio", { name: "Full" }).getAttribute("aria-checked")).toBe("true");
   });
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button, DropZone, FileList, Section } from "@/components";
+import { Button, ClickIn, ClickInHost, DropZone, FileList, Section } from "@/components";
 import { formatBytes } from "@/lib/format";
 import { useShortcut } from "@/lib/shortcuts";
 import { JobRow } from "@/shell/JobRow";
@@ -12,8 +12,18 @@ import styles from "./FileToolLayout.module.css";
 export interface FileToolLayoutProps {
   moduleId: string;
   inputs: FileInputs;
-  /** Options section (rendered between inputs and the run button). */
+  /** Legacy options section (rendered between inputs and the run button). Prefer `primary` + `advanced`. */
   options?: ReactNode;
+  /** The one or two settings that belong on the top level (rendered between the input and the run button). */
+  primary?: ReactNode;
+  /** Everything else: one "Advanced" click-in row that opens a drawer. */
+  advanced?: ReactNode;
+  /** One-line state of the advanced settings ("MP3 · 320 kbps · keep metadata"). */
+  advancedSummary?: string;
+  /** Drawer title (default "Advanced"). */
+  advancedTitle?: string;
+  /** Extra click-ins (e.g. a separate "Model" group), rendered under the Advanced row. */
+  moreClickIns?: ReactNode;
   /** Run button label, e.g. "Split 3 tracks". */
   runLabel: string;
   onRun: () => void | Promise<void>;
@@ -32,6 +42,11 @@ export function FileToolLayout({
   moduleId,
   inputs,
   options,
+  primary,
+  advanced,
+  advancedSummary,
+  advancedTitle = "Advanced",
+  moreClickIns,
   runLabel,
   onRun,
   runDisabledReason,
@@ -54,12 +69,18 @@ export function FileToolLayout({
   };
   useShortcut("Mod+Enter", run, { when: canRun, allowInInputs: true });
 
+  const hasPanels = advanced != null || moreClickIns != null;
+
   return (
+    <ClickInHost className={styles.host}>
+      <div className={styles.scroll}>
     <section className={styles.root} aria-label={mod?.name ?? moduleId}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{mod?.name ?? moduleId}</h1>
-        {mod?.tagline && <p className={styles.tagline}>{mod.tagline}</p>}
-      </header>
+      {/* The shell's top bar already shows the tool's name (SPEC §13.1: no duplicate headers); only the tagline stays. */}
+      {mod?.tagline && (
+        <header className={styles.header}>
+          <p className={styles.tagline}>{mod.tagline}</p>
+        </header>
+      )}
 
       <DepsGate moduleId={moduleId} />
 
@@ -112,6 +133,19 @@ export function FileToolLayout({
 
       {options}
 
+      {primary != null && <div className={styles.primary}>{primary}</div>}
+
+      {hasPanels && (
+        <div className={styles.panels}>
+          {advanced != null && (
+            <ClickIn icon="sliders-horizontal" title={advancedTitle} summary={advancedSummary} tip="Every other setting for this tool" width={400}>
+              <div className={styles.drawerBody}>{advanced}</div>
+            </ClickIn>
+          )}
+          {moreClickIns}
+        </div>
+      )}
+
       <div className={styles.run}>
         <Button
           variant="primary"
@@ -138,5 +172,7 @@ export function FileToolLayout({
 
       {results}
     </section>
+      </div>
+    </ClickInHost>
   );
 }

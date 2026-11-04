@@ -2,10 +2,10 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { EditClip } from "@/lib/api";
 import { parseSpeed } from "@/viz/edit/schema";
-import { HEADER_PX, msToX } from "../geometry";
-import { findClip } from "../doc";
-import { useEditStudio, useMarkers } from "../store";
-import { seekTo } from "../transport/player";
+import { HEADER_PX, msToX } from "@/editor/geometry";
+import { findClip } from "@/editor/doc";
+import { useEditStudio, useMarkers } from "@/editor/store";
+import { seekTo } from "@/editor/transport/player";
 import { accentMoments, clipMoments, footageMoments, momentTip } from "./logic";
 import styles from "./moments.module.css";
 import { useFootageMoments } from "./store";

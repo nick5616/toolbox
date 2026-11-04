@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Button, IconButton, SegmentedControl, Stepper, Switch, TextField, cx } from "@/components";
+import { ClickIn, IconButton, MenuButton, SegmentedControl, Stepper, Switch, TextField, cx } from "@/components";
 import { PdfAction, type FileInfo, type PdfOptions } from "@/lib/api";
 import { PageGrid } from "./PageGrid";
 import { PasswordField } from "./PasswordField";
@@ -52,6 +52,15 @@ function Row({ label, tip, children }: { label: string; tip?: string; children: 
   );
 }
 
+/** The per-action settings: one click-in row with a summary of the current choices. */
+function Options({ summary, tip, width, children }: { summary: string; tip: string; width?: number; children: ReactNode }) {
+  return (
+    <ClickIn icon="sliders-horizontal" title="Options" summary={summary} tip={tip} width={width} className={styles.options}>
+      <div className={styles.drawer}>{children}</div>
+    </ClickIn>
+  );
+}
+
 function reasonFor(p: PanelProps, min = 1): string {
   if (p.files.length < min) return min > 1 ? `Add at least ${min} files` : "Add a file to continue";
   return p.blocker;
@@ -86,8 +95,10 @@ export function SplitPanel(p: PanelProps) {
   else if (!parsed.error) count = parsed.items.length * p.files.length;
   const inputError = ui.splitMode === "ranges" && ui.ranges.trim() !== "" ? parsed.error : "";
   const reason = reasonFor(p) || (ui.splitMode === "ranges" ? parsed.error : "");
+  const summary = ui.splitMode === "every" ? `Every ${noun(ui.every, "page", "pages")}` : ui.ranges.trim() === "" ? "Custom ranges" : ui.ranges.trim();
   return (
     <div className={styles.panel}>
+      <Options summary={summary} tip="Split every N pages or at custom page ranges">
       <SegmentedControl
         aria-label="Split mode"
         value={ui.splitMode}
@@ -126,6 +137,7 @@ export function SplitPanel(p: PanelProps) {
           )}
         </div>
       )}
+      </Options>
       {count > 0 && (
         <p className={styles.note} data-tip="How many PDFs this split will produce">
           Creates {noun(count, "file", "files")}
@@ -172,29 +184,27 @@ export function OrganizePanel(p: PanelProps) {
         {tb("Rotate left", "rotate-ccw", "Turn the selected pages a quarter turn anticlockwise", () => setTiles(rotateTiles(tiles, selected, -90)), none)}
         {tb("Rotate right", "rotate-cw", "Turn the selected pages a quarter turn clockwise", () => setTiles(rotateTiles(tiles, selected, 90)), none)}
         {tb("Delete selected", "trash-2", "Leave the selected pages out of the new PDF (Delete key)", () => afterRemoval(deleteTiles(tiles, selected)), none)}
-        <Button
+        <MenuButton
           size="sm"
-          variant="secondary"
-          disabled={none}
-          data-tip={none ? "Select one or more pages first" : "Delete every page except the selected ones"}
-          onClick={() => afterRemoval(keepOnly(tiles, selected))}
-        >
-          Keep only selected
-        </Button>
-        <Button size="sm" variant="secondary" data-tip="Flip the order of all pages, last first" onClick={() => setTiles(reverseTiles(tiles))}>
-          Reverse
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          data-tip="Undo every change: all pages back in original order and rotation"
-          onClick={() => {
-            setTiles(initialTiles(pages));
-            setSelected(new Set());
-          }}
-        >
-          Reset
-        </Button>
+          variant="ghost"
+          icon="ellipsis"
+          label="More…"
+          tip="More page tools: keep only the selected pages, reverse the order, reset"
+          items={() => [
+            { id: "keep", label: "Keep only selected", icon: "check-check", disabled: none, tip: none ? "Select one or more pages first" : "Delete every page except the selected ones", onSelect: () => afterRemoval(keepOnly(tiles, selected)) },
+            { id: "reverse", label: "Reverse", icon: "arrow-down-up", tip: "Flip the order of all pages, last first", onSelect: () => setTiles(reverseTiles(tiles)) },
+            {
+              id: "reset",
+              label: "Reset",
+              icon: "undo-2",
+              tip: "Undo every change: all pages back in original order and rotation",
+              onSelect: () => {
+                setTiles(initialTiles(pages));
+                setSelected(new Set());
+              },
+            },
+          ]}
+        />
         <span className={styles.summary} role="status" data-tip="What the new PDF will contain compared with the original">
           {summarize(tiles, pages)}
         </span>
@@ -230,9 +240,11 @@ const LEVELS = [
 ] as const;
 
 export function CompressPanel(p: PanelProps) {
+  const level = LEVELS.find((l) => l.id === p.ui.level) ?? LEVELS[1];
   return (
     <div className={styles.panel}>
-      <div role="radiogroup" aria-label="Compression level" className={styles.cards}>
+      <Options summary={level.title} tip="How much to shrink photos and scans" width={400}>
+      <div role="radiogroup" aria-label="Compression level" className={styles.cardsCol}>
         {LEVELS.map((l) => (
           <button
             key={l.id}
@@ -248,6 +260,7 @@ export function CompressPanel(p: PanelProps) {
           </button>
         ))}
       </div>
+      </Options>
       <p className={styles.note} data-tip="Compression only re-encodes embedded pictures, so text stays sharp">
         Text and vector graphics are never degraded; only photos and scans shrink.
       </p>
@@ -262,8 +275,10 @@ export function CompressPanel(p: PanelProps) {
 }
 
 export function ImagesToPdfPanel(p: PanelProps) {
+  const sizeName = p.ui.pageSize === "a4" ? "A4" : p.ui.pageSize === "letter" ? "Letter" : "Fit to image";
   return (
     <div className={styles.panel}>
+      <Options summary={`${sizeName} · ${p.ui.margin === "small" ? "margin" : "no margin"}`} tip="Page size and margin of the new PDF" width={420}>
       <Row label="Page size" tip="Size of each page in the new PDF">
         <SegmentedControl
           aria-label="Page size"
@@ -282,6 +297,7 @@ export function ImagesToPdfPanel(p: PanelProps) {
         checked={p.ui.margin === "small"}
         onChange={(on) => p.setUi((u) => ({ ...u, margin: on ? "small" : "none" }))}
       />
+      </Options>
       <RunBar
         label={p.files.length > 0 ? `Create PDF from ${noun(p.files.length, "image", "images")}` : "Create PDF"}
         reason={reasonFor(p)}
@@ -306,8 +322,10 @@ export function PdfToImagesPanel(p: PanelProps) {
     const total = pagesOf(p.infos, f.path);
     if (total > 0) count += mode === "all" ? total : rangeError ? 0 : countPages(parsed.items, total);
   }
+  const summary = `${ui.imageFormat.toUpperCase()} · ${ui.dpi} dpi · ${mode === "all" ? "all pages" : ui.pageRange.trim() === "" ? "page range" : `pages ${ui.pageRange.trim()}`}`;
   return (
     <div className={styles.panel}>
+      <Options summary={summary} tip="Image format, resolution and which pages" width={440}>
       <Row label="Format" tip="File type of each page image">
         <SegmentedControl
           aria-label="Image format"
@@ -361,6 +379,7 @@ export function PdfToImagesPanel(p: PanelProps) {
           {rangeError}
         </p>
       )}
+      </Options>
       {count > 0 && (
         <p className={styles.note} data-tip="How many image files will be written">
           Creates {noun(count, "image", "images")}

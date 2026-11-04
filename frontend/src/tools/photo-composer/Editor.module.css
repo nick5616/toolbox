@@ -49,57 +49,33 @@
   display: flex;
 }
 
-.side {
-  flex: none;
-  width: clamp(260px, 30%, 320px);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-left: 1px solid var(--line);
-  background: var(--bg-panel);
-}
-
-.tabs {
-  flex: none;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--line);
-}
-
 .multi {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
-  padding: var(--space-3);
 }
 
 .multiText {
   margin: 0;
   font-size: var(--text-sm);
+  color: var(--fg-muted);
 }
 
-.layers {
+/* The click-in launchers: one line, never wrapping; summaries ellipsize. */
+.dock {
   flex: none;
-  max-height: 38%;
   display: flex;
-  flex-direction: column;
-  min-height: 120px;
-  border-bottom: 1px solid var(--line);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--line);
+  background: var(--bg-panel);
+  overflow: hidden;
 }
 
-.sideTitle {
-  margin: 0;
-  padding: var(--space-2) var(--space-3) 0;
-  font-size: var(--text-xs);
-  line-height: var(--text-xs-lh);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
-}
-
-.props {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
+.dockItem {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 260px;
 }

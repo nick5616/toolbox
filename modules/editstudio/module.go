@@ -74,7 +74,7 @@ type Module struct {
 // New builds the module.
 func New(cfg Config) *Module {
 	m := &Module{cfg: cfg, matteSem: make(chan struct{}, 1)}
-	m.docs = &projectdocs.Docs{Store: cfg.Store, Root: cfg.ProjectsDir, Kind: core.ProjectEdit, Summarize: summarize}
+	m.docs = &projectdocs.Docs{Store: cfg.Store, Root: cfg.ProjectsDir, Kind: core.ProjectEdit, Summarize: summarize, Flags: projectFlags}
 	m.analyze = func(ctx context.Context, job *core.JobContext, input string, o viz.AnalyzeOptions) (viz.AnalysisRef, error) {
 		if cfg.Analyzer == nil {
 			return viz.AnalysisRef{}, core.Errorf(core.CodeInternal, "Song analysis isn't available")
@@ -85,7 +85,12 @@ func New(cfg Config) *Module {
 }
 
 // Register adds the module to the registry.
-func Register(reg *core.Registry, m *Module) error { return reg.Register(m) }
+func Register(reg *core.Registry, m *Module) error {
+	if err := reg.Register(m); err != nil {
+		return err
+	}
+	return reg.Register(NewVideoModule(m))
+}
 
 // Docs gives other code read access to edit projects.
 func (m *Module) Docs() *projectdocs.Docs { return m.docs }
@@ -105,6 +110,8 @@ func (m *Module) Descriptor() core.Descriptor {
 		Accepts:      core.Accepts{Extensions: slices.Concat(media.AudioExtensions(), media.VideoExtensions(), media.ImageExtensions())},
 		Requires:     []string{"ffmpeg", "ffprobe", sidecar.DepID},
 		OutputSubdir: "Edits", Order: 14, MaxConcurrent: 2, NotAStep: true,
+		Base:  VideoModuleID,
+		Parts: []string{"visualizer", "stems", "transcribe", "bg-remover"},
 	}
 }
 

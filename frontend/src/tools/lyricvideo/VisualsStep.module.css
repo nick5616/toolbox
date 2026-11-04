@@ -16,6 +16,10 @@
   max-width: 100%;
 }
 
+.rowLauncher {
+  max-width: 420px;
+}
+
 .hint {
   font-size: var(--text-sm);
   color: var(--fg-subtle);

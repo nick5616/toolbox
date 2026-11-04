@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Banner, Button, IconButton, Slider, Spinner, Switch } from "@/components";
+import { Banner, Button, IconButton, MenuButton, Slider, Spinner, Switch } from "@/components";
 import { MediaPlayer, Timeline, formatMs, useMediaSource, type Marker, type MediaPlayerHandle, type Range } from "@/components/media";
 import type { PostLimits, PostSlide, ProjectInfo } from "@/lib/api";
 import { FramedMedia } from "./FramedMedia";
@@ -11,38 +11,57 @@ import styles from "./SlideStage.module.css";
 
 export interface SlideStageProps {
   slide: PostSlide;
-  format: string;
   aspect: string;
   project: ProjectInfo | undefined;
-  limits: PostLimits;
   onChange: (patch: Partial<PostSlide>) => void;
-  /** Opens Photo Composer / Video Editor for this slide. */
-  onEdit: () => void;
+  /** Opens Photo Composer / the Sequence Editor for this slide, here or in its own window. */
+  onEdit: (where: "here" | "window") => void;
+  /** The frame shown while a clip is trimmed (set by the Trim click-in in the dock). */
+  stillMs: number;
 }
 
-export function SlideStage({ slide, format, aspect, project, limits, onChange, onEdit }: SlideStageProps) {
+/** Zoom, rotate and reset: the content of the Framing click-in. */
+export function FramingPanel({ slide, onChange }: { slide: PostSlide; onChange: (patch: Partial<PostSlide>) => void }) {
+  const rotate = (dir: 1 | -1) => onChange({ rotation: normalizeRotation(slide.rotation + dir * 90) });
+  const reset = () => onChange({ zoom: 1, panX: 0, panY: 0, rotation: 0 });
+  return (
+    <div className={styles.framing}>
+      <label className={styles.zoom} data-tip="Zoom into the picture to choose what shows in the frame (or scroll over it)">
+        <span className={styles.label}>Zoom</span>
+        <Slider aria-label="Zoom" min={1} max={4} step={0.01} value={slide.zoom} onChange={(v) => onChange({ zoom: clampZoom(v) })} format={(v) => `${v.toFixed(2)}×`} />
+      </label>
+      <div className={styles.framingRow}>
+        <IconButton icon="rotate-ccw" label="Rotate left" data-tip="Turn the picture 90 degrees counter-clockwise" onClick={() => rotate(-1)} />
+        <IconButton icon="rotate-cw" label="Rotate right" data-tip="Turn the picture 90 degrees clockwise" onClick={() => rotate(1)} />
+        <Button size="sm" variant="ghost" data-tip="Undo zoom, position and rotation so the picture fills the frame again" onClick={reset} disabled={slide.zoom === 1 && slide.panX === 0 && slide.panY === 0 && slide.rotation === 0}>
+          Reset framing
+        </Button>
+      </div>
+      <p className={styles.hint}>Drag the picture to move it; scroll over it to zoom.</p>
+    </div>
+  );
+}
+
+export function SlideStage({ slide, aspect, project, onChange, onEdit, stillMs }: SlideStageProps) {
   const isClip = slide.kind === "clip";
   const isProject = slide.kind === "composition" || slide.kind === "video";
-  const [stillMs, setStillMs] = useState(slide.inMs);
-  useEffect(() => setStillMs(slide.inMs), [slide.id, slide.inMs]);
-
   const stillSlide = useMemo(() => (isClip ? { ...slide, inMs: stillMs } : slide), [slide, isClip, stillMs]);
   const visual = useSlideVisual(stillSlide, project, 1280);
   const framable = slide.kind !== "video";
   const pending = isPending(slide);
 
   const patchFraming = (p: Partial<Pick<PostSlide, "zoom" | "panX" | "panY">>) => onChange(p);
-  const rotate = (dir: 1 | -1) => onChange({ rotation: normalizeRotation(slide.rotation + dir * 90) });
-  const reset = () => onChange({ zoom: 1, panX: 0, panY: 0, rotation: 0 });
-
   return (
     <section className={styles.root} aria-label="Selected slide">
       <div className={styles.area}>
         {pending ? (
           <div className={styles.pending}>
             <p>{slide.kind === "composition" ? "This composition isn't made yet." : "This video isn't made yet."}</p>
-            <Button variant="primary" icon="pencil" data-tip={slide.kind === "composition" ? "Open Photo Composer to design this slide" : "Open Video Editor to make this slide"} onClick={onEdit}>
-              {slide.kind === "composition" ? "Make it in Photo Composer" : "Make it in Video Editor"}
+            <Button variant="primary" icon="pencil" data-tip={slide.kind === "composition" ? "Open Photo Composer to design this slide" : "Open the Sequence Editor to make this slide"} onClick={() => onEdit("here")}>
+              {slide.kind === "composition" ? "Make it in Photo Composer" : "Make it in the Sequence Editor"}
+            </Button>
+            <Button variant="ghost" size="sm" icon="app-window" data-tip="Open the editor in its own window; this post refreshes when you close it" onClick={() => onEdit("window")}>
+              Make it in its own window
             </Button>
           </div>
         ) : (
@@ -66,34 +85,31 @@ export function SlideStage({ slide, format, aspect, project, limits, onChange, o
         </Banner>
       )}
 
-      <div className={styles.controls}>
-        {framable && !pending && (
-          <>
-            <label className={styles.zoom} data-tip="Zoom into the picture to choose what shows in the frame (or scroll over it)">
-              <span className={styles.label}>Zoom</span>
-              <Slider aria-label="Zoom" min={1} max={4} step={0.01} value={slide.zoom} onChange={(v) => onChange({ zoom: clampZoom(v) })} format={(v) => `${v.toFixed(2)}×`} />
-            </label>
-            <IconButton icon="rotate-ccw" label="Rotate left" data-tip="Turn the picture 90 degrees counter-clockwise" onClick={() => rotate(-1)} />
-            <IconButton icon="rotate-cw" label="Rotate right" data-tip="Turn the picture 90 degrees clockwise" onClick={() => rotate(1)} />
-            <Button size="sm" variant="ghost" data-tip="Undo zoom, position and rotation so the picture fills the frame again" onClick={reset} disabled={slide.zoom === 1 && slide.panX === 0 && slide.panY === 0 && slide.rotation === 0}>
-              Reset framing
-            </Button>
-          </>
-        )}
-        {isProject && !pending && (
-          <Button icon="pencil" data-tip={slide.kind === "composition" ? "Open this composition in Photo Composer" : "Open this video in Video Editor"} onClick={onEdit}>
-            Edit {slide.kind === "composition" ? "composition" : "video"}
-          </Button>
-        )}
-        {isProject && !pending && project && <span className={styles.projectName} data-tip="The saved project behind this slide">{project.name}</span>}
-      </div>
-
-      {isClip && <ClipControls slide={slide} format={format} limits={limits} onChange={onChange} onSeek={setStillMs} />}
+      {isProject && !pending && (
+        <div className={styles.controls}>
+          <MenuButton
+            size="sm"
+            icon="pencil"
+            label={slide.kind === "composition" ? "Edit composition" : "Edit video"}
+            tip={project ? `Edit "${project.name}"` : slide.kind === "composition" ? "Open this composition in Photo Composer" : "Open this video in the Sequence Editor"}
+            items={() => [
+              { id: "edit-here", label: "Edit here", icon: "pencil", tip: slide.kind === "composition" ? "Open Photo Composer in this window" : "Open the Sequence Editor in this window", onSelect: () => onEdit("here") },
+              { id: "edit-window", label: "Edit in its own window", icon: "app-window", tip: "Open the editor in a separate window; this post refreshes when you close it", onSelect: () => onEdit("window") },
+            ]}
+          />
+        </div>
+      )}
     </section>
   );
 }
 
-function ClipControls({
+/** "0:02 – 0:10 (8.0 s)" plus "muted" for the Trim click-in. */
+export function trimSummary(slide: Pick<PostSlide, "inMs" | "outMs" | "mute">): string {
+  const len = Math.max(0, slide.outMs - slide.inMs);
+  return `${formatMs(slide.inMs)} – ${formatMs(slide.outMs)} (${(len / 1000).toFixed(1)} s)${slide.mute ? " · muted" : ""}`;
+}
+
+export function ClipControls({
   slide,
   format,
   limits,

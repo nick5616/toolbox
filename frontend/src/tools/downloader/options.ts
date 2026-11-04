@@ -51,3 +51,36 @@ export function sanitizeOptions(raw: unknown, defaults: DownloaderOptions): Down
 export function serializeOptions(o: DownloaderOptions): string {
   return JSON.stringify(o);
 }
+
+const QUALITY_LABEL: Record<string, string> = {
+  [AudioQuality.QualityBest]: "best",
+  [AudioQuality.Quality320]: "320k",
+  [AudioQuality.Quality256]: "256k",
+  [AudioQuality.Quality192]: "192k",
+  [AudioQuality.Quality128]: "128k",
+};
+
+/** One-line state of the Format click-in: "MP3 · 320k", "FLAC", "MP4 · 1080p". */
+export function formatSummary(o: DownloaderOptions): string {
+  if (o.mode === DownloadMode.ModeVideo) {
+    return `MP4 · ${o.maxResolution === MaxResolution.ResBest ? "best" : `${o.maxResolution}p`}`;
+  }
+  const fmt = o.audioFormat.toUpperCase();
+  return o.audioFormat === AudioFormat.FormatMP3 ? `${fmt} · ${QUALITY_LABEL[o.audioQuality] ?? o.audioQuality}` : fmt;
+}
+
+/** One-line state of the Trim click-in. */
+export function trimSummary(o: DownloaderOptions): string {
+  if (!o.trimEnabled) return "Whole file";
+  return `${o.trimStart || "0:00"} – ${o.trimEnd || "end"}`;
+}
+
+/** One-line state of the Extras click-in (embedded data and playlists). */
+export function extrasSummary(o: DownloaderOptions): string {
+  const wavAudio = o.mode === DownloadMode.ModeAudio && o.audioFormat === AudioFormat.FormatWAV;
+  const parts: string[] = [];
+  if (o.embedMetadata) parts.push("metadata");
+  if (o.embedThumbnail && !wavAudio) parts.push("thumbnail");
+  if (o.playlist) parts.push("playlists");
+  return parts.length === 0 ? "Nothing embedded" : parts.join(" · ");
+}

@@ -131,10 +131,17 @@ import { clearVisualCache } from "./useSlideVisual";
 
 const toasts = () => useToastStore.getState().toasts.map((t) => t.title);
 
+/** Opens the Sources click-in (one drawer is open at a time). */
+async function showSources() {
+  const launcher = screen.getByRole("button", { name: /^Sources/ });
+  if (launcher.getAttribute("aria-expanded") !== "true") await userEvent.click(launcher);
+  await screen.findByRole("dialog", { name: "Sources" });
+}
+
 async function open() {
   render(<PostBuilderView moduleId="post-builder" />);
   await screen.findByRole("region", { name: "Slides" });
-  await screen.findByRole("complementary", { name: "Sources" });
+  await showSources();
 }
 
 function options() {
@@ -363,6 +370,7 @@ describe("Sources panel", () => {
     const marked = () => options().filter((o) => o.getAttribute("data-highlighted") === "true").map((o) => o.getAttribute("aria-label"));
     expect(marked()).toEqual(["a.jpg"]);
     await userEvent.setup().click(screen.getByRole("button", { name: "Slide 2, Photo" }));
+    await showSources(); // clicking a slide closes the drawer
     expect(marked()).toEqual(["b.jpg"]);
   });
 
@@ -644,5 +652,16 @@ describe("dropping on the page", () => {
     drop(["/a.jpg"]);
     expect(h.stat).not.toHaveBeenCalled();
     expect(useUI.getState().drop).not.toBeNull();
+  });
+});
+
+describe("Sources click-in", () => {
+  it("summarises the pool by folder name, never a path", async () => {
+    h.doc.current = { ...h.post([]), folder: "C:/Photos/Trip", extra: ["/x/y.jpg"] } as never;
+    render(<PostBuilderView moduleId="post-builder" />);
+    await screen.findByRole("region", { name: "Slides" });
+    const text = screen.getByRole("button", { name: /^Sources/ }).textContent ?? "";
+    expect(text).toContain("Trip + 1 file");
+    expect(text).not.toContain("Photos");
   });
 });

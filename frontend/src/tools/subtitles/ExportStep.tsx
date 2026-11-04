@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Banner, Button, ColorSwatchPicker, PathText, Section, SegmentedControl, Select, cx, toast } from "@/components";
+import { Banner, Button, ClickIn, ColorSwatchPicker, IconButton, Section, SegmentedControl, Select, cx, toast, useClickIn } from "@/components";
 import type { MediaSourceState } from "@/components/media";
 import { VisualsCanvas, VisualsPicker } from "@/components/viz";
 import { parseShow } from "@/components/viz/pickerModel";
@@ -10,7 +10,8 @@ import type { Show } from "@/viz/types";
 import type { EditorTab } from "./editor";
 import { TabBar } from "./EditStep";
 import { CueOverlay } from "./CueOverlay";
-import { BACKGROUND_CHOICES, CANVAS_CHOICES, POSITION_CHOICES, QUALITY_CHOICES, SIZE_CHOICES, canvasAspect, type Prefs } from "./options";
+import { basename } from "./logic";
+import { BACKGROUND_CHOICES, CANVAS_CHOICES, POSITION_CHOICES, QUALITY_CHOICES, SIZE_CHOICES, canvasAspect, textSummary, videoSummary, type Prefs } from "./options";
 import { RunStatus } from "./RunStatus";
 import type { JobRun } from "./useJobRun";
 import { useCachedAnalysis, useImageThumb } from "./visuals";
@@ -145,7 +146,7 @@ export interface ExportStepProps {
   /** The cues as timed lines (words included). */
   lines: TimedLine[];
   onOpenDesigner: () => void;
-  onOpenInVisualizer: () => void;
+  onOpenInVisualizer: (inWindow?: boolean) => void;
 }
 
 /** Step 4: save files, add a track, or burn into the picture. */
@@ -177,6 +178,8 @@ export function ExportStep(p: ExportStepProps) {
   const analysis = useCachedAnalysis(p.mediaPath, p.visuals?.stems ?? false, show !== null);
   const imageThumb = useImageThumb(p.prefs.backgroundPath, isAudio && p.prefs.background === "image");
   const backdrop = burnBackdrop({ audio: isAudio, background: p.prefs.background, color: p.prefs.backgroundColor, image: imageThumb, show, analysis, timeMs: p.playheadMs, aspect });
+  const { close: closeClickIn } = useClickIn();
+  const visualsName = show?.name ?? parseShow(p.visuals?.showJson)?.name ?? "Default";
   const needsImage = isAudio && p.prefs.background === "image" && !p.prefs.backgroundPath;
   const pickImage = async () => {
     try {
@@ -199,12 +202,16 @@ export function ExportStep(p: ExportStepProps) {
           mode={mode}
           aspect={aspect}
           playheadMs={p.playheadMs}
-          onOpenDesigner={p.onOpenDesigner}
+          onOpenDesigner={() => {
+            closeClickIn();
+            p.onOpenDesigner();
+          }}
         />
-        <div>
-          <Button variant="ghost" icon="sparkles" onClick={p.onOpenInVisualizer} data-tip="Open Visualizer with this audio and these words for the full set of reactions">
+        <div className={styles.buttonRow}>
+          <Button variant="ghost" icon="sparkles" onClick={() => p.onOpenInVisualizer()} data-tip="Open Visualizer with this audio and these words for the full set of reactions">
             Make it fully reactive in Visualizer
           </Button>
+          <IconButton size="sm" icon="app-window" label="Open Visualizer in its own window" data-tip="Open Visualizer with this in its own window" onClick={() => p.onOpenInVisualizer(true)} />
         </div>
       </div>
     ) : null;
@@ -248,9 +255,6 @@ export function ExportStep(p: ExportStepProps) {
 
       <Section label="Add as a track" tip="Put the subtitles inside a copy of the video as a track the player can switch on or off">
         <div className={styles.form}>
-          <div className={styles.muted}>
-            No quality loss: the video is copied as is, and the player can turn the subtitles on or off.
-          </div>
           {needVideo ? (
             <Button variant="secondary" icon="film" onClick={p.onPickMedia} data-tip="A track needs a video to ride with; choose one">
               Pick the video
@@ -291,9 +295,25 @@ export function ExportStep(p: ExportStepProps) {
             </>
           ) : (
             <>
+              <div role="radiogroup" aria-label="Style" data-tip="Choose how the burned-in text looks" className={styles.styleCards}>
+                {p.styleInfos.map((s) => (
+                  <StyleCard
+                    key={s.id}
+                    info={s}
+                    selected={p.prefs.style === s.id}
+                    still={still}
+                    backdrop={backdrop}
+                    aspect={aspect}
+                    text={text}
+                    prefs={p.prefs}
+                    onSelect={() => p.setPrefs((o) => ({ ...o, style: s.id }))}
+                  />
+                ))}
+              </div>
+              <div className={styles.rows}>
               {isAudio && (
-                <>
-                  <div className={styles.muted}>Makes a video from the audio, with the subtitles drawn on a background.</div>
+                <ClickIn icon="film" title="Video" summary={videoSummary(p.prefs)} tip="The shape, size and background of the video that will be made" width={380}>
+                  <div className={styles.drawerForm}>
                   <div className={styles.inlineFields}>
                     <div className={styles.field}>
                       <span className={styles.fieldLabel} data-tip="The shape of the video that will be made">Canvas</span>
@@ -326,65 +346,53 @@ export function ExportStep(p: ExportStepProps) {
                       <Button variant="secondary" icon="image" data-tip="Pick a picture to use as the background" onClick={() => void pickImage()}>
                         {p.prefs.backgroundPath ? "Change the image" : "Choose an image"}
                       </Button>
-                      {p.prefs.backgroundPath && <PathText path={p.prefs.backgroundPath} />}
+                      {p.prefs.backgroundPath && (
+                        <span className={styles.muted} data-tip={p.prefs.backgroundPath}>
+                          {basename(p.prefs.backgroundPath)}
+                        </span>
+                      )}
                     </div>
                   )}
-                  {p.prefs.background === "visualizer" && visualsPicker("background")}
-                </>
+                  </div>
+                </ClickIn>
+              )}
+              {isAudio && p.prefs.background === "visualizer" && (
+                <ClickIn icon="sparkles" title="Visuals" summary={visualsName} tip="The animated visuals behind the subtitles" width={460}>
+                  {visualsPicker("background")}
+                </ClickIn>
               )}
               {!isAudio && (
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel} data-tip="Optional animated graphics drawn over the video">Visuals</span>
-                  <SegmentedControl
-                    aria-label="Visuals"
-                    value={p.addVisuals ? "add" : "none"}
-                    options={[
-                      { value: "none", label: "None", tip: "Only the subtitles are added to the picture" },
-                      { value: "add", label: "Add visuals over the video", tip: "Draw animated visuals that react to the sound over your video" },
-                    ]}
-                    onChange={(v) => p.onAddVisuals(v === "add")}
-                  />
-                </div>
+                <ClickIn icon="sparkles" title="Visuals" summary={p.addVisuals ? visualsName : "None"} tip="Optional animated graphics drawn over the video" width={460}>
+                  <div className={styles.drawerForm}>
+                    <SegmentedControl
+                      aria-label="Visuals"
+                      value={p.addVisuals ? "add" : "none"}
+                      options={[
+                        { value: "none", label: "None", tip: "Only the subtitles are added to the picture" },
+                        { value: "add", label: "Add visuals over the video", tip: "Draw animated visuals that react to the sound over your video" },
+                      ]}
+                      onChange={(v) => p.onAddVisuals(v === "add")}
+                    />
+                    {p.addVisuals && visualsPicker("overlay")}
+                  </div>
+                </ClickIn>
               )}
-              {!isAudio && p.addVisuals && visualsPicker("overlay")}
-              <div role="radiogroup" aria-label="Style" data-tip="Choose how the burned-in text looks" className={styles.styleCards}>
-                {p.styleInfos.map((s) => (
-                  <StyleCard
-                    key={s.id}
-                    info={s}
-                    selected={p.prefs.style === s.id}
-                    still={still}
-                    backdrop={backdrop}
-                    aspect={aspect}
-                    text={text}
-                    prefs={p.prefs}
-                    onSelect={() => p.setPrefs((o) => ({ ...o, style: s.id }))}
-                  />
-                ))}
-              </div>
-              <div className={styles.inlineFields}>
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel} data-tip="How big the text is relative to the picture">Size</span>
-                  <SegmentedControl
-                    aria-label="Size"
-                    value={p.prefs.size}
-                    options={SIZE_CHOICES}
-                    onChange={(size) => p.setPrefs((o) => ({ ...o, size }))}
-                  />
+              <ClickIn icon="type" title="Text" summary={textSummary(p.prefs)} tip="Size, position and typeface of the burned-in text" width={340}>
+                <div className={styles.drawerForm}>
+                  <div className={styles.field}>
+                    <span className={styles.fieldLabel} data-tip="How big the text is relative to the picture">Size</span>
+                    <SegmentedControl aria-label="Size" value={p.prefs.size} options={SIZE_CHOICES} onChange={(size) => p.setPrefs((o) => ({ ...o, size }))} />
+                  </div>
+                  <div className={styles.field}>
+                    <span className={styles.fieldLabel} data-tip="Where on the picture the text sits">Position</span>
+                    <SegmentedControl aria-label="Position" value={p.prefs.position} options={POSITION_CHOICES} onChange={(position) => p.setPrefs((o) => ({ ...o, position }))} />
+                  </div>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Font</span>
+                    <Select aria-label="Font" data-tip="The typeface for the burned-in text" value={p.prefs.font} options={fontOptions} onChange={(font) => p.setPrefs((o) => ({ ...o, font }))} />
+                  </label>
                 </div>
-                <div className={styles.field}>
-                  <span className={styles.fieldLabel} data-tip="Where on the picture the text sits">Position</span>
-                  <SegmentedControl
-                    aria-label="Position"
-                    value={p.prefs.position}
-                    options={POSITION_CHOICES}
-                    onChange={(position) => p.setPrefs((o) => ({ ...o, position }))}
-                  />
-                </div>
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>Font</span>
-                  <Select aria-label="Font" data-tip="The typeface for the burned-in text" value={p.prefs.font} options={fontOptions} onChange={(font) => p.setPrefs((o) => ({ ...o, font }))} />
-                </label>
+              </ClickIn>
               </div>
               <div>
                 <Button

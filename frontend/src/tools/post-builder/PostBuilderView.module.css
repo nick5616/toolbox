@@ -1,10 +1,10 @@
 .root {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   height: 100%;
   min-height: 0;
-  padding: var(--space-5);
+  padding: var(--space-3) var(--space-4);
   overflow: hidden;
 }
 
@@ -18,19 +18,19 @@
 
 .header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  min-width: 0;
 }
 
-.title {
-  margin: 0;
-  font-size: var(--text-xl);
-  line-height: var(--text-xl-lh);
-  font-weight: 600;
+.stripSlot {
+  flex: 1;
+  min-width: 0;
 }
 
 .save {
+  flex: none;
   color: var(--fg-subtle);
   font-size: var(--text-sm);
 }
@@ -54,7 +54,7 @@
 
 .body {
   display: grid;
-  grid-template-columns: 170px minmax(0, 1fr) 340px;
+  grid-template-columns: 150px minmax(0, 1fr) 280px;
   gap: var(--space-4);
   flex: 1;
   min-height: 0;
@@ -90,41 +90,19 @@
   justify-content: center;
 }
 
-.footer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--line);
-}
-
 .spacer {
   flex: 1;
 }
 
-.last {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
-}
 
-.lastLabel {
-  color: var(--fg-subtle);
-}
 
-.lastPath {
-  overflow: hidden;
-  max-width: 320px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-}
 
 .blocker {
+  flex: 0 1 220px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--danger);
   font-size: var(--text-sm);
 }
@@ -145,8 +123,34 @@
   font-size: var(--text-sm);
 }
 
-@media (max-width: 1100px) {
+@media (min-width: 1280px) {
   .body {
-    grid-template-columns: 150px minmax(0, 1fr) 300px;
+    grid-template-columns: 170px minmax(0, 1fr) 320px;
   }
+}
+
+/* The click-in launchers: one line, never wrapping; summaries ellipsize. */
+.dock {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.chips {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dockItem {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 220px;
 }

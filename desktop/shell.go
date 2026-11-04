@@ -45,6 +45,12 @@ type Options struct {
 	// --- end vault ---
 	// DarkMode reports whether the effective UI theme is dark (popup background).
 	DarkMode func() bool
+	// --- pop-out windows (Phase 10) ---
+	// OnNewWindow styles a new pop-out window (main.go: the Windows title bar theme).
+	OnNewWindow func(w *application.WebviewWindow)
+	// OnFilesDropped handles files dropped on a pop-out window (key = its window key).
+	OnFilesDropped func(key string, e *application.WindowEvent)
+	// --- end pop-out windows ---
 }
 
 // Shell owns the tray, hotkeys, popup window and close-to-tray behaviour.
@@ -53,7 +59,9 @@ type Shell struct {
 	hk    *hotkeyManager
 	popup *popup
 	tray  *tray
-	login loginItem
+	// windows are the pop-out windows (Phase 10).
+	windows *windowManager
+	login   loginItem
 	// --- auto-paste (WP-D2)
 	paster     Paster
 	pasteAsync func(func()) // runs the paste off the UI call; tests run it inline
@@ -95,6 +103,7 @@ func New(o Options) *Shell {
 	// --- end auto-paste ---
 	s.popup = &popup{s: s}
 	s.tray = newTray(s)
+	s.windows = newWindowManager(s)
 	return s
 }
 

@@ -3,8 +3,8 @@ import { toast } from "@/components";
 import { EditStudioService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { deriveMarkers } from "@/viz/edit/markers";
-import { useEditStudio } from "../store";
-import { flushEdit } from "../useEditAutosave";
+import { useEditStudio } from "@/editor/store";
+import { flushEdit } from "@/editor/useEditAutosave";
 import { buildMarkerRows } from "./laneLogic";
 
 /** Go's MaxTextRows. */

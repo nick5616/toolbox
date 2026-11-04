@@ -9,6 +9,8 @@ export interface NavItem {
   soon?: boolean;
   /** One-line description for the tooltip. */
   tip?: string;
+  /** Set on a variant listed under its base tool (the base's id). */
+  variantOf?: string;
 }
 
 export const RECENT_ITEM: NavItem = { id: "library", label: "Recent", icon: "history", tip: "Every file your tools have made, newest first, with search and quick actions" };
@@ -40,7 +42,16 @@ export function useNavGroups(): NavGroups {
   const comingSoonOpen = useUI((s) => s.comingSoonOpen);
   return useMemo(() => {
     // Pipelines is its own item under Recent, not a tool (SPEC.md §11.1).
-    const tools = modules.filter((m) => isReady(m) && m.id !== PIPELINES_ITEM.id).map(toItem);
+    const ready = modules.filter((m) => isReady(m) && m.id !== PIPELINES_ITEM.id);
+    const readyIds = new Set(ready.map((m) => m.id));
+    // A variant nests under its base when the base is a listed (ready, visible) baseline.
+    const nestedUnder = (m: ModuleView) => (m.base && readyIds.has(m.base) && !ready.find((b) => b.id === m.base)?.base ? m.base : "");
+    const tools: NavItem[] = [];
+    for (const m of ready) {
+      if (nestedUnder(m)) continue;
+      tools.push(toItem(m));
+      for (const v of ready) if (nestedUnder(v) === m.id) tools.push({ ...toItem(v), variantOf: m.id });
+    }
     const soon = modules.filter((m) => !isReady(m)).map(toItem);
     return { tools, soon, ordered: [RECENT_ITEM, PIPELINES_ITEM, ...tools, ...(comingSoonOpen ? soon : [])] };
   }, [modules, comingSoonOpen]);

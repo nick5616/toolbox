@@ -394,7 +394,7 @@ func run() error {
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
-		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true, WebviewUserDataPath: sandboxWebviewDir(paths), AdditionalBrowserArgs: devtoolsArgs()},
+		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true, WebviewUserDataPath: sandboxWebviewDir(paths), AdditionalBrowserArgs: browserArgs()},
 		// The Visualizer streams rendered video over raw messages: no socket
 		// (SPEC.md §4.4). The broker checks the token and the origin.
 		RawMessageHandler: func(_ application.Window, msg string, origin *application.OriginInfo) {
@@ -457,6 +457,19 @@ func run() error {
 		DarkMode: func() bool {
 			t := settings.Current().Theme
 			return t == core.ThemeDark || (t == core.ThemeSystem && app.Env.IsDarkMode())
+		},
+		OnNewWindow: func(w *application.WebviewWindow) {
+			t := settings.Current().Theme
+			dark := t == core.ThemeDark || (t == core.ThemeSystem && app.Env.IsDarkMode())
+			application.InvokeSync(func() { setTitleBarDark(w, dark) })
+		},
+		OnFilesDropped: func(key string, e *application.WindowEvent) {
+			files := e.Context().DroppedFiles()
+			drop := core.FilesDropped{Paths: files, Result: reg.Match(files), Window: key}
+			if d := e.Context().DropTargetDetails(); d != nil {
+				drop.TargetID = d.ElementID
+			}
+			emitter.Emit(core.EventFilesDropped, drop)
 		},
 	})
 	if err := shell.Start(); err != nil {
@@ -526,6 +539,14 @@ func appOrigins() []string {
 // devtoolsArgs opens WebView2's DevTools protocol on 127.0.0.1 for automated
 // UI checks, only when both the sandbox support dir and TOOLBOX_DEVTOOLS_PORT
 // are set (dev only, like the Vite dev server; never in a normal run).
+// browserArgs are WebView2's extra arguments. With pop-out windows (Phase 10)
+// the main window is often covered by a pop-out while it plays the edit, so
+// Chromium must not throttle occluded windows (their clock and audio drive the
+// pop-out preview).
+func browserArgs() []string {
+	return append([]string{"--disable-backgrounding-occluded-windows"}, devtoolsArgs()...)
+}
+
 func devtoolsArgs() []string {
 	port := os.Getenv("TOOLBOX_DEVTOOLS_PORT")
 	if port == "" || os.Getenv(core.EnvSupportDir) == "" {

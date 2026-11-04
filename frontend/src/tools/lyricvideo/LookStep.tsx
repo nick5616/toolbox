@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { Banner, Button, ColorSwatchPicker, Icon, Section, SegmentedControl, Select, Switch, cx } from "@/components";
+import { Banner, Button, ClickIn, ColorSwatchPicker, Icon, Section, SegmentedControl, Select, Switch, cx } from "@/components";
 import { VisualsCanvas } from "@/components/viz";
 import type { Analysis } from "@/viz/analysis";
 import { basename, type Row } from "./logic";
-import { ASPECTS, type Prefs, type RememberedLook, type SongMeta } from "./options";
+import { ASPECTS, backgroundSummary, extrasSummary, textSummary, type Prefs, type RememberedLook, type SongMeta } from "./options";
 import { Preview } from "./Preview";
 import { aspectNumber, designLabel, previewShow } from "./visuals";
 import styles from "./LyricVideoView.module.css";
@@ -106,15 +106,20 @@ export function LookStep(p: LookStepProps) {
           </div>
         </Section>
 
-        <Section label="Background" tip="What is behind the words">
-          {visuals && (
+        {visuals && (
+          <Section label="Background" tip="What is behind the words">
             <div className={styles.buttonRow}>
               <span data-testid="visuals-label" data-tip="The animated visuals chosen in the Visuals step">Visuals: {designLabel(look)}</span>
               <Button size="sm" variant="ghost" onClick={p.onChangeVisuals} data-tip="Go back to the Visuals step to change the design">
                 Change
               </Button>
             </div>
-          )}
+          </Section>
+        )}
+        <div className={styles.rows}>
+        {!visuals && (
+        <ClickIn icon="image" title="Background" summary={backgroundSummary(look)} tip="What is behind the words" width={380}>
+        <div className={styles.drawerForm}>
           {!visuals && (
             <div className={styles.bgGrid} role="radiogroup" aria-label="Background" data-tip="Choose what is behind the words">
               {BACKGROUND_CARDS.map((c) => (
@@ -161,9 +166,11 @@ export function LookStep(p: LookStepProps) {
               )}
             </div>
           )}
-        </Section>
+        </div>
+        </ClickIn>
+        )}
 
-        <Section label="Text" tip="How the lyrics look on screen">
+        <ClickIn icon="type" title="Text" summary={textSummary(look)} tip="How the lyrics look on screen" width={360}>
           <div className={styles.form}>
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Font</span>
@@ -192,9 +199,9 @@ export function LookStep(p: LookStepProps) {
             </div>
             <Switch tip="Also show the upcoming line, dimmed, so viewers can read ahead" checked={look.showNext} onChange={(showNext) => setLook({ showNext })} label="Show next line" />
           </div>
-        </Section>
+        </ClickIn>
 
-        <Section label="Extras" tip="Optional additions to the video">
+        <ClickIn icon="sparkles" title="Extras" summary={extrasSummary(look)} tip="Optional additions to the video" width={340}>
           <div className={styles.form}>
             {!visuals && (
               <div className={styles.field}>
@@ -213,7 +220,8 @@ export function LookStep(p: LookStepProps) {
             )}
             <Switch tip="Open the video with a card showing the song title and artist" checked={look.titleCard} onChange={(titleCard) => setLook({ titleCard })} label="Title card" />
           </div>
-        </Section>
+        </ClickIn>
+        </div>
 
         <div className={styles.footer}>
           <Button onClick={p.onContinue} data-tip="Go on to preview and render the video">Continue to Render</Button>

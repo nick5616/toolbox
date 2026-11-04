@@ -10,16 +10,15 @@
 
 .header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-start;
   gap: var(--space-3);
+  min-width: 0;
 }
 
-.title {
-  margin: 0;
-  font-size: var(--text-xl);
-  line-height: var(--text-xl-lh);
-  font-weight: 600;
+.modelRow {
+  width: 300px;
+  max-width: 100%;
 }
 
 .fileName {
@@ -49,16 +48,18 @@
 
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .brush {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-width: 200px;
+  flex: 0 1 200px;
+  min-width: 120px;
 }
 
 .label,

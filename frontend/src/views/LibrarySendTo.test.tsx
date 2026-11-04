@@ -2,6 +2,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const match = vi.fn();
+const popOutTool = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("@/lib/windows", async (orig) => {
+  const actual = await orig<typeof import("@/lib/windows")>();
+  return { ...actual, popOutTool: (...a: unknown[]) => popOutTool(...a) };
+});
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -47,8 +53,18 @@ describe("Library Send to…", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send to…" }));
     await waitFor(() => expect(match).toHaveBeenCalledWith(["/lib/a.mp3"]));
     expect(screen.queryByRole("menuitem", { name: "Mod soon" })).toBeNull();
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Mod stems" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Open in Mod stems" }));
     expect(useUI.getState().handoff).toEqual({ moduleId: "stems", inputs: ["/lib/a.mp3"] });
     expect(useUI.getState().view).toBe("stems");
+  });
+
+  it("also offers each tool in its own window", async () => {
+    popOutTool.mockClear();
+    render(<LibraryView />);
+    fireEvent.click(screen.getByRole("button", { name: "Send to…" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Open in Mod stems (new window)" }));
+    await waitFor(() => expect(popOutTool).toHaveBeenCalled());
+    expect(popOutTool.mock.calls[0]?.[0]).toBe("stems");
+    expect(useUI.getState().handoff).toBeNull();
   });
 });

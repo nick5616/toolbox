@@ -65,6 +65,16 @@ type Descriptor struct {
 	// NotAStep keeps a module out of the pipeline step catalogue (creator
 	// tools whose work is an interactive project).
 	NotAStep bool `json:"-"`
+
+	// Composition (Phase 10, SPEC.md §3). Base is the tool this one is a
+	// variant of: the same core with a composition layered on top (Edit
+	// Studio is Video Editor + the music layer). The sidebar lists a variant
+	// under its base. "" = a baseline tool.
+	Base string `json:"base"`
+	// Parts are the other tools this one is built from (constituents), in
+	// display order. The tool header lists them; each can be opened inline
+	// or popped out into its own window. Never includes Base.
+	Parts []string `json:"parts"`
 }
 
 // ErrJobLess is returned by Jobs.Submit (and by job-less modules' Validate)

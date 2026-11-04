@@ -37,7 +37,7 @@ import { useJobs } from "@/state/jobs";
 import { buildFixture } from "@/viz/fixture";
 import { PRESETS, showFromPreset } from "@/viz/presets";
 import { DEFAULT_EXPORT, outputSize, sanitizeExport, type ExportPrefs } from "./exportPrefs";
-import ExportStep from "./ExportStep";
+import ExportStep, { exportSoundSummary } from "./ExportStep";
 import { liveSpeed } from "./useVizJob";
 import { useVisualizer } from "./store";
 
@@ -121,11 +121,25 @@ describe("ExportStep", () => {
     expect(screen.getByText(/keeps the video's shape/)).toBeTruthy();
   });
 
-  it("shows aspect, frame rate and background in full mode", () => {
+  it("shows aspect and frame rate on top, and background behind its click-in, in full mode", async () => {
     setup();
     expect(screen.getByRole("radiogroup", { name: "Aspect" })).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "Frame rate" })).toBeTruthy();
+    expect(screen.queryByLabelText("Background")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /^Sound and background/ }));
     expect(screen.getByLabelText("Background")).toBeTruthy();
+  });
+
+  it("summarises the click-ins", () => {
+    setup(DEFAULT_EXPORT, { selection: { startMs: 4000, endMs: 20000 } });
+    expect(screen.getByRole("button", { name: /^Range.*0:04–0:20/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Sound and background.*Original audio · No background/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Preview.*From 0:05/ })).toBeTruthy();
+  });
+
+  it("describes the sound and background", () => {
+    expect(exportSoundSummary({ ...DEFAULT_EXPORT, audio: "instrumental", background: "cover" }, true)).toBe("Instrumental · Cover art");
+    expect(exportSoundSummary({ ...DEFAULT_EXPORT, background: "video" }, false)).toBe("Original audio");
   });
 
   it("notes the JPEG fallback", async () => {
@@ -146,6 +160,7 @@ describe("ExportStep", () => {
 
   it("renders a 10 s preview from the playhead", async () => {
     setup();
+    await userEvent.click(screen.getByRole("button", { name: /^Preview/ }));
     await userEvent.click(screen.getByRole("button", { name: "Render 10 s preview" }));
     await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(1));
     const opts = (h.enqueue.mock.calls[0] as [string[], Record<string, unknown>])[1];

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Banner, Button, DropZone, Icon, IconButton, Meter, Section, cx, toast } from "@/components";
+import { Banner, Button, ClickInHost, DropZone, Icon, IconButton, Meter, Section, cx, toast } from "@/components";
 import { useMediaSource } from "@/components/media";
 import { JobStatus, JobsService, PackComponentState, PacksService, RedactAction, RedactService, type RedactOptions, type RedactTrack } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -32,7 +32,7 @@ import {
   type RedactSettings,
   type VideoState,
 } from "./logic";
-import { OptionsPanel } from "./OptionsPanel";
+import { CompactOptions } from "./CompactOptions";
 import { Results } from "./Results";
 import { VideoReview } from "./VideoReview";
 import styles from "./RedactView.module.css";
@@ -231,16 +231,14 @@ export default function RedactView({ moduleId }: ToolViewProps) {
   useShortcut("Enter", apply, { when: canApply });
 
   // ---- render ----
-  const header = (
-    <header className={styles.header}>
-      <h1 className={styles.title}>Redact</h1>
-      {files.length > 0 && (
+  const header =
+    files.length > 0 ? (
+      <header className={styles.header}>
         <Button size="sm" variant="ghost" data-tip="Drop this session and pick other files" onClick={more}>
           Choose different files
         </Button>
-      )}
-    </header>
-  );
+      </header>
+    ) : null;
   const warning = (
     <Banner tone="warn" title="Detection can miss faces and plates.">
       Check every image or frame before sharing.
@@ -249,18 +247,19 @@ export default function RedactView({ moduleId }: ToolViewProps) {
 
   if (files.length === 0) {
     return (
-      <section className={styles.root} aria-label="Redact">
-        {header}
-        {warning}
-        <DepsGate moduleId={moduleId} />
-        <div className={styles.empty}>
-          <DropZone id="redact-drop" label="Drop photos or one video" hint="Blur, pixelate or black out faces and number plates." icon="scan-face">
-            <Button variant="secondary" icon="folder-open" data-tip="Pick photos, or a single video, to hide faces and plates in" onClick={() => void inputs.pick()}>
-              Choose files
-            </Button>
-          </DropZone>
-        </div>
-      </section>
+      <ClickInHost>
+        <section className={styles.root} aria-label="Redact">
+          {warning}
+          <DepsGate moduleId={moduleId} />
+          <div className={styles.empty}>
+            <DropZone id="redact-drop" label="Drop photos or one video" hint="Blur, pixelate or black out faces and number plates." icon="scan-face">
+              <Button variant="secondary" icon="folder-open" data-tip="Pick photos, or a single video, to hide faces and plates in" onClick={() => void inputs.pick()}>
+                Choose files
+              </Button>
+            </DropZone>
+          </div>
+        </section>
+      </ClickInHost>
     );
   }
 
@@ -274,6 +273,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
   const reviewedAll = imagePaths.filter((p) => reviewed.has(p) || p === cur).length;
 
   return (
+    <ClickInHost>
     <section className={styles.root} aria-label="Redact">
       {header}
       {warning}
@@ -338,7 +338,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
           ) : (
             <Gallery entries={entries} edits={edits} reviewed={reviewed} onOpen={go} />
           )}
-          {current && <Section label="Effect" tip="How the boxes will be hidden in the saved copy"><OptionsPanel settings={settings} onChange={patch} part="effect" /></Section>}
+          {current && <CompactOptions settings={settings} onChange={patch} part="effect" />}
         </>
       ) : (
         <div className={styles.setup}>
@@ -355,8 +355,8 @@ export default function RedactView({ moduleId }: ToolViewProps) {
               ))}
             </ul>
           </Section>
-          <Section label="Options" tip="What to look for and how to hide it">
-            <OptionsPanel settings={settings} onChange={patch} part="all" />
+          <Section label="Find" tip="What to look for; how it is hidden is under Effect">
+            <CompactOptions settings={settings} onChange={patch} part="all" />
           </Section>
           {hasHeic && (
             <p className={styles.hint}>HEIC photos can't be previewed here, so they can only be redacted automatically, with no review step.</p>
@@ -418,6 +418,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
         </div>
       )}
     </section>
+    </ClickInHost>
   );
 }
 

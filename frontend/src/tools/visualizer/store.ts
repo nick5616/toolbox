@@ -40,6 +40,8 @@ export interface VisualizerState {
   renderSeed: number;
   /** The designer playhead, for "Render 10 s preview" (UI-V2). */
   playheadMs: number;
+  /** Width / height of the preview (set by the Design step; the pop-out preview follows it). */
+  aspect: number;
   /** Look details handed over with timed text; applied once by the Design step (UI-V2). */
   seedLook: SeedLook | null;
 
@@ -54,6 +56,7 @@ export interface VisualizerState {
   setRenderSeed(seed: number): void;
   setPlayheadMs(ms: number): void;
   setSeedLook(look: SeedLook | null): void;
+  setAspect(aspect: number): void;
   reset(): void;
 }
 
@@ -83,6 +86,7 @@ const initial = {
   selection: null,
   renderSeed: 1,
   playheadMs: 0,
+  aspect: 16 / 9,
   seedLook: null,
 };
 
@@ -99,5 +103,6 @@ export const useVisualizer = create<VisualizerState>((set) => ({
   setRenderSeed: (renderSeed) => set({ renderSeed }),
   setPlayheadMs: (playheadMs) => set({ playheadMs }),
   setSeedLook: (seedLook) => set({ seedLook }),
+  setAspect: (aspect) => set({ aspect }),
   reset: () => set(initial),
 }));

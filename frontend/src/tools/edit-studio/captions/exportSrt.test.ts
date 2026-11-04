@@ -6,7 +6,7 @@ vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
   return { ...actual, EditStudioService: { ExportText: (...a: unknown[]) => h.exportText(...a) } };
 });
-vi.mock("../useEditAutosave", () => ({ flushEdit: () => h.flush() }));
+vi.mock("@/editor/useEditAutosave", () => ({ flushEdit: () => h.flush() }));
 vi.mock("@/components", async (orig) => {
   const actual = await orig<typeof import("@/components")>();
   return { ...actual, toast: (...a: unknown[]) => h.toast(...a) };
@@ -15,7 +15,7 @@ vi.mock("@/components", async (orig) => {
 import { normalizeProject } from "@/viz/edit/defaults";
 import { buildEditFixture, fixtureProject } from "@/viz/edit/fixture";
 import { DEFAULT_TEXT_STYLE, serializeTextStyle } from "@/viz/edit/schema";
-import { useEditStudio } from "../store";
+import { useEditStudio } from "@/editor/store";
 import { exportSrt } from "./exportSrt";
 
 function open(captions: boolean, lines = "", start = 4000, end = 12_000) {

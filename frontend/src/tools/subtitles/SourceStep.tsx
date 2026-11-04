@@ -1,10 +1,9 @@
-import { useState } from "react";
-import { Banner, Button, DropZone, Icon, Section, SegmentedControl, Select, Spinner, Stepper, Switch } from "@/components";
+import { Banner, Button, ClickIn, DropZone, Icon, Section, SegmentedControl, Select, Spinner, Stepper, Switch } from "@/components";
 import type { MediaSourceState } from "@/components/media";
 import { formatMs } from "@/components/media";
 import type { Language } from "@/lib/api";
 import { basename } from "./logic";
-import { MODEL_CHOICES, type Prefs } from "./options";
+import { MODEL_CHOICES, splitSummary, type Prefs } from "./options";
 import { RunStatus } from "./RunStatus";
 import type { JobRun } from "./useJobRun";
 import styles from "./SubtitlesView.module.css";
@@ -30,7 +29,6 @@ export interface SourceStepProps {
 
 /** Step 1: where the subtitles come from. */
 export function SourceStep(p: SourceStepProps) {
-  const [more, setMore] = useState(false);
   const { prefs, setPrefs } = p;
   const info = p.media.source?.info;
   const textStreams = (info?.subtitles ?? []).filter((s) => s.text);
@@ -148,19 +146,14 @@ export function SourceStep(p: SourceStepProps) {
                   onChange={(language) => setPrefs((o) => ({ ...o, language }))}
                 />
               </label>
-              <Switch
-                tip="Write the subtitles in English whatever language is spoken"
-                checked={prefs.translateToEnglish}
-                onChange={(translateToEnglish) => setPrefs((o) => ({ ...o, translateToEnglish }))}
-                label="Translate to English"
-              />
-              <div>
-                <Button size="sm" variant="ghost" icon={more ? "chevron-up" : "chevron-down"} aria-expanded={more} data-tip="Fine-tune how the text is split into subtitles" onClick={() => setMore((m) => !m)}>
-                  More
-                </Button>
-              </div>
-              {more && (
-                <div className={styles.moreBox}>
+              <ClickIn icon="type" title="Subtitle text" summary={splitSummary(prefs)} tip="How the text is split into subtitles, and translating to English" width={340} className={styles.rowLauncher}>
+                <div className={styles.drawerForm}>
+                  <Switch
+                    tip="Write the subtitles in English whatever language is spoken"
+                    checked={prefs.translateToEnglish}
+                    onChange={(translateToEnglish) => setPrefs((o) => ({ ...o, translateToEnglish }))}
+                    label="Translate to English"
+                  />
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>Characters per line</span>
                     <Stepper
@@ -186,7 +179,7 @@ export function SourceStep(p: SourceStepProps) {
                     />
                   </div>
                 </div>
-              )}
+              </ClickIn>
               <div>
                 <Button icon="captions" onClick={p.onGenerate} loading={p.gen.busy} disabled={busy || p.media.status === "error"} data-tip={p.media.status === "error" ? "The file couldn't be read" : busy ? "Wait for the current task to finish" : "Listen to the speech and write subtitles for it"}>
                   Generate subtitles
@@ -196,12 +189,9 @@ export function SourceStep(p: SourceStepProps) {
             </div>
           </Section>
 
+          {(textStreams.length > 0 || otherStreams.length > 0) && (
           <Section label="Subtitles inside this video" tip="Subtitle tracks already stored in the file">
-            {p.media.status === "loading" ? (
-              <div className={styles.muted}>Reading the file…</div>
-            ) : textStreams.length === 0 && otherStreams.length === 0 ? (
-              <div className={styles.muted}>This file has no subtitle tracks.</div>
-            ) : (
+            {(
               <ul className={styles.streams}>
                 {textStreams.map((s) => (
                   <li key={s.index} className={styles.stream}>
@@ -227,17 +217,15 @@ export function SourceStep(p: SourceStepProps) {
             )}
             <RunStatus run={p.extract} runningLabel="Extracting subtitles…" showResult={false} />
           </Section>
+          )}
         </>
       )}
 
-      <Section label="Subtitle file" tip="Edit subtitles you already have">
-        <div className={styles.buttonRow}>
-          <Button variant="secondary" icon="file-text" onClick={p.onPickSubtitleFile} disabled={busy} data-tip={busy ? "Wait for the current task to finish" : "Open an .srt or .vtt file to edit it"}>
-            Use a subtitle file…
-          </Button>
-          <span className={styles.muted}>An .srt or .vtt you already have.</span>
-        </div>
-      </Section>
+      <div className={styles.buttonRow}>
+        <Button variant="ghost" icon="file-text" onClick={p.onPickSubtitleFile} disabled={busy} data-tip={busy ? "Wait for the current task to finish" : "Open an .srt or .vtt file you already have, to edit it"}>
+          Use a subtitle file…
+        </Button>
+      </div>
     </div>
   );
 }

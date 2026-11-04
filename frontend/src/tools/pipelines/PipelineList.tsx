@@ -33,24 +33,30 @@ function stepIcon(catalog: readonly StepType[], type: string): string {
   return catalog.find((t) => t.id === type)?.icon ?? "box";
 }
 
-export function PipelineList({ onNew }: PipelineListProps) {
+/** Loads the pipelines and keeps one selected whenever there is one (also used while the list is hidden). */
+export function usePipelineListEffects(): void {
   const entries = usePipelines((s) => s.entries);
-  const catalog = usePipelines((s) => s.catalog);
-  const templates = usePipelines((s) => s.templates);
   const loaded = usePipelines((s) => s.loaded);
   const selected = usePipelines((s) => s.selectedPipelineId);
   const selectPipeline = usePipelines((s) => s.selectPipeline);
-  const openRunSheet = usePipelines((s) => s.openRunSheet);
-
   useEffect(() => {
     if (!loaded) void usePipelines.getState().load().catch(() => undefined);
   }, [loaded]);
-
-  // Keep a pipeline selected whenever there is one.
   useEffect(() => {
     if (entries.length > 0 && !entries.some((e) => e.pipeline.id === selected)) selectPipeline(entries[0]?.pipeline.id ?? null);
     else if (entries.length === 0 && selected !== null) selectPipeline(null);
   }, [entries, selected, selectPipeline]);
+}
+
+export function PipelineList({ onNew }: PipelineListProps) {
+  const entries = usePipelines((s) => s.entries);
+  const catalog = usePipelines((s) => s.catalog);
+  const templates = usePipelines((s) => s.templates);
+  const selected = usePipelines((s) => s.selectedPipelineId);
+  const selectPipeline = usePipelines((s) => s.selectPipeline);
+  const openRunSheet = usePipelines((s) => s.openRunSheet);
+
+  usePipelineListEffects();
 
   if (entries.length === 0) {
     const quick = QUICK_TEMPLATES.map((id) => templates.find((t) => t.id === id)).filter((t) => t !== undefined);

@@ -214,4 +214,16 @@ describe("Vault unlocked", () => {
     await user.click(screen.getByRole("button", { name: "Lock" }));
     expect(svc.Lock).toHaveBeenCalled();
   });
+
+  it("keeps folders in a click-in that summarises the current one", async () => {
+    svc.State.mockResolvedValue({ ...base, unlocked: true, lockAt: 0 });
+    svc.Folders.mockResolvedValue(["Taxes"]);
+    const user = userEvent.setup();
+    render(<VaultView moduleId="vault" />);
+    const launcher = await screen.findByRole("button", { name: /Folders/ });
+    expect(launcher.textContent).toContain("All files");
+    await user.click(launcher);
+    await user.click(await screen.findByRole("button", { name: "Taxes" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Folders/ }).textContent).toContain("Taxes"));
+  });
 });

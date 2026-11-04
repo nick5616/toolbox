@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EditSourceState } from "@/lib/api";
 import { normalizeProject } from "@/viz/edit/defaults";
 import { buildEditFixture, fixtureProject } from "@/viz/edit/fixture";
-import { useEditStudio } from "../store";
+import { useEditStudio } from "@/editor/store";
 import { SectionStyleDialog } from "./SectionStyleDialog";
 import { STYLE_TRACK_NAME } from "./styleLogic";
 import { useSectionStyle } from "./useSectionStyle";

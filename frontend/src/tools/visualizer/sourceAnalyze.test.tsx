@@ -79,6 +79,9 @@ beforeEach(() => {
   setup();
 });
 
+/** Opens one of the Source step's click-in rows (Words, Instruments, Mood). */
+const openRow = (user: ReturnType<typeof userEvent.setup>, name: string) => user.click(screen.getByRole("button", { name: new RegExp(`^${name}`) }));
+
 describe("Source step", () => {
   it("shows the drop zone until a file is chosen", () => {
     render(<SourceStep />);
@@ -87,13 +90,21 @@ describe("Source step", () => {
 
   it("defaults for an audio file: stems on, words none, no video choice", async () => {
     h.open.mockResolvedValue(info(false));
+    const user = userEvent.setup();
     useVisualizer.getState().setInput("C:/m/song.mp3", false);
     render(<SourceStep />);
     expect(await screen.findByText("Night Drive")).toBeTruthy();
+    // The top level shows only the song, the video choice and Analyze; the rest sits behind summarised rows.
+    expect(screen.queryByRole("switch", { name: "Separate instruments" })).toBeNull();
+    expect(screen.getByRole("button", { name: /^Words.*No words/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Instruments.*Separated/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Mood.*Needs words/ })).toBeTruthy();
+    await openRow(user, "Instruments");
     expect((screen.getByRole("switch", { name: "Separate instruments" }) as HTMLElement).getAttribute("aria-checked")).toBe("true");
     expect(screen.queryByRole("radio", { name: "Over the video" })).toBeNull();
     expect(screen.getByRole("switch", { name: "Also save the stems to the Library" }).getAttribute("aria-checked")).toBe("false");
     // Mood needs words.
+    await openRow(user, "Mood");
     expect((screen.getByRole("switch", { name: "Read the mood of the words" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -102,7 +113,7 @@ describe("Source step", () => {
     const user = userEvent.setup();
     useVisualizer.getState().setInput("C:/m/clip.mp4", true);
     render(<SourceStep />);
-    expect(screen.getByRole("switch", { name: "Separate instruments" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("button", { name: /^Instruments.*Off/ })).toBeTruthy();
     expect(useVisualizer.getState().mode).toBe("overlay");
     await user.click(await screen.findByRole("radio", { name: "Use only its sound" }));
     expect(useVisualizer.getState().mode).toBe("full");
@@ -113,6 +124,7 @@ describe("Source step", () => {
     const user = userEvent.setup();
     useVisualizer.getState().setInput("C:/m/song.mp3", false);
     render(<SourceStep />);
+    await openRow(user, "Words");
     await user.click(screen.getByRole("radio", { name: "Paste lyrics" }));
     expect(screen.getByRole("textbox", { name: "Lyrics" })).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Language" })).toBeTruthy();
@@ -123,13 +135,16 @@ describe("Source step", () => {
     expect(screen.queryByRole("combobox", { name: "Language" })).toBeNull();
     await user.click(screen.getByRole("radio", { name: "No words" }));
     expect(useVisualizer.getState().analyze.words).toBe(WordsSource.WordsNone);
+    expect(screen.getByRole("button", { name: /^Words.*No words/ })).toBeTruthy();
   });
 
   it("deeper reading is disabled without a ready chat model", async () => {
     h.open.mockResolvedValue(info(false));
+    const user = userEvent.setup();
     useVisualizer.getState().setInput("C:/m/song.mp3", false);
     useVisualizer.getState().setAnalyze({ words: WordsSource.WordsDetect });
     render(<SourceStep />);
+    await openRow(user, "Mood");
     const sw = screen.getByRole("switch", { name: "Deeper reading with Local Chat" }) as HTMLButtonElement;
     await waitFor(() => expect(screen.getByText("Download a model in Local Chat")).toBeTruthy());
     expect(sw.disabled).toBe(true);
@@ -169,6 +184,8 @@ describe("Source step", () => {
     const lines = [{ startMs: 0, endMs: 1000, text: "hi", words: [] }];
     useUI.setState({ handoff: { moduleId: "visualizer", inputs: ["C:/m/song.mp3"], seed: { kind: "timed-text", from: "lyric-video", lines, overlay: false } } } as unknown as Parameters<typeof useUI.setState>[0]);
     render(<SourceStep />);
+    expect(await screen.findByRole("button", { name: /^Words.*From Lyric Video/ })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: /^Words/ }));
     expect(await screen.findByRole("radio", { name: "From Lyric Video" })).toBeTruthy();
     const s = useVisualizer.getState();
     expect(s.input).toBe("C:/m/song.mp3");

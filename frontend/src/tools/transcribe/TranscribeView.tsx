@@ -10,7 +10,7 @@ import {
 } from "@/lib/api";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { useOrderedJobs, type JobView } from "@/state/jobs";
-import { FileToolLayout, runLabel, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -216,68 +216,81 @@ export default function TranscribeView({ moduleId }: ToolViewProps) {
         onRun={onRun}
         running={running}
         inputErrors={inputErrors}
-        options={
-          <Section label="Options" tip="Pick the model, language and which transcript files to write">
-            <div className={styles.options}>
+        primary={
+          <>
+            <div className={styles.optRow}>
+              <label className={styles.optLabel} htmlFor="transcribe-language">
+                Language
+              </label>
+              <Select
+                id="transcribe-language"
+                data-tip="The language spoken; auto-detect works well but a fixed choice is safer for short or noisy clips"
+                value={opts.language}
+                options={languageOptions}
+                onChange={(language) => setOpts((o) => ({ ...o, language }))}
+              />
+            </div>
+            <div className={styles.optRow}>
+              <span className={styles.optLabel} id="transcribe-formats" data-tip="Which transcript files to save; pick at least one">
+                Formats
+              </span>
+              <div role="group" aria-labelledby="transcribe-formats" className={styles.chips}>
+                {FORMATS.map((f) => {
+                  const on = (opts.formats ?? []).includes(f);
+                  return (
+                    <button
+                      key={f}
+                      type="button"
+                      aria-pressed={on}
+                      data-tip={`${FORMAT_TIPS[f] ?? f}${on ? "" : " (click to include)"}`}
+                      className={cx(styles.chip, on && styles.chipOn)}
+                      onClick={() => setOpts((o) => ({ ...o, formats: toggleFormat(o.formats, f) }))}
+                    >
+                      {f.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        }
+        advancedSummary={summarize(
+          presets.find((p) => p.id === opts.model)?.label ?? opts.model,
+          opts.task === TranscribeTask.TaskTranslate ? "translate to English" : "transcribe",
+          opts.vad && "skip silence",
+        )}
+        advanced={
+          <div className={styles.options}>
+            <Section label="Model" tip="Speed versus accuracy of the speech model">
               <ModelCards
                 presets={presets}
                 value={opts.model}
                 onChange={(id) => setOpts((o) => ({ ...o, model: id as TranscribeModel }))}
               />
-              <div className={styles.optRow}>
-                <label className={styles.optLabel} htmlFor="transcribe-language">
-                  Language
-                </label>
-                <Select
-                  id="transcribe-language"
-                  data-tip="The language spoken; auto-detect works well but a fixed choice is safer for short or noisy clips"
-                  value={opts.language}
-                  options={languageOptions}
-                  onChange={(language) => setOpts((o) => ({ ...o, language }))}
-                />
-              </div>
-              <div className={styles.optRow}>
-                <span className={styles.optLabel} data-tip="Keep the original language or translate to English">Task</span>
-                <SegmentedControl
-                  aria-label="Task"
-                  value={opts.task}
-                  onChange={(task) => setOpts((o) => ({ ...o, task }))}
-                  options={[
-                    { value: TranscribeTask.TaskTranscribe, label: "Transcribe", tip: "Write down what is said in the original language" },
-                    { value: TranscribeTask.TaskTranslate, label: "Translate to English", tip: "Write the speech out translated into English, whatever language it is in" },
-                  ]}
-                />
-              </div>
-              <div className={styles.optRow}>
-                <span className={styles.optLabel} id="transcribe-formats" data-tip="Which transcript files to save; pick at least one">
-                  Formats
-                </span>
-                <div role="group" aria-labelledby="transcribe-formats" className={styles.chips}>
-                  {FORMATS.map((f) => {
-                    const on = (opts.formats ?? []).includes(f);
-                    return (
-                      <button
-                        key={f}
-                        type="button"
-                        aria-pressed={on}
-                        data-tip={`${FORMAT_TIPS[f] ?? f}${on ? "" : " (click to include)"}`}
-                        className={cx(styles.chip, on && styles.chipOn)}
-                        onClick={() => setOpts((o) => ({ ...o, formats: toggleFormat(o.formats, f) }))}
-                      >
-                        {f.toUpperCase()}
-                      </button>
-                    );
-                  })}
+            </Section>
+            <Section label="Speech" tip="What to write and how to treat quiet parts">
+              <div className={styles.options}>
+                <div className={styles.optRow}>
+                  <span className={styles.optLabel} data-tip="Keep the original language or translate to English">Task</span>
+                  <SegmentedControl
+                    aria-label="Task"
+                    value={opts.task}
+                    onChange={(task) => setOpts((o) => ({ ...o, task }))}
+                    options={[
+                      { value: TranscribeTask.TaskTranscribe, label: "Transcribe", tip: "Write down what is said in the original language" },
+                      { value: TranscribeTask.TaskTranslate, label: "Translate to English", tip: "Write the speech out translated into English, whatever language it is in" },
+                    ]}
+                  />
                 </div>
+                <Switch
+                  checked={opts.vad}
+                  onChange={(vad) => setOpts((o) => ({ ...o, vad }))}
+                  label="Skip silence"
+                  tip="Cut long silent stretches before transcribing; faster and avoids made-up text in quiet parts"
+                />
               </div>
-              <Switch
-                checked={opts.vad}
-                onChange={(vad) => setOpts((o) => ({ ...o, vad }))}
-                label="Skip silence"
-                tip="Cut long silent stretches before transcribing; faster and avoids made-up text in quiet parts"
-              />
-            </div>
-          </Section>
+            </Section>
+          </div>
         }
         results={
           <Section label="Results" tip="Finished transcripts with their files">

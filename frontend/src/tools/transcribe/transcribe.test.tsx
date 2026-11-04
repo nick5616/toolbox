@@ -70,16 +70,18 @@ describe("TranscribeView", () => {
     enqueue.mockResolvedValue([{}]);
     const user = userEvent.setup();
     render(<TranscribeView moduleId="transcribe" />);
-    await screen.findByRole("radio", { name: /Turbo/ });
-    expect(screen.getByText(/Slower on CPU/)).toBeTruthy();
     expect(await screen.findByRole("option", { name: "French" })).toBeTruthy();
-
-    await user.click(screen.getByRole("radio", { name: /Turbo/ }));
     await user.selectOptions(screen.getByLabelText("Language"), "fr");
-    await user.click(screen.getByRole("radio", { name: "Translate to English" }));
     await user.click(screen.getByRole("button", { name: "VTT" }));
     await user.click(screen.getByRole("button", { name: "SRT" }));
+
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
+    await screen.findByRole("radio", { name: /Turbo/ });
+    expect(screen.getByText(/Slower on CPU/)).toBeTruthy();
+    await user.click(screen.getByRole("radio", { name: /Turbo/ }));
+    await user.click(screen.getByRole("radio", { name: "Translate to English" }));
     await user.click(screen.getByRole("switch", { name: "Skip silence" }));
+    expect(screen.getByRole("button", { name: /Advanced/ }).textContent).toContain("translate to English");
 
     await user.click(screen.getByRole("button", { name: "Add files…" }));
     const run = await screen.findByRole("button", { name: /Transcribe 1 file/ });
@@ -99,7 +101,7 @@ describe("TranscribeView", () => {
   it("cannot turn off the last format", async () => {
     const user = userEvent.setup();
     render(<TranscribeView moduleId="transcribe" />);
-    await screen.findByRole("radio", { name: /Turbo/ });
+    await screen.findByRole("button", { name: "SRT" });
     await user.click(screen.getByRole("button", { name: "SRT" }));
     await user.click(screen.getByRole("button", { name: "TXT" }));
     expect(screen.getByRole("button", { name: "TXT" }).getAttribute("aria-pressed")).toBe("true");

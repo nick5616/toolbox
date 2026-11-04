@@ -2,9 +2,10 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } f
 import {
   Badge,
   Button,
+  ClickIn,
+  ClickInHost,
   ConfirmDialog,
   EmptyState,
-  IconButton,
   Kbd,
   SegmentedControl,
   Spinner,
@@ -20,7 +21,7 @@ import { useDesktop } from "@/state/desktop";
 import { useSettings } from "@/state/settings";
 import type { ToolViewProps } from "@/tools";
 import { ClipRow } from "./ClipRow";
-import { ClipboardSettingsPanel } from "./ClipboardSettingsPanel";
+import { ClipboardSettingsPanel, clipboardSummary } from "./ClipboardSettingsPanel";
 import { removeClips, upsertClip, type KindFilter } from "./clips";
 import { useClipList } from "./useClipList";
 import { useSelection } from "./useSelection";
@@ -49,13 +50,13 @@ function fail(title: string, e: unknown) {
 
 export default function ClipboardView(_props: ToolViewProps) {
   const enabled = useSettings((s) => s.settings.clipboard.enabled);
+  const clipSettings = useSettings((s) => s.settings.clipboard);
   const hotkey = useSettings((s) => s.settings.hotkeys?.clipboard ?? "");
   const update = useSettings((s) => s.update);
   const state = useDesktop((s) => s.clipboard);
 
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState<KindFilter>("all");
-  const [showSettings, setShowSettings] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [keepPinned, setKeepPinned] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -172,62 +173,63 @@ export default function ClipboardView(_props: ToolViewProps) {
   const combo = acceleratorToCombo(hotkey);
 
   return (
+    <ClickInHost>
     <div className={styles.root} onKeyDown={onKeyDown}>
       <header className={styles.header}>
-        <h1 className={styles.title}>Clipboard History</h1>
         {enabled && (
           <span className={styles.status} role="status">
             <Badge tone={statusTone} tip={state.error ? "Recording hit a problem; see the message" : state.paused ? "Copies are being ignored until you resume" : state.recording ? "Everything you copy is being saved to the history" : "Recording is getting ready"}>{statusLabel}</Badge>
             {state.error && <span className={styles.errorText}>{state.error}</span>}
           </span>
         )}
+        {enabled && (
+          <Button size="sm" variant="secondary" collapsible onClick={() => void togglePause()} icon={state.paused ? "play" : "pause"} data-tip={state.paused ? "Start saving what you copy again" : "Stop saving copies for now; existing history stays"}>
+            {state.paused ? "Resume" : "Pause"}
+          </Button>
+        )}
         <span className={styles.spacer} />
         {enabled && (
-          <>
-            <Button size="sm" variant="secondary" onClick={() => void togglePause()} icon={state.paused ? "play" : "pause"} data-tip={state.paused ? "Start saving what you copy again" : "Stop saving copies for now; existing history stays"}>
-              {state.paused ? "Resume" : "Pause"}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              icon="external-link"
-              data-tip="Open the small picker window that lists recent copies"
-              onClick={() => ClipboardService.OpenPopup().catch((e: unknown) => fail("Couldn't open popup", e))}
-            >
-              Open popup
-            </Button>
-            <span className={styles.hotkey} data-tip={combo ? "The global shortcut that opens the popup; change it in Settings" : "No global shortcut is set; choose one in Settings"}>
-              {combo ? <Kbd combo={combo} /> : <span className={styles.noKey}>No shortcut</span>}
-            </span>
-          </>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="external-link"
+            collapsible
+            data-tip={combo ? `Open the small picker window that lists recent copies (${combo})` : "Open the small picker window that lists recent copies"}
+            onClick={() => ClipboardService.OpenPopup().catch((e: unknown) => fail("Couldn't open popup", e))}
+          >
+            Open popup
+          </Button>
+        )}
+        {enabled && (
+          <span className={styles.hotkey} data-tip={combo ? "The global shortcut that opens the popup; change it in Settings" : "No global shortcut is set; choose one in Settings"}>
+            {combo ? <Kbd combo={combo} /> : <span className={styles.noKey}>No shortcut</span>}
+          </span>
         )}
         {hasHistory && (
-          <Button size="sm" variant="secondary" icon="trash-2" data-tip="Delete saved items, optionally keeping the pinned ones" onClick={() => setConfirmClear(true)}>
+          <Button size="sm" variant="secondary" icon="trash-2" collapsible data-tip="Delete saved items, optionally keeping the pinned ones" onClick={() => setConfirmClear(true)}>
             Clear…
           </Button>
         )}
         {enabled && (
-          <IconButton
+          <ClickIn
             icon="settings"
-            label="Clipboard settings"
-            data-tip="Image capture, how long history is kept, and auto-paste"
-            pressed={showSettings}
-            aria-expanded={showSettings}
-            onClick={() => setShowSettings((v) => !v)}
-          />
+            title="Clipboard settings"
+            summary={clipboardSummary(clipSettings)}
+            tip="Image capture, how long history is kept, auto-paste and the popup shortcut"
+            className={styles.settingsRow}
+            width={400}
+          >
+            <section className={styles.settings} aria-label="Clipboard settings">
+              <ClipboardSettingsPanel />
+              <div>
+                <Button size="sm" variant="ghost" onClick={() => void setEnabled(false)} loading={busy} data-tip="Stop recording what you copy; existing history is kept">
+                  Turn off recording
+                </Button>
+              </div>
+            </section>
+          </ClickIn>
         )}
       </header>
-
-      {enabled && showSettings && (
-        <section className={styles.settings} aria-label="Clipboard settings">
-          <ClipboardSettingsPanel />
-          <div>
-            <Button size="sm" variant="ghost" onClick={() => void setEnabled(false)} loading={busy} data-tip="Stop recording what you copy; existing history is kept">
-              Turn off recording
-            </Button>
-          </div>
-        </section>
-      )}
 
       {!enabled && (
         <EmptyState
@@ -335,5 +337,6 @@ export default function ClipboardView(_props: ToolViewProps) {
         }
       />
     </div>
+    </ClickInHost>
   );
 }

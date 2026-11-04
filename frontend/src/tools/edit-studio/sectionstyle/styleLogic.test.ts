@@ -4,7 +4,7 @@ import { normalizeProject, type NormalProject } from "@/viz/edit/defaults";
 import { buildEditFixture, fixtureKicks, fixtureProject } from "@/viz/edit/fixture";
 import { parseEffects, parseTransform, parseTransition } from "@/viz/edit/schema";
 import type { Marker, MarkerLane } from "@/viz/edit/types";
-import { newClip } from "../doc";
+import { newClip } from "@/editor/doc";
 import { validateShape } from "../autofill/autofill";
 import type { AutofillSource } from "../autofill/types";
 import { DEFAULT_SETTINGS, STYLE_TRACK_NAME, clearAdjustRange, cutDensity, planStyle, rangeFromContext, resolveHitLane, snapToGrid, styleEffects, type StyleSettings } from "./styleLogic";

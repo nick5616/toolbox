@@ -36,7 +36,7 @@ import { defaultSettings, useSettings } from "@/state/settings";
 import { useToastStore } from "@/components/toast";
 import ClipboardPopup from "./ClipboardPopup";
 import ClipboardView from "./ClipboardView";
-import { ClipboardSettingsPanel } from "./ClipboardSettingsPanel";
+import { ClipboardSettingsPanel, clipboardSummary } from "./ClipboardSettingsPanel";
 import { clearThumbCache } from "./useImageThumb";
 import { compareClips, matchesFilters } from "./clips";
 
@@ -251,10 +251,17 @@ describe("ClipboardView", () => {
     await waitFor(() => expect(toasts()).toContain("Cleared 3 items"));
   });
 
+  it("summarises the settings on the click-in row", async () => {
+    expect(clipboardSummary({ images: true, retentionDays: 30, autoPaste: false })).toBe("Text + images · 30 days");
+    expect(clipboardSummary({ images: false, retentionDays: 0, autoPaste: true })).toBe("Text only · kept forever · auto-paste");
+    render(<ClipboardView moduleId="clipboard" />);
+    expect(screen.getByRole("button", { name: /Clipboard settings/ }).textContent).toMatch(/days|forever/);
+  });
+
   it("turns recording off from the settings area", async () => {
     const user = userEvent.setup();
     render(<ClipboardView moduleId="clipboard" />);
-    await user.click(screen.getByRole("button", { name: "Clipboard settings" }));
+    await user.click(screen.getByRole("button", { name: /Clipboard settings/ }));
     await user.click(screen.getByRole("button", { name: "Turn off recording" }));
     expect(update).toHaveBeenCalledWith({ clipboard: expect.objectContaining({ enabled: false }) });
   });

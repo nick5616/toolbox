@@ -32,6 +32,8 @@ const h = vi.hoisted(() => {
     slideInfo: vi.fn(),
     pickWith: vi.fn(),
     reveal: vi.fn(async (_p: string) => undefined),
+    popOut: vi.fn(async (_r: unknown) => undefined),
+    getCalls: vi.fn(),
     setState: vi.fn(async (..._a: unknown[]) => undefined),
     savedState: { current: "" },
     posts: { current: [] as unknown[] },
@@ -45,7 +47,10 @@ vi.mock("@/lib/api", async (orig) => {
     PostsService: {
       List: async () => h.posts.current,
       Limits: async () => ({ maxSlides: 20, maxClipMs: 60000, maxReelMs: 180000, maxCaptionChars: 2200, maxHashtags: 30, maxMentions: 20, minWidth: 1080, frameWidth: 1080, maxAltTextChars: 1000 }),
-      Get: async () => structuredClone(h.doc.current),
+      Get: async () => {
+        h.getCalls();
+        return structuredClone(h.doc.current);
+      },
       Save: (...a: [string, string, unknown]) => h.save(...a),
       Check: (d: unknown) => h.check(d),
       Create: (...a: unknown[]) => h.create(...a),
@@ -61,6 +66,7 @@ vi.mock("@/lib/api", async (orig) => {
     LibraryService: { RevealPath: (p: string) => h.reveal(p), OpenLibraryFolder: async () => undefined },
     SettingsService: { ModuleState: async () => h.savedState.current, SetModuleState: (...a: unknown[]) => h.setState(...a) },
     JobsService: { Cancel: async () => undefined },
+    DesktopService: { PopOut: (r: unknown) => h.popOut(r), OpenWindows: async () => [] },
     ModulesService: { Match: async () => ({ matches: [] }) },
   };
 });
@@ -82,6 +88,7 @@ import { useToastStore } from "@/components/toast";
 import { JobStatus, type Job } from "@/lib/api";
 import { useJobs } from "@/state/jobs";
 import { useModules } from "@/state/modules";
+import { useWindows } from "@/state/windows";
 import { useUI } from "@/state/ui";
 import { sendToItems } from "@/views/LibraryView";
 import { AddToPostDialog } from "./AddToPostDialog";
@@ -97,6 +104,13 @@ async function open() {
   renderView();
   await screen.findByRole("region", { name: "Slides" });
   await waitFor(() => expect(selectedIndex()).toBeGreaterThanOrEqual(0));
+}
+
+/** Opens a click-in drawer by its launcher (one drawer is open at a time). */
+async function showPanel(name: string) {
+  const launcher = screen.getByRole("button", { name: new RegExp(`^${name}`) });
+  if (launcher.getAttribute("aria-expanded") !== "true") await userEvent.click(launcher);
+  await screen.findByRole("dialog", { name });
 }
 
 function slideButtons() {
@@ -127,6 +141,9 @@ beforeEach(() => {
   h.slideInfo.mockReset();
   h.pickWith.mockReset();
   h.reveal.mockClear();
+  h.popOut.mockClear();
+  h.getCalls.mockClear();
+  useWindows.setState({ open: [] });
   useUI.setState({ handoff: null, view: "post-builder" });
   useJobs.setState({ byId: {} });
   useToastStore.setState({ toasts: [] });
@@ -206,10 +223,22 @@ describe("caption and alt text", () => {
 
   it("edits the alt text of the selected slide", async () => {
     await open();
+    expect(screen.getByRole("button", { name: /^Alt text/ }).textContent).toContain("Slide 1 · empty");
+    await showPanel("Alt text");
     const user = userEvent.setup();
     await user.click(screen.getByRole("textbox", { name: "Alt text" }));
     await user.paste("A beach");
     expect((screen.getByRole("textbox", { name: "Alt text" }) as HTMLTextAreaElement).value).toBe("A beach");
+  });
+
+  it("keeps the caption and the phone preview at the top level", async () => {
+    await open();
+    expect(screen.getByRole("textbox", { name: "Caption" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Phone preview" })).toBeTruthy();
+    // Everything else is a click-in with a summary.
+    for (const [name, text] of [["Format", "Carousel · 4:5"], ["Sources", "No folder"], ["Checks", "All clear"]] as const) {
+      expect(screen.getByRole("button", { name: new RegExp(`^${name}`) }).textContent).toContain(text);
+    }
   });
 });
 
@@ -220,6 +249,8 @@ describe("checks", () => {
       { level: "note", slideId: "", message: "Location will be removed" },
     ];
     await open();
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Checks/ }).textContent).toContain("2 notes"));
+    await showPanel("Checks");
     const checks = await screen.findByRole("region", { name: "Checks" });
     const item = await within(checks).findByRole("button", { name: /May look soft/ });
     expect(within(checks).getByText(/Location will be removed/)).toBeTruthy();
@@ -254,9 +285,10 @@ describe("export", () => {
     toast.action?.onClick();
     expect(h.reveal).toHaveBeenCalledWith("/lib/Posts/Trip 2026-11-01");
 
-    // The folder is remembered and shown, with Copy caption beside it.
-    expect(await screen.findByText("/lib/Posts/Trip 2026-11-01")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy caption" })).toBeTruthy();
+    // The folder is remembered (by name in the menu), with Copy caption beside it.
+    await user.click(await screen.findByRole("button", { name: "More export actions" }));
+    expect(await screen.findByRole("menuitem", { name: "Open last export (Trip 2026-11-01)" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Copy caption" })).toBeTruthy();
     const saved = JSON.parse(h.setState.mock.calls[h.setState.mock.calls.length - 1]![1] as string) as { exports: Record<string, string> };
     expect(saved.exports.p1).toBe("/lib/Posts/Trip 2026-11-01");
   });
@@ -293,9 +325,53 @@ describe("composition and video slides", () => {
   it("Edit on a linked composition hands off with its project id", async () => {
     h.doc.current = h.post([h.slide("a", { kind: "composition", path: "", projectId: "proj-9" })]);
     await open();
-    await userEvent.setup().click(await screen.findByRole("button", { name: /Edit composition/ }));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Edit composition/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit here" }));
     await waitFor(() => expect(useUI.getState().handoff?.moduleId).toBe("photo-composer"));
     expect(useUI.getState().handoff?.postSlide).toEqual({ postId: "p1", slideId: "a", aspect: "4:5", projectId: "proj-9" });
+    expect(h.popOut).not.toHaveBeenCalled();
+  });
+
+  it("Edit in its own window opens the tool window with the same handoff, and refreshes when it closes", async () => {
+    h.doc.current = h.post([h.slide("a", { kind: "video", path: "", projectId: "vid-3" })]);
+    await open();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Edit video/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit in its own window" }));
+    await waitFor(() => expect(h.popOut).toHaveBeenCalledTimes(1));
+    const req = h.popOut.mock.calls[0]![0] as { key: string; query: string; handoff: string };
+    expect(req.key).toBe("tool:video-editor");
+    expect(JSON.parse(req.handoff)).toEqual({ moduleId: "video-editor", inputs: [], postSlide: { postId: "p1", slideId: "a", aspect: "4:5", projectId: "vid-3" } });
+    expect(useUI.getState().handoff).toBeNull();
+
+    // The window opens, then closes: the post is reloaded from disk.
+    act(() => useWindows.setState({ open: ["tool:video-editor"] }));
+    const before = h.getCalls.mock.calls.length;
+    act(() => useWindows.setState({ open: [] }));
+    await waitFor(() => expect(h.getCalls.mock.calls.length).toBeGreaterThan(before));
+  });
+
+  it("refreshes the post when this window is focused again after editing elsewhere", async () => {
+    h.doc.current = h.post([h.slide("a", { kind: "composition", path: "", projectId: "proj-9" })]);
+    await open();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Edit composition/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit in its own window" }));
+    await waitFor(() => expect(h.popOut).toHaveBeenCalled());
+    const before = h.getCalls.mock.calls.length;
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    await waitFor(() => expect(h.getCalls.mock.calls.length).toBeGreaterThan(before));
+  });
+
+  it("a pending composition offers to make it here or in its own window", async () => {
+    h.doc.current = h.post([h.slide("a", { kind: "composition", path: "", projectId: "pending" })]);
+    await open();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Make it in its own window" }));
+    await waitFor(() => expect(h.popOut).toHaveBeenCalledTimes(1));
+    expect((h.popOut.mock.calls[0]![0] as { key: string }).key).toBe("tool:photo-composer");
   });
 
   it("a postSlide handoff coming back selects that slide", async () => {

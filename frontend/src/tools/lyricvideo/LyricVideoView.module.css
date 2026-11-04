@@ -160,6 +160,28 @@
   max-width: 100%;
 }
 
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.drawerForm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.drawerForm .field,
+.rows .field {
+  flex-wrap: wrap;
+}
+
+.rows .fieldLabel {
+  min-width: 100px;
+}
+
 .field {
   display: flex;
   align-items: center;
@@ -204,7 +226,7 @@
 
 .sheetTools {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-3);

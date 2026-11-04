@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Banner, Button, CompareSlider, DropZone, IconButton, Meter, SegmentedControl, Slider, cx, toast } from "@/components";
+import { Banner, Button, ClickIn, ClickInHost, CompareSlider, DropZone, IconButton, MenuButton, Meter, SegmentedControl, Slider, cx, toast } from "@/components";
 import { EraserModel, EraserService, FilesService, JobsService, MediaService, type EraserModelInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
@@ -29,7 +29,7 @@ import {
   type StrokeCtx,
   type View,
 } from "./mask";
-import { DEFAULT_SETTINGS, canPaintOn, modelHint, needsThumb, sanitizeSettings } from "./options";
+import { DEFAULT_SETTINGS, canPaintOn, modelHint, needsThumb, sanitizeSettings, summarizeModel } from "./options";
 import styles from "./ObjectEraserView.module.css";
 
 type Tool = "brush" | "unpaint";
@@ -378,41 +378,39 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
 
   // ---- render ----
 
-  const header = (
+  const header = file ? (
     <header className={styles.header}>
-      <h1 className={styles.title}>Object Eraser</h1>
-      {file && (
-        <span className={styles.fileName} data-tip={path ?? file.path}>
-          <span>{baseName(path ?? file.path)}</span>
-          <Button
-            size="sm"
-            variant="ghost"
-            data-tip="Drop this photo and pick another one"
-            onClick={() => {
-              inputs.clear();
-              void inputs.pick();
-            }}
-          >
-            Choose another
-          </Button>
-        </span>
-      )}
+      <span className={styles.fileName} data-tip={path ?? file.path}>
+        <span>{baseName(path ?? file.path)}</span>
+        <Button
+          size="sm"
+          variant="ghost"
+          data-tip="Drop this photo and pick another one"
+          onClick={() => {
+            inputs.clear();
+            void inputs.pick();
+          }}
+        >
+          Choose another
+        </Button>
+      </span>
     </header>
-  );
+  ) : null;
 
   if (!file) {
     return (
-      <section className={styles.root} aria-label="Object Eraser">
-        {header}
-        <DepsGate moduleId={moduleId} />
-        <div className={styles.empty}>
-          <DropZone id="eraser-drop" label="Drop a photo" hint="Paint over what you want gone, then erase it." icon="eraser">
-            <Button variant="secondary" icon="folder-open" data-tip="Pick the photo you want to remove things from" onClick={() => void inputs.pick()}>
-              Choose photo
-            </Button>
-          </DropZone>
-        </div>
-      </section>
+      <ClickInHost>
+        <section className={styles.root} aria-label="Object Eraser">
+          <DepsGate moduleId={moduleId} />
+          <div className={styles.empty}>
+            <DropZone id="eraser-drop" label="Drop a photo" hint="Paint over what you want gone, then erase it." icon="eraser">
+              <Button variant="secondary" icon="folder-open" data-tip="Pick the photo you want to remove things from" onClick={() => void inputs.pick()}>
+                Choose photo
+              </Button>
+            </DropZone>
+          </div>
+        </section>
+      </ClickInHost>
     );
   }
 
@@ -422,12 +420,14 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
   ];
   const current = models.find((m) => m.id === settings.model);
   const needsDownload = current && !current.present && current.downloadBytes > 0;
+  const modelSummary = summarizeModel(settings.model, current);
   const zoomPct = Math.round(scale * view.zoom * 100);
   const cursorSize = settings.brush;
   const showCursor = editing && cursor && !spaceDown && !panning.current;
   const failed = job && (job.status === "failed" || job.status === "cancelled") ? job : undefined;
 
   return (
+    <ClickInHost>
     <section className={styles.root} aria-label="Object Eraser">
       {header}
       <DepsGate moduleId={moduleId} />
@@ -466,12 +466,17 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
           <IconButton size="sm" icon="zoom-out" label="Zoom out" data-tip="Zoom out; Ctrl or Cmd with the mouse wheel also zooms" disabled={!img} onClick={() => zoomBy(1 / 1.25)} />
           <span className={styles.zoom} data-tip="Current zoom level of the picture">{img ? `${zoomPct}%` : ""}</span>
           <IconButton size="sm" icon="zoom-in" label="Zoom in" data-tip="Zoom in for precise painting; hold Space and drag to move around" disabled={!img} onClick={() => zoomBy(1.25)} />
-          <Button size="sm" variant="ghost" disabled={!img} data-tip="Zoom so the whole photo fits in the window" onClick={() => setView(FIT_VIEW)}>
-            Fit
-          </Button>
-          <Button size="sm" variant="ghost" disabled={!img || img.w === 0} data-tip="Show the photo at its real pixel size" onClick={() => setView({ zoom: actualSizeZoom(box, { w: img?.w ?? 0, h: img?.h ?? 0 }), panX: 0, panY: 0 })}>
-            100%
-          </Button>
+          <MenuButton
+            size="sm"
+            variant="ghost"
+            icon="maximize-2"
+            label="Fit and actual size"
+            tip="Zoom to fit the window, or show the photo at its real pixel size"
+            items={() => [
+              { id: "fit", label: "Fit to window", tip: "Zoom so the whole photo fits in the window", disabled: !img, onSelect: () => setView(FIT_VIEW) },
+              { id: "actual", label: "Actual size (100%)", tip: "Show the photo at its real pixel size", disabled: !img || img.w === 0, onSelect: () => setView({ zoom: actualSizeZoom(box, { w: img?.w ?? 0, h: img?.h ?? 0 }), panX: 0, panY: 0 }) },
+            ]}
+          />
         </div>
       )}
 
@@ -588,13 +593,15 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
           </>
         ) : (
           <>
-            <div className={styles.models}>
-              <SegmentedControl aria-label="Model" size="sm" value={settings.model} onChange={(model) => setSettings((s) => ({ ...s, model }))} options={modelOptions} disabled={running} />
-              <span className={styles.hint} data-tip="Speed and quality of the selected model, and whether it must be downloaded">
-                {modelHint(models)}
-                {needsDownload && current ? ` · downloads ${Math.round(current.downloadBytes / (1024 * 1024))} MB on first use` : ""}
-              </span>
-            </div>
+            <ClickIn icon="cpu" title="Model" summary={modelSummary} tip="Speed and quality of the fill, and whether the model must be downloaded" width={340} className={styles.modelRow}>
+              <div className={styles.models}>
+                <SegmentedControl aria-label="Model" size="sm" value={settings.model} onChange={(model) => setSettings((s) => ({ ...s, model }))} options={modelOptions} disabled={running} />
+                <span className={styles.hint} data-tip="Speed and quality of the selected model, and whether it must be downloaded">
+                  {modelHint(models)}
+                  {needsDownload && current ? ` · downloads ${Math.round(current.downloadBytes / (1024 * 1024))} MB on first use` : ""}
+                </span>
+              </div>
+            </ClickIn>
             <span className={styles.spacer} />
             {gate.blocked && <span className={styles.hint}>{gate.reason}</span>}
             <Button
@@ -611,5 +618,6 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
         )}
       </div>
     </section>
+    </ClickInHost>
   );
 }

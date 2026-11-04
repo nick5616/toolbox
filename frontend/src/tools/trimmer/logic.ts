@@ -224,6 +224,21 @@ export function summaryText(segs: readonly Seg[], settings: Pick<TrimmerSettings
   return `${n} ${n === 1 ? "segment" : "segments"} · ${formatClock(kept)} total · ${size}`;
 }
 
+/** One-line state of the Frame click-in: the original shape or the crop ratio. */
+export function frameSummary(s: Pick<TrimmerSettings, "aspect">): string {
+  return s.aspect === TrimAspect.AspectKeep ? "Original shape" : `Crop ${s.aspect}`;
+}
+
+/** One-line state of the Output click-in: only what differs from the defaults. */
+export function outputSummary(s: Pick<TrimmerSettings, "join" | "maxSizeMB" | "maxHeight" | "removeAudio">, segmentCount: number): string {
+  const parts: string[] = [];
+  if (segmentCount >= 2) parts.push(s.join === TrimJoin.JoinMerge ? "One file" : "Separate files");
+  if (s.maxSizeMB > 0) parts.push(`≤ ${s.maxSizeMB} MB`);
+  if (s.maxHeight > 0) parts.push(`≤ ${s.maxHeight}p`);
+  if (s.removeAudio) parts.push("no audio");
+  return parts.length === 0 ? "Original size" : parts.join(" · ");
+}
+
 /** Why the segments can't be exported, or null. */
 export function segmentsError(segs: readonly Seg[], durationMs: number): string | null {
   if (segs.length === 0) return "Add a segment to export";

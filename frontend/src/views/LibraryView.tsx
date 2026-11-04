@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Badge, Button, EmptyState, Icon, IconButton, MenuButton, Select, TextField, toast, type MenuItem } from "@/components";
+import { Badge, Button, ClickIn, ClickInHost, EmptyState, Icon, IconButton, MenuButton, Select, TextField, toast, type MenuItem } from "@/components";
 import { LibraryService, ModulesService, OutputKind } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
+import { openToolItems } from "@/lib/openTool";
 import { revealLabel } from "@/lib/platform";
 import { useShortcut } from "@/lib/shortcuts";
 import { useLibrary, type OutputView } from "@/state/library";
-import { useUI } from "@/state/ui";
 import { isReady, useModules } from "@/state/modules";
 // --- pipelines ---
 import { usePipelines } from "@/state/pipelines";
@@ -37,12 +37,14 @@ export async function sendToItems(path: string): Promise<MenuItem[]> {
   const res = await ModulesService.Match([path]);
   const tools: MenuItem[] = (res.matches ?? [])
     .filter((m) => isReady(m.module))
-    .map((m) => ({
-      id: m.module.id,
-      label: m.module.name,
-      icon: m.module.icon,
-      onSelect: () => useUI.getState().handOff({ moduleId: m.module.id, inputs: [path] }),
-    }));
+    .flatMap((m) =>
+      // "Open in <tool>" plus "…(new window)"; names come from the match so they're right even before the store fills.
+      openToolItems(m.module.id, [path], "send").map((it, i) => ({
+        ...it,
+        label: i === 0 ? `Open in ${m.module.name}` : `Open in ${m.module.name} (new window)`,
+        icon: i === 0 ? m.module.icon : "app-window",
+      })),
+    );
   // --- pipelines ---
   const pipelines: MenuItem[] = usePipelines
     .getState()
@@ -154,43 +156,47 @@ export function LibraryView() {
     if (target) focusRow(target.id);
   };
 
+  const filterSummary = moduleId ? (byId[moduleId]?.name ?? moduleId) : "All tools";
+
   const rovingId = selected ? selected.id : (items[0]?.id ?? "");
 
   return (
-    <section className={styles.root} aria-label="Recent">
+    <ClickInHost className={styles.root}>
+      <section className={styles.section} aria-label="Recent">
       <header className={styles.header}>
-        <h1 className={styles.title}>Recent</h1>
-        <div className={styles.toolbar}>
-          <TextField
-            ref={searchRef}
-            icon="search"
-            size="sm"
-            placeholder="Search outputs"
-            aria-label="Search outputs"
-            data-tip="Search by file name. Press / to focus"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            wrapperClassName={styles.search}
-          />
-          <Select
-            size="sm"
-            value={moduleId}
-            onChange={setModuleId}
-            aria-label="Filter by tool"
-            data-tip="Show only files made by one tool"
-            options={moduleOptions}
-            className={styles.filter}
-          />
-          <Button
-            size="sm"
-            variant="secondary"
-            icon="folder-open"
-            data-tip="Open your library folder, where all outputs are saved, in the file manager"
-            onClick={() => void LibraryService.OpenLibraryFolder("").catch(fail)}
-          >
-            Open library folder
-          </Button>
-        </div>
+        <TextField
+          ref={searchRef}
+          icon="search"
+          size="sm"
+          placeholder="Search outputs"
+          aria-label="Search outputs"
+          data-tip="Search by file name. Press / to focus"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          wrapperClassName={styles.search}
+        />
+        <ClickIn icon="list-filter" title="Filters" summary={filterSummary} tip="Show only files made by one tool" className={styles.filters} width={320}>
+          <div className={styles.drawerBody}>
+            <Select
+              value={moduleId}
+              onChange={setModuleId}
+              aria-label="Filter by tool"
+              data-tip="Show only files made by one tool"
+              options={moduleOptions}
+            />
+            {moduleId ? (
+              <Button size="sm" variant="secondary" icon="x" data-tip="Show files from every tool again" onClick={() => setModuleId("")}>
+                Clear filters
+              </Button>
+            ) : null}
+          </div>
+        </ClickIn>
+        <IconButton
+          icon="folder-open"
+          label="Open library folder"
+          data-tip="Open your library folder, where all outputs are saved, in the file manager"
+          onClick={() => void LibraryService.OpenLibraryFolder("").catch(fail)}
+        />
       </header>
 
       {items.length === 0 ? (
@@ -276,6 +282,7 @@ export function LibraryView() {
           </Button>
         </div>
       ) : null}
-    </section>
+      </section>
+    </ClickInHost>
   );
 }

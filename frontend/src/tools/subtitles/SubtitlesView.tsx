@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { ConfirmDialog, Icon, cx, toast } from "@/components";
+import { ClickInHost, ConfirmDialog, Icon, cx, toast } from "@/components";
+import { openTool } from "@/lib/openTool";
 import { useMediaSource, type MediaPlayerHandle } from "@/components/media";
 import {
   FilesService,
@@ -337,9 +338,9 @@ export default function SubtitlesView({ moduleId }: ToolViewProps) {
       buildOptions(SubtitlesAction.ActionBurn, prefs, { cues: toCues(rows), visuals: burnsVisuals ? visuals : null }),
     );
   };
-  const onOpenInVisualizer = () => {
+  const onOpenInVisualizer = (inWindow?: boolean) => {
     if (!mediaPath) return;
-    useUI.getState().handOff({ moduleId: "visualizer", inputs: [mediaPath], seed: handoffSeed(cueLines, isVideo, prefs) });
+    void openTool("visualizer", [mediaPath], { seed: handoffSeed(cueLines, isVideo, prefs) }, { window: inWindow === true });
   };
   const onEmbed = () => {
     if (!mediaPath || !tab || blocker) return;
@@ -428,6 +429,7 @@ export default function SubtitlesView({ moduleId }: ToolViewProps) {
   const sourceLanguage = sourceLang ?? original?.language ?? "";
 
   return (
+    <ClickInHost>
     <div className={styles.root}>
       <nav className={styles.steps} aria-label="Steps">
         {STEPS.map((s, i) => (
@@ -587,5 +589,6 @@ export default function SubtitlesView({ moduleId }: ToolViewProps) {
         onCancel={() => setConfirm(null)}
       />
     </div>
+    </ClickInHost>
   );
 }

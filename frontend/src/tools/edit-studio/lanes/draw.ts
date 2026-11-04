@@ -3,7 +3,7 @@
  * the visible window only; nothing here runs per playhead tick.
  */
 import type { Marker, MarkerLane } from "@/viz/edit/types";
-import { msToX } from "../geometry";
+import { msToX } from "@/editor/geometry";
 import { isRanged, RANGED_LANES, visibleMarkers } from "./laneLogic";
 
 const FONT = '10px "Geist Variable", system-ui, sans-serif';
