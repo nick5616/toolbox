@@ -118,7 +118,7 @@ export function VisualsPicker({ inputPath, lines, value, onChange, mode, aspect,
               Listening to the song…{pct > 0 ? ` ${pct}%` : ""}
             </span>
             {listening.stage && <span className={styles.stage}>{listening.stage}</span>}
-            <Button size="sm" variant="ghost" onClick={listening.cancel}>
+            <Button size="sm" variant="ghost" onClick={listening.cancel} data-tip="Stop listening to the song">
               Cancel
             </Button>
           </div>
@@ -130,7 +130,7 @@ export function VisualsPicker({ inputPath, lines, value, onChange, mode, aspect,
           tone="danger"
           title={listening.error.message}
           action={
-            <Button size="sm" onClick={listening.start}>
+            <Button size="sm" onClick={listening.start} data-tip="Listen to the song again">
               Try again
             </Button>
           }
@@ -150,12 +150,12 @@ export function VisualsPicker({ inputPath, lines, value, onChange, mode, aspect,
       />
 
       <div className={styles.controls}>
-        <Field label="Intensity" htmlFor="viz-intensity">
+        <Field label={<span data-tip="How strongly the visuals react to the music; 0 is still">Intensity</span>} htmlFor="viz-intensity">
           <Slider id="viz-intensity" aria-label="Intensity" min={0} max={2} step={0.05} value={show?.reactivity ?? 1} disabled={!show} format={(v) => v.toFixed(2)} onChange={(v) => show && emit(withReactivity(show, v))} />
         </Field>
-        <Field label="Colours">
-          <div className={styles.swatches} role="group" aria-label="Colours">
-            <button type="button" className={cx(styles.own, ownPalette && styles.on)} aria-pressed={ownPalette} disabled={!show || !base} onClick={() => show && base && emit(withPalette(show, base.palette))}>
+        <Field label={<span data-tip="Keep the design's own colours or use one palette throughout">Colours</span>}>
+          <div className={styles.swatches} role="group" aria-label="Colours" data-tip="Colour palettes">
+            <button type="button" className={cx(styles.own, ownPalette && styles.on)} aria-pressed={ownPalette} data-tip="Use the colours the chosen design came with" disabled={!show || !base} onClick={() => show && base && emit(withPalette(show, base.palette))}>
               Design&apos;s own
             </button>
             {SWATCH_PALETTES.map((p) => (
@@ -166,7 +166,7 @@ export function VisualsPicker({ inputPath, lines, value, onChange, mode, aspect,
                 style={{ background: `linear-gradient(135deg, ${p.colors[0]} 50%, ${p.colors[1]} 50%)` }}
                 aria-label={p.name}
                 aria-pressed={fixedId === p.id}
-                title={p.name}
+                data-tip={`${p.name}: use this palette throughout`}
                 disabled={!show}
                 onClick={() => show && emit(withFixedPalette(show, p.id))}
               />
@@ -177,6 +177,7 @@ export function VisualsPicker({ inputPath, lines, value, onChange, mode, aspect,
 
       <div className={styles.switches}>
         <Switch
+          tip={busy ? "Wait until the song has been listened to" : "Split the song into drums, bass, vocals and other so each can drive its own visuals"}
           label="Separate instruments"
           checked={stems}
           disabled={busy}
@@ -188,6 +189,7 @@ export function VisualsPicker({ inputPath, lines, value, onChange, mode, aspect,
         <span className={styles.hint}>Richer reactions; takes about as long as the song.</span>
         {hasLines && (
           <Switch
+            tip="Let the lyrics and their mood move the visuals; needs the mood reader"
             label="React to the words"
             checked={useWords}
             onChange={(v) => {
@@ -200,7 +202,7 @@ export function VisualsPicker({ inputPath, lines, value, onChange, mode, aspect,
 
       {onOpenDesigner && (
         <div>
-          <Button variant="secondary" icon="sliders-horizontal" onClick={onOpenDesigner}>
+          <Button variant="secondary" icon="sliders-horizontal" onClick={onOpenDesigner} data-tip="Tune colours, reactions, layers and the timeline yourself">
             Open the full designer
           </Button>
         </div>

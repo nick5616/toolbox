@@ -72,14 +72,14 @@ export function DesignerSheet({ inputPath, rows, lines, value, mode, aspect, pre
   return (
     <div className={styles.sheet} role="dialog" aria-label="Visual designer">
       <div className={styles.bar}>
-        <IconButton icon="undo-2" label="Undo" disabled={!history.canUndo} onClick={history.undo} />
-        <IconButton icon="redo-2" label="Redo" disabled={!history.canRedo} onClick={history.redo} />
-        <span className={styles.name}>{history.show.name}</span>
+        <IconButton icon="undo-2" label="Undo" data-tip="Undo the last design change" kbd="Mod+Z" disabled={!history.canUndo} onClick={history.undo} />
+        <IconButton icon="redo-2" label="Redo" data-tip="Redo the change you just undid" kbd="Mod+Shift+Z" disabled={!history.canRedo} onClick={history.redo} />
+        <span className={styles.name} data-tip="The name of this design">{history.show.name}</span>
         <span className={styles.spacer} />
-        <Button variant="ghost" onClick={close}>
+        <Button variant="ghost" onClick={close} data-tip="Close without keeping your changes" data-tip-kbd="Esc">
           Cancel
         </Button>
-        <Button variant="primary" icon="check" onClick={() => onDone({ ...value, showJson: JSON.stringify(history.show) })}>
+        <Button variant="primary" icon="check" data-tip="Keep this design and return to Subtitles" onClick={() => onDone({ ...value, showJson: JSON.stringify(history.show) })}>
           Done
         </Button>
       </div>
@@ -96,7 +96,7 @@ export function DesignerSheet({ inputPath, rows, lines, value, mode, aspect, pre
             text={text}
           />
         ) : listening.status === "error" ? (
-          <Banner tone="danger" title={listening.error?.message ?? "Couldn't listen to the file"} action={<Button size="sm" onClick={listening.start}>Try again</Button>}>
+          <Banner tone="danger" title={listening.error?.message ?? "Couldn't listen to the file"} action={<Button size="sm" onClick={listening.start} data-tip="Listen to the file again">Try again</Button>}>
             {listening.error?.hint}
           </Banner>
         ) : (

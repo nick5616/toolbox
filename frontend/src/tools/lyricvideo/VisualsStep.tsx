@@ -34,10 +34,10 @@ export interface VisualsStepProps {
   onContinue: () => void;
 }
 
-const MODES: Array<{ value: VisualsMode; label: string }> = [
-  { value: "quick", label: "Quick" },
-  { value: "designer", label: "Full designer" },
-  { value: "classic", label: "Classic background" },
+const MODES: Array<{ value: VisualsMode; label: string; tip: string }> = [
+  { value: "quick", label: "Quick", tip: "Pick a ready-made animated design from a few suggestions" },
+  { value: "designer", label: "Full designer", tip: "Tune colours, reactions, layers and the timeline yourself" },
+  { value: "classic", label: "Classic background", tip: "Skip the animation and use a cover, colour, gradient, image or video" },
 ];
 
 /** Step 3: choose visuals that react to the song, or keep a classic background. */
@@ -71,10 +71,11 @@ export function VisualsStep(p: VisualsStepProps) {
 
   return (
     <div className={styles.root}>
-      <Section label="Instruments">
+      <Section label="Instruments" tip="Splitting the song into instruments gives richer reactions">
         <div className={styles.panel}>
           {p.engineBlocked && <DepsGate moduleId={p.moduleId} />}
           <Switch
+            tip={!p.stemsInstalled ? "Download the instrument separation model first" : busy ? "Wait until the song has been listened to" : "Split the song into drums, bass, vocals and other so each can drive its own visuals"}
             checked={stems}
             disabled={!p.stemsInstalled || busy}
             onChange={setStems}
@@ -82,7 +83,7 @@ export function VisualsStep(p: VisualsStepProps) {
           />
           {!p.stemsInstalled && <StemsModelBanner />}
           <span className={styles.hint}>Richer reactions; takes about as long as the song.</span>
-          <label className={styles.check}>
+          <label className={styles.check} data-tip={stems ? "Keep the separated instrument tracks as audio files in your Library" : "Turn on Separate instruments first"}>
             <input
               type="checkbox"
               checked={p.saveStems && stems}
@@ -99,7 +100,7 @@ export function VisualsStep(p: VisualsStepProps) {
               <div className={styles.listeningText}>
                 <span>Listening to the song…{pct > 0 ? ` ${pct}%` : ""}</span>
                 {listening.stage && <span className={styles.hint}>{listening.stage}</span>}
-                <Button size="sm" variant="ghost" onClick={listening.cancel}>
+                <Button size="sm" variant="ghost" onClick={listening.cancel} data-tip="Stop listening to the song">
                   Cancel
                 </Button>
               </div>
@@ -111,7 +112,7 @@ export function VisualsStep(p: VisualsStepProps) {
               tone="danger"
               title={listening.error.message}
               action={
-                <Button size="sm" onClick={listening.start}>
+                <Button size="sm" onClick={listening.start} data-tip="Listen to the song again">
                   Try again
                 </Button>
               }
@@ -120,7 +121,7 @@ export function VisualsStep(p: VisualsStepProps) {
             </Banner>
           )}
           {listening.status === "ready" && listening.ref?.summary && (
-            <span className={styles.hint} data-testid="listened">
+            <span className={styles.hint} data-testid="listened" data-tip="What the app found when it listened: tempo, key and whether instruments were split">
               Listened: {listening.ref.summary.tempo ? `${Math.round(listening.ref.summary.tempo)} bpm` : "tempo unknown"}
               {listening.ref.summary.key ? `, ${listening.ref.summary.key}` : ""}
               {listening.ref.summary.hasStems ? ", instruments separated" : ""}
@@ -129,7 +130,7 @@ export function VisualsStep(p: VisualsStepProps) {
         </div>
       </Section>
 
-      <SegmentedControl aria-label="Visuals" value={mode} options={MODES} onChange={setMode} />
+      <SegmentedControl aria-label="Visuals" data-tip="How to choose the visuals" value={mode} options={MODES} onChange={setMode} />
 
       <div className={styles.body}>
         {mode === "classic" && (
@@ -175,14 +176,14 @@ export function VisualsStep(p: VisualsStepProps) {
       </div>
 
       <div className={styles.footer}>
-        <span className={styles.design} data-testid="design-label">
+        <span className={styles.design} data-testid="design-label" data-tip="The visuals the video will use">
           Design: <strong>{label}</strong>
         </span>
         <span className={styles.spacer} />
-        <Button variant="ghost" size="sm" icon="external-link" onClick={p.onMakeInVisualizer}>
+        <Button variant="ghost" size="sm" icon="external-link" onClick={p.onMakeInVisualizer} data-tip="Open Visualizer with this song and these lyrics to make the whole video there">
           Make the whole video in Visualizer
         </Button>
-        <Button onClick={p.onContinue}>Continue to Look</Button>
+        <Button onClick={p.onContinue} data-tip="Go on to the shape, background and text look">Continue to Look</Button>
       </div>
     </div>
   );
@@ -206,7 +207,7 @@ function StemsModelBanner() {
       tone="info"
       title="The instrument separation model isn't downloaded"
       action={
-        <Button variant="primary" size="sm" icon="download" loading={busy} onClick={() => void install()}>
+        <Button variant="primary" size="sm" icon="download" loading={busy} onClick={() => void install()} data-tip="Download the model once; after that it works offline">
           Download
         </Button>
       }
@@ -250,9 +251,9 @@ function DesignerHost({ songPath, analysis, look, rows, meta, aspect, onDesign }
   return (
     <div className={styles.designer}>
       <div className={styles.bar}>
-        <IconButton icon="undo-2" label="Undo" kbd="Mod+Z" disabled={!history.canUndo} onClick={history.undo} />
-        <IconButton icon="redo-2" label="Redo" kbd="Mod+Shift+Z" disabled={!history.canRedo} onClick={history.redo} />
-        <span className={styles.name}>{history.show.name}</span>
+        <IconButton icon="undo-2" label="Undo" data-tip="Undo the last design change" kbd="Mod+Z" disabled={!history.canUndo} onClick={history.undo} />
+        <IconButton icon="redo-2" label="Redo" data-tip="Redo the change you just undid" kbd="Mod+Shift+Z" disabled={!history.canRedo} onClick={history.redo} />
+        <span className={styles.name} data-tip="The name of this design">{history.show.name}</span>
       </div>
       <VisualDesigner
         inputPath={songPath}

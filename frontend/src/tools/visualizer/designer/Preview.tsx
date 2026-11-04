@@ -96,7 +96,7 @@ export function Preview({ inputPath, analysis, show, aspect, mode, hostPlayer, o
       );
     } else if (media.status === "error") {
       body = (
-        <Banner tone="danger" title={media.error?.message ?? "Couldn't open the video"} action={<Button size="sm" onClick={media.retry}>Try again</Button>}>
+        <Banner tone="danger" title={media.error?.message ?? "Couldn't open the video"} action={<Button size="sm" onClick={media.retry} data-tip="Try opening the video again">Try again</Button>}>
           {media.error?.hint}
         </Banner>
       );
@@ -115,6 +115,7 @@ export function Preview({ inputPath, analysis, show, aspect, mode, hostPlayer, o
             ref={stage}
             className={styles.stage}
             data-testid="design-stage"
+            data-tip="The live preview of your design"
             onClick={() => {
               if (document.fullscreenElement === stage.current) (hostPlayer ?? ownPlayer.current)?.toggle();
             }}
@@ -127,7 +128,7 @@ export function Preview({ inputPath, analysis, show, aspect, mode, hostPlayer, o
           (media.status === "ready" && media.source ? (
             <MediaPlayer ref={ownPlayer} source={media.source} kind="audio" onTime={onTime} className={styles.audioPlayer} />
           ) : media.status === "error" ? (
-            <Banner tone="danger" title={media.error?.message ?? "Couldn't open the song"} action={<Button size="sm" onClick={media.retry}>Try again</Button>}>
+            <Banner tone="danger" title={media.error?.message ?? "Couldn't open the song"} action={<Button size="sm" onClick={media.retry} data-tip="Try opening the song again">Try again</Button>}>
               {media.error?.hint}
             </Banner>
           ) : (
@@ -155,16 +156,16 @@ export function Preview({ inputPath, analysis, show, aspect, mode, hostPlayer, o
           value={quality}
           onChange={setQuality}
           options={[
-            { value: "auto", label: "Auto" },
-            { value: "full", label: "Full" },
-            { value: "draft", label: "Draft" },
+            { value: "auto", label: "Auto", tip: "Lower the preview detail automatically if the computer struggles" },
+            { value: "full", label: "Full", tip: "Always show the preview at full detail; may stutter on slow machines" },
+            { value: "draft", label: "Draft", tip: "Show a faster, lower-detail preview; the export is unaffected" },
           ]}
         />
-        <span className={styles.fps} aria-label="Frames per second">
+        <span className={styles.fps} aria-label="Frames per second" data-tip="How smoothly the preview is drawing right now; the export is unaffected">
           {fps > 0 ? `${Math.round(fps)} fps` : "-- fps"}
         </span>
         <span className={styles.spacer} />
-        <IconButton size="sm" icon="maximize" label={fs.active ? "Leave full screen" : "Full screen"} kbd="F" pressed={fs.active} onClick={fs.toggle} />
+        <IconButton size="sm" icon="maximize" label={fs.active ? "Leave full screen" : "Full screen"} data-tip={fs.active ? "Go back to the designer" : "Fill the screen with the preview; click it to play or pause"} kbd="F" pressed={fs.active} onClick={fs.toggle} />
       </div>
     </div>
   );

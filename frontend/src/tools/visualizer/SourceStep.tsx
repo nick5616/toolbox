@@ -82,7 +82,7 @@ function ModelRows({ ids, moodMissing }: { ids: string[]; moodMissing: boolean }
           tone="info"
           title={`${modelLabel(id)} isn't downloaded`}
           action={
-            <Button variant="primary" size="sm" icon="download" loading={busy} onClick={() => void install()}>
+            <Button variant="primary" size="sm" icon="download" loading={busy} onClick={() => void install()} data-tip="Download the model once; after that it works offline">
               Download
             </Button>
           }
@@ -196,12 +196,12 @@ export default function SourceStep({ onAnalyze }: SourceStepProps) {
 
   const choice = wordsChoiceOf(o.words);
   const words = hasWords(o);
-  const wordsOptions: Array<{ value: WordsChoice; label: string }> = [
-    ...(seedFrom && seedLines ? [{ value: "given" as const, label: SEED_LABEL[seedFrom] }] : []),
-    { value: "detect", label: "Detect from the audio" },
-    { value: "align", label: "Paste lyrics" },
-    { value: "file", label: "From a file" },
-    { value: "none", label: "No words" },
+  const wordsOptions: Array<{ value: WordsChoice; label: string; tip?: string }> = [
+    ...(seedFrom && seedLines ? [{ value: "given" as const, label: SEED_LABEL[seedFrom], tip: "Use the lines and timing already made in the other tool" }] : []),
+    { value: "detect", label: "Detect from the audio", tip: "Listen to the vocals and write out the words with timing" },
+    { value: "align", label: "Paste lyrics", tip: "Paste the real lyrics; they are matched to the singing for accurate timing" },
+    { value: "file", label: "From a file", tip: "Load lyrics from an .lrc, .srt, .vtt or .txt file" },
+    { value: "none", label: "No words", tip: "Skip words; visuals follow only the music" },
   ];
   const langOptions = [{ value: "", label: "Detect the language" }, ...languages.map((l) => ({ value: l.code, label: l.name }))];
 
@@ -221,7 +221,7 @@ export default function SourceStep({ onAnalyze }: SourceStepProps) {
       <div className={styles.empty}>
         <DropZone id="tool-drop:visualizer" icon="sparkles" label="Drop a song or video" hint="Visuals that follow the instruments, the beat, the chords and the words.">
           <div className={styles.buttonRow}>
-            <Button icon="plus" onClick={() => void pick()}>
+            <Button icon="plus" onClick={() => void pick()} data-tip="Pick an audio or video file from your computer">
               Choose a file…
             </Button>
           </div>
@@ -236,11 +236,11 @@ export default function SourceStep({ onAnalyze }: SourceStepProps) {
   return (
     <div className={styles.body}>
       <div className={styles.card}>
-        <div className={styles.cover} aria-label={isVideo ? "Video still" : "Cover art"}>
+        <div className={styles.cover} aria-label={isVideo ? "Video still" : "Cover art"} data-tip={isVideo ? "A still frame from the video" : "The cover art embedded in the file"}>
           {coverUrl ? <img src={coverUrl} alt="" /> : <Icon name={isVideo ? "film" : "music"} size={32} />}
         </div>
         <div className={styles.info}>
-          <div className={styles.fileName} title={input}>
+          <div className={styles.fileName} data-tip={input}>
             {tagTitle || basename(input)}
           </div>
           <div className={styles.meta}>
@@ -254,26 +254,26 @@ export default function SourceStep({ onAnalyze }: SourceStepProps) {
             {info && [tagArtist, isVideo ? "Video" : "Audio", formatMs(info.durationMs)].filter(Boolean).join(" · ")}
           </div>
         </div>
-        <Button size="sm" variant="ghost" onClick={() => void pick()}>
+        <Button size="sm" variant="ghost" onClick={() => void pick()} data-tip="Choose a different song or video">
           Change
         </Button>
       </div>
 
       {isVideo && (
-        <Section label="Video">
+        <Section label="Video" tip="Whether the visuals draw over the picture or replace it">
           <SegmentedControl
             aria-label="Video"
             value={mode}
             options={[
-              { value: "overlay", label: "Over the video" },
-              { value: "full", label: "Use only its sound" },
+              { value: "overlay", label: "Over the video", tip: "Draw the visuals on top of your video and keep its picture" },
+              { value: "full", label: "Use only its sound", tip: "Ignore the picture and make full-screen visuals for the soundtrack" },
             ]}
             onChange={(v) => useVisualizer.getState().setMode(v)}
           />
         </Section>
       )}
 
-      <Section label="Words">
+      <Section label="Words" tip="Where the lyrics come from, so visuals can follow them">
         <div className={styles.form}>
           <SegmentedControl
             aria-label="Words"
@@ -286,17 +286,17 @@ export default function SourceStep({ onAnalyze }: SourceStepProps) {
               aria-label="Lyrics"
               value={o.lyricsText}
               onChange={(e) => set({ lyricsText: e.target.value })}
-              placeholder="Paste the lyrics here"
+              placeholder="Paste the lyrics here" data-tip="Plain lyrics, one line per row; blank lines separate verses"
               minRows={5}
               maxRows={12}
             />
           )}
           {choice === "file" && (
             <div className={styles.row}>
-              <Button size="sm" variant="secondary" icon="file-text" onClick={() => void pickLyrics()}>
+              <Button size="sm" variant="secondary" icon="file-text" onClick={() => void pickLyrics()} data-tip="Pick a lyrics file: .lrc, .srt, .vtt or .txt">
                 {o.lyricsPath ? "Change file…" : "Choose a lyrics file…"}
               </Button>
-              <span className={styles.hint} title={o.lyricsPath}>
+              <span className={styles.hint} data-tip={o.lyricsPath || "Accepted lyrics file types"}>
                 {o.lyricsPath ? basename(o.lyricsPath) : ".lrc, .srt, .vtt or .txt"}
               </span>
             </div>
@@ -309,31 +309,32 @@ export default function SourceStep({ onAnalyze }: SourceStepProps) {
           {(choice === "detect" || choice === "align") && (
             <label className={styles.row}>
               <span className={styles.fieldLabel}>Language</span>
-              <Select aria-label="Language" size="sm" value={o.language} options={langOptions} onChange={(v) => set({ language: v })} />
+              <Select aria-label="Language" data-tip="The language sung; pick it if detection gets it wrong" size="sm" value={o.language} options={langOptions} onChange={(v) => set({ language: v })} />
             </label>
           )}
         </div>
       </Section>
 
-      <Section label="Instruments">
+      <Section label="Instruments" tip="Split the song into drums, bass, vocals and other">
         <div className={styles.form}>
-          <Switch label="Separate instruments" checked={o.stems} onChange={(v) => set({ stems: v, saveStems: v && o.saveStems })} />
+          <Switch tip="Split the song so each instrument can drive its own visuals; takes about as long as the song" label="Separate instruments" checked={o.stems} onChange={(v) => set({ stems: v, saveStems: v && o.saveStems })} />
           <span className={styles.hint}>Lets drums, bass, vocals and other instruments drive different visuals. Takes about as long as the song.</span>
           <div className={styles.indent}>
-            <Switch label="Also save the stems to the Library" checked={o.stems && o.saveStems} disabled={!o.stems} onChange={(v) => set({ saveStems: v })} />
+            <Switch tip={o.stems ? "Keep the separated instrument tracks as audio files in your Library" : "Turn on Separate instruments first"} label="Also save the stems to the Library" checked={o.stems && o.saveStems} disabled={!o.stems} onChange={(v) => set({ saveStems: v })} />
           </div>
         </div>
       </Section>
 
-      <Section label="Mood">
+      <Section label="Mood" tip="Let the meaning of the words shape the visuals">
         <div className={styles.form}>
-          <Switch label="Read the mood of the words" checked={words && o.mood} disabled={!words} onChange={(v) => set({ mood: v })} />
+          <Switch tip={words ? "A small local model reads how each line feels and what it pictures" : "Choose a Words option first"} label="Read the mood of the words" checked={words && o.mood} disabled={!words} onChange={(v) => set({ mood: v })} />
           <span className={styles.hint}>
             A small local model reads how each line feels and what it pictures (fire, rain, stars…), in any language.
             {!words && " Choose a Words option to turn this on."}
           </span>
           <div className={styles.indent}>
             <Switch
+              tip={!words || !o.mood ? "Turn on the mood reading first" : chatReady ? "Use your local chat model for a slower, subtler reading" : "Needs a model downloaded in Local Chat"}
               label="Deeper reading with Local Chat"
               checked={words && o.mood && o.deepRead}
               disabled={!words || !o.mood || !chatReady}
@@ -353,7 +354,7 @@ export default function SourceStep({ onAnalyze }: SourceStepProps) {
 
       <div className={styles.footer}>
         {blockReason && <span className={styles.reason}>{blockReason}</span>}
-        <Button icon="sparkles" onClick={analyze} disabled={!!blockReason || media.status === "error"}>
+        <Button icon="sparkles" onClick={analyze} disabled={!!blockReason || media.status === "error"} data-tip={blockReason || "Listen to the song and map its beats, sections, instruments and words"}>
           Analyze
         </Button>
       </div>

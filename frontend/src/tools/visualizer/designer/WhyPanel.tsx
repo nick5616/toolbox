@@ -11,7 +11,7 @@ export function WhyPanel({ show }: { show: Show }) {
   const facts = useMemo(() => (d ? whyFacts(show, d.analysis, d.signals, d.liveMs) : []), [show, d]);
   if (facts.length === 0) return null;
   return (
-    <div className={styles.why} aria-label="Why" role="status">
+    <div className={styles.why} aria-label="Why" role="status" data-tip="What is driving the visuals at the playhead right now">
       <Icon name="info" size={14} className={styles.whyIcon} />
       <ul className={styles.whyList}>
         {facts.map((f, i) => (

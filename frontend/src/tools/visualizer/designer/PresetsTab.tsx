@@ -54,6 +54,7 @@ export function PresetsTab({ show, onChange, analysis, mode, aspect, playheadMs,
               <TextField
                 size="sm"
                 aria-label="Preset name"
+                data-tip="A name for this design in My presets"
                 autoFocus
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -70,6 +71,7 @@ export function PresetsTab({ show, onChange, analysis, mode, aspect, playheadMs,
               <Button
                 size="sm"
                 variant="primary"
+                data-tip={name.trim() ? "Keep this design in My presets" : "Type a name first"}
                 disabled={!name.trim()}
                 onClick={() => {
                   onSavePreset({ ...show, name: name.trim() });
@@ -78,7 +80,7 @@ export function PresetsTab({ show, onChange, analysis, mode, aspect, playheadMs,
               >
                 Save
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setNaming(false)}>
+              <Button size="sm" variant="ghost" data-tip="Close without saving" onClick={() => setNaming(false)}>
                 Cancel
               </Button>
             </>
@@ -86,6 +88,7 @@ export function PresetsTab({ show, onChange, analysis, mode, aspect, playheadMs,
             <Button
               size="sm"
               icon="plus"
+              data-tip="Save the current design so you can load it again from My presets"
               onClick={() => {
                 setName(show.name && !PRESETS.some((p) => p.name === show.name) ? show.name : "My preset");
                 setNaming(true);

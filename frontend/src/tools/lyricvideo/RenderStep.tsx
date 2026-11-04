@@ -29,7 +29,7 @@ function PreviewClip({ path }: { path: string }) {
   const media = useMediaSource(path);
   if (media.status === "error") {
     return (
-      <Banner tone="danger" title={media.error?.message ?? "Couldn't open the preview"} action={<Button size="sm" onClick={media.retry}>Try again</Button>}>
+      <Banner tone="danger" title={media.error?.message ?? "Couldn't open the preview"} action={<Button size="sm" onClick={media.retry} data-tip="Try opening the preview clip again">Try again</Button>}>
         {media.error?.hint}
       </Banner>
     );
@@ -49,10 +49,10 @@ export function RenderStep(p: RenderStepProps) {
       {p.warning && <Banner tone="warn" title={p.warning} />}
       {p.instrumental && <DepsGate moduleId={p.moduleId} />}
 
-      <Section label="Preview">
+      <Section label="Preview" tip="Render a short sample with the exact look before the full render">
         <div className={styles.form}>
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>Starts at {formatMs(p.previewStartMs)}</span>
+            <span className={styles.fieldLabel} data-tip="Where in the song the 10 second preview starts">Starts at {formatMs(p.previewStartMs)}</span>
             <Slider
               aria-label="Preview start"
               min={0}
@@ -64,7 +64,7 @@ export function RenderStep(p: RenderStepProps) {
             />
           </label>
           <div className={styles.buttonRow}>
-            <Button icon="play" variant="secondary" onClick={p.onPreview} loading={p.preview.busy} disabled={gated || busy}>
+            <Button icon="play" variant="secondary" onClick={p.onPreview} loading={p.preview.busy} disabled={gated || busy} data-tip={p.blocker || (gated ? "The AI engine isn't installed yet" : busy ? "Wait for the current render to finish" : "Render 10 seconds from the chosen start so you can check the exact result")}>
               Render 10 s preview
             </Button>
           </div>
@@ -73,13 +73,13 @@ export function RenderStep(p: RenderStepProps) {
         </div>
       </Section>
 
-      <Section label="Video">
+      <Section label="Video" tip="Render the finished lyric video">
         <div className={styles.form}>
           <div className={styles.buttonRow}>
-            <Button icon="film" onClick={p.onRender} loading={p.render.busy} disabled={gated || busy}>
+            <Button icon="film" onClick={p.onRender} loading={p.render.busy} disabled={gated || busy} data-tip={p.blocker || (gated ? "The AI engine isn't installed yet" : busy ? "Wait for the current render to finish" : "Render the whole video and save it to your Library")}>
               Render video
             </Button>
-            <span className={styles.muted}>Also saves the timings as a .lrc file.</span>
+            <span className={styles.muted} data-tip="An .lrc file with the line times is saved next to the video">Also saves the timings as a .lrc file.</span>
           </div>
           <RunStatus run={p.render} runningLabel="Rendering the video…" doneLabel="Your lyric video is ready" />
         </div>

@@ -32,7 +32,7 @@ export function SongStep(p: SongStepProps) {
           hint="Turn a song and its lyrics into a video with the words on screen."
         >
           <div className={styles.buttonRow}>
-            <Button icon="plus" onClick={p.onPick}>
+            <Button icon="plus" onClick={p.onPick} data-tip="Pick an audio file from your computer">
               Choose a song…
             </Button>
           </div>
@@ -45,11 +45,11 @@ export function SongStep(p: SongStepProps) {
   return (
     <div className={styles.songBody}>
       <div className={styles.songCard}>
-        <div className={styles.cover} aria-label="Cover art">
+        <div className={styles.cover} aria-label="Cover art" data-tip="The cover art embedded in the song">
           {p.coverUrl ? <img src={p.coverUrl} alt="" /> : <Icon name="music" size={32} />}
         </div>
         <div className={styles.songInfo}>
-          <div className={styles.fileName} title={p.songPath}>
+          <div className={styles.fileName} data-tip={p.songPath}>
             {basename(p.songPath)}
           </div>
           <div className={styles.fileMeta}>
@@ -63,39 +63,39 @@ export function SongStep(p: SongStepProps) {
             {info && `${formatMs(info.durationMs)}${info.hasCover ? " · has cover art" : " · no cover art"}`}
           </div>
         </div>
-        <Button size="sm" variant="ghost" onClick={p.onPick}>
+        <Button size="sm" variant="ghost" onClick={p.onPick} data-tip="Choose a different song">
           Change
         </Button>
       </div>
 
       {p.media.status === "error" && (
-        <Banner tone="danger" title={p.media.error?.message ?? "Couldn't open this song"} action={<Button size="sm" onClick={p.media.retry}>Try again</Button>}>
+        <Banner tone="danger" title={p.media.error?.message ?? "Couldn't open this song"} action={<Button size="sm" onClick={p.media.retry} data-tip="Try reading the song again">Try again</Button>}>
           {p.media.error?.hint}
         </Banner>
       )}
 
-      <Section label="Title and artist">
+      <Section label="Title and artist" tip="Used on the title card at the start of the video">
         <div className={styles.form}>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>Title</span>
-            <TextField aria-label="Title" value={p.title} onChange={(e) => p.onTitle(e.target.value)} placeholder="Song title" />
+            <TextField aria-label="Title" data-tip="The song title for the title card" value={p.title} onChange={(e) => p.onTitle(e.target.value)} placeholder="Song title" />
           </label>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>Artist</span>
-            <TextField aria-label="Artist" value={p.artist} onChange={(e) => p.onArtist(e.target.value)} placeholder="Artist" />
+            <TextField aria-label="Artist" data-tip="The artist name for the title card" value={p.artist} onChange={(e) => p.onArtist(e.target.value)} placeholder="Artist" />
           </label>
           <span className={styles.hint}>Shown on the title card at the start of the video.</span>
         </div>
       </Section>
 
-      <Section label="Audio in the video">
+      <Section label="Audio in the video" tip="Which version of the sound the finished video carries">
         <div className={styles.form}>
           <SegmentedControl
             aria-label="Audio"
             value={p.audio}
             options={[
-              { value: "original", label: "Original" },
-              { value: "instrumental", label: "Instrumental (karaoke)" },
+              { value: "original", label: "Original", tip: "Use the song exactly as it is, vocals included" },
+              { value: "instrumental", label: "Instrumental (karaoke)", tip: "Remove the vocals so people can sing along; made on your computer by the AI engine" },
             ]}
             onChange={p.onAudio}
           />
@@ -108,7 +108,7 @@ export function SongStep(p: SongStepProps) {
       </Section>
 
       <div className={styles.footer}>
-        <Button onClick={p.onContinue} disabled={!ready}>
+        <Button onClick={p.onContinue} disabled={!ready} data-tip={ready ? "Go on to get and fix the lyrics" : "Wait until the song has been read"}>
           {p.rows.length > 0 ? "Continue to Lyrics" : "Next: Lyrics"}
         </Button>
       </div>

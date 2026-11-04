@@ -31,6 +31,13 @@ const STEPS: Array<{ id: VisualizerStep; label: string }> = [
   { id: "export", label: "Export" },
 ];
 
+const STEP_TIP: Record<VisualizerStep, string> = {
+  source: "Choose the song or video and what to analyse",
+  analyze: "Listen to the song and build its map of beats, sections and words",
+  design: "Choose the look and how the visuals react to the music",
+  export: "Render the visuals to a video file",
+};
+
 export const LAST_SHOW_KEY = "visualizer.lastShow";
 const MAX_KEYS = 50;
 
@@ -178,7 +185,7 @@ export default function VisualizerView({ moduleId }: ToolViewProps) {
     <div className={styles.root}>
       <nav className={styles.steps} aria-label="Steps">
         {STEPS.map((s, i) => (
-          <button key={s.id} type="button" className={cx(styles.step, step === s.id && styles.stepOn)} aria-current={step === s.id ? "step" : undefined} disabled={!reachable(s.id)} onClick={() => setStep(s.id)}>
+          <button key={s.id} type="button" data-tip={reachable(s.id) ? STEP_TIP[s.id] : STEP_TIP[s.id] + " (finish the earlier steps first)"} className={cx(styles.step, step === s.id && styles.stepOn)} aria-current={step === s.id ? "step" : undefined} disabled={!reachable(s.id)} onClick={() => setStep(s.id)}>
             <span className={styles.stepNum}>{i + 1}</span>
             {s.label}
             {i < STEPS.length - 1 && <Icon name="chevron-right" size={12} className={styles.stepSep} />}

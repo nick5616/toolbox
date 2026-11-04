@@ -53,10 +53,10 @@ export function SourceStep(p: SourceStepProps) {
           hint="Generate subtitles from speech, or edit ones you already have."
         >
           <div className={styles.buttonRow}>
-            <Button icon="plus" onClick={p.onPickMedia}>
+            <Button icon="plus" onClick={p.onPickMedia} data-tip="Pick a video or audio file to generate subtitles from its speech">
               Choose a video or audio file…
             </Button>
-            <Button variant="secondary" icon="file-text" onClick={p.onPickSubtitleFile}>
+            <Button variant="secondary" icon="file-text" onClick={p.onPickSubtitleFile} data-tip="Open an .srt or .vtt file you already have to edit it">
               Use a subtitle file…
             </Button>
           </div>
@@ -71,7 +71,7 @@ export function SourceStep(p: SourceStepProps) {
         <div className={styles.fileCard}>
           <Icon name={info && !info.video ? "music" : "film"} size={18} />
           <div className={styles.fileInfo}>
-            <div className={styles.fileName} title={p.mediaPath}>
+            <div className={styles.fileName} data-tip={p.mediaPath}>
               {basename(p.mediaPath)}
             </div>
             <div className={styles.fileMeta}>
@@ -85,14 +85,14 @@ export function SourceStep(p: SourceStepProps) {
               {info && `${formatMs(info.durationMs)} · ${info.video ? "video" : "audio"}`}
             </div>
           </div>
-          <Button size="sm" variant="ghost" onClick={p.onPickMedia} disabled={busy}>
+          <Button size="sm" variant="ghost" onClick={p.onPickMedia} disabled={busy} data-tip={busy ? "Wait for the current task to finish" : "Choose a different video or audio file"}>
             Change
           </Button>
         </div>
       )}
 
       {p.media.status === "error" && p.mediaPath && (
-        <Banner tone="danger" title={p.media.error?.message ?? "Couldn't open this file"} action={<Button size="sm" onClick={p.media.retry}>Try again</Button>}>
+        <Banner tone="danger" title={p.media.error?.message ?? "Couldn't open this file"} action={<Button size="sm" onClick={p.media.retry} data-tip="Try reading the file again">Try again</Button>}>
           {p.media.error?.hint}
         </Banner>
       )}
@@ -111,14 +111,14 @@ export function SourceStep(p: SourceStepProps) {
             <div className={styles.fileMeta}>{p.subPath ? basename(p.subPath) : "Ready to edit"}</div>
           </div>
           {!p.mediaPath && (
-            <Button size="sm" variant="secondary" icon="film" onClick={p.onPickMedia}>
+            <Button size="sm" variant="secondary" icon="film" onClick={p.onPickMedia} data-tip="Add the video so you can see the subtitles on the picture while editing">
               Pick the video (optional)
             </Button>
           )}
-          <Button size="sm" onClick={p.onContinue}>
+          <Button size="sm" onClick={p.onContinue} data-tip="Open the subtitle editor">
             Edit
           </Button>
-          <Button size="sm" variant="ghost" onClick={p.onStartOver}>
+          <Button size="sm" variant="ghost" onClick={p.onStartOver} data-tip="Discard these subtitles and begin again">
             Start over
           </Button>
         </div>
@@ -126,12 +126,13 @@ export function SourceStep(p: SourceStepProps) {
 
       {p.mediaPath && (
         <>
-          <Section label="Generate from speech">
+          <Section label="Generate from speech" tip="Listen to the audio on your computer and write out what is said, with timing">
             <div className={styles.form}>
               <label className={styles.field}>
                 <span className={styles.fieldLabel}>Model</span>
                 <Select
                   aria-label="Model"
+                  data-tip="Base is quickest, Small is balanced, Turbo is the most accurate but slowest"
                   value={prefs.model}
                   options={MODEL_CHOICES}
                   onChange={(model) => setPrefs((o) => ({ ...o, model }))}
@@ -141,18 +142,20 @@ export function SourceStep(p: SourceStepProps) {
                 <span className={styles.fieldLabel}>Spoken language</span>
                 <Select
                   aria-label="Spoken language"
+                  data-tip="The language spoken in the file; set it if auto-detect gets it wrong"
                   value={prefs.language}
                   options={languageOptions}
                   onChange={(language) => setPrefs((o) => ({ ...o, language }))}
                 />
               </label>
               <Switch
+                tip="Write the subtitles in English whatever language is spoken"
                 checked={prefs.translateToEnglish}
                 onChange={(translateToEnglish) => setPrefs((o) => ({ ...o, translateToEnglish }))}
                 label="Translate to English"
               />
               <div>
-                <Button size="sm" variant="ghost" icon={more ? "chevron-up" : "chevron-down"} aria-expanded={more} onClick={() => setMore((m) => !m)}>
+                <Button size="sm" variant="ghost" icon={more ? "chevron-up" : "chevron-down"} aria-expanded={more} data-tip="Fine-tune how the text is split into subtitles" onClick={() => setMore((m) => !m)}>
                   More
                 </Button>
               </div>
@@ -162,6 +165,7 @@ export function SourceStep(p: SourceStepProps) {
                     <span className={styles.fieldLabel}>Characters per line</span>
                     <Stepper
                       aria-label="Characters per line"
+                      data-tip="The most characters on one line before it wraps; 32 to 60"
                       value={prefs.maxLineChars}
                       min={32}
                       max={60}
@@ -172,10 +176,11 @@ export function SourceStep(p: SourceStepProps) {
                     <span className={styles.fieldLabel}>Lines</span>
                     <SegmentedControl
                       aria-label="Lines per subtitle"
+                      data-tip="How many lines one subtitle may have on screen"
                       value={String(prefs.maxLines)}
                       options={[
-                        { value: "1", label: "1" },
-                        { value: "2", label: "2" },
+                        { value: "1", label: "1", tip: "One line per subtitle; shorter, quicker to read" },
+                        { value: "2", label: "2", tip: "Up to two lines per subtitle, the usual style" },
                       ]}
                       onChange={(v) => setPrefs((o) => ({ ...o, maxLines: Number(v) }))}
                     />
@@ -183,7 +188,7 @@ export function SourceStep(p: SourceStepProps) {
                 </div>
               )}
               <div>
-                <Button icon="captions" onClick={p.onGenerate} loading={p.gen.busy} disabled={busy || p.media.status === "error"}>
+                <Button icon="captions" onClick={p.onGenerate} loading={p.gen.busy} disabled={busy || p.media.status === "error"} data-tip={p.media.status === "error" ? "The file couldn't be read" : busy ? "Wait for the current task to finish" : "Listen to the speech and write subtitles for it"}>
                   Generate subtitles
                 </Button>
               </div>
@@ -191,7 +196,7 @@ export function SourceStep(p: SourceStepProps) {
             </div>
           </Section>
 
-          <Section label="Subtitles inside this video">
+          <Section label="Subtitles inside this video" tip="Subtitle tracks already stored in the file">
             {p.media.status === "loading" ? (
               <div className={styles.muted}>Reading the file…</div>
             ) : textStreams.length === 0 && otherStreams.length === 0 ? (
@@ -204,7 +209,7 @@ export function SourceStep(p: SourceStepProps) {
                       {s.title || `Track ${s.index}`}
                       <span className={styles.muted}> · {s.language || "unknown language"} · {s.codec}</span>
                     </span>
-                    <Button size="sm" variant="secondary" disabled={busy} onClick={() => p.onExtract(s.index)}>
+                    <Button size="sm" variant="secondary" disabled={busy} onClick={() => p.onExtract(s.index)} data-tip="Copy this track out of the video so you can edit it">
                       Use this track
                     </Button>
                   </li>
@@ -215,7 +220,7 @@ export function SourceStep(p: SourceStepProps) {
                       {s.title || `Track ${s.index}`}
                       <span className={styles.muted}> · {s.language || "unknown language"} · {s.codec}</span>
                     </span>
-                    <span className={styles.muted}>Picture-based, can't be edited</span>
+                    <span className={styles.muted} data-tip="This track is made of images, not text, so it can't be read or edited here">Picture-based, can't be edited</span>
                   </li>
                 ))}
               </ul>
@@ -225,9 +230,9 @@ export function SourceStep(p: SourceStepProps) {
         </>
       )}
 
-      <Section label="Subtitle file">
+      <Section label="Subtitle file" tip="Edit subtitles you already have">
         <div className={styles.buttonRow}>
-          <Button variant="secondary" icon="file-text" onClick={p.onPickSubtitleFile} disabled={busy}>
+          <Button variant="secondary" icon="file-text" onClick={p.onPickSubtitleFile} disabled={busy} data-tip={busy ? "Wait for the current task to finish" : "Open an .srt or .vtt file to edit it"}>
             Use a subtitle file…
           </Button>
           <span className={styles.muted}>An .srt or .vtt you already have.</span>

@@ -95,7 +95,7 @@ function StyleCard({
     return () => ro.disconnect();
   }, []);
   return (
-    <button type="button" role="radio" aria-checked={selected} className={cx(styles.styleCard, selected && styles.styleOn)} onClick={onSelect}>
+    <button type="button" role="radio" aria-checked={selected} data-tip={`${info.label}: a look for the burned-in text; click to use it`} className={cx(styles.styleCard, selected && styles.styleOn)} onClick={onSelect}>
       <span ref={box} className={styles.still} style={{ aspectRatio: String(aspect) }}>
         {still && <img src={still} alt="" className={styles.stillImg} />}
         {backdrop}
@@ -202,7 +202,7 @@ export function ExportStep(p: ExportStepProps) {
           onOpenDesigner={p.onOpenDesigner}
         />
         <div>
-          <Button variant="ghost" icon="sparkles" onClick={p.onOpenInVisualizer}>
+          <Button variant="ghost" icon="sparkles" onClick={p.onOpenInVisualizer} data-tip="Open Visualizer with this audio and these words for the full set of reactions">
             Make it fully reactive in Visualizer
           </Button>
         </div>
@@ -218,16 +218,17 @@ export function ExportStep(p: ExportStepProps) {
         </Banner>
       )}
 
-      <Section label="Save as a file">
+      <Section label="Save as a file" tip="Write the subtitles to .srt or .vtt files in your Library">
         <div className={styles.form}>
           <div className={styles.field}>
-            <span className={styles.fieldLabel}>Formats</span>
+            <span className={styles.fieldLabel} data-tip="Pick one or both; at least one stays on">Formats</span>
             <div className={styles.chips} role="group" aria-label="Formats">
               {["srt", "vtt"].map((f) => (
                 <button
                   key={f}
                   type="button"
                   aria-pressed={formats.includes(f)}
+                  data-tip={f === "srt" ? "SubRip: the most widely supported subtitle format" : "WebVTT: the format used by web video players"}
                   className={cx(styles.chip, formats.includes(f) && styles.chipOn)}
                   onClick={() => toggleFormat(f)}
                 >
@@ -237,7 +238,7 @@ export function ExportStep(p: ExportStepProps) {
             </div>
           </div>
           <div>
-            <Button icon="check" loading={p.save.busy} disabled={p.blocker !== null || p.cueCount === 0 || anyBusy} onClick={p.onSave}>
+            <Button icon="check" loading={p.save.busy} disabled={p.blocker !== null || p.cueCount === 0 || anyBusy} data-tip={p.blocker ?? (p.cueCount === 0 ? "There are no subtitles to save" : anyBusy ? "Wait for the current task to finish" : "Save the subtitles in the chosen formats")} onClick={p.onSave}>
               Save {formats.map((f) => f.toUpperCase()).join(" + ")}
             </Button>
           </div>
@@ -245,13 +246,13 @@ export function ExportStep(p: ExportStepProps) {
         </div>
       </Section>
 
-      <Section label="Add as a track">
+      <Section label="Add as a track" tip="Put the subtitles inside a copy of the video as a track the player can switch on or off">
         <div className={styles.form}>
           <div className={styles.muted}>
             No quality loss: the video is copied as is, and the player can turn the subtitles on or off.
           </div>
           {needVideo ? (
-            <Button variant="secondary" icon="film" onClick={p.onPickMedia}>
+            <Button variant="secondary" icon="film" onClick={p.onPickMedia} data-tip="A track needs a video to ride with; choose one">
               Pick the video
             </Button>
           ) : (
@@ -260,13 +261,14 @@ export function ExportStep(p: ExportStepProps) {
                 <span className={styles.fieldLabel}>Track language</span>
                 <Select
                   aria-label="Track language"
+                  data-tip="The language label stored with the track so players can show it"
                   value={p.prefs.trackLanguage}
                   options={langOptions}
                   onChange={(trackLanguage) => p.setPrefs((o) => ({ ...o, trackLanguage }))}
                 />
               </label>
               <div>
-                <Button icon="captions" loading={p.embed.busy} disabled={p.blocker !== null || p.cueCount === 0 || anyBusy || p.media.status === "error"} onClick={p.onEmbed}>
+                <Button icon="captions" loading={p.embed.busy} disabled={p.blocker !== null || p.cueCount === 0 || anyBusy || p.media.status === "error"} data-tip={p.blocker ?? (p.cueCount === 0 ? "There are no subtitles to add" : anyBusy ? "Wait for the current task to finish" : p.media.status === "error" ? "The video couldn't be read" : "Copy the video with the subtitles added as a switchable track; the picture is not re-encoded")} onClick={p.onEmbed}>
                   Add subtitle track
                 </Button>
               </div>
@@ -276,13 +278,13 @@ export function ExportStep(p: ExportStepProps) {
         </div>
       </Section>
 
-      <Section label={isAudio ? "Make a video" : "Burn into the video"}>
+      <Section label={isAudio ? "Make a video" : "Burn into the video"} tip={isAudio ? "Turn the audio into a video with the subtitles drawn on a background" : "Draw the subtitles into the picture so they show everywhere; the video is re-encoded"}>
         <div className={styles.form}>
           {p.mediaPath === null ? (
             <>
               <div className={styles.muted}>Burning draws the text into the picture. It needs the video, or an audio file to make a video from.</div>
               <div>
-                <Button variant="secondary" icon="film" onClick={p.onPickMedia}>
+                <Button variant="secondary" icon="film" onClick={p.onPickMedia} data-tip="Choose the video or audio file to draw the subtitles on">
                   Pick the video
                 </Button>
               </div>
@@ -294,11 +296,11 @@ export function ExportStep(p: ExportStepProps) {
                   <div className={styles.muted}>Makes a video from the audio, with the subtitles drawn on a background.</div>
                   <div className={styles.inlineFields}>
                     <div className={styles.field}>
-                      <span className={styles.fieldLabel}>Canvas</span>
-                      <SegmentedControl aria-label="Canvas" value={p.prefs.canvas} options={CANVAS_CHOICES} onChange={(canvas) => p.setPrefs((o) => ({ ...o, canvas }))} />
+                      <span className={styles.fieldLabel} data-tip="The shape of the video that will be made">Canvas</span>
+                      <SegmentedControl aria-label="Canvas" data-tip="The shape of the video that will be made" value={p.prefs.canvas} options={CANVAS_CHOICES} onChange={(canvas) => p.setPrefs((o) => ({ ...o, canvas }))} />
                     </div>
                     <div className={styles.field}>
-                      <span className={styles.fieldLabel}>Quality</span>
+                      <span className={styles.fieldLabel} data-tip="Height of the picture in pixels">Quality</span>
                       <SegmentedControl
                         aria-label="Quality"
                         value={String(p.prefs.canvasHeight)}
@@ -307,7 +309,7 @@ export function ExportStep(p: ExportStepProps) {
                       />
                     </div>
                     <div className={styles.field}>
-                      <span className={styles.fieldLabel}>Background</span>
+                      <span className={styles.fieldLabel} data-tip="What shows behind the subtitles">Background</span>
                       <SegmentedControl
                         aria-label="Background"
                         value={p.prefs.background}
@@ -321,7 +323,7 @@ export function ExportStep(p: ExportStepProps) {
                   )}
                   {p.prefs.background === "image" && (
                     <div className={styles.field}>
-                      <Button variant="secondary" icon="image" onClick={() => void pickImage()}>
+                      <Button variant="secondary" icon="image" data-tip="Pick a picture to use as the background" onClick={() => void pickImage()}>
                         {p.prefs.backgroundPath ? "Change the image" : "Choose an image"}
                       </Button>
                       {p.prefs.backgroundPath && <PathText path={p.prefs.backgroundPath} />}
@@ -332,20 +334,20 @@ export function ExportStep(p: ExportStepProps) {
               )}
               {!isAudio && (
                 <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Visuals</span>
+                  <span className={styles.fieldLabel} data-tip="Optional animated graphics drawn over the video">Visuals</span>
                   <SegmentedControl
                     aria-label="Visuals"
                     value={p.addVisuals ? "add" : "none"}
                     options={[
-                      { value: "none", label: "None" },
-                      { value: "add", label: "Add visuals over the video" },
+                      { value: "none", label: "None", tip: "Only the subtitles are added to the picture" },
+                      { value: "add", label: "Add visuals over the video", tip: "Draw animated visuals that react to the sound over your video" },
                     ]}
                     onChange={(v) => p.onAddVisuals(v === "add")}
                   />
                 </div>
               )}
               {!isAudio && p.addVisuals && visualsPicker("overlay")}
-              <div role="radiogroup" aria-label="Style" className={styles.styleCards}>
+              <div role="radiogroup" aria-label="Style" data-tip="Choose how the burned-in text looks" className={styles.styleCards}>
                 {p.styleInfos.map((s) => (
                   <StyleCard
                     key={s.id}
@@ -362,7 +364,7 @@ export function ExportStep(p: ExportStepProps) {
               </div>
               <div className={styles.inlineFields}>
                 <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Size</span>
+                  <span className={styles.fieldLabel} data-tip="How big the text is relative to the picture">Size</span>
                   <SegmentedControl
                     aria-label="Size"
                     value={p.prefs.size}
@@ -371,7 +373,7 @@ export function ExportStep(p: ExportStepProps) {
                   />
                 </div>
                 <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Position</span>
+                  <span className={styles.fieldLabel} data-tip="Where on the picture the text sits">Position</span>
                   <SegmentedControl
                     aria-label="Position"
                     value={p.prefs.position}
@@ -381,7 +383,7 @@ export function ExportStep(p: ExportStepProps) {
                 </div>
                 <label className={styles.field}>
                   <span className={styles.fieldLabel}>Font</span>
-                  <Select aria-label="Font" value={p.prefs.font} options={fontOptions} onChange={(font) => p.setPrefs((o) => ({ ...o, font }))} />
+                  <Select aria-label="Font" data-tip="The typeface for the burned-in text" value={p.prefs.font} options={fontOptions} onChange={(font) => p.setPrefs((o) => ({ ...o, font }))} />
                 </label>
               </div>
               <div>
@@ -389,6 +391,22 @@ export function ExportStep(p: ExportStepProps) {
                   icon="film"
                   loading={p.burn.busy}
                   disabled={p.blocker !== null || p.cueCount === 0 || anyBusy || p.media.status === "error" || needsImage || (visualized && !p.visuals)}
+                  data-tip={
+                    p.blocker ??
+                    (p.cueCount === 0
+                      ? "There are no subtitles to draw"
+                      : anyBusy
+                        ? "Wait for the current task to finish"
+                        : p.media.status === "error"
+                          ? "The file couldn't be read"
+                          : needsImage
+                            ? "Choose a background image first"
+                            : visualized && !p.visuals
+                              ? "Choose the visuals first"
+                              : isAudio
+                                ? "Render a video from the audio with the subtitles drawn on the chosen background"
+                                : "Render a copy of the video with the subtitles drawn into the picture")
+                  }
                   onClick={p.onBurn}
                 >
                   {isAudio ? "Make a video" : "Burn into the video"}

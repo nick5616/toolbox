@@ -121,26 +121,26 @@ export function parseResult(json: string): SubtitlesResult | null {
 }
 
 export const MODEL_CHOICES = [
-  { value: "base", label: "Base (fast)" },
-  { value: "small", label: "Small (balanced)" },
-  { value: "turbo", label: "Turbo (best)" },
+  { value: "base", label: "Base (fast)", tip: "Fastest and smallest; fine for clear speech" },
+  { value: "small", label: "Small (balanced)", tip: "A good balance of speed and accuracy" },
+  { value: "turbo", label: "Turbo (best)", tip: "Most accurate, especially for accents and noise; slowest" },
 ];
 
 export const CANVAS_CHOICES = [
-  { value: "16:9", label: "16:9" },
-  { value: "9:16", label: "9:16" },
-  { value: "1:1", label: "1:1" },
+  { value: "16:9", label: "16:9", tip: "Widescreen, for YouTube and TVs" },
+  { value: "9:16", label: "9:16", tip: "Tall, for Reels, Shorts and TikTok" },
+  { value: "1:1", label: "1:1", tip: "Square, for feed posts" },
 ];
 
 export const QUALITY_CHOICES = [
-  { value: "720", label: "720p" },
-  { value: "1080", label: "1080p" },
+  { value: "720", label: "720p", tip: "Smaller file and faster to render" },
+  { value: "1080", label: "1080p", tip: "Full HD; sharper text, slower to render" },
 ];
 
 export const BACKGROUND_CHOICES = [
-  { value: "visualizer", label: "Visualizer" },
-  { value: "color", label: "Colour" },
-  { value: "image", label: "Image" },
+  { value: "visualizer", label: "Visualizer", tip: "Animated visuals that react to the audio" },
+  { value: "color", label: "Colour", tip: "A single plain colour behind the subtitles" },
+  { value: "image", label: "Image", tip: "Your own picture behind the subtitles" },
 ];
 
 /** Canvas shape as width / height. */
@@ -149,14 +149,14 @@ export function canvasAspect(canvas: string): number {
 }
 
 export const SIZE_CHOICES = [
-  { value: "s", label: "Small" },
-  { value: "m", label: "Medium" },
-  { value: "l", label: "Large" },
+  { value: "s", label: "Small", tip: "Small text, about 4.5% of the picture height" },
+  { value: "m", label: "Medium", tip: "Medium text, about 5.5% of the picture height" },
+  { value: "l", label: "Large", tip: "Large text, about 6.5% of the picture height" },
 ];
 
 export const POSITION_CHOICES = [
-  { value: "bottom", label: "Bottom" },
-  { value: "top", label: "Top" },
+  { value: "bottom", label: "Bottom", tip: "Put the subtitles near the bottom, the usual place" },
+  { value: "top", label: "Top", tip: "Put the subtitles near the top, out of the way of lower graphics" },
 ];
 
 /** Burn size → fraction of the shorter side. */

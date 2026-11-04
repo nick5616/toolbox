@@ -51,15 +51,15 @@ export function TimelineTab({ show, onChange, analysis, selected, onSelect, onPr
   return (
     <div className={styles.tabBody}>
       <div className={styles.paramHead}>
-        <span className={styles.paramLabel}>Director</span>
+        <span className={styles.paramLabel} data-tip="Who chooses the scene for each part of the song">Director</span>
         <SegmentedControl
           size="sm"
           aria-label="Director"
           value={show.timeline.mode}
           onChange={switchMode}
           options={[
-            { value: "auto", label: "Auto" },
-            { value: "manual", label: "Manual" },
+            { value: "auto", label: "Auto", tip: "Let the app pick a scene for every section of the song" },
+            { value: "manual", label: "Manual", tip: "Choose the scene, colours and transition for each section yourself" },
           ]}
         />
       </div>
@@ -73,7 +73,7 @@ export function TimelineTab({ show, onChange, analysis, selected, onSelect, onPr
           const scene = show.scenes.find((s) => s.id === e.sceneId);
           return (
             <li key={`${e.startMs}-${i}`}>
-              <button type="button" className={cx(styles.sectionItem, manual && selected === i && styles.layerSelected)} aria-current={manual && selected === i ? "true" : undefined} onClick={() => onSelect(i)}>
+              <button type="button" className={cx(styles.sectionItem, manual && selected === i && styles.layerSelected)} aria-current={manual && selected === i ? "true" : undefined} data-tip={manual ? "Select this section to edit its scene, colours and transition" : "A section of the song and the scene Auto picked; switch to Manual to change it"} onClick={() => onSelect(i)}>
                 <span className={styles.sectionName}>{manual ? (sec ? `${sec.label[0]!.toUpperCase()}${sec.label.slice(1)} ${sec.group}` : `Part ${i + 1}`) : `${formatMs(e.startMs)} · ${scene?.name ?? e.sceneId}`}</span>
                 <span className={styles.sectionMeta}>
                   {formatMs(e.startMs)} · {scene?.name ?? e.sceneId} · {e.transition.kind}
@@ -88,13 +88,14 @@ export function TimelineTab({ show, onChange, analysis, selected, onSelect, onPr
         <div className={styles.layerParams} role="group" aria-label="Section settings">
           <label className={styles.inline}>
             <span className={styles.paramLabel}>Scene</span>
-            <Select size="sm" aria-label="Scene" value={sel.sceneId} onChange={(sceneId) => onChange(patchEntry(show, selected, { sceneId }))} options={show.scenes.map((s) => ({ value: s.id, label: s.name || s.id }))} />
+            <Select size="sm" aria-label="Scene" data-tip="Which scene plays during this section" value={sel.sceneId} onChange={(sceneId) => onChange(patchEntry(show, selected, { sceneId }))} options={show.scenes.map((s) => ({ value: s.id, label: s.name || s.id }))} />
           </label>
           <label className={styles.inline}>
             <span className={styles.paramLabel}>Colours</span>
             <Select
               size="sm"
               aria-label="Palette"
+              data-tip="Colours for this section, or keep the design's own"
               value={sel.paletteId ?? ""}
               onChange={(v) => onChange(patchEntry(show, selected, { paletteId: v === "" ? null : (v as PaletteId) }))}
               options={[{ value: "", label: "The design's own" }, ...PALETTES.map((p) => ({ value: p.id as string, label: p.name }))]}
@@ -102,16 +103,16 @@ export function TimelineTab({ show, onChange, analysis, selected, onSelect, onPr
           </label>
           <label className={styles.inline}>
             <span className={styles.paramLabel}>Arrives with</span>
-            <Select size="sm" aria-label="Transition" value={sel.transition.kind} onChange={(kind) => onChange(patchEntry(show, selected, { transition: { kind, ms: kind === "cut" ? 0 : sel.transition.ms || 800 } }))} options={TRANSITION_KINDS.map((k) => ({ value: k, label: k[0]!.toUpperCase() + k.slice(1) }))} />
+            <Select size="sm" aria-label="Transition" data-tip="How the picture changes from the previous section into this one" value={sel.transition.kind} onChange={(kind) => onChange(patchEntry(show, selected, { transition: { kind, ms: kind === "cut" ? 0 : sel.transition.ms || 800 } }))} options={TRANSITION_KINDS.map((k) => ({ value: k, label: k[0]!.toUpperCase() + k.slice(1) }))} />
           </label>
           {sel.transition.kind !== "cut" && (
             <label className={styles.inline}>
               <span className={styles.paramLabel}>Length</span>
-              <Stepper aria-label="Transition length" unit="ms" min={50} max={8000} step={50} value={sel.transition.ms} onChange={(ms) => onChange(patchEntry(show, selected, { transition: { kind: sel.transition.kind, ms } }))} />
+              <Stepper aria-label="Transition length" data-tip="How long the transition lasts, in milliseconds" unit="ms" min={50} max={8000} step={50} value={sel.transition.ms} onChange={(ms) => onChange(patchEntry(show, selected, { transition: { kind: sel.transition.kind, ms } }))} />
             </label>
           )}
           {onPreviewTransition && (
-            <Button size="sm" variant="secondary" icon="play" onClick={() => onPreviewTransition(Math.max(0, sel.startMs - 1500))}>
+            <Button size="sm" variant="secondary" icon="play" data-tip="Play from just before this section to see how it arrives" onClick={() => onPreviewTransition(Math.max(0, sel.startMs - 1500))}>
               Play the transition
             </Button>
           )}
@@ -119,7 +120,7 @@ export function TimelineTab({ show, onChange, analysis, selected, onSelect, onPr
       )}
 
       {manual && (
-        <Button size="sm" variant="ghost" icon="rotate-ccw" onClick={() => onChange(resetTimeline(show))}>
+        <Button size="sm" variant="ghost" icon="rotate-ccw" data-tip="Throw away your changes and let the app pick scenes again" onClick={() => onChange(resetTimeline(show))}>
           Reset to auto
         </Button>
       )}

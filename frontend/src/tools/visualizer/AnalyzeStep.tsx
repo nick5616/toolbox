@@ -85,17 +85,17 @@ export default function AnalyzeStep({ onDone }: AnalyzeStepProps) {
     const warnings = sum.warnings ?? [];
     return (
       <div className={styles.body}>
-        <div className={styles.chips} aria-label="Summary">
-          {sum.tempo > 0 && <Badge mono>{Math.round(sum.tempo)} BPM</Badge>}
-          {sum.key && <Badge>{sum.key}</Badge>}
-          <Badge>{(sum.sections ?? []).length} sections</Badge>
-          {sum.hasStems && <Badge>4 instruments</Badge>}
+        <div className={styles.chips} aria-label="Summary" data-tip="What the analysis found in this song">
+          {sum.tempo > 0 && <Badge mono tip="Detected tempo in beats per minute">{Math.round(sum.tempo)} BPM</Badge>}
+          {sum.key && <Badge tip="Detected musical key">{sum.key}</Badge>}
+          <Badge tip="Parts of the song found (verse, chorus…); visuals can change at each one">{(sum.sections ?? []).length} sections</Badge>
+          {sum.hasStems && <Badge tip="Drums, bass, vocals and other were separated, so each can drive its own visuals">4 instruments</Badge>}
           {sum.hasWords && (
-            <Badge>
+            <Badge tip="Lines of words found, with timing, and their language">
               {sum.lines} lines{langName ? ` · ${langName}` : ""}
             </Badge>
           )}
-          {sum.hasMeaning && <Badge tone="accent">Mood read</Badge>}
+          {sum.hasMeaning && <Badge tone="accent" tip="Each line was read for feeling and imagery, so visuals can match the words">Mood read</Badge>}
         </div>
         {warnings.length > 0 && (
           <Banner tone="warn" title={warnings.length === 1 ? "Heads up" : "A few things to know"}>
@@ -108,10 +108,10 @@ export default function AnalyzeStep({ onDone }: AnalyzeStepProps) {
         )}
         <SongMap analysis={analysis} playheadMs={playheadMs} onSeek={setPlayheadMs} />
         <div className={styles.footer}>
-          <Button variant="ghost" icon="rotate-ccw" onClick={back}>
+          <Button variant="ghost" icon="rotate-ccw" onClick={back} data-tip="Go back to the options and analyse again; finished stages are reused from the cache">
             Re-analyze with different options
           </Button>
-          <Button icon="sparkles" onClick={forward}>
+          <Button icon="sparkles" onClick={forward} data-tip="Open the designer to choose how the visuals look and react">
             Design the visuals
           </Button>
         </div>
@@ -130,7 +130,7 @@ export default function AnalyzeStep({ onDone }: AnalyzeStepProps) {
         <div className={styles.head}>
           <span>{run.loading ? "Loading the analysis…" : run.phase === "queued" ? "Waiting to start…" : "Analysing…"}</span>
           {active && (
-            <Button size="sm" variant="ghost" onClick={run.cancel}>
+            <Button size="sm" variant="ghost" onClick={run.cancel} data-tip="Stop the analysis; finished stages are kept for next time">
               Cancel
             </Button>
           )}
@@ -140,7 +140,7 @@ export default function AnalyzeStep({ onDone }: AnalyzeStepProps) {
           status={failed ? "failed" : run.phase === "cancelled" ? "cancelled" : run.phase === "queued" ? "queued" : "running"}
           label="Analysis progress"
         />
-        <ol className={styles.stages} aria-label="Stages">
+        <ol className={styles.stages} aria-label="Stages" data-tip="The steps of the analysis; earlier results are reused">
           {rows.map((r) => (
             <li key={r.id} className={styles.stage} data-state={r.state}>
               <StageIcon state={r.state} />
@@ -159,10 +159,11 @@ export default function AnalyzeStep({ onDone }: AnalyzeStepProps) {
       {run.phase === "cancelled" && <Banner tone="info" title="Cancelled" />}
       {!active && !run.loading && (
         <div className={styles.footer}>
-          <Button variant="ghost" icon="arrow-left" onClick={back}>
+          <Button variant="ghost" icon="arrow-left" onClick={back} data-tip="Return to the source options">
             Back to options
           </Button>
           <Button
+            data-tip="Run the analysis again with the same options"
             onClick={() => {
               started.current = true;
               void run.start();
