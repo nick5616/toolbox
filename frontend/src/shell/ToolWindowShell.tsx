@@ -25,6 +25,22 @@ function isHandoff(h: unknown, moduleId: string): h is Handoff {
   return !!h && typeof h === "object" && (h as { moduleId?: unknown }).moduleId === moduleId && Array.isArray((h as { inputs?: unknown }).inputs);
 }
 
+/**
+ * The window's start-up handoff, taken once per page. React's StrictMode runs
+ * the effect twice in development: the first run's take was discarded by its
+ * cleanup and the second found nothing, so tool windows opened empty.
+ */
+let initialTake: Promise<unknown> | null = null;
+function takeInitialHandoff(): Promise<unknown> {
+  if (!initialTake) initialTake = takeWindowHandoff();
+  return initialTake;
+}
+
+/** Test hook. */
+export function resetInitialHandoffForTest(): void {
+  initialTake = null;
+}
+
 /** Root of a tool window (`/?window=tool&view=<id>`): a slim top bar and the tool, nothing else. */
 export function ToolWindowShell({ view }: ToolWindowShellProps) {
   const mod = useModules((s) => s.byId[view]);
@@ -36,9 +52,9 @@ export function ToolWindowShell({ view }: ToolWindowShellProps) {
   // The window's one-time handoff, then any later one sent to this window.
   useEffect(() => {
     let live = true;
-    const take = async () => {
+    const take = async (initial: boolean) => {
       try {
-        const h = await takeWindowHandoff();
+        const h = await (initial ? takeInitialHandoff() : takeWindowHandoff());
         if (!live || !isHandoff(h, view)) return;
         if (h.embed) {
           setEmbedded(h);
@@ -50,11 +66,11 @@ export function ToolWindowShell({ view }: ToolWindowShellProps) {
         /* no handoff */
       }
     };
-    void take().finally(() => {
+    void take(true).finally(() => {
       if (live) setReady(true);
     });
     const off = on("windows:handoff", (p) => {
-      if (p.key === key) void take();
+      if (p.key === key) void take(false);
     });
     return () => {
       live = false;

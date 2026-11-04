@@ -51,7 +51,7 @@ import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
 import { CompositionBar } from "./CompositionBar";
 import { ConstituentDrawer } from "./ConstituentDrawer";
-import { ToolWindowShell } from "./ToolWindowShell";
+import { ToolWindowShell, resetInitialHandoffForTest } from "./ToolWindowShell";
 
 function FakeStems() {
   const e = useEmbed();
@@ -72,6 +72,7 @@ function mod(id: string, name: string, extra: Partial<Descriptor> = {}): Descrip
 }
 
 beforeEach(() => {
+  resetInitialHandoffForTest();
   h.takeHandoff.mockReset().mockResolvedValue("");
   h.popOut.mockClear();
   h.relaySend.mockClear();

@@ -55,13 +55,14 @@ vi.mock("@/views/LibraryView", () => ({ LibraryView: () => <div>library stub</di
 import { PartWindowShell } from "./PartWindowShell";
 import { PoppedOutPlaceholder } from "./PoppedOutPlaceholder";
 import { Shell } from "./Shell";
-import { ToolWindowShell } from "./ToolWindowShell";
+import { ToolWindowShell, resetInitialHandoffForTest } from "./ToolWindowShell";
 
 function mod(id: string, name: string, base = ""): Descriptor {
   return { id, name, tagline: "", description: "", icon: "box", status: "ready", accepts: { extensions: [".mp3"], urls: false }, requires: null, recommends: null, base, parts: [], order: 1 } as unknown as Descriptor;
 }
 
 beforeEach(() => {
+  resetInitialHandoffForTest();
   h.takeHandoff.mockReset().mockResolvedValue("");
   h.showMain.mockClear();
   h.closeWindow.mockClear();
