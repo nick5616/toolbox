@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Badge, SegmentedControl, Switch, TextArea } from "@/components";
 import { diffLines, diffStats, sideBySide, unifiedText, type DiffOp } from "./diff.logic";
 import { CopyButton, useDebounced } from "./shared";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 function Line({ op, num }: { op: DiffOp | undefined; num?: number }) {
@@ -19,11 +20,11 @@ function Line({ op, num }: { op: DiffOp | undefined; num?: number }) {
 }
 
 export default function DiffUtil() {
-  const [left, setLeft] = useState("");
-  const [right, setRight] = useState("");
-  const [view, setView] = useState<"unified" | "side">("unified");
-  const [ignoreWhitespace, setIgnoreWhitespace] = useState(false);
-  const [ignoreCase, setIgnoreCase] = useState(false);
+  const [left, setLeft] = useUtilState("diff", "left", "");
+  const [right, setRight] = useUtilState("diff", "right", "");
+  const [view, setView] = useUtilState<"unified" | "side">("diff", "view", "unified");
+  const [ignoreWhitespace, setIgnoreWhitespace] = useUtilState("diff", "ignoreWhitespace", false);
+  const [ignoreCase, setIgnoreCase] = useUtilState("diff", "ignoreCase", false);
   const dl = useDebounced(left);
   const dr = useDebounced(right);
 

@@ -50,11 +50,16 @@ interface DevUtilsNav {
   /** Set by the palette or a drop; null means "use the remembered one". */
   selected: UtilId | null;
   select: (id: UtilId) => void;
+  /** Files handed to the tool, waiting for the Hash utility to take them. */
+  pendingFiles: string[];
+  setPendingFiles: (paths: string[]) => void;
 }
 
 export const useDevUtilsNav = create<DevUtilsNav>((set) => ({
   selected: null,
   select: (id) => set({ selected: id }),
+  pendingFiles: [],
+  setPendingFiles: (paths) => set({ pendingFiles: paths }),
 }));
 
 /** Case-insensitive match on name and keywords. */

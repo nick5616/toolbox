@@ -8,15 +8,17 @@ import { useFileInputs } from "@/tools/_kit";
 import { mapInputErrors } from "@/tools/_kit/enqueue";
 import { ALGO_LABEL, HASH_ALGOS, matchingAlgo, parseHashResult, type HashAlgo } from "./hash.logic";
 import { CopyButton, useDebounced } from "./shared";
+import { useDevUtilsNav } from "../registry";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 export const DEV_UTILS_ID = "dev-utils";
 
 export default function HashUtil() {
-  const [text, setText] = useState("");
+  const [text, setText] = useUtilState("hash", "text", "");
   const debounced = useDebounced(text);
   const [textHashes, setTextHashes] = useState<Record<string, string>>({});
-  const [compare, setCompare] = useState("");
+  const [compare, setCompare] = useUtilState("hash", "compare", "");
 
   useEffect(() => {
     let live = true;
@@ -38,7 +40,15 @@ export default function HashUtil() {
   }, [debounced]);
 
   const inputs = useFileInputs(DEV_UTILS_ID);
-  const [algos, setAlgos] = useState<HashAlgo[]>(["md5", "sha1", "sha256", "sha512", "crc32"]);
+  // Files handed to the tool while another utility was showing.
+  const pending = useDevUtilsNav((s) => s.pendingFiles);
+  const { add: addFiles } = inputs;
+  useEffect(() => {
+    if (pending.length === 0) return;
+    useDevUtilsNav.getState().setPendingFiles([]);
+    void addFiles(pending);
+  }, [pending, addFiles]);
+  const [algos, setAlgos] = useUtilState<HashAlgo[]>("hash", "algos", ["md5", "sha1", "sha256", "sha512", "crc32"]);
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
   const jobs = useOrderedJobs(DEV_UTILS_ID);

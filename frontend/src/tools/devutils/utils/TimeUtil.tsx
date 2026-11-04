@@ -2,14 +2,15 @@ import { useMemo, useState } from "react";
 import { Button, Select, TextField } from "@/components";
 import { OutputBox, useDebounced } from "./shared";
 import { formatInZone, localZone, parseTimeInput, relativeTime, toUnix, zoneList, type UnixUnit } from "./time.logic";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 type UnitChoice = UnixUnit | "auto";
 
 export default function TimeUtil() {
-  const [text, setText] = useState(() => String(Math.floor(Date.now() / 1000)));
-  const [unit, setUnit] = useState<UnitChoice>("auto");
-  const [zone, setZone] = useState(localZone);
+  const [text, setText] = useUtilState("time", "text", () => String(Math.floor(Date.now() / 1000)));
+  const [unit, setUnit] = useUtilState<UnitChoice>("time", "unit", "auto");
+  const [zone, setZone] = useUtilState("time", "zone", localZone);
   const [now, setNow] = useState(() => Date.now());
   const debounced = useDebounced(text);
   const zones = useMemo(() => zoneList(), []);

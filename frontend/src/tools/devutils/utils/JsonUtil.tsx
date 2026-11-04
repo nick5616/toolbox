@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Badge, SegmentedControl, TextArea } from "@/components";
 import { caretExcerpt, formatJson, jsonToYaml, minifyJson, parseJson, parseYaml, sortKeys, type IndentChoice } from "./json.logic";
 import { OutputBox, useDebounced } from "./shared";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 type Mode = "format" | "minify" | "sort" | "to-yaml" | "from-yaml";
@@ -40,9 +41,9 @@ function compute(input: string, mode: Mode, indent: IndentChoice): Computed {
 }
 
 export default function JsonUtil() {
-  const [input, setInput] = useState("");
-  const [mode, setMode] = useState<Mode>("format");
-  const [indent, setIndent] = useState<IndentChoice>("2");
+  const [input, setInput] = useUtilState("json", "input", "");
+  const [mode, setMode] = useUtilState<Mode>("json", "mode", "format");
+  const [indent, setIndent] = useUtilState<IndentChoice>("json", "indent", "2");
   const debounced = useDebounced(input);
   const r = useMemo(() => compute(debounced, mode, indent), [debounced, mode, indent]);
 

@@ -4,13 +4,14 @@ import { DevUtilsService, FilesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { decodeText, encodeText, mimeForPath, reshapeBase64, toDataUrl } from "./base64.logic";
 import { OutputBox, useDebounced } from "./shared";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 export default function Base64Util() {
-  const [dir, setDir] = useState<"encode" | "decode">("encode");
-  const [input, setInput] = useState("");
-  const [urlSafe, setUrlSafe] = useState(false);
-  const [padding, setPadding] = useState(true);
+  const [dir, setDir] = useUtilState<"encode" | "decode">("base64", "dir", "encode");
+  const [input, setInput] = useUtilState("base64", "input", "");
+  const [urlSafe, setUrlSafe] = useUtilState("base64", "urlSafe", false);
+  const [padding, setPadding] = useUtilState("base64", "padding", true);
   const [fileB64, setFileB64] = useState<{ path: string; b64: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const debounced = useDebounced(input);

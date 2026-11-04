@@ -1,9 +1,13 @@
 import { Suspense, useEffect, useState } from "react";
-import { ClickIn, ClickInHost, EmptyState, Icon, Spinner, TextField } from "@/components";
+import { ClickIn, ClickInHost, EmptyState, Icon, IconButton, Spinner, TextField } from "@/components";
 import { useClickIn } from "@/components/ClickIn";
-import { useUI } from "@/state/ui";
+import { useToolHandoff } from "@/lib/embed";
+import { popOutPart } from "@/lib/windows";
 import { useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "../index";
+import { detectUtil } from "./detect";
+import { setUtilValue } from "./store";
+import { devUtilsWorkspace as ws } from "./workspace";
 import { UTILS, UTIL_TIPS, filterUtils, isUtilId, useDevUtilsNav, type UtilId } from "./registry";
 import styles from "./DevUtils.module.css";
 
@@ -55,11 +59,20 @@ export default function DevUtilsView({ moduleId }: ToolViewProps) {
   const selected = useDevUtilsNav((s) => s.selected);
   const select = useDevUtilsNav((s) => s.select);
 
-  // A file dropped on this tool (or sent to it) belongs to the Hash utility.
-  const handoff = useUI((s) => s.handoff);
-  useEffect(() => {
-    if (handoff?.moduleId === moduleId) select("hash");
-  }, [handoff, moduleId, select]);
+  ws.useHost();
+
+  // Text opens the utility that fits it (JSON, JWT, URL, …) with the text as its input; files belong to Hash.
+  useToolHandoff(moduleId, (h) => {
+    if (h.text && h.text.body !== "") {
+      const d = detectUtil(h.text.body);
+      setUtilValue(d.util, d.key, h.text.body);
+      select(d.util);
+      setSaved({ last: d.util });
+    } else if (h.inputs.length > 0) {
+      useDevUtilsNav.getState().setPendingFiles(h.inputs);
+      select("hash");
+    }
+  });
 
   const currentId: UtilId = selected ?? (loaded ? saved.last : DEFAULTS.last);
   const current = UTILS.find((u) => u.id === currentId) ?? UTILS[0]!;
@@ -90,6 +103,12 @@ export default function DevUtilsView({ moduleId }: ToolViewProps) {
           >
             <PickerList currentId={current.id} onChoose={choose} />
           </ClickIn>
+          <IconButton
+            icon="picture-in-picture-2"
+            label={"Pop out " + current.name}
+            data-tip={"Open " + current.name + " in its own small window; it stays live"}
+            onClick={() => void popOutPart(ws.panelPart, { instance: current.id, params: { panel: current.id }, title: current.name + " — Toolbox", width: 520, height: 560 })}
+          />
         </header>
         <div className={styles.main}>
           <Suspense fallback={<Spinner />}>
