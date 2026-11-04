@@ -350,7 +350,7 @@ function RulerRow({ width, pps, scrollMs, hiddenLanes, seek }: RowCommon & { hid
         />
       </div>
       <div className={styles.area}>
-        <canvas ref={cv} className={`${styles.canvas} ${styles.ruler}`} aria-label="Ruler" data-tip="Time ruler: click or drag to move the playhead; scroll to pan, Ctrl+scroll to zoom" {...seek} />
+        <canvas ref={cv} className={`${styles.canvas} ${styles.ruler}`} aria-label="Ruler" data-tip="Time ruler: click or drag to move the playhead; scroll to zoom, Shift+scroll or middle-drag to pan" {...seek} />
       </div>
     </div>
   );

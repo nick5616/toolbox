@@ -185,8 +185,8 @@ export function Transport() {
         />
       </label>
       <span className={styles.spacer} />
-      <IconButton icon="zoom-out" label="Zoom out" size="sm" data-tip={pps <= 6 ? "Fully zoomed out" : "Show more of the timeline (Ctrl+scroll also zooms)"} onClick={() => zoom(1 / 1.5)} disabled={pps <= 6} />
-      <IconButton icon="zoom-in" label="Zoom in" size="sm" data-tip={pps >= 800 ? "Fully zoomed in" : "Show less of the timeline in more detail (Ctrl+scroll also zooms)"} onClick={() => zoom(1.5)} disabled={pps >= 800} />
+      <IconButton icon="zoom-out" label="Zoom out" size="sm" data-tip={pps <= 6 ? "Fully zoomed out" : "Show more of the timeline (the wheel over the timeline also zooms)"} onClick={() => zoom(1 / 1.5)} disabled={pps <= 6} />
+      <IconButton icon="zoom-in" label="Zoom in" size="sm" data-tip={pps >= 800 ? "Fully zoomed in" : "Show less of the timeline in more detail (the wheel over the timeline also zooms)"} onClick={() => zoom(1.5)} disabled={pps >= 800} />
       <Button size="sm" variant="secondary" data-tip="Zoom so the whole edit fits the timeline" onClick={fit}>
         Fit
       </Button>
