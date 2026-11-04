@@ -22,6 +22,12 @@ export function instrumentsSummary(o: AnalyzeOptions): string {
   return o.saveStems ? "Separated · saved" : "Separated";
 }
 
+/** The rail's one-liner for the Analysis panel: "Words · 4 stems · mood". */
+export function analysisSummary(o: AnalyzeOptions): string {
+  const words = hasWords(o);
+  return [words ? "Words" : "No words", o.stems ? "4 stems" : "", words && o.mood ? "mood" : ""].filter(Boolean).join(" · ");
+}
+
 export function moodSummary(o: AnalyzeOptions): string {
   if (!hasWords(o)) return "Needs words";
   if (!o.mood) return "Off";

@@ -6,6 +6,7 @@ const h = vi.hoisted(() => ({
   open: vi.fn(),
   enqueue: vi.fn(),
   cancel: vi.fn(),
+  pick: vi.fn(),
   chatReady: { value: false },
 }));
 
@@ -19,7 +20,7 @@ vi.mock("@/lib/api", async (orig) => {
       URLFor: async (p: string) => `/media/t/${p}`,
       Waveform: async () => [],
     },
-    FilesService: { PickWith: async () => [], Pick: async () => [] },
+    FilesService: { PickWith: (...a: unknown[]) => h.pick(...a), Pick: async () => [] },
     TranscribeService: { Languages: async () => [{ code: "en", name: "English" }] },
     PacksService: { InstallFor: async () => ({}), Install: async () => ({ jobs: [], restart: false }) },
     JobsService: { Cancel: async (...a: unknown[]) => h.cancel(...a) },
@@ -37,16 +38,19 @@ vi.mock("@/viz/analysis", async (orig) => {
   return { ...actual, loadAnalysis: async () => (await import("@/viz/fixture")).buildFixture() };
 });
 
+import { ClickInHost } from "@/components";
 import { DepSource, DepState, JobStatus, PackComponentKind, PackComponentState, PackState, WordsSource, type DepStatus } from "@/lib/api";
 import { useDeps } from "@/state/deps";
 import { useJobs } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { usePacks } from "@/state/packs";
-import { useUI } from "@/state/ui";
 import { comp, pack } from "@/views/setup/packFixtures";
-import AnalyzeStep from "./AnalyzeStep";
-import SourceStep from "./SourceStep";
+import AnalysisPanel from "./AnalysisPanel";
+import AnalysisStage from "./AnalysisStage";
+import SourcePanel, { EmptySource } from "./SourcePanel";
 import { DEFAULT_ANALYZE, useVisualizer } from "./store";
+import { applyHandoff } from "./useSeed";
+import { analysisSummary } from "./source/summaries";
 import { NEW_TRACKER, stageRows, trackMessage, visibleStages } from "./source/logic";
 
 function dep(id: string, state: DepState): DepStatus {
@@ -70,81 +74,75 @@ function setup(deps: DepState = DepState.DepOK, models = PackComponentState.Comp
 
 beforeEach(() => {
   h.open.mockReset();
+  h.open.mockResolvedValue(info(false));
   h.enqueue.mockReset();
   h.cancel.mockReset();
+  h.pick.mockReset();
+  h.pick.mockResolvedValue([]);
   h.chatReady.value = false;
   useVisualizer.getState().reset();
-  useUI.setState({ handoff: null });
   useJobs.setState({ byId: {}, logs: {}, logsLoaded: {} });
   setup();
 });
 
-/** Opens one of the Source step's click-in rows (Words, Instruments, Mood). */
-const openRow = (user: ReturnType<typeof userEvent.setup>, name: string) => user.click(screen.getByRole("button", { name: new RegExp(`^${name}`) }));
+const inHost = (node: React.ReactNode) => render(<ClickInHost>{node}</ClickInHost>);
 
-describe("Source step", () => {
+describe("Source panel (the former Source step)", () => {
   it("shows the drop zone until a file is chosen", () => {
-    render(<SourceStep />);
+    render(<EmptySource />);
     expect(screen.getByText("Drop a song or video")).toBeTruthy();
   });
 
-  it("defaults for an audio file: stems on, words none, no video choice", async () => {
-    h.open.mockResolvedValue(info(false));
-    const user = userEvent.setup();
+  it("shows the song, and Change picks another file", async () => {
+    h.pick.mockResolvedValue(["C:/m/other.mp3"]);
     useVisualizer.getState().setInput("C:/m/song.mp3", false);
-    render(<SourceStep />);
+    render(<SourcePanel />);
     expect(await screen.findByText("Night Drive")).toBeTruthy();
-    // The top level shows only the song, the video choice and Analyze; the rest sits behind summarised rows.
-    expect(screen.queryByRole("switch", { name: "Separate instruments" })).toBeNull();
-    expect(screen.getByRole("button", { name: /^Words.*No words/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Instruments.*Separated/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Mood.*Needs words/ })).toBeTruthy();
-    await openRow(user, "Instruments");
-    expect((screen.getByRole("switch", { name: "Separate instruments" }) as HTMLElement).getAttribute("aria-checked")).toBe("true");
     expect(screen.queryByRole("radio", { name: "Over the video" })).toBeNull();
-    expect(screen.getByRole("switch", { name: "Also save the stems to the Library" }).getAttribute("aria-checked")).toBe("false");
-    // Mood needs words.
-    await openRow(user, "Mood");
-    expect((screen.getByRole("switch", { name: "Read the mood of the words" }) as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Change" }));
+    await waitFor(() => expect(useVisualizer.getState().input).toBe("C:/m/other.mp3"));
+    expect(useVisualizer.getState().analysis).toBeNull();
   });
 
   it("video: stems off, the video choice drives the mode", async () => {
     h.open.mockResolvedValue(info(true));
-    const user = userEvent.setup();
     useVisualizer.getState().setInput("C:/m/clip.mp4", true);
-    render(<SourceStep />);
-    expect(screen.getByRole("button", { name: /^Instruments.*Off/ })).toBeTruthy();
+    render(<SourcePanel />);
     expect(useVisualizer.getState().mode).toBe("overlay");
-    await user.click(await screen.findByRole("radio", { name: "Use only its sound" }));
+    expect(useVisualizer.getState().analyze.stems).toBe(false);
+    await userEvent.click(await screen.findByRole("radio", { name: "Use only its sound" }));
     expect(useVisualizer.getState().mode).toBe("full");
+  });
+});
+
+describe("Analysis panel (the former Source options and Analyze result)", () => {
+  it("defaults for an audio file: stems on, words none", async () => {
+    useVisualizer.getState().setInput("C:/m/song.mp3", false);
+    render(<AnalysisPanel />);
+    expect((screen.getByRole("switch", { name: "Separate instruments" }) as HTMLElement).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("switch", { name: "Also save the stems to the Library" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("radio", { name: "No words" }).getAttribute("aria-checked")).toBe("true");
+    expect((screen.getByRole("switch", { name: "Read the mood of the words" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: "Re-analyse" })).toBeNull();
   });
 
   it("Words options reveal their inputs and the language", async () => {
-    h.open.mockResolvedValue(info(false));
     const user = userEvent.setup();
     useVisualizer.getState().setInput("C:/m/song.mp3", false);
-    render(<SourceStep />);
-    await openRow(user, "Words");
+    render(<AnalysisPanel />);
     await user.click(screen.getByRole("radio", { name: "Paste lyrics" }));
     expect(screen.getByRole("textbox", { name: "Lyrics" })).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Language" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Analyze" }).hasAttribute("disabled")).toBe(true);
-    await user.type(screen.getByRole("textbox", { name: "Lyrics" }), "hello");
-    expect(screen.getByRole("button", { name: "Analyze" }).hasAttribute("disabled")).toBe(false);
     await user.click(screen.getByRole("radio", { name: "From a file" }));
     expect(screen.queryByRole("combobox", { name: "Language" })).toBeNull();
     await user.click(screen.getByRole("radio", { name: "No words" }));
     expect(useVisualizer.getState().analyze.words).toBe(WordsSource.WordsNone);
-    expect(screen.getByRole("button", { name: /^Words.*No words/ })).toBeTruthy();
   });
 
   it("deeper reading is disabled without a ready chat model", async () => {
-    h.open.mockResolvedValue(info(false));
-    const user = userEvent.setup();
     useVisualizer.getState().setInput("C:/m/song.mp3", false);
     useVisualizer.getState().setAnalyze({ words: WordsSource.WordsDetect });
-    render(<SourceStep />);
-    await openRow(user, "Mood");
+    render(<AnalysisPanel />);
     const sw = screen.getByRole("switch", { name: "Deeper reading with Local Chat" }) as HTMLButtonElement;
     await waitFor(() => expect(screen.getByText("Download a model in Local Chat")).toBeTruthy());
     expect(sw.disabled).toBe(true);
@@ -152,13 +150,11 @@ describe("Source step", () => {
 
   it("DepsGate rows follow the chosen options", async () => {
     setup(DepState.DepMissing, PackComponentState.ComponentMissing);
-    h.open.mockResolvedValue(info(false));
     useVisualizer.getState().setInput("C:/m/song.mp3", false);
-    const { unmount } = render(<SourceStep />);
+    const { unmount } = render(<AnalysisPanel />);
     expect(screen.getAllByText("The AI engine isn't installed").length).toBeGreaterThan(0);
     expect(screen.getByText("The instrument separation model isn't downloaded")).toBeTruthy();
     expect(screen.queryByText("The speech model isn't downloaded")).toBeNull();
-    expect(screen.queryByText("The mood reader isn't downloaded")).toBeNull();
     act(() => useVisualizer.getState().setAnalyze({ words: WordsSource.WordsDetect, mood: true }));
     expect(await screen.findByText("The speech model isn't downloaded")).toBeTruthy();
     expect(screen.getByText("The mood reader isn't downloaded")).toBeTruthy();
@@ -168,31 +164,41 @@ describe("Source step", () => {
     unmount();
   });
 
-  it("Analyze moves to the analyze step and clears the old analysis", async () => {
-    h.open.mockResolvedValue(info(false));
-    const user = userEvent.setup();
-    const onAnalyze = vi.fn();
-    useVisualizer.getState().setInput("C:/m/song.mp3", false);
-    render(<SourceStep onAnalyze={onAnalyze} />);
-    await user.click(screen.getByRole("button", { name: "Analyze" }));
-    expect(useVisualizer.getState().step).toBe("analyze");
-    expect(onAnalyze).toHaveBeenCalled();
-  });
-
-  it("the timed-text seed prefills the Words option", async () => {
-    h.open.mockResolvedValue(info(false));
+  it("the timed-text seed prefills the Words option and keeps the look for the design", async () => {
     const lines = [{ startMs: 0, endMs: 1000, text: "hi", words: [] }];
-    useUI.setState({ handoff: { moduleId: "visualizer", inputs: ["C:/m/song.mp3"], seed: { kind: "timed-text", from: "lyric-video", lines, overlay: false } } } as unknown as Parameters<typeof useUI.setState>[0]);
-    render(<SourceStep />);
-    expect(await screen.findByRole("button", { name: /^Words.*From Lyric Video/ })).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: /^Words/ }));
-    expect(await screen.findByRole("radio", { name: "From Lyric Video" })).toBeTruthy();
+    act(() => applyHandoff({ moduleId: "visualizer", inputs: ["C:/m/song.mp3"], seed: { kind: "timed-text", from: "lyric-video", lines, overlay: false } } as Parameters<typeof applyHandoff>[0]));
+    render(<AnalysisPanel />);
     const s = useVisualizer.getState();
     expect(s.input).toBe("C:/m/song.mp3");
     expect(s.analyze.words).toBe(WordsSource.WordsGiven);
     expect(s.analyze.lines).toHaveLength(1);
     expect(s.seedFrom).toBe("lyric-video");
+    expect(s.seedLook?.from).toBe("lyric-video");
     expect(screen.getByRole("radio", { name: "From Lyric Video" }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("shows what the analysis found, and Re-analyse clears it (the stage then runs again)", async () => {
+    const { buildFixture } = await import("@/viz/fixture");
+    const user = userEvent.setup();
+    const ref = { key: "k", audioJson: "", featuresPath: "", textJson: "", instrumental: "", summary: { durationMs: 60000, tempo: 120, key: "A minor", sections: ["intro", "verse"], hasStems: true, hasWords: true, hasMeaning: true, moodSource: "reader", language: "en", lines: 86, warnings: ["Some words were hard to hear"] } };
+    useVisualizer.setState({ input: "C:/m/song.mp3", analysis: buildFixture(), ref });
+    inHost(<AnalysisPanel />);
+    expect(screen.getByText("120 BPM")).toBeTruthy();
+    expect(screen.getByText("A minor")).toBeTruthy();
+    expect(screen.getByText("2 sections")).toBeTruthy();
+    expect(screen.getByText("4 instruments")).toBeTruthy();
+    expect(screen.getByText(/86 lines/)).toBeTruthy();
+    expect(screen.getByText("Some words were hard to hear")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Re-analyse" }));
+    expect(useVisualizer.getState().analysis).toBeNull();
+    expect(useVisualizer.getState().ref).toBeNull();
+    expect(h.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("summarises the options for the rail", () => {
+    expect(analysisSummary(DEFAULT_ANALYZE)).toBe("No words · 4 stems");
+    expect(analysisSummary({ ...DEFAULT_ANALYZE, words: WordsSource.WordsDetect })).toBe("Words · 4 stems · mood");
+    expect(analysisSummary({ ...DEFAULT_ANALYZE, words: WordsSource.WordsDetect, stems: false, mood: false })).toBe("Words");
   });
 });
 
@@ -215,14 +221,14 @@ describe("stage list logic", () => {
   });
 });
 
-describe("Analyze step", () => {
+describe("Analysis stage (the former Analyze step)", () => {
   const job = (over: Record<string, unknown>) => ({ id: "j1", moduleId: "visualizer", status: JobStatus.JobRunning, progress: 0, message: "", inputs: ["C:/m/song.mp3"], outputs: [], ...over });
 
-  it("follows the job through its stages, then shows the result", async () => {
+  it("starts by itself, follows the job through its stages, then puts the analysis in the store", async () => {
     h.enqueue.mockResolvedValue([job({ status: JobStatus.JobQueued })]);
     useVisualizer.getState().setInput("C:/m/song.mp3", false);
     useVisualizer.getState().setAnalyze({ words: WordsSource.WordsDetect });
-    render(<AnalyzeStep />);
+    inHost(<AnalysisStage />);
     await waitFor(() => expect(h.enqueue).toHaveBeenCalled());
     const [paths, opts] = h.enqueue.mock.calls[0] as [string[], { action: string; analyze: { words: string } }];
     expect(paths).toEqual(["C:/m/song.mp3"]);
@@ -242,24 +248,27 @@ describe("Analyze step", () => {
       featuresPath: "f.bin",
       textJson: "t.json",
       instrumental: "",
-      summary: { durationMs: 60000, tempo: 120, key: "A minor", sections: ["intro", "verse"], hasStems: true, hasWords: true, hasMeaning: true, moodSource: "reader", language: "en", lines: 86, warnings: ["Some words were hard to hear"] },
+      summary: { durationMs: 60000, tempo: 120, key: "A minor", sections: ["intro", "verse"], hasStems: true, hasWords: true, hasMeaning: true, moodSource: "reader", language: "en", lines: 86, warnings: null },
     };
     useJobs.getState().upsert(job({ status: JobStatus.JobDone, progress: 1, message: "Analysis ready", resultJson: JSON.stringify({ action: "analyze", analysis: ref }) }) as never);
-    expect(await screen.findByText("120 BPM")).toBeTruthy();
-    expect(screen.getByText("A minor")).toBeTruthy();
-    expect(screen.getByText("2 sections")).toBeTruthy();
-    expect(screen.getByText("4 instruments")).toBeTruthy();
-    expect(screen.getByText(/86 lines/)).toBeTruthy();
-    expect(screen.getByText("Some words were hard to hear")).toBeTruthy();
-    expect(screen.getByRole("group", { name: "Song map" })).toBeTruthy();
-    expect(useVisualizer.getState().analysis).not.toBeNull();
+    await waitFor(() => expect(useVisualizer.getState().analysis).not.toBeNull());
+    expect(useVisualizer.getState().ref?.key).toBe("k");
+  });
+
+  it("waits with the reason when the engine or a model is missing, and doesn't start", async () => {
+    setup(DepState.DepMissing, PackComponentState.ComponentMissing);
+    useVisualizer.getState().setInput("C:/m/song.mp3", false);
+    inHost(<AnalysisStage />);
+    expect(await screen.findByText("Ready to analyse")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Analysis options" })).toBeTruthy();
+    expect(h.enqueue).not.toHaveBeenCalled();
   });
 
   it("shows a failed job and cancels a running one", async () => {
     const user = userEvent.setup();
     h.enqueue.mockResolvedValue([job({})]);
     useVisualizer.getState().setInput("C:/m/song.mp3", false);
-    render(<AnalyzeStep />);
+    inHost(<AnalysisStage />);
     await waitFor(() => expect(h.enqueue).toHaveBeenCalled());
     useJobs.getState().upsert(job({ message: "Separating the instruments" }) as never);
     await user.click(await screen.findByRole("button", { name: "Cancel" }));
@@ -267,16 +276,6 @@ describe("Analyze step", () => {
     useJobs.getState().upsert(job({ status: JobStatus.JobFailed, error: "The AI engine isn't installed", errorHint: "Install it" }) as never);
     expect(await screen.findByText("The AI engine isn't installed")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
-  });
-
-  it("Re-analyze goes back to Source and clears the analysis", async () => {
-    const { buildFixture } = await import("@/viz/fixture");
-    const user = userEvent.setup();
-    useVisualizer.setState({ step: "analyze", input: "C:/m/song.mp3", analysis: buildFixture(), ref: { key: "k", audioJson: "", featuresPath: "", textJson: "", instrumental: "", summary: { durationMs: 1, tempo: 90, key: "C major", sections: [], hasStems: false, hasWords: false, hasMeaning: false, moodSource: "music", language: "", lines: 0, warnings: null } } });
-    render(<AnalyzeStep />);
-    await user.click(screen.getByRole("button", { name: "Re-analyze with different options" }));
-    expect(useVisualizer.getState().step).toBe("source");
-    expect(useVisualizer.getState().analysis).toBeNull();
-    expect(h.enqueue).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Analysis options" })).toBeTruthy();
   });
 });

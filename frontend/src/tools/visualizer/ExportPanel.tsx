@@ -1,12 +1,12 @@
 /**
- * Visualizer step 4 (SPEC.md §8.4): size, range, audio and background, a 10 s
- * preview from the playhead, and the full render with its result card.
- *
- * Props: `prefs`/`onPrefs` (the host persists them), `onBack` (to Design).
- * Reads the design, analysis and Song Map selection from the Visualizer store.
+ * The Export panel (SPEC Phase 11 §5.5; the Export step): size and quality
+ * (shape, resolution, frame rate), the range, the sound and background, a 10 s
+ * preview from the playhead, and the full render with its result card. Opened
+ * by the header's Export button. Reads the design, analysis, Song Map
+ * selection and the remembered export options from the Visualizer store.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Banner, Button, ClickIn, Icon, IconButton, Meter, Section, SegmentedControl, Select, Slider, toast } from "@/components";
+import { Banner, Button, Icon, IconButton, Meter, Section, SegmentedControl, Select, Slider, toast } from "@/components";
 import { MediaPlayer, formatMs, useMediaSource } from "@/components/media";
 import { FilesService, JobStatus, VisualizerAction, VisualizerMode, type VisualizerOptions } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -17,7 +17,7 @@ import { validateShow } from "@/viz/validate";
 import { ASPECTS, exportBlocker, exportRules, outputSize, type Aspect, type ExportPrefs, type Height } from "./exportPrefs";
 import { useVisualizer } from "./store";
 import { liveSpeed, parseVizResult, useVizJob, type VizJob } from "./useVizJob";
-import styles from "./ExportStep.module.css";
+import styles from "./ExportPanel.module.css";
 
 const ASPECT_TIP: Record<string, string> = {
   "16:9": "Widescreen, for YouTube and TVs",
@@ -32,12 +32,6 @@ const QUALITY_TIP: Record<number, string> = {
   1440: "Sharper than Full HD; renders slower",
   2160: "4K; sharpest, slowest and biggest files",
 };
-
-export interface ExportStepProps {
-  prefs: ExportPrefs;
-  onPrefs(patch: Partial<ExportPrefs>): void;
-  onBack?: () => void;
-}
 
 const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".bmp"];
 const VIDEO_EXTS = [".mp4", ".mov", ".mkv", ".webm", ".m4v"];
@@ -168,7 +162,9 @@ function ResultCard({ job }: { job: NonNullable<VizJob["job"]> }) {
   );
 }
 
-export default function ExportStep({ prefs, onPrefs }: ExportStepProps) {
+export default function ExportPanel() {
+  const prefs = useVisualizer((s) => s.exportPrefs);
+  const onPrefs = useVisualizer((s) => s.setExportPrefs);
   const input = useVisualizer((s) => s.input);
   const mode = useVisualizer((s) => s.mode);
   const show = useVisualizer((s) => s.show);
@@ -250,8 +246,6 @@ export default function ExportStep({ prefs, onPrefs }: ExportStepProps) {
   };
 
   const maxStart = Math.max(0, durationMs - 1000);
-  const soundSummary = exportSoundSummary(prefs, rules.showBackground);
-  const previewSummary = preview.busy ? "Rendering…" : previewPath ? "Ready to watch" : `From ${clock(previewStart)}`;
 
   return (
     <div className={styles.root}>
@@ -294,8 +288,7 @@ export default function ExportStep({ prefs, onPrefs }: ExportStepProps) {
         </div>
       </Section>
 
-      <div className={styles.rows}>
-      <ClickIn icon="scissors" title="Range" summary={useSel ? `${clock(startMs)}–${clock(endMs)}` : "Whole song"} tip="Render the whole song or only part of it">
+      <Section label="Range" tip="Render the whole song or only part of it">
         <div className={styles.form}>
           <SegmentedControl
             size="sm"
@@ -304,18 +297,18 @@ export default function ExportStep({ prefs, onPrefs }: ExportStepProps) {
             onChange={setRange}
             options={[
               { value: "whole", label: "Whole song", tip: "Render from the start to the end" },
-              { value: "selection", label: selection ? `Selection ${formatMs(selection.startMs)}–${formatMs(selection.endMs)}` : "Selection", disabled: !selection, tip: selection ? "Render only the part you selected on the Song Map" : "Shift-drag on the Song Map in Design to select a part first" },
+              { value: "selection", label: selection ? `Selection ${formatMs(selection.startMs)}–${formatMs(selection.endMs)}` : "Selection", disabled: !selection, tip: selection ? "Render only the part you selected on the Song Map" : "Shift-drag on the Song Map to select a part first" },
             ]}
           />
-          {!selection && <p className={styles.muted}>Shift-drag on the Song Map in Design to pick a part.</p>}
+          {!selection && <p className={styles.muted}>Shift-drag on the Song Map to pick a part.</p>}
         </div>
-      </ClickIn>
+      </Section>
 
-      <ClickIn icon="image" title="Sound and background" summary={soundSummary} tip="Which audio goes in the video and what is behind the visuals">
+      <Section label="Sound and background" tip="Which audio goes in the video and what is behind the visuals">
         <div className={styles.form}>
           <div className={styles.field}>
             <span className={styles.label} data-tip="Which sound the finished video carries">Audio</span>
-            <SegmentedControl size="sm" aria-label="Audio" value={prefs.audio} onChange={(audio) => onPrefs({ audio })} options={[{ value: "original", label: "Original", tip: "Use the song exactly as it is" }, { value: "instrumental", label: "Instrumental", tip: rules.instrumentalAllowed ? "Use the song without vocals" : "Needs the instruments separated in the Source step", disabled: !rules.instrumentalAllowed }]} />
+            <SegmentedControl size="sm" aria-label="Audio" value={prefs.audio} onChange={(audio) => onPrefs({ audio })} options={[{ value: "original", label: "Original", tip: "Use the song exactly as it is" }, { value: "instrumental", label: "Instrumental", tip: rules.instrumentalAllowed ? "Use the song without vocals" : "Needs the instruments separated in the Analysis panel", disabled: !rules.instrumentalAllowed }]} />
             {!rules.instrumentalAllowed && <span className={styles.muted}>Needs the instruments separated.</span>}
           </div>
           {rules.showBackground && (
@@ -345,9 +338,9 @@ export default function ExportStep({ prefs, onPrefs }: ExportStepProps) {
             </div>
           )}
         </div>
-      </ClickIn>
+      </Section>
 
-      <ClickIn icon="play" title="Preview" summary={previewSummary} tip="Render a short sample to check the look before the full render">
+      <Section label="Preview" tip="Render a short sample to check the look before the full render">
         <div className={styles.form}>
           <label className={styles.field}>
             <span className={styles.label} data-tip="Where in the song the 10 second preview starts">Starts at {formatMs(previewStart)}</span>
@@ -361,8 +354,7 @@ export default function ExportStep({ prefs, onPrefs }: ExportStepProps) {
           <Progress run={preview} label="Rendering the preview…" rangeSec={10} outFps={prefs.fps} />
           {previewPath && preview.job?.status === JobStatus.JobDone && <PreviewClip key={previewPath} path={previewPath} />}
         </div>
-      </ClickIn>
-      </div>
+      </Section>
 
       <Section label="Video" tip="Render the finished video">
         <div className={styles.form}>
