@@ -43,7 +43,7 @@ export function EditSignalSelect({ value, onChange, label }: EditSignalSelectPro
   return (
     <span className={styles.signalSelect}>
       {lane && <span className={styles.swatch} data-testid="lane-swatch" style={{ background: `var(--lane-${lane})` }} />}
-      <select className={styles.nativeSelect} aria-label={label} value={value} onChange={(e) => onChange(e.target.value as EditSignalId)}>
+      <select className={styles.nativeSelect} data-tip="What drives this: a marker lane (beats, kicks…) or a signal from the song" aria-label={label} value={value} onChange={(e) => onChange(e.target.value as EditSignalId)}>
         <optgroup label="Markers">
           {MARKER_LANES.map((l) => (
             <option key={l} value={`marker.${l}`}>

@@ -30,39 +30,40 @@ export function SongInspector() {
       <div className={styles.head}>
         <h2 className={styles.title}>Song</h2>
       </div>
-      <Section label="Range" action={<Button size="sm" onClick={openRangePicker}>Change range…</Button>}>
+      <Section label="Range" tip="Which part of the song the edit uses" action={<Button size="sm" data-tip="Pick a different start and end in the song; clips keep their place on the timeline" onClick={openRangePicker}>Change range…</Button>}>
         <div className={styles.stack}>
-          <div className={styles.row}>
+          <div className={styles.row} data-tip="Where in the full song the edit starts (minutes:seconds)">
             <span className={styles.label}>From</span>
             <span className={styles.mono}>{formatClock(song.startMs)}</span>
           </div>
-          <div className={styles.row}>
+          <div className={styles.row} data-tip="Where in the full song the edit ends (minutes:seconds)">
             <span className={styles.label}>To</span>
             <span className={styles.mono}>{formatClock(song.endMs)}</span>
           </div>
-          <div className={styles.row}>
+          <div className={styles.row} data-tip="How long the finished video is (minutes:seconds)">
             <span className={styles.label}>Edit length</span>
             <span className={styles.mono}>{formatClock(length)}</span>
           </div>
         </div>
       </Section>
-      <Section label="Analysis" action={<Button size="sm" onClick={() => useEditStudio.getState().setReanalyze(true)}>Analyze again…</Button>}>
+      <Section label="Analysis" tip="The beats, drops and sections found in the song" action={<Button size="sm" data-tip="Run the song analysis again, e.g. to add lyrics; your clips and markers are kept" onClick={() => useEditStudio.getState().setReanalyze(true)}>Analyze again…</Button>}>
         <p className={styles.hint}>Analyze again to add the lyrics or pick up a newer AI engine. Your clips and markers are kept.</p>
       </Section>
-      <Section label="Sound">
+      <Section label="Sound" tip="Volume and fades for the song in the export">
         <div className={styles.stack}>
           <span className={styles.label}>Gain</span>
-          <Slider aria-label="Song gain" min={-24} max={12} step={0.5} value={song.gainDb} onChange={(gainDb) => setSong({ gainDb }, "song-gain")} format={(v) => `${v > 0 ? "+" : ""}${v.toFixed(1)} dB`} />
+          <Slider data-tip="Make the song louder or quieter in decibels; 0 keeps it as is" aria-label="Song gain" min={-24} max={12} step={0.5} value={song.gainDb} onChange={(gainDb) => setSong({ gainDb }, "song-gain")} format={(v) => `${v > 0 ? "+" : ""}${v.toFixed(1)} dB`} />
           <span className={styles.label}>Fade in</span>
-          <Slider aria-label="Fade in" min={0} max={fadeMax} step={100} value={Math.min(song.fadeInMs, fadeMax)} onChange={(fadeInMs) => setSong({ fadeInMs }, "song-fade-in")} format={(v) => `${(v / 1000).toFixed(1)} s`} />
+          <Slider data-tip="Fade the song up from silence over this many seconds at the start" aria-label="Fade in" min={0} max={fadeMax} step={100} value={Math.min(song.fadeInMs, fadeMax)} onChange={(fadeInMs) => setSong({ fadeInMs }, "song-fade-in")} format={(v) => `${(v / 1000).toFixed(1)} s`} />
           <span className={styles.label}>Fade out</span>
-          <Slider aria-label="Fade out" min={0} max={fadeMax} step={100} value={Math.min(song.fadeOutMs, fadeMax)} onChange={(fadeOutMs) => setSong({ fadeOutMs }, "song-fade-out")} format={(v) => `${(v / 1000).toFixed(1)} s`} />
+          <Slider data-tip="Fade the song down to silence over this many seconds at the end" aria-label="Fade out" min={0} max={fadeMax} step={100} value={Math.min(song.fadeOutMs, fadeMax)} onChange={(fadeOutMs) => setSong({ fadeOutMs }, "song-fade-out")} format={(v) => `${(v / 1000).toFixed(1)} s`} />
         </div>
       </Section>
-      <Section label="Cut timing">
+      <Section label="Cut timing" tip="Nudge every beat-synced cut a few frames earlier or later">
         <div className={styles.stack}>
           <span className={styles.label}>Cut offset</span>
           <Slider
+            data-tip="Shift cuts by whole frames: negative cuts land just before the beat, positive just after"
             aria-label="Cut offset"
             min={-3}
             max={3}

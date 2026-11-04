@@ -141,6 +141,7 @@ export function EffectPicker({ types, stacks, room, label, makeEffect, onAdd }: 
         ref={triggerRef}
         icon="plus"
         label="Add effect"
+        data-tip={room > 0 ? "Add an effect: pick one, or a ready-made stack that reacts to the music" : "This stack is full; remove an effect to add another"}
         size="sm"
         variant="ghost"
         aria-haspopup="menu"
@@ -160,6 +161,7 @@ export function EffectPicker({ types, stacks, room, label, makeEffect, onAdd }: 
             size="sm"
             icon="search"
             placeholder="Search effects"
+            data-tip="Type to filter by name, description or group; Enter adds the highlighted one"
             aria-label="Search effects"
             value={query}
             onChange={(e) => {
@@ -181,6 +183,7 @@ export function EffectPicker({ types, stacks, room, label, makeEffect, onAdd }: 
                     role="menuitem"
                     tabIndex={-1}
                     aria-label={e.label}
+                    data-tip={disabled ? "This stack is full; remove an effect first" : e.count > 1 ? `${e.description} Adds ${e.count} effects` : e.description}
                     disabled={disabled}
                     data-active={i === cur || undefined}
                     className={cx(styles.item, i === cur && styles.active)}

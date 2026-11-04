@@ -37,7 +37,7 @@ export function AdjustInspector({ clip }: { clip: EditClip }) {
         clipTimeMs={clipTimeMs}
         onChange={(next, key) => commit({ effects: serializeEffects(next) }, scoped(key))}
       />
-      <Section label="Opacity">
+      <Section label="Opacity" tip="How strongly this clip's effects apply to the tracks below, 0 to 100%">
         <EditParamEditor
           spec={{ min: r.min, max: r.max, step: 0.01, label: "Opacity" }}
           value={transform.opacity as EditParam}

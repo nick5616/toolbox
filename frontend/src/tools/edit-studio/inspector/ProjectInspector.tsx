@@ -33,31 +33,32 @@ export function ProjectInspector() {
       <div className={styles.head}>
         <h2 className={styles.title}>Edit settings</h2>
       </div>
-      <Section label="Frame">
+      <Section label="Frame" tip="The picture shape, smoothness and the colour behind everything">
         <div className={styles.stack}>
           <div className={styles.row}>
             <span className={styles.label}>Aspect</span>
-            <Select size="sm" aria-label="Aspect" value={project.aspect} onChange={(aspect) => set({ aspect })} options={ASPECTS.map((a) => ({ value: a, label: a }))} />
+            <Select size="sm" data-tip="Video shape: 9:16 for phones and Reels, 16:9 for YouTube, 1:1 for squares" aria-label="Aspect" value={project.aspect} onChange={(aspect) => set({ aspect })} options={ASPECTS.map((a) => ({ value: a, label: a }))} />
           </div>
           <p className={styles.hint}>Changing the aspect keeps your clips; the preview re-fits them.</p>
           <div className={styles.row}>
             <span className={styles.label}>Frame rate</span>
-            <Select size="sm" aria-label="Frame rate" value={String(project.fps)} onChange={(v) => set({ fps: Number(v) })} options={FPS_OPTIONS} />
+            <Select size="sm" data-tip="Frames per second; 60 is smoother but makes bigger files and takes longer" aria-label="Frame rate" value={String(project.fps)} onChange={(v) => set({ fps: Number(v) })} options={FPS_OPTIONS} />
           </div>
           <p className={styles.warn}>Changing the frame rate prepares every source video again.</p>
-          <div className={styles.colorRow}>
+          <div className={styles.colorRow} data-tip="The colour behind all clips, seen wherever nothing covers the frame">
             <span className={styles.label}>Background</span>
             <ColorSwatchPicker aria-label="Background colour" value={project.background || "#000000"} onChange={(background) => set({ background }, "background")} />
           </div>
         </div>
       </Section>
 
-      <Section label="Look">
+      <Section label="Look" tip="A finishing style applied to the whole edit, on top of every clip">
         <div className={styles.row}>
           <span className={styles.label}>Preset</span>
           <Select
             size="sm"
             aria-label="Look preset"
+            data-tip="Pick a colour grade for the whole edit (vivid, warm, noir…); edit the Look effects below to go further"
             value={preset}
             onChange={(id) => {
               if (id !== "custom") set({ look: serializeLook(applyLook(look, id as LookId)) });
@@ -76,17 +77,17 @@ export function ProjectInspector() {
         onChange={(next, key) => set({ look: serializeLook(next) }, key ? `look:${key}` : "")}
       />
 
-      <Section label="Export">
+      <Section label="Export" tip="Settings that affect the exported video">
         <div className={styles.stack}>
           <div className={styles.row}>
             <span className={styles.label}>Size</span>
-            <Select size="sm" aria-label="Export size" value={String(project.exportHeight)} onChange={(v) => set({ exportHeight: Number(v) })} options={EXPORT_OPTIONS} />
+            <Select size="sm" data-tip="Height of the exported video in pixels; the width follows the aspect" aria-label="Export size" value={String(project.exportHeight)} onChange={(v) => set({ exportHeight: Number(v) })} options={EXPORT_OPTIONS} />
           </div>
           <div className={styles.row}>
             <span className={styles.label}>Seed</span>
-            <Stepper aria-label="Seed" min={0} max={MAX_SEED} step={1} value={project.seed} onChange={(seed) => set({ seed: Math.round(seed) }, "seed")} />
+            <Stepper data-tip="Number that fixes the random parts of effects; the same seed always gives the same frames" aria-label="Seed" min={0} max={MAX_SEED} step={1} value={project.seed} onChange={(seed) => set({ seed: Math.round(seed) }, "seed")} />
           </div>
-          <Button size="sm" icon="refresh-cw" onClick={() => set({ seed: Math.floor(Math.random() * MAX_SEED) })}>
+          <Button size="sm" icon="refresh-cw" data-tip="Pick a new random seed to get a different version of the random-looking effects" onClick={() => set({ seed: Math.floor(Math.random() * MAX_SEED) })}>
             New seed
           </Button>
           <p className={styles.hint}>The seed decides the random-looking parts of effects, so the same seed gives the same frames.</p>

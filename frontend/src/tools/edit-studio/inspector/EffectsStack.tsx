@@ -106,7 +106,7 @@ export function EffectsStack({ posts, onChange, types, clipTimeMs, allowKeys, te
   };
 
   return (
-    <Section label={label} action={<EffectPicker types={types} stacks={templates} room={MAX_EFFECTS - posts.length} label={effectLabel} makeEffect={newEffect} onAdd={addAll} />}>
+    <Section label={label} tip="Effects change how the picture looks, top to bottom; reactions make them hit on the music" action={<EffectPicker types={types} stacks={templates} room={MAX_EFFECTS - posts.length} label={effectLabel} makeEffect={newEffect} onAdd={addAll} />}>
       <div className={styles.stack}>
         {posts.length === 0 && <p className={styles.hint}>No effects yet. Add one, or start from a template that reacts to markers.</p>}
         {posts.map((p, i) => {
@@ -129,6 +129,7 @@ export function EffectsStack({ posts, onChange, types, clipTimeMs, allowKeys, te
                   type="button"
                   className={styles.grip}
                   aria-label={`Reorder ${effectLabel(p.type)}`}
+                  data-tip="Drag up or down to change the order effects are applied in, or press the arrow keys"
                   onPointerDown={(e) => onGripDown(e, p.id)}
                   onPointerMove={onGripMove}
                   onPointerUp={onGripUp}
@@ -137,11 +138,11 @@ export function EffectsStack({ posts, onChange, types, clipTimeMs, allowKeys, te
                 >
                   <GripGlyph />
                 </button>
-                <button type="button" className={styles.itemName} aria-expanded={expanded} onClick={() => toggleOpen(p.id)}>
+                <button type="button" className={styles.itemName} data-tip={`${EFFECT_CATALOG[p.type]?.description ?? effectLabel(p.type)} Click to ${expanded ? "hide" : "show"} its settings`} aria-expanded={expanded} onClick={() => toggleOpen(p.id)}>
                   {effectLabel(p.type)}
                 </button>
-                <Switch aria-label={`Enable ${effectLabel(p.type)}`} checked={p.enabled} onChange={(enabled) => patch(p.id, (x) => ({ ...x, enabled }), "")} />
-                <IconButton size="sm" icon="trash-2" label={`Remove ${effectLabel(p.type)}`} onClick={() => onChange(posts.filter((x) => x.id !== p.id), "")} />
+                <Switch tip={p.enabled ? "Turn this effect off without losing its settings" : "Turn this effect back on"} aria-label={`Enable ${effectLabel(p.type)}`} checked={p.enabled} onChange={(enabled) => patch(p.id, (x) => ({ ...x, enabled }), "")} />
+                <IconButton size="sm" icon="trash-2" label={`Remove ${effectLabel(p.type)}`} data-tip="Delete this effect from the stack" onClick={() => onChange(posts.filter((x) => x.id !== p.id), "")} />
               </div>
               {p.enabled && <HitOn post={p} onChange={(next, key) => patch(p.id, () => next, key)} />}
               {expanded && (
@@ -166,7 +167,7 @@ export function EffectsStack({ posts, onChange, types, clipTimeMs, allowKeys, te
                       }
                       if (spec.kind === "enum") {
                         return (
-                          <div key={name} className={styles.row}>
+                          <div key={name} className={styles.row} data-tip={`${spec.label}: choose one of the options`}>
                             <span className={styles.label}>{spec.label}</span>
                             <Select
                               size="sm"
@@ -179,11 +180,11 @@ export function EffectsStack({ posts, onChange, types, clipTimeMs, allowKeys, te
                         );
                       }
                       if (spec.kind === "bool") {
-                        return <Switch key={name} label={spec.label} checked={typeof v === "boolean" ? v : spec.default} onChange={(b) => setParam(p.id, name, b, "")} />;
+                        return <Switch key={name} tip={`${spec.label}: turn on or off`} label={spec.label} checked={typeof v === "boolean" ? v : spec.default} onChange={(b) => setParam(p.id, name, b, "")} />;
                       }
                       const color = typeof v === "string" && v.startsWith("#") ? v : spec.default.startsWith("#") ? spec.default : "#ffffff";
                       return (
-                        <div key={name} className={styles.colorRow}>
+                        <div key={name} className={styles.colorRow} data-tip={`${spec.label}: white, black or a #rrggbb colour`}>
                           <span className={styles.label}>{spec.label}</span>
                           <ColorSwatchPicker aria-label={spec.label} value={color} onChange={(c) => setParam(p.id, name, c, "ep:color")} />
                         </div>

@@ -36,25 +36,26 @@ export function KeyframeToggle({ name, value, current, clipTimeMs, onChange }: K
         <Select
           size="sm"
           className={styles.easeSelect}
+          data-tip="How the value moves from this key to the next: smooth, straight line, or hold then jump"
           aria-label={`Easing of ${name} key`}
           value={(keys[at] as Key).ease}
           onChange={(ease) => onChange(setEaseAt(value, clipTimeMs, ease))}
           options={EASES}
         />
       )}
-      {keys.length > 0 && <IconButton size="sm" icon="chevron-left" label={`Previous ${name} key`} disabled={!neighbourKey(keys, clipTimeMs, -1)} onClick={() => jump(-1)} />}
+      {keys.length > 0 && <IconButton size="sm" icon="chevron-left" label={`Previous ${name} key`} data-tip="Move the playhead to the previous keyframe" disabled={!neighbourKey(keys, clipTimeMs, -1)} onClick={() => jump(-1)} />}
       <button
         type="button"
         className={styles.diamondBtn}
         aria-label={onKey ? `Remove ${name} key` : `Add ${name} key`}
         aria-pressed={onKey}
         data-keyed={keys.length > 0 || undefined}
-        title={onKey ? "Remove key at the playhead" : "Add key at the playhead"}
+        data-tip={onKey ? "Remove the keyframe at the playhead" : "Add a keyframe here so the value can change over the clip"}
         onClick={() => onChange(onKey ? removeKeyAt(value, clipTimeMs) : setKeyAt(value, clipTimeMs, current))}
       >
         <span className={styles.diamond} />
       </button>
-      {keys.length > 0 && <IconButton size="sm" icon="chevron-right" label={`Next ${name} key`} disabled={!neighbourKey(keys, clipTimeMs, 1)} onClick={() => jump(1)} />}
+      {keys.length > 0 && <IconButton size="sm" icon="chevron-right" label={`Next ${name} key`} data-tip="Move the playhead to the next keyframe" disabled={!neighbourKey(keys, clipTimeMs, 1)} onClick={() => jump(1)} />}
     </span>
   );
 }

@@ -48,7 +48,9 @@ export function EditParamEditor({ spec, value, onChange, clipTimeMs, allowKeys, 
   return (
     <div className={styles.param}>
       <div className={styles.paramHead}>
-        <span className={styles.label}>{spec.label}</span>
+        <span className={styles.label} data-tip={`${spec.label}: drag the slider to set it${allowKeys ? ", or add keyframes to animate it over the clip" : ""}`}>
+          {spec.label}
+        </span>
         <span className={styles.paramTools}>
           {allowKeys && <KeyframeToggle name={spec.label} value={value} current={shown} clipTimeMs={clipTimeMs} onChange={(next) => onChange(next, "")} />}
           {allowMods && (
@@ -56,6 +58,7 @@ export function EditParamEditor({ spec, value, onChange, clipTimeMs, allowKeys, 
               size="sm"
               icon="activity"
               label={`Reactions for ${spec.label}`}
+              data-tip={`Make ${spec.label.toLowerCase()} jump to the music: beats, kicks, snares or any other signal drive it`}
               pressed={open || mods.length > 0}
               className={cx(mods.length > 0 && styles.reactive)}
               onClick={() => setOpen((o) => !o)}
@@ -64,6 +67,7 @@ export function EditParamEditor({ spec, value, onChange, clipTimeMs, allowKeys, 
         </span>
       </div>
       <Slider
+        data-tip={keyed ? `${spec.label} at the playhead; changing it edits the key there` : `${spec.label}; drag to set, or use the diamond to animate it`}
         aria-label={spec.label}
         min={spec.min}
         max={spec.max}

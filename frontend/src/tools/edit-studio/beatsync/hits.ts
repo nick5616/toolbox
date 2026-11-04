@@ -23,6 +23,26 @@ export const HIT_LANES: ReadonlyArray<{ value: HitLane; label: string }> = [
   { value: "word", label: "Words" },
 ];
 
+/** One-line explanations of each lane, for tooltips. */
+export const HIT_LANE_TIPS: Record<HitLane, string> = {
+  beat: "Every beat of the song",
+  downbeat: "The first beat of each bar: stronger, less frequent",
+  kick: "Kick drum hits",
+  snare: "Snare drum hits",
+  hats: "Hi-hat hits: the fast ticking on top",
+  bass: "Bass note hits",
+  vocals: "Moments where a voice comes in",
+  other: "Hits from other instruments",
+  section: "The start of each song section (verse, chorus…)",
+  drop: "The big drops in the song",
+  lift: "Build-ups before a drop",
+  break: "Quiet breaks in the song",
+  stop: "Moments where the music stops",
+  phrase: "The start of each sung or played phrase",
+  word: "Each sung word (needs lyrics)",
+  custom: "Markers you added yourself",
+};
+
 export const HIT_DECAYS = [
   { value: 90, label: "Snappy" },
   { value: 180, label: "Punchy" },

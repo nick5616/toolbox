@@ -13,6 +13,32 @@ import { EditParamEditor } from "./EditParamEditor";
 import { isKeyed, paramBase } from "./paramOps";
 import styles from "./inspector.module.css";
 
+const BLEND_TIPS: Record<string, string> = {
+  normal: "Draw the clip as it is, on top of what is below",
+  add: "Add the colours to what is below: brightens, great for light and glow",
+  screen: "Lighten what is below; black disappears, like projected light",
+  multiply: "Darken what is below; white disappears, like stacked ink",
+  overlay: "Boost contrast: lights get lighter and darks darker",
+  softlight: "A gentle contrast boost, softer than overlay",
+  hardlight: "A strong contrast boost, harsher than overlay",
+  difference: "Show how much the colours differ; makes strange inverted colours",
+  exclusion: "Like difference, but softer and with less contrast",
+  lighten: "Keep whichever pixel is brighter, this clip or below",
+  darken: "Keep whichever pixel is darker, this clip or below",
+  colordodge: "Brighten strongly and blow out the highlights",
+};
+const FIT_TIPS: Record<string, string> = {
+  fill: "Scale the clip to cover the whole frame, cropping the edges",
+  fit: "Scale the clip to show all of it, with empty bars where it doesn't fill the frame",
+  "fit-blur": "Show all of the clip over a blurred, enlarged copy of itself",
+  "fit-color": "Show all of the clip over a flat colour",
+};
+const SLOW_TIPS: Record<string, string> = {
+  blend: "When slowed down, mix neighbouring frames for smoother motion (fast, the default)",
+  none: "When slowed down, repeat the nearest frame: crisp but steppy",
+  interpolate: "When slowed down, synthesise in-between frames for smooth slow motion (takes a while to make)",
+};
+
 export const INTERP_LABEL = "Synthesized in-between frames (slow motion)";
 
 const FIT_OPTIONS = [
@@ -62,10 +88,10 @@ export function SourceSection({ clip, fps, clipTimeMs, onChange }: SourceSection
   const setSpeed = (p: EditParam, key: string) => onChange({ speed: serializeSpeed(p) }, key);
 
   return (
-    <Section label={hasSource ? "Source" : "Blend"}>
+    <Section label={hasSource ? "Source" : "Blend"} tip={hasSource ? "The clip's file, timing, sound and how it fills the frame" : "How this clip mixes with what is below it"}>
       <div className={styles.stack}>
         {hasSource && (
-          <div className={styles.row}>
+          <div className={styles.row} data-tip="The source file; this app never changes it">
             <span className={styles.label}>File</span>
             <span className={styles.mono} title={clip.path}>
               {baseName(clip.path)}
@@ -73,19 +99,20 @@ export function SourceSection({ clip, fps, clipTimeMs, onChange }: SourceSection
           </div>
         )}
         {clip.kind === "color" && (
-          <div className={styles.colorRow}>
+          <div className={styles.colorRow} data-tip="The clip's colour: white, black or a #rrggbb value">
             <span className={styles.label}>Colour</span>
             <ColorSwatchPicker aria-label="Clip colour" value={clip.color || "#000000"} onChange={(color) => onChange({ color }, `${clip.id}:color`)} />
           </div>
         )}
         {isVideo && (
           <>
-            <div className={styles.row}>
+            <div className={styles.row} data-tip="Where in the source video this clip starts playing, in milliseconds">
               <span className={styles.label}>In point</span>
               <Stepper aria-label="In point" unit="ms" min={0} step={100} value={clip.inMs} onChange={(inMs) => onChange({ inMs: Math.round(inMs) }, `${clip.id}:in`)} />
             </div>
             <div className={styles.stack}>
               <Switch
+                tip="Turn on to keyframe the speed (ramps, freezes); off keeps one steady speed"
                 label="Speed changes over time"
                 checked={speedKeyed}
                 onChange={(on) => setSpeed(on ? { base: paramBase(speed), keys: [{ t: 0, v: paramBase(speed), ease: "ease" }] } : paramBase(speed), "")}
@@ -104,6 +131,7 @@ export function SourceSection({ clip, fps, clipTimeMs, onChange }: SourceSection
                 <>
                   <span className={styles.label}>Speed</span>
                   <Slider
+                    data-tip="Playback speed: 1× is normal, below 1× is slow motion, above is fast"
                     aria-label="Speed"
                     min={0.1}
                     max={4}
@@ -118,13 +146,14 @@ export function SourceSection({ clip, fps, clipTimeMs, onChange }: SourceSection
             <div className={styles.stack}>
               <div className={styles.row}>
                 <span className={styles.label}>Slow motion</span>
-                <Select size="sm" aria-label="Slow motion" value={slow} onChange={(v) => onChange({ slow: v === "blend" ? "" : v }, "")} options={SLOW_OPTIONS} />
+                <Select size="sm" data-tip={SLOW_TIPS[slow]} aria-label="Slow motion" value={slow} onChange={(v) => onChange({ slow: v === "blend" ? "" : v }, "")} options={SLOW_OPTIONS} />
               </div>
               {slow === "interpolate" && <InterpControl clip={clip} fps={fps} />}
             </div>
             <div className={styles.stack}>
               <span className={styles.label}>Volume</span>
               <Slider
+                data-tip="This clip's sound level in the export; 100% is the original"
                 aria-label="Volume"
                 min={0}
                 max={2}
@@ -142,20 +171,20 @@ export function SourceSection({ clip, fps, clipTimeMs, onChange }: SourceSection
           <>
             <div className={styles.row}>
               <span className={styles.label}>Fit</span>
-              <Select size="sm" aria-label="Fit" value={clip.fit || "fill"} onChange={(fit) => onChange({ fit }, "")} options={FIT_OPTIONS} />
+              <Select size="sm" data-tip={FIT_TIPS[clip.fit || "fill"]} aria-label="Fit" value={clip.fit || "fill"} onChange={(fit) => onChange({ fit }, "")} options={FIT_OPTIONS} />
             </div>
             {clip.fit === "fit-color" && (
-              <div className={styles.colorRow}>
+              <div className={styles.colorRow} data-tip="The colour behind the clip where it doesn't fill the frame">
                 <span className={styles.label}>Fit colour</span>
                 <ColorSwatchPicker aria-label="Fit colour" value={clip.fitColor || "#000000"} onChange={(fitColor) => onChange({ fitColor }, `${clip.id}:fitcolor`)} />
               </div>
             )}
-            <Switch label="Flip horizontally" checked={clip.flipX} onChange={(flipX) => onChange({ flipX }, "")} />
+            <Switch tip="Mirror the picture left to right" label="Flip horizontally" checked={clip.flipX} onChange={(flipX) => onChange({ flipX }, "")} />
           </>
         )}
         <div className={styles.row}>
           <span className={styles.label}>Blend</span>
-          <Select size="sm" aria-label="Blend" value={clip.blend || "normal"} onChange={(blend) => onChange({ blend }, "")} options={BLEND_OPTIONS} />
+          <Select size="sm" data-tip={BLEND_TIPS[clip.blend || "normal"]} aria-label="Blend" value={clip.blend || "normal"} onChange={(blend) => onChange({ blend }, "")} options={BLEND_OPTIONS} />
         </div>
       </div>
     </Section>
@@ -224,7 +253,7 @@ function InterpControl({ clip, fps }: { clip: EditClip; fps: number }) {
   return (
     <div className={styles.stack}>
       <p className={styles.hint}>Until it is made, the clip uses blended frames.</p>
-      <Button size="sm" onClick={() => void make()}>
+      <Button size="sm" data-tip="Create the smooth slow motion for this part of the clip; it runs as a background job" onClick={() => void make()}>
         Make
       </Button>
     </div>
