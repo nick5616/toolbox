@@ -117,24 +117,26 @@ export function Timeline({
     });
   }, [playheadMs, durationMs]);
 
-  // Wheel: Ctrl+wheel zooms, plain/Shift wheel pans. Non-passive so we can preventDefault.
+  // Wheel: zooms (zoomable timelines); Shift/sideways pans. Non-passive so we can preventDefault.
   useEffect(() => {
     const el = track.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       const { view: v, width: w, durationMs: d } = live.current;
       if (w <= 0 || d <= 0) return;
-      if (e.ctrlKey || e.metaKey) {
-        if (!zoomable) return;
+      const sideways = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+      // The wheel zooms around the pointer; Shift+wheel or sideways scrolling pans (so do the scrollbar and a middle-button drag).
+      if (zoomable && !sideways && !e.shiftKey) {
         e.preventDefault();
         const rect = el.getBoundingClientRect();
         const frac = rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0.5;
-        setView(zoomView(v, d, frac, Math.pow(WHEEL_ZOOM_STEP, -e.deltaY)));
+        const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+        setView(zoomView(v, d, frac, Math.pow(WHEEL_ZOOM_STEP, -dy)));
         return;
       }
       if (v.spanMs >= d) return;
       e.preventDefault();
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      const delta = sideways ? e.deltaX : e.deltaY || e.deltaX;
       setView(panView(v, d, (delta / w) * v.spanMs));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -306,6 +308,14 @@ export function Timeline({
         })}
         <div className={styles.playhead} style={{ left: msToPx(playheadMs, view, width) }} aria-hidden="true" />
       </div>
+      {zoomable && durationMs > 0 && width > 0 && (
+        <ViewScrollbar
+          width={width}
+          startFrac={view.startMs / durationMs}
+          spanFrac={Math.min(1, view.spanMs / durationMs)}
+          onStart={(f) => setView((v) => clampView({ ...v, startMs: f * durationMs }, durationMs))}
+        />
+      )}
       {markers && markers.length > 0 && (
         <div className={styles.markers}>
           {markers.map((m) => {
@@ -326,6 +336,43 @@ export function Timeline({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/** A horizontal scrollbar for a zoomed view: drag the thumb or click the bar. */
+function ViewScrollbar({ width, startFrac, spanFrac, onStart }: { width: number; startFrac: number; spanFrac: number; onStart(frac: number): void }) {
+  const thumbW = Math.max(24, spanFrac * width);
+  const room = Math.max(1, width - thumbW);
+  const left = spanFrac >= 1 ? 0 : (startFrac / Math.max(1e-6, 1 - spanFrac)) * room;
+  const toFrac = (px: number) => (Math.max(0, Math.min(room, px)) / room) * (1 - spanFrac);
+  const drag = useRef<{ x: number; left: number } | null>(null);
+  return (
+    <div
+      className={styles.scrollbar}
+      data-tip="Drag to pan (or Shift+wheel, or hold the middle mouse button). The wheel zooms"
+      onPointerDown={(e) => {
+        if (e.button !== 0 || e.target !== e.currentTarget) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        onStart(toFrac(e.clientX - r.left - thumbW / 2));
+      }}
+    >
+      <div
+        className={styles.scrollThumb}
+        style={{ left, width: thumbW }}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          e.stopPropagation();
+          e.currentTarget.setPointerCapture(e.pointerId);
+          drag.current = { x: e.clientX, left };
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (d) onStart(toFrac(d.left + e.clientX - d.x));
+        }}
+        onPointerUp={() => (drag.current = null)}
+        onPointerCancel={() => (drag.current = null)}
+      />
     </div>
   );
 }

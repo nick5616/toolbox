@@ -33,10 +33,10 @@ export function visibleRange(widthPx: number, pps: number, scrollMs: number): { 
 /**
  * Wheel handling for any timeline row container (attach to the element that
  * spans header + time area):
- * - over the time area, the wheel moves along the time (sideways trackpad
- *   scrolling too);
- * - over the row headers, or with Shift, it scrolls the rows up and down;
- * - Ctrl/Cmd+wheel zooms around the pointer.
+ * - the wheel (and a trackpad pinch) zooms the time around the pointer;
+ * - Shift+wheel and sideways trackpad scrolling pan along the time (as do the
+ *   scrollbar and a middle-button drag);
+ * - over the row names, or with Alt, the wheel scrolls the rows up and down.
  * Clamped to [0, durationMs].
  */
 export function useTimelineWheel(el: HTMLElement | null, durationMs: number): void {
@@ -48,17 +48,9 @@ export function useTimelineWheel(el: HTMLElement | null, durationMs: number): vo
       const x = Math.max(0, e.clientX - rect.left - HEADER_PX);
       const timeWidth = Math.max(1, rect.width - HEADER_PX);
       const maxScroll = Math.max(0, durationMs - (timeWidth * 1000) / pps);
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const at = xToMs(x, pps, scrollMs);
-        const next = Math.max(6, Math.min(800, pps * Math.exp(-e.deltaY * 0.0015)));
-        const nextMax = Math.max(0, durationMs - (timeWidth * 1000) / next);
-        setView(next, Math.min(nextMax, Math.max(0, at - (x * 1000) / next)));
-        return;
-      }
       const sideways = Math.abs(e.deltaX) > Math.abs(e.deltaY);
       const overHeaders = e.clientX - rect.left < HEADER_PX;
-      if (!sideways && (e.shiftKey || overHeaders)) {
+      if (!sideways && (e.altKey || overHeaders)) {
         const rows = rowsScroller(el);
         if (!rows) return;
         e.preventDefault();
@@ -66,8 +58,17 @@ export function useTimelineWheel(el: HTMLElement | null, durationMs: number): vo
         return;
       }
       e.preventDefault();
-      const d = wheelPx(e, timeWidth, sideways ? e.deltaX : e.deltaY);
-      setView(pps, Math.min(maxScroll, Math.max(0, scrollMs + (d * 1000) / pps)));
+      if (sideways || e.shiftKey) {
+        const d = wheelPx(e, timeWidth, sideways ? e.deltaX : e.deltaY || e.deltaX);
+        setView(pps, Math.min(maxScroll, Math.max(0, scrollMs + (d * 1000) / pps)));
+        return;
+      }
+      // Zoom around the pointer; never further out than the whole edit.
+      const fitPps = Math.max(6, (timeWidth * 1000) / Math.max(1, durationMs));
+      const at = xToMs(x, pps, scrollMs);
+      const next = Math.max(Math.min(fitPps, pps), Math.min(800, pps * Math.exp(-wheelPx(e, 300) * 0.0015)));
+      const nextMax = Math.max(0, durationMs - (timeWidth * 1000) / next);
+      setView(next, Math.min(nextMax, Math.max(0, at - (x * 1000) / next)));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);

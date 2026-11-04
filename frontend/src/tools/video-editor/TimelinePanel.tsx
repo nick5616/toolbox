@@ -101,17 +101,17 @@ export function TimelinePanel(p: TimelinePanelProps) {
     setPps(clampPps(((w - 24) / Math.max(totalMs + LANE_PAD_MS / 2, 1000)) * 1000));
   };
 
-  // Ctrl+wheel zooms around the pointer.
+  // The wheel zooms around the pointer.
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) {
-        // A plain wheel moves along the time (the rows fit; sideways trackpad scrolling is native).
-        if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && !e.shiftKey && el.scrollWidth > el.clientWidth) {
-          e.preventDefault();
-          el.scrollLeft += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-        }
+      // The wheel zooms around the pointer; Shift+wheel pans (sideways trackpad scrolling,
+      // the scrollbar and a middle-button drag pan natively).
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      if (e.shiftKey) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
         return;
       }
       e.preventDefault();

@@ -141,14 +141,15 @@ export function SongMap({ analysis, timeline, playheadMs, onSeek, selection, onS
     const el = viewportRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const rect = el.getBoundingClientRect();
-        zoomRef.current(ppsRef.current * Math.exp(-e.deltaY * 0.0025), e.clientX - rect.left);
-      } else if (e.deltaX === 0 && e.deltaY !== 0 && el.scrollWidth > el.clientWidth) {
-        e.preventDefault();
+      // The wheel zooms around the pointer; Shift+wheel pans (sideways scrolling, the scrollbar and a middle-button drag too).
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      if (e.shiftKey) {
         el.scrollLeft += e.deltaY;
+        return;
       }
+      const rect = el.getBoundingClientRect();
+      zoomRef.current(ppsRef.current * Math.exp(-e.deltaY * 0.0025), e.clientX - rect.left);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -248,7 +249,7 @@ export function SongMap({ analysis, timeline, playheadMs, onSeek, selection, onS
   return (
     <div className={cx(styles.root, className)} role="group" aria-label="Song map">
       <div className={styles.toolbar}>
-        <span className={styles.hint}>Ctrl + wheel to zoom · Shift + drag to select a range</span>
+        <span className={styles.hint}>Wheel to zoom · Shift+wheel or middle-drag to pan · Shift + drag to select a range</span>
         {selection && onSelect && (
           <button type="button" className={styles.clear} onClick={() => onSelect(null)}>
             Clear selection

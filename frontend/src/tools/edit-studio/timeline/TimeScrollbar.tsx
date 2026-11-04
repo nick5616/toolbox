@@ -1,7 +1,7 @@
 /**
  * A horizontal scrollbar for the timeline (the lanes and tracks share
  * pps/scrollMs, so one bar moves both). Drag the thumb, or click the bar to
- * jump there. Hidden when the whole edit fits.
+ * jump there. Scroll the wheel over the timeline to zoom.
  */
 import { useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { HEADER_PX } from "../geometry";
@@ -10,7 +10,8 @@ import styles from "./TimeScrollbar.module.css";
 
 export function thumbGeometry(barPx: number, durationMs: number, pps: number, scrollMs: number, timePx: number): { left: number; width: number; visible: boolean } {
   const visibleMs = (timePx * 1000) / pps;
-  if (durationMs <= 0 || barPx <= 0 || visibleMs >= durationMs) return { left: 0, width: barPx, visible: false };
+  // Always shown (a full-width thumb when the whole edit fits) so panning is easy to find.
+  if (durationMs <= 0 || barPx <= 0 || visibleMs >= durationMs) return { left: 0, width: barPx, visible: barPx > 0 };
   const width = Math.max(24, (visibleMs / durationMs) * barPx);
   const maxScroll = durationMs - visibleMs;
   const left = maxScroll > 0 ? (Math.min(scrollMs, maxScroll) / maxScroll) * (barPx - width) : 0;
@@ -53,7 +54,7 @@ export function TimeScrollbar({ width, durationMs }: { width: number; durationMs
   };
   return (
     <div className={styles.wrap} style={{ paddingLeft: HEADER_PX + 4 }}>
-      <div className={styles.bar} style={{ width: barPx }} onPointerDown={onBar} role="scrollbar" aria-orientation="horizontal" aria-label="Scroll the timeline" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((g.left / Math.max(1, barPx - g.width)) * 100)} aria-controls="es-tracks">
+      <div className={styles.bar} style={{ width: barPx }} onPointerDown={onBar} data-tip="Drag to pan along the song (or Shift+wheel, or hold the middle mouse button). Wheel over the timeline zooms" role="scrollbar" aria-orientation="horizontal" aria-label="Scroll the timeline" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((g.left / Math.max(1, barPx - g.width)) * 100)} aria-controls="es-tracks">
         <div className={styles.thumb} style={{ left: g.left, width: g.width }} onPointerDown={onThumbDown} onPointerMove={onThumbMove} onPointerUp={onThumbUp} onPointerCancel={onThumbUp} />
       </div>
     </div>
