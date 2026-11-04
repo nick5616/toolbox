@@ -38,6 +38,7 @@ func LaneDefaults() map[string]LaneSettings {
 		"bass": d(false, 0.3), "vocals": d(false, 0.3), "other": d(false, 0.3),
 		"section": d(true, 0), "drop": d(true, 0), "lift": d(true, 0), "break": d(false, 0),
 		"stop": d(true, 0.5), "phrase": d(false, 0), "word": d(false, 0), "custom": d(true, 0),
+		"accent": d(true, 0.3),
 	}
 }
 

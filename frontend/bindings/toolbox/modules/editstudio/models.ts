@@ -530,6 +530,23 @@ export interface MatteStroke {
     "color": string;
 }
 
+/**
+ * Moment is one stand-out instant of a source (source ms).
+ */
+export interface Moment {
+    "ms": number;
+
+    /**
+     * 0..1
+     */
+    "strength": number;
+
+    /**
+     * "cut" (a shot change) | "motion" (a burst of movement or light)
+     */
+    "kind": string;
+}
+
 export interface RecipeRun {
     "recipeId": string;
     "seed": number;

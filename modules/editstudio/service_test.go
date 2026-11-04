@@ -44,7 +44,7 @@ func TestServiceCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(doc.Tracks) != 1 || doc.Tracks[0].Kind != "video" || doc.Seed <= 0 || doc.ExportHeight != 1080 || len(doc.Markers.Lanes) != 16 {
+	if len(doc.Tracks) != 1 || doc.Tracks[0].Kind != "video" || doc.Seed <= 0 || doc.ExportHeight != 1080 || len(doc.Markers.Lanes) != 17 {
 		t.Errorf("new doc %+v", doc)
 	}
 	if err := validateShape(doc); err != nil {

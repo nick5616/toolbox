@@ -27,7 +27,7 @@ var (
 	fxTargets     = []string{"clip", "subject", "background"}
 	matteModes    = []string{MattePeople, MatteSelect, MatteImage}
 	textKinds     = []string{TextMarkersCSV, TextMarkersJSON, TextSRT}
-	laneIDs       = []string{"beat", "downbeat", "kick", "snare", "hats", "bass", "vocals", "other",
+	laneIDs       = []string{"beat", "downbeat", "kick", "snare", "hats", "bass", "vocals", "other", "accent",
 		"section", "drop", "lift", "break", "stop", "phrase", "word", "custom"}
 	colorRe = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 	idRe    = regexp.MustCompile(`^[A-Za-z0-9_-]{1,40}$`)

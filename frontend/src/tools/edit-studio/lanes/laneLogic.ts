@@ -40,6 +40,7 @@ export const LANE_LABELS: Readonly<Record<MarkerLane, string>> = {
   phrase: "Phrases",
   word: "Words",
   custom: "Custom",
+  accent: "Accents",
 };
 
 /** Lanes drawn as ranges. */

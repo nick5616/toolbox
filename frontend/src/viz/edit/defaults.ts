@@ -25,6 +25,7 @@ export const LANE_DEFAULTS: Readonly<Record<MarkerLane, LaneSettings>> = {
   phrase: lane(false, 0),
   word: lane(false, 0),
   custom: lane(true, 0),
+  accent: lane(true, 0.3),
 };
 
 /** A lane's settings in a project (defaults for a missing lane). */

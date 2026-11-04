@@ -138,6 +138,13 @@ export function Mattes(projectID: string, ids: string[] | null): $CancellablePro
 }
 
 /**
+ * Moments lists the stand-out instants of a video source (source ms), measuring its motion once.
+ */
+export function Moments(path: string, fps: number): $CancellablePromise<$models.Moment[] | null> {
+    return $Call.ByID(1443339059, path, fps);
+}
+
+/**
  * Prepare submits one prepare job for source paths.
  */
 export function Prepare(projectID: string, paths: string[] | null, fps: number): $CancellablePromise<core$0.Job> {

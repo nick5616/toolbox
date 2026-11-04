@@ -31,6 +31,7 @@ export const MARKER_TAU: Readonly<Record<MarkerLane, number>> = {
   phrase: 400,
   word: 150,
   custom: 150,
+  accent: 160,
 };
 
 /** Lanes whose pulses always peak at 1, whatever the marker strength. */

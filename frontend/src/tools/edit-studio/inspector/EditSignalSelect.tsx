@@ -24,6 +24,7 @@ export const LANE_LABELS: Record<MarkerLane, string> = {
   phrase: "Phrases",
   word: "Words",
   custom: "Custom markers",
+  accent: "Accents (stand-out hits)",
 };
 
 export function signalLabel(id: EditSignalId): string {

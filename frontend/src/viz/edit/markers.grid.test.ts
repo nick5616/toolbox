@@ -48,3 +48,19 @@ describe("drops after stops", () => {
     expect(drops.map((d) => d.ms)).toEqual([16_000]);
   });
 });
+
+describe("accents", () => {
+  it("finds the stand-out hits of the fixture and keeps them 250 ms apart", async () => {
+    const { buildEditFixture } = await import("./fixture");
+    const { deriveMarkers } = await import("./markers");
+    const { LANE_DEFAULTS } = await import("./defaults");
+    const a = buildEditFixture();
+    const lanes = { ...LANE_DEFAULTS };
+    const ms = deriveMarkers(a, { lanes, barOffset: 0, hidden: [], moved: {}, labels: {}, custom: [] }, { startMs: 0, endMs: a.durationMs });
+    const acc = ms.filter((m) => m.lane === "accent");
+    expect(acc.length).toBeGreaterThan(0);
+    // the drop at 16 s is an accent
+    expect(acc.some((m) => Math.abs(m.ms - 16_000) < 300)).toBe(true);
+    for (let i = 1; i < acc.length; i++) expect((acc[i] as { ms: number }).ms - (acc[i - 1] as { ms: number }).ms).toBeGreaterThanOrEqual(250);
+  });
+});

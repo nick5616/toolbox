@@ -452,7 +452,80 @@ function rawLane(a: Analysis, lane: MarkerLane, s: LaneSettings, grid: BarGrid):
       return deriveWords(a, grid);
     case "custom":
       return [];
+    case "accent":
+      return deriveAccents(a, grid);
   }
+}
+
+/**
+ * Accents (Part C): the hits that stand out from what's around them, the
+ * moments an editor puts something special on. A peak of the song's onset
+ * strength (whole mix, and each stem when there are stems) counts when it is
+ * clearly stronger than the typical hit in the 4 s around it, or when it is a
+ * strong hit away from the beat grid (a fill, a syncopated stab). Drops and
+ * the first hit after a stop always count. The strongest win: at least a beat
+ * apart, about one every two bars at most.
+ */
+export function deriveAccents(a: Analysis, grid: BarGrid): Raw[] {
+  const fps = a.fps;
+  const ids = a.audio.stems ? ["mix.onset", "drums.kick", "drums.snare", "bass.onset", "vocals.onset", "other.onset"] : ["mix.onset"];
+  const bg = beatGrid(a);
+  const period = beatPeriod(a) || 500;
+  const cands: Raw[] = [];
+  for (const id of ids) {
+    const v = a.channel(id);
+    if (!v) continue;
+    const peaks = pickPeaks(v, fps, 0.12, grid);
+    if (peaks.length < 4) continue;
+    const win = 2000;
+    let lo = 0;
+    let hi = 0;
+    const sorted: number[] = [];
+    for (const p of peaks) {
+      // the typical peak strength around p (median of peaks within ±2 s, p excluded)
+      while (lo < peaks.length && (peaks[lo] as Raw).ms < p.ms - win) lo++;
+      while (hi < peaks.length && (peaks[hi] as Raw).ms <= p.ms + win) hi++;
+      sorted.length = 0;
+      for (let k = lo; k < hi; k++) if (peaks[k] !== p) sorted.push((peaks[k] as Raw).strength);
+      sorted.sort((x, y) => x - y);
+      const med = sorted.length ? (sorted[sorted.length >> 1] as number) : 0;
+      const ratio = p.strength / Math.max(0.05, med);
+      const nb = nearestBeatMs(bg.times, p.ms);
+      const offGrid = Math.abs(p.ms - nb) > period * 0.18;
+      let score = 0;
+      if (ratio >= 2.2 && p.strength >= 0.45) score = Math.min(1, (ratio - 1) / 3);
+      else if (offGrid && p.strength >= 0.7 && ratio >= 1.5) score = 0.55;
+      if (id !== "mix.onset") score *= 0.85;
+      if (score > 0) cands.push({ ms: p.ms, strength: Math.max(0.3, score), bar: p.bar });
+    }
+  }
+  for (const d of deriveDrops(a, grid)) cands.push({ ms: d.ms, strength: 1, bar: d.bar });
+  for (const s of deriveStops(a, grid)) if (s.endMs !== undefined) cands.push({ ms: s.endMs, strength: 0.9, bar: barOf(grid, s.endMs) });
+  // Strongest first; at least a beat apart; about one accent every two bars at most.
+  const bars = Math.max(1, a.durationMs / (period * Math.max(1, a.audio.beatsPerBar || 4)));
+  const budget = Math.max(4, Math.round(bars / 2));
+  cands.sort((x, y) => y.strength - x.strength);
+  const out: Raw[] = [];
+  for (const c of cands) {
+    if (out.length >= budget) break;
+    if (out.some((o) => Math.abs(o.ms - c.ms) < Math.max(250, period * 0.9))) continue;
+    out.push(c);
+  }
+  return out.sort((x, y) => x.ms - y.ms);
+}
+
+function nearestBeatMs(times: readonly number[], ms: number): number {
+  let lo = 0;
+  let hi = times.length - 1;
+  if (hi < 0) return ms;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if ((times[mid] as number) < ms) lo = mid + 1;
+    else hi = mid;
+  }
+  const b = times[lo] as number;
+  const p = lo > 0 ? (times[lo - 1] as number) : b;
+  return Math.abs(p - ms) < Math.abs(b - ms) ? p : b;
 }
 
 const idOf = (lane: MarkerLane, ms: number) => `${lane}:${ms}`;

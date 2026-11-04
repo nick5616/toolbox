@@ -255,7 +255,7 @@ describe("EditParamEditor in the Inspector", () => {
     expect(typeof opacity === "object" && opacity.mods).toHaveLength(1);
     const driver = screen.getByLabelText("Driver") as HTMLSelectElement;
     const markers = within(driver).getByRole("group", { name: "Markers" });
-    expect(within(markers).getAllByRole("option")).toHaveLength(16);
+    expect(within(markers).getAllByRole("option")).toHaveLength(17);
     expect(within(driver).getByRole("group", { name: "Instruments" })).toBeTruthy();
     expect(screen.getByTestId("lane-swatch").getAttribute("style")).toContain("var(--lane-beat)");
     fireEvent.change(driver, { target: { value: "marker.snare" } });

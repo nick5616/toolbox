@@ -19,6 +19,8 @@ export type { EditProject };
 export const MARKER_LANES = [
   "beat", "downbeat", "kick", "snare", "hats", "bass", "vocals", "other",
   "section", "drop", "lift", "break", "stop", "phrase", "word", "custom",
+  // Part C: stand-out moments of the song (accents, fills, hits that don't repeat).
+  "accent",
 ] as const;
 export type MarkerLane = (typeof MARKER_LANES)[number];
 

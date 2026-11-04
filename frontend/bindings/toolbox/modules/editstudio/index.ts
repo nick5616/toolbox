@@ -28,6 +28,7 @@ export type {
     MatteRequest,
     MatteState,
     MatteStroke,
+    Moment,
     RecipeRun,
     Result,
     Song,

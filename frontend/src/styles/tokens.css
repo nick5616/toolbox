@@ -135,6 +135,7 @@
   --lane-phrase: #63e6be;
   --lane-word: #a5d8ff;
   --lane-custom: #ffe066;
+  --lane-accent: #ff5ec4;
 }
 
 :root[data-theme="light"] {
@@ -154,4 +155,5 @@
   --lane-phrase: #0f766e;
   --lane-word: #1d4ed8;
   --lane-custom: #a16207;
+  --lane-accent: #be185d;
 }

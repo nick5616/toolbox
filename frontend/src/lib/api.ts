@@ -368,6 +368,7 @@ export type {
   Song as EditSong,
   Source as EditSource,
   SourceState as EditSourceState,
+  Moment as EditMoment,
   StreamIndex as EditStreamIndex,
   TextRequest as EditTextRequest,
   Track as EditTrack,

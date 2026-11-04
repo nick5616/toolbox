@@ -16,6 +16,7 @@ export const HIT_LANES: ReadonlyArray<{ value: HitLane; label: string }> = [
   { value: "kick", label: "Kicks" },
   { value: "snare", label: "Snares" },
   { value: "hats", label: "Hi-hats" },
+  { value: "accent", label: "Accents (stand-out hits)" },
   { value: "bass", label: "Bass hits" },
   { value: "vocals", label: "Vocal hits" },
   { value: "drop", label: "Drops" },
@@ -41,6 +42,7 @@ export const HIT_LANE_TIPS: Record<HitLane, string> = {
   phrase: "The start of each sung or played phrase",
   word: "Each sung word (needs lyrics)",
   custom: "Markers you added yourself",
+  accent: "Stand-out moments: hits, fills and stabs that are bigger than what's around them",
 };
 
 export const HIT_DECAYS = [
