@@ -10,13 +10,15 @@ import {
   SegmentedControl,
   Spinner,
   TextField,
+  ToolClickIn,
   toast,
   type BadgeTone,
 } from "@/components";
-import { ClipboardService } from "@/lib/api";
+import { ClipKind, ClipboardService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { acceleratorToCombo, isMac } from "@/lib/platform";
 import { isEditableTarget, useShortcut } from "@/lib/shortcuts";
+import { useCompositionInputs } from "@/state/composition";
 import { useDesktop } from "@/state/desktop";
 import { useSettings } from "@/state/settings";
 import type { ToolViewProps } from "@/tools";
@@ -48,7 +50,8 @@ function fail(title: string, e: unknown) {
   toast({ title, description: toAppError(e).message, tone: "danger" });
 }
 
-export default function ClipboardView(_props: ToolViewProps) {
+export default function ClipboardView({ moduleId }: ToolViewProps) {
+  useCompositionInputs(moduleId, { "dev-utils": [] });
   const enabled = useSettings((s) => s.settings.clipboard.enabled);
   const clipSettings = useSettings((s) => s.settings.clipboard);
   const hotkey = useSettings((s) => s.settings.hotkeys?.clipboard ?? "");
@@ -70,6 +73,8 @@ export default function ClipboardView(_props: ToolViewProps) {
   const sel = useSelection(items);
   const filtering = search.trim() !== "" || kind !== "all";
   const hasHistory = items.length > 0 || filtering;
+  // The selected text item can be opened in Dev Utilities (it stays on this computer).
+  const textItem = sel.selected && sel.selected.kind === ClipKind.ClipText && sel.selected.text !== "" ? sel.selected : null;
 
   useShortcut("/", () => searchRef.current?.focus());
 
@@ -267,6 +272,16 @@ export default function ClipboardView(_props: ToolViewProps) {
               trailing={<Kbd combo="/" />}
             />
             <SegmentedControl aria-label="Filter by kind" value={kind} onChange={setKind} options={KINDS} />
+            <ToolClickIn
+              host={moduleId}
+              module="dev-utils"
+              variant="icon"
+              icon="braces"
+              title="Open in Dev Utilities"
+              tip="Open the selected text in the matching developer utility: JSON, JWT, Base64, a URL, a timestamp or a colour"
+              extra={textItem ? { text: { title: "Copied text", body: textItem.text } } : undefined}
+              disabledReason={textItem ? undefined : "Select a copied text item first"}
+            />
           </div>
 
           <div
