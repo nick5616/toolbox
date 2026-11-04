@@ -61,53 +61,78 @@ func parseSceneScores(lines []string) []float64 {
 	return out
 }
 
-// pickMoments finds the stand-out frames of a scene-score curve: shot changes
-// (score ≥ cutScore) and bursts clearly above the typical motion of the 2 s
-// around them. At most one moment per 400 ms; the strongest win.
-func pickMoments(c motionCurve) []Moment {
+// pickMoments finds the stand-out instants of a clip: its shot changes
+// (`shots`, source ms) and bursts of movement or light. The scene score is
+// smoothed over 7 frames first (CFR conversion duplicates frames, which makes
+// the raw score saw-toothed); a burst is a local peak clearly above the typical
+// motion of the 2 s around it. The strongest win, 0.6 s apart, about one per
+// 1.5 s of footage at most.
+func pickMoments(c motionCurve, shots []int64) []Moment {
 	n := len(c.Scores)
 	if n == 0 || c.FPS <= 0 {
 		return []Moment{}
 	}
-	const cutScore = 0.3
-	win := c.FPS * 2
+	sm := make([]float64, n)
+	for i := range sm {
+		lo, hi := max(0, i-3), min(n-1, i+3)
+		sum := 0.0
+		for j := lo; j <= hi; j++ {
+			sum += c.Scores[j]
+		}
+		sm[i] = sum / float64(hi-lo+1)
+	}
 	type cand struct {
-		i     int
-		s     float64
+		ms    int64
 		kind  string
 		score float64
 	}
 	var cands []cand
+	for _, s := range shots {
+		if s > 0 {
+			cands = append(cands, cand{s, "cut", 1})
+		}
+	}
+	win := c.FPS * 2
 	local := make([]float64, 0, 2*win+1)
 	for i := 1; i < n-1; i++ {
-		v := c.Scores[i]
-		if v < c.Scores[i-1] || v < c.Scores[i+1] || v < 0.04 {
-			continue
-		}
-		if v >= cutScore {
-			cands = append(cands, cand{i, v, "cut", math.Min(1, 0.6+v)})
+		v := sm[i]
+		if v < sm[i-1] || v < sm[i+1] || v < 0.05 {
 			continue
 		}
 		local = local[:0]
 		for j := max(0, i-win); j <= min(n-1, i+win); j++ {
-			if j != i {
-				local = append(local, c.Scores[j])
-			}
+			local = append(local, sm[j])
 		}
 		sort.Float64s(local)
-		med := local[len(local)/2]
-		ratio := v / math.Max(0.004, med)
-		if ratio >= 4 && v >= 0.06 {
-			cands = append(cands, cand{i, v, "motion", math.Min(1, 0.3+ratio/20)})
+		med := math.Max(0.01, local[len(local)/2])
+		ratio := v / med
+		if ratio >= 1.8 {
+			cands = append(cands, cand{int64(math.Round(float64(i) * 1000 / float64(c.FPS))), "motion", math.Min(1, 0.35+(ratio-1)/4)})
 		}
 	}
-	sort.Slice(cands, func(a, b int) bool { return cands[a].score > cands[b].score })
-	minGap := int(math.Round(0.4 * float64(c.FPS)))
+	if len(cands) == 0 {
+		// Even busy footage has a peak: offer its strongest instant.
+		best := 0
+		for i := range sm {
+			if sm[i] > sm[best] {
+				best = i
+			}
+		}
+		if sm[best] >= 0.05 {
+			cands = append(cands, cand{int64(math.Round(float64(best) * 1000 / float64(c.FPS))), "motion", 0.5})
+		}
+	}
+	sort.SliceStable(cands, func(a, b int) bool { return cands[a].score > cands[b].score })
+	durMs := int64(n) * 1000 / int64(c.FPS)
+	budget := max(3, int(durMs/1500))
 	kept := []cand{}
 	for _, cd := range cands {
+		if len(kept) >= budget {
+			break
+		}
 		ok := true
 		for _, k := range kept {
-			if d := cd.i - k.i; d < minGap && d > -minGap {
+			if d := cd.ms - k.ms; d < 600 && d > -600 {
 				ok = false
 				break
 			}
@@ -116,10 +141,10 @@ func pickMoments(c motionCurve) []Moment {
 			kept = append(kept, cd)
 		}
 	}
-	sort.Slice(kept, func(a, b int) bool { return kept[a].i < kept[b].i })
+	sort.Slice(kept, func(a, b int) bool { return kept[a].ms < kept[b].ms })
 	out := make([]Moment, 0, len(kept))
 	for _, k := range kept {
-		out = append(out, Moment{Ms: int64(math.Round(float64(k.i) * 1000 / float64(c.FPS))), Strength: math.Round(k.score*100) / 100, Kind: k.kind})
+		out = append(out, Moment{Ms: k.ms, Strength: math.Round(k.score*100) / 100, Kind: k.kind})
 	}
 	return out
 }
@@ -180,5 +205,5 @@ func (s *Service) Moments(path string, fps int) ([]Moment, error) {
 	if len(c.Scores) == 0 {
 		return []Moment{}, core.Errorf(core.CodeToolFailed, "Couldn't measure the motion in this clip")
 	}
-	return pickMoments(c), nil
+	return pickMoments(c, s.m.ShotsFor(path)), nil
 }
