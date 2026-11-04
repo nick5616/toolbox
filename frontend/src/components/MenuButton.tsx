@@ -29,13 +29,16 @@ export interface MenuButtonProps {
   collapsible?: boolean;
   /** Tooltip for the trigger (default "<label> (opens a menu)"). */
   tip?: string;
+  /** Same as `tip` (callers that pass the attribute form). */
+  "data-tip"?: string;
 }
 
 /**
  * A button that opens a popover menu. With `icon` and the ghost variant it
  * renders icon-only (label becomes the aria-label); otherwise a labelled button.
  */
-export function MenuButton({ label, icon, items, emptyLabel = "Nothing available", size = "md", variant = "secondary", collapsible = false, tip }: MenuButtonProps) {
+export function MenuButton({ label, icon, items, emptyLabel = "Nothing available", size = "md", variant = "secondary", collapsible = false, tip: tipProp, "data-tip": dataTip }: MenuButtonProps) {
+  const tip = tipProp ?? dataTip;
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [list, setList] = useState<MenuItem[]>([]);
