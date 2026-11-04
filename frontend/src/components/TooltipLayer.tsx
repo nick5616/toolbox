@@ -39,11 +39,24 @@ export function tipFor(start: Element | null): { el: HTMLElement; text: string; 
     const tip = el.getAttribute("data-tip");
     if (tip) return { el, text: tip, kbd: el.getAttribute("data-tip-kbd"), side: sideOf(el.getAttribute("data-tip-side")) };
     if (el.matches(INTERACTIVE)) {
+      // A wrapper close by (a span/div around a slider, swatch or menu) may carry the real explanation.
+      const near = nearTip(el);
+      if (near) return { el, text: near.getAttribute("data-tip") as string, kbd: near.getAttribute("data-tip-kbd"), side: sideOf(near.getAttribute("data-tip-side")) };
       const label = el.getAttribute("aria-label");
       const visible = (el.textContent ?? "").replace(/\s+/g, " ").trim();
       if (label && label.trim() && !sameText(label, visible)) return { el, text: label, kbd: null, side: "top" };
       // Keep walking: a labelled wrapper may describe it.
     }
+  }
+  return null;
+}
+
+/** A data-tip on one of the 3 nearest ancestors that wrap only this control (not a whole section or row of controls). */
+function nearTip(el: HTMLElement): HTMLElement | null {
+  let n = el.parentElement;
+  for (let i = 0; i < 3 && n && n !== document.body; i++, n = n.parentElement) {
+    if (n.dataset.tipOff !== undefined) return null;
+    if (n.hasAttribute("data-tip")) return n.querySelectorAll(INTERACTIVE).length <= 2 ? n : null;
   }
   return null;
 }
