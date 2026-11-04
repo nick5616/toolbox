@@ -8,6 +8,7 @@ import { MenuButton } from "@/components";
 import { laneSettings } from "@/viz/edit/defaults";
 import { MAX_SECTION_LABEL, renameSection } from "./laneLogic";
 import { msToX } from "../geometry";
+import { useSectionStyle } from "../sectionstyle/useSectionStyle";
 import { useEditStudio, useMarkers, useProject } from "../store";
 import styles from "./SectionBands.module.css";
 
@@ -88,6 +89,7 @@ export function SectionBands({ className }: SectionBandsProps) {
                 items={() => [
                   { id: "rename", label: "Rename section", onSelect: () => setRenaming({ id: m.id, value: name }) },
                   { id: "select", label: "Select range", onSelect: select },
+                  { id: "style", label: "Style this section…", tip: "Choose what this part cuts on, which footage it uses and what it reacts to", onSelect: () => useSectionStyle.getState().open({ fromMs: m.ms, toMs: end }) },
                   {
                     id: "autofill",
                     label: "Auto-fill this section",

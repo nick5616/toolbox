@@ -302,7 +302,7 @@ describe("context menu", () => {
     fireEvent.contextMenu(clipEl("a"), { clientX: 50, clientY: 50 });
     const menu = await screen.findByRole("menu");
     const labels = within(menu).getAllByRole("menuitem").map((i) => i.textContent);
-    expect(labels).toEqual(["Split at playhead", "Slice at downbeat markers", "Slice and cycle sources", "Split subject", "Pin", "Duplicate", "Delete", "Reveal source"]);
+    expect(labels).toEqual(["Split at playhead", "Slice at downbeat markers", "Slice and cycle sources", "Split subject", "Pin", "Style this part…", "Duplicate", "Delete", "Reveal source"]);
     expect((within(menu).getByRole("menuitem", { name: "Split at playhead" }) as HTMLButtonElement).disabled).toBe(true); // playhead at 0, the clip starts there
     expect((within(menu).getByRole("menuitem", { name: "Split subject" }) as HTMLButtonElement).disabled).toBe(true);
     await userEvent.click(within(menu).getByRole("menuitem", { name: "Delete" }));

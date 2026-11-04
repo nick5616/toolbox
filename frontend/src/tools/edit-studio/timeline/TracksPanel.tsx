@@ -30,6 +30,7 @@ import { addVisualClip } from "../visual/addVisual";
 import { startScrub } from "./scrub";
 import { CutToBeat } from "../beatsync/CutButton";
 import { MomentsOverlay } from "../moments/MomentsOverlay";
+import { openStyleFromContext } from "../sectionstyle/useSectionStyle";
 
 export const VIDEO_ROW_PX = 56;
 export const ADJUST_ROW_PX = 36;
@@ -333,6 +334,7 @@ function Tracks({ project }: { project: NormalProject }) {
           commit(next);
         },
       },
+      { id: "style", label: "Style this part…", icon: "wand-sparkles", tip: "Choose what this part cuts on, which footage it uses and what it reacts to", onSelect: () => openStyleFromContext(live.current.markers) },
       { id: "dup", label: "Duplicate", icon: "copy", tip: "Copy the selected clips right after themselves", onSelect: () => void duplicateSelection() },
       { id: "del", label: "Delete", icon: "trash-2", tip: "Remove the selected clips from the edit (you can undo it)", onSelect: () => void deleteSelection() },
       {
@@ -364,6 +366,9 @@ function Tracks({ project }: { project: NormalProject }) {
           Adjustment track
         </Button>
         <CutToBeat />
+        <Button size="sm" icon="wand-sparkles" data-tip="Style a part of the song: what it cuts on, which footage it uses and what it reacts to (uses the selection, else the section at the playhead)" onClick={() => openStyleFromContext(markers)}>
+          Style
+        </Button>
         <Button size="sm" icon="type" data-tip="Add a text clip: a title, a lyric line or any words over the picture" onClick={() => addTextClip()}>
           Text
         </Button>
