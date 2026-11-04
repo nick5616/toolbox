@@ -35,6 +35,8 @@ vi.mock("@/lib/api", async (orig) => {
 });
 
 import { PdfAction, type Descriptor } from "@/lib/api";
+import { useEmbed } from "@/lib/embed";
+import { registerToolViews } from "@/lib/toolActions";
 import { useToastStore } from "@/components/toast";
 import { normalizeModule, useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
@@ -190,5 +192,17 @@ describe("PdfView", () => {
     usePdfIntent.getState().request(PdfAction.ActionCompress);
     render(<PdfView moduleId="pdf" />);
     await waitFor(() => expect(checked().textContent).toMatch(/Compress PDF/));
+  });
+
+  it("Make searchable opens OCR with the PDFs in the list", async () => {
+    function FakeOcr() {
+      return <p>ocr gets: {useEmbed()?.handoff.inputs.join(",")}</p>;
+    }
+    registerToolViews({ ocr: FakeOcr });
+    const ocr = { ...desc, id: "ocr", name: "OCR", accepts: { extensions: [".pdf"], urls: false } } as unknown as Descriptor;
+    useModules.setState({ byId: { pdf: normalizeModule(desc), ocr: normalizeModule(ocr) } });
+    const user = await open(["/a.pdf", "/b.png"]);
+    await user.click(screen.getByRole("button", { name: /Make searchable/ }));
+    expect(await screen.findByText("ocr gets: /a.pdf")).toBeTruthy();
   });
 });
