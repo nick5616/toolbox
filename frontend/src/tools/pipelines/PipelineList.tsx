@@ -61,7 +61,7 @@ export function PipelineList({ onNew }: PipelineListProps) {
           title="No pipelines yet"
           body="A pipeline chains tools together and runs them on every file you give it."
           action={
-            <Button variant="primary" icon="plus" onClick={onNew}>
+            <Button variant="primary" icon="plus" data-tip="Pick a template or start with an empty pipeline" onClick={onNew}>
               New pipeline
             </Button>
           }
@@ -69,7 +69,7 @@ export function PipelineList({ onNew }: PipelineListProps) {
         {quick.length > 0 && (
           <div className={styles.quick}>
             {quick.map((t) => (
-              <button key={t.id} type="button" className={styles.quickCard} onClick={() => void createPipeline(t.id)}>
+              <button key={t.id} type="button" className={styles.quickCard} data-tip={`Create a "${t.pipeline.name}" pipeline from this template`} onClick={() => void createPipeline(t.id)}>
                 <Icon name={t.icon} size={16} className={styles.quickIcon} />
                 <span className={styles.quickText}>
                   <span className={styles.name}>{t.pipeline.name}</span>
@@ -79,7 +79,7 @@ export function PipelineList({ onNew }: PipelineListProps) {
             ))}
           </div>
         )}
-        <Button variant="ghost" size="sm" onClick={onNew}>
+        <Button variant="ghost" size="sm" data-tip="Browse every ready-made pipeline template" onClick={onNew}>
           All templates…
         </Button>
       </div>
@@ -105,6 +105,7 @@ export function PipelineList({ onNew }: PipelineListProps) {
                 className={styles.main}
                 aria-current={p.id === selected ? "true" : undefined}
                 aria-label={p.name}
+                data-tip="Select to edit this pipeline. Drop files on the card to run it"
                 onClick={() => selectPipeline(p.id)}
               >
                 <span className={styles.top}>
@@ -112,19 +113,19 @@ export function PipelineList({ onNew }: PipelineListProps) {
                     className={cx(styles.dot, styles[status])}
                     role="img"
                     aria-label={STATUS_LABEL[status]}
-                    title={STATUS_LABEL[status]}
+                    data-tip={status === "ready" ? "Ready to run" : status === "missing" ? "Some tools this pipeline uses are not installed" : "A step has a problem; open the pipeline to see it"}
                   />
                   <span className={styles.name}>{p.name}</span>
                 </span>
-                <span className={styles.icons} aria-hidden="true">
+                <span className={styles.icons} aria-hidden="true" data-tip="The tools used by each step, in order">
                   {(p.steps ?? []).map((s) => (
                     <Icon key={s.id} name={stepIcon(catalog, s.type)} size={14} />
                   ))}
                 </span>
                 <span className={styles.meta}>
-                  <span>Takes: {describeAccepts(e.check.accepts)}</span>
+                  <span data-tip="The kinds of files this pipeline can start with">Takes: {describeAccepts(e.check.accepts)}</span>
                   {watching && (
-                    <span className={styles.watch} title={e.watch.message || "Watching a folder"}>
+                    <span className={styles.watch} data-tip={e.watch.message || (e.watch.active ? "Runs automatically on new files in the watched folder" : "Folder watching is paused or not working")}>
                       <Icon name="eye" size={12} />
                       {e.watch.active ? "watching" : "watch paused"}
                     </span>
@@ -134,6 +135,7 @@ export function PipelineList({ onNew }: PipelineListProps) {
               <IconButton
                 icon="play"
                 label={`Run ${p.name}`}
+                data-tip={e.check.ready ? "Run this pipeline on files or links you choose" : "Fix this pipeline's problems before running it"}
                 variant="ghost"
                 size="sm"
                 className={styles.run}

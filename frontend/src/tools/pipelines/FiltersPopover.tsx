@@ -58,6 +58,7 @@ export function FiltersPopover({ filter, onChange }: FiltersPopoverProps) {
         variant="ghost"
         aria-haspopup="dialog"
         aria-expanded={open}
+        data-tip="Limit this step by kind of file, file extension or part of the name"
         onClick={() => {
           setExts(filter.exts.join(", "));
           setOpen(!open);
@@ -78,7 +79,7 @@ export function FiltersPopover({ filter, onChange }: FiltersPopoverProps) {
           }}
         >
           <div className={styles.group}>
-            <span className={styles.label}>Kinds</span>
+            <span className={styles.label} data-tip="Only take files of these kinds; none ticked means all kinds">Kinds</span>
             <div className={styles.chips}>
               {KINDS.map((k) => (
                 <button
@@ -86,6 +87,7 @@ export function FiltersPopover({ filter, onChange }: FiltersPopoverProps) {
                   type="button"
                   className={cx(styles.chip, filter.kinds.includes(k.value) && styles.on)}
                   aria-pressed={filter.kinds.includes(k.value)}
+                  data-tip={filter.kinds.includes(k.value) ? `Stop limiting to ${k.label.toLowerCase()}` : `Only take ${k.label.toLowerCase()} files`}
                   onClick={() => toggleKind(k.value)}
                 >
                   {k.label}
@@ -94,12 +96,13 @@ export function FiltersPopover({ filter, onChange }: FiltersPopoverProps) {
             </div>
           </div>
           <label className={styles.group}>
-            <span className={styles.label}>Extensions</span>
+            <span className={styles.label} data-tip="Only take files that end like this">Extensions</span>
             <TextField
               size="sm"
               mono
               placeholder=".png, .jpg"
               aria-label="Extensions"
+              data-tip="File endings separated by commas, e.g. .png, .jpg; leave empty for any"
               value={exts}
               onChange={(e) => {
                 setExts(e.target.value);
@@ -108,11 +111,12 @@ export function FiltersPopover({ filter, onChange }: FiltersPopoverProps) {
             />
           </label>
           <label className={styles.group}>
-            <span className={styles.label}>Name contains</span>
+            <span className={styles.label} data-tip="Only take files whose name includes this text">Name contains</span>
             <TextField
               size="sm"
               placeholder="e.g. final"
               aria-label="Name contains"
+              data-tip="Part of the file name, ignoring upper and lower case; leave empty for any"
               value={filter.name}
               onChange={(e) => onChange({ ...filter, name: e.target.value })}
             />

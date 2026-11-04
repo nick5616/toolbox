@@ -62,7 +62,7 @@ export function Shell() {
       <div className={styles.main}>
         <header className={cx(styles.topbar, isMac && styles.drag)}>
           <h1 className={styles.title}>{viewTitle(view, byId)}</h1>
-          <Button size="sm" icon="search" className={styles.noDrag} onClick={() => setPaletteOpen(true)}>
+          <Button size="sm" icon="search" className={styles.noDrag} data-tip="Find a tool, action, setting or recent file and jump to it" onClick={() => setPaletteOpen(true)}>
             Search
             <Kbd combo="Mod+K" />
           </Button>

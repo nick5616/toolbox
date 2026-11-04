@@ -97,6 +97,7 @@ export function Waveform({ peaks, progress = 0, band, onSeek, height = 56, class
     <div
       ref={wrap}
       data-testid="waveform"
+      data-tip={onSeek ? "Click anywhere on the waveform to jump to that point" : "Loudness over time"}
       className={cx(styles.root, onSeek && styles.seekable, className)}
       style={{ height }}
       onClick={onClick}

@@ -64,6 +64,7 @@ export function AutoPasteSetting({ checked, onChange }: AutoPasteSettingProps) {
         onChange={(v) => void toggle(v)}
         label="Paste into the previous app after picking an item"
         aria-describedby="clip-autopaste-status"
+        tip={unsupported ? "Auto-paste is not available on this platform yet" : "After you pick an item in the popup, Toolbox presses paste once in the app you were using. Off by default"}
       />
       <div id="clip-autopaste-status" className={styles.pasteStatus}>
         {unsupported ? (
@@ -71,7 +72,7 @@ export function AutoPasteSetting({ checked, onChange }: AutoPasteSettingProps) {
         ) : checked && perm === "denied" ? (
           <p className={styles.note} role="status">
             Needs Accessibility permission
-            <Button size="sm" variant="secondary" onClick={() => void request()}>
+            <Button size="sm" variant="secondary" data-tip="Ask the system to let Toolbox send a paste keystroke" onClick={() => void request()}>
               Request permission
             </Button>
           </p>

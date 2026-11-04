@@ -7,14 +7,19 @@ export interface NavItem {
   label: string;
   icon: string;
   soon?: boolean;
+  /** One-line description for the tooltip. */
+  tip?: string;
 }
 
-export const RECENT_ITEM: NavItem = { id: "library", label: "Recent", icon: "history" };
-export const PIPELINES_ITEM: NavItem = { id: "pipelines", label: "Pipelines", icon: "workflow" };
-export const SETTINGS_ITEM: NavItem = { id: "settings", label: "Settings", icon: "settings" };
+export const RECENT_ITEM: NavItem = { id: "library", label: "Recent", icon: "history", tip: "Every file your tools have made, newest first, with search and quick actions" };
+export const PIPELINES_ITEM: NavItem = { id: "pipelines", label: "Pipelines", icon: "workflow", tip: "Chain tools into repeatable recipes that run on files, folders or a schedule" };
+export const SETTINGS_ITEM: NavItem = { id: "settings", label: "Settings", icon: "settings", tip: "Library folder, tool packs, shortcuts, appearance and dependencies" };
 
 function toItem(m: ModuleView): NavItem {
-  return { id: m.id, label: m.name, icon: m.icon, soon: !isReady(m) };
+  const soon = !isReady(m);
+  const base = m.tagline || m.description;
+  const tip = soon ? (base ? `${base} (coming soon)` : "Coming soon") : base;
+  return { id: m.id, label: m.name, icon: m.icon, soon, ...(tip ? { tip } : {}) };
 }
 
 /** Visible modules (non-hidden), ordered by descriptor order. */

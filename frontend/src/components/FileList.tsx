@@ -39,7 +39,7 @@ export function FileList({ files, onRemove, empty, className, ...aria }: FileLis
           <PathText path={f.path} className={styles.path} />
           {f.size != null && <span className={styles.size}>{formatBytes(f.size)}</span>}
           {f.trailing}
-          {onRemove && <IconButton size="sm" icon="x" label="Remove" onClick={() => onRemove(f.path)} />}
+          {onRemove && <IconButton size="sm" icon="x" label="Remove" data-tip="Remove this file from the list (the file itself is not deleted)" onClick={() => onRemove(f.path)} />}
         </li>
       ))}
     </ul>

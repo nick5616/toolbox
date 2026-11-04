@@ -50,31 +50,32 @@ function ModelCard({
   return (
     <li className={styles.card}>
       <div className={styles.head}>
-        <span className={styles.name}>{model.label}</span>
-        {model.isDefault && <Badge tone="accent">Default</Badge>}
-        <span className={styles.size}>{formatSize(model.bytes)}</span>
+        <span className={styles.name} data-tip="A model you can download and run on this computer">{model.label}</span>
+        {model.isDefault && <Badge tone="accent" tip="New conversations use this model unless you pick another">Default</Badge>}
+        <span className={styles.size} data-tip="Download size and disk space">{formatSize(model.bytes)}</span>
       </div>
-      <div className={styles.meta}>
+      <div className={styles.meta} data-tip="Licence and what this model is good at">
         {model.license}
         {model.hint ? ` · ${model.hint}` : ""}
       </div>
-      {!model.verified && <div className={styles.warn}>Not tested on this machine</div>}
+      {!model.verified && <div className={styles.warn} data-tip="It should work but has not been tried on a computer like yours">Not tested on this machine</div>}
       {active ? (
         <div className={styles.progress}>
           <Meter
             value={job && job.progress >= 0 ? job.progress : -1}
             label={`Downloading ${model.label}`}
+            tip="Download progress"
             size="sm"
             className={styles.meter}
           />
           <span className={styles.msg}>{job?.message || "Starting…"}</span>
-          <Button size="sm" variant="ghost" onClick={cancel}>
+          <Button size="sm" variant="ghost" data-tip="Stop this download" onClick={cancel}>
             Cancel
           </Button>
         </div>
       ) : (
         <div className={styles.actions}>
-          <Button size="sm" variant="secondary" icon="download" loading={busy} onClick={() => void download()}>
+          <Button size="sm" variant="secondary" icon="download" loading={busy} data-tip="Download this model so you can chat with it offline" onClick={() => void download()}>
             Download
           </Button>
         </div>

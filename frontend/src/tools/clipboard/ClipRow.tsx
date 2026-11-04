@@ -50,29 +50,31 @@ function ClipRowImpl({ item, domId, selected, compact, index, now, onSelect, onA
       aria-selected={selected}
       aria-label={clipLabel(item)}
       data-clip-id={item.id}
+      data-tip={compact ? "Click or press Enter to copy this again" : "Click to select; double-click or press Enter to copy it again"}
+      data-tip-side="right"
       className={cx(styles.row, compact && styles.compact, selected && styles.selected)}
       onClick={() => (compact ? onActivate(item.id) : onSelect(item.id))}
       onDoubleClick={compact ? undefined : () => onActivate(item.id)}
       onMouseMove={compact && !selected ? () => onSelect(item.id) : undefined}
     >
-      {index !== undefined && <span className={styles.index}>{index}</span>}
+      {index !== undefined && <span className={styles.index} data-tip={`Press ${index} to pick this item`}>{index}</span>}
       {isImage ? <Thumb item={item} size={compact ? 40 : 64} /> : null}
       <div className={styles.body}>
         {isImage ? (
-          <span className={styles.imageTitle}>Image</span>
+          <span className={styles.imageTitle} data-tip="A copied image">Image</span>
         ) : (
           <span className={styles.preview}>{item.preview || "(whitespace)"}</span>
         )}
         <span className={styles.meta}>
           {item.pinned && <Icon name="pin" size={11} className={styles.pinGlyph} />}
-          <span>{formatRelativeTime(item.lastUsedAt, now)}</span>
+          <span data-tip="When you last copied or used this item">{formatRelativeTime(item.lastUsedAt, now)}</span>
           <span aria-hidden="true">·</span>
-          <span>{meta}</span>
+          <span data-tip={isImage ? "Image size in pixels and file size" : "Number of characters"}>{meta}</span>
         </span>
       </div>
       {!compact && (
         <div className={styles.actions}>
-          {onCopy && <IconButton size="sm" icon="copy" label="Copy" tabIndex={-1} onClick={stop(() => onCopy(item.id))} />}
+          {onCopy && <IconButton size="sm" icon="copy" label="Copy" data-tip="Put this item back on the clipboard" tabIndex={-1} onClick={stop(() => onCopy(item.id))} />}
           {onPin && (
             <button
               type="button"
@@ -80,13 +82,13 @@ function ClipRowImpl({ item, domId, selected, compact, index, now, onSelect, onA
               className={cx(styles.pinBtn, item.pinned && styles.pinned)}
               aria-label={item.pinned ? "Unpin" : "Pin"}
               aria-pressed={item.pinned}
-              title={item.pinned ? "Unpin" : "Pin"}
+              data-tip={item.pinned ? "Unpin: let this item be removed by the history limits again" : "Pin: keep this item even when old history is cleaned up"}
               onClick={stop(() => onPin(item.id, !item.pinned))}
             >
               <Icon name={item.pinned ? "pin-off" : "pin"} size={14} />
             </button>
           )}
-          {onDelete && <IconButton size="sm" icon="trash-2" label="Delete" variant="danger" tabIndex={-1} onClick={stop(() => onDelete(item.id))} />}
+          {onDelete && <IconButton size="sm" icon="trash-2" label="Delete" data-tip="Remove this item from the history" variant="danger" tabIndex={-1} onClick={stop(() => onDelete(item.id))} />}
         </div>
       )}
     </div>

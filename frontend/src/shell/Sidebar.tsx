@@ -30,22 +30,24 @@ function SidebarItem({ item, collapsed, active, dot, running, badge, onClick }: 
       className={cx(styles.item, active && styles.active, item.soon && styles.soon)}
       aria-current={active ? "page" : undefined}
       aria-label={collapsed ? item.label : undefined}
+      data-tip={collapsed ? (item.tip ? `${item.label}: ${item.tip}` : item.label) : item.tip}
+      data-tip-side="right"
       onClick={onClick}
     >
       <Icon name={item.icon} size={16} />
       {!collapsed && <span className={styles.label}>{item.label}</span>}
-      {!collapsed && item.soon && <Badge>SOON</Badge>}
+      {!collapsed && item.soon && <Badge tip="Not available yet">SOON</Badge>}
       {!collapsed && badge ? (
-        <span className={styles.badge} aria-label={`${badge} waiting for you`}>
+        <span className={styles.badge} aria-label={`${badge} waiting for you`} data-tip="Pipeline steps waiting for you to do something">
           {badge}
         </span>
       ) : null}
-      {running && <span className={styles.running} title="Running" data-testid="running-indicator" />}
-      {dot && <span className={cx(styles.dot, styles[dot])} data-testid={`dot-${dot}`} />}
+      {running && <span className={styles.running} data-tip="A job from this tool is running" data-testid="running-indicator" />}
+      {dot && <span className={cx(styles.dot, styles[dot])} data-testid={`dot-${dot}`} data-tip={dot === "danger" ? "A required component failed to install: open Settings" : "A required component is missing: open Settings to install it"} />}
     </button>
   );
   return collapsed ? (
-    <Tooltip label={item.label} side="right" className={styles.tipWrap}>
+    <Tooltip label={item.tip ? `${item.label}: ${item.tip}` : item.label} side="right" className={styles.tipWrap}>
       {btn}
     </Tooltip>
   ) : (
@@ -108,6 +110,7 @@ export function Sidebar() {
           size="sm"
           icon="panel-left"
           label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          data-tip={collapsed ? "Show tool names next to the icons" : "Shrink the sidebar to icons only"}
           kbd="Mod+Backslash"
           tooltipSide="right"
           className={styles.noDrag}
@@ -154,7 +157,7 @@ function Section({
     <div className={styles.section}>
       {!collapsed &&
         (toggle ? (
-          <button type="button" className={cx(styles.sectionLabel, styles.sectionToggle)} onClick={toggle.onToggle} aria-expanded={toggle.open}>
+          <button type="button" className={cx(styles.sectionLabel, styles.sectionToggle)} onClick={toggle.onToggle} aria-expanded={toggle.open} data-tip={toggle.open ? "Hide tools that are not ready yet" : "Show tools that are not ready yet"}>
             <Icon name={toggle.open ? "chevron-down" : "chevron-right"} size={12} />
             {label}
           </button>

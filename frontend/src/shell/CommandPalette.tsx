@@ -192,6 +192,7 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
             aria-expanded="true"
             aria-controls="palette-list"
             aria-label="Search commands"
+            data-tip="Type to filter. Arrows move, Enter opens, Esc closes"
           />
         </div>
         <div className={styles.list} ref={listRef} id="palette-list" role="listbox">

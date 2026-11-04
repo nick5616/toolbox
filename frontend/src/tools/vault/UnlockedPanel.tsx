@@ -72,7 +72,7 @@ function Preview({ entry, url, onClose }: { entry: VaultEntry; url: string; onCl
       <div className={styles.previewPanel} role="dialog" aria-modal="true" aria-label={`Preview of ${entry.name}`} onMouseDown={(e) => e.stopPropagation()}>
         <div className={styles.previewHead}>
           <span className={styles.previewName}>{entry.name}</span>
-          <IconButton size="sm" icon="x" label="Close preview" onClick={onClose} />
+          <IconButton size="sm" icon="x" label="Close preview" data-tip="Close the preview; the decrypted copy is removed" kbd="Esc" onClick={onClose} />
         </div>
         <img className={styles.previewImg} src={url} alt={entry.name} />
       </div>
@@ -219,14 +219,14 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
   return (
     <>
       <div className={styles.header}>
-        <div className={styles.status}>
+        <div className={styles.status} data-tip="The vault is open. It locks by itself after the time set in Settings">
           <Icon name="lock" size={16} className={styles.statusIcon} />
           <span aria-live="off">{lockIn ? `Unlocked · locks in ${lockIn}` : "Unlocked"}</span>
         </div>
-        <Button variant="secondary" icon="lock" onClick={() => void VaultService.Lock().catch(fail)}>
+        <Button variant="secondary" icon="lock" data-tip="Lock now: forget the key from memory and delete any opened temporary copies" onClick={() => void VaultService.Lock().catch(fail)}>
           Lock
         </Button>
-        <Button variant="primary" icon="plus" onClick={() => void pick()}>
+        <Button variant="primary" icon="plus" data-tip="Choose files to copy into the vault, encrypted; your originals stay where they are" onClick={() => void pick()}>
           Add files
         </Button>
       </div>
@@ -243,6 +243,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
               type="button"
               className={`${styles.folder} ${folder === f.id ? styles.folderActive : ""}`}
               aria-current={folder === f.id ? "page" : undefined}
+              data-tip={f.id === ALL ? "Show every file in the vault" : f.id === ROOT ? "Files not in any folder" : `Show the files in ${f.label}`}
               onClick={() => {
                 setFolder(f.id);
                 setSelected(new Set());
@@ -252,7 +253,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
               <span className={styles.folderName}>{f.label}</span>
             </button>
           ))}
-          <Button size="sm" variant="ghost" icon="folder-plus" onClick={() => { setText(""); setFolderDialog(true); }}>
+          <Button size="sm" variant="ghost" icon="folder-plus" data-tip="Make a folder to organise vault files; it appears once you move a file into it" onClick={() => { setText(""); setFolderDialog(true); }}>
             New folder
           </Button>
         </nav>
@@ -263,6 +264,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
               size="sm"
               icon="search"
               aria-label="Search files"
+              data-tip="Search file names in the current folder"
               placeholder="Search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -270,14 +272,14 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
             <span className={styles.toolbarSpacer} />
             {selected.size > 0 && (
               <>
-                <span className={styles.selection}>{selected.size} selected</span>
-                <Button size="sm" variant="secondary" icon="arrow-down-to-line" onClick={() => exportIds(selectedIds)}>
+                <span className={styles.selection} data-tip="Files ticked in the list">{selected.size} selected</span>
+                <Button size="sm" variant="secondary" icon="arrow-down-to-line" data-tip="Decrypt copies of the selected files into a folder you choose" onClick={() => exportIds(selectedIds)}>
                   Export selected
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => openMove(selectedIds)}>
+                <Button size="sm" variant="secondary" data-tip="Move the selected files to another vault folder" onClick={() => openMove(selectedIds)}>
                   Move selected…
                 </Button>
-                <Button size="sm" variant="danger" icon="trash-2" onClick={() => setDialog({ kind: "delete", ids: selectedIds })}>
+                <Button size="sm" variant="danger" icon="trash-2" data-tip="Permanently delete the selected files from the vault" onClick={() => setDialog({ kind: "delete", ids: selectedIds })}>
                   Delete selected
                 </Button>
               </>
@@ -289,7 +291,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
               <EmptyState icon="search" title="No matching files." />
             ) : (
               <DropZone id="tool-drop:vault" label="Drop files here to encrypt them" hint="Adding copies the files; your originals stay where they are.">
-                <Button size="sm" variant="secondary" icon="plus" onClick={() => void pick()}>
+                <Button size="sm" variant="secondary" icon="plus" data-tip="Choose files to encrypt into the vault" onClick={() => void pick()}>
                   Add files…
                 </Button>
               </DropZone>
@@ -302,6 +304,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
                     <input
                       type="checkbox"
                       aria-label="Select all files"
+                      data-tip="Tick or untick every file in this list"
                       checked={allSelected}
                       onChange={() => setSelected(allSelected ? new Set() : new Set(sorted.map((e) => e.id)))}
                     />
@@ -309,9 +312,9 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
                   <th className={styles.colIcon}>
                     <span className={styles.srOnly}>Type</span>
                   </th>
-                  <th>Name</th>
-                  <th>Size</th>
-                  <th>Added</th>
+                  <th data-tip="The decrypted file name">Name</th>
+                  <th data-tip="The file's original size">Size</th>
+                  <th data-tip="When the file was put in the vault">Added</th>
                   <th>
                     <span className={styles.srOnly}>Actions</span>
                   </th>
@@ -321,37 +324,39 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
                 {sorted.map((e) => (
                   <tr key={e.id}>
                     <td className={styles.colCheck}>
-                      <input type="checkbox" aria-label={`Select ${e.name}`} checked={selected.has(e.id)} onChange={() => toggle(e.id)} />
+                      <input type="checkbox" data-tip="Tick to use this file in bulk actions" aria-label={`Select ${e.name}`} checked={selected.has(e.id)} onChange={() => toggle(e.id)} />
                     </td>
-                    <td className={styles.colIcon}>
+                    <td className={styles.colIcon} data-tip="File type">
                       <Icon name={iconFor(e.name)} size={14} />
                     </td>
-                    <td className={styles.nameCell} title={e.name}>
+                    <td className={styles.nameCell} data-tip={e.name}>
                       {e.name}
                     </td>
                     <td className={styles.colSize}>{formatBytes(e.size)}</td>
                     <td className={styles.colDate}>{formatDate(e.addedAt)}</td>
                     <td className={styles.colActions}>
-                      <IconButton size="sm" icon="external-link" label={`Open ${e.name}`} onClick={() => void VaultService.Open(e.id).catch(fail)} />
+                      <IconButton size="sm" icon="external-link" label={`Open ${e.name}`} data-tip="Decrypt a temporary copy and open it with your default app; it is wiped when you lock" onClick={() => void VaultService.Open(e.id).catch(fail)} />
                       {isImageName(e.name) && (
-                        <IconButton size="sm" icon="eye" label={`Preview ${e.name}`} onClick={() => void openPreview(e)} />
+                        <IconButton size="sm" icon="eye" label={`Preview ${e.name}`} data-tip="Look at this image here without opening another app" onClick={() => void openPreview(e)} />
                       )}
-                      <IconButton size="sm" icon="arrow-down-to-line" label={`Export ${e.name}`} onClick={() => exportIds([e.id])} />
+                      <IconButton size="sm" icon="arrow-down-to-line" label={`Export ${e.name}`} data-tip="Save a decrypted copy to a folder you choose" onClick={() => exportIds([e.id])} />
                       <MenuButton
                         size="sm"
                         variant="ghost"
                         icon="chevron-down"
                         label={`More actions for ${e.name}`}
+                        tip="Rename or move this file"
                         items={() => [
                           {
                             id: "rename",
                             label: "Rename…",
+                            tip: "Change the file name inside the vault",
                             onSelect: () => {
                               setText(e.name);
                               setDialog({ kind: "rename", entry: e });
                             },
                           },
-                          { id: "move", label: "Move to…", onSelect: () => openMove([e.id]) },
+                          { id: "move", label: "Move to…", tip: "Put this file in another vault folder", onSelect: () => openMove([e.id]) },
                         ]}
                       />
                       <IconButton
@@ -359,6 +364,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
                         variant="danger"
                         icon="trash-2"
                         label={`Delete ${e.name}`}
+                        data-tip="Permanently delete this file from the vault"
                         onClick={() => setDialog({ kind: "delete", ids: [e.id] })}
                       />
                     </td>
@@ -369,7 +375,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
           )}
           {sorted.length > 0 && (
             <DropZone id="tool-drop:vault" label="Drop files here to encrypt them">
-              <Button size="sm" variant="secondary" icon="plus" onClick={() => void pick()}>
+              <Button size="sm" variant="secondary" icon="plus" data-tip="Choose files to encrypt into the vault" onClick={() => void pick()}>
                 Add files…
               </Button>
             </DropZone>
@@ -391,7 +397,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
         title="Rename file"
         body={
           <Field label="Name">
-            {(c) => <TextField {...c} autoFocus value={text} onChange={(e) => setText(e.target.value)} />}
+            {(c) => <TextField {...c} data-tip="The new file name, including its extension" autoFocus value={text} onChange={(e) => setText(e.target.value)} />}
           </Field>
         }
         confirmLabel="Rename"
@@ -407,6 +413,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
               {(c) => (
                 <Select
                   {...c}
+                  data-tip="The existing folder to move into"
                   value={moveTarget}
                   onChange={setMoveTarget}
                   options={[{ value: ROOT, label: "Unfiled" }, ...allFolders.map((f) => ({ value: f, label: f }))]}
@@ -414,7 +421,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
               )}
             </Field>
             <Field label="Or a new folder">
-              {(c) => <TextField {...c} value={newFolder} onChange={(e) => setNewFolder(e.target.value)} />}
+              {(c) => <TextField {...c} data-tip="Type a name to create a new folder; this wins over the list above" value={newFolder} onChange={(e) => setNewFolder(e.target.value)} />}
             </Field>
           </div>
         }
@@ -427,7 +434,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
         title="New folder"
         body={
           <Field label="Folder name">
-            {(c) => <TextField {...c} autoFocus value={text} onChange={(e) => setText(e.target.value)} />}
+            {(c) => <TextField {...c} data-tip="Name for the new folder" autoFocus value={text} onChange={(e) => setText(e.target.value)} />}
           </Field>
         }
         confirmLabel="Create"

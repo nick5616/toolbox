@@ -28,12 +28,12 @@ export default function NumbersUtil() {
           aria-label="Input base"
           value={String(base) as "10" | "16" | "8" | "2"}
           onChange={(b) => setBase(Number(b) as Base)}
-          options={BASES.map((b) => ({ value: String(b.base) as "10" | "16" | "8" | "2", label: b.label }))}
+          options={BASES.map((b) => ({ value: String(b.base) as "10" | "16" | "8" | "2", label: b.label, tip: `Read the number you type as ${b.label.toLowerCase()} (base ${b.base})` }))}
         />
-        <Stepper value={width} min={8} max={64} step={8} unit="bit" onChange={(w) => setWidth(clampWidth(w))} aria-label="Bit width" />
+        <Stepper value={width} min={8} max={64} step={8} unit="bit" onChange={(w) => setWidth(clampWidth(w))} aria-label="Bit width" data-tip="How many bits wide the number is, for two's complement (negative numbers)" />
       </div>
       <div className={styles.col}>
-        <TextField mono value={text} invalid={invalid} onChange={(e) => setText(e.target.value)} aria-label="Number" spellCheck={false} />
+        <TextField mono value={text} invalid={invalid} onChange={(e) => setText(e.target.value)} aria-label="Number" data-tip="An integer in the base chosen above; underscores and a minus sign are fine" spellCheck={false} />
         {invalid && <p className={styles.error}>Not a valid base-{base} integer.</p>}
       </div>
       {value !== null && (

@@ -48,25 +48,25 @@ function CheckBody({ w }: { w: WaitingCell }) {
       <ul className={styles.checks}>
         {files.map((f) => (
           <li key={f.path} className={cx(styles.check, off.has(f.path) && styles.off)}>
-            <input type="checkbox" aria-label={f.name || baseName(f.path)} checked={!off.has(f.path)} onChange={() => toggle(f.path)} />
+            <input type="checkbox" data-tip="Untick to leave this file out of the next steps" aria-label={f.name || baseName(f.path)} checked={!off.has(f.path)} onChange={() => toggle(f.path)} />
             <Thumb file={f} />
-            <span className={styles.fileName} title={f.path}>
+            <span className={styles.fileName} data-tip={f.path}>
               {f.name || baseName(f.path)}
             </span>
-            <Button size="sm" variant="ghost" disabled={!f.outputId} onClick={() => openRunFile(f)} aria-label={`Open ${f.name}`}>
+            <Button size="sm" variant="ghost" disabled={!f.outputId} onClick={() => openRunFile(f)} aria-label={`Open ${f.name}`} data-tip={f.outputId ? "Open this file with your default app to look at it" : "This file is not in the Library, so it cannot be opened from here"}>
               Open
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => revealRunFile(f)} aria-label={`${revealLabel}: ${f.name}`}>
+            <Button size="sm" variant="ghost" onClick={() => revealRunFile(f)} aria-label={`${revealLabel}: ${f.name}`} data-tip="Show this file in your file manager">
               Reveal
             </Button>
           </li>
         ))}
       </ul>
       <div className={styles.actions}>
-        <Button variant="primary" onClick={() => continueCheck(w, kept.map((f) => f.path))}>
+        <Button variant="primary" data-tip={kept.length === 0 ? "No files are ticked, so nothing would carry on" : "Carry on to the next step with only the ticked files"} onClick={() => continueCheck(w, kept.map((f) => f.path))}>
           {`Continue with ${kept.length} ${kept.length === 1 ? "file" : "files"}`}
         </Button>
-        <Button variant="ghost" onClick={() => stopItem(w)}>
+        <Button variant="ghost" data-tip="Give up on this file: its remaining steps are cancelled, other files go on" onClick={() => stopItem(w)}>
           Stop this file
         </Button>
       </div>
@@ -103,22 +103,23 @@ function ManualBody({ w }: { w: WaitingCell }) {
       <div className={styles.actions}>
         <Button
           icon="external-link"
+          data-tip={`Open ${tool} with these files loaded, ready for you to work`}
           onClick={() => useUI.getState().handOff({ moduleId: w.step.type, inputs: inputs.map((f) => f.path) })}
         >
           {`Open ${tool}`}
         </Button>
-        <Button variant="primary" disabled={!canContinue} onClick={() => continueManual(w, false)}>
+        <Button variant="primary" disabled={!canContinue} data-tip={canContinue ? "You are done here: carry on with what you made" : `Finish a ${tool} job first, then continue`} onClick={() => continueManual(w, false)}>
           Continue
         </Button>
         {!canContinue && (
-          <Button variant="ghost" onClick={() => continueManual(w, true)}>
+          <Button variant="ghost" data-tip="Skip your own edit and carry on with the file as it was" onClick={() => continueManual(w, true)}>
             Continue with the original file
           </Button>
         )}
-        <Button variant="ghost" onClick={() => skipStep(w)}>
+        <Button variant="ghost" data-tip="Leave this step out and carry on with the next one" onClick={() => skipStep(w)}>
           Skip step
         </Button>
-        <Button variant="ghost" onClick={() => stopItem(w)}>
+        <Button variant="ghost" data-tip="Give up on this file: its remaining steps are cancelled, other files go on" onClick={() => stopItem(w)}>
           Stop this file
         </Button>
       </div>

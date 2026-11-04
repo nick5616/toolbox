@@ -27,13 +27,15 @@ export interface MenuButtonProps {
   variant?: "ghost" | "secondary";
   /** In a compact toolbar, shows only the icon below 820 px (see Button's `collapsible`). */
   collapsible?: boolean;
+  /** Tooltip for the trigger (default "<label> (opens a menu)"). */
+  tip?: string;
 }
 
 /**
  * A button that opens a popover menu. With `icon` and the ghost variant it
  * renders icon-only (label becomes the aria-label); otherwise a labelled button.
  */
-export function MenuButton({ label, icon, items, emptyLabel = "Nothing available", size = "md", variant = "secondary", collapsible = false }: MenuButtonProps) {
+export function MenuButton({ label, icon, items, emptyLabel = "Nothing available", size = "md", variant = "secondary", collapsible = false, tip }: MenuButtonProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [list, setList] = useState<MenuItem[]>([]);
@@ -132,6 +134,7 @@ export function MenuButton({ label, icon, items, emptyLabel = "Nothing available
   };
 
   const triggerProps = {
+    ...(icon && variant === "ghost" ? {} : { "data-tip": tip ?? `${label} (opens a menu)` }),
     "aria-haspopup": "menu" as const,
     "aria-expanded": open,
     onClick: toggle,
@@ -141,7 +144,7 @@ export function MenuButton({ label, icon, items, emptyLabel = "Nothing available
   return (
     <span className={styles.root}>
       {icon && variant === "ghost" ? (
-        <IconButton ref={triggerRef} icon={icon} label={label} size={size} variant="ghost" {...triggerProps} />
+        <IconButton ref={triggerRef} icon={icon} label={label} size={size} variant="ghost" data-tip={tip ?? `${label} (opens a menu)`} {...triggerProps} />
       ) : (
         <Button ref={triggerRef} variant={variant} size={size} icon={icon} collapsible={collapsible} {...triggerProps}>
           {label}

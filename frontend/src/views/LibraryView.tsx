@@ -167,6 +167,7 @@ export function LibraryView() {
             size="sm"
             placeholder="Search outputs"
             aria-label="Search outputs"
+            data-tip="Search by file name. Press / to focus"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             wrapperClassName={styles.search}
@@ -175,6 +176,8 @@ export function LibraryView() {
             size="sm"
             value={moduleId}
             onChange={setModuleId}
+            aria-label="Filter by tool"
+            data-tip="Show only files made by one tool"
             options={moduleOptions}
             className={styles.filter}
           />
@@ -182,6 +185,7 @@ export function LibraryView() {
             size="sm"
             variant="secondary"
             icon="folder-open"
+            data-tip="Open your library folder, where all outputs are saved, in the file manager"
             onClick={() => void LibraryService.OpenLibraryFolder("").catch(fail)}
           >
             Open library folder
@@ -205,21 +209,23 @@ export function LibraryView() {
               onFocus={() => setSelectedId(o.id)}
               onDoubleClick={() => !o.missing && void open(o)}
             >
-              <span className={styles.kind}>
+              <span className={styles.kind} data-tip="File type">
                 <Icon name={kindIcon[o.kind] ?? "file"} size={16} />
               </span>
-              <span className={styles.name} title={o.path}>
+              <span className={styles.name} data-tip={o.path}>
                 {o.name}
               </span>
-              {o.missing ? <Badge tone="warn">MISSING</Badge> : null}
-              <span className={styles.module}>{byId[o.moduleId]?.name ?? o.moduleId}</span>
-              <span className={styles.mono}>{o.missing ? "" : formatBytes(o.sizeBytes)}</span>
-              <span className={styles.mono}>{formatRelativeTime(o.createdAt)}</span>
+              {o.missing ? <Badge tone="warn" tip="This file was moved or deleted outside the app">MISSING</Badge> : null}
+              <span className={styles.module} data-tip="The tool that made this file">{byId[o.moduleId]?.name ?? o.moduleId}</span>
+              <span className={styles.mono} data-tip="File size">{o.missing ? "" : formatBytes(o.sizeBytes)}</span>
+              <span className={styles.mono} data-tip="When it was made">{formatRelativeTime(o.createdAt)}</span>
               <span className={styles.actions}>
                 <IconButton
                   size="sm"
                   icon="folder-open"
                   label={revealLabel}
+                  data-tip={o.missing ? "The file is missing" : "Show this file in your file manager"}
+                  data-tip-kbd="Mod+Shift+R"
                   disabled={o.missing}
                   onClick={() => void reveal(o)}
                 />
@@ -229,6 +235,7 @@ export function LibraryView() {
                     variant="ghost"
                     icon="external-link"
                     label="Send to…"
+                    tip="Send this file to another tool that can use it, or to a pipeline"
                     emptyLabel="No tools accept this file"
                     items={() => sendToItems(o.path)}
                   />
@@ -237,6 +244,7 @@ export function LibraryView() {
                   size="sm"
                   icon="external-link"
                   label="Open"
+                  data-tip={o.missing ? "The file is missing" : "Open with your default app (double-click or Enter also works)"}
                   disabled={o.missing}
                   onClick={() => void open(o)}
                 />
@@ -244,6 +252,7 @@ export function LibraryView() {
                   size="sm"
                   icon="copy"
                   label="Copy path"
+                  data-tip={o.missing ? "The file is missing" : "Copy the full file path to the clipboard"}
                   disabled={o.missing}
                   onClick={() => void copyPath(o)}
                 />
@@ -251,6 +260,7 @@ export function LibraryView() {
                   size="sm"
                   icon="trash-2"
                   label="Remove from library"
+                  data-tip="Forget this entry; the file itself is not deleted"
                   onClick={() => void remove(o)}
                 />
               </span>
@@ -261,7 +271,7 @@ export function LibraryView() {
 
       {nextCursor ? (
         <div className={styles.more}>
-          <Button size="sm" variant="secondary" loading={loading} onClick={() => void useLibrary.getState().loadMore()}>
+          <Button size="sm" variant="secondary" loading={loading} data-tip="Show older outputs" onClick={() => void useLibrary.getState().loadMore()}>
             Load more
           </Button>
         </div>

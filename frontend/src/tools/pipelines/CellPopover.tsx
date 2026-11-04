@@ -79,7 +79,7 @@ export function CellPopover({ run, item, stepIndex, anchor, onClose }: CellPopov
 
       {cell.jobIds.length > 0 && (
         <div className={styles.section}>
-          <div className={styles.label}>Jobs</div>
+          <div className={styles.label} data-tip="The tool jobs that ran for this step">Jobs</div>
           <ul className={styles.list}>
             {cell.jobIds.map((id) => {
               const job = byId[id];
@@ -87,7 +87,7 @@ export function CellPopover({ run, item, stepIndex, anchor, onClose }: CellPopov
                 <li key={id} className={styles.job}>
                   <span className={styles.jobTitle}>{job ? job.title || job.id : id}</span>
                   {job && <StatusChip status={job.status as ChipStatus} />}
-                  <Button size="sm" variant="ghost" onClick={() => showLog(id)} aria-label={`Show log for ${job?.title || id}`}>
+                  <Button size="sm" variant="ghost" onClick={() => showLog(id)} aria-label={`Show log for ${job?.title || id}`} data-tip="Open the job tray with this job's technical output">
                     Show log
                   </Button>
                 </li>
@@ -99,7 +99,7 @@ export function CellPopover({ run, item, stepIndex, anchor, onClose }: CellPopov
 
       {cell.files.length > 0 && (
         <div className={styles.section}>
-          <div className={styles.label}>Files</div>
+          <div className={styles.label} data-tip="Files this step made">Files</div>
           <ul className={styles.list}>
             {cell.files.map((f) => (
               <RunFileRow key={f.path} file={f} />
@@ -110,12 +110,12 @@ export function CellPopover({ run, item, stepIndex, anchor, onClose }: CellPopov
 
       {vars.length > 0 && (
         <div className={styles.section}>
-          <div className={styles.label}>Variables</div>
+          <div className={styles.label} data-tip="Values later steps can use as {name} in their text options">Variables</div>
           <dl className={styles.vars}>
             {vars.map(([k, v]) => (
               <div key={k} className={styles.var}>
                 <dt>{k}</dt>
-                <dd title={v}>{v}</dd>
+                <dd data-tip={v}>{v}</dd>
               </div>
             ))}
           </dl>

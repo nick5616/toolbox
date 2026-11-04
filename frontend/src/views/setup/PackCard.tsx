@@ -47,13 +47,13 @@ function openLink(e: React.MouseEvent, href: string) {
 function StateBadge({ pack }: { pack: PackView }) {
   switch (pack.state) {
     case PackState.PackInstalled:
-      return <Badge tone="ok">Installed</Badge>;
+      return <Badge tone="ok" tip="Everything in this pack is installed">Installed</Badge>;
     case PackState.PackOutdated:
-      return <Badge tone="warn">Update available</Badge>;
+      return <Badge tone="warn" tip="A newer version of something in this pack is available">Update available</Badge>;
     case PackState.PackPartial:
-      return <Badge tone="neutral">Partly installed</Badge>;
+      return <Badge tone="neutral" tip="Some parts are installed; install again to add the rest">Partly installed</Badge>;
     case PackState.PackUnsupported: {
-      const badge = <Badge tone="neutral">Not available on this computer</Badge>;
+      const badge = <Badge tone="neutral" tip="This pack does not run on your system">Not available on this computer</Badge>;
       return pack.unsupportedReason ? <Tooltip label={pack.unsupportedReason}>{badge}</Tooltip> : badge;
     }
     default:
@@ -83,11 +83,11 @@ function ComponentRow({ pack, size, id }: { pack: PackView; size: PackSize; id: 
   }
   return (
     <li className={cx(styles.part, cls)} data-state={c.state}>
-      <a href={c.href} className={styles.partLink} onClick={(e) => openLink(e, c.href)} rel="noreferrer">
+      <a href={c.href} data-tip={`Open the ${c.name} project page in your browser`} className={styles.partLink} onClick={(e) => openLink(e, c.href)} rel="noreferrer">
         {c.name}
       </a>
-      <span className={styles.license}>{c.license}</span>
-      <span className={styles.amount}>
+      <span className={styles.license} data-tip="The software licence">{c.license}</span>
+      <span className={styles.amount} data-tip={cost.kind === "with" ? `Already counted in the ${cost.withPack ?? "other"} pack you picked` : cost.kind === "system" ? "Already on your computer, so nothing to download" : cost.kind === "installed" ? "Already installed" : "Disk space this part uses once installed"}>
         {cost.kind === "installed" ? <PackIcon name="check" size={11} strokeWidth={3} /> : null}
         {cost.kind === "with" ? <s>{formatSize(c.diskBytes)}</s> : null}
         {amount}
@@ -113,16 +113,16 @@ function Progress({ progress, packName }: { progress: PackProgress; packName: st
         </span>
         {status === "running" || status === "waiting" ? (
           progress.onCancel ? (
-            <IconButton size="sm" icon="x" label={`Cancel ${packName} install`} onClick={progress.onCancel} />
+            <IconButton size="sm" icon="x" label={`Cancel ${packName} install`} data-tip="Stop installing this pack" onClick={progress.onCancel} />
           ) : null
         ) : null}
         {(status === "failed" || status === "cancelled") && progress.onRetry ? (
-          <Button size="sm" variant="secondary" onClick={progress.onRetry}>
+          <Button size="sm" variant="secondary" data-tip="Try installing this pack again" onClick={progress.onRetry}>
             Retry
           </Button>
         ) : null}
       </div>
-      <Meter value={status === "done" ? 1 : progress.value} status={meterStatus} size="sm" label="Install progress" />
+      <Meter tip="Install progress for this pack" value={status === "done" ? 1 : progress.value} status={meterStatus} size="sm" label="Install progress" />
     </div>
   );
 }
@@ -148,6 +148,7 @@ export function PackCard({ pack, size, mode, selected = false, locked = false, o
           className={styles.hit}
           data-pack-card=""
           aria-label={pack.name}
+          data-tip={selectable ? (selected ? `${pack.name} will be installed; click to leave it out` : `Click to include the ${pack.name} pack in the install`) : present ? "Already installed" : locked ? "Installing; choices are locked" : "Not available"}
           aria-pressed={isSelectable(pack) ? selected : undefined}
           aria-disabled={!selectable || undefined}
           onClick={() => {
@@ -171,9 +172,9 @@ export function PackCard({ pack, size, mode, selected = false, locked = false, o
           </span>
         </div>
         <div>
-          <div className={styles.name}>{pack.name}</div>
+          <div className={styles.name} data-tip="A pack is a group of related tools">{pack.name}</div>
           {showSize ? (
-            <div className={styles.size}>
+            <div className={styles.size} data-tip="Disk space once installed, and how much to download">
               {formatSize(size.disk)}
               <small>· {formatSize(size.download)} download</small>
             </div>
@@ -182,7 +183,7 @@ export function PackCard({ pack, size, mode, selected = false, locked = false, o
         <div className={styles.body}>
           {pack.unlocks.length > 0 ? (
             <div>
-              <div className={styles.label}>Unlocks</div>
+              <div className={styles.label} data-tip="Tools that start working once this pack is installed">Unlocks</div>
               <ul className={styles.unlocks}>
                 {pack.unlocks.map((u) => (
                   <li key={u.moduleId}>
@@ -194,7 +195,7 @@ export function PackCard({ pack, size, mode, selected = false, locked = false, o
             </div>
           ) : null}
           <div>
-            <div className={styles.label}>Downloads</div>
+            <div className={styles.label} data-tip="Engines and models this pack installs, each with its licence and size">Downloads</div>
             <ul className={styles.parts}>
               {pack.components.map((c) => (
                 <ComponentRow key={c.id} pack={pack} size={size} id={c.id} />

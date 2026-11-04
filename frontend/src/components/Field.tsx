@@ -42,7 +42,7 @@ export function Field({ label, hint, error, required, children, htmlFor, classNa
       <label htmlFor={controlId} className={styles.label}>
         {label}
         {required && (
-          <span className={styles.required} aria-hidden="true">
+          <span className={styles.required} aria-hidden="true" data-tip="Required">
             {" "}
             *
           </span>

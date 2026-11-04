@@ -16,9 +16,9 @@ export function SettingsClipboard() {
   };
 
   return (
-    <Section label="Clipboard">
+    <Section label="Clipboard" tip="Optional history of what you copy, kept only on this computer">
       <div className={styles.stack}>
-        <Switch checked={clip.enabled} onChange={toggle} label="Enable clipboard history" />
+        <Switch checked={clip.enabled} onChange={toggle} label="Enable clipboard history" tip="Start recording text and images you copy so you can find them later. Off by default" />
         <ClipboardSettingsPanel />
         <p className={styles.note}>
           Clipboard history stays on this computer. Copies marked sensitive by password managers are never recorded,

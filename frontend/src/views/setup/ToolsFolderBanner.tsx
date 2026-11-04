@@ -38,7 +38,7 @@ export function ToolsFolderBanner() {
         tone="warn"
         className={styles.banner}
         action={
-          <Button size="sm" variant="secondary" onClick={() => void choose()}>
+          <Button size="sm" variant="secondary" data-tip="Pick a folder that exists, or reconnect the drive and restart" onClick={() => void choose()}>
             Choose folder…
           </Button>
         }

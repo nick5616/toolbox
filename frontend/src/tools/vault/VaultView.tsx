@@ -45,7 +45,7 @@ export default function VaultView(_props: ToolViewProps) {
         <Banner
           tone="info"
           action={
-            <Button size="sm" variant="secondary" onClick={() => setNotice("")}>
+            <Button size="sm" variant="secondary" data-tip="Hide this message" onClick={() => setNotice("")}>
               Dismiss
             </Button>
           }

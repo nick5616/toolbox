@@ -54,6 +54,7 @@ export function ClipboardSettingsPanel({ className }: ClipboardSettingsPanelProp
         checked={clip.images}
         onChange={(images) => void save("images", { images })}
         label="Capture images"
+        tip="Also keep pictures you copy (up to 20 MB each), saved as files in the app folder"
         aria-describedby={errors.images ? "clip-images-error" : undefined}
       />
       {errors.images && (
@@ -69,6 +70,7 @@ export function ClipboardSettingsPanel({ className }: ClipboardSettingsPanelProp
               id={c.id}
               aria-describedby={c["aria-describedby"]}
               invalid={!!errors.retentionDays}
+              data-tip="Items older than this are deleted automatically"
               value={String(clip.retentionDays)}
               options={RETENTION}
               onChange={(v) => void save("retentionDays", { retentionDays: Number(v) })}
@@ -80,6 +82,7 @@ export function ClipboardSettingsPanel({ className }: ClipboardSettingsPanelProp
             <Stepper
               id={c.id}
               aria-describedby={c["aria-describedby"]}
+              data-tip="When the history grows past this many items, the oldest unpinned ones are deleted"
               value={clip.maxItems}
               min={50}
               max={5000}

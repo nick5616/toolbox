@@ -284,6 +284,7 @@ export function SetupView({ overlay = false, onClose }: SetupViewProps) {
               className={styles.close}
               icon="x"
               label="Close setup"
+              data-tip="Leave this screen; you can open it again from Settings"
               kbd="Escape"
               onClick={onClose}
             />
@@ -298,9 +299,9 @@ export function SetupView({ overlay = false, onClose }: SetupViewProps) {
           </header>
 
           <div className={styles.builtin}>
-            <span>Always included</span>
+            <span data-tip="Tools that need no download and are always available">Always included</span>
             {BUILTIN.map((b) => (
-              <span key={b.name} className={styles.chip}>
+              <span key={b.name} className={styles.chip} data-tip={`${b.name} is built in and needs no download`}>
                 <PackIcon name={b.icon} size={12} />
                 {b.name}
               </span>
@@ -314,6 +315,7 @@ export function SetupView({ overlay = false, onClose }: SetupViewProps) {
                 variant="secondary"
                 icon="chevron-left"
                 label="Scroll left"
+                data-tip="Show the packs on the left"
                 onClick={() => scrollBy(-1)}
               />
             ) : null}
@@ -380,6 +382,7 @@ export function SetupView({ overlay = false, onClose }: SetupViewProps) {
                   variant="secondary"
                   icon="chevron-right"
                   label="Scroll right"
+                  data-tip="Show more packs"
                   onClick={() => scrollBy(1)}
                 />
               </>
@@ -394,11 +397,11 @@ export function SetupView({ overlay = false, onClose }: SetupViewProps) {
             disk={disk}
             add={sizes.totalDisk}
             location={
-              <span className={styles.location}>
+              <span className={styles.location} data-tip="The drive and folder where tools will be installed">
                 <PackIcon name="hard-drive" size={14} />
                 <PathText path={effectiveLocation} className={styles.path} />
                 {toolsDir?.fromEnv ? (
-                  <span className={styles.fromEnv}>
+                  <span className={styles.fromEnv} data-tip="An environment variable fixes this location">
                     Set by TOOLBOX_TOOLS_DIR
                   </span>
                 ) : (
@@ -406,6 +409,7 @@ export function SetupView({ overlay = false, onClose }: SetupViewProps) {
                     size="sm"
                     variant="ghost"
                     disabled={installing}
+                    data-tip={installing ? "Locked while installing" : "Install tools to a different folder or drive"}
                     onClick={() => void pick()}
                   >
                     Change…
@@ -439,18 +443,19 @@ export function SetupView({ overlay = false, onClose }: SetupViewProps) {
             <Button
               variant="primary"
               className={styles.primary}
+              data-tip="Finish and start using the app"
               onClick={() => void openToolbox()}
             >
               Open Toolbox
             </Button>
           ) : (
-            <Button variant="ghost" onClick={() => void background()}>
+            <Button variant="ghost" data-tip="Close this screen; installs keep going and show in the job tray" onClick={() => void background()}>
               Continue in background
             </Button>
           )
         ) : (
           <>
-            <Button variant="ghost" onClick={() => void skip()}>
+            <Button variant="ghost" data-tip="Install nothing now; add packs any time in Settings" onClick={() => void skip()}>
               Skip for now
             </Button>
             <Tooltip
@@ -465,6 +470,7 @@ export function SetupView({ overlay = false, onClose }: SetupViewProps) {
                 icon="download"
                 className={styles.primary}
                 disabled={!canInstall}
+                data-tip={canInstall ? "Download and install the selected packs" : "Select at least one pack"}
                 loading={queuing}
                 onClick={install}
               >

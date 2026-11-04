@@ -33,7 +33,7 @@ export function ConversationList(p: ConversationListProps) {
   return (
     <nav className={styles.sidebar} aria-label="Conversations">
       <div className={styles.sideTop}>
-        <Button variant="primary" icon="message-square" onClick={p.onNew} className={styles.newBtn}>
+        <Button variant="primary" icon="message-square" onClick={p.onNew} className={styles.newBtn} data-tip="Start a fresh conversation with an empty history">
           New chat
         </Button>
         <TextField
@@ -41,6 +41,7 @@ export function ConversationList(p: ConversationListProps) {
           size="sm"
           aria-label="Search conversations"
           placeholder="Search"
+          data-tip="Search conversation titles and messages"
           value={p.search}
           onChange={(e) => p.onSearch(e.target.value)}
         />
@@ -58,6 +59,7 @@ export function ConversationList(p: ConversationListProps) {
                   <TextField
                     size="sm"
                     aria-label="Conversation title"
+                    data-tip="Type a new name; Enter saves, Esc cancels"
                     autoFocus
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
@@ -74,12 +76,14 @@ export function ConversationList(p: ConversationListProps) {
                     type="button"
                     className={styles.convBtn}
                     aria-current={c.id === p.activeId ? "true" : undefined}
+                    data-tip="Open this conversation"
                     onClick={() => p.onSelect(c.id)}
                   >
                     {c.title || "New chat"}
                   </button>
                   <MenuButton
                     label={`Actions for ${c.title || "New chat"}`}
+                    tip="Rename, export or delete this conversation"
                     icon="chevron-down"
                     variant="ghost"
                     size="sm"
@@ -87,13 +91,14 @@ export function ConversationList(p: ConversationListProps) {
                       {
                         id: "rename",
                         label: "Rename",
+                        tip: "Give this conversation a new name",
                         onSelect: () => {
                           setDraft(c.title);
                           setRenaming(c.id);
                         },
                       },
-                      { id: "export", label: "Export as Markdown", onSelect: () => p.onExport(c.id) },
-                      { id: "delete", label: "Delete", icon: "trash-2", onSelect: () => setDeleting(c) },
+                      { id: "export", label: "Export as Markdown", tip: "Save the conversation as a Markdown text file in your library", onSelect: () => p.onExport(c.id) },
+                      { id: "delete", label: "Delete", icon: "trash-2", tip: "Remove this conversation and its messages for good", onSelect: () => setDeleting(c) },
                     ]}
                   />
                 </div>
@@ -102,7 +107,7 @@ export function ConversationList(p: ConversationListProps) {
           </section>
         ))}
         {p.hasMore && (
-          <Button variant="ghost" size="sm" onClick={p.onMore}>
+          <Button variant="ghost" size="sm" data-tip="Load older conversations" onClick={p.onMore}>
             Show more
           </Button>
         )}

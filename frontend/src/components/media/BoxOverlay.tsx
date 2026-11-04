@@ -139,6 +139,7 @@ export function BoxOverlay({ rect, boxes, onChange, editable = false, drawMode =
             role={editable ? "button" : undefined}
             aria-pressed={editable ? b.enabled : undefined}
             aria-label={b.label ?? `${b.kind} box`}
+            data-tip={editable ? (b.enabled ? "Click to select this box; click again to switch it off" : "Switched off: click to switch it on") : `${b.kind} box`}
             className={cx(styles.box, b.enabled ? styles.on : styles.off, isSel && styles.selected)}
             style={{
               left: `${b.x * 100}%`,
@@ -156,6 +157,7 @@ export function BoxOverlay({ rect, boxes, onChange, editable = false, drawMode =
                 <div
                   key={c}
                   data-testid={`handle-${b.id}-${c}`}
+                  data-tip="Drag to resize this box"
                   className={cx(styles.corner, styles[c])}
                   onPointerDown={(e) => onCornerDown(e, b.id, c)}
                   onClick={(e) => e.stopPropagation()}

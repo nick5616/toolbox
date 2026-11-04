@@ -35,12 +35,12 @@ export default function PipelinesView(_props: ToolViewProps) {
           value={tab}
           onChange={(v) => setTab(v)}
           options={[
-            { value: "pipelines", label: "Pipelines" },
-            { value: "runs", label: active > 0 ? `Runs (${active})` : "Runs" },
+            { value: "pipelines", label: "Pipelines", tip: "Your saved recipes and the editor for the selected one" },
+            { value: "runs", label: active > 0 ? `Runs (${active})` : "Runs", tip: active > 0 ? `${active} run${active === 1 ? " is" : "s are"} in progress; see every run and what it made` : "See every run of your pipelines and what it made" },
           ]}
         />
         <span className={styles.spacer} />
-        <Button icon="plus" onClick={newPipeline.open}>
+        <Button icon="plus" data-tip="Create a pipeline from a ready-made template or from scratch" onClick={newPipeline.open}>
           New
         </Button>
       </header>

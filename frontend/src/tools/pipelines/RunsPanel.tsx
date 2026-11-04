@@ -22,15 +22,15 @@ function RunRow({ run, selected, onSelect }: { run: RunView; selected: boolean; 
   const { done, total } = runProgress(run);
   return (
     <li>
-      <button type="button" className={cx(styles.row, selected && styles.selected)} aria-current={selected ? "true" : undefined} onClick={onSelect}>
+      <button type="button" className={cx(styles.row, selected && styles.selected)} aria-current={selected ? "true" : undefined} data-tip="Show this run's progress and results" onClick={onSelect}>
         <span className={styles.rowTop}>
           <span className={styles.rowName}>{run.name}</span>
           <StatusChip status={chip.status} label={chip.label} />
         </span>
         <span className={styles.rowMeta}>
-          <span>{`${done} of ${total} ${total === 1 ? "file" : "files"}`}</span>
+          <span data-tip="Files that finished all their steps, out of all files in this run">{`${done} of ${total} ${total === 1 ? "file" : "files"}`}</span>
           <span>{formatRelativeTime(run.createdAt)}</span>
-          {run.needsYou > 0 && <Badge tone="accent">Needs you</Badge>}
+          {run.needsYou > 0 && <Badge tone="accent" tip="A step is waiting for you to check or do something">Needs you</Badge>}
         </span>
       </button>
     </li>
@@ -56,12 +56,12 @@ function RunDetail({ run }: { run: RunView }) {
           <h2 className={styles.name}>{run.name}</h2>
           <StatusChip status={chip.status} label={chip.label} />
         </div>
-        <div className={styles.headMeta}>
+        <div className={styles.headMeta} data-tip="When it started and what started it">
           Started {formatRelativeTime(run.createdAt)} · {TRIGGER[run.trigger] ?? run.trigger}
         </div>
         <div className={styles.headActions}>
           {active && (
-            <Button size="sm" icon="square" onClick={() => PipelinesService.Cancel(run.id).catch(report)}>
+            <Button size="sm" icon="square" data-tip="Stop this run; steps that already finished keep their files" onClick={() => PipelinesService.Cancel(run.id).catch(report)}>
               Cancel
             </Button>
           )}
@@ -69,6 +69,7 @@ function RunDetail({ run }: { run: RunView }) {
             size="sm"
             icon="rotate-ccw"
             disabled={!retryable}
+            data-tip={retryable ? "Run again only the files and steps that failed or were cancelled" : "Nothing to retry: no step failed or was cancelled"}
             onClick={() => PipelinesService.Retry(run.id).then(upsertRun).catch(report)}
           >
             Retry failed
@@ -77,6 +78,7 @@ function RunDetail({ run }: { run: RunView }) {
             size="sm"
             icon="trash-2"
             disabled={!cleanable}
+            data-tip={cleanable ? "Delete the temporary files of steps not set to Keep; kept results stay" : active ? "Wait for the run to finish first" : "There are no in-between files to delete"}
             onClick={() =>
               PipelinesService.CleanUp(run.id)
                 .then((n) => toast({ tone: "success", title: n === 1 ? "Deleted 1 in-between file" : `Deleted ${n} in-between files` }))
@@ -85,7 +87,7 @@ function RunDetail({ run }: { run: RunView }) {
           >
             Delete in-between files
           </Button>
-          <Button size="sm" variant="danger" icon="x" disabled={active} onClick={() => setConfirm(true)}>
+          <Button size="sm" variant="danger" icon="x" disabled={active} data-tip={active ? "Cancel the run before removing it" : "Remove this run from the list; kept files stay in your Library"} onClick={() => setConfirm(true)}>
             Remove
           </Button>
         </div>
@@ -109,7 +111,7 @@ function RunDetail({ run }: { run: RunView }) {
           <div className={styles.confirm}>
             <p>This removes the run from the list. The jobs and the files you kept stay.</p>
             <label className={styles.check}>
-              <input type="checkbox" checked={alsoClean} onChange={(e) => setAlsoClean(e.target.checked)} />
+              <input type="checkbox" data-tip="Also delete files of steps that were not set to Keep" checked={alsoClean} onChange={(e) => setAlsoClean(e.target.checked)} />
               Also delete in-between files
             </label>
           </div>
@@ -161,7 +163,7 @@ export function RunsPanel() {
   return (
     <div className={styles.root}>
       <aside className={styles.list}>
-        <Select aria-label="Filter runs by pipeline" size="sm" value={filter} options={options} onChange={setFilter} />
+        <Select aria-label="Filter runs by pipeline" data-tip="Show only the runs of one pipeline" size="sm" value={filter} options={options} onChange={setFilter} />
         {runs.length === 0 ? (
           <div className={styles.none}>No runs of this pipeline.</div>
         ) : (

@@ -123,7 +123,7 @@ export function TemplateField({ value, onChange, vars, label, multiline, placeho
   return (
     <div className={styles.root}>
       <div className={styles.head}>
-        <label htmlFor={id} className={styles.label}>
+        <label htmlFor={id} className={styles.label} data-tip="Type {name} to use a variable; it is replaced with the real value for each file">
           {label}
         </label>
         <MenuButton
@@ -148,6 +148,7 @@ export function TemplateField({ value, onChange, vars, label, multiline, placeho
                 key={v.name}
                 role="option"
                 aria-selected={i === active}
+                data-tip={`Insert {${v.name}}`}
                 className={cx(styles.option, i === active && styles.active)}
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -165,7 +166,7 @@ export function TemplateField({ value, onChange, vars, label, multiline, placeho
         {used.length > 0 && (
           <span className={styles.chips}>
             {[...new Set(used.map((p) => p.text))].map((n) => (
-              <span key={n} className={cx(styles.chip, !known.has(n) && styles.bad)}>{`{${n}}`}</span>
+              <span key={n} data-tip={known.has(n) ? "A variable used in this text" : "No such variable here; check the spelling"} className={cx(styles.chip, !known.has(n) && styles.bad)}>{`{${n}}`}</span>
             ))}
           </span>
         )}

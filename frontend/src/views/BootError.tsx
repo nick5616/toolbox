@@ -17,8 +17,8 @@ export function BootError({ error, onReload }: BootErrorProps) {
         <h1 className={styles.title}>Toolbox couldn't start</h1>
         <p className={styles.message}>{error.message}</p>
         {error.hint ? <p className={styles.hint}>{error.hint}</p> : null}
-        {error.code ? <code className={styles.code}>{error.code}</code> : null}
-        <Button variant="primary" onClick={onReload}>
+        {error.code ? <code className={styles.code} data-tip="Error code to quote when reporting the problem">{error.code}</code> : null}
+        <Button variant="primary" data-tip="Reload the window and try starting again" onClick={onReload}>
           Reload
         </Button>
       </section>

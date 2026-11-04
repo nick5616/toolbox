@@ -38,7 +38,7 @@ export default function UrlUtil() {
     <div className={styles.util}>
       <div className={styles.col}>
         <span className={styles.label}>Encode or decode a component</span>
-        <TextArea mono minRows={3} maxRows={10} value={text} onChange={(e) => setText(e.target.value)} aria-label="Text" spellCheck={false} />
+        <TextArea mono minRows={3} maxRows={10} value={text} onChange={(e) => setText(e.target.value)} aria-label="Text" data-tip="Text to percent-encode or decode, e.g. spaces as %20" spellCheck={false} />
       </div>
       <div className={styles.cols}>
         <OutputBox label="Encoded" value={debouncedText === "" ? "" : encoded} />
@@ -56,6 +56,7 @@ export default function UrlUtil() {
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://example.com/path?key=value"
           aria-label="URL"
+          data-tip="A full web address to split into scheme, host, path and query parameters"
           invalid={url.trim() !== "" && !parsed.ok}
           spellCheck={false}
         />
@@ -76,6 +77,7 @@ export default function UrlUtil() {
                       value={parts[f.key]}
                       onChange={(e) => update({ ...parts, [f.key]: e.target.value })}
                       aria-label={f.label}
+                      data-tip={`Edit the ${f.label.toLowerCase()} part; the rebuilt URL updates`}
                       spellCheck={false}
                     />
                   </td>
@@ -97,14 +99,15 @@ export default function UrlUtil() {
                 {parts.params.map((p, i) => (
                   <tr key={i}>
                     <td>
-                      <TextField mono size="sm" value={p.key} onChange={(e) => setParam(i, { key: e.target.value })} aria-label={`Key ${i + 1}`} spellCheck={false} />
+                      <TextField mono size="sm" value={p.key} onChange={(e) => setParam(i, { key: e.target.value })} aria-label={`Key ${i + 1}`} data-tip="Name of this query parameter" spellCheck={false} />
                     </td>
                     <td>
-                      <TextField mono size="sm" value={p.value} onChange={(e) => setParam(i, { value: e.target.value })} aria-label={`Value ${i + 1}`} spellCheck={false} />
+                      <TextField mono size="sm" value={p.value} onChange={(e) => setParam(i, { value: e.target.value })} aria-label={`Value ${i + 1}`} data-tip="Value of this query parameter" spellCheck={false} />
                     </td>
                     <td>
                       <IconButton
                         label={`Remove parameter ${i + 1}`}
+                        data-tip="Delete this query parameter"
                         icon="x"
                         size="sm"
                         onClick={() => update({ ...parts, params: parts.params.filter((_, j) => j !== i) })}
@@ -115,7 +118,7 @@ export default function UrlUtil() {
               </tbody>
             </table>
             <div>
-              <Button size="sm" variant="secondary" icon="plus" onClick={() => update({ ...parts, params: [...parts.params, { key: "", value: "" }] })}>
+              <Button size="sm" variant="secondary" icon="plus" data-tip="Add an empty query parameter to fill in" onClick={() => update({ ...parts, params: [...parts.params, { key: "", value: "" }] })}>
                 Add parameter
               </Button>
             </div>

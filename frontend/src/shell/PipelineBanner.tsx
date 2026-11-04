@@ -37,15 +37,15 @@ export function PipelineBanner({ view }: { view: string }) {
       <span className={styles.actions}>
         {!many && (
           <>
-            <Button size="sm" variant="secondary" disabled={!canContinue} onClick={() => continueManual(first, false)}>
+            <Button size="sm" variant="secondary" disabled={!canContinue} data-tip={canContinue ? "You finished this step: let the pipeline carry on with the result" : "Finish the job in this tool first, then continue the pipeline"} onClick={() => continueManual(first, false)}>
               Continue
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => skipStep(first)}>
+            <Button size="sm" variant="ghost" data-tip="Skip this step and carry on with the files as they are" onClick={() => skipStep(first)}>
               Skip step
             </Button>
           </>
         )}
-        <Button size="sm" variant="ghost" onClick={many ? showRuns : show}>
+        <Button size="sm" variant="ghost" data-tip={many ? "See all pipeline runs that are waiting" : "Open this pipeline run to see where it is"} onClick={many ? showRuns : show}>
           {many ? "Show" : "Show run"}
         </Button>
       </span>

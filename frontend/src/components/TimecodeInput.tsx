@@ -25,6 +25,7 @@ export const TimecodeInput = forwardRef<HTMLInputElement, TimecodeInputProps>(fu
       placeholder={placeholder}
       aria-invalid={invalid || undefined}
       className={cx(styles.input, invalid && styles.invalid, className)}
+      data-tip="Time as minutes:seconds, e.g. 1:05.5, or plain seconds"
       onChange={(e) => onChange(e.target.value)}
       {...rest}
     />

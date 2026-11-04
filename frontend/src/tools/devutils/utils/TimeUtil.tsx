@@ -25,12 +25,14 @@ export default function TimeUtil() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           aria-label="Timestamp or date"
+          data-tip="A Unix timestamp or a date such as 2023-11-14T22:13:20Z"
           placeholder="1700000000 or 2023-11-14T22:13:20Z"
           wrapperClassName={styles.col}
           spellCheck={false}
         />
         <Select
           aria-label="Unit"
+          data-tip="Whether a plain number counts seconds, milliseconds or microseconds; Auto guesses from its size"
           value={unit}
           onChange={setUnit}
           options={[
@@ -43,6 +45,7 @@ export default function TimeUtil() {
         <Button
           variant="secondary"
           icon="clock"
+          data-tip="Fill in the current time in milliseconds"
           onClick={() => {
             setNow(Date.now());
             setText(String(Date.now()));
@@ -66,7 +69,7 @@ export default function TimeUtil() {
           </div>
           <div className={styles.col}>
             <span className={styles.label}>Time zone</span>
-            <Select aria-label="Time zone" value={zone} onChange={setZone} options={zoneOptions} />
+            <Select aria-label="Time zone" data-tip="Show the same moment as local time in another place" value={zone} onChange={setZone} options={zoneOptions} />
           </div>
           <OutputBox label={`In ${zone}`} value={formatInZone(parsed.date, zone)} />
         </>

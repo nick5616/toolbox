@@ -13,6 +13,8 @@ export interface SliderProps {
   disabled?: boolean;
   id?: string;
   "aria-label"?: string;
+  /** Tooltip for the slider. */
+  "data-tip"?: string;
 }
 
 /** Native range input styled with tokens; the value is shown right-aligned in mono. */
@@ -32,6 +34,7 @@ export function Slider({ value, onChange, min, max, step, format, disabled, id, 
         value={value}
         disabled={disabled}
         aria-label={rest["aria-label"]}
+        data-tip={rest["data-tip"]}
         onChange={(e) => onChange(Number(e.target.value))}
       />
       <output className={styles.value} htmlFor={id}>

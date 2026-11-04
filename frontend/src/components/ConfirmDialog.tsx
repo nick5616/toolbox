@@ -75,10 +75,10 @@ export function ConfirmDialog({ open, title, body, confirmLabel, tone = "default
         </h2>
         {body && <div className={styles.body}>{body}</div>}
         <div className={styles.footer}>
-          <Button ref={cancelRef} variant="secondary" onClick={onCancel}>
+          <Button ref={cancelRef} variant="secondary" data-tip="Close this without doing anything" data-tip-kbd="Esc" onClick={onCancel}>
             Cancel
           </Button>
-          <Button ref={confirmRef} variant={danger ? "danger" : "primary"} onClick={onConfirm}>
+          <Button ref={confirmRef} variant={danger ? "danger" : "primary"} data-tip={danger ? `${confirmLabel}: this cannot be undone` : `${confirmLabel} and close`} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </div>

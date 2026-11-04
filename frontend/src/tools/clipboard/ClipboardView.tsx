@@ -29,9 +29,9 @@ import styles from "./ClipboardView.module.css";
 const PAGE = 200;
 
 const KINDS = [
-  { value: "all", label: "All" },
-  { value: "text", label: "Text" },
-  { value: "image", label: "Images" },
+  { value: "all", label: "All", tip: "Show text and images" },
+  { value: "text", label: "Text", tip: "Show only copied text" },
+  { value: "image", label: "Images", tip: "Show only copied images" },
 ] as const;
 
 function useNow(intervalMs: number): number {
@@ -177,31 +177,32 @@ export default function ClipboardView(_props: ToolViewProps) {
         <h1 className={styles.title}>Clipboard History</h1>
         {enabled && (
           <span className={styles.status} role="status">
-            <Badge tone={statusTone}>{statusLabel}</Badge>
+            <Badge tone={statusTone} tip={state.error ? "Recording hit a problem; see the message" : state.paused ? "Copies are being ignored until you resume" : state.recording ? "Everything you copy is being saved to the history" : "Recording is getting ready"}>{statusLabel}</Badge>
             {state.error && <span className={styles.errorText}>{state.error}</span>}
           </span>
         )}
         <span className={styles.spacer} />
         {enabled && (
           <>
-            <Button size="sm" variant="secondary" onClick={() => void togglePause()} icon={state.paused ? "play" : "pause"}>
+            <Button size="sm" variant="secondary" onClick={() => void togglePause()} icon={state.paused ? "play" : "pause"} data-tip={state.paused ? "Start saving what you copy again" : "Stop saving copies for now; existing history stays"}>
               {state.paused ? "Resume" : "Pause"}
             </Button>
             <Button
               size="sm"
               variant="secondary"
               icon="external-link"
+              data-tip="Open the small picker window that lists recent copies"
               onClick={() => ClipboardService.OpenPopup().catch((e: unknown) => fail("Couldn't open popup", e))}
             >
               Open popup
             </Button>
-            <span className={styles.hotkey}>
+            <span className={styles.hotkey} data-tip={combo ? "The global shortcut that opens the popup; change it in Settings" : "No global shortcut is set; choose one in Settings"}>
               {combo ? <Kbd combo={combo} /> : <span className={styles.noKey}>No shortcut</span>}
             </span>
           </>
         )}
         {hasHistory && (
-          <Button size="sm" variant="secondary" icon="trash-2" onClick={() => setConfirmClear(true)}>
+          <Button size="sm" variant="secondary" icon="trash-2" data-tip="Delete saved items, optionally keeping the pinned ones" onClick={() => setConfirmClear(true)}>
             Clear…
           </Button>
         )}
@@ -209,6 +210,7 @@ export default function ClipboardView(_props: ToolViewProps) {
           <IconButton
             icon="settings"
             label="Clipboard settings"
+            data-tip="Image capture, how long history is kept, and auto-paste"
             pressed={showSettings}
             aria-expanded={showSettings}
             onClick={() => setShowSettings((v) => !v)}
@@ -220,7 +222,7 @@ export default function ClipboardView(_props: ToolViewProps) {
         <section className={styles.settings} aria-label="Clipboard settings">
           <ClipboardSettingsPanel />
           <div>
-            <Button size="sm" variant="ghost" onClick={() => void setEnabled(false)} loading={busy}>
+            <Button size="sm" variant="ghost" onClick={() => void setEnabled(false)} loading={busy} data-tip="Stop recording what you copy; existing history is kept">
               Turn off recording
             </Button>
           </div>
@@ -241,7 +243,7 @@ export default function ClipboardView(_props: ToolViewProps) {
             </>
           }
           action={
-            <Button variant="primary" onClick={() => void setEnabled(true)} loading={busy}>
+            <Button variant="primary" onClick={() => void setEnabled(true)} loading={busy} data-tip="Start saving text and images you copy, on this computer only">
               Start recording clipboard history
             </Button>
           }
@@ -257,6 +259,7 @@ export default function ClipboardView(_props: ToolViewProps) {
               icon="search"
               placeholder="Search clipboard history"
               aria-label="Search clipboard history"
+              data-tip="Search the text of copied items. Press / to focus"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               trailing={<Kbd combo="/" />}
@@ -300,7 +303,7 @@ export default function ClipboardView(_props: ToolViewProps) {
             )}
             {list.hasMore && (
               <div className={styles.more}>
-                <Button size="sm" variant="secondary" onClick={list.loadMore} loading={list.loadingMore}>
+                <Button size="sm" variant="secondary" onClick={list.loadMore} loading={list.loadingMore} data-tip="Show older items">
                   Load more
                 </Button>
               </div>
@@ -325,7 +328,7 @@ export default function ClipboardView(_props: ToolViewProps) {
           <>
             <p className={styles.dialogText}>This permanently deletes the saved items, including copied images.</p>
             <label className={styles.check}>
-              <input type="checkbox" checked={keepPinned} onChange={(e) => setKeepPinned(e.target.checked)} />
+              <input type="checkbox" data-tip="Leave pinned items alone and delete the rest" checked={keepPinned} onChange={(e) => setKeepPinned(e.target.checked)} />
               Keep pinned items
             </label>
           </>

@@ -13,9 +13,9 @@ export function useDebounced<T>(value: T, ms = 150): T {
   return v;
 }
 
-export function CopyButton({ text, label = "Copy", disabled }: { text: string; label?: string; disabled?: boolean }) {
+export function CopyButton({ text, label = "Copy", disabled, what }: { text: string; label?: string; disabled?: boolean; what?: string }) {
   return (
-    <Button size="sm" variant="secondary" icon="copy" disabled={disabled ?? text === ""} onClick={() => void copyText(text)}>
+    <Button size="sm" variant="secondary" icon="copy" disabled={disabled ?? text === ""} data-tip={(disabled ?? text === "") ? "Nothing to copy yet" : what ? `Copy ${what} to the clipboard` : "Copy this result to the clipboard"} onClick={() => void copyText(text)}>
       {label}
     </Button>
   );
@@ -37,9 +37,9 @@ export function OutputBox({
     <div className={styles.col}>
       <div className={styles.outHead}>
         <span className={styles.label}>{label}</span>
-        <CopyButton text={value} />
+        <CopyButton text={value} what={label} />
       </div>
-      <pre className={[styles.out, value === "" ? styles.outEmpty : "", className ?? ""].join(" ").trim()} aria-label={label}>
+      <pre data-tip="Result; select text to copy part of it" className={[styles.out, value === "" ? styles.outEmpty : "", className ?? ""].join(" ").trim()} aria-label={label}>
         {children ?? (value === "" ? "—" : value)}
       </pre>
     </div>
