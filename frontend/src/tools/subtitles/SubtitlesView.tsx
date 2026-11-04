@@ -67,7 +67,7 @@ function GenerateCta() {
   return (
     <div className={styles.cta}>
       <div className={styles.ctaCard}>
-        <Button icon="captions" onClick={generate} loading={gen.busy} disabled={!mediaPath || busy || mediaStatus === "error"} data-tip={busy ? "Wait for the current task to finish" : "Listen to the speech and write subtitles for it"}>
+        <Button variant="primary" icon="captions" onClick={generate} loading={gen.busy} disabled={!mediaPath || busy || mediaStatus === "error"} data-tip={busy ? "Wait for the current task to finish" : "Listen to the speech and write subtitles for it"}>
           Generate subtitles
         </Button>
         <span className={styles.ctaSummary} data-tip="Change these in the Transcription panel">

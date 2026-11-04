@@ -87,6 +87,8 @@
 
 .player {
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .audioCue {
@@ -107,13 +109,12 @@
   color: var(--fg-muted);
 }
 
-/* Before any cues: the primary action over the picture. */
+/* Before any cues: the primary action, in the room the cue list will take (never over the picture or timeline). */
 .cta {
-  position: absolute;
-  inset: 0;
+  flex: 1 1 auto;
+  min-height: 140px;
   display: grid;
   place-items: center;
-  pointer-events: none;
 }
 
 .ctaCard {

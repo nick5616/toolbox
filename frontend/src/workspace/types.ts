@@ -19,6 +19,8 @@ export interface ToolPanel {
   /** [a-z0-9-], unique within the tool ("layers", "cues"). */
   id: string;
   title: string;
+  /** A shorter caption for the rail (≤ 10 characters), when the title doesn't fit under an icon. */
+  short?: string;
   /** lucide icon name (registered in components/Icon.tsx). */
   icon: string;
   /** One line for the launcher tooltip. */

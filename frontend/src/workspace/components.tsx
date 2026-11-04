@@ -86,7 +86,7 @@ export function WorkspaceRail({ ws, panels, summaries, badges, extra = [] }: Wor
   const items: { id: string; caption: string; node: (launcherOnly: boolean) => ReactNode; open?: () => void; icon?: string; tip?: string }[] = [
     ...ids.map((id) => ({
       id,
-      caption: ws.getPanel(id)?.title ?? id,
+      caption: ws.getPanel(id)?.short ?? ws.getPanel(id)?.title ?? id,
       icon: ws.getPanel(id)?.icon,
       tip: ws.getPanel(id)?.tip,
       open: () => open(panelDrawerId(id)),
