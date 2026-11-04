@@ -38,16 +38,22 @@ function OutputRow({ o }: { o: OutputView }) {
   return (
     <li className={cx(styles.row, o.missing && styles.missing)}>
       <Icon name={KIND_ICON[o.kind] ?? "file"} size={14} className={styles.kind} />
-      <span className={styles.name} title={o.path}>
+      <span className={styles.name} data-tip={o.path}>
         {o.name}
       </span>
-      {o.missing && <Badge tone="warn">MISSING</Badge>}
-      <span className={styles.meta}>{formatBytes(o.sizeBytes)}</span>
-      <span className={styles.meta}>{formatRelativeTime(o.createdAt)}</span>
+      {o.missing && <Badge tone="warn" tip="The file was moved or deleted outside Toolbox">
+          MISSING
+        </Badge>}
+      <span className={styles.meta} data-tip="File size on disk">
+        {formatBytes(o.sizeBytes)}
+      </span>
+      <span className={styles.meta} data-tip={new Date(o.createdAt).toLocaleString()}>
+        {formatRelativeTime(o.createdAt)}
+      </span>
       <span className={styles.actions}>
-        <IconButton size="sm" icon="folder-open" label={revealLabel} disabled={o.missing} onClick={() => void run(LibraryService.Reveal(o.id))} />
-        <IconButton size="sm" icon="external-link" label="Open" disabled={o.missing} onClick={() => void run(LibraryService.Open(o.id))} />
-        <IconButton size="sm" icon="copy" label="Copy path" onClick={() => void copyPath(o.path)} />
+        <IconButton size="sm" icon="folder-open" label={revealLabel} data-tip={o.missing ? "The file is missing" : "Show this file in its folder"} disabled={o.missing} onClick={() => void run(LibraryService.Reveal(o.id))} />
+        <IconButton size="sm" icon="external-link" label="Open" data-tip={o.missing ? "The file is missing" : "Open this file in its default app"} disabled={o.missing} onClick={() => void run(LibraryService.Open(o.id))} />
+        <IconButton size="sm" icon="copy" label="Copy path" data-tip="Copy the full path of this file" onClick={() => void copyPath(o.path)} />
       </span>
     </li>
   );
@@ -60,7 +66,7 @@ export function RecentDownloads() {
   return (
     <>
       {active.length > 0 && (
-        <Section label="Active">
+        <Section label="Active" tip="Downloads that are queued or running">
           <div className={styles.jobs}>
             {active.map((j) => (
               <JobRow key={j.id} job={j} compact />
@@ -68,7 +74,7 @@ export function RecentDownloads() {
           </div>
         </Section>
       )}
-      <Section label="Recent downloads">
+      <Section label="Recent downloads" tip="The latest files this tool saved to your library">
         {recent.length === 0 ? (
           <EmptyState icon="download" title="Nothing downloaded yet." body="Paste a link above, or anywhere in the app." />
         ) : (

@@ -49,7 +49,7 @@ export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions 
   return (
     <div className={styles.root}>
       <div className={styles.bar}>
-        <span className={styles.count}>
+        <span className={styles.count} data-tip="Number of finished results listed below">
           {rows.length} {rows.length === 1 ? "result" : "results"}
         </span>
         <span className={styles.barActions}>
@@ -59,6 +59,7 @@ export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions 
             variant="secondary"
             icon="copy"
             disabled={rows.length === 0}
+            data-tip={rows.length === 0 ? "Nothing to copy yet" : "Copy the whole table as CSV, ready to paste into a spreadsheet"}
             onClick={() => void copyText(toCsv(rows, columns), `Copied ${label} as CSV`)}
           >
             Copy CSV
@@ -77,7 +78,7 @@ export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions 
                     {c.header}
                   </th>
                 ))}
-                <th className={styles.copyCol}>
+                <th className={styles.copyCol} data-tip="Copy a row as tab-separated text">
                   <span className={styles.srOnly}>Copy</span>
                 </th>
               </tr>
@@ -95,6 +96,7 @@ export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions 
                       size="sm"
                       icon="copy"
                       label="Copy row"
+                      data-tip="Copy this row as tab-separated text"
                       className={styles.copyBtn}
                       onClick={() => void copyText(columns.map((c) => c.text(r)).join("\t"), "Row copied")}
                     />

@@ -46,10 +46,12 @@ export function Results({ job, onEdit, onMore }: ResultsProps) {
           <li key={o.id || o.path} className={styles.card} data-testid="result-card">
             {isVideoPath(o.path) ? <VideoResult path={o.path} /> : <Thumb path={o.path} size={480} className={styles.cardThumb} />}
             <div className={styles.cardFoot}>
-              <span className={styles.cardName} title={o.path}>
+              <span className={styles.cardName} data-tip={o.path}>
                 {o.name || baseName(o.path)}
               </span>
-              <span className={styles.hint}>{formatBytes(o.sizeBytes)}</span>
+              <span className={styles.hint} data-tip="File size on disk">
+                {formatBytes(o.sizeBytes)}
+              </span>
               <FileActions outputId={o.id} path={o.path} disabled={o.missing} />
             </div>
           </li>
@@ -58,11 +60,11 @@ export function Results({ job, onEdit, onMore }: ResultsProps) {
       <div className={styles.footer}>
         <span className={styles.spacer} />
         {onEdit && (
-          <Button variant="secondary" onClick={onEdit}>
+          <Button variant="secondary" data-tip="Go back to the boxes, change them and save again" onClick={onEdit}>
             Edit the boxes again
           </Button>
         )}
-        <Button variant="primary" icon="scan-face" onClick={onMore}>
+        <Button variant="primary" icon="scan-face" data-tip="Clear this session and pick new files to redact" onClick={onMore}>
           Redact more
         </Button>
       </div>

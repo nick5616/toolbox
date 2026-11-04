@@ -15,14 +15,14 @@ export interface TrimFieldsProps {
 export function TrimFields({ enabled, start, end, errors, onEnabled, onStart, onEnd }: TrimFieldsProps) {
   return (
     <div className={styles.stack}>
-      <Switch checked={enabled} onChange={onEnabled} label="Trim to a section" />
+      <Switch checked={enabled} onChange={onEnabled} label="Trim to a section" tip="Download only part of the video or track instead of all of it" />
       {enabled && (
         <div className={styles.row}>
           <Field label="Start" error={errors.trimStart}>
-            {(c) => <TimecodeInput {...c} value={start} onChange={onStart} placeholder="0:00" invalid={!!errors.trimStart} />}
+            {(c) => <TimecodeInput {...c} data-tip="Where the section begins, as minutes:seconds or h:mm:ss" value={start} onChange={onStart} placeholder="0:00" invalid={!!errors.trimStart} />}
           </Field>
           <Field label="End" error={errors.trimEnd}>
-            {(c) => <TimecodeInput {...c} value={end} onChange={onEnd} placeholder="end" invalid={!!errors.trimEnd} />}
+            {(c) => <TimecodeInput {...c} data-tip="Where the section ends; leave empty to go to the end" value={end} onChange={onEnd} placeholder="end" invalid={!!errors.trimEnd} />}
           </Field>
         </div>
       )}

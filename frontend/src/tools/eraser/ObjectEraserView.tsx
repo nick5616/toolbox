@@ -382,11 +382,12 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
     <header className={styles.header}>
       <h1 className={styles.title}>Object Eraser</h1>
       {file && (
-        <span className={styles.fileName} title={path ?? file.path}>
+        <span className={styles.fileName} data-tip={path ?? file.path}>
           <span>{baseName(path ?? file.path)}</span>
           <Button
             size="sm"
             variant="ghost"
+            data-tip="Drop this photo and pick another one"
             onClick={() => {
               inputs.clear();
               void inputs.pick();
@@ -406,7 +407,7 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
         <DepsGate moduleId={moduleId} />
         <div className={styles.empty}>
           <DropZone id="eraser-drop" label="Drop a photo" hint="Paint over what you want gone, then erase it." icon="eraser">
-            <Button variant="secondary" icon="folder-open" onClick={() => void inputs.pick()}>
+            <Button variant="secondary" icon="folder-open" data-tip="Pick the photo you want to remove things from" onClick={() => void inputs.pick()}>
               Choose photo
             </Button>
           </DropZone>
@@ -416,8 +417,8 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
   }
 
   const modelOptions = [
-    { value: EraserModel.ModelBest, label: "Best" },
-    { value: EraserModel.ModelFast, label: "Fast" },
+    { value: EraserModel.ModelBest, label: "Best", tip: "Highest quality fill with cleaner textures; slower and a larger first-use model download" },
+    { value: EraserModel.ModelFast, label: "Fast", tip: "Quicker with a smaller model; good for small objects, may look smeared on large areas" },
   ];
   const current = models.find((m) => m.id === settings.model);
   const needsDownload = current && !current.present && current.downloadBytes > 0;
@@ -438,33 +439,37 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
       )}
 
       {!done && (
-        <div className={styles.toolbar} role="toolbar" aria-label="Painting tools">
+        <div className={styles.toolbar} role="toolbar" aria-label="Painting tools" data-tip="Paint over what you want gone, then press Erase">
           <SegmentedControl
             aria-label="Tool"
             size="sm"
             value={effectiveTool}
             onChange={(t) => setTool(t)}
             options={[
-              { value: "brush", label: "Brush" },
-              { value: "unpaint", label: "Unpaint" },
+              { value: "brush", label: "Brush", tip: "Paint over the things to remove. Hold Alt to unpaint temporarily" },
+              { value: "unpaint", label: "Unpaint", tip: "Rub out part of your mask where you painted too much" },
             ]}
             disabled={!editing}
           />
           <div className={styles.brush}>
-            <span className={styles.label}>Size</span>
-            <Slider aria-label="Brush size" min={4} max={300} value={settings.brush} onChange={(brush) => setSettings((s) => ({ ...s, brush: clampBrush(brush) }))} format={(v) => `${v}px`} disabled={!editing} />
+            <label className={styles.label} htmlFor="eraser-brush" data-tip="Brush diameter in screen pixels; use [ and ] to change it">
+              Size
+            </label>
+            <div data-tip="Brush diameter in screen pixels; use [ and ] to change it">
+            <Slider id="eraser-brush" min={4} max={300} value={settings.brush} onChange={(brush) => setSettings((s) => ({ ...s, brush: clampBrush(brush) }))} format={(v) => `${v}px`} disabled={!editing} />
+            </div>
           </div>
-          <IconButton size="sm" icon="undo-2" label="Undo" kbd="Mod+Z" disabled={!editing || !history.current.canUndo} onClick={undo} />
-          <IconButton size="sm" icon="redo-2" label="Redo" kbd="Mod+Shift+Z" disabled={!editing || !history.current.canRedo} onClick={redo} />
-          <IconButton size="sm" icon="trash-2" label="Clear mask" kbd="Mod+Backspace" disabled={!editing || !hasPaint} onClick={clearMask} />
+          <IconButton size="sm" icon="undo-2" label="Undo" data-tip="Undo the last brush stroke" kbd="Mod+Z" disabled={!editing || !history.current.canUndo} onClick={undo} />
+          <IconButton size="sm" icon="redo-2" label="Redo" data-tip="Bring back the stroke you undid" kbd="Mod+Shift+Z" disabled={!editing || !history.current.canRedo} onClick={redo} />
+          <IconButton size="sm" icon="trash-2" label="Clear mask" data-tip="Remove all your painting and start the mask again" kbd="Mod+Backspace" disabled={!editing || !hasPaint} onClick={clearMask} />
           <span className={styles.spacer} />
-          <IconButton size="sm" icon="zoom-out" label="Zoom out" disabled={!img} onClick={() => zoomBy(1 / 1.25)} />
-          <span className={styles.zoom}>{img ? `${zoomPct}%` : ""}</span>
-          <IconButton size="sm" icon="zoom-in" label="Zoom in" disabled={!img} onClick={() => zoomBy(1.25)} />
-          <Button size="sm" variant="ghost" disabled={!img} onClick={() => setView(FIT_VIEW)}>
+          <IconButton size="sm" icon="zoom-out" label="Zoom out" data-tip="Zoom out; Ctrl or Cmd with the mouse wheel also zooms" disabled={!img} onClick={() => zoomBy(1 / 1.25)} />
+          <span className={styles.zoom} data-tip="Current zoom level of the picture">{img ? `${zoomPct}%` : ""}</span>
+          <IconButton size="sm" icon="zoom-in" label="Zoom in" data-tip="Zoom in for precise painting; hold Space and drag to move around" disabled={!img} onClick={() => zoomBy(1.25)} />
+          <Button size="sm" variant="ghost" disabled={!img} data-tip="Zoom so the whole photo fits in the window" onClick={() => setView(FIT_VIEW)}>
             Fit
           </Button>
-          <Button size="sm" variant="ghost" disabled={!img || img.w === 0} onClick={() => setView({ zoom: actualSizeZoom(box, { w: img?.w ?? 0, h: img?.h ?? 0 }), panX: 0, panY: 0 })}>
+          <Button size="sm" variant="ghost" disabled={!img || img.w === 0} data-tip="Show the photo at its real pixel size" onClick={() => setView({ zoom: actualSizeZoom(box, { w: img?.w ?? 0, h: img?.h ?? 0 }), panX: 0, panY: 0 })}>
             100%
           </Button>
         </div>
@@ -478,15 +483,17 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
             value={resultMode}
             onChange={setResultMode}
             options={[
-              { value: "compare", label: "Before / After" },
-              { value: "result", label: "Result" },
+              { value: "compare", label: "Before / After", tip: "Drag the divider to compare the original with the erased result" },
+              { value: "result", label: "Result", tip: "Show only the finished photo" },
             ]}
           />
           <span className={styles.spacer} />
-          <span className={styles.resultName} title={output.path}>
+          <span className={styles.resultName} data-tip={output.path}>
             {output.name}
           </span>
-          <span className={styles.label}>{formatBytes(output.sizeBytes)}</span>
+          <span className={styles.label} data-tip="File size on disk">
+            {formatBytes(output.sizeBytes)}
+          </span>
           <FileActions outputId={output.id} path={output.path} />
         </div>
       )}
@@ -511,6 +518,7 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
             ref={stageRef}
             className={cx(styles.stage, spaceDown && styles.grab, editing && !spaceDown && styles.paint)}
             data-testid="stage"
+            data-tip={editing ? "Click and drag to paint over what to remove; Space plus drag pans, Ctrl or Cmd plus wheel zooms" : undefined}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endStroke}
@@ -531,7 +539,7 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
                   }}
                   onError={() => setLoadError("This photo can't be opened")}
                 />
-                <canvas ref={maskRef} className={styles.mask} aria-label="Mask" />
+                <canvas ref={maskRef} className={styles.mask} aria-label="Mask" data-tip={editing ? "Your painted mask: everything painted will be removed and filled in" : "Your painted mask"} />
               </div>
             ) : !loadError ? (
               <span className={styles.hint} role="status">
@@ -544,7 +552,7 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
                 <div className={styles.overlayCard}>
                   <Meter value={job.progress} label="Erase progress" />
                   <span className={styles.stageText}>{job.message || "Starting…"}</span>
-                  <Button size="sm" variant="secondary" onClick={() => void JobsService.Cancel(job.id).catch(() => undefined)}>
+                  <Button size="sm" variant="secondary" data-tip="Stop erasing; your mask is kept" onClick={() => void JobsService.Cancel(job.id).catch(() => undefined)}>
                     Cancel
                   </Button>
                 </div>
@@ -568,11 +576,13 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
       <div className={styles.footer}>
         {done && output ? (
           <>
-            <span className={styles.hint}>{img ? `${img.w} × ${img.h}` : ""}</span>
-            <Button variant="secondary" onClick={editAgain}>
+            <span className={styles.hint} data-tip="Photo size in pixels, width by height">
+              {img ? `${img.w} × ${img.h}` : ""}
+            </span>
+            <Button variant="secondary" data-tip="Go back to your mask to paint more and erase again from the original" onClick={editAgain}>
               Edit mask again
             </Button>
-            <Button variant="primary" icon="eraser" onClick={keepErasing}>
+            <Button variant="primary" icon="eraser" data-tip="Use the result as the new starting photo and remove more things from it" onClick={keepErasing}>
               Keep erasing on the result
             </Button>
           </>
@@ -580,14 +590,21 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
           <>
             <div className={styles.models}>
               <SegmentedControl aria-label="Model" size="sm" value={settings.model} onChange={(model) => setSettings((s) => ({ ...s, model }))} options={modelOptions} disabled={running} />
-              <span className={styles.hint}>
+              <span className={styles.hint} data-tip="Speed and quality of the selected model, and whether it must be downloaded">
                 {modelHint(models)}
                 {needsDownload && current ? ` · downloads ${Math.round(current.downloadBytes / (1024 * 1024))} MB on first use` : ""}
               </span>
             </div>
             <span className={styles.spacer} />
             {gate.blocked && <span className={styles.hint}>{gate.reason}</span>}
-            <Button variant="primary" icon="eraser" kbd="Enter" loading={submitting} disabled={!canErase} title={!hasPaint ? "Paint over what to erase first" : undefined} onClick={() => void erase()}>
+            <Button
+              variant="primary"
+              icon="eraser"
+              kbd="Enter"
+              loading={submitting}
+              disabled={!canErase}
+              data-tip={canErase ? "Remove everything you painted and fill it in to match the surroundings" : gate.blocked ? gate.reason : !hasPaint ? "Paint over what to erase first" : "Wait for the photo to load"}
+              onClick={() => void erase()}>
               Erase
             </Button>
           </>

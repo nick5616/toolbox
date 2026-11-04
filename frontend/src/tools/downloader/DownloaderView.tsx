@@ -131,7 +131,7 @@ export default function DownloaderView(_props: ToolViewProps) {
           <button
             type="button"
             className={styles.destination}
-            title="Open downloads folder"
+            data-tip="Open the folder where finished downloads are saved"
             onClick={() => void LibraryService.OpenLibraryFolder("Downloads").catch((e: unknown) => toast({ title: toAppError(e).message, tone: "danger" }))}
           >
             <PathText path={destination} />
@@ -153,11 +153,20 @@ export default function DownloaderView(_props: ToolViewProps) {
           kbd="Mod+Enter"
           loading={submitting}
           disabled={!canSubmit}
+          data-tip={
+            canSubmit
+              ? "Start downloading every valid link below with these options"
+              : blockReason ?? (urls.length === 0 ? "Paste at least one valid link first" : listError || "Fix the highlighted problems first")
+          }
           onClick={() => void submit()}
         >
           {urls.length > 0 ? `Download ${urls.length}` : "Download"}
         </Button>
-        {blockReason && <p className={styles.reason}>{blockReason}</p>}
+        {blockReason && (
+          <p className={styles.reason} data-tip="Why downloading is unavailable">
+            {blockReason}
+          </p>
+        )}
       </div>
 
       <RecentDownloads />

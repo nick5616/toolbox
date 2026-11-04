@@ -29,6 +29,12 @@ import { PreviewPanel } from "./PreviewPanel";
 import styles from "./TranscribeView.module.css";
 
 const MAX_GROUPS = 10;
+const FORMAT_TIPS: Record<string, string> = {
+  txt: "Plain text transcript, no timestamps",
+  srt: "Subtitle file with timestamps; works in most video players and editors",
+  vtt: "WebVTT subtitles for web video and HTML players",
+  json: "Full detail with word timings, for scripts and other programs",
+};
 const SPEED_LABEL: Record<string, string> = { fast: "Fastest", balanced: "Balanced", best: "Best quality" };
 
 function ModelCards({ presets, value, onChange }: { presets: PresetInfo[]; value: string; onChange: (id: string) => void }) {
@@ -68,13 +74,22 @@ function ModelCards({ presets, value, onChange }: { presets: PresetInfo[]; value
           className={cx(styles.card, p.id === value && styles.selected)}
           onClick={() => onChange(p.id)}
           onKeyDown={(e) => onKeyDown(e, i)}
+          data-tip={`${p.label}: ${p.speed === "fast" ? "fastest, least accurate" : p.speed === "best" ? "most accurate, slowest" : "a good balance of speed and accuracy"}; ${formatBytes(p.downloadBytes)} model download on first use`}
         >
           <span className={styles.cardHead}>
             <span className={styles.label}>{p.label}</span>
-            <Badge tone={p.speed === "best" ? "accent" : "neutral"}>{SPEED_LABEL[p.speed] ?? p.speed}</Badge>
+            <Badge tone={p.speed === "best" ? "accent" : "neutral"} tip="How this model trades speed against accuracy">
+              {SPEED_LABEL[p.speed] ?? p.speed}
+            </Badge>
           </span>
-          <span className={styles.note}>{formatBytes(p.downloadBytes)} first-use download</span>
-          {p.id === "turbo" && <span className={styles.note}>Slower on CPU</span>}
+          <span className={styles.note} data-tip="The model is downloaded once and then works offline">
+            {formatBytes(p.downloadBytes)} first-use download
+          </span>
+          {p.id === "turbo" && (
+            <span className={styles.note} data-tip="Fast on a GPU, but much slower when only a CPU is available">
+              Slower on CPU
+            </span>
+          )}
         </button>
       ))}
     </div>
@@ -98,22 +113,27 @@ function TranscriptGroup({
   return (
     <div className={styles.group}>
       <div className={styles.groupHead}>
-        <span className={styles.track} title={job.title}>
+        <span className={styles.track} data-tip={job.title}>
           {job.title}
         </span>
         <span className={styles.meta}>
           {result.language && (
-            <Badge tone="accent">
+            <Badge tone="accent" tip={auto ? "Language the model detected, with its confidence" : "Language you chose"}>
               {langName}
               {auto && result.languageProbability > 0 ? ` · ${Math.round(result.languageProbability * 100)}%` : ""}
             </Badge>
           )}
-          <Badge mono>{formatDuration(result.durationSec)}</Badge>
-          <Badge mono>{result.segments} segments</Badge>
+          <Badge mono tip="Length of the audio or video">
+            {formatDuration(result.durationSec)}
+          </Badge>
+          <Badge mono tip="Number of timed text blocks in the transcript">
+            {result.segments} segments
+          </Badge>
           <Button
             size="sm"
             variant="secondary"
             disabled={!preview}
+            data-tip={preview ? "Read the first lines of the transcript here" : "No text file to preview"}
             onClick={() => preview && onPreview(preview, job.title)}
           >
             Preview
@@ -126,10 +146,14 @@ function TranscriptGroup({
           return (
             <li key={path} className={cx(shared.row, out?.missing && shared.missing)}>
               <Icon name="file-text" size={14} className={shared.icon} />
-              <span className={shared.name} title={path}>
+              <span className={shared.name} data-tip={path}>
                 {basename(path)}
               </span>
-              {out && <span className={shared.meta}>{formatBytes(out.sizeBytes)}</span>}
+              {out && (
+                <span className={shared.meta} data-tip="File size on disk">
+                  {formatBytes(out.sizeBytes)}
+                </span>
+              )}
               <span className={shared.actions}>
                 <FileActions outputId={out?.id} path={path} disabled={out?.missing} />
               </span>
@@ -193,7 +217,7 @@ export default function TranscribeView({ moduleId }: ToolViewProps) {
         running={running}
         inputErrors={inputErrors}
         options={
-          <Section label="Options">
+          <Section label="Options" tip="Pick the model, language and which transcript files to write">
             <div className={styles.options}>
               <ModelCards
                 presets={presets}
@@ -206,25 +230,26 @@ export default function TranscribeView({ moduleId }: ToolViewProps) {
                 </label>
                 <Select
                   id="transcribe-language"
+                  data-tip="The language spoken; auto-detect works well but a fixed choice is safer for short or noisy clips"
                   value={opts.language}
                   options={languageOptions}
                   onChange={(language) => setOpts((o) => ({ ...o, language }))}
                 />
               </div>
               <div className={styles.optRow}>
-                <span className={styles.optLabel}>Task</span>
+                <span className={styles.optLabel} data-tip="Keep the original language or translate to English">Task</span>
                 <SegmentedControl
                   aria-label="Task"
                   value={opts.task}
                   onChange={(task) => setOpts((o) => ({ ...o, task }))}
                   options={[
-                    { value: TranscribeTask.TaskTranscribe, label: "Transcribe" },
-                    { value: TranscribeTask.TaskTranslate, label: "Translate to English" },
+                    { value: TranscribeTask.TaskTranscribe, label: "Transcribe", tip: "Write down what is said in the original language" },
+                    { value: TranscribeTask.TaskTranslate, label: "Translate to English", tip: "Write the speech out translated into English, whatever language it is in" },
                   ]}
                 />
               </div>
               <div className={styles.optRow}>
-                <span className={styles.optLabel} id="transcribe-formats">
+                <span className={styles.optLabel} id="transcribe-formats" data-tip="Which transcript files to save; pick at least one">
                   Formats
                 </span>
                 <div role="group" aria-labelledby="transcribe-formats" className={styles.chips}>
@@ -235,6 +260,7 @@ export default function TranscribeView({ moduleId }: ToolViewProps) {
                         key={f}
                         type="button"
                         aria-pressed={on}
+                        data-tip={`${FORMAT_TIPS[f] ?? f}${on ? "" : " (click to include)"}`}
                         className={cx(styles.chip, on && styles.chipOn)}
                         onClick={() => setOpts((o) => ({ ...o, formats: toggleFormat(o.formats, f) }))}
                       >
@@ -248,12 +274,13 @@ export default function TranscribeView({ moduleId }: ToolViewProps) {
                 checked={opts.vad}
                 onChange={(vad) => setOpts((o) => ({ ...o, vad }))}
                 label="Skip silence"
+                tip="Cut long silent stretches before transcribing; faster and avoids made-up text in quiet parts"
               />
             </div>
           </Section>
         }
         results={
-          <Section label="Results">
+          <Section label="Results" tip="Finished transcripts with their files">
             {done.length === 0 ? (
               <EmptyState icon="captions" title="No transcripts yet." body="Transcribe a file and its transcript appears here." />
             ) : (

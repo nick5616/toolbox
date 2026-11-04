@@ -9,6 +9,7 @@ export function PasswordField({
   error,
   hint,
   autoFocus,
+  tip = "Needed to open this PDF; it is kept in memory only and never saved",
 }: {
   label: string;
   value: string;
@@ -16,6 +17,8 @@ export function PasswordField({
   error?: string;
   hint?: string;
   autoFocus?: boolean;
+  /** Tooltip for the field. */
+  tip?: string;
 }) {
   const [show, setShow] = useState(false);
   return (
@@ -23,6 +26,7 @@ export function PasswordField({
       {(control) => (
         <TextField
           {...control}
+          data-tip={tip}
           type={show ? "text" : "password"}
           autoComplete="off"
           autoFocus={autoFocus}
@@ -30,7 +34,7 @@ export function PasswordField({
           invalid={!!error}
           onChange={(e) => onChange(e.target.value)}
           trailing={
-            <IconButton size="sm" icon={show ? "eye-off" : "eye"} label={show ? "Hide password" : "Show password"} onClick={() => setShow((s) => !s)} />
+            <IconButton size="sm" icon={show ? "eye-off" : "eye"} label={show ? "Hide password" : "Show password"} data-tip={show ? "Hide the typed password again" : "Show the typed password so you can check it"} onClick={() => setShow((s) => !s)} />
           }
         />
       )}

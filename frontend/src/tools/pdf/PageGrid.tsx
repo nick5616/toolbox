@@ -55,6 +55,7 @@ function PageTile({
       role="option"
       aria-selected={selected}
       aria-label={label}
+      data-tip={`${label}. Click to select, Ctrl or Shift click for several, drag to reorder, Delete to remove`}
       data-index={index}
       tabIndex={focused ? 0 : -1}
       draggable
@@ -73,8 +74,14 @@ function PageTile({
           <span className={styles.placeholder} />
         )}
       </div>
-      <span className={styles.num}>{tile.page}</span>
-      {tile.rotate !== 0 && <span className={styles.badge}>{tile.rotate}°</span>}
+      <span className={styles.num} data-tip="Original page number">
+        {tile.page}
+      </span>
+      {tile.rotate !== 0 && (
+        <span className={styles.badge} data-tip="This page will be rotated by this many degrees clockwise">
+          {tile.rotate}°
+        </span>
+      )}
     </div>
   );
 }
@@ -179,6 +186,7 @@ export function PageGrid({ path, password, tiles, selected, focusPage, onTiles, 
       role="listbox"
       aria-label="Pages"
       aria-multiselectable="true"
+      data-tip="Page thumbnails: select pages, then rotate, delete or drag them into a new order. Alt plus arrow keys moves the selection"
       className={styles.grid}
     >
       {tiles.map((tile, index) => (

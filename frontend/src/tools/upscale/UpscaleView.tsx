@@ -9,6 +9,7 @@ import {
   type UpscaleLimits,
   type UpscaleModelInfo,
 } from "@/lib/api";
+import { formatBytes } from "@/lib/format";
 import { useOrderedJobs } from "@/state/jobs";
 import { FileToolLayout, runLabel, setRequiresOverride, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { AUDIO_ENGINE_ID } from "@/tools/_kit/DepsGate";
@@ -154,7 +155,12 @@ export default function UpscaleView({ moduleId }: ToolViewProps) {
   };
 
   const okCount = verdicts.filter((x) => x.v.kind !== "over").length;
-  const modelOptions = (models.length > 0 ? models : []).map((m) => ({ value: m.id, label: m.label, hint: m.hint }));
+  const modelOptions = (models.length > 0 ? models : []).map((m) => ({
+    value: m.id,
+    label: m.label,
+    hint: m.hint,
+    tip: `${m.label}: ${m.hint}. Runs on the GPU; the CPU option downloads ${formatBytes(m.cpuDownloadBytes)} of model data on first use`,
+  }));
 
   return (
     <FileToolLayout
@@ -172,7 +178,7 @@ export default function UpscaleView({ moduleId }: ToolViewProps) {
               engine instead.
             </Banner>
           )}
-          <Section label="Options">
+          <Section label="Options" tip="Pick the model, how much to enlarge, and where the work runs">
             <div className={imageStyles.options}>
               <RadioCards
                 aria-label="Model"
@@ -181,14 +187,14 @@ export default function UpscaleView({ moduleId }: ToolViewProps) {
                 onChange={(model) => setOpts((o) => ({ ...o, model }))}
               />
               <div className={imageStyles.optRow}>
-                <span className={imageStyles.optLabel}>Scale</span>
+                <span className={imageStyles.optLabel} data-tip="How many times wider and taller the result will be">Scale</span>
                 <SegmentedControl
                   aria-label="Scale"
                   value={String(opts.scale) as "2" | "4"}
                   onChange={(v) => setOpts((o) => ({ ...o, scale: Number(v) }))}
                   options={[
-                    { value: "2", label: "2×" },
-                    { value: "4", label: "4×" },
+                    { value: "2", label: "2×", tip: "Double the width and height (4 times the pixels); faster and lighter on memory" },
+                    { value: "4", label: "4×", tip: "Four times the width and height (16 times the pixels); big files, slower, may exceed the size limit" },
                   ]}
                 />
               </div>
@@ -198,6 +204,7 @@ export default function UpscaleView({ moduleId }: ToolViewProps) {
                 </label>
                 <Select
                   id="upscale-format"
+                  data-tip="File type of the upscaled image; PNG is lossless, JPG and WebP are smaller"
                   value={opts.format}
                   options={FORMAT_OPTIONS}
                   onChange={(format) => setOpts((o) => ({ ...o, format }))}
@@ -209,22 +216,23 @@ export default function UpscaleView({ moduleId }: ToolViewProps) {
                 </label>
                 <Select
                   id="upscale-device"
+                  data-tip="Automatic uses the GPU when one is available; CPU works anywhere but is much slower"
                   value={opts.device}
                   options={DEVICE_OPTIONS}
                   onChange={(device) => setOpts((o) => ({ ...o, device }))}
                 />
                 {cpu && (
-                  <span className={imageStyles.mono}>
+                  <span className={imageStyles.mono} data-tip="Rough time to finish on the CPU for the images that fit the limit">
                     {estimate ? `Estimated time ${estimate}` : "Runs on the AI engine, much slower than a GPU"}
                   </span>
                 )}
               </div>
               {inputs.files.length > 0 && (
-                <ul className={imageStyles.sizeList} aria-label="Image sizes">
+                <ul className={imageStyles.sizeList} aria-label="Image sizes" data-tip="Each image's size now and after upscaling; red rows exceed the size limit and are skipped">
                   {verdicts.map(({ path, v }) => (
                     <li key={path} className={cx(imageStyles.rowInfo, v.kind === "over" && imageStyles.rowWarn)}>
-                      <span title={path}>{basename(path)}</span>
-                      <span>
+                      <span data-tip={path}>{basename(path)}</span>
+                      <span data-tip="Original size, then the size after upscaling">
                         {v.kind === "heic"
                           ? "HEIC"
                           : v.kind === "unknown"
@@ -240,7 +248,7 @@ export default function UpscaleView({ moduleId }: ToolViewProps) {
         </>
       }
       results={
-        <Section label="Results">
+        <Section label="Results" tip="Finished upscales; drag the slider on a card to compare with the original">
           <ResultCards
             items={items}
             preview={preview}

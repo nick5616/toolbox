@@ -16,7 +16,11 @@ export function useDepsBlockReason(): string | null {
 }
 
 function Hint({ text }: { text: string }) {
-  return text ? <code className={styles.hint}>{text}</code> : null;
+  return text ? (
+    <code className={styles.hint} data-tip="Run this command in a terminal to install it">
+      {text}
+    </code>
+  ) : null;
 }
 
 export function DepsBanner() {
@@ -40,7 +44,13 @@ export function DepsBanner() {
           tone="danger"
           title="yt-dlp isn't installed"
           action={
-            <Button variant="primary" size="sm" loading={installing} onClick={() => void updateYtDlp().catch(() => undefined)}>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={installing}
+              data-tip="Download yt-dlp, the program that fetches audio and video from links, and keep it up to date"
+              onClick={() => void updateYtDlp().catch(() => undefined)}
+            >
               Install yt-dlp
             </Button>
           }

@@ -235,7 +235,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
     <header className={styles.header}>
       <h1 className={styles.title}>Redact</h1>
       {files.length > 0 && (
-        <Button size="sm" variant="ghost" onClick={more}>
+        <Button size="sm" variant="ghost" data-tip="Drop this session and pick other files" onClick={more}>
           Choose different files
         </Button>
       )}
@@ -255,7 +255,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
         <DepsGate moduleId={moduleId} />
         <div className={styles.empty}>
           <DropZone id="redact-drop" label="Drop photos or one video" hint="Blur, pixelate or black out faces and number plates." icon="scan-face">
-            <Button variant="secondary" icon="folder-open" onClick={() => void inputs.pick()}>
+            <Button variant="secondary" icon="folder-open" data-tip="Pick photos, or a single video, to hide faces and plates in" onClick={() => void inputs.pick()}>
               Choose files
             </Button>
           </DropZone>
@@ -283,7 +283,14 @@ export default function RedactView({ moduleId }: ToolViewProps) {
           tone="info"
           title="Redact needs its detection models"
           action={
-            <Button variant="primary" size="sm" icon="download" loading={installing} onClick={() => void installModels()}>
+            <Button
+              variant="primary"
+              size="sm"
+              icon="download"
+              loading={installing}
+              data-tip="Download the face and number-plate detectors once; they run offline afterwards"
+              onClick={() => void installModels()}
+            >
               Install the models
             </Button>
           }
@@ -307,7 +314,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
         <div className={styles.progress} role="status">
           <Meter value={job?.progress ?? -1} label="Progress" />
           <span className={styles.hint}>{job?.message || (run?.action === "detect" ? "Looking for faces and plates…" : "Starting…")}</span>
-          <Button size="sm" variant="secondary" onClick={cancel}>
+          <Button size="sm" variant="secondary" data-tip="Stop the search or the redaction" onClick={cancel}>
             Cancel
           </Button>
         </div>
@@ -331,24 +338,24 @@ export default function RedactView({ moduleId }: ToolViewProps) {
           ) : (
             <Gallery entries={entries} edits={edits} reviewed={reviewed} onOpen={go} />
           )}
-          {current && <Section label="Effect"><OptionsPanel settings={settings} onChange={patch} part="effect" /></Section>}
+          {current && <Section label="Effect" tip="How the boxes will be hidden in the saved copy"><OptionsPanel settings={settings} onChange={patch} part="effect" /></Section>}
         </>
       ) : (
         <div className={styles.setup}>
-          <Section label="Files" action={<Button size="sm" variant="ghost" icon="plus" onClick={() => void inputs.pick()}>Add more</Button>}>
+          <Section label="Files" tip="The photos or the single video that will be searched" action={<Button size="sm" variant="ghost" icon="plus" data-tip="Add more photos to this batch" onClick={() => void inputs.pick()}>Add more</Button>}>
             <ul className={styles.fileList}>
               {paths.map((p) => (
                 <li key={p} className={styles.fileRow}>
                   <Thumb path={p} size={96} className={styles.fileThumb} />
-                  <span className={styles.fileName} title={p}>
+                  <span className={styles.fileName} data-tip={p}>
                     {baseName(p)}
                   </span>
-                  <IconButton size="sm" icon="x" label={`Remove ${baseName(p)}`} onClick={() => remove(p)} />
+                  <IconButton size="sm" icon="x" label={`Remove ${baseName(p)}`} data-tip="Take this file out of the batch (the file on disk is untouched)" onClick={() => remove(p)} />
                 </li>
               ))}
             </ul>
           </Section>
-          <Section label="Options">
+          <Section label="Options" tip="What to look for and how to hide it">
             <OptionsPanel settings={settings} onChange={patch} part="all" />
           </Section>
           {hasHeic && (
@@ -361,7 +368,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
         <div className={styles.footer}>
           {reviewing ? (
             <>
-              <Button variant="ghost" onClick={startOver}>
+              <Button variant="ghost" data-tip="Throw away the boxes and search again" onClick={startOver}>
                 Start over
               </Button>
               <span className={styles.spacer} />
@@ -371,7 +378,15 @@ export default function RedactView({ moduleId }: ToolViewProps) {
                 </span>
               )}
               {!canApply && !submitting && <span className={styles.hint}>{gate.blocked ? gate.reason : "Nothing is switched on to hide yet."}</span>}
-              <Button variant="primary" icon="scan-face" kbd="Enter" loading={submitting} disabled={!canApply} onClick={apply}>
+              <Button
+                variant="primary"
+                icon="scan-face"
+                kbd="Enter"
+                loading={submitting}
+                disabled={!canApply}
+                data-tip={canApply ? "Hide everything that is switched on and save a new copy; the original stays as it is" : gate.blocked ? gate.reason : "Switch on at least one box or track first"}
+                onClick={apply}
+              >
                 {vdet ? "Redact video" : entries.length > 1 ? `Redact all ${entries.length}` : "Save redacted"}
               </Button>
             </>
@@ -380,10 +395,22 @@ export default function RedactView({ moduleId }: ToolViewProps) {
               <span className={styles.spacer} />
               {blocked && <span className={styles.hint}>{blocked}</span>}
               {nothingToFind && !blocked && <span className={styles.hint}>Turn on faces or number plates.</span>}
-              <Button variant="secondary" disabled={!canStart} onClick={auto} title="Find and hide everything, with no review">
+              <Button
+                variant="secondary"
+                disabled={!canStart}
+                data-tip={canStart ? "Find and hide everything in one go, with no chance to review the boxes" : blocked || (nothingToFind ? "Turn on faces or number plates first" : "Add files first")}
+                onClick={auto}
+              >
                 Redact without review
               </Button>
-              <Button variant="primary" icon="scan-search" loading={submitting} disabled={!canDetect} onClick={detect}>
+              <Button
+                variant="primary"
+                icon="scan-search"
+                loading={submitting}
+                disabled={!canDetect}
+                data-tip={canDetect ? "Search for faces and plates, then review the boxes before anything is hidden" : hasHeic ? "HEIC photos cannot be reviewed; use Redact without review" : blocked || (nothingToFind ? "Turn on faces or number plates first" : "Add files first")}
+                onClick={detect}
+              >
                 {isVideo ? "Find faces and plates" : paths.length > 1 ? `Find in ${paths.length} images` : "Find faces and plates"}
               </Button>
             </>
@@ -401,7 +428,7 @@ function VideoStage({ vdet, onState }: { vdet: VideoDet; onState: (s: VideoState
   }
   if (media.status === "error") {
     return (
-      <Banner tone="danger" title={media.error?.message ?? "This video can't be opened"} action={<Button size="sm" onClick={media.retry}>Retry</Button>}>
+      <Banner tone="danger" title={media.error?.message ?? "This video can't be opened"} action={<Button size="sm" data-tip="Try opening the video again" onClick={media.retry}>Retry</Button>}>
         {media.error?.hint}
       </Banner>
     );
@@ -425,10 +452,10 @@ function Gallery({ entries, edits, reviewed, onOpen }: { entries: ImageEntry[]; 
   return (
     <div className={styles.gallery} role="list" aria-label="Detections per image">
       {entries.map((e) => (
-        <button key={e.path} type="button" role="listitem" className={cx(styles.galleryItem, reviewed.has(e.path) && styles.galleryDone)} onClick={() => onOpen(e.path)} aria-label={baseName(e.path)}>
+        <button key={e.path} type="button" role="listitem" className={cx(styles.galleryItem, reviewed.has(e.path) && styles.galleryDone)} onClick={() => onOpen(e.path)} aria-label={baseName(e.path)} data-tip="Open this image to review its boxes">
           <Thumb path={e.path} size={320} className={styles.galleryThumb} />
           <span className={styles.galleryName}>{baseName(e.path)}</span>
-          <span className={styles.hint}>{countLabel(edits[e.path] ?? [])}</span>
+          <span className={styles.hint} data-tip="Boxes found in this image">{countLabel(edits[e.path] ?? [])}</span>
           {reviewed.has(e.path) && <Icon name="check" size={14} className={styles.galleryCheck} />}
         </button>
       ))}

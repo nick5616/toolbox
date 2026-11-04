@@ -65,16 +65,17 @@ export function FileToolLayout({
 
       <Section
         label="Input"
+        tip="The files this tool will process; originals are never changed"
         action={
           !empty && (
             <span className={styles.summary}>
-              <span className={styles.mono}>
+              <span className={styles.mono} data-tip="How many files are queued and their combined size">
                 {inputs.files.length} {inputs.files.length === 1 ? "file" : "files"} · {formatBytes(totalSize)}
               </span>
-              <Button size="sm" variant="secondary" icon="plus" onClick={() => void inputs.pick()}>
+              <Button size="sm" variant="secondary" icon="plus" data-tip="Choose more files to process together" onClick={() => void inputs.pick()}>
                 Add files…
               </Button>
-              <Button size="sm" variant="ghost" onClick={inputs.clear}>
+              <Button size="sm" variant="ghost" data-tip="Remove every file from the list; the files on disk are untouched" onClick={inputs.clear}>
                 Clear
               </Button>
             </span>
@@ -82,11 +83,13 @@ export function FileToolLayout({
         }
       >
         {empty ? (
-          <DropZone id={`tool-drop:${moduleId}`} label="Drop files here or Add files…">
-            <Button size="sm" variant="secondary" icon="plus" onClick={() => void inputs.pick()}>
-              Add files…
-            </Button>
-          </DropZone>
+          <div data-tip="Drag files here from your file manager, or use Add files">
+            <DropZone id={`tool-drop:${moduleId}`} label="Drop files here or Add files…">
+              <Button size="sm" variant="secondary" icon="plus" data-tip="Open a file picker" onClick={() => void inputs.pick()}>
+                Add files…
+              </Button>
+            </DropZone>
+          </div>
         ) : (
           <FileList
             aria-label="Input files"
@@ -96,7 +99,7 @@ export function FileToolLayout({
                 path: f.path,
                 size: f.sizeBytes,
                 trailing: err ? (
-                  <span className={styles.error} role="alert">
+                  <span className={styles.error} role="alert" data-tip="This file was rejected when queuing; remove it or fix it and try again">
                     {err}
                   </span>
                 ) : undefined,
@@ -110,14 +113,21 @@ export function FileToolLayout({
       {options}
 
       <div className={styles.run}>
-        <Button variant="primary" kbd="Mod+Enter" loading={running} disabled={!canRun} onClick={run}>
+        <Button
+          variant="primary"
+          kbd="Mod+Enter"
+          loading={running}
+          disabled={!canRun}
+          data-tip={canRun ? "Queue a job for the files above with these options" : running ? "Submitting the files" : empty ? "Add at least one file first" : reason}
+          onClick={run}
+        >
           {runLabel}
         </Button>
-        {reason && <p className={styles.reason}>{reason}</p>}
+        {reason && <p className={styles.reason} data-tip="Why the run button is disabled">{reason}</p>}
       </div>
 
       {active.length > 0 && (
-        <Section label="Active">
+        <Section label="Active" tip="Jobs from this tool that are queued or running">
           <div className={styles.jobs}>
             {active.map((j) => (
               <JobRow key={j.id} job={j} compact />

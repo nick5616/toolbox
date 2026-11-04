@@ -79,13 +79,14 @@ export default function ConverterView({ moduleId }: ToolViewProps) {
       inputErrors={inputErrors}
       runDisabledReason={allBad ? `No selected file fits ${preset?.label ?? "this preset"}` : undefined}
       options={
-        <Section label="Options">
+        <Section label="Options" tip="Choose the output format and quality">
           <div className={styles.stack}>
             <Field label="Preset" hint={presetHint(preset)}>
               {(c) => (
                 <Select
                   id={c.id}
                   aria-describedby={c["aria-describedby"]}
+                  data-tip={preset ? `${preset.label}: ${presetHint(preset)}` : "Pick the kind of file to produce; each preset sets format and quality for you"}
                   value={opts.preset}
                   options={presetSelectOptions(presets)}
                   onChange={(id) => setOpts((o) => ({ ...o, preset: id }))}
@@ -95,16 +96,23 @@ export default function ConverterView({ moduleId }: ToolViewProps) {
             {hasHeight && (
               <Field label="Max height">
                 {(c) => (
-                  <Select id={c.id} value={opts.maxHeight} options={HEIGHTS} onChange={(maxHeight) => setOpts((o) => ({ ...o, maxHeight }))} />
+                  <Select
+                    id={c.id}
+                    value={opts.maxHeight}
+                    options={HEIGHTS}
+                    data-tip="Shrink anything taller than this; smaller sizes make smaller files. Never enlarges"
+                    onChange={(maxHeight) => setOpts((o) => ({ ...o, maxHeight }))} />
                 )}
               </Field>
             )}
-            <Switch label="Keep metadata" checked={opts.keepMetadata} onChange={(keepMetadata) => setOpts((o) => ({ ...o, keepMetadata }))} />
+            <Switch
+              tip="Copy tags, dates and camera info from the original; turn off to strip them for privacy"
+              label="Keep metadata" checked={opts.keepMetadata} onChange={(keepMetadata) => setOpts((o) => ({ ...o, keepMetadata }))} />
           </div>
         </Section>
       }
       results={
-        <Section label="Recent conversions">
+        <Section label="Recent conversions" tip="Files this tool converted lately">
           {recent.length === 0 ? (
             <EmptyState icon="repeat" title="Nothing converted yet." body="Converted files appear here." />
           ) : (
@@ -112,11 +120,15 @@ export default function ConverterView({ moduleId }: ToolViewProps) {
               {recent.map((o) => (
                 <li key={o.id} className={cx(shared.row, o.missing && shared.missing)}>
                   <Icon name={KIND_ICON[o.kind] ?? "file"} size={14} className={shared.icon} />
-                  <span className={shared.name} title={o.path}>
+                  <span className={shared.name} data-tip={o.path}>
                     {o.name}
                   </span>
-                  <span className={shared.meta}>{formatBytes(o.sizeBytes)}</span>
-                  <span className={shared.meta}>{formatRelativeTime(o.createdAt)}</span>
+                  <span className={shared.meta} data-tip="File size on disk">
+                    {formatBytes(o.sizeBytes)}
+                  </span>
+                  <span className={shared.meta} data-tip={new Date(o.createdAt).toLocaleString()}>
+                    {formatRelativeTime(o.createdAt)}
+                  </span>
                   <span className={shared.actions}>
                     <FileActions outputId={o.id} path={o.path} disabled={o.missing} />
                   </span>

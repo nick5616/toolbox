@@ -44,26 +44,30 @@ function Group({ job }: { job: JobView }) {
   return (
     <div className={styles.group}>
       <div className={styles.head}>
-        <span className={styles.title} title={job.title}>
+        <span className={styles.title} data-tip={job.title}>
           {job.title}
         </span>
         {r.folder && (
-          <Button size="sm" variant="secondary" icon="folder-open" onClick={() => void openFolder(r.folder)}>
+          <Button size="sm" variant="secondary" icon="folder-open" data-tip="Open the folder with all the files this job made" onClick={() => void openFolder(r.folder)}>
             Open folder
           </Button>
         )}
       </div>
-      {parts.length > 0 && <p className={styles.summary}>{parts.join(" · ")}</p>}
+      {parts.length > 0 && <p className={styles.summary} data-tip="What the job did, e.g. size saved or pages kept">{parts.join(" · ")}</p>}
       <ul className={shared.list}>
         {shown.map((path) => {
           const out = job.outputs.find((o) => o.path === path);
           return (
             <li key={path} className={cx(shared.row, out?.missing && shared.missing)}>
               <Icon name={r.folder ? "image" : "file-text"} size={14} className={shared.icon} />
-              <span className={shared.name} title={path}>
+              <span className={shared.name} data-tip={path}>
                 {basename(path)}
               </span>
-              {out && <span className={shared.meta}>{formatBytes(out.sizeBytes)}</span>}
+              {out && (
+                <span className={shared.meta} data-tip="File size on disk">
+                  {formatBytes(out.sizeBytes)}
+                </span>
+              )}
               <span className={shared.actions}>
                 <FileActions outputId={out?.id} path={path} disabled={out?.missing} />
               </span>
@@ -72,7 +76,7 @@ function Group({ job }: { job: JobView }) {
         })}
         {outputs.length > shown.length && (
           <li className={shared.row}>
-            <span className={shared.meta}>
+            <span className={shared.meta} data-tip="Open the folder to see the rest">
               + {outputs.length - shown.length} more in the folder
             </span>
           </li>
@@ -89,7 +93,7 @@ export function Results({ moduleId }: { moduleId: string }) {
     [jobs],
   );
   return (
-    <Section label="Results">
+    <Section label="Results" tip="Finished PDF jobs and the files they made">
       {done.length === 0 ? (
         <EmptyState icon="file-text" title="No results yet." body="Finished PDFs appear here." />
       ) : (

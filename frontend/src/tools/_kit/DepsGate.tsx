@@ -123,10 +123,25 @@ function PackButtons({ moduleId, requires }: { moduleId: string; requires: strin
   const withSize = (label: string, bytes: number) => (bytes > 0 ? `${label} (${formatSize(bytes)})` : label);
   return (
     <div className={styles.packActions}>
-      <Button variant="primary" size="sm" icon="download" loading={busy === "needs"} disabled={busy !== ""} onClick={() => void run("needs")}>
+      <Button
+        variant="primary"
+        size="sm"
+        icon="download"
+        loading={busy === "needs"}
+        disabled={busy !== ""}
+        data-tip="Download and set up only the engines and models this tool needs, and nothing else"
+        onClick={() => void run("needs")}
+      >
         {withSize("Install what this tool needs", needs.disk)}
       </Button>
-      <Button variant="secondary" size="sm" loading={busy === "pack"} disabled={busy !== ""} onClick={() => void run("pack")}>
+      <Button
+        variant="secondary"
+        size="sm"
+        loading={busy === "pack"}
+        disabled={busy !== ""}
+        data-tip={`Install every tool in the ${pack.name} pack at once, so they all work offline later`}
+        onClick={() => void run("pack")}
+      >
         {withSize(`Install the ${pack.name} pack`, packDisk)}
       </Button>
     </div>
@@ -193,7 +208,13 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
           tone={outdated ? "warn" : "info"}
           title={outdated ? "The AI engine needs an update" : "The AI engine isn't installed"}
           action={
-            <Button variant="primary" size="sm" loading={busy} onClick={() => void installEngine()}>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={busy}
+              data-tip={outdated ? "Download the newer AI engine; installed models are kept" : "Download and set up the local Python engine (about 1 GB) that runs the audio, speech and image tools"}
+              onClick={() => void installEngine()}
+            >
               {outdated ? "Update" : "Install AI engine"}
             </Button>
           }
@@ -214,7 +235,13 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
           tone="info"
           title={outdated ? "ExifTool needs an update" : "ExifTool isn't installed"}
           action={
-            <Button variant="primary" size="sm" loading={busy} onClick={() => void installExiftool()}>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={busy}
+              data-tip={outdated ? "Download the newer ExifTool (about 11 MB)" : "Download ExifTool (about 11 MB), the program that reads and writes photo metadata"}
+              onClick={() => void installExiftool()}
+            >
               {outdated ? "Update ExifTool" : "Install ExifTool"}
             </Button>
           }
@@ -231,7 +258,13 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
           tone="info"
           title={outdated ? "The upscaler engine needs an update" : "The upscaler engine isn't installed"}
           action={
-            <Button variant="primary" size="sm" loading={busy} onClick={() => void installUpscaler()}>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={busy}
+              data-tip={outdated ? "Download the newer upscaler program (about 50 MB)" : "Download the small GPU upscaler program (about 50 MB); it runs only on this computer"}
+              onClick={() => void installUpscaler()}
+            >
               {outdated ? "Update upscaler" : "Install upscaler"}
             </Button>
           }
@@ -252,20 +285,28 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
           title="ffmpeg is required"
           action={
             hint ? (
-              <Button size="sm" variant="secondary" icon="copy" onClick={() => void copyHint(hint)}>
+              <Button size="sm" variant="secondary" icon="copy" data-tip="Copy the install command to paste in a terminal" onClick={() => void copyHint(hint)}>
                 Copy
               </Button>
             ) : undefined
           }
         >
-          {hint && <code className={styles.hint}>{hint}</code>}
+          {hint && (
+            <code className={styles.hint} data-tip="Install command for ffmpeg">
+              {hint}
+            </code>
+          )}
         </Banner>,
       );
     } else {
       const hint = d?.installHint ?? "";
       banners.push(
         <Banner key={id} tone="warn" title={`${d?.name ?? id} isn't installed`}>
-          {hint && <code className={styles.hint}>{hint}</code>}
+          {hint && (
+            <code className={styles.hint} data-tip="Run this command in a terminal to install it">
+              {hint}
+            </code>
+          )}
         </Banner>,
       );
     }

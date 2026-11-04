@@ -160,19 +160,22 @@ function PreviewCard({ paths, opts, blocked }: PreviewCardProps) {
     durationMs > 0 ? { start: startMs / durationMs, end: Math.min(1, (startMs + PREVIEW_MS) / durationMs) } : undefined;
 
   return (
-    <Section label="Preview">
+    <Section label="Preview" tip="Try the cleanup on 10 seconds and switch between original and cleaned audio">
       <div className={styles.preview} data-testid="cleanup-preview">
         <div className={styles.previewHead}>
           {paths.length > 1 ? (
             <Select
               aria-label="Preview file"
+              data-tip="Choose which queued file to preview"
               size="sm"
               value={path}
               onChange={setSelected}
               options={paths.map((p) => ({ value: p, label: basename(p) }))}
             />
           ) : (
-            <span className={styles.fileName}>{basename(path)}</span>
+            <span className={styles.fileName} data-tip="The file the preview is made from">
+              {basename(path)}
+            </span>
           )}
           <Button
             size="sm"
@@ -180,6 +183,7 @@ function PreviewCard({ paths, opts, blocked }: PreviewCardProps) {
             icon="play"
             loading={running || starting}
             disabled={!!blocked || running || starting || durationMs === 0}
+            data-tip={blocked || (durationMs === 0 ? "Waiting for the file to be read" : "Clean a 10-second excerpt with these options so you can compare it with the original")}
             onClick={() => void run()}
           >
             Preview 10 s
@@ -193,14 +197,14 @@ function PreviewCard({ paths, opts, blocked }: PreviewCardProps) {
             height={64}
             onSeek={(f) => setStartMs(previewStartFor(f, durationMs))}
           />
-          <span className={styles.waveHelp}>
+          <span className={styles.waveHelp} data-tip="The shaded band is the 10 seconds that will be previewed">
             {media.status === "preparing"
               ? "Preparing a preview copy…"
               : "Click the waveform to choose where the 10 s preview starts"}
           </span>
         </div>
 
-        {running && <p className={styles.progress}>{job?.message || "Making the preview…"}</p>}
+        {running && <p className={styles.progress} data-tip="The preview is being made">{job?.message || "Making the preview…"}</p>}
         {failed && (
           <p className={styles.error} role="alert">
             {failed}
@@ -211,8 +215,10 @@ function PreviewCard({ paths, opts, blocked }: PreviewCardProps) {
         {sources && shown && (
           <div className={styles.outcome}>
             <ABToggle a={sources.a} b={sources.b} labels={["Original", "Cleaned"]} />
-            <p className={styles.summary}>{previewSummary(shown.outcome)}</p>
-            {stale && <p className={styles.stale}>Options changed — preview again</p>}
+            <p className={styles.summary} data-tip="Loudness and hum found in the excerpt before and after cleaning">
+              {previewSummary(shown.outcome)}
+            </p>
+            {stale && <p className={styles.stale} data-tip="The options or start point changed since this preview was made">Options changed — preview again</p>}
           </div>
         )}
       </div>
@@ -304,13 +310,13 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
   }, [jobs]);
 
   const columns: ResultColumn<(typeof rows)[number]>[] = [
-    { key: "file", header: "File", render: (r) => basename(r.output), text: (r) => basename(r.output) },
+    { key: "file", header: "File", render: (r) => <span data-tip={r.output}>{basename(r.output)}</span>, text: (r) => basename(r.output) },
     {
       key: "before",
       header: "Before",
       align: "right",
       mono: true,
-      render: (r) => `${formatLufs(r.lufsBefore)} LUFS`,
+      render: (r) => <span data-tip="Loudness of the original, in LUFS (closer to 0 is louder)">{formatLufs(r.lufsBefore)} LUFS</span>,
       text: (r) => r.lufsBefore.toFixed(1),
     },
     {
@@ -318,13 +324,13 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
       header: "After",
       align: "right",
       mono: true,
-      render: (r) => `${formatLufs(r.lufsAfter)} LUFS`,
+      render: (r) => <span data-tip="Loudness of the cleaned file, in LUFS">{formatLufs(r.lufsAfter)} LUFS</span>,
       text: (r) => r.lufsAfter.toFixed(1),
     },
     {
       key: "hum",
       header: "Hum",
-      render: (r) => (r.humHz > 0 ? `${r.humHz} Hz removed` : "None"),
+      render: (r) => <span data-tip="Mains hum frequency that was filtered out, if any">{r.humHz > 0 ? `${r.humHz} Hz removed` : "None"}</span>,
       text: (r) => (r.humHz > 0 ? String(r.humHz) : ""),
     },
     {
@@ -355,12 +361,20 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
               title="Voice isolation needs its model"
               action={
                 <>
-                  <Button variant="primary" size="sm" icon="download" loading={installing} onClick={() => void installModel()}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon="download"
+                    loading={installing}
+                    data-tip="Download the DeepFilterNet3 voice model (8 MB, one time); it runs offline afterwards"
+                    onClick={() => void installModel()}
+                  >
                     Install voice isolation (8 MB)
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
+                    data-tip="Skip the AI model and use the built-in strong noise filter instead"
                     onClick={() => setOpts((o) => ({ ...o, denoise: CleanupDenoise.DenoiseStrong }))}
                   >
                     Use Strong instead
@@ -371,31 +385,32 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
               DeepFilterNet3 is a small download that runs on your computer.
             </Banner>
           )}
-          <Section label="Options">
+          <Section label="Options" tip="Pick which problems to fix; they are applied in this order">
             <div className={styles.options}>
               <div className={styles.row}>
-                <span className={styles.label}>Rumble filter</span>
+                <span className={styles.label} data-tip="Removes very low frequencies such as desk thumps and wind">Rumble filter</span>
                 <div className={styles.control}>
                   <Switch
                     checked={opts.highPass}
                     onChange={(highPass) => setOpts((o) => ({ ...o, highPass }))}
                     label="Cut below 80 Hz"
+                    tip="Applies a high-pass filter at 80 Hz; voices and most music are unaffected"
                   />
                 </div>
               </div>
 
               <div className={styles.row}>
-                <span className={styles.label}>Hum</span>
+                <span className={styles.label} data-tip="Electrical buzz from mains power">Hum</span>
                 <div className={styles.control}>
                   <SegmentedControl
                     aria-label="Hum"
                     value={opts.hum}
                     onChange={(hum) => setOpts((o) => ({ ...o, hum }))}
                     options={[
-                      { value: CleanupHum.HumAuto, label: "Auto" },
-                      { value: CleanupHum.Hum50, label: "50 Hz" },
-                      { value: CleanupHum.Hum60, label: "60 Hz" },
-                      { value: CleanupHum.HumOff, label: "Off" },
+                      { value: CleanupHum.HumAuto, label: "Auto", tip: "Detect whether the buzz is 50 or 60 Hz from the file itself" },
+                      { value: CleanupHum.Hum50, label: "50 Hz", tip: "Remove 50 Hz buzz and harmonics (Europe, Asia, Africa)" },
+                      { value: CleanupHum.Hum60, label: "60 Hz", tip: "Remove 60 Hz buzz and harmonics (Americas, parts of Asia)" },
+                      { value: CleanupHum.HumOff, label: "Off", tip: "Do not remove any hum" },
                     ]}
                   />
                   <p className={styles.hint}>Mains buzz and its harmonics. Auto listens to the file and picks 50 or 60 Hz.</p>
@@ -403,17 +418,17 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
               </div>
 
               <div className={styles.row}>
-                <span className={styles.label}>Noise reduction</span>
+                <span className={styles.label} data-tip="Reduces steady background noise such as hiss, fans and room tone">Noise reduction</span>
                 <div className={styles.control}>
                   <SegmentedControl
                     aria-label="Noise reduction"
                     value={opts.denoise}
                     onChange={(denoise) => setOpts((o) => ({ ...o, denoise }))}
                     options={[
-                      { value: CleanupDenoise.DenoiseOff, label: "Off" },
-                      { value: CleanupDenoise.DenoiseLight, label: "Light" },
-                      { value: CleanupDenoise.DenoiseStrong, label: "Strong" },
-                      { value: CleanupDenoise.DenoiseVoice, label: "Voice isolation (AI)" },
+                      { value: CleanupDenoise.DenoiseOff, label: "Off", tip: "Leave background noise untouched" },
+                      { value: CleanupDenoise.DenoiseLight, label: "Light", tip: "Gentle filter that keeps the sound natural; fast" },
+                      { value: CleanupDenoise.DenoiseStrong, label: "Strong", tip: "Heavier filter that removes more noise but can sound slightly processed; fast" },
+                      { value: CleanupDenoise.DenoiseVoice, label: "Voice isolation (AI)", tip: "AI model keeps the speech and removes everything else; best quality, slower, needs the AI engine and an 8 MB model" },
                     ]}
                   />
                   <p className={styles.hint}>{DENOISE_HINT[opts.denoise]}</p>
@@ -421,17 +436,17 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
               </div>
 
               <div className={styles.row}>
-                <span className={styles.label}>Loudness</span>
+                <span className={styles.label} data-tip="Normalise the overall volume to a standard level so tracks sound equally loud">Loudness</span>
                 <div className={styles.control}>
                   <SegmentedControl
                     aria-label="Loudness"
                     value={opts.loudness}
                     onChange={(loudness) => setOpts((o) => ({ ...o, loudness }))}
                     options={[
-                      { value: CleanupLoudness.LoudnessOff, label: "Off" },
-                      { value: CleanupLoudness.LoudnessPodcast, label: "Podcast" },
-                      { value: CleanupLoudness.LoudnessStreaming, label: "Streaming" },
-                      { value: CleanupLoudness.LoudnessBroadcast, label: "Broadcast" },
+                      { value: CleanupLoudness.LoudnessOff, label: "Off", tip: "Keep the original volume" },
+                      { value: CleanupLoudness.LoudnessPodcast, label: "Podcast", tip: "Target about -16 LUFS, the usual level for podcasts and spoken word" },
+                      { value: CleanupLoudness.LoudnessStreaming, label: "Streaming", tip: "Target about -14 LUFS, what Spotify and YouTube normalise to" },
+                      { value: CleanupLoudness.LoudnessBroadcast, label: "Broadcast", tip: "Target about -23 LUFS, the EBU R128 standard for TV and radio" },
                     ]}
                   />
                   <p className={styles.hint}>{loud?.detail}</p>
@@ -440,10 +455,11 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
 
               {!allVideo && (
                 <div className={styles.row}>
-                  <span className={styles.label}>Output format</span>
+                  <span className={styles.label} data-tip="File type of the cleaned audio">Output format</span>
                   <div className={styles.control}>
                     <Select
                       aria-label="Output format"
+                      data-tip="File type of the cleaned audio; WAV and FLAC are lossless, MP3 and M4A are smaller"
                       size="sm"
                       value={opts.format}
                       onChange={(format) => setOpts((o) => ({ ...o, format }))}
@@ -465,7 +481,7 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
         </>
       }
       results={
-        <Section label="Results">
+        <Section label="Results" tip="Cleaned files with loudness before and after">
           <ResultTable
             rows={rows}
             columns={columns}

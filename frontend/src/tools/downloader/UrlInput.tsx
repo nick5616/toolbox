@@ -34,12 +34,13 @@ export const UrlInput = forwardRef<HTMLTextAreaElement, UrlInputProps>(function 
         onChange={(e) => onChange(e.target.value)}
         placeholder="Paste one or more links…"
         aria-label="Links"
+        data-tip="One link per line, up to 50"
         invalid={invalid > 0 || !!listError}
         spellCheck={false}
       />
       {parsed.length > 0 && (
         <>
-          <ul className={styles.chips} aria-label="Parsed links">
+          <ul className={styles.chips} aria-label="Parsed links" data-tip="How each link was understood; hover a chip to see the full link or what is wrong with it">
             {parsed.map((p) => {
               const error = p.error ?? serverErrors[p.raw];
               return (
@@ -49,14 +50,18 @@ export const UrlInput = forwardRef<HTMLTextAreaElement, UrlInputProps>(function 
                       <Icon name={error ? "x" : "check"} size={12} className={error ? styles.badIcon : styles.okIcon} />
                       <span className={styles.host}>{p.valid ? p.host : truncate(p.raw, 28)}</span>
                       {p.valid && p.path && <span className={styles.path}>{truncate(p.path, 28)}</span>}
-                      {p.count > 1 && <span className={styles.count}>×{p.count}</span>}
+                      {p.count > 1 && (
+                        <span className={styles.count} data-tip="This link appears more than once; it is downloaded once">
+                          ×{p.count}
+                        </span>
+                      )}
                     </span>
                   </Tooltip>
                 </li>
               );
             })}
           </ul>
-          <p className={cx(styles.summary, (invalid > 0 || listError) && styles.summaryBad)}>
+          <p className={cx(styles.summary, (invalid > 0 || listError) && styles.summaryBad)} data-tip="How many links were found and how many cannot be downloaded">
             {summary}
             {listError ? ` · ${listError}` : ""}
           </p>

@@ -48,7 +48,11 @@ export function OrderedList({ files, kind, infos, password, onMove, onRemove, in
   const dragFrom = useRef(-1);
   const [over, setOver] = useState(-1);
   return (
-    <ol className={styles.list} aria-label={kind === "pdf" ? "PDFs to merge, in order" : "Images, in page order"}>
+    <ol
+      className={styles.list}
+      aria-label={kind === "pdf" ? "PDFs to merge, in order" : "Images, in page order"}
+      data-tip={kind === "pdf" ? "Files are joined top to bottom; drag rows or use the arrows to reorder" : "Images become pages top to bottom; drag rows or use the arrows to reorder"}
+    >
       {files.map((f, i) => {
         const name = basename(f.path);
         const pages = infos[f.path]?.info?.pages;
@@ -77,32 +81,35 @@ export function OrderedList({ files, kind, infos, password, onMove, onRemove, in
               setOver(-1);
             }}
           >
-            <span className={styles.handle} aria-hidden="true">
+            <span className={styles.handle} aria-hidden="true" data-tip="Drag to change the order">
               <Icon name="grip-vertical" size={14} />
             </span>
-            <span className={styles.index}>{i + 1}</span>
+            <span className={styles.index} data-tip={kind === "pdf" ? "Position in the merged PDF" : "Page number in the new PDF"}>
+              {i + 1}
+            </span>
             {kind === "pdf" ? <PdfThumb path={f.path} password={password} /> : <ImageThumb path={f.path} />}
-            <span className={styles.name} title={f.path}>
+            <span className={styles.name} data-tip={f.path}>
               {name}
             </span>
             {err && (
-              <span className={styles.error} role="alert">
+              <span className={styles.error} role="alert" data-tip="This file has a problem; remove it or fix it and try again">
                 {err}
               </span>
             )}
-            <span className={styles.meta}>
+            <span className={styles.meta} data-tip="Page count and file size">
               {pages ? `${pages} ${pages === 1 ? "page" : "pages"} · ` : ""}
               {formatBytes(f.sizeBytes)}
             </span>
-            <IconButton size="sm" icon="chevron-up" label={`Move ${name} up`} disabled={i === 0} onClick={() => onMove(i, i - 1)} />
+            <IconButton size="sm" icon="chevron-up" label={`Move ${name} up`} data-tip="Move this file one place earlier" disabled={i === 0} onClick={() => onMove(i, i - 1)} />
             <IconButton
               size="sm"
               icon="chevron-down"
               label={`Move ${name} down`}
+              data-tip="Move this file one place later"
               disabled={i === files.length - 1}
               onClick={() => onMove(i, i + 1)}
             />
-            <IconButton size="sm" icon="x" label={`Remove ${name}`} onClick={() => onRemove(f.path)} />
+            <IconButton size="sm" icon="x" label={`Remove ${name}`} data-tip="Take this file out of the list (the file on disk is untouched)" onClick={() => onRemove(f.path)} />
           </li>
         );
       })}

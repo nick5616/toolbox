@@ -83,6 +83,13 @@ export default function ExifView({ moduleId }: ToolViewProps) {
 
   const noActionable = paths.length > 0 && actionable.length === 0;
   const barDisabled = paths.length === 0 || noActionable || gate.blocked || running;
+  const barReason = paths.length === 0
+    ? "Add photos first"
+    : noActionable
+      ? "RAW files are read-only here"
+      : gate.blocked
+        ? gate.reason
+        : "Working on the current files";
 
   return (
     <>
@@ -97,9 +104,9 @@ export default function ExifView({ moduleId }: ToolViewProps) {
         options={
           <>
             {paths.length > 0 && (
-              <Section label="Inspector">
+              <Section label="Inspector" tip="Look at the metadata hidden inside a file before you change anything">
                 <div className={styles.panes}>
-                  <ul className={styles.picker} role="listbox" aria-label="Files">
+                  <ul className={styles.picker} role="listbox" aria-label="Files" data-tip="Choose which file to inspect on the right">
                     {inputs.files.map((f) => {
                       const m = meta[f.path];
                       const gps = m?.status === "ok" && m.view.hasLocation;
@@ -119,12 +126,18 @@ export default function ExifView({ moduleId }: ToolViewProps) {
                           }}
                         >
                           <Icon name="image" size={14} className={shared.icon} />
-                          <span className={styles.pickName} title={f.path}>
+                          <span className={styles.pickName} data-tip={f.path}>
                             {basename(f.path)}
                           </span>
-                          {gps && <Badge tone="warn">GPS</Badge>}
-                          {m?.status === "ok" && !m.view.editable && <Badge>RAW</Badge>}
-                          <span className={shared.meta}>{formatBytes(f.sizeBytes)}</span>
+                          {gps && (
+                            <Badge tone="warn" tip="This photo contains GPS coordinates showing where it was taken">
+                              GPS
+                            </Badge>
+                          )}
+                          {m?.status === "ok" && !m.view.editable && <Badge tip="RAW camera file; metadata can be read here but not changed">RAW</Badge>}
+                          <span className={shared.meta} data-tip="File size on disk">
+                            {formatBytes(f.sizeBytes)}
+                          </span>
                         </li>
                       );
                     })}
@@ -135,17 +148,19 @@ export default function ExifView({ moduleId }: ToolViewProps) {
                 </div>
               </Section>
             )}
-            <Section label="Actions">
+            <Section label="Actions" tip="Changes are saved to new copies; the originals are never modified">
               <div className={styles.actions}>
                 <Switch
                   checked={saved.keepOrientation}
                   onChange={(keepOrientation) => setSaved({ keepOrientation })}
                   label="Keep orientation & colour profile"
+                  tip="Keep the rotation flag and colour profile so the cleaned photo still looks right; turn off to strip these too"
                 />
                 <div className={styles.actionBtns}>
                   <Button
                     variant={anyGps ? "primary" : "secondary"}
                     disabled={barDisabled}
+                    data-tip={barDisabled ? barReason : "Delete only the GPS location from new copies, keep everything else"}
                     onClick={() => void submit(base(ExifAction.ActionStripLocation))}
                   >
                     Remove location
@@ -153,16 +168,23 @@ export default function ExifView({ moduleId }: ToolViewProps) {
                   <Button
                     variant="secondary"
                     disabled={barDisabled}
+                    data-tip={barDisabled ? barReason : "Strip location, camera, dates and every other tag from new copies"}
                     onClick={() => void submit(base(ExifAction.ActionStripAll))}
                   >
                     Remove all metadata
                   </Button>
-                  <Button variant="secondary" icon="wand-sparkles" disabled={barDisabled} onClick={() => setEditOpen(true)}>
+                  <Button
+                    variant="secondary"
+                    icon="wand-sparkles"
+                    disabled={barDisabled}
+                    data-tip={barDisabled ? barReason : "Set title, author, copyright, keywords or date on new copies"}
+                    onClick={() => setEditOpen(true)}
+                  >
                     Edit…
                   </Button>
                 </div>
                 {readOnly.length > 0 && (
-                  <p className={styles.note}>
+                  <p className={styles.note} data-tip="RAW files cannot be edited here, so they are left out of the actions">
                     RAW files are read-only here ({readOnly.length} {readOnly.length === 1 ? "file" : "files"} skipped).
                   </p>
                 )}
@@ -182,7 +204,7 @@ export default function ExifView({ moduleId }: ToolViewProps) {
           </>
         }
         results={
-          <Section label="Results">
+          <Section label="Results" tip="Cleaned copies; the originals are never changed">
             {done.length === 0 ? (
               <EmptyState icon="scan-search" title="No cleaned files yet." body="Cleaned copies appear here. Originals are never changed." />
             ) : (
@@ -194,10 +216,14 @@ export default function ExifView({ moduleId }: ToolViewProps) {
                   return (
                     <li key={j.id} className={cx(shared.row, out?.missing && shared.missing)}>
                       <Icon name="image" size={14} className={shared.icon} />
-                      <span className={shared.name} title={r.output}>
+                      <span className={shared.name} data-tip={r.output}>
                         {basename(r.output)}
                       </span>
-                      {j.message && <span className={shared.meta}>{j.message}</span>}
+                      {j.message && (
+                        <span className={shared.meta} data-tip="What was changed in this copy">
+                          {j.message}
+                        </span>
+                      )}
                       <span className={shared.actions}>
                         <FileActions outputId={out?.id} path={r.output} disabled={out?.missing} />
                       </span>

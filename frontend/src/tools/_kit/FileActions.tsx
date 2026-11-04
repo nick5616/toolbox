@@ -26,6 +26,7 @@ export function FileActions({ outputId, path, disabled }: FileActionsProps) {
         size="sm"
         icon="folder-open"
         label={revealLabel}
+        data-tip={disabled ? "The file is missing" : outputId ? "Show this file in its folder" : "Show the folder that holds this file"}
         disabled={disabled}
         onClick={() => void run(outputId ? LibraryService.Reveal(outputId) : LibraryService.RevealPath(path))}
       />
@@ -33,6 +34,7 @@ export function FileActions({ outputId, path, disabled }: FileActionsProps) {
         size="sm"
         icon="external-link"
         label="Open"
+        data-tip={disabled ? "The file is missing" : outputId ? "Open this file in its default app" : "Not yet registered in the library, so it can only be revealed"}
         disabled={disabled || !outputId}
         onClick={() => {
           if (outputId) void run(LibraryService.Open(outputId));
