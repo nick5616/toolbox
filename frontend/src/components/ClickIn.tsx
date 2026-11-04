@@ -31,6 +31,10 @@ interface HostCtx {
   setOpenId: (id: string | null) => void;
   /** "inline": click-ins open as disclosures in place (an embedded tool never opens a drawer in a drawer). */
   mode: "drawer" | "inline";
+  /** 0 for a tool's host; n for click-ins opened from inside an open drawer (they stack over it, in the same host area). */
+  depth: number;
+  /** For the host inside a drawer: the host that drawer belongs to (useClickIn addresses it). */
+  parent?: HostCtx;
 }
 
 const HostContext = createContext<HostCtx | null>(null);
@@ -61,7 +65,7 @@ export function ClickInHost({ children, className, style, mode }: ClickInHostPro
   const effective = mode ?? (parent?.mode === "inline" ? "inline" : "drawer");
   const [el, setEl] = useState<HTMLElement | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const ctx = useMemo<HostCtx>(() => ({ el, openId, setOpenId, mode: effective }), [el, openId, effective]);
+  const ctx = useMemo<HostCtx>(() => ({ el, openId, setOpenId, mode: effective, depth: 0 }), [el, openId, effective]);
   return (
     <HostContext.Provider value={ctx}>
       <div ref={setEl} className={cx(styles.host, effective === "inline" && styles.hostInline, className)} style={style} data-click-in-host data-mode={effective}>
@@ -73,7 +77,9 @@ export function ClickInHost({ children, className, style, mode }: ClickInHostPro
 
 /** Opens and closes the click-in drawer of the nearest host. Without a host these do nothing. */
 export function useClickIn(): { open: (id: string) => void; close: () => void; isOpen: (id: string) => boolean; openId: string | null } {
-  const host = useContext(HostContext);
+  // Inside a drawer, this addresses the host the drawer belongs to (a panel closing itself, or switching to another panel).
+  const inner = useContext(HostContext);
+  const host = inner?.parent ?? inner;
   const setOpenId = host?.setOpenId;
   const open = useCallback((id: string) => setOpenId?.(id), [setOpenId]);
   const close = useCallback(() => setOpenId?.(null), [setOpenId]);
@@ -116,6 +122,24 @@ export interface ClickInProps {
 }
 
 const DEFAULT_WIDTH = 360;
+
+/**
+ * Click-ins inside an open drawer (a ToolClickIn in a panel, "Trim first" in
+ * Subtitles' Source panel) open as a drawer stacked over it, in the same host
+ * area and as wide as they ask; closing it shows the drawer beneath again.
+ */
+function NestedHost({ parent, children }: { parent: HostCtx; children: ReactNode }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const ctx = useMemo<HostCtx>(() => ({ el: parent.el, openId, setOpenId, mode: "drawer", depth: parent.depth + 1, parent }), [parent, openId]);
+  return <HostContext.Provider value={ctx}>{children}</HostContext.Provider>;
+}
+
+/** Whether a node is inside a drawer stacked above `depth`. */
+function inDeeperDrawer(t: Node, depth: number): boolean {
+  const el = t instanceof Element ? t : t.parentElement;
+  const d = el?.closest("[data-click-in-depth]");
+  return !!d && Number(d.getAttribute("data-click-in-depth")) > depth;
+}
 
 export function ClickIn({
   icon,
@@ -181,6 +205,7 @@ export function ClickIn({
 
   // Esc closes the innermost open click-in; a click in the host outside a drawer closes it.
   const hostEl = host?.el ?? null;
+  const depth = host?.depth ?? 0;
   useEffect(() => {
     if (!isOpen) return;
     const token = Symbol(myId);
@@ -195,6 +220,7 @@ export function ClickIn({
       const t = e.target as Node | null;
       if (!t) return;
       if (drawerRef.current?.contains(t) || launcherRef.current?.contains(t)) return;
+      if (inDeeperDrawer(t, depth)) return;
       close();
     };
     document.addEventListener("keydown", onKey);
@@ -206,7 +232,7 @@ export function ClickIn({
       document.removeEventListener("keydown", onKey);
       if (!inline) target.removeEventListener("pointerdown", onDown, true);
     };
-  }, [isOpen, close, hostEl, myId, inline]);
+  }, [isOpen, close, hostEl, myId, inline, depth]);
 
   const launch = () => {
     if (disabledReason) return;
@@ -311,7 +337,8 @@ export function ClickIn({
         drawerRef.current = el;
       }}
       className={cx(styles.drawer, !hostEl && styles.fixed)}
-      style={{ "--click-in-w": `${width}px` } as CSSProperties}
+      style={{ "--click-in-w": `${width}px`, zIndex: 30 + depth } as CSSProperties}
+      data-click-in-depth={depth}
       role="dialog"
       aria-label={title}
       tabIndex={-1}
@@ -322,7 +349,7 @@ export function ClickIn({
         {canPopOut ? <IconButton size="sm" icon="picture-in-picture-2" label="Pop out" data-tip="Open this in its own window" onClick={() => void popOut()} /> : null}
         <IconButton size="sm" icon="x" label="Close" onClick={close} />
       </header>
-      <div className={cx(styles.body, flush && styles.flush)}>{children}</div>
+      <div className={cx(styles.body, flush && styles.flush)}>{host ? <NestedHost parent={host}>{children}</NestedHost> : children}</div>
     </aside>
   ) : null;
 

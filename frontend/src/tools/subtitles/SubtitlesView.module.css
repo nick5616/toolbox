@@ -1,73 +1,59 @@
 .root {
   position: relative;
-  display: flex;
-  flex-direction: column;
   height: 100%;
   min-height: 0;
-  gap: var(--space-4);
-  padding: var(--space-5) var(--space-6);
+}
+
+/* The empty state before a source is chosen: the drop zone. */
+.sourceEmpty {
+  max-width: 640px;
+  margin: var(--space-8) auto;
+  padding: 0 var(--space-6);
+  width: 100%;
   box-sizing: border-box;
 }
 
-.steps {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-shrink: 0;
-}
-
-.step {
+/* ---- header ---- */
+.headChip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
+  min-width: 0;
+  max-width: 280px;
+  height: var(--control-h-compact, 28px);
+  padding: 0 var(--space-3);
   font-size: var(--text-sm);
-  color: var(--fg-muted);
-  background: transparent;
-  border: 0;
+  color: var(--fg);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
   border-radius: var(--r-md);
   cursor: pointer;
 }
 
-.step:hover:not(:disabled) {
+.headChip:hover {
   background: var(--bg-hover);
 }
 
-.step:focus-visible {
+.headChip:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
 
-.step:disabled {
-  color: var(--fg-faint);
-  cursor: default;
+.headChipText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.stepOn {
-  color: var(--fg);
-  font-weight: 600;
-}
-
-.stepNum {
-  display: inline-grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
   font-size: var(--text-xs);
-  font-family: var(--font-mono);
-  border: 1px solid var(--line-strong);
-  border-radius: 50%;
-}
-
-.stepOn .stepNum {
-  color: var(--accent-fg);
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.stepSep {
-  color: var(--fg-faint);
-  margin-left: var(--space-2);
+  color: var(--fg-subtle);
+  white-space: nowrap;
 }
 
 .dot {
@@ -78,32 +64,145 @@
   display: inline-block;
 }
 
-.unsaved {
-  margin-left: var(--space-3);
-  font-size: var(--text-xs);
-  color: var(--warn);
+/* ---- stage ---- */
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  box-sizing: border-box;
 }
 
-.body {
+.previewMain {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+  gap: var(--space-2);
 }
 
-.sourceEmpty {
-  max-width: 640px;
-  margin: var(--space-8) auto;
+.player {
   width: 100%;
 }
 
-.sourceBody {
+.audioCue {
+  text-align: center;
+  padding: var(--space-3);
+  background: var(--bg-inset);
+  border-radius: var(--r-md);
+  white-space: pre-wrap;
+}
+
+.center {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  max-width: 760px;
-  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8);
+  color: var(--fg-muted);
+}
+
+/* Before any cues: the primary action over the picture. */
+.cta {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.ctaCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  max-width: 340px;
+  text-align: center;
+  pointer-events: auto;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.3));
+}
+
+.ctaSummary {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+/* ---- the cue list (side) ---- */
+.cuesBox {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  box-sizing: border-box;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.grow {
+  flex: 1;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabOn {
+  color: var(--fg);
+  background: var(--bg-raised);
+  border-color: var(--line-strong);
+}
+
+.tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.shiftLabel {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+/* ---- panels ---- */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  box-sizing: border-box;
 }
 
 .buttonRow {
@@ -161,7 +260,7 @@
 }
 
 .fieldLabel {
-  min-width: 140px;
+  min-width: 110px;
   font-size: var(--text-sm);
   color: var(--fg-muted);
 }
@@ -174,15 +273,6 @@
 
 .inlineFields .fieldLabel {
   min-width: 0;
-}
-
-.moreBox {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
 }
 
 .muted {
@@ -224,6 +314,7 @@
   background: var(--bg-raised);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
+  box-sizing: border-box;
 }
 
 .runHead {
@@ -244,6 +335,7 @@
   background: var(--ok-soft);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
+  box-sizing: border-box;
 }
 
 .resultHead {
@@ -274,110 +366,6 @@
   white-space: nowrap;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-}
-
-.editGrid {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(360px, 1fr);
-  gap: var(--space-4);
-}
-
-.editLeft,
-.editRight {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-height: 0;
-  min-width: 0;
-}
-
-.player {
-  width: 100%;
-}
-
-.audioCue {
-  text-align: center;
-  padding: var(--space-3);
-  background: var(--bg-inset);
-  border-radius: var(--r-md);
-  white-space: pre-wrap;
-}
-
-.center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  padding: var(--space-8);
-  color: var(--fg-muted);
-}
-
-.tabs {
-  display: flex;
-  gap: var(--space-1);
-  flex-shrink: 0;
-}
-
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  cursor: pointer;
-}
-
-.tabOn {
-  color: var(--fg);
-  background: var(--bg-raised);
-  border-color: var(--line-strong);
-}
-
-.tab:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.toolbar {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: var(--space-2);
-  flex-shrink: 0;
-}
-
-.sep {
-  width: 1px;
-  height: 20px;
-  background: var(--line);
-}
-
-.shiftLabel {
-  font-size: var(--text-sm);
-  color: var(--fg-muted);
-}
-
-.grow {
-  flex: 1;
-}
-
-.rows {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  width: 100%;
-  max-width: 420px;
-}
-
-.rowLauncher {
-  max-width: 420px;
 }
 
 .drawerForm {
@@ -477,12 +465,6 @@
   font-weight: 600;
 }
 
-@media (max-width: 900px) {
-  .editGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
 .layer {
   position: absolute;
   inset: 0;
@@ -501,4 +483,9 @@
   flex-direction: column;
   gap: var(--space-3);
   width: 100%;
+}
+
+/* The Trim-first drawer's launcher lives in the Source panel's button; this one is only the drawer. */
+.hiddenLauncher {
+  display: none;
 }

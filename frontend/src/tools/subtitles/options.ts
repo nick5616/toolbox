@@ -1,4 +1,10 @@
 import { SubtitlesAction, SubtitleStyle, type SubtitlesOptions, type SubtitlesResult } from "@/lib/api";
+import { isSpeechModel, type SpeechSettings } from "@/blocks/speech";
+
+/** The speech-block view of the prefs (model, spoken language, translate to English). */
+export function speechOf(p: Pick<Prefs, "model" | "language" | "translateToEnglish">): SpeechSettings {
+  return { model: p.model, language: p.language, translate: p.translateToEnglish };
+}
 
 /** What the view remembers between sessions (never the cues). */
 export interface Prefs {
@@ -42,7 +48,6 @@ export const DEFAULT_PREFS: Prefs = {
   backgroundPath: "",
 };
 
-const MODELS = ["base", "small", "turbo"];
 const STYLES: string[] = [SubtitleStyle.StyleClassic, SubtitleStyle.StyleBoxed, SubtitleStyle.StyleYellow, SubtitleStyle.StyleMinimal];
 
 function str(v: unknown, fallback: string): string {
@@ -55,7 +60,7 @@ export function sanitizePrefs(saved: unknown, d: Prefs): Prefs {
   const formats = Array.isArray(s.formats) ? s.formats.filter((f): f is string => f === "srt" || f === "vtt") : [];
   const lineChars = typeof s.maxLineChars === "number" ? Math.round(s.maxLineChars) : d.maxLineChars;
   return {
-    model: MODELS.includes(str(s.model, "")) ? str(s.model, d.model) : d.model,
+    model: isSpeechModel(s.model) ? s.model : d.model,
     language: str(s.language, d.language),
     translateToEnglish: typeof s.translateToEnglish === "boolean" ? s.translateToEnglish : d.translateToEnglish,
     maxLineChars: lineChars >= 32 && lineChars <= 60 ? lineChars : d.maxLineChars,
@@ -119,12 +124,6 @@ export function parseResult(json: string): SubtitlesResult | null {
     return null;
   }
 }
-
-export const MODEL_CHOICES = [
-  { value: "base", label: "Base (fast)", tip: "Fastest and smallest; fine for clear speech" },
-  { value: "small", label: "Small (balanced)", tip: "A good balance of speed and accuracy" },
-  { value: "turbo", label: "Turbo (best)", tip: "Most accurate, especially for accents and noise; slowest" },
-];
 
 export const CANVAS_CHOICES = [
   { value: "16:9", label: "16:9", tip: "Widescreen, for YouTube and TVs" },

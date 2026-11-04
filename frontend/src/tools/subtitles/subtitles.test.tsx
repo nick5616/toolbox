@@ -53,10 +53,13 @@ vi.mock("@/components/media", async (orig) => {
   };
 });
 
-import { JobStatus, type Job } from "@/lib/api";
+import { JobStatus, ModuleStatus, type Descriptor, type Job } from "@/lib/api";
+import { registerToolViews } from "@/lib/toolActions";
 import { useJobs } from "@/state/jobs";
+import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
 import SubtitlesView from "./SubtitlesView";
+import { initialData, useSubtitles } from "./store";
 
 const CUES = [
   { startMs: 0, endMs: 2000, text: "Hello" },
@@ -113,7 +116,16 @@ function handOff(inputs: string[]) {
   act(() => useUI.getState().handOff({ moduleId: "subtitles", inputs }));
 }
 
-async function openSubtitleFile(user: ReturnType<typeof userEvent.setup>) {
+type User = ReturnType<typeof userEvent.setup>;
+
+/** Opens a panel from the header or the rail (both launch the same drawer). */
+async function openPanel(user: User, name: string, dialog = name) {
+  const launcher = screen.getAllByRole("button", { name: new RegExp(`^${name}`) })[0]!;
+  await user.click(launcher);
+  return screen.findByRole("dialog", { name: dialog });
+}
+
+async function openSubtitleFile(user: User) {
   load.mockResolvedValue(CUES);
   render(<SubtitlesView moduleId="subtitles" />);
   handOff(["/in/talk.srt"]);
@@ -133,24 +145,26 @@ describe("SubtitlesView", () => {
     open.mockResolvedValue(VIDEO_SOURCE);
     useJobs.setState({ byId: {} });
     useUI.setState({ handoff: null, view: "subtitles" });
+    useSubtitles.setState(initialData());
   });
 
-  it("starts empty with a drop zone and the two ways in", () => {
+  it("starts empty with a drop zone and the two ways in, and no stepper", () => {
     render(<SubtitlesView moduleId="subtitles" />);
     expect(screen.getByText(/Drop a video, an audio file, or an \.srt/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Choose a video or audio file/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Use a subtitle file/ })).toBeTruthy();
-    expect((screen.getByRole("button", { name: /Edit/ }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: /Translate/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole("navigation", { name: "Steps" })).toBeNull();
   });
 
-  it("loads a dropped subtitle file straight into the editor", async () => {
+  it("loads a dropped subtitle file straight into the workspace", async () => {
     const user = userEvent.setup();
     await openSubtitleFile(user);
     expect(load).toHaveBeenCalledWith("/in/talk.srt");
     expect(screen.getAllByTestId("cue-row")).toHaveLength(3);
     expect((screen.getByLabelText("Subtitle 2 text") as HTMLTextAreaElement).value).toBe("World");
-    // No video: the player area offers to pick one.
+    // No video: the stage offers to pick one; the source chip names the subtitle file.
     expect(screen.getByText("No video to preview against")).toBeTruthy();
+    expect(screen.getByText("talk.srt")).toBeTruthy();
   });
 
   it("shows an error when the subtitle file can't be read", async () => {
@@ -161,7 +175,7 @@ describe("SubtitlesView", () => {
     expect(screen.getByText("Couldn't read the subtitles")).toBeTruthy();
   });
 
-  it("edits text, marks the step unsaved, supports undo, and saves with the cues", async () => {
+  it("edits text, marks it unsaved, supports undo, and saves with the cues (Export)", async () => {
     const user = userEvent.setup();
     await openSubtitleFile(user);
     const text = screen.getByLabelText("Subtitle 2 text");
@@ -169,8 +183,9 @@ describe("SubtitlesView", () => {
     await user.type(text, "Planet");
     expect(screen.getByLabelText("Unsaved changes")).toBeTruthy();
 
+    const panel = await openPanel(user, "Export");
     enqueue.mockResolvedValue([job({ id: "s1" })]);
-    await user.click(screen.getByRole("button", { name: /^Save/ }));
+    await user.click(within(panel).getByRole("button", { name: /^Save/ }));
     await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(1));
     const [inputs, opts] = enqueue.mock.calls[0] as [string[], { action: string; cues: Array<{ text: string }>; formats: string[] }];
     expect(inputs).toEqual(["/in/talk.srt"]);
@@ -202,6 +217,8 @@ describe("SubtitlesView", () => {
     expect((screen.getByLabelText("Subtitle 1 text") as HTMLTextAreaElement).value).toBe("Hello World");
     await user.click(screen.getByRole("button", { name: "Undo" }));
     expect(screen.getAllByTestId("cue-row")).toHaveLength(3);
+    await user.click(screen.getByRole("button", { name: "Redo" }));
+    expect(screen.getAllByTestId("cue-row")).toHaveLength(2);
   });
 
   it("splits with Ctrl+Enter at the caret", async () => {
@@ -222,10 +239,11 @@ describe("SubtitlesView", () => {
     await openSubtitleFile(user);
     await user.clear(screen.getByLabelText("Subtitle 3 text"));
     expect(screen.getByText("Subtitle 3: Text is empty")).toBeTruthy();
-    expect((screen.getByRole("button", { name: /^Save/ }) as HTMLButtonElement).disabled).toBe(true);
+    const panel = await openPanel(user, "Export");
+    expect((within(panel).getByRole("button", { name: /^Save/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("shifts all times from the toolbar", async () => {
+  it("shifts all times from the cue list toolbar", async () => {
     const user = userEvent.setup();
     await openSubtitleFile(user);
     await user.click(screen.getByRole("button", { name: "Shift timing" }));
@@ -268,33 +286,44 @@ describe("SubtitlesView", () => {
     await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
   });
 
-  it("generates from speech and opens the result in the editor", async () => {
+  it("before any cues shows the video, the Transcription summary and a Generate button", async () => {
+    render(<SubtitlesView moduleId="subtitles" />);
+    handOff(["/in/talk.mp4"]);
+    await screen.findByText("talk.mp4");
+    expect(await screen.findByTestId("player")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Generate subtitles" })).toBeTruthy();
+    expect(screen.getByText("Small · Auto-detect")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /Use a subtitle file/ }).length).toBeGreaterThan(0);
+    // No cue list yet.
+    expect(screen.queryByRole("list", { name: "Subtitles" })).toBeNull();
+  });
+
+  it("generates from speech (Transcription panel) and opens the result in the cue list", async () => {
     const user = userEvent.setup();
     render(<SubtitlesView moduleId="subtitles" />);
     handOff(["/in/talk.mp4"]);
     await screen.findByText("talk.mp4");
-    // Streams are listed per text track; picture-based ones can't be used.
-    expect(await screen.findByRole("button", { name: "Use this track" })).toBeTruthy();
-    expect(screen.getByText(/can't be edited/)).toBeTruthy();
 
-    // Splitting options are a click-in that says what they are set to.
-    expect(screen.queryByLabelText("Characters per line")).toBeNull();
-    expect(screen.getByRole("button", { name: /^Subtitle text/ }).textContent).toContain("42 characters · 2 lines");
-    await user.click(screen.getByRole("button", { name: /^Subtitle text/ }));
-    await user.click(screen.getByRole("radio", { name: "1" }));
-    expect(screen.getByRole("button", { name: /^Subtitle text/ }).textContent).toContain("42 characters · 1 line");
-    await user.click(screen.getByRole("radio", { name: "2" }));
+    // Subtitle tracks inside the video are in the Source panel; picture-based ones can't be used.
+    const source = await openPanel(user, "talk.mp4", "Source");
+    expect(await within(source).findByRole("button", { name: "Use this track" })).toBeTruthy();
+    expect(within(source).getByText(/can't be edited/)).toBeTruthy();
 
+    // The speech block and the text-splitting options are in the Transcription panel.
+    const panel = await openPanel(user, "Transcription");
+    expect(within(panel).getAllByLabelText("Characters per line").length).toBeGreaterThan(0);
+    await user.click(within(panel).getByRole("radio", { name: "1" }));
+    await user.click(within(panel).getByRole("radio", { name: "2" }));
     enqueue.mockResolvedValue([job({ id: "g1" })]);
-    await user.selectOptions(screen.getByLabelText("Model"), "turbo");
-    await user.click(screen.getByRole("button", { name: "Generate subtitles" }));
+    await user.selectOptions(within(panel).getByLabelText("Model"), "turbo");
+    await user.click(within(panel).getByRole("button", { name: "Generate subtitles" }));
     await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(1));
     const [inputs, opts] = enqueue.mock.calls[0] as [string[], { action: string; model: string; formats: string[] }];
     expect(inputs).toEqual(["/in/talk.mp4"]);
     expect(opts).toMatchObject({ action: "generate", model: "turbo", formats: ["srt"] });
 
     act(() => useJobs.getState().upsert(job({ id: "g1", status: JobStatus.JobRunning, progress: 0.4, message: "Transcribing" }) as never));
-    expect(await screen.findByText("Transcribing")).toBeTruthy();
+    expect((await screen.findAllByText("Transcribing")).length).toBeGreaterThan(0);
 
     load.mockResolvedValue(CUES);
     act(() =>
@@ -327,9 +356,10 @@ describe("SubtitlesView", () => {
     const user = userEvent.setup();
     render(<SubtitlesView moduleId="subtitles" />);
     handOff(["/in/talk.mp4"]);
-    await screen.findByRole("button", { name: "Use this track" });
+    await screen.findByText("talk.mp4");
+    const source = await openPanel(user, "talk.mp4", "Source");
     enqueue.mockResolvedValue([job({ id: "x1" })]);
-    await user.click(screen.getByRole("button", { name: "Use this track" }));
+    await user.click(await within(source).findByRole("button", { name: "Use this track" }));
     await waitFor(() => expect(enqueue).toHaveBeenCalled());
     expect((enqueue.mock.calls[0] as [string[], { action: string; streamIndex: number }])[1]).toMatchObject({ action: "extract", streamIndex: 2 });
   });
@@ -338,22 +368,22 @@ describe("SubtitlesView", () => {
     const user = userEvent.setup();
     translatorStatus.mockResolvedValue({ ready: false, model: "", error: "No model is downloaded" });
     await openSubtitleFile(user);
-    await user.click(screen.getByRole("button", { name: /Translate/ }));
-    expect(await screen.findByText("Download a model in Local Chat to translate")).toBeTruthy();
-    expect(screen.getByText("No model is downloaded")).toBeTruthy();
-    expect((screen.getByRole("button", { name: /^Translate 3 subtitles/ }) as HTMLButtonElement).disabled).toBe(true);
-    await user.click(screen.getByRole("button", { name: "Open Local Chat" }));
+    const panel = await openPanel(user, "Translate");
+    expect(await within(panel).findByText("Download a model in Local Chat to translate")).toBeTruthy();
+    expect(within(panel).getByText("No model is downloaded")).toBeTruthy();
+    expect((within(panel).getByRole("button", { name: /^Translate 3 subtitles/ }) as HTMLButtonElement).disabled).toBe(true);
+    await user.click(within(panel).getByRole("button", { name: "Open Local Chat" }));
     expect(useUI.getState().view).toBe("llm-chat");
   });
 
-  it("translates and opens the result as a second tab", async () => {
+  it("translates and opens the result as a second track", async () => {
     const user = userEvent.setup();
     await openSubtitleFile(user);
-    await user.click(screen.getByRole("button", { name: /Translate/ }));
-    await screen.findByText(/Translating with Qwen 3/);
-    await user.selectOptions(screen.getByLabelText("Target language"), "es");
+    const panel = await openPanel(user, "Translate");
+    await within(panel).findByText(/Translating with Qwen 3/);
+    await user.selectOptions(within(panel).getByLabelText("Target language"), "es");
     enqueue.mockResolvedValue([job({ id: "t1" })]);
-    await user.click(screen.getByRole("button", { name: /^Translate 3 subtitles/ }));
+    await user.click(within(panel).getByRole("button", { name: /^Translate 3 subtitles/ }));
     await waitFor(() => expect(enqueue).toHaveBeenCalled());
     const [, opts] = enqueue.mock.calls[0] as [string[], { action: string; targetLanguage: string; cues: unknown[] }];
     expect(opts).toMatchObject({ action: "translate", targetLanguage: "es" });
@@ -379,13 +409,12 @@ describe("SubtitlesView", () => {
   it("asks for the video before burning or embedding", async () => {
     const user = userEvent.setup();
     await openSubtitleFile(user);
-    await user.click(screen.getByRole("button", { name: /Export/ }));
-    const pick = await screen.findAllByRole("button", { name: "Pick the video" });
-    expect(pick).toHaveLength(2);
-    expect(screen.getByRole("button", { name: /Save SRT/ })).toBeTruthy();
+    const panel = await openPanel(user, "Export");
+    expect(within(panel).getAllByRole("button", { name: "Pick the video" })).toHaveLength(2);
+    expect(within(panel).getByRole("button", { name: /Save SRT/ })).toBeTruthy();
   });
 
-  it("burns with the chosen style and embeds with a track language", async () => {
+  it("burns with the chosen style (Style panel) and embeds with a track language (Export panel)", async () => {
     const user = userEvent.setup();
     render(<SubtitlesView moduleId="subtitles" />);
     handOff(["/in/talk.mp4"]);
@@ -394,34 +423,45 @@ describe("SubtitlesView", () => {
     pickWith.mockResolvedValue(["/in/talk.srt"]);
     await user.click(screen.getAllByRole("button", { name: /Use a subtitle file/ })[0]!);
     await screen.findByLabelText("Subtitle 1 text");
-    await user.click(screen.getByRole("button", { name: /Export/ }));
 
-    await user.click(await screen.findByRole("radio", { name: /Boxed/ }));
-    expect(screen.getByRole("button", { name: /^Text/ }).textContent).toContain("Medium · bottom · Arial");
-    await user.click(screen.getByRole("button", { name: /^Text/ }));
-    await user.click(screen.getByRole("radio", { name: "Large" }));
-    expect(screen.getByRole("button", { name: /^Text/ }).textContent).toContain("Large · bottom");
+    const style = await openPanel(user, "Style");
+    await user.click(await within(style).findByRole("radio", { name: /Boxed/ }));
+    await user.click(within(style).getByRole("radio", { name: "Large" }));
+
+    const exportPanel = await openPanel(user, "Export");
     enqueue.mockResolvedValue([job({ id: "b1" })]);
-    await user.click(screen.getByRole("button", { name: "Burn into the video" }));
+    await user.click(within(exportPanel).getByRole("button", { name: "Burn into the video" }));
     await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(1));
     const [binputs, bopts] = enqueue.mock.calls[0] as [string[], Record<string, unknown>];
     expect(binputs).toEqual(["/in/talk.mp4"]);
     expect(bopts).toMatchObject({ action: "burn", style: "boxed", size: "l", position: "bottom" });
 
-    await user.selectOptions(screen.getByLabelText("Track language"), "es");
+    await user.selectOptions(within(exportPanel).getByLabelText("Track language"), "es");
     enqueue.mockResolvedValue([job({ id: "e1" })]);
     // Wait for the burn job to finish so the buttons unlock.
     act(() => useJobs.getState().upsert(job({ id: "b1", status: JobStatus.JobDone, progress: 1, resultJson: JSON.stringify({ outputs: ["/o/Subtitles/talk (subtitled).mp4"] }) }) as never));
-    await user.click(await screen.findByRole("button", { name: "Add subtitle track" }));
+    await user.click(await within(exportPanel).findByRole("button", { name: "Add subtitle track" }));
     await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(2));
     expect((enqueue.mock.calls[1] as [string[], Record<string, unknown>])[1]).toMatchObject({ action: "embed", trackLanguage: "es" });
+  });
+
+  it("saves in both formats chosen in the Export panel", async () => {
+    const user = userEvent.setup();
+    await openSubtitleFile(user);
+    const panel = await openPanel(user, "Export");
+    await user.click(within(panel).getByRole("button", { name: "VTT" }));
+    enqueue.mockResolvedValue([job({ id: "s3" })]);
+    await user.click(within(panel).getByRole("button", { name: "Save SRT + VTT" }));
+    await waitFor(() => expect(enqueue).toHaveBeenCalled());
+    expect((enqueue.mock.calls[0] as [string[], { formats: string[] }])[1].formats).toEqual(["srt", "vtt"]);
   });
 
   it("copies a result path through copyText", async () => {
     const user = userEvent.setup();
     await openSubtitleFile(user);
+    const panel = await openPanel(user, "Export");
     enqueue.mockResolvedValue([job({ id: "s2" })]);
-    await user.click(screen.getByRole("button", { name: /^Save/ }));
+    await user.click(within(panel).getByRole("button", { name: /^Save/ }));
     await waitFor(() => expect(enqueue).toHaveBeenCalled());
     act(() =>
       useJobs.getState().upsert(
@@ -433,3 +473,72 @@ describe("SubtitlesView", () => {
     expect(copy).toHaveBeenCalledWith("/o/Subtitles/talk.srt");
   });
 });
+
+function desc(id: string, name: string): Descriptor {
+  return { id, name, icon: "box", status: ModuleStatus.StatusReady, accepts: { extensions: [], urls: false, any: false } } as unknown as Descriptor;
+}
+
+describe("Trim first", () => {
+  beforeEach(() => {
+    enqueue.mockReset();
+    load.mockReset();
+    open.mockReset();
+    open.mockResolvedValue(VIDEO_SOURCE);
+    useJobs.setState({ byId: {} });
+    useUI.setState({ handoff: null, view: "subtitles" });
+    useSubtitles.setState(initialData());
+    useModules.getState().setAll([desc("trimmer", "Trimmer"), desc("subtitles", "Subtitles")]);
+  });
+
+  function FakeTrimmer() {
+    // The embed context carries the handoff and Use; the fake just echoes it.
+    return <TrimmerStub />;
+  }
+
+  it("opens the Trimmer with the source and Use makes the cut the new source", async () => {
+    registerToolViews({ trimmer: FakeTrimmer });
+    const user = userEvent.setup();
+    render(<SubtitlesView moduleId="subtitles" />);
+    handOff(["/in/talk.mp4"]);
+    await screen.findByText("talk.mp4");
+    const source = await openPanel(user, "talk.mp4", "Source");
+    await user.click(within(source).getByRole("button", { name: /Trim first/ }));
+    expect(await screen.findByText("trimmer for /in/talk.mp4")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Use this cut" }));
+    await waitFor(() => expect(useSubtitles.getState().mediaPath).toBe("/in/cut.mp4"));
+    expect(await screen.findByText("cut.mp4")).toBeTruthy();
+  });
+
+  it("asks before clearing the cues when the cut replaces the source", async () => {
+    registerToolViews({ trimmer: FakeTrimmer });
+    const user = userEvent.setup();
+    render(<SubtitlesView moduleId="subtitles" />);
+    load.mockResolvedValue(CUES);
+    handOff(["/in/talk.mp4"]);
+    await screen.findByText("talk.mp4");
+    handOff(["/in/talk.srt"]);
+    await screen.findByLabelText("Subtitle 1 text");
+    const source = await openPanel(user, "talk.mp4", "Source");
+    await user.click(within(source).getByRole("button", { name: /Trim first/ }));
+    await user.click(await screen.findByRole("button", { name: "Use this cut" }));
+    expect(await screen.findByText("Use the trimmed video?")).toBeTruthy();
+    expect(useSubtitles.getState().mediaPath).toBe("/in/talk.mp4");
+    await user.click(screen.getByRole("button", { name: "Use the cut" }));
+    await waitFor(() => expect(useSubtitles.getState().mediaPath).toBe("/in/cut.mp4"));
+    expect(useSubtitles.getState().editor.tabs).toHaveLength(0);
+  });
+});
+
+import { useEmbed } from "@/lib/embed";
+
+function TrimmerStub() {
+  const e = useEmbed();
+  return (
+    <div>
+      <p>trimmer for {e?.handoff.inputs.join(",")}</p>
+      <button type="button" onClick={() => e?.onUse?.(["/in/cut.mp4"])}>
+        {e?.useLabel}
+      </button>
+    </div>
+  );
+}
