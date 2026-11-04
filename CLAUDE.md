@@ -282,6 +282,9 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Constituents open inside their host**: `<ToolClickIn host module inputs onUse useLabel />` (components) renders the constituent's own view in a drawer and pops it out with the same handoff; results return through `onUse` (also from the popped-out window, over the `embed` relay channel). Tool views take hand-offs only through `useToolHandoff(moduleId, cb)` (`lib/embed.ts`), never `useUI().takeHandoff` directly, and check `useEmbed()` to render compactly. Hosts report what each part would get with `useCompositionInputs(host, {...})` so the CompositionBar's "Uses" chips open the part inside the host.
 - **Workspaces** (`src/workspace/`): a workspace tool keeps its document in a zustand store and calls `defineWorkspace({moduleId, store, bridge, isOpen, panels, preview, useReplica})` in `tools/<id>/workspace.ts(x)` (auto-discovered by `parts/index.ts`); its view calls `ws.useHost()` and lays out with `StudioLayout`, `WorkspaceRail`, `WorkspacePanel`, `OneLineBar`, `WorkspacePreviewFrame`. Panels take no props; replicas (`ws.isReplica()`) never save or submit jobs; bitmaps/analyses load locally in `useReplica`.
 - **Every result row can be sent on**: the kit's `FileActions` offers Send to (tools that accept the file, also in a new window) and Use when embedded.
+- **Click-ins inside a drawer stack over it** (their own width); `useClickIn()` inside a drawer addresses the drawer's own host. Panels that pick files or submit jobs are `poppable: false`.
+- **Big local images in an `<img>`**: use `wholeImageUrl(path)` (`lib/wholeImage.ts`), never a bare media URL (media responses stop at 4 MiB and `<img>` never asks for the rest); `FilesService.ImageThumb` for previews.
+- **One-time window state** (a tool window's start-up handoff, a parked session) must survive React StrictMode's double effects in dev: take it once per page, not once per effect run.
 
 ## Conventions
 

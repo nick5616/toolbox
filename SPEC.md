@@ -1,6 +1,6 @@
 # Toolbox — Phase 11 Spec: Composable everything
 
-Status: **IN PROGRESS 2026-11-04**. Written and executed without a review stop because the user asked to keep going ("i love it. keep going for the whole app and all the tools in it") right after testing Phase 10. Like Phase 10, the result is left **uncommitted on `main`** for the user to test (see DECISIONS 2026-11-04).
+Status: **BUILT 2026-11-04, uncommitted for review**. Written and executed without a review stop because the user asked to keep going ("i love it. keep going for the whole app and all the tools in it") right after testing Phase 10. Like Phase 10, the result is left **uncommitted on `main`** for the user to test (see DECISIONS 2026-11-04).
 Author: architect session (Opus). Phase 10 (composable tools) is archived in `docs/specs/phase-10.md`; every Phase 10 contract still holds unless changed here.
 
 ## 0. The brief
