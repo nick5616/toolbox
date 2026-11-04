@@ -32,6 +32,7 @@ import styles from "./inspector.module.css";
 import { TextSection } from "../text/TextSection";
 import { VisualSection } from "../visual/VisualSection";
 import { clipLabel } from "../timeline/clipInfo";
+import { MomentsSection } from "../moments/MomentsSection";
 
 const TRANSFORM_LABELS: Record<Exclude<keyof ClipTransform, "edges">, { label: string; step: number; format(v: number): string }> = {
   x: { label: "Position x", step: 0.005, format: (v) => `${(v * 100).toFixed(1)}%` },
@@ -148,6 +149,7 @@ export function ClipInspector({ clip }: { clip: EditClip }) {
         clipTimeMs={clipTimeMs}
         onChange={(next, key) => commit({ effects: serializeEffects(next) }, scoped(key))}
       />
+      {clip.kind === "video" && <MomentsSection clip={clip} />}
       {hasSource && effects.length > 0 && (
         <div className={styles.stack}>
           <div className={styles.row}>
