@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Banner, Button, ConfirmDialog, Icon, IconButton, MenuButton, useClickIn } from "@/components";
 import { MediaPlayer, Timeline, useMediaSource, type Marker } from "@/components/media";
-import { useVisualsAnalysis } from "@/components/viz";
+import { useVisualsAnalysis } from "@/components/viz/useVisualsAnalysis";
 import { LyricSource, MediaService, VisualizerService } from "@/lib/api";
 import { openToolItems } from "@/lib/openTool";
 import { useShortcut } from "@/lib/shortcuts";
