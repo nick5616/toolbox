@@ -357,3 +357,8 @@ Newest last. Format: date — decision — why.
   - **Matte tracks** are drawn dashed with a matte icon. A track that is the matte of the track below isn't drawn by itself: all of its clips, not just the one over the matted clip. Put a title on its own track.
   - **Known gap:** the "Velocity edit" recipe can't write speed keys (the auto-fill draft model has none), so it suggests Velocity → Ramp into the beat per clip.
   - **Wave B (the six builders) in the real app:** all 22 effects, 12 transitions, 8 visual layers, text, text-through-video and the picker were checked in the preview. A 30 s "FX demo" export matched it.
+- 2026-11-03 — Part C (SPEC §24):
+  - **Accents lane:** stand-out onset peaks (mix and stems), strong off-grid hits, drops and the returns after stops. The strongest are kept, a beat apart, about one every two bars at most. A first version without the budget gave 3 per second.
+  - **Footage moments:** FFmpeg scene scores of the preview stream, smoothed over 7 frames; CFR conversion duplicates frames and makes the raw score saw-toothed. Shot changes come from the detected shots, about one moment per 1.5 s.
+  - **Velocity ramps** (`beatsync/velocityRamp.ts`): piecewise-linear speed keys, slow on the hit (a ~0.3 s slow-mo moment) and fast in between. They are scaled so a clip plays exactly as much footage as at normal speed (or what's left of the source), so a ramp never runs out of footage and never changes the cuts.
+  - **Where velocity applies:** the clip inspector (every selected clip), Section styles, and the "Velocity edit" recipe, which now writes real ramps.

@@ -7,7 +7,7 @@
  * min clip length), then the distribution modes re-point each new clip's in
  * point. Nothing here touches the document it is given.
  */
-import type { EditClip, EditMoment } from "@/lib/api";
+import type { EditClip, EditMoment, EditSourceState } from "@/lib/api";
 import type { Analysis } from "@/viz/analysis";
 import type { NormalProject } from "@/viz/edit/defaults";
 import { clipSourceSpan, newClip, newId, newTrack } from "../doc";
@@ -19,6 +19,8 @@ import { autofill, validateShape } from "../autofill/autofill";
 import type { AutofillSource, Recipe, RecipeRule } from "../autofill/types";
 import { HIT_LANES, readHit, writeHit } from "../beatsync/hits";
 import { FX_STACKS } from "../inspector/FxStacks";
+import { withVelocity } from "../beatsync/applyVelocity";
+import type { VelocityShape } from "../beatsync/velocityRamp";
 
 export const STYLE_TRACK_NAME = "Section styles";
 export const MAX_TRACKS = 8;
@@ -45,6 +47,9 @@ export interface StyleSettings {
   strength: number;
   transition: TransitionKind;
   transitionMs: number;
+  /** Velocity ramps on the new clips ("off" = normal speed). */
+  velocity: "off" | VelocityShape;
+  velocityIntensity: number;
 }
 
 export const DEFAULT_SETTINGS: StyleSettings = {
@@ -61,6 +66,8 @@ export const DEFAULT_SETTINGS: StyleSettings = {
   strength: 0.8,
   transition: "cut",
   transitionMs: 200,
+  velocity: "off",
+  velocityIntensity: 0.7,
 };
 
 /** Cut lanes offered by the dialog (a subset of the hit lanes), plus "keep". */
@@ -168,6 +175,8 @@ export interface StyleInput {
   seed: number;
   /** Target video track; unknown/"new" = a new "Cuts" track. */
   trackId: string;
+  /** Source states (durations, for velocity ramps that stay inside the footage). */
+  sourceStates?: Record<string, EditSourceState | undefined>;
 }
 
 export interface StylePlan {
@@ -365,6 +374,8 @@ export function planStyle(input: StyleInput): StylePlan {
   const style = (c: EditClip): EditClip => {
     let n = c.kind === "video" || c.kind === "image" || c.kind === "color" ? { ...c, in: tin } : c;
     if (s.mirror && (n.kind === "video" || n.kind === "image")) n = mirrorOf(n);
+    // Each new clip starts on a hit (the cut), so its velocity ramp slows there.
+    if (s.velocity !== "off" && newIds.has(c.id)) n = withVelocity(n, { shape: s.velocity, hits: "cut", intensity: s.velocityIntensity }, input.markers, input.sourceStates ?? {});
     return n;
   };
   tracks = tracks.map((t) => (t.id !== targetId ? t : { ...t, clips: t.clips.map((c) => (newIds.has(c.id) ? style(c) : c)) }));

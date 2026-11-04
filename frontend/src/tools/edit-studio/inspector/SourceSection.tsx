@@ -12,6 +12,7 @@ import { flushEdit } from "../useEditAutosave";
 import { EditParamEditor } from "./EditParamEditor";
 import { isKeyed, paramBase } from "./paramOps";
 import styles from "./inspector.module.css";
+import { VelocityControl } from "../beatsync/VelocityControl";
 
 const BLEND_TIPS: Record<string, string> = {
   normal: "Draw the clip as it is, on top of what is below",
@@ -110,6 +111,7 @@ export function SourceSection({ clip, fps, clipTimeMs, onChange }: SourceSection
               <span className={styles.label}>In point</span>
               <Stepper aria-label="In point" unit="ms" min={0} step={100} value={clip.inMs} onChange={(inMs) => onChange({ inMs: Math.round(inMs) }, `${clip.id}:in`)} />
             </div>
+            <VelocityControl clip={clip} />
             <div className={styles.stack}>
               <Switch
                 tip="Turn on to keyframe the speed (ramps, freezes); off keeps one steady speed"

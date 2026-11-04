@@ -13,6 +13,7 @@ import { useEditStudio, useMarkers, useProject } from "../store";
 import { DISTRIBUTIONS, STYLE_CUT_LANES, cutDensity, planStyle, resolveHitLane, resolveSources, snapToGrid, type Distribution, type Range, type SourceMode, type StyleSettings } from "./styleLogic";
 import { savedSettings, useSectionStyle } from "./useSectionStyle";
 import styles from "./SectionStyleDialog.module.css";
+import { VELOCITY_SHAPES } from "../beatsync/velocityRamp";
 
 const EVERY = [1, 2, 4, 8].map((n) => ({ value: String(n), label: n === 1 ? "Every one" : `Every ${n}` }));
 const MIN_CLIPS = [100, 150, 250, 400, 600, 1000].map((n) => ({ value: String(n), label: n < 1000 ? `${n} ms` : `${n / 1000} s` }));
@@ -64,8 +65,8 @@ function Body({ range: initial, onClose }: { range: Range; onClose: () => void }
 
   const plan = useMemo(() => {
     if (!project || !analysis) return null;
-    return planStyle({ project, markers, analysis, sources, selectedPaths: selected, moments, range, settings: s, seed, trackId: targetId });
-  }, [project, analysis, markers, sources, selected, moments, range, s, seed, targetId]);
+    return planStyle({ project, markers, analysis, sources, selectedPaths: selected, moments, range, settings: s, seed, trackId: targetId, sourceStates });
+  }, [project, analysis, markers, sources, selected, moments, range, s, seed, targetId, sourceStates]);
 
   const D = project ? editLength(project) : 0;
   const ticks = useMemo(() => {
@@ -190,6 +191,23 @@ function Body({ range: initial, onClose }: { range: Range; onClose: () => void }
             )}
             {waiting && <span className={styles.note}>Finding the moments in your footage…</span>}
             <Switch checked={s.mirror} onChange={(v) => set({ mirror: v })} label="Mirror edges" tip="Where a zoomed or moved clip leaves the frame, show the picture mirrored instead of empty space" />
+            <Field label="Velocity">
+              {(c) => (
+                <Select
+                  id={c.id}
+                  size="sm"
+                  data-tip="Each clip slows right on its cut and speeds up after it (or rushes into it), without running out of footage"
+                  value={s.velocity}
+                  onChange={(v) => set({ velocity: v as StyleSettings["velocity"] })}
+                  options={[{ value: "off", label: "Off (normal speed)" }, ...VELOCITY_SHAPES.map((x) => ({ value: x.value, label: x.label }))]}
+                />
+              )}
+            </Field>
+            {s.velocity !== "off" && (
+              <Field label="Velocity intensity">
+                {(c) => <Slider id={c.id} aria-label="Velocity intensity" data-tip="How extreme the speed ramp is" min={0.1} max={1} step={0.05} value={s.velocityIntensity} onChange={(v) => set({ velocityIntensity: v })} format={(v) => `${Math.round(v * 100)}%`} />}
+              </Field>
+            )}
           </fieldset>
         )}
 

@@ -12,6 +12,7 @@ import { RECIPES } from "./recipes";
 import { useSelectedSources } from "./selection";
 import type { AutofillOptions, AutofillSource } from "./types";
 import styles from "./AutofillDialog.module.css";
+import { withVelocity } from "../beatsync/applyVelocity";
 
 export interface AutofillDialogProps {
   open: boolean;
@@ -136,7 +137,9 @@ function Body({ range, onClose }: { range: AutofillDialogProps["range"]; onClose
     const gone = new Set(res.removed);
     const tr = next.tracks.find((t) => t.id === target);
     if (!tr) return;
-    const clips = [...tr.clips.filter((c) => !gone.has(c.id)), ...res.clips].sort((x, y) => x.startMs - y.startMs || x.endMs - y.endMs);
+    // "Velocity edit": every new clip slows on its cut and speeds up after it.
+    const made = recipe.id === "velocity-edit" ? res.clips.map((c) => withVelocity(c, { shape: "hit", hits: "cut", intensity: 0.75 }, markers, sourceStates)) : res.clips;
+    const clips = [...tr.clips.filter((c) => !gone.has(c.id)), ...made].sort((x, y) => x.startMs - y.startMs || x.endMs - y.endMs);
     const bad = validateShape(clips, new Set(res.clips.map((c) => c.id)), D);
     if (bad) {
       setProblem(`Auto-fill made an invalid layout, so nothing was changed. ${bad}.`);

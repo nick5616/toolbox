@@ -74,7 +74,7 @@ export const RECIPES: readonly Recipe[] = [
   {
     id: "velocity-edit",
     name: "Velocity edit",
-    description: "A cut on every beat with a zoom punch and motion blur on the kicks. Use Velocity in a clip's menu to ramp its speed into the beat.",
+    description: "A cut on every beat; each clip slows on its cut and speeds up after it, with a zoom punch and motion blur on the kicks.",
     // A recipe can't carry speed keys (only freezes on stops), so the ramps are applied per clip
     // with Velocity > Ramp into the beat (inspector/velocity.ts); the effects are the recipe's part.
     rules: [{ cutLane: "beat", minClipMs: 250, sourceOrder: "shuffleNoRepeat", videoIn: "random", effects: stack("velocity-punch") }],
