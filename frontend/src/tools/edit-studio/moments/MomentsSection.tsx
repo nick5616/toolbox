@@ -19,7 +19,6 @@ import {
   formatMoment,
   KIND_LABELS,
   momentTip,
-  strengthWord,
   usedEffect,
   type ClipFx,
   type ClipMoment,
@@ -133,7 +132,6 @@ export function MomentsSection({ clip }: { clip: EditClip }) {
                     <span className={styles.what} data-tip={momentTip(m.kind, m.clipMs, m.strength)}>
                       <span className={styles.time}>{formatMoment(m.clipMs)}</span>
                       <span className={styles.kind}>{KIND_LABELS[m.kind]}</span>
-                      <span className={styles.str}>{strengthWord(m.strength)}</span>
                     </span>
                     <Select
                       size="sm"
