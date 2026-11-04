@@ -45,8 +45,8 @@ export function SourcesPanel({ postId, onAdd }: SourcesPanelProps) {
   return (
     <div className={styles.panel} aria-label="Post sources">
       <div className={styles.head}>
-        <h2 className={styles.title}>Post photos</h2>
-        <Button size="sm" variant="ghost" icon="refresh-cw" loading={loading} onClick={refresh}>
+        <h2 className={styles.title} data-tip="The photos collected in this post">Post photos</h2>
+        <Button size="sm" variant="ghost" icon="refresh-cw" data-tip="Reload the list of photos in this post" loading={loading} onClick={refresh}>
           Refresh
         </Button>
       </div>

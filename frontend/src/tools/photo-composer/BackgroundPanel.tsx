@@ -20,16 +20,16 @@ export function BackgroundPanel({ background: b, adjust, onAdjust, onChange, onC
   const hasPhoto = !!b.image?.path;
   return (
     <div role="group" aria-label="Background">
-      <Group title="Background">
+      <Group title="Background" tip="What shows behind all the layers">
         <SegmentedControl<Kind>
           size="sm"
           fullWidth
           aria-label="Background kind"
           value={b.kind as Kind}
           options={[
-            { value: "color", label: "Colour" },
-            { value: "gradient", label: "Gradient" },
-            { value: "image", label: "Photo" },
+            { value: "color", label: "Colour", tip: "A single flat colour" },
+            { value: "gradient", label: "Gradient", tip: "A smooth blend between two colours" },
+            { value: "image", label: "Photo", tip: "Use one of your photos as the background" },
           ]}
           onChange={(kind) => {
             if (kind === "image" && !hasPhoto) {
@@ -39,35 +39,35 @@ export function BackgroundPanel({ background: b, adjust, onAdjust, onChange, onC
             set({ kind });
           }}
         />
-        <Row label={b.kind === "gradient" ? "From" : "Colour"}>
+        <Row label={b.kind === "gradient" ? "From" : "Colour"} tip={b.kind === "gradient" ? "Colour at the start of the gradient" : "Background colour"}>
           <Colour label="Background colour" value={b.color} onChange={(color) => set({ color })} />
         </Row>
         {b.kind === "gradient" && (
           <>
-            <Row label="To">
+            <Row label="To" tip="Colour at the end of the gradient">
               <Colour label="Gradient end colour" value={b.color2} onChange={(color2) => set({ color2 })} />
             </Row>
-            <Row label="Angle">
+            <Row label="Angle" tip="Direction of the gradient in degrees; 0 runs left to right">
               <NumberField label="Gradient angle" unit="°" min={-360} max={360} value={b.angle} onChange={(angle) => set({ angle: Math.round(angle) })} />
             </Row>
           </>
         )}
       </Group>
       {b.kind === "image" && hasPhoto && (
-        <Group title="Photo">
+        <Group title="Photo" tip="Settings for the background photo">
           <Row label="Photo">
-            <Button size="sm" variant="secondary" icon="image" onClick={onChoosePhoto}>
+            <Button size="sm" variant="secondary" icon="image" data-tip="Pick a different background photo" onClick={onChoosePhoto}>
               Replace…
             </Button>
           </Row>
           <Row label="Adjust">
-            <Switch checked={adjust} label="Adjust background" onChange={onAdjust} />
+            <Switch checked={adjust} label="Adjust background" tip="Drag and scroll on the canvas to move and zoom the background photo instead of the layers" onChange={onAdjust} />
           </Row>
           {adjust && <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-subtle)" }}>Drag on the canvas to move the photo; scroll to zoom.</p>}
-          <Row label="Zoom">
+          <Row label="Zoom" tip="Enlarge the background photo; 1x fills the canvas exactly">
             <Slider aria-label="Background zoom" min={1} max={4} step={0.01} value={b.zoom} format={(v) => `${v.toFixed(2)}x`} onChange={(zoom) => set({ zoom })} />
           </Row>
-          <Row label="Blur">
+          <Row label="Blur" tip="Soften the background photo so the layers stand out">
             <Slider aria-label="Background blur" min={0} max={1} step={0.01} value={b.blur} format={pct} onChange={(blur) => set({ blur })} />
           </Row>
           <LookControls look={b.look} onChange={(look) => set({ look })} />

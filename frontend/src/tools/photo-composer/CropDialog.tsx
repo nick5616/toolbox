@@ -50,14 +50,14 @@ export function CropDialog({ layer, onApply, onCancel }: CropDialogProps) {
   const dispW = nat ? Math.min(MAX_W, MAX_H * sourceAspect) : MAX_W;
   const dispH = nat ? dispW / sourceAspect : MAX_H;
 
-  const options: Array<{ value: Shape; label: string }> = [
-    ...(full ? [] : [{ value: "current" as const, label: "Current" }]),
-    { value: "original", label: "Original" },
-    { value: "1:1", label: "1:1" },
-    { value: "4:5", label: "4:5" },
-    { value: "3:4", label: "3:4" },
-    { value: "16:9", label: "16:9" },
-    { value: "9:16", label: "9:16" },
+  const options: Array<{ value: Shape; label: string; tip: string }> = [
+    ...(full ? [] : [{ value: "current" as const, label: "Current", tip: "Keep the crop shape you have now and move it" }]),
+    { value: "original", label: "Original", tip: "No crop: show the whole photo" },
+    { value: "1:1", label: "1:1", tip: "Square crop" },
+    { value: "4:5", label: "4:5", tip: "Portrait crop, the standard Instagram feed shape" },
+    { value: "3:4", label: "3:4", tip: "Portrait crop, a little taller than 4:5" },
+    { value: "16:9", label: "16:9", tip: "Wide landscape crop" },
+    { value: "9:16", label: "9:16", tip: "Tall crop for stories and reels" },
   ];
 
   const apply = () => {
@@ -68,7 +68,7 @@ export function CropDialog({ layer, onApply, onCancel }: CropDialogProps) {
   return (
     <Modal wide title="Crop photo" confirmLabel="Apply" confirmDisabled={!nat} onConfirm={apply} onCancel={onCancel}>
       <SegmentedControl<Shape> size="sm" aria-label="Crop shape" value={shape} options={options} onChange={setShape} />
-      <div className={styles.frame} style={{ width: dispW, height: dispH }}>
+      <div className={styles.frame} style={{ width: dispW, height: dispH }} data-tip="Drag the bright window to choose which part of the photo to keep">
         {src && (
           <img
             className={styles.img}
