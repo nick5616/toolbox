@@ -89,13 +89,13 @@ describe("PipelineEditor List | Graph", () => {
     expect(document.querySelector(`[data-wire-id="${A}|*|${C}"]`)).toBeTruthy();
   });
 
-  it("keeps triggers and run history behind click-ins in Graph mode, with summaries", () => {
+  it("keeps panels (step, triggers, runs, about) behind click-ins in Graph mode, with summaries", () => {
     seed(pipeline("p1", base().steps ?? [], { watch: { enabled: true, folder: "C:/Users/me/Inbox" } }));
     render(<PipelineEditor />);
     expect(screen.queryByRole("region", { name: "Triggers" })).toBeNull();
     const trig = screen.getByRole("button", { name: /Triggers/ });
     expect(trig.textContent).toMatch(/Watching Inbox/);
-    expect(screen.getByRole("button", { name: /Run history/ }).textContent).toMatch(/no runs yet/);
+    expect(screen.getByRole("button", { name: /Runs/ }).textContent).toMatch(/no runs yet/);
     fireEvent.click(trig);
     expect(screen.getByText(/Watch a folder/)).toBeTruthy();
   });

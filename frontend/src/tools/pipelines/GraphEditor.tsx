@@ -41,8 +41,6 @@ import {
 import { WireCanvas, type WireSpec } from "./graph/WireCanvas";
 import type { WireVisualState } from "./graph/wireStyle";
 import { GraphNodeView } from "./GraphNodeView";
-import { StepOptions } from "./StepOptions";
-import { stepName } from "./stepHelpers";
 import { DRAG_TYPE, QuickAdd, ToolStore } from "./ToolStore";
 import styles from "./GraphEditor.module.css";
 
@@ -55,7 +53,9 @@ export interface GraphEditorProps {
   runs: readonly RunView[];
   onEdit: (fn: (p: Pipeline) => Pipeline) => void;
   /** Layout-only changes: saved, but nothing to re-check. */
-  onLayout: (layout: string) => void;
+  onLayout: (layout: string, undoable?: boolean) => void;
+  /** The gear on a node: the app shows the Step panel for it. */
+  onOpenStep?: (id: string) => void;
   touchedKeep: Set<string>;
   /** Makes the canvas a drop target that runs this pipeline on dropped files (the id the file router looks for). */
   dropTargetId?: string;
@@ -89,7 +89,7 @@ interface Wiring {
 }
 
 /** The node-graph editor of a pipeline (SPEC.md §12): tool store, canvas, options drawer. */
-export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, onLayout, touchedKeep, dropTargetId }: GraphEditorProps) {
+export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, onLayout, onOpenStep, touchedKeep, dropTargetId }: GraphEditorProps) {
   const steps = stepsOf(pipeline);
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
   const rootSize = useElementSize(root);
@@ -113,14 +113,12 @@ export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, o
   const [wiring, setWiringState] = useState<Wiring | null>(null);
   const [hover, setHover] = useState<{ id: string; reason: string } | null>(null);
   const [refusal, setRefusal] = useState<{ x: number; y: number; text: string } | null>(null);
-  const [optionsFor, setOptionsFor] = useState<string | null>(null);
   const [quick, setQuick] = useState<{ sx: number; sy: number; wx: number; wy: number } | null>(null);
   const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [glActive, setGlActive] = useState(false);
   const [vp, setVp] = useState<HTMLDivElement | null>(null);
   const size = useElementSize(vp);
 
-  const checkById = useMemo(() => new Map((check.steps ?? []).map((s) => [s.stepId, s] as const)), [check.steps]);
   const graph = useMemo(() => buildGraph(steps, check, layout), [steps, check, layout]);
   const nodes = useMemo<GraphNode[]>(
     () => (move ? graph.nodes.map((n) => (move.ids.has(n.id) ? { ...n, x: n.x + move.dx, y: n.y + move.dy } : n)) : graph.nodes),
@@ -175,9 +173,9 @@ export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, o
     return { ...out, ...extra };
   };
 
-  const pushLayout = (v: View, pos: Record<string, Pt>, ids: Iterable<string>) => {
+  const pushLayout = (v: View, pos: Record<string, Pt>, ids: Iterable<string>, undoable = false) => {
     const json = serializeLayout({ v: 1, nodes: pos, view: v }, ids);
-    if (json !== latest.current.pipeline.layout) onLayout(json);
+    if (json !== latest.current.pipeline.layout) onLayout(json, undoable);
   };
 
   const setView = (next: View | ((v: View) => View)) => {
@@ -267,9 +265,6 @@ export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, o
     setQuick(null);
   };
 
-  const patchStep = (id: string, patch: Partial<PipelineStep>) =>
-    onEdit((p) => ({ ...p, steps: stepsOf(p).map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
-
   const removeNodes = (ids: ReadonlySet<string>) => {
     const real = new Set([...ids].filter((i) => i !== INPUT_NODE));
     if (real.size === 0) return;
@@ -280,7 +275,6 @@ export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, o
     }
     commit(deleteSteps(cur, real));
     setSelNodes(new Set());
-    setOptionsFor((o) => (o && real.has(o) ? null : o));
   };
 
   const duplicateNodes = (ids: ReadonlySet<string>) => {
@@ -449,7 +443,7 @@ export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, o
           const extra: Record<string, Pt> = {};
           for (const n of latest.current.graph.nodes) if (ids.has(n.id)) extra[n.id] = { x: n.x + last.dx, y: n.y + last.dy };
           const pos = positions(extra);
-          pushLayout(latest.current.view, pos, latest.current.graph.nodes.map((n) => n.id));
+          pushLayout(latest.current.view, pos, latest.current.graph.nodes.map((n) => n.id), true);
         }
         setMove(null);
       },
@@ -581,9 +575,6 @@ export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, o
     return bezierAt(wireBezier(outPortPos(a, selected.port), inPortPos(b)), 0.5);
   }, [selected, nodeById]);
 
-  const stepIndex = (id: string) => steps.findIndex((s) => s.id === id);
-  const optStep = optionsFor ? steps.find((s) => s.id === optionsFor) : undefined;
-  const optType = optStep ? catalog.find((t) => t.id === optStep.type) : undefined;
   const zoomPct = Math.round(view.zoom * 100);
   const centre = { x: size.width / 2, y: size.height / 2 };
 
@@ -649,7 +640,7 @@ export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, o
                   inKind={graph.wires.find((w) => w.to === n.id)?.kind}
                   onPointerDown={onNodeDown(n.id)}
                   onPortDown={(e, port) => onPortDown(e, n.id, port)}
-                  onOptions={() => setOptionsFor((o) => (o === n.id ? null : n.id))}
+                  onOptions={() => onOpenStep?.(n.id)}
                 />
               );
             })}
@@ -685,28 +676,6 @@ export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, o
           </Button>
         </div>
 
-        {optStep && (
-          <aside className={styles.drawer} aria-label={`Options for ${stepName(optStep, optType)}`} data-no-wheel="1">
-            <div className={styles.drawerHead}>
-              <span className={styles.drawerTitle}>{stepName(optStep, optType)}</span>
-              <IconButton size="sm" icon="x" label="Close options" onClick={() => setOptionsFor(null)} />
-            </div>
-            <div className={styles.drawerBody}>
-              <StepOptions
-                graph
-                step={optStep}
-                steps={steps}
-                index={stepIndex(optStep.id)}
-                catalog={catalog}
-                checkById={checkById}
-                onChange={(patch) => patchStep(optStep.id, patch)}
-                onKeepTouched={() => touchedKeep.add(optStep.id)}
-                onDuplicate={() => duplicateNodes(new Set([optStep.id]))}
-                onRemove={() => removeNodes(new Set([optStep.id]))}
-              />
-            </div>
-          </aside>
-        )}
       </div>
     </div>
   );
