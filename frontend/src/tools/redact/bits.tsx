@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Icon, TimecodeInput } from "@/components";
 import { formatMs, parseTimecodeMs } from "@/components/media";
-import { FilesService, MediaService } from "@/lib/api";
+import { FilesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { releaseImageUrl, wholeImageUrl } from "@/lib/wholeImage";
 import { effectParams, isHeicPath, isTiffPath, type ImageBox } from "./logic";
 import styles from "./RedactView.module.css";
 
@@ -12,12 +13,18 @@ export function useImageUrl(path: string | null, thumbMax = 1600): { url: string
   useEffect(() => {
     if (!path) return;
     let cancelled = false;
-    // TIFF and HEIC: a Go-decoded preview (HEIC is converted once, then cached).
-    (isTiffPath(path) || isHeicPath(path) ? FilesService.ImageThumb(path, thumbMax) : MediaService.URLFor(path))
-      .then((url) => !cancelled && setState({ path, url, error: "" }))
+    let made = "";
+    // TIFF and HEIC: a Go-decoded preview (HEIC is converted once, then cached). Others: the whole file (media URLs cap at 4 MiB).
+    (isTiffPath(path) || isHeicPath(path) ? FilesService.ImageThumb(path, thumbMax) : wholeImageUrl(path))
+      .then((url) => {
+        made = url;
+        if (cancelled) releaseImageUrl(url);
+        else setState({ path, url, error: "" });
+      })
       .catch((e) => !cancelled && setState({ path, url: "", error: toAppError(e).message }));
     return () => {
       cancelled = true;
+      releaseImageUrl(made);
     };
   }, [path, thumbMax]);
   if (!path || state.path !== path) return { url: "", error: "" };

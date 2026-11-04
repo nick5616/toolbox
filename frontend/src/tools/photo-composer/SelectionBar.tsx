@@ -128,7 +128,7 @@ export function SelectionBar() {
       { key: "name", width: 100, node: <span className={styles.name} title={layer.name}>{layer.name}</span> },
       {
         key: "opacity",
-        width: 130,
+        width: 180,
         node: (
           <span className={styles.opacity}>
             <Slider

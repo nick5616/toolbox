@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Banner, Button, ClickIn, ClickInHost, CompareSlider, DropZone, IconButton, MenuButton, Meter, SegmentedControl, Slider, cx, toast } from "@/components";
-import { EraserModel, EraserService, FilesService, JobsService, MediaService, type EraserModelInfo } from "@/lib/api";
+import { EraserModel, EraserService, FilesService, JobsService, type EraserModelInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { releaseImageUrl, wholeImageUrl } from "@/lib/wholeImage";
 import { formatBytes } from "@/lib/format";
 import { useShortcut } from "@/lib/shortcuts";
 import { isActive, useJob } from "@/state/jobs";
@@ -137,11 +138,17 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
       return;
     }
     let cancelled = false;
-    (needsThumb(path) ? FilesService.ImageThumb(path, 1600) : MediaService.URLFor(path))
-      .then((url) => !cancelled && setImg({ url, w: 0, h: 0 }))
+    let made = "";
+    (needsThumb(path) ? FilesService.ImageThumb(path, 1600) : wholeImageUrl(path))
+      .then((url) => {
+        made = url;
+        if (cancelled) releaseImageUrl(url);
+        else setImg({ url, w: 0, h: 0 });
+      })
       .catch((e) => !cancelled && setLoadError(toAppError(e).message));
     return () => {
       cancelled = true;
+      releaseImageUrl(made);
     };
   }, [path]);
 
@@ -164,11 +171,17 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
       return;
     }
     let cancelled = false;
-    MediaService.URLFor(output.path)
-      .then((u) => !cancelled && setAfterUrl(u))
+    let made = "";
+    wholeImageUrl(output.path)
+      .then((u) => {
+        made = u;
+        if (cancelled) releaseImageUrl(u);
+        else setAfterUrl(u);
+      })
       .catch(() => undefined);
     return () => {
       cancelled = true;
+      releaseImageUrl(made);
     };
   }, [output]);
   useEffect(() => {
