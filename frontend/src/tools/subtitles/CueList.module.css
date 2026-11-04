@@ -27,6 +27,11 @@
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
+.selected {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
 .bad {
   box-shadow: inset 3px 0 0 var(--danger);
 }

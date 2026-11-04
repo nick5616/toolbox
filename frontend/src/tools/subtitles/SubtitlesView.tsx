@@ -5,7 +5,7 @@
  * current subtitle, and the cue list. All state is in `store.ts`.
  */
 import { useMemo } from "react";
-import { Banner, Button, ClickInHost, ConfirmDialog, DropZone, Icon, IconButton, MenuButton, ToolClickIn, toolDrawerId, useClickIn, type MenuItem } from "@/components";
+import { Banner, Button, ClickInHost, ConfirmDialog, DropZone, Icon, IconButton, MenuButton, useClickIn, type MenuItem } from "@/components";
 import { languageName, speechSummary } from "@/blocks/speech";
 import { useToolHandoff } from "@/lib/embed";
 import { useShortcut } from "@/lib/shortcuts";
@@ -21,6 +21,7 @@ import { anyDirty } from "./editor";
 import { basename } from "./logic";
 import { canvasAspect, speechOf } from "./options";
 import { SubtitlesPreview } from "./Preview";
+import { useSessionTransfer } from "./session";
 import { RunStatus } from "./RunStatus";
 import { useRun } from "./runs";
 import { MODULE_ID, useSubtitles } from "./store";
@@ -99,7 +100,6 @@ function Workspace() {
   const pickMedia = useSubtitles((s) => s.pickMedia);
   const pickSubtitleFile = useSubtitles((s) => s.pickSubtitleFile);
   const openInVisualizer = useSubtitles((s) => s.openInVisualizer);
-  const useCut = useSubtitles((s) => s.useCut);
   const hasCues = editor.tabs.length > 0;
   const tab = editor.tabs.find((t) => t.id === editor.activeId);
   const dirty = anyDirty(editor);
@@ -166,19 +166,9 @@ function Workspace() {
       <Button size="sm" icon="download" onClick={() => open(panelDrawerId("export"))} data-tip="Save files, add a track to the video or burn the text into the picture">
         Export
       </Button>
-      {/* The panels with no rail launcher stay mounted so their drawers open by id. */}
+      {/* The Source panel has no rail launcher (the source chip opens it), so its drawer stays mounted here. */}
       <span hidden>
         <WorkspacePanel ws={ws} panel="source" variant="icon" />
-        <ToolClickIn
-          host={MODULE_ID}
-          module="trimmer"
-          inputs={mediaPath ? [mediaPath] : []}
-          useLabel="Use this cut"
-          onUse={useCut}
-          width={760}
-          title="Trim first"
-          id={toolDrawerId("trimmer")}
-        />
       </span>
     </>
   );
@@ -211,6 +201,7 @@ export default function SubtitlesView({ moduleId }: ToolViewProps) {
   ws.useHost();
   useJobWatcher();
   usePrefsPersistence();
+  useSessionTransfer();
   const media = useHostMedia();
   useToolHandoff(moduleId, (h) => useSubtitles.getState().handleInputs(h.inputs));
 

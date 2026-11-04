@@ -57,6 +57,8 @@ interface RowProps {
   row: CueRow;
   index: number;
   active: boolean;
+  selected: boolean;
+  onSelect: (id: string) => void;
   last: boolean;
   issues: CueIssues;
   onPatch: (id: string, patch: Partial<Omit<CueRow, "id">>, key?: string) => void;
@@ -66,7 +68,7 @@ interface RowProps {
   onNav: (index: number, dir: 1 | -1) => void;
 }
 
-const Row = memo(function Row({ row, index, active, last, issues, onPatch, onAction, onSeek, onCaret, onNav }: RowProps) {
+const Row = memo(function Row({ row, index, active, selected, onSelect, last, issues, onPatch, onAction, onSeek, onCaret, onNav }: RowProps) {
   const items = (): MenuItem[] => [
     { id: "split", label: "Split at cursor", tip: "Cut this subtitle in two at the text cursor and share its time (Ctrl+Enter)", icon: "scissors", onSelect: () => onAction("split", row.id) },
     { id: "merge", label: "Merge with next", tip: last ? "This is the last subtitle" : "Join this subtitle and the next into one", icon: "arrow-left-right", disabled: last, onSelect: () => onAction("merge", row.id) },
@@ -92,11 +94,14 @@ const Row = memo(function Row({ row, index, active, last, issues, onPatch, onAct
 
   return (
     <div
-      className={cx(styles.row, active && styles.active, issues.errors.length > 0 && styles.bad)}
+      className={cx(styles.row, active && styles.active, selected && styles.selected, issues.errors.length > 0 && styles.bad)}
       style={{ height: ROW_HEIGHT }}
       data-active={active || undefined}
+      data-selected={selected || undefined}
+      onFocus={() => onSelect(row.id)}
       data-testid="cue-row"
       onClick={(e) => {
+        onSelect(row.id);
         if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.seek !== undefined) onSeek(row.startMs);
       }}
     >
@@ -159,10 +164,13 @@ export interface CueListProps {
   /** Focus this cue's text next time it is rendered (after an insert). */
   focusId?: string;
   onFocused?: () => void;
+  /** The selected cue (clicked or being edited): marked apart from the playhead's. */
+  selectedId?: string;
+  onSelect?: (id: string) => void;
 }
 
 /** The cue list: fixed-height rows, windowed above WINDOW_THRESHOLD cues. */
-export function CueList({ rows, activeIndex, playing, maxLine, onPatch, onAction, onSeek, focusId, onFocused }: CueListProps) {
+export function CueList({ rows, activeIndex, playing, maxLine, onPatch, onAction, onSeek, focusId, onFocused, selectedId, onSelect }: CueListProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const carets = useRef(new Map<string, number>());
   const [scrollTop, setScrollTop] = useState(0);
@@ -227,6 +235,7 @@ export function CueList({ rows, activeIndex, playing, maxLine, onPatch, onAction
     }
   }, [pendingFocus, rows, first, last]);
 
+  const select = useCallback((id: string) => onSelect?.(id), [onSelect]);
   const onCaret = useCallback((id: string, caret: number) => {
     carets.current.set(id, caret);
   }, []);
@@ -263,6 +272,8 @@ export function CueList({ rows, activeIndex, playing, maxLine, onPatch, onAction
               row={row}
               index={i}
               active={i === activeIndex}
+              selected={!!selectedId && row.id === selectedId}
+              onSelect={select}
               last={i === rows.length - 1}
               issues={issues.get(i) ?? { errors: [], warnings: [] }}
               onPatch={onPatch}
