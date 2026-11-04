@@ -73,7 +73,7 @@ describe("sendToMenuItems", () => {
     expect(h.popOutTool).toHaveBeenCalledWith("bg-remover", expect.objectContaining({ handoff: { moduleId: "bg-remover", inputs: ["/x/a.png"] } }));
     items[0]!.onSelect();
     expect(useUI.getState().handoff).toEqual({ moduleId: "bg-remover", inputs: ["/x/a.png"] });
-    items[4]!.onSelect();
+    items[2]!.onSelect();
     expect(h.addToPost).toHaveBeenCalledWith("/x/a.png");
   });
 
