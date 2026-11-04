@@ -48,7 +48,7 @@ export function Preview({ look, aspect, rows, ms, coverUrl, imageUrl, backdropNo
     };
 
   return (
-    <div className={styles.frame} style={{ aspectRatio: RATIOS[aspect] ?? "16 / 9" }} data-testid="lyric-preview" data-aspect={aspect}>
+    <div className={styles.frame} style={{ aspectRatio: RATIOS[aspect] ?? "16 / 9" }} data-testid="lyric-preview" data-aspect={aspect} data-tip="An approximate preview of the video at the playhead">
       {backdropNode ? <div className={styles.backdrop}>{backdropNode}</div> : <div className={styles.backdrop} style={backdrop} />}
       {bg === "video" && <div className={styles.note}>Video background (see Render preview)</div>}
       {sharpCover && <img className={cx(styles.cover, wide ? styles.coverWide : styles.coverTall)} src={coverUrl} alt="" />}

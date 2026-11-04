@@ -34,7 +34,7 @@ export function RunStatus({ run, runningLabel, showResult = true, doneLabel = "D
       <div className={styles.runBox} role="status" aria-live="polite">
         <div className={styles.runHead}>
           <span>{queued ? "Waiting to start…" : runningLabel}</span>
-          <Button size="sm" variant="ghost" onClick={run.cancel}>
+          <Button size="sm" variant="ghost" onClick={run.cancel} data-tip="Stop this and discard what was made so far">
             Cancel
           </Button>
         </div>
@@ -57,7 +57,7 @@ export function RunStatus({ run, runningLabel, showResult = true, doneLabel = "D
     const result = parseResult(job.resultJson);
     const outputs = result?.outputs?.length ? result.outputs : job.outputs.map((o) => o.path);
     return (
-      <div className={styles.resultCard} aria-label="Result">
+      <div className={styles.resultCard} aria-label="Result" data-tip="The finished files are saved in your Library">
         <div className={styles.resultHead}>
           <Icon name="check" size={14} />
           <span>{doneLabel}</span>
@@ -68,11 +68,11 @@ export function RunStatus({ run, runningLabel, showResult = true, doneLabel = "D
             return (
               <li key={path} className={styles.resultRow}>
                 <Icon name={/\.lrc$/i.test(path) ? "file-text" : "film"} size={14} />
-                <span className={styles.resultName} title={path}>
+                <span className={styles.resultName} data-tip={path}>
                   {basename(path)}
                 </span>
                 <FileActions outputId={out?.id} path={path} disabled={out?.missing} />
-                <IconButton size="sm" icon="copy" label="Copy path" onClick={() => void copyText(path, { what: "path" })} />
+                <IconButton size="sm" icon="copy" label="Copy path" data-tip="Copy the full path of this file" onClick={() => void copyText(path, { what: "path" })} />
               </li>
             );
           })}

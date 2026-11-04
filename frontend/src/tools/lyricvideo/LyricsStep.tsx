@@ -55,10 +55,10 @@ export interface LyricsStepProps {
   onContinue: () => void;
 }
 
-const SOURCE_OPTIONS: Array<{ value: LyricSource; label: string }> = [
-  { value: LyricSource.SourceDetect, label: "Detect from the song" },
-  { value: LyricSource.SourceAlign, label: "Paste lyrics" },
-  { value: LyricSource.SourceFile, label: "From a file" },
+const SOURCE_OPTIONS: Array<{ value: LyricSource; label: string; tip: string }> = [
+  { value: LyricSource.SourceDetect, label: "Detect from the song", tip: "Listen to the isolated vocals and write out the words with timing" },
+  { value: LyricSource.SourceAlign, label: "Paste lyrics", tip: "Paste the real lyrics; they are matched to the singing for accurate timing" },
+  { value: LyricSource.SourceFile, label: "From a file", tip: "Load lyrics that already have timing from an .lrc, .srt or .vtt file, or plain .txt" },
 ];
 
 function basenameOf(p: string): string {
@@ -85,7 +85,7 @@ export function LyricsStep(p: LyricsStepProps) {
 
   return (
     <div className={styles.lyricsBody}>
-      <Section label="Where do the lyrics come from?">
+      <Section label="Where do the lyrics come from?" tip="How to get the words and when each line is sung">
         <div className={styles.form}>
           <SegmentedControl
             aria-label="Lyrics source"
@@ -98,6 +98,7 @@ export function LyricsStep(p: LyricsStepProps) {
               <span className={styles.fieldLabel}>Lyrics (recommended)</span>
               <TextArea
                 aria-label="Lyrics"
+                data-tip="Plain text, one line per row; up to 20,000 characters"
                 minRows={5}
                 maxRows={12}
                 maxLength={20000}
@@ -113,7 +114,7 @@ export function LyricsStep(p: LyricsStepProps) {
           )}
           {source === "file" && (
             <div className={styles.buttonRow}>
-              <Button variant="secondary" icon="file-text" onClick={p.onPickLyricsFile}>
+              <Button variant="secondary" icon="file-text" onClick={p.onPickLyricsFile} data-tip="Pick a lyrics file: .lrc, .srt, .vtt or .txt">
                 Choose a .lrc, .srt, .vtt or .txt…
               </Button>
               <span className={styles.muted}>{p.lyricsPath ? basenameOf(p.lyricsPath) : "No file chosen"}</span>
@@ -122,12 +123,12 @@ export function LyricsStep(p: LyricsStepProps) {
           {source !== "file" && (
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Sung language</span>
-              <Select aria-label="Sung language" value={prefs.language} options={languageOptions} onChange={(language) => setPrefs((o) => ({ ...o, language }))} />
+              <Select aria-label="Sung language" data-tip="The language of the singing; set it if auto-detect gets it wrong" value={prefs.language} options={languageOptions} onChange={(language) => setPrefs((o) => ({ ...o, language }))} />
             </label>
           )}
           <DepsGate moduleId={p.moduleId} />
           <div className={styles.buttonRow}>
-            <Button icon="wand-sparkles" onClick={p.onGetTimings} loading={p.gen.busy} disabled={!canGet}>
+            <Button icon="wand-sparkles" onClick={p.onGetTimings} loading={p.gen.busy} disabled={!canGet} data-tip={canGet ? "Find out when each line is sung and fill the sheet below" : p.gen.busy ? "Timing is already running" : p.engineBlocked ? "The AI engine isn't installed yet" : source === "align" ? "Paste the lyrics first" : "Choose a lyrics file first"}>
               Get timings
             </Button>
           </div>
@@ -151,22 +152,23 @@ export function LyricsStep(p: LyricsStepProps) {
         </Banner>
       )}
 
-      <Section label="Lyric lines">
+      <Section label="Lyric lines" tip="The lines of the song and when each starts and ends; edit them here">
         <div className={styles.sheetTools}>
-          <Button size="sm" variant="secondary" icon="plus" onClick={p.onInsert} disabled={p.tapping}>
+          <Button size="sm" variant="secondary" icon="plus" onClick={p.onInsert} disabled={p.tapping} data-tip="Add a new line after the selected one">
             Insert line
           </Button>
-          <Button size="sm" variant="secondary" icon="trash-2" onClick={p.onDelete} disabled={!p.canDelete || p.tapping}>
+          <Button size="sm" variant="secondary" icon="trash-2" onClick={p.onDelete} disabled={!p.canDelete || p.tapping} data-tip="Delete the selected lines">
             Delete
           </Button>
-          <IconButton size="sm" icon="undo-2" label="Undo" disabled={!p.canUndo} onClick={p.onUndo} />
-          <IconButton size="sm" icon="redo-2" label="Redo" disabled={!p.canRedo} onClick={p.onRedo} />
-          <span className={styles.shiftGroup}>
-            <IconButton size="sm" icon="minus" label="Shift all earlier" disabled={!hasRows || p.tapping} onClick={() => applyShift(-1)} />
+          <IconButton size="sm" icon="undo-2" label="Undo" data-tip="Undo the last lyric edit" disabled={!p.canUndo} onClick={p.onUndo} />
+          <IconButton size="sm" icon="redo-2" label="Redo" data-tip="Redo the edit you just undid" disabled={!p.canRedo} onClick={p.onRedo} />
+          <span className={styles.shiftGroup} data-tip="Move every line earlier or later by the same amount to fix a constant offset">
+            <IconButton size="sm" icon="minus" label="Shift all earlier" data-tip="Move every line earlier by the amount in the box (100 ms if empty)" disabled={!hasRows || p.tapping} onClick={() => applyShift(-1)} />
             <TextField
               size="sm"
               mono
               aria-label="Shift all by (ms)"
+              data-tip="Milliseconds to shift all lines by; leave empty for 100"
               wrapperClassName={styles.shiftField}
               value={shift}
               placeholder="100"
@@ -174,15 +176,15 @@ export function LyricsStep(p: LyricsStepProps) {
               onChange={(e) => setShift(e.target.value)}
             />
             <span className={styles.muted}>ms</span>
-            <IconButton size="sm" icon="plus" label="Shift all later" disabled={!hasRows || p.tapping} onClick={() => applyShift(1)} />
+            <IconButton size="sm" icon="plus" label="Shift all later" data-tip="Move every line later by the amount in the box (100 ms if empty)" disabled={!hasRows || p.tapping} onClick={() => applyShift(1)} />
           </span>
           <span className={styles.spacer} />
           {p.tapping ? (
-            <Button size="sm" icon="square" onClick={p.onTapEnd}>
+            <Button size="sm" icon="square" onClick={p.onTapEnd} data-tip="Stop tapping and keep the times you set" data-tip-kbd="Escape">
               Stop tapping
             </Button>
           ) : (
-            <Button size="sm" icon="pointer" onClick={p.onTapStart} disabled={!hasRows}>
+            <Button size="sm" icon="pointer" onClick={p.onTapStart} disabled={!hasRows} data-tip={hasRows ? "Play the song and press Space as each line starts to set its time" : "Add some lyric lines first"}>
               Tap to sync
             </Button>
           )}
@@ -190,7 +192,7 @@ export function LyricsStep(p: LyricsStepProps) {
             label="More"
             icon="chevron-down"
             size="sm"
-            items={() => [{ id: "lrc", label: "Export .lrc", icon: "file-text", disabled: !hasRows || !!p.blocker || p.lrc.busy, onSelect: p.onExportLrc }]}
+            items={() => [{ id: "lrc", label: "Export .lrc", tip: "Save the timed lyrics as an .lrc file you can use in music players", icon: "file-text", disabled: !hasRows || !!p.blocker || p.lrc.busy, onSelect: p.onExportLrc }]}
           />
         </div>
 
@@ -229,7 +231,7 @@ export function LyricsStep(p: LyricsStepProps) {
         ) : (
           <div className={styles.emptySheet}>
             No lyrics yet. Get timings above, or
-            <Button size="sm" variant="ghost" onClick={p.onInsert}>
+            <Button size="sm" variant="ghost" onClick={p.onInsert} data-tip="Start the sheet with one empty line">
               add a line by hand
             </Button>
           </div>
@@ -237,7 +239,7 @@ export function LyricsStep(p: LyricsStepProps) {
       </Section>
 
       <div className={styles.footer}>
-        <Button onClick={p.onContinue} disabled={!hasRows || !!p.blocker || p.tapping}>
+        <Button onClick={p.onContinue} disabled={!hasRows || !!p.blocker || p.tapping} data-tip={p.blocker || (!hasRows ? "Add some lyric lines first" : p.tapping ? "Finish tapping first" : "Go on to choose the background visuals")}>
           Continue to Visuals
         </Button>
       </div>

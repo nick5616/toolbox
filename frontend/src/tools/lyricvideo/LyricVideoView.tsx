@@ -49,6 +49,14 @@ import { componentInstalled, STEMS_MODEL, stepAnalyzeOptions, visualizerSeed } f
 import styles from "./LyricVideoView.module.css";
 
 type Step = "song" | "lyrics" | "visuals" | "look" | "render";
+const STEP_TIP: Record<Step, string> = {
+  song: "Choose the song and its title and artist",
+  lyrics: "Get the lyrics and when each line is sung, then fix them",
+  visuals: "Choose animated visuals that react to the song",
+  look: "Pick the shape, background and how the words look",
+  render: "Preview and render the finished video",
+};
+
 const STEPS: Array<{ id: Step; label: string }> = [
   { id: "song", label: "Song" },
   { id: "lyrics", label: "Lyrics" },
@@ -445,12 +453,13 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
             type="button"
             className={cx(styles.step, step === s.id && styles.stepOn)}
             aria-current={step === s.id ? "step" : undefined}
+            data-tip={tapping ? "Finish tapping first" : reachable(s.id) ? STEP_TIP[s.id] : STEP_TIP[s.id] + " (finish the earlier steps first)"}
             disabled={!reachable(s.id)}
             onClick={() => (tapping ? undefined : setStep(s.id))}
           >
             <span className={styles.stepNum}>{i + 1}</span>
             {s.label}
-            {s.id === "lyrics" && dirty && <span className={styles.dot} role="img" aria-label="Edited lines" />}
+            {s.id === "lyrics" && dirty && <span className={styles.dot} role="img" aria-label="Edited lines" data-tip="You have edited the lyric lines" />}
             {i < STEPS.length - 1 && <Icon name="chevron-right" size={12} className={styles.stepSep} />}
           </button>
         ))}

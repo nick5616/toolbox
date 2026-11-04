@@ -27,6 +27,22 @@ export interface LookStepProps {
   onContinue: () => void;
 }
 
+const ASPECT_TIP: Record<string, string> = {
+  "16:9": "Widescreen, for YouTube and TVs",
+  "9:16": "Tall, for Reels, Shorts and TikTok",
+  "1:1": "Square, for feed posts",
+  "4:5": "Slightly tall, for Instagram feed posts",
+};
+
+const BACKGROUND_TIP: Record<string, string> = {
+  "blur-cover": "A heavily blurred copy of the cover art fills the picture",
+  cover: "The sharp cover art in the middle over a blurred copy of it",
+  color: "A single plain colour",
+  gradient: "A smooth fade between two colours, top to bottom",
+  image: "Your own picture behind the words",
+  video: "Your own video looping behind the words",
+};
+
 const BACKGROUND_CARDS: Array<{ id: string; label: string; icon: string }> = [
   { id: "blur-cover", label: "Blurred cover", icon: "image" },
   { id: "cover", label: "Cover and blur", icon: "music" },
@@ -65,48 +81,49 @@ export function LookStep(p: LookStepProps) {
             }
           />
         </div>
-        <div className={styles.hint}>Preview is approximate — Render preview shows the exact result.</div>
+        <div className={styles.hint} data-tip="This preview is drawn quickly in the window; the render preview is exact">Preview is approximate — Render preview shows the exact result.</div>
         {p.player}
       </div>
 
       <div className={styles.lookRight}>
-        <Section label="Shape">
+        <Section label="Shape" tip="The proportions and sharpness of the video">
           <div className={styles.form}>
             <SegmentedControl
               aria-label="Aspect"
               value={prefs.aspect}
-              options={ASPECTS.map((a) => ({ value: a, label: a }))}
+              options={ASPECTS.map((a) => ({ value: a, label: a, tip: ASPECT_TIP[a] ?? "Video shape " + a }))}
               onChange={(aspect) => setPrefs((o) => ({ ...o, aspect }))}
             />
             <SegmentedControl
               aria-label="Quality"
               value={String(prefs.height)}
               options={[
-                { value: "720", label: "720p" },
-                { value: "1080", label: "1080p" },
+                { value: "720", label: "720p", tip: "Smaller file and faster to render" },
+                { value: "1080", label: "1080p", tip: "Full HD; sharper text, slower to render" },
               ]}
               onChange={(v) => setPrefs((o) => ({ ...o, height: Number(v) }))}
             />
           </div>
         </Section>
 
-        <Section label="Background">
+        <Section label="Background" tip="What is behind the words">
           {visuals && (
             <div className={styles.buttonRow}>
-              <span data-testid="visuals-label">Visuals: {designLabel(look)}</span>
-              <Button size="sm" variant="ghost" onClick={p.onChangeVisuals}>
+              <span data-testid="visuals-label" data-tip="The animated visuals chosen in the Visuals step">Visuals: {designLabel(look)}</span>
+              <Button size="sm" variant="ghost" onClick={p.onChangeVisuals} data-tip="Go back to the Visuals step to change the design">
                 Change
               </Button>
             </div>
           )}
           {!visuals && (
-            <div className={styles.bgGrid} role="radiogroup" aria-label="Background">
+            <div className={styles.bgGrid} role="radiogroup" aria-label="Background" data-tip="Choose what is behind the words">
               {BACKGROUND_CARDS.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   role="radio"
                   aria-checked={look.background === c.id}
+                  data-tip={BACKGROUND_TIP[c.id] ?? c.label}
                   className={cx(styles.bgCard, look.background === c.id && styles.bgCardOn)}
                   onClick={() => setLook({ background: c.id })}
                 >
@@ -123,7 +140,7 @@ export function LookStep(p: LookStepProps) {
           )}
           {(look.background === "image" || look.background === "video") && (
             <div className={styles.buttonRow}>
-              <Button size="sm" variant="secondary" icon="folder-open" onClick={() => p.onPickBackground(look.background === "image" ? "image" : "video")}>
+              <Button size="sm" variant="secondary" icon="folder-open" data-tip={look.background === "image" ? "Pick a picture to use as the background" : "Pick a video to play behind the words"} onClick={() => p.onPickBackground(look.background === "image" ? "image" : "video")}>
                 {look.backgroundPath ? "Change…" : look.background === "image" ? "Choose an image…" : "Choose a video…"}
               </Button>
               <span className={styles.muted}>{look.backgroundPath ? basename(look.backgroundPath) : "Nothing chosen yet"}</span>
@@ -133,12 +150,12 @@ export function LookStep(p: LookStepProps) {
           {(look.background === "color" || look.background === "gradient") && (
             <div className={styles.form}>
               <div className={styles.field}>
-                <span className={styles.fieldLabel}>{look.background === "gradient" ? "Top colour" : "Colour"}</span>
+                <span className={styles.fieldLabel} data-tip="White, black or any #rrggbb colour">{look.background === "gradient" ? "Top colour" : "Colour"}</span>
                 <ColorSwatchPicker aria-label="Background colour" value={look.color1} onChange={(color1) => setLook({ color1 })} />
               </div>
               {look.background === "gradient" && (
                 <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Bottom colour</span>
+                  <span className={styles.fieldLabel} data-tip="The colour the gradient fades to at the bottom">Bottom colour</span>
                   <ColorSwatchPicker aria-label="Gradient bottom colour" value={look.color2} onChange={(color2) => setLook({ color2 })} />
                 </div>
               )}
@@ -146,60 +163,60 @@ export function LookStep(p: LookStepProps) {
           )}
         </Section>
 
-        <Section label="Text">
+        <Section label="Text" tip="How the lyrics look on screen">
           <div className={styles.form}>
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Font</span>
-              <Select aria-label="Font" value={look.font} options={fontOptions} onChange={(font) => setLook({ font })} />
+              <Select aria-label="Font" data-tip="The typeface for the lyrics" value={look.font} options={fontOptions} onChange={(font) => setLook({ font })} />
             </label>
             <div className={styles.field}>
-              <span className={styles.fieldLabel}>Text colour</span>
+              <span className={styles.fieldLabel} data-tip="Colour of the lyrics; white, black or any #rrggbb">Text colour</span>
               <ColorSwatchPicker aria-label="Text colour" value={look.textColor} onChange={(textColor) => setLook({ textColor })} />
             </div>
             <div className={styles.field}>
-              <span className={styles.fieldLabel}>Highlight colour</span>
+              <span className={styles.fieldLabel} data-tip="Colour of the word being sung when Karaoke fill is on">Highlight colour</span>
               <ColorSwatchPicker aria-label="Highlight colour" value={look.highlightColor} onChange={(highlightColor) => setLook({ highlightColor })} />
             </div>
-            <Switch checked={look.karaoke} onChange={(karaoke) => setLook({ karaoke })} label="Karaoke fill" />
+            <Switch tip="Fill each word with the highlight colour as it is sung" checked={look.karaoke} onChange={(karaoke) => setLook({ karaoke })} label="Karaoke fill" />
             <div className={styles.field}>
               <span className={styles.fieldLabel}>Position</span>
               <SegmentedControl
                 aria-label="Position"
                 value={look.position}
                 options={[
-                  { value: "center", label: "Centre" },
-                  { value: "lower", label: "Lower" },
+                  { value: "center", label: "Centre", tip: "Put the lyrics in the middle of the picture" },
+                  { value: "lower", label: "Lower", tip: "Put the lyrics near the bottom, like subtitles" },
                 ]}
                 onChange={(position) => setLook({ position })}
               />
             </div>
-            <Switch checked={look.showNext} onChange={(showNext) => setLook({ showNext })} label="Show next line" />
+            <Switch tip="Also show the upcoming line, dimmed, so viewers can read ahead" checked={look.showNext} onChange={(showNext) => setLook({ showNext })} label="Show next line" />
           </div>
         </Section>
 
-        <Section label="Extras">
+        <Section label="Extras" tip="Optional additions to the video">
           <div className={styles.form}>
             {!visuals && (
               <div className={styles.field}>
-                <span className={styles.fieldLabel}>Visualiser</span>
+                <span className={styles.fieldLabel} data-tip="A simple moving graphic that follows the sound">Visualiser</span>
                 <SegmentedControl
                   aria-label="Visualiser"
                   value={look.visualizer}
                   options={[
-                    { value: "none", label: "None" },
-                    { value: "wave", label: "Wave" },
-                    { value: "bars", label: "Bars" },
+                    { value: "none", label: "None", tip: "No audio visualiser" },
+                    { value: "wave", label: "Wave", tip: "A moving waveform of the sound along the bottom" },
+                    { value: "bars", label: "Bars", tip: "Spectrum bars that jump with the sound" },
                   ]}
                   onChange={(visualizer) => setLook({ visualizer })}
                 />
               </div>
             )}
-            <Switch checked={look.titleCard} onChange={(titleCard) => setLook({ titleCard })} label="Title card" />
+            <Switch tip="Open the video with a card showing the song title and artist" checked={look.titleCard} onChange={(titleCard) => setLook({ titleCard })} label="Title card" />
           </div>
         </Section>
 
         <div className={styles.footer}>
-          <Button onClick={p.onContinue}>Continue to Render</Button>
+          <Button onClick={p.onContinue} data-tip="Go on to preview and render the video">Continue to Render</Button>
         </div>
       </div>
     </div>

@@ -31,6 +31,7 @@ function TimeField({ value, label, onCommit }: { value: number; label: string; o
   return (
     <TimecodeInput
       aria-label={label}
+      data-tip="When this line starts, as minutes:seconds; press Enter to apply"
       className={styles.time}
       value={draft ?? formatMs(value)}
       invalid={invalid}
@@ -80,20 +81,21 @@ const SheetRow = memo(function SheetRow({ row, index, active, selected, tapNext,
       onFocus={() => onSelect(row.id)}
       onClick={() => onSelect(row.id)}
     >
-      <span className={styles.rowNum}>{n}</span>
+      <span className={styles.rowNum} data-tip="Line number">{n}</span>
       <TimeField value={row.startMs} label={`Line ${n} start`} onCommit={(ms) => onStart(row.id, ms)} />
       <TextField
         size="sm"
         wrapperClassName={styles.rowText}
         aria-label={`Line ${n} text`}
+        data-tip={outOfOrder ? "This line starts before the previous one; fix its time" : suspect ? "This line may be mistimed; check it against the song" : "The words of this line"}
         value={row.text}
         placeholder="(empty line)"
         invalid={outOfOrder}
         onChange={(e) => onText(row.id, e.target.value)}
       />
-      <IconButton size="sm" icon="minus" label={`Line ${n} 0.1 s earlier`} onClick={() => onNudge(row.id, -NUDGE_MS)} />
-      <IconButton size="sm" icon="plus" label={`Line ${n} 0.1 s later`} onClick={() => onNudge(row.id, NUDGE_MS)} />
-      <IconButton size="sm" icon="play" label={`Play from line ${n}`} onClick={() => onPlay(row.startMs)} />
+      <IconButton size="sm" icon="minus" label={`Line ${n} 0.1 s earlier`} data-tip="Start this line 0.1 seconds earlier" onClick={() => onNudge(row.id, -NUDGE_MS)} />
+      <IconButton size="sm" icon="plus" label={`Line ${n} 0.1 s later`} data-tip="Start this line 0.1 seconds later" onClick={() => onNudge(row.id, NUDGE_MS)} />
+      <IconButton size="sm" icon="play" label={`Play from line ${n}`} data-tip="Play the song from the start of this line" onClick={() => onPlay(row.startMs)} />
     </div>
   );
 });
@@ -151,6 +153,7 @@ export function LyricSheet(p: LyricSheetProps) {
       ref={ref}
       role="list"
       aria-label="Lyric lines"
+      data-tip="Click a line to select it; edit its time and words in place"
       className={styles.sheet}
       onScroll={windowed ? (e) => setScrollTop(e.currentTarget.scrollTop) : undefined}
     >
