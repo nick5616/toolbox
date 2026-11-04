@@ -33,8 +33,9 @@ export function TranslateStep(p: TranslateStepProps) {
     <div className={styles.sourceBody}>
       <Section
         label="Translate"
+        tip="Translate the subtitles with your local chat model; nothing leaves your computer"
         action={
-          <Button size="sm" variant="ghost" icon="refresh-cw" onClick={p.onRefreshStatus}>
+          <Button size="sm" variant="ghost" icon="refresh-cw" onClick={p.onRefreshStatus} data-tip="Check again whether Local Chat has a model ready">
             Check again
           </Button>
         }
@@ -51,7 +52,7 @@ export function TranslateStep(p: TranslateStepProps) {
               tone="warn"
               title="Download a model in Local Chat to translate"
               action={
-                <Button size="sm" onClick={p.onOpenChat}>
+                <Button size="sm" onClick={p.onOpenChat} data-tip="Go to Local Chat to download a model">
                   Open Local Chat
                 </Button>
               }
@@ -61,11 +62,11 @@ export function TranslateStep(p: TranslateStepProps) {
           )}
           <label className={styles.field}>
             <span className={styles.fieldLabel}>From</span>
-            <Select aria-label="Source language" value={p.sourceLanguage} options={sourceOptions} onChange={p.onSource} />
+            <Select aria-label="Source language" data-tip="The language of the current subtitles; Unknown lets the model work it out" value={p.sourceLanguage} options={sourceOptions} onChange={p.onSource} />
           </label>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>To</span>
-            <Select aria-label="Target language" value={p.targetLanguage} options={targetOptions} onChange={p.onTarget} />
+            <Select aria-label="Target language" data-tip="The language to translate into; the result becomes a new track" value={p.targetLanguage} options={targetOptions} onChange={p.onTarget} />
           </label>
           {p.blocker && (
             <Banner tone="warn" title="Fix this before translating">
@@ -78,6 +79,7 @@ export function TranslateStep(p: TranslateStepProps) {
               icon="languages"
               loading={p.run.busy}
               disabled={!ready || p.targetLanguage === "" || p.cueCount === 0 || p.blocker !== null || p.run.busy}
+              data-tip={!ready ? "Local Chat needs a downloaded model first" : p.targetLanguage === "" ? "Choose the language to translate into" : p.cueCount === 0 ? "There are no subtitles to translate" : p.blocker ?? (p.run.busy ? "Translation is already running" : "Translate every subtitle with the local chat model")}
               onClick={p.onTranslate}
             >
               Translate {p.cueCount} {p.cueCount === 1 ? "subtitle" : "subtitles"}

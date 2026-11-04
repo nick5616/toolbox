@@ -31,6 +31,7 @@ function TimeField({ value, label, onCommit }: { value: number; label: string; o
   return (
     <TimecodeInput
       aria-label={label}
+      data-tip="Time as minutes:seconds.milliseconds; press Enter to apply"
       className={styles.time}
       value={draft ?? formatMs(value)}
       invalid={invalid}
@@ -67,12 +68,12 @@ interface RowProps {
 
 const Row = memo(function Row({ row, index, active, last, issues, onPatch, onAction, onSeek, onCaret, onNav }: RowProps) {
   const items = (): MenuItem[] => [
-    { id: "split", label: "Split at cursor", icon: "scissors", onSelect: () => onAction("split", row.id) },
-    { id: "merge", label: "Merge with next", icon: "arrow-left-right", disabled: last, onSelect: () => onAction("merge", row.id) },
-    { id: "insert", label: "Insert after", icon: "plus", onSelect: () => onAction("insert", row.id) },
-    { id: "start", label: "Start at playhead", icon: "skip-back", onSelect: () => onAction("startAtPlayhead", row.id) },
-    { id: "end", label: "End at playhead", icon: "skip-forward", onSelect: () => onAction("endAtPlayhead", row.id) },
-    { id: "delete", label: "Delete", icon: "trash-2", onSelect: () => onAction("delete", row.id) },
+    { id: "split", label: "Split at cursor", tip: "Cut this subtitle in two at the text cursor and share its time (Ctrl+Enter)", icon: "scissors", onSelect: () => onAction("split", row.id) },
+    { id: "merge", label: "Merge with next", tip: last ? "This is the last subtitle" : "Join this subtitle and the next into one", icon: "arrow-left-right", disabled: last, onSelect: () => onAction("merge", row.id) },
+    { id: "insert", label: "Insert after", tip: "Add a new empty subtitle after this one", icon: "plus", onSelect: () => onAction("insert", row.id) },
+    { id: "start", label: "Start at playhead", tip: "Make this subtitle begin where the video is now", icon: "skip-back", onSelect: () => onAction("startAtPlayhead", row.id) },
+    { id: "end", label: "End at playhead", tip: "Make this subtitle end where the video is now", icon: "skip-forward", onSelect: () => onAction("endAtPlayhead", row.id) },
+    { id: "delete", label: "Delete", tip: "Remove this subtitle", icon: "trash-2", onSelect: () => onAction("delete", row.id) },
   ];
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -100,7 +101,7 @@ const Row = memo(function Row({ row, index, active, last, issues, onPatch, onAct
       }}
     >
       <div className={styles.head} data-seek="">
-        <span className={styles.index} data-seek="">
+        <span className={styles.index} data-seek="" data-tip="Subtitle number; click the row to jump the video here">
           {index + 1}
         </span>
         <TimeField value={row.startMs} label={`Subtitle ${index + 1} start`} onCommit={(ms) => onPatch(row.id, { startMs: ms }, `start:${row.id}`)} />
@@ -108,15 +109,16 @@ const Row = memo(function Row({ row, index, active, last, issues, onPatch, onAct
           →
         </span>
         <TimeField value={row.endMs} label={`Subtitle ${index + 1} end`} onCommit={(ms) => onPatch(row.id, { endMs: ms }, `end:${row.id}`)} />
-        <span className={styles.dur} data-seek="">
+        <span className={styles.dur} data-seek="" data-tip="How long this subtitle stays on screen">
           {durationS.toFixed(1)} s
         </span>
-        <span className={styles.menu}>
+        <span className={styles.menu} data-tip="Split, merge, insert, set timing from the playhead or delete">
           <MenuButton label={`Subtitle ${index + 1} actions`} icon="chevron-down" variant="ghost" size="sm" items={items} />
         </span>
       </div>
       <TextArea
         aria-label={`Subtitle ${index + 1} text`}
+        data-tip="The words shown; Ctrl+Enter splits at the cursor, Alt+Up or Down moves between subtitles"
         data-cue-text={row.id}
         className={styles.text}
         minRows={2}
@@ -131,12 +133,12 @@ const Row = memo(function Row({ row, index, active, last, issues, onPatch, onAct
       />
       <div className={styles.notes}>
         {issues.errors.map((m) => (
-          <span key={m} className={styles.error}>
+          <span key={m} className={styles.error} data-tip="Fix this before saving">
             {m}
           </span>
         ))}
         {issues.warnings.map((m) => (
-          <span key={m} className={styles.warn}>
+          <span key={m} className={styles.warn} data-tip="A suggestion; saving is still allowed">
             {m}
           </span>
         ))}
@@ -249,6 +251,7 @@ export function CueList({ rows, activeIndex, playing, maxLine, onPatch, onAction
       className={styles.list}
       role="list"
       aria-label="Subtitles"
+      data-tip="Click a row to jump the video to it"
       onScroll={(e) => windowed && setScrollTop(e.currentTarget.scrollTop)}
     >
       <div style={{ height: first * ROW_HEIGHT }} aria-hidden />

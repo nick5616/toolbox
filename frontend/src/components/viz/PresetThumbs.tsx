@@ -208,21 +208,21 @@ export function PresetThumbs({ items, analysis, timeMs, aspect, mode, selectedId
   };
 
   return (
-    <div className={cx(styles.grid, className)} role="group" aria-label="Designs">
+    <div className={cx(styles.grid, className)} role="group" aria-label="Designs" data-tip="Ready-made designs shown live with your music; click one to use it">
       {unavailable && <p className={styles.note}>This computer&apos;s graphics can&apos;t draw live previews, so the cards show names only.</p>}
       {ordered.map((item) => {
         const selected = item.id === selectedId;
         const hasMenu = item.kind === "mine" && (onRename || onDelete);
         return (
           <div key={item.id} className={cx(styles.card, selected && styles.selected)}>
-            <button type="button" className={styles.pick} aria-pressed={selected} aria-label={item.name} onClick={() => onSelect(item)}>
+            <button type="button" className={styles.pick} aria-pressed={selected} aria-label={item.name} data-tip={item.description ? `${item.name}: ${item.description}` : item.name} onClick={() => onSelect(item)}>
               <span className={styles.thumb} style={{ aspectRatio: `${w} / ${h}` }}>
                 <canvas ref={setCanvas(item.id)} width={w} height={h} className={styles.canvas} />
               </span>
               <span className={styles.name}>
                 {item.name}
                 {item.kind === "mine" && (
-                  <Badge tone="accent" className={styles.badge}>
+                  <Badge tone="accent" className={styles.badge} tip="A design you saved yourself">
                     Mine
                   </Badge>
                 )}
@@ -237,8 +237,8 @@ export function PresetThumbs({ items, analysis, timeMs, aspect, mode, selectedId
                   variant="ghost"
                   size="sm"
                   items={() => [
-                    ...(onRename ? [{ id: "rename", label: "Rename", icon: "pencil", onSelect: () => setRenaming(item.id) }] : []),
-                    ...(onDelete ? [{ id: "delete", label: "Delete", icon: "trash-2", onSelect: () => onDelete(item) }] : []),
+                    ...(onRename ? [{ id: "rename", label: "Rename", tip: "Give this saved design a new name", icon: "pencil", onSelect: () => setRenaming(item.id) }] : []),
+                    ...(onDelete ? [{ id: "delete", label: "Delete", tip: "Remove this saved design", icon: "trash-2", onSelect: () => onDelete(item) }] : []),
                   ]}
                 />
               </span>
@@ -248,6 +248,7 @@ export function PresetThumbs({ items, analysis, timeMs, aspect, mode, selectedId
                 autoFocus
                 size="sm"
                 aria-label="Design name"
+                data-tip="Press Enter to rename, Esc to cancel"
                 defaultValue={item.name}
                 wrapperClassName={styles.rename}
                 onBlur={(e) => commitRename(item, e.currentTarget.value)}

@@ -52,6 +52,12 @@ import { useJobRun } from "./useJobRun";
 import styles from "./SubtitlesView.module.css";
 
 type Step = "source" | "edit" | "translate" | "export";
+const STEP_TIP: Record<Step, string> = {
+  source: "Generate subtitles from speech, or open ones you already have",
+  edit: "Fix the words and timing against the video",
+  translate: "Translate the subtitles into another language",
+  export: "Save files, add a track to the video or burn the text into the picture",
+};
 const STEPS: Array<{ id: Step; label: string }> = [
   { id: "source", label: "Source" },
   { id: "edit", label: "Edit" },
@@ -430,12 +436,13 @@ export default function SubtitlesView({ moduleId }: ToolViewProps) {
             type="button"
             className={cx(styles.step, step === s.id && styles.stepOn)}
             aria-current={step === s.id ? "step" : undefined}
+            data-tip={reachable(s.id) ? STEP_TIP[s.id] : STEP_TIP[s.id] + " (add or generate subtitles first)"}
             disabled={!reachable(s.id)}
             onClick={() => setStep(s.id)}
           >
             <span className={styles.stepNum}>{i + 1}</span>
             {s.label}
-            {s.id === "edit" && dirty && <span className={styles.dot} role="img" aria-label="Unsaved changes" />}
+            {s.id === "edit" && dirty && <span className={styles.dot} role="img" aria-label="Unsaved changes" data-tip="You have edits that aren't saved yet" />}
             {i < STEPS.length - 1 && <Icon name="chevron-right" size={12} className={styles.stepSep} />}
           </button>
         ))}

@@ -191,7 +191,7 @@ export function VisualsCanvas({ show, analysis, timeMs, aspect, mode, quality = 
   }
   return (
     <div ref={rootRef} className={cx(styles.root, className)}>
-      <canvas key={mode} ref={canvasRef} className={styles.canvas} style={{ width: size.cssW, height: size.cssH, background: mode === "overlay" ? "transparent" : undefined }} aria-label="Visual preview" />
+      <canvas key={mode} ref={canvasRef} className={styles.canvas} style={{ width: size.cssW, height: size.cssH, background: mode === "overlay" ? "transparent" : undefined }} aria-label="Visual preview" data-tip="Live preview of the visuals, drawn from the song" />
     </div>
   );
 }

@@ -21,11 +21,12 @@ export function TabBar({ tabs, activeId, onSelect }: { tabs: EditorTab[]; active
           type="button"
           role="tab"
           aria-selected={t.id === activeId}
+          data-tip="Switch to this subtitle track"
           className={cx(styles.tab, t.id === activeId && styles.tabOn)}
           onClick={() => onSelect(t.id)}
         >
           {t.label}
-          {isDirty(t) && <span className={styles.dot} aria-label="Unsaved changes" />}
+          {isDirty(t) && <span className={styles.dot} aria-label="Unsaved changes" data-tip="This track has changes you haven't saved" />}
         </button>
       ))}
     </div>
@@ -104,7 +105,7 @@ export function EditStep(p: EditStepProps) {
         title="No video to preview against"
         body="You can edit without one. Pick the video to see the subtitles on the picture."
         action={
-          <Button icon="film" onClick={p.onPickMedia}>
+          <Button icon="film" onClick={p.onPickMedia} data-tip="Choose the video to preview the subtitles against">
             Pick the video…
           </Button>
         }
@@ -125,7 +126,7 @@ export function EditStep(p: EditStepProps) {
     );
   } else if (p.media.status === "error") {
     left = (
-      <Banner tone="danger" title={p.media.error?.message ?? "Couldn't open the file"} action={<Button size="sm" onClick={p.media.retry}>Try again</Button>}>
+      <Banner tone="danger" title={p.media.error?.message ?? "Couldn't open the file"} action={<Button size="sm" onClick={p.media.retry} data-tip="Try opening the file again">Try again</Button>}>
         {p.media.error?.hint}
       </Banner>
     );
@@ -142,7 +143,7 @@ export function EditStep(p: EditStepProps) {
           overlay={kind === "video" ? overlay : undefined}
           className={styles.player}
         />
-        {kind === "audio" && current && <div className={styles.audioCue}>{current.text}</div>}
+        {kind === "audio" && current && <div className={styles.audioCue} data-tip="The subtitle at the playhead">{current.text}</div>}
         <Timeline
           durationMs={info?.durationMs ?? 0}
           playheadMs={p.playheadMs}
@@ -166,17 +167,18 @@ export function EditStep(p: EditStepProps) {
       <div className={styles.editLeft}>{left}</div>
       <div className={styles.editRight}>
         <TabBar tabs={p.tabs} activeId={p.activeId} onSelect={p.onSelectTab} />
-        <div className={styles.toolbar} role="toolbar" aria-label="Subtitle tools">
-          <IconButton size="sm" icon="undo-2" label="Undo" kbd="Mod+Z" disabled={!p.canUndo} onClick={p.onUndo} />
-          <IconButton size="sm" icon="redo-2" label="Redo" kbd="Mod+Shift+Z" disabled={!p.canRedo} onClick={p.onRedo} />
+        <div className={styles.toolbar} role="toolbar" aria-label="Subtitle tools" data-tip="Tools for the whole subtitle list">
+          <IconButton size="sm" icon="undo-2" label="Undo" data-tip="Undo the last subtitle edit" kbd="Mod+Z" disabled={!p.canUndo} onClick={p.onUndo} />
+          <IconButton size="sm" icon="redo-2" label="Redo" data-tip="Redo the edit you just undid" kbd="Mod+Shift+Z" disabled={!p.canRedo} onClick={p.onRedo} />
           <span className={styles.sep} aria-hidden />
-          <span className={styles.shiftLabel} id="shift-label">
+          <span className={styles.shiftLabel} id="shift-label" data-tip="If every subtitle comes too late, enter by how much and press Shift to move them all earlier (use a negative number if they are early)">
             Subtitles are late by
           </span>
-          <Stepper aria-labelledby="shift-label" value={lateBy} step={100} min={-600000} max={600000} unit="ms" onChange={setLateBy} />
+          <Stepper aria-labelledby="shift-label" data-tip="How many milliseconds late the subtitles are" value={lateBy} step={100} min={-600000} max={600000} unit="ms" onChange={setLateBy} />
           <Button
             size="sm"
             variant="secondary"
+            data-tip={lateBy === 0 ? "Enter how late the subtitles are first" : p.rows.length === 0 ? "There are no subtitles to shift" : "Move every subtitle earlier by that amount"}
             disabled={lateBy === 0 || p.rows.length === 0}
             onClick={() => {
               p.onShift(-lateBy);
@@ -186,19 +188,19 @@ export function EditStep(p: EditStepProps) {
             Shift
           </Button>
           <span className={styles.sep} aria-hidden />
-          <IconButton size="sm" icon="search" label="Find and replace" pressed={findOpen} onClick={() => setFindOpen((o) => !o)} />
+          <IconButton size="sm" icon="search" label="Find and replace" data-tip="Search the subtitle text and replace it everywhere" pressed={findOpen} onClick={() => setFindOpen((o) => !o)} />
           <span className={styles.grow} />
-          <Button size="sm" icon="check" kbd="Mod+S" loading={p.save.busy} disabled={p.rows.length === 0 || p.blocker !== null || p.save.busy} onClick={p.onSave}>
+          <Button size="sm" icon="check" kbd="Mod+S" data-tip={p.blocker ? "Fix the problem shown below first" : p.rows.length === 0 ? "There are no subtitles to save" : "Write the subtitles to a file in your Library"} loading={p.save.busy} disabled={p.rows.length === 0 || p.blocker !== null || p.save.busy} onClick={p.onSave}>
             Save
           </Button>
         </div>
         {findOpen && (
           <div className={styles.findRow}>
-            <TextField size="sm" aria-label="Find" placeholder="Find" value={find} onChange={(e) => { setFind(e.target.value); setReplaced(null); }} />
-            <TextField size="sm" aria-label="Replace with" placeholder="Replace with" value={repl} onChange={(e) => setRepl(e.target.value)} />
-            <Switch checked={matchCase} onChange={setMatchCase} label="Match case" />
-            <span className={styles.muted}>{replaced !== null ? `Replaced ${replaced}` : find ? `${matches} found` : ""}</span>
-            <Button size="sm" variant="secondary" disabled={matches === 0} onClick={() => setReplaced(p.onReplace(find, repl, matchCase))}>
+            <TextField size="sm" aria-label="Find" data-tip="The text to look for in the subtitles" placeholder="Find" value={find} onChange={(e) => { setFind(e.target.value); setReplaced(null); }} />
+            <TextField size="sm" aria-label="Replace with" data-tip="What to put instead; leave empty to delete the matches" placeholder="Replace with" value={repl} onChange={(e) => setRepl(e.target.value)} />
+            <Switch tip="Only match text with the same upper and lower case" checked={matchCase} onChange={setMatchCase} label="Match case" />
+            <span className={styles.muted} data-tip="How many places match, or how many were replaced">{replaced !== null ? `Replaced ${replaced}` : find ? `${matches} found` : ""}</span>
+            <Button size="sm" variant="secondary" disabled={matches === 0} data-tip={matches === 0 ? "Nothing matches yet" : "Replace every match in all subtitles; undo brings it back"} onClick={() => setReplaced(p.onReplace(find, repl, matchCase))}>
               Replace all
             </Button>
           </div>
@@ -215,7 +217,7 @@ export function EditStep(p: EditStepProps) {
             title="No subtitles yet"
             body="Add the first one and set its timing."
             action={
-              <Button icon="plus" onClick={p.onInsertFirst}>
+              <Button icon="plus" onClick={p.onInsertFirst} data-tip="Create the first subtitle, then set its timing">
                 Add a subtitle
               </Button>
             }
