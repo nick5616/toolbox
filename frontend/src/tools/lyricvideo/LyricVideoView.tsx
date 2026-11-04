@@ -1,72 +1,33 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ClickInHost, ConfirmDialog, Icon, cx, toast } from "@/components";
-import { openTool } from "@/lib/openTool";
-import { MediaPlayer, useMediaSource, type MediaPlayerHandle } from "@/components/media";
-import { fixtureFlag, useVisualsAnalysis } from "@/components/viz/useVisualsAnalysis";
-import {
-  FilesService,
-  LyricAction,
-  LyricSource,
-  LyricVideoService,
-  MediaService,
-  TranscribeService,
-  VisualizerService,
-  type Language,
-} from "@/lib/api";
-import { toAppError } from "@/lib/errors";
-import { useShortcut } from "@/lib/shortcuts";
-import { useModules } from "@/state/modules";
-import { usePacks } from "@/state/packs";
-import { useUI } from "@/state/ui";
-import { setRequiresOverride, useDepsGate, useModuleOptions } from "@/tools/_kit";
+/**
+ * Lyric Video (SPEC.md §9.2; Phase 11 §5.4): a drop zone until a song is
+ * chosen, then one workspace (`LyricVideoWorkspace`): song chip, undo/redo and
+ * Render in the header, the Song / Lyrics / Visuals / Look panels in the rail,
+ * the preview on the stage and the lyric lines at the side.
+ *
+ * The song, its lyric sheet and its undo history live in the store (they
+ * survive leaving the tool); the look and options are remembered in module
+ * state. `?vizfixture=1` opens with a sample sheet so the visuals can be tried
+ * without a song.
+ */
+import { Suspense, lazy, useEffect } from "react";
+import { Button, ClickInHost, DropZone, Spinner } from "@/components";
+import { fixtureFlag } from "@/components/viz/useVisualsAnalysis";
+import { SettingsService } from "@/lib/api";
+import { useToolHandoff } from "@/lib/embed";
+import { useCompositionInputs } from "@/state/composition";
+import { DepsGate } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
-import {
-  deleteRow,
-  documentIssues,
-  insertAfter,
-  latestStarted,
-  nudgeLine,
-  setLineStart,
-  setLineText,
-  shiftAll,
-  stem,
-  suspectIds,
-  tagValue,
-  tapBack,
-  tapStamp,
-  toLines,
-  toRows,
-  type Row,
-} from "./logic";
-import { IMAGE_EXTS, LYRIC_EXTS, VIDEO_EXTS, DEFAULT_PREFS, buildOptions, lyricsNeedEngine, parseResult, sanitizePrefs } from "./options";
-import { LookStep } from "./LookStep";
-import { LyricsStep } from "./LyricsStep";
-import { RenderStep } from "./RenderStep";
-import { dispatchSheet, useSession, useSessionField } from "./session";
-import { SongStep } from "./SongStep";
-import { useJobRun } from "./useJobRun";
-import { VisualsStep } from "./VisualsStep";
-import { componentInstalled, STEMS_MODEL, stepAnalyzeOptions, visualizerSeed } from "./visuals";
-import styles from "./LyricVideoView.module.css";
+import { useChooseSong } from "./actions";
+import { useEngineRequirement } from "./engine";
+import type { Row } from "./logic";
+import { DEFAULT_PREFS, sanitizePrefs } from "./options";
+import { useLyricVideo } from "./store";
+import { lyricVideoWorkspace as ws } from "./workspace";
+import styles from "./panels.module.css";
 
-type Step = "song" | "lyrics" | "visuals" | "look" | "render";
-const STEP_TIP: Record<Step, string> = {
-  song: "Choose the song and its title and artist",
-  lyrics: "Get the lyrics and when each line is sung, then fix them",
-  visuals: "Choose animated visuals that react to the song",
-  look: "Pick the shape, background and how the words look",
-  render: "Preview and render the finished video",
-};
+const LyricVideoWorkspace = lazy(() => import("./LyricVideoWorkspace"));
 
-const STEPS: Array<{ id: Step; label: string }> = [
-  { id: "song", label: "Song" },
-  { id: "lyrics", label: "Lyrics" },
-  { id: "visuals", label: "Visuals" },
-  { id: "look", label: "Look" },
-  { id: "render", label: "Render" },
-];
-
-/** Dev only (`?vizfixture=1`): a sample sheet so the Visuals step opens without a song. */
+/** Dev only (`?vizfixture=1`): a sample sheet so the Visuals panel opens without a song. */
 const FIXTURE_SONG = "C:\\fixture\\song.mp3";
 const FIXTURE_LINES: Row[] = [
   { id: "f1", startMs: 2000, endMs: 6000, text: "Hold the light a little longer", words: [] },
@@ -74,541 +35,80 @@ const FIXTURE_LINES: Row[] = [
   { id: "f3", startMs: 11000, endMs: 15000, text: "Every colour in the sky", words: [] },
 ];
 
-export default function LyricVideoView({ moduleId }: ToolViewProps) {
-  const [prefs, setPrefs] = useModuleOptions(moduleId, DEFAULT_PREFS, sanitizePrefs);
-  const fixture = useMemo(() => fixtureFlag(), []);
-  const [step, setStep] = useState<Step>(fixture ? "visuals" : "song");
-  // The song, its tags and the lyric sheet survive leaving the tool (session store).
-  const [songPath, setSongPath] = useSessionField("songPath");
-  const [meta, setMeta] = useSessionField("meta");
-  const [text, setText] = useSessionField("text");
-  const [lyricsPath, setLyricsPath] = useSessionField("lyricsPath");
-  const history = useSession((s) => s.history);
-  const dispatch = dispatchSheet;
-  const [selectedId, setSelectedId] = useState("");
-  const [matched, setMatched] = useSessionField("matched");
-  const [noLyrics, setNoLyrics] = useSessionField("noLyrics");
-  const [hasInstrumental, setHasInstrumental] = useSessionField("hasInstrumental");
-  const [saveStems, setSaveStems] = useSessionField("saveStems");
-  const [playheadMs, setPlayheadMs] = useState(0);
-  const [tapIndex, setTapIndex] = useState(-1);
-  const [previewStartMs, setPreviewStartMs] = useState(0);
-  const [previewPath, setPreviewPath] = useState("");
-  const [languages, setLanguages] = useState<Language[]>([]);
-  const [fonts, setFonts] = useState<string[]>([]);
-  const [coverUrl, setCoverUrl] = useState<string | undefined>(undefined);
-  const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
-  const [waveform, setWaveform] = useState<number[] | undefined>(undefined);
-  const [confirm, setConfirm] = useState<{ title: string; body: string; label: string; run: () => void } | null>(null);
-
-  const playerRef = useRef<MediaPlayerHandle>(null);
-  const media = useMediaSource(songPath);
-  const info = media.source?.info;
-  const mediaReady = media.status === "ready" && !!media.source;
-  const durationMs = info?.durationMs ?? 0;
-  const hasCover = !!info?.hasCover;
-  const rows = history.present;
-  const dirty = history.past.length > 0;
-  const issues = useMemo(() => documentIssues(rows), [rows]);
-  const tapping = tapIndex >= 0;
-  const look = prefs.look;
-
-  // ---- static data ----
+/** The look and options are remembered between sessions (never the lyrics). */
+function usePrefsPersistence(moduleId: string): void {
+  const prefs = useLyricVideo((s) => s.prefs);
+  const dirty = useLyricVideo((s) => s.prefsDirty);
   useEffect(() => {
-    let cancelled = false;
-    TranscribeService.Languages().then((l) => !cancelled && setLanguages(l ?? [])).catch(() => undefined);
-    LyricVideoService.Fonts().then((f) => !cancelled && setFonts(f ?? [])).catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // ---- song decorations: cover, waveform, tags ----
-  useEffect(() => {
-    setCoverUrl(undefined);
-    setWaveform(undefined);
-    if (!songPath || !mediaReady) return;
-    let cancelled = false;
-    if (hasCover) MediaService.Frame(songPath, 0, 640).then((u) => !cancelled && setCoverUrl(u)).catch(() => undefined);
-    MediaService.Waveform(songPath, 800).then((w) => !cancelled && setWaveform(w ?? undefined)).catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [songPath, mediaReady, hasCover]);
-
-  // A remembered session keeps its (possibly edited) title and artist.
-  const metaFor = useRef(useSession.getState().meta.title !== "" ? useSession.getState().songPath : "");
-  useEffect(() => {
-    if (!songPath || !info || metaFor.current === songPath) return;
-    metaFor.current = songPath;
-    setMeta({ title: tagValue(info.tags, "title") || stem(songPath), artist: tagValue(info.tags, "artist") });
-  }, [songPath, info]);
-
-  useEffect(() => {
-    setImageUrl(undefined);
-    if (look.background !== "image" || !look.backgroundPath) return;
-    let cancelled = false;
-    MediaService.URLFor(look.backgroundPath).then((u) => !cancelled && setImageUrl(u)).catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [look.background, look.backgroundPath]);
-
-  // ---- the AI engine gate: only the runs that need it require it ----
-  const visualsOn = prefs.look.background === "visualizer";
-  const engineRequired =
-    (step === "lyrics" && lyricsNeedEngine(prefs.source, lyricsPath)) ||
-    (step === "visuals" && prefs.visualsMode !== "classic") ||
-    ((step === "render" || step === "song") && prefs.audio === "instrumental");
-  useEffect(() => {
-    setRequiresOverride(moduleId, engineRequired ? ["ffmpeg", "ffprobe", "audio-engine"] : null);
-  }, [moduleId, engineRequired]);
-  useEffect(() => () => setRequiresOverride(moduleId, null), [moduleId]);
-  const gate = useDepsGate(moduleId);
-  const engineBlocked = engineRequired && gate.blocked;
-
-  // ---- visuals: the listening (one analyze job with the sheet as given words) ----
-  const packs = usePacks((s) => s.list);
-  const stemsInstalled = componentInstalled(packs, STEMS_MODEL);
-  const [moodChecked, setMoodChecked] = useState(false);
-  const [moodReady, setMoodReady] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    VisualizerService.MoodReaderReady()
-      .then((ok) => alive && setMoodReady(Boolean(ok)))
-      .catch(() => undefined)
-      .finally(() => alive && setMoodChecked(true));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  const lines = useMemo(() => toLines(rows), [rows]);
-  const stemsOn = look.visuals.stems && stemsInstalled;
-  const analyze = useMemo(
-    () => stepAnalyzeOptions({ stems: stemsOn, saveStems, useWords: look.visuals.useWords, lines, moodReady }),
-    [stemsOn, saveStems, look.visuals.useWords, lines, moodReady],
-  );
-  const onVisualsStep = step === "visuals" && prefs.visualsMode !== "classic";
-  const listeningPath = songPath && (onVisualsStep || (step === "look" && visualsOn)) ? songPath : null;
-  const listening = useVisualsAnalysis(listeningPath, { analyze, auto: onVisualsStep && moodChecked && !engineBlocked });
-  const instrumentalRef = listening.ref?.instrumental;
-  useEffect(() => {
-    if (instrumentalRef) setHasInstrumental(true);
-  }, [instrumentalRef, setHasInstrumental]);
-
-  // ---- jobs ----
-  const gen = useJobRun((job) => {
-    const r = parseResult(job.resultJson);
-    if (!r) return;
-    dispatch({ type: "reset", rows: toRows(r.lines) });
-    setSelectedId("");
-    setNoLyrics((r.lines ?? []).length === 0);
-    setHasInstrumental(r.hasInstrumental);
-    const aligned = prefs.source === LyricSource.SourceAlign || (prefs.source === LyricSource.SourceFile && /\.txt$/i.test(lyricsPath));
-    setMatched(aligned ? r.matched : null);
-    setPlayheadMs(0);
-  });
-  const lrc = useJobRun();
-  const preview = useJobRun((job) => {
-    const r = parseResult(job.resultJson);
-    if (r?.previewPath) setPreviewPath(r.previewPath);
-  });
-  const render = useJobRun();
-
-  // ---- navigation ----
-  const guard = useCallback(
-    (run: () => void) => {
-      if (!dirty) return run();
-      setConfirm({
-        title: "Discard your lyric edits?",
-        body: "The lines you edited by hand will be replaced.",
-        label: "Discard",
-        run,
-      });
-    },
-    [dirty],
-  );
-
-  const takeSong = useCallback(
-    (path: string) => {
-      const apply = () => {
-        setSongPath(path);
-        setMeta({ title: "", artist: "" });
-        metaFor.current = "";
-        setText("");
-        setLyricsPath("");
-        dispatch({ type: "reset", rows: [] });
-        setSelectedId("");
-        setMatched(null);
-        setNoLyrics(false);
-        setHasInstrumental(false);
-        setSaveStems(false);
-        setPlayheadMs(0);
-        setTapIndex(-1);
-        setPreviewPath("");
-        setPreviewStartMs(0);
-        gen.clear();
-        lrc.clear();
-        preview.clear();
-        render.clear();
-        setStep("song");
-      };
-      if (dirty) guard(apply);
-      else apply();
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [dirty, guard],
-  );
-
-  const handoff = useUI((s) => s.handoff);
-  useEffect(() => {
-    if (handoff?.moduleId !== moduleId) return;
-    const h = useUI.getState().takeHandoff(moduleId);
-    const first = h?.inputs[0];
-    if (first) takeSong(first);
-  }, [handoff, moduleId, takeSong]);
-
-  const exts = useModules((s) => s.byId[moduleId]?.accepts.extensions);
-  const onPickSong = useCallback(async () => {
-    try {
-      const paths = (await FilesService.PickWith("Choose a song", exts && exts.length > 0 ? exts : null, false)) ?? [];
-      if (paths[0]) takeSong(paths[0]);
-    } catch (e) {
-      toast({ title: toAppError(e).message, tone: "danger" });
-    }
-  }, [exts, takeSong]);
-
-  const onPickLyricsFile = useCallback(async () => {
-    try {
-      const paths = (await FilesService.PickWith("Choose a lyrics file", LYRIC_EXTS, false)) ?? [];
-      if (paths[0]) setLyricsPath(paths[0]);
-    } catch (e) {
-      toast({ title: toAppError(e).message, tone: "danger" });
-    }
-  }, []);
-
-  const onPickBackground = useCallback(
-    async (kind: "image" | "video") => {
+    let off = false;
+    void (async () => {
       try {
-        const title = kind === "image" ? "Choose a background image" : "Choose a background video";
-        const paths = (await FilesService.PickWith(title, kind === "image" ? IMAGE_EXTS : VIDEO_EXTS, false)) ?? [];
-        const path = paths[0];
-        if (path) setPrefs((o) => ({ ...o, look: { ...o.look, backgroundPath: path } }));
-      } catch (e) {
-        toast({ title: toAppError(e).message, tone: "danger" });
+        const saved = await SettingsService.ModuleState(moduleId);
+        if (!off && saved) useLyricVideo.getState().loadPrefs(sanitizePrefs(JSON.parse(saved) as unknown, DEFAULT_PREFS));
+      } catch {
+        /* unreadable state: the defaults stay */
       }
-    },
-    [setPrefs],
+    })();
+    return () => {
+      off = true;
+    };
+  }, [moduleId]);
+  useEffect(() => {
+    if (!dirty) return;
+    const t = setTimeout(() => {
+      SettingsService.SetModuleState(moduleId, JSON.stringify(prefs)).catch(() => undefined);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [prefs, dirty, moduleId]);
+}
+
+function EmptySong({ moduleId }: { moduleId: string }) {
+  const choose = useChooseSong();
+  return (
+    <div className={styles.sourceEmpty}>
+      <DropZone id="tool-drop:lyric-video" icon="mic-vocal" label="Drop a song" hint="Turn a song and its lyrics into a video with the words on screen.">
+        <div className={styles.buttonRow}>
+          <Button icon="plus" onClick={() => void choose()} data-tip="Pick an audio file from your computer">
+            Choose a song…
+          </Button>
+        </div>
+      </DropZone>
+      <DepsGate moduleId={moduleId} />
+    </div>
   );
+}
 
-  // ---- playback ----
-  const onSeek = useCallback((ms: number) => {
-    setPlayheadMs(ms);
-    playerRef.current?.seek(ms);
-  }, []);
-  const onPlayFrom = useCallback((ms: number) => {
-    setPlayheadMs(ms);
-    playerRef.current?.seek(ms);
-    playerRef.current?.play();
-  }, []);
+export default function LyricVideoView({ moduleId }: ToolViewProps) {
+  const songPath = useLyricVideo((s) => s.songPath);
 
+  usePrefsPersistence(moduleId);
+  useEngineRequirement();
+  ws.useHost();
+  useToolHandoff(moduleId, (h) => {
+    const first = h.inputs[0];
+    if (first) useLyricVideo.getState().requestSong(first);
+  });
+  useCompositionInputs(moduleId, songPath ? { stems: [songPath], transcribe: [songPath], visualizer: [songPath] } : {});
+
+  // Dev only: `?vizfixture=1` starts with a sample sheet.
   useEffect(() => {
-    setPlayheadMs(0);
-    setTapIndex(-1);
-  }, [step]);
-
-  // ---- editing ----
-  const edit = useCallback((fn: (r: Row[]) => Row[], key?: string) => dispatch({ type: "edit", fn, key, at: Date.now() }), []);
-  const onStart = useCallback((id: string, ms: number) => edit((r) => setLineStart(r, id, ms), `start:${id}`), [edit]);
-  const onNudge = useCallback((id: string, d: number) => edit((r) => nudgeLine(r, id, d), `nudge:${id}`), [edit]);
-  const onTextEdit = useCallback((id: string, t: string) => edit((r) => setLineText(r, id, t), `text:${id}`), [edit]);
-
-  const activeIndex = useMemo(() => latestStarted(rows, playheadMs), [rows, playheadMs]);
-
-  const onInsert = () => {
-    const sel = rows.findIndex((r) => r.id === selectedId);
-    const index = sel >= 0 ? sel : activeIndex >= 0 ? activeIndex : rows.length - 1;
-    const res = insertAfter(rows, index, mediaReady ? Math.round(playheadMs) : undefined);
-    edit(() => res.rows);
-    setSelectedId(res.id);
-  };
-  const onDelete = () => {
-    const sel = rows.findIndex((r) => r.id === selectedId);
-    if (sel < 0) return;
-    const neighbour = rows[sel + 1] ?? rows[sel - 1];
-    edit((r) => deleteRow(r, selectedId));
-    setSelectedId(neighbour?.id ?? "");
-  };
-
-  useShortcut("Mod+Z", () => dispatch({ type: "undo" }), { when: step === "lyrics" && !tapping, allowInInputs: true });
-  useShortcut(["Mod+Shift+Z", "Mod+Y"], () => dispatch({ type: "redo" }), { when: step === "lyrics" && !tapping, allowInInputs: true });
-
-  // ---- tap to sync ----
-  const endTap = useCallback(() => {
-    setTapIndex(-1);
-    playerRef.current?.pause();
+    if (!fixtureFlag() || useLyricVideo.getState().songPath) return;
+    const s = useLyricVideo.getState();
+    s.applySong(FIXTURE_SONG);
+    s.setMeta({ title: "Golden Hour", artist: "Fixture" });
+    s.resetSheet(FIXTURE_LINES);
+    s.setVisualsEngaged(true);
   }, []);
-  const startTap = () => {
-    if (rows.length === 0) return;
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    playerRef.current?.seek(0);
-    setPlayheadMs(0);
-    playerRef.current?.play();
-    setTapIndex(0);
-  };
-  const stamp = () => {
-    const index = tapIndex;
-    const ms = Math.round(playerRef.current?.currentMs() ?? playheadMs);
-    const res = tapStamp(rows, index, ms);
-    edit((r) => tapStamp(r, index, ms).rows);
-    const row = res.rows[index];
-    if (row) setSelectedId(row.id);
-    if (res.done) endTap();
-    else setTapIndex(res.next);
-  };
-  useShortcut(" ", stamp, { when: tapping });
-  useShortcut("Backspace", () => setTapIndex(tapBack(tapIndex)), { when: tapping });
-  useShortcut("Escape", endTap, { when: tapping });
-
-  // ---- running jobs ----
-  const onGetTimings = () => {
-    if (!songPath) return;
-    const run = () =>
-      void gen.start(
-        [songPath],
-        buildOptions(LyricAction.ActionLyrics, prefs, meta, {
-          text: prefs.source === LyricSource.SourceAlign ? text : "",
-          lyricsPath: prefs.source === LyricSource.SourceFile ? lyricsPath : "",
-        }),
-      );
-    if (dirty) guard(run);
-    else run();
-  };
-  const onExportLrc = () => {
-    if (!songPath || issues.blocker) return;
-    void lrc.start([songPath], buildOptions(LyricAction.ActionLRC, prefs, meta, { lines: toLines(rows) }));
-  };
-  const lookBlocker =
-    (look.background === "image" || look.background === "video") && !look.backgroundPath
-      ? "Choose a background file on the Look step, or pick another background."
-      : look.background === "visualizer" && look.visuals.showJson === ""
-        ? "Choose a design on the Visuals step, or pick a classic background."
-        : "";
-  const blocker = issues.blocker || lookBlocker;
-  // Renders separate instruments only when the model is there.
-  const jobPrefs = useMemo(() => ({ ...prefs, look: { ...prefs.look, visuals: { ...prefs.look.visuals, stems: stemsOn } } }), [prefs, stemsOn]);
-  const onPreview = () => {
-    if (!songPath || blocker) return;
-    setPreviewPath("");
-    void preview.start(
-      [songPath],
-      buildOptions(LyricAction.ActionPreview, jobPrefs, meta, { lines: toLines(rows), previewStartMs: Math.round(previewStartMs) }),
-    );
-  };
-  const onRender = () => {
-    if (!songPath || blocker) return;
-    void render.start([songPath], buildOptions(LyricAction.ActionRender, jobPrefs, meta, { lines: toLines(rows) }));
-  };
-
-  // ---- the shared player ----
-  const playerNode =
-    mediaReady && media.source && songPath ? (
-      <MediaPlayer
-        ref={playerRef}
-        source={media.source}
-        kind="audio"
-        path={songPath}
-        onTime={setPlayheadMs}
-        keyboard={!tapping}
-        {...(waveform ? { waveform } : {})}
-      />
-    ) : media.status === "error" ? null : (
-      <div className={styles.muted}>Opening the song…</div>
-    );
-
-  const suspect = useMemo(() => (matched !== null && matched < 0.7 ? suspectIds(rows) : new Set<string>()), [matched, rows]);
-  const tapLine = tapping ? (rows[tapIndex]?.text ?? "") : "";
-  const hasLines = rows.length > 0;
-  const reachable = (s: Step) => s === "song" || (!!songPath && (s === "lyrics" || hasLines));
-
-  // Dev only: `?vizfixture=1` starts on the Visuals step with a sample sheet.
-  useEffect(() => {
-    if (!fixture || useSession.getState().songPath) return;
-    setSongPath(FIXTURE_SONG);
-    setMeta({ title: "Golden Hour", artist: "Fixture" });
-    dispatch({ type: "reset", rows: FIXTURE_LINES });
-  }, [fixture, setSongPath, setMeta, dispatch]);
-
-  const onMakeInVisualizer = (inWindow?: boolean) => {
-    if (!songPath) return;
-    void openTool("visualizer", [songPath], { seed: visualizerSeed(lines, look) }, { window: inWindow === true });
-  };
-  const renderWarning = look.background === "blur-cover" || look.background === "cover" ? (hasCover ? "" : "This song has no cover art, so the background falls back to a gradient.") : "";
 
   return (
-    <ClickInHost>
-    <div className={styles.root}>
-      <nav className={styles.steps} aria-label="Steps">
-        {STEPS.map((s, i) => (
-          <button
-            key={s.id}
-            type="button"
-            className={cx(styles.step, step === s.id && styles.stepOn)}
-            aria-current={step === s.id ? "step" : undefined}
-            data-tip={tapping ? "Finish tapping first" : reachable(s.id) ? STEP_TIP[s.id] : STEP_TIP[s.id] + " (finish the earlier steps first)"}
-            disabled={!reachable(s.id)}
-            onClick={() => (tapping ? undefined : setStep(s.id))}
-          >
-            <span className={styles.stepNum}>{i + 1}</span>
-            {s.label}
-            {s.id === "lyrics" && dirty && <span className={styles.dot} role="img" aria-label="Edited lines" data-tip="You have edited the lyric lines" />}
-            {i < STEPS.length - 1 && <Icon name="chevron-right" size={12} className={styles.stepSep} />}
-          </button>
-        ))}
-      </nav>
-
-      <div className={styles.body}>
-        {step === "song" && (
-          <SongStep
-            songPath={songPath}
-            media={media}
-            coverUrl={coverUrl}
-            title={meta.title}
-            artist={meta.artist}
-            onTitle={(title) => setMeta((m) => ({ ...m, title }))}
-            onArtist={(artist) => setMeta((m) => ({ ...m, artist }))}
-            audio={prefs.audio}
-            onAudio={(audio) => setPrefs((o) => ({ ...o, audio }))}
-            hasInstrumental={hasInstrumental}
-            rows={rows}
-            onPick={() => void onPickSong()}
-            onContinue={() => setStep("lyrics")}
-          />
-        )}
-        {step === "lyrics" && songPath && (
-          <LyricsStep
-            moduleId={moduleId}
-            prefs={prefs}
-            setPrefs={setPrefs}
-            languages={languages}
-            text={text}
-            onText={setText}
-            lyricsPath={lyricsPath}
-            onPickLyricsFile={() => void onPickLyricsFile()}
-            gen={gen}
-            engineBlocked={engineBlocked}
-            onGetTimings={onGetTimings}
-            player={playerNode}
-            durationMs={durationMs}
-            playheadMs={playheadMs}
-            waveform={waveform}
-            onSeek={onSeek}
-            rows={rows}
-            activeIndex={activeIndex}
-            sheet={{
-              selectedId,
-              tapIndex,
-              suspect,
-              outOfOrder: issues.firstOutOfOrder,
-              onSelect: setSelectedId,
-              onStart,
-              onNudge,
-              onText: onTextEdit,
-              onPlay: onPlayFrom,
-            }}
-            matched={matched}
-            noLyrics={noLyrics}
-            blocker={issues.blocker}
-            blank={issues.blank}
-            canUndo={history.past.length > 0}
-            canRedo={history.future.length > 0}
-            onUndo={() => dispatch({ type: "undo" })}
-            onRedo={() => dispatch({ type: "redo" })}
-            onInsert={onInsert}
-            onDelete={onDelete}
-            canDelete={rows.some((r) => r.id === selectedId)}
-            onShiftAll={(d) => edit((r) => shiftAll(r, d))}
-            tapping={tapping}
-            tapLine={tapLine}
-            onTapStart={startTap}
-            onTapEnd={endTap}
-            lrc={lrc}
-            onExportLrc={onExportLrc}
-            onContinue={() => setStep("visuals")}
-          />
-        )}
-        {step === "visuals" && songPath && (
-          <VisualsStep
-            moduleId={moduleId}
-            songPath={songPath}
-            prefs={prefs}
-            setPrefs={setPrefs}
-            lines={lines}
-            rows={rows}
-            meta={meta}
-            listening={listening}
-            stemsInstalled={stemsInstalled}
-            saveStems={saveStems}
-            onSaveStems={setSaveStems}
-            engineBlocked={engineBlocked}
-            onMakeInVisualizer={onMakeInVisualizer}
-            onContinue={() => setStep("look")}
-          />
-        )}
-        {step === "look" && (
-          <LookStep
-            prefs={prefs}
-            setPrefs={setPrefs}
-            meta={meta}
-            fonts={fonts}
-            rows={rows}
-            playheadMs={playheadMs}
-            coverUrl={coverUrl}
-            imageUrl={imageUrl}
-            hasCover={hasCover}
-            player={playerNode}
-            analysis={listening.analysis}
-            onChangeVisuals={() => setStep("visuals")}
-            onPickBackground={(k) => void onPickBackground(k)}
-            onContinue={() => {
-              setPreviewStartMs(Math.max(0, Math.round(playheadMs)));
-              setStep("render");
-            }}
-          />
-        )}
-        {step === "render" && (
-          <RenderStep
-            moduleId={moduleId}
-            durationMs={durationMs}
-            previewStartMs={previewStartMs}
-            onPreviewStart={setPreviewStartMs}
-            blocker={blocker}
-            engineBlocked={engineBlocked}
-            instrumental={prefs.audio === "instrumental"}
-            warning={renderWarning}
-            preview={preview}
-            previewPath={previewPath}
-            render={render}
-            onPreview={onPreview}
-            onRender={onRender}
-          />
-        )}
-      </div>
-
-      <ConfirmDialog
-        open={confirm !== null}
-        title={confirm?.title ?? ""}
-        body={confirm?.body}
-        confirmLabel={confirm?.label ?? "OK"}
-        tone="danger"
-        onConfirm={() => {
-          const run = confirm?.run;
-          setConfirm(null);
-          run?.();
-        }}
-        onCancel={() => setConfirm(null)}
-      />
-    </div>
+    <ClickInHost className={styles.root}>
+      {songPath ? (
+        <Suspense fallback={<Spinner size={18} label="Loading" />}>
+          <LyricVideoWorkspace />
+        </Suspense>
+      ) : (
+        <EmptySong moduleId={moduleId} />
+      )}
     </ClickInHost>
   );
 }

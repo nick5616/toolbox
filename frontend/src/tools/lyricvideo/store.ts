@@ -84,6 +84,8 @@ export interface LyricVideoState {
   // ---- visuals ----
   /** The full designer is open on the stage. */
   designerOpen: boolean;
+  /** The Visuals panel was opened for this song: the listening may start by itself. */
+  visualsEngaged: boolean;
   /** What the listening found (host: the live hook; a replica loads the analysis from the ref). */
   listening: VisualsAnalysis | null;
   listenRef: AnalysisRef | null;
@@ -116,6 +118,7 @@ export interface LyricVideoState {
   setPlaying(v: boolean): void;
   setPreviewStartMs(ms: number): void;
   setDesignerOpen(open: boolean): void;
+  setVisualsEngaged(v: boolean): void;
   requestPanel(id: string | null): void;
   // job slots
   setJob(slot: JobSlot, id: string): void;
@@ -174,6 +177,7 @@ function initial() {
     tapIndex: -1,
     previewStartMs: 0,
     designerOpen: false,
+    visualsEngaged: false,
     listening: null as VisualsAnalysis | null,
     listenRef: null as AnalysisRef | null,
     jobIds: NO_IDS,
@@ -203,7 +207,6 @@ export const useLyricVideo = create<LyricVideoState>((set, get) => {
         // what is remembered across songs
         prefs: get().prefs,
         prefsDirty: get().prefsDirty,
-        listening: get().listening,
         songPath: path,
       }),
     requestSong: (path) => {
@@ -232,6 +235,7 @@ export const useLyricVideo = create<LyricVideoState>((set, get) => {
     setPlaying: (playing) => set({ playing }),
     setPreviewStartMs: (previewStartMs) => set({ previewStartMs }),
     setDesignerOpen: (designerOpen) => set({ designerOpen }),
+    setVisualsEngaged: (visualsEngaged) => set({ visualsEngaged }),
     requestPanel: (id) => set((s) => ({ panelRequest: id ? { id, n: (s.panelRequest?.n ?? 0) + 1 } : null })),
 
     setJob: (slot, id) => slotSet("jobIds", slot, id),
