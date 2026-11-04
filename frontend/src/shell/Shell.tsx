@@ -30,7 +30,7 @@ import { useShellShortcuts } from "./useShellShortcuts";
 import styles from "./Shell.module.css";
 
 /** Views that are not tools (no Pop out). */
-const NON_TOOL_VIEWS = new Set(["library", "settings", "pipelines", "gallery", "setup"]);
+const NON_TOOL_VIEWS = new Set(["library", "settings", "gallery", "setup"]);
 
 /** A tool that's open in its own window shows a placeholder here instead. */
 function ToolSlot({ view }: { view: string }) {

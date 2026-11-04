@@ -68,7 +68,7 @@ beforeEach(() => {
 describe("sendToMenuItems", () => {
   it("lists ready visible tools that accept the file, not the current one, with new-window variants and Add to post", () => {
     const items = sendToMenuItems("/x/a.png", "converter", useModules.getState().list);
-    expect(items.map((i) => i.label)).toEqual(["Background Remover", "Background Remover (new window)", "Post Builder", "Post Builder (new window)", "Add to post…"]);
+    expect(items.map((i) => i.label)).toEqual(["Background Remover", "Background Remover (new window)", "Add to post…"]);
     items[1]!.onSelect();
     expect(h.popOutTool).toHaveBeenCalledWith("bg-remover", expect.objectContaining({ handoff: { moduleId: "bg-remover", inputs: ["/x/a.png"] } }));
     items[0]!.onSelect();

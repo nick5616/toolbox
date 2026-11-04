@@ -19,7 +19,7 @@ export function moduleTakesFile(m: ModuleView, path: string): boolean {
 export function sendToMenuItems(path: string, currentId: string, modules: readonly ModuleView[]): MenuItem[] {
   const items: MenuItem[] = [];
   for (const m of modules) {
-    if (m.id === currentId || m.hidden || !isReady(m) || !moduleTakesFile(m, path)) continue;
+    if (m.id === currentId || m.id === "post-builder" || m.hidden || !isReady(m) || !moduleTakesFile(m, path)) continue;
     openToolItems(m.id, [path], "send").forEach((it, i) =>
       items.push({ id: it.id, label: i === 0 ? m.name : `${m.name} (new window)`, icon: i === 0 ? m.icon : "app-window", tip: it.tip, onSelect: it.onSelect }),
     );
