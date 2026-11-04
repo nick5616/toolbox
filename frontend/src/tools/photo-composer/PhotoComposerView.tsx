@@ -5,15 +5,17 @@ import { toAppError } from "@/lib/errors";
 import { ASPECTS, sanitizeComposition } from "@/composer/model";
 import { closeWindow, currentWindow } from "@/lib/windows";
 import { useModules } from "@/state/modules";
-import { useUI, type Handoff, type PostSlideSeed } from "@/state/ui";
+import { useToolHandoff } from "@/lib/embed";
+import { useUI, type PostSlideSeed } from "@/state/ui";
 import type { ToolViewProps } from "../index";
-import { Editor, IMAGE_EXTS } from "./Editor";
+import { Editor } from "./Editor";
 import { Modal } from "./Modal";
 import { ProjectsStrip } from "./ProjectsStrip";
+import { IMAGE_EXTS, MODULE_ID, useComposer } from "./store";
 import { discardedProjects } from "./useAutosave";
+import { composerWorkspace as ws } from "./workspace";
 import styles from "./PhotoComposerView.module.css";
 
-export const MODULE_ID = "photo-composer";
 const DEFAULT_NAME = "Untitled composition";
 
 interface Open {
@@ -98,6 +100,14 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
   const counter = useRef(0);
   const took = useRef(false);
 
+  // While a composition is open this window hosts its store for popped-out panels and the preview.
+  ws.useHost();
+  const closeOpen = useCallback(() => {
+    useComposer.getState().close();
+    setOpen(null);
+  }, []);
+  useEffect(() => () => useComposer.getState().close(), []);
+
   const refresh = useCallback(async (): Promise<ProjectInfo[]> => {
     try {
       const list = (await ComposerService.List()) ?? [];
@@ -124,7 +134,9 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
         const list = await refresh();
         const info = list.find((p) => p.id === id);
         if (!info) throw new Error("This composition no longer exists.");
-        setOpen({ info, doc: sanitizeComposition(raw), postSlide });
+        const doc = sanitizeComposition(raw);
+        useComposer.getState().open({ id, name: info.name, doc, postSlide });
+        setOpen({ info, doc, postSlide });
         queuePhotos(photos);
         remember(id);
         return true;
@@ -149,11 +161,7 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
   );
 
   // Handoffs: photos from the Library / a drop, or a post slide to make or edit.
-  const handoff = useUI((s) => s.handoff);
-  useEffect(() => {
-    if (handoff?.moduleId !== moduleId) return;
-    const h: Handoff | null = useUI.getState().takeHandoff(moduleId);
-    if (!h) return;
+  useToolHandoff(moduleId, (h) => {
     took.current = true;
     const slide = h.postSlide;
     if (slide) {
@@ -167,8 +175,7 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
       if (open) queuePhotos(h.inputs);
       else void createProject(DEFAULT_NAME, "4:5", "", null, h.inputs);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handoff, moduleId]);
+  });
 
   // First load: the list, the aspects, and the project that was open last time.
   useEffect(() => {
@@ -234,7 +241,7 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
     if (!info) return;
     setDeleting(null);
     discardedProjects.add(info.id);
-    if (open?.info.id === info.id) setOpen(null);
+    if (open?.info.id === info.id) closeOpen();
     try {
       await ComposerService.Delete(info.id);
       await refresh();
@@ -251,7 +258,7 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
       void closeWindow(w.key).catch(() => undefined);
       return;
     }
-    setOpen(null);
+    closeOpen();
     useUI.getState().handOff({ moduleId: "post-builder", inputs: [], postSlide: slide });
   }, []);
 
@@ -279,7 +286,7 @@ export default function PhotoComposerView({ moduleId }: ToolViewProps) {
           incoming={incoming}
           renameTo={renameTo}
           onClose={() => {
-            setOpen(null);
+            closeOpen();
             void refresh();
           }}
           onInfo={onInfo}

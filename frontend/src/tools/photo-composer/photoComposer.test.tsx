@@ -70,7 +70,7 @@ vi.mock("@/lib/api", async (orig) => {
     SettingsService: { ModuleState: async () => "", SetModuleState: async () => undefined },
     FilesService: { PickWith: async () => [], ImageThumb: async () => "data:image/png;base64,AAAA" },
     LibraryService: { Reveal: async () => undefined },
-    DesktopService: { CloseWindow: (k: string) => m.closeWindow(k), OpenWindows: async () => [] },
+    DesktopService: { CloseWindow: (k: string) => m.closeWindow(k), OpenWindows: async () => [], Relay: async () => undefined },
   };
 });
 
@@ -100,6 +100,7 @@ import { JobStatus, type Composition, type Job, type ProjectInfo } from "@/lib/a
 import { addLayer, newComposition, newImageLayer, newTextLayer } from "@/composer/model";
 import { useJobs } from "@/state/jobs";
 import { useUI } from "@/state/ui";
+import { useComposer } from "./store";
 import PhotoComposerView from "./PhotoComposerView";
 import { discardedProjects } from "./useAutosave";
 import { displayToDocIndex, dropIndex, fitScale, moveWithSnap, nudge, panBackground, scaleByHandle } from "./logic";
@@ -127,7 +128,7 @@ const layerNames = () => within(layerList()).getAllByRole("listitem").map((li) =
 
 /** Opens a click-in drawer by its launcher (one drawer is open at a time). */
 async function showPanel(name: string) {
-  const launcher = screen.getByRole("button", { name: new RegExp(`^${name}`) });
+  const launcher = screen.getByRole("button", { name: new RegExp(`^${name}$`) });
   if (launcher.getAttribute("aria-expanded") !== "true") await userEvent.click(launcher);
   await screen.findByRole("dialog", { name });
 }
@@ -183,11 +184,11 @@ describe("projects strip", () => {
   it("shows summaries on the click-in launchers", async () => {
     renderView();
     await openProject("Market");
-    const launcher = (n: string) => screen.getByRole("button", { name: new RegExp(`^${n}`) }).textContent ?? "";
-    expect(launcher("Layers")).toContain("2 layers");
-    expect(launcher("Properties")).toContain("Nothing selected");
-    expect(launcher("Background")).toContain("Colour");
-    expect(screen.queryByRole("button", { name: /^Sources/ })).toBeNull();
+    const tip = (n: string) => screen.getByRole("button", { name: n }).getAttribute("data-tip") ?? "";
+    expect(tip("Layers")).toContain("2 layers");
+    expect(tip("Background")).toContain("Colour");
+    expect(tip("Canvas")).toContain("4:5");
+    expect(screen.queryByRole("button", { name: "Sources" })).toBeNull();
   });
 
   it("creates a new composition from the New dialog", async () => {
@@ -234,8 +235,8 @@ describe("editor", () => {
     const rowB = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
     fireEvent.pointerDown(rowB, { button: 0, clientY: 10 });
     fireEvent.pointerUp(rowB);
-    await showPanel("Properties");
-    const tool = screen.getByRole("toolbar");
+    await showPanel("Layer");
+    const tool = screen.getByRole("toolbar", { name: "Composer tools" });
     const x = screen.getByLabelText("X") as HTMLInputElement;
     expect(x.value).toBe("540");
     fireEvent.keyDown(tool, { key: "ArrowRight" });
@@ -256,7 +257,7 @@ describe("editor", () => {
     fireEvent.pointerUp(rowB);
     fireEvent.keyDown(rowB, { key: "Delete" });
     await waitFor(() => expect(layerNames()).toEqual(["a"]));
-    fireEvent.keyDown(screen.getByRole("toolbar"), { key: "z", ctrlKey: true });
+    fireEvent.keyDown(screen.getByRole("toolbar", { name: "Composer tools" }), { key: "z", ctrlKey: true });
     await waitFor(() => expect(layerNames()).toEqual(["b", "a"]));
   });
 
@@ -267,11 +268,11 @@ describe("editor", () => {
     const rowB = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
     fireEvent.pointerDown(rowB, { button: 0 });
     fireEvent.pointerUp(rowB);
-    await showPanel("Properties");
+    await showPanel("Layer");
     await userEvent.click(screen.getByRole("button", { name: "Backward" }));
     await showPanel("Layers");
     expect(layerNames()).toEqual(["a", "b"]);
-    await showPanel("Properties");
+    await showPanel("Layer");
     await userEvent.click(screen.getByRole("button", { name: "Front" }));
     await showPanel("Layers");
     expect(layerNames()).toEqual(["b", "a"]);
@@ -315,7 +316,7 @@ describe("editor", () => {
     const rowB = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
     fireEvent.pointerDown(rowB, { button: 0 });
     fireEvent.pointerUp(rowB);
-    await showPanel("Properties");
+    await showPanel("Layer");
     fireEvent.change(screen.getByLabelText("Rotation"), { target: { value: "30" } });
     await userEvent.click(screen.getByRole("switch", { name: "Shadow" }));
     await userEvent.click(screen.getByRole("switch", { name: "Mirror" }));
@@ -330,8 +331,8 @@ describe("editor", () => {
   it("applies a layout from the menu", async () => {
     renderView();
     await openProject("Market");
-    await userEvent.click(screen.getByRole("button", { name: "Layouts" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: /^Grid/ }));
+    await showPanel("Layouts");
+    await userEvent.click(await screen.findByRole("button", { name: /^Grid/ }));
     expect(m.applyLayout).toHaveBeenCalled();
     expect(m.applyLayout.mock.calls[0]?.[1]).toBe("grid");
   });
@@ -339,7 +340,7 @@ describe("editor", () => {
   it("adds a text layer and opens it for editing", async () => {
     renderView();
     await openProject("Market");
-    await userEvent.click(screen.getByRole("button", { name: "Add text" }));
+    await addText();
     expect(screen.getByLabelText("Edit text")).toBeTruthy();
     await showPanel("Layers");
     expect(layerNames()[0]).toBe("Text");
@@ -368,7 +369,7 @@ describe("remove background", () => {
     expect(screen.getAllByRole("status", { name: "Removing background" }).length).toBeGreaterThan(0);
 
     act(() => useJobs.getState().upsert(job(JobStatus.JobDone, [{ path: "C:/out/b-cut.png" }])));
-    await showPanel("Properties");
+    await showPanel("Layer");
     const restore = await screen.findByRole("button", { name: "Restore original" });
     await waitFor(() => expect(m.save).toHaveBeenCalledTimes(1));
     let saved = m.save.mock.calls.at(-1)?.[2] as Composition;
@@ -399,7 +400,7 @@ describe("autosave", () => {
     await openProject("Market");
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add text" }));
+      useComposer.getState().addText();
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(700);
@@ -423,7 +424,7 @@ describe("autosave", () => {
     await openProject("Market");
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add text" }));
+      useComposer.getState().addText();
       await vi.advanceTimersByTimeAsync(900);
     });
     expect(screen.getByText("Couldn't save")).toBeTruthy();
@@ -432,7 +433,7 @@ describe("autosave", () => {
   it("saves pending changes when leaving the view", async () => {
     const { unmount } = renderView();
     await openProject("Market");
-    await userEvent.click(screen.getByRole("button", { name: "Add text" }));
+    await addText();
     expect(m.save).not.toHaveBeenCalled();
     unmount();
     await waitFor(() => expect(m.save).toHaveBeenCalledTimes(1));
@@ -453,7 +454,7 @@ describe("post handoff", () => {
 
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add text" }));
+      useComposer.getState().addText();
       await vi.advanceTimersByTimeAsync(900);
     });
     expect(m.save).toHaveBeenCalled();
@@ -465,7 +466,7 @@ describe("post handoff", () => {
 
     // Later saves do not link again.
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add text" }));
+      useComposer.getState().addText();
       await vi.advanceTimersByTimeAsync(900);
     });
     expect(m.postsSave).toHaveBeenCalledTimes(1);
@@ -631,9 +632,7 @@ describe("batch remove background", () => {
     fireEvent.pointerDown(rows[0] as HTMLElement, { button: 0 });
     fireEvent.pointerUp(rows[0] as HTMLElement);
     ctrlClick(rows[1] as HTMLElement);
-    await showPanel("Properties");
-    expect(screen.getByText("2 layers selected")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Properties/ }).textContent).toContain("2 selected");
+    expect(screen.getByText("2 layers")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Remove background (2)" }));
     await waitFor(() => expect(m.removeBg.mock.calls.map((c) => c[0])).toEqual(["C:/photos/b.jpg", "C:/photos/a.jpg"]));
@@ -650,7 +649,6 @@ describe("batch remove background", () => {
       { path: "C:/out/b.png", original: "C:/photos/b.jpg" },
     ]);
 
-    await showPanel("Properties");
     await userEvent.click(screen.getByRole("button", { name: "Restore originals" }));
     await waitFor(() => expect(m.save).toHaveBeenCalledTimes(2));
     expect(lastSavedLayers().map((l) => l.image?.ref)).toEqual([
@@ -697,7 +695,7 @@ describe("sources tab", () => {
     fireEvent.doubleClick(screen.getByText("x.jpg"));
     await showPanel("Layers");
     await waitFor(() => expect(layerNames()).toEqual(["x", "b", "a"]));
-    await showPanel("Properties");
+    await showPanel("Layer");
     expect((screen.getByLabelText("X") as HTMLInputElement).value).toBe("540");
     expect((screen.getByLabelText("Y") as HTMLInputElement).value).toBe("675");
   });
@@ -712,7 +710,7 @@ describe("sources tab", () => {
     });
     await showPanel("Layers");
     await waitFor(() => expect(layerNames()).toEqual(["x", "b", "a"]));
-    await showPanel("Properties");
+    await showPanel("Layer");
     expect((screen.getByLabelText("X") as HTMLInputElement).value).toBe("270");
     expect((screen.getByLabelText("Y") as HTMLInputElement).value).toBe("337.5");
   });
@@ -780,3 +778,8 @@ describe("stage geometry", () => {
     expect(panBackground(doc, { w: 2160, h: 1080 }, { panX: 0.9, panY: 0 }, -1000, 0).panX).toBe(1);
   });
 });
+
+async function addText() {
+  await userEvent.click(screen.getByRole("button", { name: "Add" }));
+  await userEvent.click(await screen.findByRole("menuitem", { name: "Add text" }));
+}

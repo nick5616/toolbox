@@ -1,0 +1,21 @@
+.pad {
+  padding: var(--space-3);
+}
+
+.note {
+  margin: 0;
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.value {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.layout {
+  width: 100%;
+  justify-content: flex-start;
+}

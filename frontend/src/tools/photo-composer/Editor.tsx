@@ -1,54 +1,32 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent } from "react";
-import { Button, ClickIn, IconButton, MenuButton, Spinner, TextField, toast, useClickIn } from "@/components";
-import {
-  ComposerService,
-  FilesService,
-  LibraryService,
-  PostsService,
-  type ComposerBackground,
-  type ComposerLayer,
-  type Composition,
-  type ProjectInfo,
-} from "@/lib/api";
+import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent as RKeyboardEvent } from "react";
+import { Button, IconButton, MenuButton, Spinner, TextField, toast, useClickIn } from "@/components";
+import { ComposerService, LibraryService, PostsService, type ComposerLayer, type Composition, type ProjectInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { useBeforePopOut } from "@/lib/popout";
 import { revealLabel } from "@/lib/platform";
-import { useHistory } from "@/composer/history";
-import { applyLayout, LAYOUTS, type LayoutKind } from "@/composer/layouts";
-import { loadImage, loadImages } from "@/composer/loadImages";
-import {
-  addLayer,
-  deleteLayer,
-  duplicateLayer,
-  findLayer,
-  layerList,
-  MAX_LAYERS,
-  MAX_TEXT_CHARS,
-  moveLayer,
-  newImageLayer,
-  newTextLayer,
-  reorderLayer,
-  setLayerSource,
-  updateLayer,
-  type MoveDirection,
-} from "@/composer/model";
-import { imagePaths, imageSize, layerSize } from "@/composer/render";
+import { applyLayout } from "@/composer/layouts";
+import { loadImage } from "@/composer/loadImages";
+import { addLayer, findLayer, layerList, MAX_LAYERS, newImageLayer, setLayerSource } from "@/composer/model";
+import { imageSize, layerSize } from "@/composer/render";
+import { useCompositionInputs } from "@/state/composition";
 import { useJobs } from "@/state/jobs";
-import { useModules } from "@/state/modules";
 import type { PostSlideSeed } from "@/state/ui";
-import { BackgroundPanel } from "./BackgroundPanel";
+import { StudioLayout, Spacer, WorkspacePreviewFrame, WorkspaceRail } from "@/workspace";
+import { ComposerStage } from "./canvas";
 import { CropDialog } from "./CropDialog";
-import { LayersPanel } from "./LayersPanel";
-import { backgroundSummary, geometryChanged, idRange, layersSummary as layersText, nudge, propertiesSummary } from "./logic";
-import { PropertiesPanel } from "./PropertiesPanel";
-import { SourcesPanel } from "./SourcesPanel";
-import { Stage } from "./Stage";
+import { composerImages, imageFailed, useComposerImages, useLoadComposerImages } from "./images";
+import { backgroundSummary, layersSummary, nudge } from "./logic";
+import { SelectionBar } from "./SelectionBar";
+import { MODULE_ID, resetFailureToasts, toastError, toastFailureOnce, useComposer, useDoc, useSelectedLayers, type Pending } from "./store";
 import { useAutosave, type SaveState } from "./useAutosave";
+import { composerWorkspace as ws } from "./workspace";
 import styles from "./Editor.module.css";
 
-export const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tif", ".tiff", ".heic", ".heif"];
+export { IMAGE_EXTS } from "./store";
 
 export interface EditorProps {
   project: ProjectInfo;
+  /** The document the store was opened with (the autosave's baseline). */
   initialDoc: Composition;
   /** Set when opened from a post. */
   postSlide: PostSlideSeed | null;
@@ -73,73 +51,46 @@ const SAVE_LABEL: Record<SaveState, string> = {
 
 const baseName = (p: string): string => p.split(/[\\/]/).pop() ?? p;
 
-function toastError(title: string, e: unknown): void {
-  const err = toAppError(e);
-  toast({ title, description: err.hint ? `${err.message} ${err.hint}` : err.message, tone: "danger" });
-}
-
 function isTyping(t: EventTarget | null): boolean {
   const el = t as HTMLElement | null;
   if (!el || !el.tagName) return false;
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
 }
 
-interface Pending {
-  jobId: string;
-  /** The path the job was started on. */
-  from: string;
-}
+const sameLabels = (a: Record<string, string>, b: Record<string, string>): boolean => {
+  const ka = Object.keys(a);
+  return ka.length === Object.keys(b).length && ka.every((k) => a[k] === b[k]);
+};
 
-/** Steps of a collage build (SPEC.md §B13.5). */
-type BuildPhase = "idle" | "adding" | "layout1" | "submitting" | "cutting" | "layout2" | "done";
-
-/** The open composition: toolbar, stage, layers and properties. */
+/**
+ * The open composition: header, rail, canvas and the selection bar. This
+ * component is the host's logic (autosave, jobs, the collage build, keys); the
+ * state is in `useComposer` and the panels/preview are the workspace's.
+ */
 export function Editor({ project, initialDoc, postSlide, incoming, onClose, onInfo, onBackToPost, renameTo }: EditorProps) {
-  const hist = useHistory<Composition>(initialDoc);
-  const [live, setLive] = useState<Composition | null>(null);
-  const committed = useRef(hist.value);
-  committed.current = hist.value;
-  const doc = live ?? hist.value;
-  const [name, setName] = useState(project.name);
+  const st = useComposer.getState;
+  const recorded = useComposer((s) => s.history?.present ?? null);
+  const doc = useDoc();
+  const name = useComposer((s) => s.name);
+  const saveState = useComposer((s) => s.saveState);
+  const exporting = useComposer((s) => s.exporting);
+  const undoable = useComposer((s) => (s.history?.past.length ?? 0) > 0);
+  const redoable = useComposer((s) => (s.history?.future.length ?? 0) > 0);
+  const pending = useComposer((s) => s.pending);
+  const phase = useComposer((s) => s.phase);
+  const cropId = useComposer((s) => s.cropId);
+  const selected = useSelectedLayers();
+  const images = useComposerImages((s) => s.images);
+  const clickIn = useClickIn();
+  const jobsById = useJobs((s) => s.byId);
+
   const renameSeen = useRef(renameTo?.n ?? 0);
   useEffect(() => {
     if (renameTo && renameTo.n !== renameSeen.current) {
       renameSeen.current = renameTo.n;
-      setName(renameTo.name);
+      st().setName(renameTo.name);
     }
-  }, [renameTo]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [adjustBg, setAdjustBg] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [cropId, setCropId] = useState<string | null>(null);
-  const [pending, setPending] = useState<Record<string, Pending>>({});
-  const pendingRef = useRef<Record<string, Pending>>({});
-  const [multi, setMulti] = useState<string[]>([]);
-  const [phase, setPhase] = useState<BuildPhase>("idle");
-  const buildIds = useRef<string[]>([]);
-  const buildStarted = useRef(false);
-  /** The user moved, scaled or rotated a layer (or chose a layout): a build must not rearrange it. */
-  const touched = useRef(false);
-  const internal = useRef(false);
-  const [exporting, setExporting] = useState(false);
-  const [images, setImages] = useState<ReadonlyMap<string, ImageBitmap>>(() => new Map());
-  const exts = useModules((s) => s.byId["photo-composer"]?.accepts.extensions);
-  const root = useRef<HTMLDivElement>(null);
-  const clickIn = useClickIn();
-
-  const edit = useCallback(
-    (fn: (d: Composition) => Composition, opts: { merge?: boolean } = {}) => {
-      const next = fn(committed.current);
-      if (next === committed.current) return;
-      if (!internal.current && geometryChanged(committed.current, next)) touched.current = true;
-      if (!opts.merge) hist.checkpoint();
-      committed.current = next;
-      hist.set(next);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hist.set, hist.checkpoint],
-  );
+  }, [renameTo, st]);
 
   // ---- post link ----
   const linked = useRef(!postSlide || !!postSlide.projectId);
@@ -169,210 +120,30 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   const autosave = useAutosave({
     projectId: project.id,
     name,
-    doc: hist.value,
+    doc: recorded ?? initialDoc,
     onSaved: (info, first) => {
       onInfo(info);
       if (first) void linkToPost(info.id);
     },
   });
-
-  // ---- images ----
-  const reported = useRef(new Set<string>());
-  const pathsKey = useMemo(() => imagePaths(hist.value).join("\n"), [hist.value]);
   useEffect(() => {
-    const need = pathsKey ? pathsKey.split("\n") : [];
-    let off = false;
-    void loadImages(need).then((r) => {
-      if (off) return;
-      setImages((prev) => {
-        let same = prev.size === r.images.size;
-        if (same) for (const [k, v] of r.images) if (prev.get(k) !== v) same = false;
-        return same ? prev : new Map(r.images);
-      });
-      for (const [p, msg] of r.failed) {
-        if (reported.current.has(p)) continue;
-        reported.current.add(p);
-        toast({ title: `Couldn't load ${baseName(p)}`, description: msg, tone: "warn" });
-      }
-    });
-    return () => {
-      off = true;
-    };
-  }, [pathsKey]);
+    st().setSaveState(autosave.state);
+  }, [autosave.state, st]);
+  useBeforePopOut(MODULE_ID, () => autosave.flush());
 
-  const sizerFor = useCallback((d: Composition) => (l: ComposerLayer) => layerSize(d, l, images), [images]);
+  // ---- images (this window's own bitmaps) ----
+  useLoadComposerImages(recorded, true);
 
-  // ---- adding things ----
-  const addPhotos = useCallback(
-    async (paths: string[], at?: { x: number; y: number }) => {
-      let n = 0;
-      for (const path of paths) {
-        if (layerList(committed.current).length >= MAX_LAYERS) {
-          toast({ title: `At most ${MAX_LAYERS} layers`, tone: "warn" });
-          return;
-        }
-        try {
-          const bmp = await loadImage(path);
-          const { w, h } = imageSize(bmp);
-          let layer = newImageLayer(path, w, h, committed.current);
-          if (at) {
-            const fan = n * 0.03;
-            layer = { ...layer, x: Math.min(1, at.x + fan), y: Math.min(1, at.y + fan) };
-          }
-          n++;
-          const added = layer;
-          edit((d) => addLayer(d, added));
-          setSelectedId(layer.id);
-          setMulti([]);
-        } catch (e) {
-          toastError(`Couldn't add ${baseName(path)}`, e);
-        }
-      }
-    },
-    [edit],
-  );
+  // ---- what the constituents get ----
+  const photoPath = selected.length === 1 && selected[0]?.kind === "image" ? (selected[0].image?.ref.path ?? "") : "";
+  const photoInputs = useMemo(() => (photoPath ? [photoPath] : []), [photoPath]);
+  useCompositionInputs(MODULE_ID, { "bg-remover": photoInputs, "object-eraser": photoInputs, upscaler: photoInputs });
 
-  const pickPhotos = useCallback(async () => {
-    try {
-      const paths = (await FilesService.PickWith("Add photos", exts && exts.length > 0 ? exts : IMAGE_EXTS, true)) ?? [];
-      if (paths.length > 0) await addPhotos(paths);
-    } catch (e) {
-      toastError("Couldn't open the file picker", e);
-    }
-  }, [exts, addPhotos]);
-
-  const addText = useCallback(() => {
-    const layer = newTextLayer(committed.current);
-    edit((d) => addLayer(d, layer));
-    setSelectedId(layer.id);
-    setEditingId(layer.id);
-  }, [edit]);
-
-  const chooseBackground = useCallback(async () => {
-    try {
-      const paths = (await FilesService.PickWith("Choose a background photo", exts && exts.length > 0 ? exts : IMAGE_EXTS, false)) ?? [];
-      const path = paths[0];
-      if (!path) return;
-      edit((d) => ({
-        ...d,
-        background: { ...d.background, kind: "image", image: { path, original: "" }, panX: 0, panY: 0, zoom: 1 },
-      }));
-    } catch (e) {
-      toastError("Couldn't open the file picker", e);
-    }
-  }, [exts, edit]);
-
-  // ---- layer edits ----
-  const patchLayer = useCallback((id: string, patch: Partial<ComposerLayer>) => edit((d) => updateLayer(d, id, patch)), [edit]);
-  const deleteById = useCallback(
-    (id: string) => {
-      edit((d) => deleteLayer(d, id));
-      setMulti((m) => m.filter((x) => x !== id));
-      setSelectedId((s) => (s === id ? null : s));
-      setEditingId((s) => (s === id ? null : s));
-    },
-    [edit],
-  );
-  const duplicateById = useCallback(
-    (id: string) => {
-      const r = duplicateLayer(committed.current, id);
-      if (!r.id) {
-        toast({ title: `At most ${MAX_LAYERS} layers`, tone: "warn" });
-        return;
-      }
-      edit(() => r.doc);
-      setSelectedId(r.id);
-    },
-    [edit],
-  );
-  const setBackground = useCallback((bg: ComposerBackground) => edit((d) => ({ ...d, background: bg })), [edit]);
-
-  const multiSelected = multi.length > 1;
-  const selected = !multiSelected && selectedId ? findLayer(doc, selectedId) : undefined;
-  /** Every selected layer, in selection order. */
-  const selectedLayers = useMemo(() => {
-    const ids = multiSelected ? multi : selectedId ? [selectedId] : [];
-    return ids.map((id) => findLayer(doc, id)).filter((l): l is ComposerLayer => !!l);
-  }, [doc, multi, multiSelected, selectedId]);
-
-  const selectLayer = useCallback(
-    (id: string | null, mods?: { toggle: boolean; range: boolean }) => {
-      if (id && mods?.toggle) {
-        const cur = multi.length > 1 ? multi : selectedId ? [selectedId] : [];
-        const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
-        setSelectedId(next.length > 0 ? (next[next.length - 1] ?? null) : null);
-        setMulti(next.length > 1 ? next : []);
-      } else if (id && mods?.range && selectedId) {
-        const order = layerList(committed.current).map((l) => l.id).reverse();
-        const ids = idRange(order, selectedId, id);
-        setSelectedId(id);
-        setMulti(ids.length > 1 ? ids : []);
-      } else {
-        setSelectedId(id);
-        setMulti([]);
-      }
-      if (id) setAdjustBg(false);
-    },
-    [multi, selectedId],
-  );
-
-  // ---- layouts ----
-  const layoutKind = useRef<LayoutKind>("scatter");
-  const layoutSeed = useRef(Date.now() % 100000);
-  const doLayout = useCallback(
-    (kind: LayoutKind) => {
-      layoutKind.current = kind;
-      layoutSeed.current += 1;
-      const before = committed.current;
-      edit((d) => applyLayout(d, kind, layoutSeed.current, undefined, sizerFor(d)));
-      if (committed.current === before) toast({ title: "Add some photos first", tone: "neutral" });
-    },
-    [edit, sizerFor],
-  );
-
-  // ---- remove background ----
-  const failShown = useRef(new Set<string>());
-  /** Toasts a failure once per batch, however many layers hit it. */
-  const toastFailureOnce = useCallback((title: string, description: string, tone: "danger" | "warn" = "danger") => {
-    const key = `${title}|${description}`;
-    if (failShown.current.has(key)) return;
-    failShown.current.add(key);
-    toast({ title, description, tone });
-  }, []);
-
-  /** Starts one background-removal job per layer; the jobs queue (the engine runs one at a time). */
-  const removeBackgrounds = useCallback(
-    async (layers: readonly ComposerLayer[]) => {
-      for (const layer of layers) {
-        const path = layer.image?.ref.path;
-        if (!path || pendingRef.current[layer.id]) continue;
-        try {
-          const job = await ComposerService.RemoveBackground(path);
-          useJobs.getState().upsert(job);
-          pendingRef.current = { ...pendingRef.current, [layer.id]: { jobId: job.id, from: path } };
-          setPending(pendingRef.current);
-        } catch (e) {
-          const err = toAppError(e);
-          toastFailureOnce("Couldn't remove the background", err.hint ? `${err.message} ${err.hint}` : err.message);
-        }
-      }
-    },
-    [toastFailureOnce],
-  );
-
-  const removeBackground = useCallback((layer: ComposerLayer) => removeBackgrounds([layer]), [removeBackgrounds]);
-
-  /** The selected image layers that can be cut out (not already cut out when several are selected). */
-  const batchRemovable = useCallback(
-    (layers: readonly ComposerLayer[]) => layers.filter((l) => l.kind === "image" && !!l.image && !pending[l.id] && (layers.length === 1 || !l.image.ref.original)),
-    [pending],
-  );
-
-  const jobsById = useJobs((s) => s.byId);
+  // ---- remove background: jobs finishing ----
   useEffect(() => {
     const entries = Object.entries(pending);
     if (entries.length === 0) {
-      failShown.current.clear();
+      resetFailureToasts();
       return;
     }
     const finished: string[] = [];
@@ -383,7 +154,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
         finished.push(layerId);
         const out = job.outputs[0]?.path;
         if (out) {
-          edit((d) => {
+          st().edit((d) => {
             const l = findLayer(d, layerId);
             if (!l?.image) return d;
             return setLayerSource(d, layerId, out, l.image.ref.original || p.from);
@@ -399,36 +170,27 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
       }
     }
     if (finished.length > 0) {
-      const next = { ...pendingRef.current };
+      const next: Record<string, Pending> = { ...st().pending };
       for (const id of finished) delete next[id];
-      pendingRef.current = next;
-      setPending(next);
+      st().setPending(next);
     }
-  }, [jobsById, pending, edit, toastFailureOnce]);
+  }, [jobsById, pending, st]);
 
-  const busyIds = useMemo(() => new Set(Object.keys(pending)), [pending]);
-  const busyLabels = useMemo(() => {
+  useEffect(() => {
     const out: Record<string, string> = {};
     for (const [layerId, p] of Object.entries(pending)) {
       const job = jobsById[p.jobId];
       if (!job) continue;
       out[layerId] = job.status === "queued" ? "queued" : job.progress > 0 && job.progress <= 1 ? `${Math.round(job.progress * 100)}%` : "";
     }
-    return out;
-  }, [pending, jobsById]);
-
-  const restoreOriginals = useCallback(
-    (layers: readonly ComposerLayer[]) => {
-      const targets = layers.filter((l) => !!l.image?.ref.original);
-      if (targets.length === 0) return;
-      edit((d) => targets.reduce((acc, l) => setLayerSource(acc, l.id, l.image?.ref.original ?? "", ""), d));
-    },
-    [edit],
-  );
-  const restoreOriginal = useCallback((layer: ComposerLayer) => restoreOriginals([layer]), [restoreOriginals]);
+    if (!sameLabels(out, st().busyLabels)) st().setBusyLabels(out);
+  }, [pending, jobsById, st]);
 
   // ---- collage build (SPEC.md §B13.5) ----
   const build = postSlide?.build?.kind === "collage" ? postSlide.build : null;
+  const buildIds = useRef<string[]>([]);
+  const buildStarted = useRef(false);
+  const buildSeed = useRef(Date.now() % 100000);
 
   const lastIncoming = useRef(0);
   useEffect(() => {
@@ -438,61 +200,56 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
       buildStarted.current = true;
       void startBuild(build, incoming.paths);
     } else {
-      void addPhotos(incoming.paths);
+      void st().addPhotos(incoming.paths);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incoming, addPhotos]);
+  }, [incoming]);
 
   /** Background and layers go in at once; the layout and cut-outs follow as the phases advance. */
   async function startBuild(b: NonNullable<typeof build>, paths: string[]) {
-    setPhase("adding");
-    internal.current = true;
-    try {
-      edit((d) => ({
+    st().setPhase("adding");
+    st().edit(
+      (d) => ({
         ...d,
         background: b.background
           ? { ...d.background, kind: "image", image: { path: b.background, original: "" }, panX: 0, panY: 0, zoom: 1 }
           : { ...d.background, kind: "color", color: b.color || d.background.color, image: null },
-      }));
-      const layers: ComposerLayer[] = [];
-      for (const path of paths) {
-        if (path === b.background || layers.length >= MAX_LAYERS) continue;
-        try {
-          const bmp = await loadImage(path);
-          const { w, h } = imageSize(bmp);
-          layers.push(newImageLayer(path, w, h, committed.current));
-        } catch (e) {
-          toastFailureOnce(`Couldn't add ${baseName(path)}`, toAppError(e).message, "warn");
-        }
+      }),
+      { internal: true },
+    );
+    const layers: ComposerLayer[] = [];
+    for (const path of paths) {
+      if (path === b.background || layers.length >= MAX_LAYERS) continue;
+      try {
+        const bmp = await loadImage(path);
+        const { w, h } = imageSize(bmp);
+        const cur = st().history?.present;
+        if (!cur) return;
+        layers.push(newImageLayer(path, w, h, cur));
+      } catch (e) {
+        toastFailureOnce(`Couldn't add ${baseName(path)}`, toAppError(e).message, "warn");
       }
-      edit((d) => layers.reduce(addLayer, d));
-      buildIds.current = layers.map((l) => l.id);
-      layoutKind.current = b.layout;
-    } finally {
-      internal.current = false;
     }
-    setPhase("layout1");
+    st().edit((d) => layers.reduce(addLayer, d), { internal: true });
+    buildIds.current = layers.map((l) => l.id);
+    st().setLayoutKind(b.layout);
+    st().setPhase("layout1");
   }
 
   const buildLayout = useCallback(() => {
-    if (!build || touched.current) return;
-    internal.current = true;
-    try {
-      edit((d) => applyLayout(d, build.layout, layoutSeed.current, buildIds.current, sizerFor(d)));
-    } finally {
-      internal.current = false;
-    }
-  }, [build, edit, sizerFor]);
+    if (!build || st().touched) return;
+    st().edit((d) => applyLayout(d, build.layout, buildSeed.current, buildIds.current, (l) => layerSize(d, l, composerImages())), { internal: true });
+  }, [build, st]);
 
   // The images behind the build's layers (or their failure) are known.
   const imagesReady = useMemo(
     () =>
       buildIds.current.every((id) => {
-        const p = findLayer(hist.value, id)?.image?.ref.path;
-        return !p || images.has(p) || reported.current.has(p);
+        const p = recorded ? findLayer(recorded, id)?.image?.ref.path : undefined;
+        return !p || images.has(p) || imageFailed(p);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hist.value, images],
+    [recorded, images],
   );
 
   useEffect(() => {
@@ -500,27 +257,31 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
     if (phase === "layout1" && imagesReady) {
       buildLayout();
       if (build.cutouts && buildIds.current.length > 0) {
-        setPhase("submitting");
-        const layers = buildIds.current.map((id) => findLayer(committed.current, id)).filter((l): l is ComposerLayer => !!l);
-        void removeBackgrounds(layers).then(() => setPhase("cutting"));
+        st().setPhase("submitting");
+        void st()
+          .removeBackgrounds(buildIds.current)
+          .then(() => st().setPhase("cutting"));
       } else {
-        setPhase("done");
+        st().setPhase("done");
       }
     } else if (phase === "cutting" && Object.keys(pending).length === 0) {
-      setPhase("layout2");
+      st().setPhase("layout2");
     } else if (phase === "layout2" && imagesReady) {
       buildLayout();
-      setPhase("done");
+      st().setPhase("done");
     }
-  }, [build, phase, imagesReady, pending, buildLayout, removeBackgrounds]);
+  }, [build, phase, imagesReady, pending, buildLayout, st]);
 
   // ---- export ----
   const exportAs = useCallback(
     async (format: "jpg" | "png") => {
-      if (exporting) return;
-      setExporting(true);
+      if (st().exporting) return;
+      st().setExporting(true);
       try {
-        edit((d) => (d.format === format ? d : { ...d, format }));
+        const changed = st().history?.present.format !== format;
+        st().setCanvas({ format });
+        // The autosave reads the document the view last rendered.
+        if (changed) await new Promise((r) => setTimeout(r, 0));
         await autosave.flush(true);
         const out = await ComposerService.Export(project.id);
         toast({
@@ -532,10 +293,10 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
       } catch (e) {
         toastError("Couldn't export", e);
       } finally {
-        setExporting(false);
+        st().setExporting(false);
       }
     },
-    [exporting, edit, autosave, project.id],
+    [st, autosave, project.id],
   );
 
   // ---- navigation ----
@@ -554,216 +315,132 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   // ---- keyboard ----
   const onKeyDown = (e: RKeyboardEvent<HTMLDivElement>) => {
     if (isTyping(e.target)) return;
+    const s = st();
+    const one = s.multi.length > 1 ? undefined : s.selectedId && s.history ? findLayer(s.history.present, s.selectedId) : undefined;
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
     if (mod && key === "z") {
       e.preventDefault();
-      if (e.shiftKey) hist.redo();
-      else hist.undo();
+      if (e.shiftKey) s.redo();
+      else s.undo();
     } else if (mod && key === "y") {
       e.preventDefault();
-      hist.redo();
-    } else if (mod && key === "d" && selected) {
+      s.redo();
+    } else if (mod && key === "d" && one) {
       e.preventDefault();
-      duplicateById(selected.id);
-    } else if ((e.key === "Delete" || e.key === "Backspace") && selected) {
+      s.duplicateLayer(one.id);
+    } else if ((e.key === "Delete" || e.key === "Backspace") && one) {
       e.preventDefault();
-      deleteById(selected.id);
-    } else if ((e.key === "Delete" || e.key === "Backspace") && multiSelected) {
+      s.deleteLayers([one.id]);
+    } else if ((e.key === "Delete" || e.key === "Backspace") && s.multi.length > 1) {
       e.preventDefault();
-      const ids = [...multi];
-      edit((d) => ids.reduce(deleteLayer, d));
-      setMulti([]);
-      setSelectedId(null);
+      s.deleteLayers([...s.multi]);
     } else if (e.key === "Escape") {
       if (clickIn.openId) return;
-      setSelectedId(null);
-      setMulti([]);
-    } else if (e.key.startsWith("Arrow") && selected && !selected.locked) {
-      const patch = nudge(committed.current, selected, e.key, e.shiftKey);
+      s.select(null);
+    } else if (e.key.startsWith("Arrow") && one && !one.locked && s.history) {
+      const patch = nudge(s.history.present, one, e.key, e.shiftKey);
       if (patch) {
         e.preventDefault();
-        edit((d) => updateLayer(d, selected.id, patch), { merge: true });
+        s.patchLayer(one.id, patch, `nudge:${one.id}`);
       }
     }
   };
 
-  const cropLayer = cropId ? findLayer(doc, cropId) : undefined;
-  const removable = batchRemovable(selectedLayers);
-  const canRemove = removable.length > 0;
-  const restorable = selectedLayers.filter((l) => !!l.image?.ref.original);
-  const anyBusy = selectedLayers.some((l) => busyIds.has(l.id));
-  const hasBgPhoto = doc.background.kind === "image" && !!doc.background.image?.path;
+  if (!doc) return null;
 
-  const layersSummary = layersText(layerList(doc).length);
-  const propsSummary = propertiesSummary(selectedLayers);
+  const cropLayer = cropId ? findLayer(doc, cropId) : undefined;
+  const single = selected.length === 1 ? selected[0] : undefined;
+  const layerCount = layerList(doc).length;
+
+  const summaries = {
+    sources: "Photos in this post",
+    layers: layersSummary(layerCount),
+    layouts: "Arrange the photos",
+    background: backgroundSummary(doc.background),
+    canvas: `${doc.aspect} · ${doc.width}×${doc.height}`,
+  };
+
+  const header = (
+    <div className={styles.headerBar} role="toolbar" aria-label="Composer tools">
+      <IconButton icon="arrow-left" label="Back to projects" data-tip="Save and go back to your list of compositions" onClick={() => void closeEditor()} />
+      <TextField
+        size="sm"
+        aria-label="Project name"
+        data-tip="Name of this composition (shown in the list and used for the exported file)"
+        wrapperClassName={styles.name}
+        value={name}
+        maxLength={120}
+        onChange={(e) => st().setName(e.target.value)}
+      />
+      <span className={styles.status} role="status" data-state={saveState} data-tip="Changes are saved automatically as you work">
+        {SAVE_LABEL[saveState]}
+      </span>
+      <Spacer />
+      {exporting && <Spinner size={14} label="Exporting" />}
+      {postSlide && (
+        <Button size="sm" variant="secondary" icon="arrow-left" collapsible data-tip="Save and return to the post this composition belongs to" onClick={() => void backToPost()}>
+          Back to post
+        </Button>
+      )}
+      <IconButton icon="undo-2" label="Undo" data-tip="Undo the last change" kbd="Ctrl+Z" disabled={!undoable} onClick={() => st().undo()} />
+      <IconButton icon="redo-2" label="Redo" data-tip="Redo the change you just undid" kbd="Ctrl+Shift+Z" disabled={!redoable} onClick={() => st().redo()} />
+      <MenuButton
+        size="sm"
+        label="Add"
+        icon="plus"
+        collapsible
+        data-tip="Add a photo or a text layer to the canvas"
+        items={() => [
+          { id: "photo", label: "Add photo", icon: "image", tip: "Add photos from your computer as new layers", onSelect: () => void st().pickPhotos() },
+          { id: "text", label: "Add text", icon: "type", tip: "Add a text layer you can type into, style and move", onSelect: () => st().addText() },
+        ]}
+      />
+      <MenuButton
+        size="sm"
+        variant="ghost"
+        label="More actions"
+        icon="ellipsis"
+        data-tip="Zoom and layer shortcuts"
+        items={() => [
+          { id: "fit", label: "Zoom to fit", icon: "maximize-2", tip: "Reset the canvas zoom so the whole picture fits", onSelect: () => st().setZoom(1) },
+          { id: "duplicate", label: "Duplicate layer", icon: "copy", tip: "Copy the selected layer", disabled: !single, onSelect: () => single && st().duplicateLayer(single.id) },
+        ]}
+      />
+      <MenuButton
+        size="sm"
+        label="Export"
+        icon="download"
+        collapsible
+        data-tip="Render the finished picture into your library"
+        items={() => [
+          { id: "jpg", label: "Export as JPG", tip: "Smaller file, best for photos and Instagram", onSelect: () => void exportAs("jpg") },
+          { id: "png", label: "Export as PNG", tip: "Lossless file, keeps transparency; larger", onSelect: () => void exportAs("png") },
+        ]}
+      />
+    </div>
+  );
 
   return (
-    <div ref={root} className={styles.editor} onKeyDown={onKeyDown}>
-      <div className={styles.toolbar} role="toolbar" aria-label="Composer tools">
-        <IconButton icon="arrow-left" label="Back to projects" data-tip="Save and go back to your list of compositions" onClick={() => void closeEditor()} />
-        <TextField
-          size="sm"
-          aria-label="Project name"
-          data-tip="Name of this composition (shown in the list and used for the exported file)"
-          wrapperClassName={styles.name}
-          value={name}
-          maxLength={120}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <span className={styles.sep} />
-        <Button size="sm" variant="secondary" collapsible icon="image" data-tip="Add photos from your computer as new layers" onClick={() => void pickPhotos()}>
-          Add photo
-        </Button>
-        <Button size="sm" variant="secondary" collapsible icon="type" data-tip="Add a text layer you can type into, style and move" onClick={addText}>
-          Add text
-        </Button>
-        <span data-tip="Arrange all the photos automatically in a ready-made layout" style={{ display: "contents" }}>
-        <MenuButton
-          size="sm"
-          label="Layouts"
-          icon="grid-3x3"
-          collapsible
-          items={() => [
-            ...LAYOUTS.map((l) => ({ id: l.id, label: `${l.label} - ${l.hint}`, tip: `Arrange the photos as ${l.label.toLowerCase()}: ${l.hint.toLowerCase()}`, onSelect: () => doLayout(l.id) })),
-            { id: "shuffle", label: "Shuffle (same layout, new arrangement)", tip: "Re-roll the current layout for a different arrangement", icon: "refresh-cw", onSelect: () => doLayout(layoutKind.current) },
-          ]}
-        />
-        </span>
-        <Button
-          size="sm"
-          variant="secondary"
-          icon="wand-sparkles"
-          collapsible
-          data-tip={canRemove ? "Cut the subject out of the selected photo(s) with the AI engine, leaving a transparent background" : "Select one or more photos to cut out"}
-          disabled={!canRemove}
-          loading={anyBusy && !canRemove}
-          onClick={() => void removeBackgrounds(removable)}
-        >
-          {multiSelected ? `Remove background (${removable.length})` : "Remove background"}
-        </Button>
-        <span className={styles.sep} />
-        <IconButton icon="undo-2" label="Undo" data-tip="Undo the last change" kbd="Ctrl+Z" disabled={!hist.canUndo} onClick={hist.undo} />
-        <IconButton icon="redo-2" label="Redo" data-tip="Redo the change you just undid" kbd="Ctrl+Shift+Z" disabled={!hist.canRedo} onClick={hist.redo} />
-        <IconButton icon="maximize-2" label="Zoom to fit" data-tip="Reset the canvas zoom so the whole picture fits" onClick={() => setZoom(1)} />
-        <span className={styles.grow} />
-        <span className={styles.status} role="status" data-state={autosave.state} data-tip="Changes are saved automatically as you work">
-          {SAVE_LABEL[autosave.state]}
-        </span>
-        {exporting && <Spinner size={14} label="Exporting" />}
-        {postSlide && (
-          <Button size="sm" variant="secondary" icon="arrow-left" collapsible data-tip="Save and return to the post this composition belongs to" onClick={() => void backToPost()}>
-            Back to post
-          </Button>
-        )}
-        <span data-tip="Render the finished picture into your library" style={{ display: "contents" }}>
-        <MenuButton
-          size="sm"
-          label="Export"
-          icon="download"
-          collapsible
-          items={() => [
-            { id: "jpg", label: "Export as JPG", tip: "Smaller file, best for photos and Instagram", onSelect: () => void exportAs("jpg") },
-            { id: "png", label: "Export as PNG", tip: "Lossless file, keeps transparency; larger", onSelect: () => void exportAs("png") },
-          ]}
-        />
-        </span>
-      </div>
-
-      <div className={styles.main}>
-        <Stage
-          doc={doc}
-          images={images}
-          selectedId={multiSelected ? null : selectedId}
-          onSelect={(id) => selectLayer(id)}
-          onSourceDrop={(paths, x, y) => void addPhotos(paths, { x, y })}
-          onLive={setLive}
-          onCommit={(d, opts) => {
-            setLive(null);
-            edit(() => d, opts);
-          }}
-          editingId={editingId}
-          onEditing={setEditingId}
-          onTextChange={(id, text) =>
-            edit((d) => {
-              const l = findLayer(d, id);
-              return l?.text ? updateLayer(d, id, { text: { ...l.text, text: Array.from(text).slice(0, MAX_TEXT_CHARS).join("") } }) : d;
-            }, { merge: true })
-          }
-          adjustBg={adjustBg && hasBgPhoto && !selected}
-          busyIds={busyIds}
-          zoom={zoom}
-          onZoom={setZoom}
-        />
-      </div>
-
-      <div className={styles.dock} role="group" aria-label="Composition panels">
-        <ClickIn icon="layers" title="Layers" summary={layersSummary} tip="Everything on the canvas, top layer first; drag a row to reorder" className={styles.dockItem}>
-          <LayersPanel
-            layers={layerList(doc)}
-            selectedId={selectedId}
-            multi={multiSelected ? new Set(multi) : undefined}
-            busyIds={busyIds}
-            busyLabels={busyLabels}
-            onSelect={selectLayer}
-            onPatch={patchLayer}
-            onDuplicate={duplicateById}
-            onDelete={deleteById}
-            onReorder={(id, index) => edit((d) => reorderLayer(d, id, index))}
-          />
-        </ClickIn>
-        <ClickIn icon="sliders-horizontal" title="Properties" summary={propsSummary} tip="Position, size, look and text of the selected layer" className={styles.dockItem}>
-          {multiSelected ? (
-            <div className={styles.multi} role="group" aria-label="Several layers">
-              <p className={styles.multiText}>{multi.length} layers selected</p>
-              <Button
-                size="sm"
-                variant="secondary"
-                icon="wand-sparkles"
-                data-tip={canRemove ? "Cut the subject out of every selected photo" : "None of the selected layers is a photo that can be cut out"}
-                disabled={!canRemove}
-                onClick={() => void removeBackgrounds(removable)}
-              >
-                Cut out all
-              </Button>
-              <Button size="sm" variant="secondary" icon="undo-2" data-tip={restorable.length === 0 ? "None of the selected photos has been cut out" : "Bring back the original photos, undoing the cut-outs"} disabled={restorable.length === 0} onClick={() => restoreOriginals(restorable)}>
-                Restore originals
-              </Button>
-            </div>
-          ) : selected ? (
-            <PropertiesPanel
-              layer={selected}
-              docWidth={doc.width}
-              docHeight={doc.height}
-              busy={busyIds.has(selected.id)}
-              onPatch={(patch) => patchLayer(selected.id, patch)}
-              onArrange={(dir: MoveDirection) => edit((d) => moveLayer(d, selected.id, dir))}
-              onCrop={() => setCropId(selected.id)}
-              onRemoveBackground={() => void removeBackground(selected)}
-              onRestoreOriginal={() => restoreOriginal(selected)}
-            />
-          ) : (
-            <p className={styles.multiText} data-tip="Click a layer on the canvas or in Layers first">Select a layer to edit it.</p>
-          )}
-        </ClickIn>
-        <ClickIn icon="paint-bucket" title="Background" summary={backgroundSummary(doc.background)} tip="What shows behind all the layers" className={styles.dockItem}>
-          <BackgroundPanel background={doc.background} adjust={adjustBg} onAdjust={setAdjustBg} onChange={setBackground} onChoosePhoto={() => void chooseBackground()} />
-        </ClickIn>
-        {postSlide && (
-          <ClickIn icon="images" title="Sources" summary="Photos in this post" tip="Photos in this post that you can add to the canvas" width={380} className={styles.dockItem}>
-            <SourcesPanel postId={postSlide.postId} onAdd={(paths) => void addPhotos(paths)} />
-          </ClickIn>
-        )}
-      </div>
-
+    <div className={styles.editor} onKeyDown={onKeyDown}>
+      <StudioLayout
+        header={header}
+        rail={<WorkspaceRail ws={ws} panels={postSlide ? ["sources", "layers", "layouts", "background", "canvas"] : ["layers", "layouts", "background", "canvas"]} summaries={summaries} />}
+        stage={
+          <WorkspacePreviewFrame ws={ws}>
+            <ComposerStage />
+          </WorkspacePreviewFrame>
+        }
+        bottom={<SelectionBar />}
+      />
       {cropLayer?.image && (
         <CropDialog
           layer={cropLayer}
-          onCancel={() => setCropId(null)}
+          onCancel={() => st().setCropId(null)}
           onApply={(crop) => {
             const im = cropLayer.image;
-            if (im) patchLayer(cropLayer.id, { image: { ...im, crop } });
-            setCropId(null);
+            if (im) st().patchLayer(cropLayer.id, { image: { ...im, crop } });
+            st().setCropId(null);
           }}
         />
       )}
