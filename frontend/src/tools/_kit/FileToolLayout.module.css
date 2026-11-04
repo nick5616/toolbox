@@ -37,6 +37,23 @@
   margin: 0 auto;
 }
 
+/* Inside another tool's drawer or window: tighter, no tagline, no centring. */
+.root.embedded {
+  gap: var(--space-4);
+  max-width: none;
+  padding: var(--space-3) var(--space-4);
+}
+
+.noFiles {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+}
+
 .header {
   display: flex;
   flex-direction: column;

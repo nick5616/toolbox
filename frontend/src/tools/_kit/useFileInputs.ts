@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "@/components";
 import { FilesService, type FileInfo } from "@/lib/api";
+import { useToolHandoff } from "@/lib/embed";
 import { toAppError } from "@/lib/errors";
 import { useModules } from "@/state/modules";
-import { useUI } from "@/state/ui";
 import { acceptsPath } from "./accepts";
 
 export interface FileInputs {
@@ -80,12 +80,8 @@ export function useFileInputs(moduleId: string): FileInputs {
     }
   }, [moduleId, add]);
 
-  const handoff = useUI((s) => s.handoff);
-  useEffect(() => {
-    if (handoff?.moduleId !== moduleId) return;
-    const h = useUI.getState().takeHandoff(moduleId);
-    if (h) void add(h.inputs);
-  }, [handoff, moduleId, add]);
+  // Dropped/pasted/Send to files; embedded, the embed's own handoff.
+  useToolHandoff(moduleId, (h) => void add(h.inputs));
 
   return { files, add, remove, clear, pick };
 }
