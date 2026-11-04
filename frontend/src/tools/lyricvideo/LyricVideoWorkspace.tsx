@@ -341,6 +341,7 @@ function Workspace({ songPath }: { songPath: string }) {
                   }}
                   source={media.source}
                   kind="audio"
+                  compact
                   path={songPath}
                   onTime={(ms) => st().setPlayheadMs(ms)}
                   onPlayingChange={(p) => st().setPlaying(p)}

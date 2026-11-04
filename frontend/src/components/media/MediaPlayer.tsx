@@ -48,6 +48,8 @@ export interface MediaPlayerProps {
   path?: string;
   /** Optional precomputed waveform peaks for audio (skips the lookup). */
   waveform?: number[];
+  /** Audio only: just the transport row, no cover/waveform stage (for tools that already show the song's waveform elsewhere). */
+  compact?: boolean;
   className?: string;
 }
 
@@ -56,7 +58,7 @@ const ZERO_RECT: ContentRect = { left: 0, top: 0, width: 0, height: 0 };
 
 /** Video/audio player with our own controls (SPEC.md §3.11). */
 export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(function MediaPlayer(
-  { source, kind, onTime, onDuration, onPlayingChange, overlay, keyboard = true, path, waveform, className },
+  { source, kind, onTime, onDuration, onPlayingChange, overlay, keyboard = true, path, waveform, compact = false, className },
   ref,
 ) {
   const media = useRef<HTMLVideoElement & HTMLAudioElement>(null);
@@ -314,7 +316,7 @@ export const MediaPlayer = forwardRef<MediaPlayerHandle, MediaPlayerProps>(funct
 
   return (
     <div className={cx(styles.root, className)} data-testid="media-player">
-      <div ref={stage} className={styles.stage}>
+      <div ref={stage} className={cx(styles.stage, compact && kind === "audio" && styles.stageHidden)}>
         {kind === "video" ? (
           <>
             <video
