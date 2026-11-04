@@ -13,6 +13,14 @@ export interface EditDialogProps {
   onCancel: () => void;
 }
 
+const FIELD_TIPS: Record<string, string> = {
+  Title: "Name of the photo or work",
+  Artist: "Photographer or creator name",
+  Copyright: "Copyright notice, e.g. the year and your name",
+  Keywords: "Comma-separated search tags",
+  DateTimeOriginal: "When the photo was taken, as YYYY:MM:DD HH:MM:SS",
+};
+
 function Form({ fields, initial, count, onApply, onCancel }: Omit<EditDialogProps, "open">) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((f) => [f, initial[f] ?? ""])),
@@ -55,10 +63,11 @@ function Form({ fields, initial, count, onApply, onCancel }: Omit<EditDialogProp
             return (
               <Field key={f} label={FIELD_LABELS[f] ?? f} hint={FIELD_HINTS[f]} error={errors[f]} htmlFor={`${uid}-${f}`}>
                 {f === "Description" ? (
-                  <TextArea id={`${uid}-${f}`} minRows={3} value={values[f] ?? ""} onChange={(e) => set(e.target.value)} />
+                  <TextArea id={`${uid}-${f}`} data-tip="Free text describing the photo" minRows={3} value={values[f] ?? ""} onChange={(e) => set(e.target.value)} />
                 ) : (
                   <TextField
                     id={`${uid}-${f}`}
+                    data-tip={FIELD_TIPS[f] ?? "Leave empty to remove this field"}
                     size="sm"
                     invalid={!!errors[f]}
                     mono={f === "DateTimeOriginal"}

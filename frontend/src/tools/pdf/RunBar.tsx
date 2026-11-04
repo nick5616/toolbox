@@ -19,10 +19,17 @@ export function RunBar({
   useShortcut("Mod+Enter", () => can && onRun(), { when: can, allowInInputs: true });
   return (
     <div className={styles.runBar}>
-      <Button variant="primary" kbd="Mod+Enter" loading={running} disabled={!can} onClick={onRun}>
+      <Button
+        variant="primary"
+        kbd="Mod+Enter"
+        loading={running}
+        disabled={!can}
+        data-tip={can ? "Queue this PDF job with the settings above" : running ? "Submitting the job" : reason}
+        onClick={onRun}
+      >
         {label}
       </Button>
-      {reason && <p className={styles.reason}>{reason}</p>}
+      {reason && <p className={styles.reason} data-tip="Why the run button is disabled">{reason}</p>}
     </div>
   );
 }

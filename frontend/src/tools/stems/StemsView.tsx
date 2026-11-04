@@ -60,19 +60,22 @@ function PresetCards({ presets, value, onChange }: PresetCardsProps) {
             className={cx(styles.card, checked && styles.selected)}
             onClick={() => onChange(p.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
+            data-tip={`${p.label}: ${p.speed === "best" ? "slowest, cleanest separation" : "faster, slightly more bleed between stems"}; splits into ${(p.stems ?? []).join(", ")}; ${formatBytes(p.downloadBytes)} model download on first use`}
           >
             <span className={styles.cardHead}>
               <span className={styles.label}>{p.label}</span>
-              <Badge tone={p.speed === "best" ? "accent" : "neutral"}>{p.speed}</Badge>
+              <Badge tone={p.speed === "best" ? "accent" : "neutral"} tip={p.speed === "best" ? "Highest quality, takes longer" : "Quicker to run, a little less clean"}>
+                {p.speed}
+              </Badge>
             </span>
             <span className={styles.chips}>
               {(p.stems ?? []).map((s) => (
-                <Badge key={s} mono>
+                <Badge key={s} mono tip={`A separate ${s} track is saved`}>
                   {s}
                 </Badge>
               ))}
             </span>
-            <span className={styles.note}>{formatBytes(p.downloadBytes)} first-use download</span>
+            <span className={styles.note} data-tip="The model is downloaded once and then works offline">{formatBytes(p.downloadBytes)} first-use download</span>
           </button>
         );
       })}
@@ -95,10 +98,10 @@ function StemGroup({ job }: { job: JobView }) {
   return (
     <div className={styles.group}>
       <div className={styles.groupHead}>
-        <span className={styles.track} title={job.title}>
+        <span className={styles.track} data-tip={job.title}>
           {job.title}
         </span>
-        <Button size="sm" variant="secondary" icon="folder-open" onClick={() => void revealFolder(folder)}>
+        <Button size="sm" variant="secondary" icon="folder-open" data-tip="Open the folder that holds all stems of this track" onClick={() => void revealFolder(folder)}>
           Reveal folder
         </Button>
       </div>
@@ -108,10 +111,14 @@ function StemGroup({ job }: { job: JobView }) {
           return (
             <li key={s.path} className={cx(shared.row, out?.missing && shared.missing)}>
               <Icon name="music" size={14} className={shared.icon} />
-              <span className={shared.name} title={s.path}>
+              <span className={shared.name} data-tip={s.path}>
                 {s.name}
               </span>
-              {out && <span className={shared.meta}>{formatBytes(out.sizeBytes)}</span>}
+              {out && (
+                <span className={shared.meta} data-tip="File size on disk">
+                  {formatBytes(out.sizeBytes)}
+                </span>
+              )}
               <span className={shared.actions}>
                 <FileActions outputId={out?.id} path={s.path} disabled={out?.missing} />
               </span>
@@ -166,7 +173,7 @@ export default function StemsView({ moduleId }: ToolViewProps) {
       running={running}
       inputErrors={inputErrors}
       options={
-        <Section label="Options">
+        <Section label="Options" tip="Pick how many stems to make and the file format">
           <div className={styles.options}>
             <PresetCards presets={presets} value={opts.preset} onChange={(id) => setOpts((o) => ({ ...o, preset: id as StemsPreset }))} />
             <SegmentedControl
@@ -174,17 +181,19 @@ export default function StemsView({ moduleId }: ToolViewProps) {
               value={opts.format}
               onChange={(format) => setOpts((o) => ({ ...o, format }))}
               options={[
-                { value: StemsFormat.FormatWAV, label: "wav" },
-                { value: StemsFormat.FormatFLAC, label: "flac" },
-                { value: StemsFormat.FormatMP3, label: "mp3" },
+                { value: StemsFormat.FormatWAV, label: "wav", tip: "Uncompressed and lossless; biggest files, best for editing in a DAW" },
+                { value: StemsFormat.FormatFLAC, label: "flac", tip: "Lossless but compressed; about half the size of WAV" },
+                { value: StemsFormat.FormatMP3, label: "mp3", tip: "Small lossy files; fine for listening or sharing, not for further mixing" },
               ]}
             />
-            <p className={styles.hint}>{STEMS_SIZE_HINT}</p>
+            <p className={styles.hint} data-tip="Rough output size for each format, per stem">
+              {STEMS_SIZE_HINT}
+            </p>
           </div>
         </Section>
       }
       results={
-        <Section label="Results">
+        <Section label="Results" tip="Finished tracks; each shows its stems with open and reveal actions">
           {done.length === 0 ? (
             <EmptyState icon="audio-lines" title="No stems yet." body="Split a track and its stems appear here." />
           ) : (

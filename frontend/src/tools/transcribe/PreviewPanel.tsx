@@ -36,10 +36,12 @@ export function PreviewPanel({ path, title, onClose }: PreviewPanelProps) {
     <aside className={styles.panel} role="complementary" aria-label="Transcript preview">
       <header className={styles.panelHead}>
         <div className={styles.panelTitle}>
-          <strong title={title}>{title}</strong>
-          <span className={styles.note}>{basename(path)}</span>
+          <strong data-tip={title}>{title}</strong>
+          <span className={styles.note} data-tip={path}>
+            {basename(path)}
+          </span>
         </div>
-        <IconButton icon="x" label="Close preview" size="sm" onClick={onClose} />
+        <IconButton icon="x" label="Close preview" size="sm" data-tip="Close the transcript preview" onClick={onClose} />
       </header>
       <div className={styles.panelBody}>
         {state === null ? (
@@ -50,7 +52,7 @@ export function PreviewPanel({ path, title, onClose }: PreviewPanelProps) {
           </p>
         ) : (
           <>
-            <pre className={styles.text}>{state.text}</pre>
+            <pre className={styles.text} data-tip="Beginning of the transcript file">{state.text}</pre>
             {state.truncated && <p className={styles.note}>Showing the first {PREVIEW_LINES} lines.</p>}
           </>
         )}

@@ -81,19 +81,21 @@ export function VideoReview({ source, tracks, state, onState, path }: VideoRevie
             />
           )}
         />
+        <div data-tip="Timeline of tracked faces and plates; click a bar to jump there, drag the playhead to scrub">
         <Timeline durationMs={durationMs} playheadMs={ms} onSeek={seek} markers={markers} onMarkerClick={(id) => {
           const t = tracks.find((x) => x.id === id);
           if (t) seek(t.startMs);
           else setSelected(id);
         }} zoomable />
+        </div>
       </div>
 
       <aside className={styles.side} aria-label="Tracks">
         <div className={styles.sideHead}>
-          <span className={styles.sideTitle}>
+          <span className={styles.sideTitle} data-tip="A track follows one face or plate through the video; only tracks that are on get hidden">
             {tracks.filter((t) => state.tracks[t.id] ?? t.enabled).length} of {tracks.length} {tracks.length === 1 ? "track" : "tracks"} on
           </span>
-          <Button size="sm" variant={drawMode ? "primary" : "secondary"} icon="square-dashed" kbd="B" aria-pressed={drawMode} onClick={() => setDrawMode((v) => !v)}>
+          <Button size="sm" variant={drawMode ? "primary" : "secondary"} icon="square-dashed" kbd="B" aria-pressed={drawMode} data-tip={drawMode ? "Stop drawing boxes" : "Draw a box by hand; it hides that area for 3 seconds from the playhead"} onClick={() => setDrawMode((v) => !v)}>
             Add box
           </Button>
         </div>
@@ -109,14 +111,16 @@ export function VideoReview({ source, tracks, state, onState, path }: VideoRevie
                 return (
                   <li key={t.id} className={styles.boxRow} data-testid={`track-${t.id}`}>
                     <Icon name={t.kind === "plate" ? "rectangle-horizontal" : "scan-face"} size={14} />
-                    <button type="button" className={styles.trackBtn} onClick={() => seek(t.startMs)}>
+                    <button type="button" className={styles.trackBtn} data-tip="Jump the video to where this track begins" onClick={() => seek(t.startMs)}>
                       <span className={styles.boxName}>
                         {t.kind === "plate" ? "Plate" : "Face"} {i + 1}
                       </span>
                       <span className={styles.boxScore}>{span(t)}</span>
                     </button>
-                    <span className={styles.boxScore}>{Math.round(t.maxScore * 100)}%</span>
-                    <Switch checked={on} aria-label={`Redact track ${i + 1}`} onChange={(v) => onState(setTrack(state, t.id, v))} />
+                    <span className={styles.boxScore} data-tip="Best confidence the search reached for this track">
+                      {Math.round(t.maxScore * 100)}%
+                    </span>
+                    <Switch checked={on} aria-label={`Redact track ${i + 1}`} data-tip={on ? "This track will be hidden; switch off if it is a false match" : "This track will be left visible"} onChange={(v) => onState(setTrack(state, t.id, v))} />
                   </li>
                 );
               })}
@@ -125,15 +129,20 @@ export function VideoReview({ source, tracks, state, onState, path }: VideoRevie
         )}
         {state.manual.length > 0 && (
           <>
-            <h4 className={styles.subHead}>Boxes added by hand</h4>
+            <h4 className={styles.subHead} data-tip="Boxes you drew yourself; each covers a time range">Boxes added by hand</h4>
             <ul className={styles.boxList}>
               {state.manual.map((b, i) => (
-                <li key={b.id} className={cx(styles.manualRow, selected === b.id && styles.boxRowSelected)} onClick={() => setSelected(b.id)}>
+                <li
+                  key={b.id}
+                  className={cx(styles.manualRow, selected === b.id && styles.boxRowSelected)}
+                  data-tip="Click to select this box; press I or O to set its start or end to the playhead"
+                  onClick={() => setSelected(b.id)}
+                >
                   <div className={styles.manualHead}>
                     <Icon name="square-dashed" size={14} />
                     <span className={styles.boxName}>Manual {i + 1}</span>
-                    <Switch checked={b.enabled} aria-label={`Redact manual box ${i + 1}`} onChange={(v) => onState({ ...state, manual: state.manual.map((m) => (m.id === b.id ? { ...m, enabled: v } : m)) })} />
-                    <IconButton size="sm" icon="trash-2" label={`Delete manual box ${i + 1}`} onClick={() => onState(removeManual(state, b.id))} />
+                    <Switch checked={b.enabled} aria-label={`Redact manual box ${i + 1}`} data-tip={b.enabled ? "This box will be hidden" : "This box will be left visible"} onChange={(v) => onState({ ...state, manual: state.manual.map((m) => (m.id === b.id ? { ...m, enabled: v } : m)) })} />
+                    <IconButton size="sm" icon="trash-2" label={`Delete manual box ${i + 1}`} data-tip="Remove this box completely" onClick={() => onState(removeManual(state, b.id))} />
                   </div>
                   <div className={styles.manualTimes}>
                     <TimeField label={`Manual box ${i + 1} start`} ms={b.startMs} onCommit={(v) => onState(setManualTime(state, b.id, "start", v, durationMs))} />

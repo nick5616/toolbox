@@ -11,7 +11,6 @@ import {
 } from "@/lib/api";
 import { copyText } from "@/lib/copy";
 import { toAppError } from "@/lib/errors";
-import { revealLabel } from "@/lib/platform";
 import { useOrderedJobs } from "@/state/jobs";
 import { FileActions, FileToolLayout, runLabel, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -35,10 +34,12 @@ function ResultCard({ item }: { item: OcrResultItem }) {
   return (
     <article className={styles.card} aria-label={item.title}>
       <h4 className={styles.cardTitle}>{item.title}</h4>
-      <p className={styles.meta}>{item.meta}</p>
+      <p className={styles.meta} data-tip="What was read and how much">
+        {item.meta}
+      </p>
       {item.files.map((f) => (
         <div key={f.path} className={styles.file}>
-          <span className={f.missing ? `${styles.fileName} ${styles.missing}` : styles.fileName} title={f.path}>
+          <span className={f.missing ? `${styles.fileName} ${styles.missing}` : styles.fileName} data-tip={f.path}>
             {f.name}
           </span>
           <FileActions outputId={f.id || undefined} path={f.path} disabled={f.missing} />
@@ -46,14 +47,14 @@ function ResultCard({ item }: { item: OcrResultItem }) {
       ))}
       {item.preview !== "" && (
         <>
-          <pre className={styles.preview} aria-label="Text preview">
+          <pre className={styles.preview} aria-label="Text preview" data-tip="The text that was read, as it will be copied">
             {item.preview}
           </pre>
           <div className={styles.previewActions}>
-            <Button size="sm" variant="secondary" icon="copy" onClick={() => void copy()}>
+            <Button size="sm" variant="secondary" icon="copy" data-tip="Copy all the recognised text to the clipboard" onClick={() => void copy()}>
               Copy text
             </Button>
-            <Button size="sm" variant="ghost" icon="folder-open" onClick={saveAs} title={revealLabel}>
+            <Button size="sm" variant="ghost" icon="folder-open" data-tip="Show the saved text file so you can copy or move it" onClick={saveAs}>
               Save as…
             </Button>
           </div>
@@ -121,44 +122,45 @@ export default function OcrView({ moduleId }: ToolViewProps) {
       running={running}
       inputErrors={inputErrors}
       options={
-        <Section label="Options">
+        <Section label="Options" tip="Choose the language and what kind of files to write">
           <div className={styles.options}>
             <div className={styles.optRow}>
-              <span id="ocr-language-label" className={styles.optLabel}>
+              <span id="ocr-language-label" className={styles.optLabel} data-tip="The language of the text in your scans; a wrong choice gives poor results">
                 Language
               </span>
               <Select<OcrLanguage>
                 aria-labelledby="ocr-language-label"
+                data-tip="Language of the text in your files; some languages need a one-time model download shown in brackets"
                 value={opts.language}
                 options={langOptions}
                 onChange={(language) => setOpts((o) => ({ ...o, language }))}
               />
               {selected && selected.downloadBytes > 0 && (
-                <span className={styles.help}>{downloadNote(selected.downloadBytes)}</span>
+                <span className={styles.help} data-tip="Size of the language model downloaded the first time you use it">{downloadNote(selected.downloadBytes)}</span>
               )}
             </div>
             <div className={styles.optRow}>
-              <span className={styles.optLabel}>PDF output</span>
+              <span className={styles.optLabel} data-tip="What to produce when the input is a PDF">PDF output</span>
               <SegmentedControl
                 aria-label="PDF output"
                 value={opts.pdfOutput}
                 onChange={(pdfOutput) => setOpts((o) => ({ ...o, pdfOutput }))}
                 options={[
-                  { value: OcrPdfOutput.PDFSearchable, label: "Searchable PDF" },
-                  { value: OcrPdfOutput.PDFText, label: "Text" },
-                  { value: OcrPdfOutput.PDFBoth, label: "Both" },
+                  { value: OcrPdfOutput.PDFSearchable, label: "Searchable PDF", tip: "A copy of the PDF with an invisible text layer so you can search and select text" },
+                  { value: OcrPdfOutput.PDFText, label: "Text", tip: "Only a plain text file with the recognised text" },
+                  { value: OcrPdfOutput.PDFBoth, label: "Both", tip: "Write the searchable PDF and a text file" },
                 ]}
               />
             </div>
             <div className={styles.optRow}>
-              <span className={styles.optLabel}>Image output</span>
+              <span className={styles.optLabel} data-tip="What to produce when the input is a photo or scan">Image output</span>
               <SegmentedControl
                 aria-label="Image output"
                 value={opts.imageOutput}
                 onChange={(imageOutput) => setOpts((o) => ({ ...o, imageOutput }))}
                 options={[
-                  { value: OcrImageOutput.ImageText, label: "Text" },
-                  { value: OcrImageOutput.ImageJSON, label: "Text + positions (JSON)" },
+                  { value: OcrImageOutput.ImageText, label: "Text", tip: "A plain text file with the recognised text" },
+                  { value: OcrImageOutput.ImageJSON, label: "Text + positions (JSON)", tip: "Also save where every word sits on the image, for scripts and other programs" },
                 ]}
               />
             </div>
@@ -166,12 +168,13 @@ export default function OcrView({ moduleId }: ToolViewProps) {
               checked={opts.skipText}
               onChange={(skipText) => setOpts((o) => ({ ...o, skipText }))}
               label="Skip pages that already have text"
+              tip="Leave pages with real text alone, which is faster and keeps their original text"
             />
           </div>
         </Section>
       }
       results={
-        <Section label="Results">
+        <Section label="Results" tip="Recognised text with its files; copy it or open the saved file">
           {items.length === 0 ? (
             <EmptyState icon="file-text" title="No results yet." body="Read some scans or photos and the text appears here." />
           ) : (

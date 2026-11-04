@@ -44,21 +44,27 @@ export default function MidiView({ moduleId }: ToolViewProps) {
       running={running}
       inputErrors={inputErrors}
       options={
-        <Section label="Options">
+        <Section label="Options" tip="Tune how audio is turned into MIDI notes">
           <div className={styles.grid}>
             <Field label="Sensitivity">
               {(c) => (
-                <Slider id={c.id} aria-label="Sensitivity" value={opts.sensitivity} min={0.1} max={0.9} step={0.05} format={pct} onChange={(sensitivity) => setOpts((o) => ({ ...o, sensitivity }))} />
+                <div data-tip="How readily notes are detected; higher finds more notes but adds false ones">
+                <Slider id={c.id} value={opts.sensitivity} min={0.1} max={0.9} step={0.05} format={pct} onChange={(sensitivity) => setOpts((o) => ({ ...o, sensitivity }))} />
+                </div>
               )}
             </Field>
             <Field label="Note floor">
               {(c) => (
-                <Slider id={c.id} aria-label="Note floor" value={opts.noteFloor} min={0.1} max={0.6} step={0.05} format={pct} onChange={(noteFloor) => setOpts((o) => ({ ...o, noteFloor }))} />
+                <div data-tip="Quietest note kept; raise it to drop faint notes and noise">
+                <Slider id={c.id} value={opts.noteFloor} min={0.1} max={0.6} step={0.05} format={pct} onChange={(noteFloor) => setOpts((o) => ({ ...o, noteFloor }))} />
+                </div>
               )}
             </Field>
             <Field label="Min note length">
               {(c) => (
-                <Stepper id={c.id} aria-label="Min note length" value={opts.minNoteMs} min={30} max={500} step={10} unit="ms" onChange={(minNoteMs) => setOpts((o) => ({ ...o, minNoteMs }))} />
+                <div data-tip="Shortest note kept, in milliseconds; raise it to remove blips">
+                <Stepper id={c.id} value={opts.minNoteMs} min={30} max={500} step={10} unit="ms" onChange={(minNoteMs) => setOpts((o) => ({ ...o, minNoteMs }))} />
+                </div>
               )}
             </Field>
             <Field label="Range">
@@ -67,27 +73,27 @@ export default function MidiView({ moduleId }: ToolViewProps) {
                 value={opts.range}
                 onChange={(range) => setOpts((o) => ({ ...o, range }))}
                 options={[
-                  { value: MidiRange.RangeFull, label: "Full" },
-                  { value: MidiRange.RangeBass, label: "Bass" },
-                  { value: MidiRange.RangeMelody, label: "Melody" },
+                  { value: MidiRange.RangeFull, label: "Full", tip: "Look for notes across the whole piano range" },
+                  { value: MidiRange.RangeBass, label: "Bass", tip: "Only keep low notes; use for bass lines" },
+                  { value: MidiRange.RangeMelody, label: "Melody", tip: "Only keep mid and high notes; use for lead lines and vocals" },
                 ]}
               />
             </Field>
             <Field label="Melodia trick" hint="Cleaner melodies; turn off for chords">
               {(c) => (
-                <Switch id={c.id} aria-label="Melodia trick" checked={opts.melodiaTrick} onChange={(melodiaTrick) => setOpts((o) => ({ ...o, melodiaTrick }))} />
+                <Switch id={c.id} aria-label="Melodia trick" data-tip="Prefers one smooth melody line over scattered notes; turn off for chords and polyphonic music" checked={opts.melodiaTrick} onChange={(melodiaTrick) => setOpts((o) => ({ ...o, melodiaTrick }))} />
               )}
             </Field>
           </div>
           <div className={styles.footer}>
-            <Button size="sm" variant="ghost" onClick={() => setOpts({ ...DEFAULT_MIDI_OPTIONS })}>
+            <Button size="sm" variant="ghost" data-tip="Put all options back to their original values" onClick={() => setOpts({ ...DEFAULT_MIDI_OPTIONS })}>
               Reset to defaults
             </Button>
           </div>
         </Section>
       }
       results={
-        <Section label="Results">
+        <Section label="Results" tip="Finished MIDI files with note counts">
           {done.length === 0 ? (
             <EmptyState icon="piano" title="No transcriptions yet." body="Transcribed MIDI files appear here." />
           ) : (
@@ -99,12 +105,22 @@ export default function MidiView({ moduleId }: ToolViewProps) {
                 return (
                   <li key={j.id} className={cx(shared.row, out?.missing && shared.missing)}>
                     <Icon name="piano" size={14} className={shared.icon} />
-                    <span className={shared.name} title={out?.path ?? j.title}>
+                    <span className={shared.name} data-tip={out?.path ?? j.title}>
                       {out?.name ?? j.title}
                     </span>
-                    {r && <Badge mono>{r.notes} notes</Badge>}
-                    {range && <span className={shared.meta}>{range}</span>}
-                    <span className={shared.meta}>{formatRelativeTime(j.finishedAt || j.createdAt)}</span>
+                    {r && (
+                      <Badge mono tip="Number of notes found in the track">
+                        {r.notes} notes
+                      </Badge>
+                    )}
+                    {range && (
+                      <span className={shared.meta} data-tip="Lowest to highest note found">
+                        {range}
+                      </span>
+                    )}
+                    <span className={shared.meta} data-tip={new Date(j.finishedAt || j.createdAt).toLocaleString()}>
+                      {formatRelativeTime(j.finishedAt || j.createdAt)}
+                    </span>
                     <span className={shared.actions}>
                       {out && <FileActions outputId={out.id} path={out.path} disabled={out.missing} />}
                     </span>

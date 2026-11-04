@@ -60,6 +60,7 @@ export function TimeField({ label, ms, onCommit }: { label: string; ms: number; 
   return (
     <TimecodeInput
       aria-label={label}
+      data-tip="Time when this box starts or stops hiding, as minutes:seconds; press Enter to apply"
       className={styles.time}
       value={shown}
       invalid={text !== null && parseTimecodeMs(text) === null}

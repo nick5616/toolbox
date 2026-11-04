@@ -150,6 +150,7 @@ export default function PdfView({ moduleId }: ToolViewProps) {
               aria-checked={a.id === ui.action}
               tabIndex={a.id === ui.action ? 0 : -1}
               className={cx(styles.action, a.id === ui.action && styles.actionOn)}
+              data-tip={`${a.title}: ${a.desc}`}
               onClick={() => setUi((u) => ({ ...u, action: a.id }))}
               onKeyDown={(e) => {
                 const i = ACTIONS.findIndex((x) => x.id === ui.action);
@@ -172,16 +173,17 @@ export default function PdfView({ moduleId }: ToolViewProps) {
         <div className={styles.main}>
           <Section
             label="Input"
+            tip="The files this action works on; originals are never changed"
             action={
               !empty && (
                 <span className={styles.summaryBar}>
-                  <span className={styles.mono}>
+                  <span className={styles.mono} data-tip="How many files are queued and their combined size">
                     {ordered.length} {ordered.length === 1 ? "file" : "files"} · {formatBytes(totalSize)}
                   </span>
-                  <Button size="sm" variant="secondary" icon="plus" onClick={() => void inputs.pick()}>
+                  <Button size="sm" variant="secondary" icon="plus" data-tip="Choose more files to add to the list" onClick={() => void inputs.pick()}>
                     Add files…
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={inputs.clear}>
+                  <Button size="sm" variant="ghost" data-tip="Remove every file from the list; the files on disk are untouched" onClick={inputs.clear}>
                     Clear
                   </Button>
                 </span>
@@ -189,14 +191,16 @@ export default function PdfView({ moduleId }: ToolViewProps) {
             }
           >
             {empty ? (
+              <div data-tip={meta.input === "image" ? "Drag images here from your file manager" : "Drag PDF files here from your file manager"}>
               <DropZone
                 id={`tool-drop:${moduleId}`}
                 label={meta.input === "image" ? "Drop images here or Add files…" : "Drop PDFs here or Add files…"}
               >
-                <Button size="sm" variant="secondary" icon="plus" onClick={() => void inputs.pick()}>
+                <Button size="sm" variant="secondary" icon="plus" data-tip="Open a file picker" onClick={() => void inputs.pick()}>
                   Add files…
                 </Button>
               </DropZone>
+              </div>
             ) : ORDERED.has(ui.action) ? (
               <OrderedList
                 files={fit}
@@ -217,11 +221,11 @@ export default function PdfView({ moduleId }: ToolViewProps) {
                     path: f.path,
                     size: f.sizeBytes,
                     trailing: err ? (
-                      <span className={styles.error} role="alert">
+                      <span className={styles.error} role="alert" data-tip="This file has a problem; remove it or fix it and try again">
                         {err}
                       </span>
                     ) : pages ? (
-                      <span className={styles.mono}>{pages} pages</span>
+                      <span className={styles.mono} data-tip="Number of pages in this PDF">{pages} pages</span>
                     ) : undefined,
                   };
                 })}
@@ -229,7 +233,7 @@ export default function PdfView({ moduleId }: ToolViewProps) {
               />
             )}
             {skipped > 0 && (
-              <p className={styles.note}>
+              <p className={styles.note} data-tip="This action only works on certain file types; the others are left out">
                 {skipped} {skipped === 1 ? "file doesn't" : "files don't"} fit {meta.title} and will be ignored.
               </p>
             )}
@@ -258,7 +262,7 @@ export default function PdfView({ moduleId }: ToolViewProps) {
           />
 
           {active.length > 0 && (
-            <Section label="Active">
+            <Section label="Active" tip="PDF jobs that are queued or running">
               <div className={styles.jobs}>
                 {active.map((j) => (
                   <JobRow key={j.id} job={j} compact />

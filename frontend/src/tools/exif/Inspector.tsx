@@ -20,7 +20,7 @@ function Thumbnail({ path, sizeBytes }: { path: string; sizeBytes: number }) {
     };
   }, [path, sizeBytes]);
   return src ? (
-    <img className={styles.thumb} src={src} alt="" />
+    <img className={styles.thumb} src={src} alt="" data-tip="Preview of the photo" />
   ) : (
     <span className={styles.thumb} aria-hidden="true">
       <Icon name="image" size={24} />
@@ -59,16 +59,18 @@ function Group({
   const bodyId = `${path}:${group.name}`;
   return (
     <section className={styles.group}>
-      <button type="button" className={styles.groupBtn} aria-expanded={expanded} aria-controls={bodyId} onClick={onToggle}>
+      <button type="button" className={styles.groupBtn} aria-expanded={expanded} aria-controls={bodyId} data-tip={expanded ? "Hide this group of tags" : "Show this group of tags"} onClick={onToggle}>
         <Icon name={expanded ? "chevron-down" : "chevron-right"} size={14} />
         <span className={styles.groupName}>{group.name}</span>
-        <span className={styles.count}>{shown.length}</span>
+        <span className={styles.count} data-tip="Number of tags in this group">
+          {shown.length}
+        </span>
       </button>
       {expanded && (
         <dl id={bodyId} className={styles.fields}>
           {shown.map((f, i) => (
             <div key={`${f.tag}:${i}`} className={styles.field}>
-              <dt title={f.tag}>{f.label}</dt>
+              <dt data-tip={`Tag name: ${f.tag}`}>{f.label}</dt>
               <dd>{f.value}</dd>
             </div>
           ))}
@@ -90,17 +92,27 @@ function Loaded({ view }: { view: MetadataView }) {
       <header className={styles.insHead}>
         <Thumbnail path={view.path} sizeBytes={view.sizeBytes} />
         <div className={styles.insInfo}>
-          <h4 className={styles.insName} title={view.path}>
+          <h4 className={styles.insName} data-tip={view.path}>
             {view.name}
           </h4>
-          <span className={styles.insMeta}>{formatBytes(view.sizeBytes)}</span>
-          {camera && <span className={styles.insMeta}>{camera}</span>}
-          {view.dateTaken && <span className={styles.insMeta}>{view.dateTaken}</span>}
+          <span className={styles.insMeta} data-tip="File size on disk">
+            {formatBytes(view.sizeBytes)}
+          </span>
+          {camera && (
+            <span className={styles.insMeta} data-tip="Camera make and model recorded in the photo">
+              {camera}
+            </span>
+          )}
+          {view.dateTaken && (
+            <span className={styles.insMeta} data-tip="When the photo was taken, from its metadata">
+              {view.dateTaken}
+            </span>
+          )}
         </div>
       </header>
 
       {view.hasLocation && view.location && (
-        <div className={styles.location}>
+        <div className={styles.location} data-tip="GPS position stored in this photo; anyone you share the file with can see it">
           <Icon name="map-pin" size={16} />
           <span className={styles.locationText}>
             Contains location: {formatCoordinates(view.location.lat, view.location.lon)}
@@ -109,6 +121,7 @@ function Loaded({ view }: { view: MetadataView }) {
             size="sm"
             variant="secondary"
             icon="copy"
+            data-tip="Copy latitude and longitude as text"
             onClick={() => view.location && void copyCoordinates(formatCoordinates(view.location.lat, view.location.lon))}
           >
             Copy coordinates
@@ -121,6 +134,7 @@ function Loaded({ view }: { view: MetadataView }) {
         icon="search"
         placeholder="Filter tags"
         aria-label="Filter tags"
+        data-tip="Type to show only tags whose name or value contains this text"
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
       />
@@ -155,7 +169,7 @@ export function Inspector({ state }: { state: MetaState | undefined }) {
   }
   return (
     <>
-      {!state.view.editable && <p className={styles.rawNote}>RAW files are read-only here.</p>}
+      {!state.view.editable && <p className={styles.rawNote} data-tip="Metadata of RAW camera files can be read but not edited here">RAW files are read-only here.</p>}
       <Loaded key={state.view.path} view={state.view} />
     </>
   );

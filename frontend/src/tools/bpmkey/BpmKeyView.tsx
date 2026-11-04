@@ -52,7 +52,7 @@ export default function BpmKeyView({ moduleId }: ToolViewProps) {
         running={running}
         inputErrors={inputErrors}
         results={
-          <Section label="Results">
+          <Section label="Results" tip="Detected tempo and musical key for each analysed track">
             <ResultTable
               rows={rows}
               columns={columns}
@@ -60,7 +60,14 @@ export default function BpmKeyView({ moduleId }: ToolViewProps) {
               label="BPM and key"
               empty={<EmptyState icon="activity" title="No analyses yet." body="Add tracks to detect their tempo and key." />}
               actions={
-                <Button size="sm" variant="ghost" icon="trash-2" disabled={rows.length === 0} onClick={() => setConfirmClear(true)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="trash-2"
+                  disabled={rows.length === 0}
+                  data-tip={rows.length === 0 ? "No results to clear" : "Remove the finished analyses from this list; your audio files are not touched"}
+                  onClick={() => setConfirmClear(true)}
+                >
                   Clear results
                 </Button>
               }

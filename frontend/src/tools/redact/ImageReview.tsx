@@ -80,18 +80,23 @@ export function ImageReview({ entry, boxes, onBoxes, settings, strip, reviewed, 
         {total > 1 && (
           <div className={styles.navRow}>
             {onBack && (
-              <Button size="sm" variant="ghost" icon="layout-grid" onClick={onBack}>
+              <Button size="sm" variant="ghost" icon="layout-grid" data-tip="Back to the overview of all images" data-tip-kbd="Escape" onClick={onBack}>
                 All images
               </Button>
             )}
-            <IconButton size="sm" icon="chevron-left" label="Previous image" kbd="ArrowLeft" disabled={index <= 0} onClick={() => step(-1)} />
-            <span className={styles.navText}>
+            <IconButton size="sm" icon="chevron-left" label="Previous image" data-tip="Go to the previous image" kbd="ArrowLeft" disabled={index <= 0} onClick={() => step(-1)} />
+            <span className={styles.navText} data-tip="Current image and its place in the batch">
               {baseName(entry.path)} · {index + 1} of {total}
             </span>
-            <IconButton size="sm" icon="chevron-right" label="Next image" kbd="ArrowRight" disabled={index >= total - 1} onClick={() => step(1)} />
+            <IconButton size="sm" icon="chevron-right" label="Next image" data-tip="Go to the next image" kbd="ArrowRight" disabled={index >= total - 1} onClick={() => step(1)} />
           </div>
         )}
-        <div ref={stage} className={styles.stage} data-testid="review-stage">
+        <div
+          ref={stage}
+          className={styles.stage}
+          data-testid="review-stage"
+          data-tip={drawMode ? "Drag to draw a new box over something to hide" : "Click a box to switch it on or off; drag to move it, drag its edges to resize"}
+        >
           {error ? (
             <Banner tone="warn" title={error} />
           ) : url ? (
@@ -122,9 +127,9 @@ export function ImageReview({ entry, boxes, onBoxes, settings, strip, reviewed, 
           )}
         </div>
         {strip && strip.length > 1 && (
-          <div className={styles.strip} role="list" aria-label="Images">
+          <div className={styles.strip} role="list" aria-label="Images" data-tip="All images in this batch; click one to review it">
             {strip.map((p) => (
-              <button key={p} type="button" role="listitem" aria-label={baseName(p)} aria-current={p === entry.path} className={cx(styles.stripItem, p === entry.path && styles.stripCurrent)} onClick={() => onGo(p)}>
+              <button key={p} type="button" role="listitem" aria-label={baseName(p)} data-tip={reviewed?.has(p) ? `${baseName(p)} (reviewed)` : baseName(p)} aria-current={p === entry.path} className={cx(styles.stripItem, p === entry.path && styles.stripCurrent)} onClick={() => onGo(p)}>
                 <Thumb path={p} size={160} />
                 {reviewed?.has(p) && <Icon name="check" size={12} className={styles.stripCheck} />}
               </button>
@@ -135,8 +140,10 @@ export function ImageReview({ entry, boxes, onBoxes, settings, strip, reviewed, 
 
       <aside className={styles.side} aria-label="Detections">
         <div className={styles.sideHead}>
-          <span className={styles.sideTitle}>{countLabel(boxes)}</span>
-          <Button size="sm" variant={drawMode ? "primary" : "secondary"} icon="square-dashed" kbd="B" aria-pressed={drawMode} onClick={() => setDrawMode((v) => !v)}>
+          <span className={styles.sideTitle} data-tip="Boxes that will be hidden out of all found or added">
+            {countLabel(boxes)}
+          </span>
+          <Button size="sm" variant={drawMode ? "primary" : "secondary"} icon="square-dashed" kbd="B" aria-pressed={drawMode} data-tip={drawMode ? "Stop drawing boxes" : "Draw a box by hand over something the search missed"} onClick={() => setDrawMode((v) => !v)}>
             Add box
           </Button>
         </div>
@@ -148,22 +155,29 @@ export function ImageReview({ entry, boxes, onBoxes, settings, strip, reviewed, 
             <p className={styles.hint}>Wrong match? Switch it off or delete it. Click a box in the picture to toggle it.</p>
             <ul className={styles.boxList}>
               {boxes.map((b, i) => (
-                <li key={b.id} className={cx(styles.boxRow, selected === b.id && styles.boxRowSelected)} onClick={() => setSelected(b.id)}>
+                <li
+                  key={b.id}
+                  className={cx(styles.boxRow, selected === b.id && styles.boxRowSelected)}
+                  data-tip="Click to select this box in the picture"
+                  onClick={() => setSelected(b.id)}
+                >
                   <Icon name={b.kind === "face" ? "scan-face" : b.kind === "plate" ? "rectangle-horizontal" : "square-dashed"} size={14} />
                   <span className={styles.boxName}>
                     {b.kind === "face" ? "Face" : b.kind === "plate" ? "Plate" : "Manual"} {i + 1}
                   </span>
-                  <span className={styles.boxScore}>{b.kind === "manual" ? "" : `${Math.round(b.score * 100)}%`}</span>
-                  <Switch checked={b.enabled} aria-label={`Redact box ${i + 1}`} onChange={() => onBoxes(toggleBox(boxes, b.id))} />
-                  <IconButton size="sm" icon="trash-2" label={`Delete box ${i + 1}`} onClick={() => onBoxes(removeBox(boxes, b.id))} />
+                  <span className={styles.boxScore} data-tip="How confident the search is that this is a real match">
+                    {b.kind === "manual" ? "" : `${Math.round(b.score * 100)}%`}
+                  </span>
+                  <Switch checked={b.enabled} aria-label={`Redact box ${i + 1}`} data-tip={b.enabled ? "This box will be hidden; switch off if it is a wrong match" : "This box will be left visible"} onChange={() => onBoxes(toggleBox(boxes, b.id))} />
+                  <IconButton size="sm" icon="trash-2" label={`Delete box ${i + 1}`} data-tip="Remove this box completely" onClick={() => onBoxes(removeBox(boxes, b.id))} />
                 </li>
               ))}
             </ul>
             <div className={styles.sideActions}>
-              <Button size="sm" variant="ghost" disabled={boxes.every((b) => b.enabled)} onClick={() => onBoxes(setAllBoxes(boxes, true))}>
+              <Button size="sm" variant="ghost" disabled={boxes.every((b) => b.enabled)} data-tip="Switch every box on" onClick={() => onBoxes(setAllBoxes(boxes, true))}>
                 All on
               </Button>
-              <Button size="sm" variant="ghost" disabled={!anyOn} onClick={() => onBoxes(setAllBoxes(boxes, false))}>
+              <Button size="sm" variant="ghost" disabled={!anyOn} data-tip="Switch every box off" onClick={() => onBoxes(setAllBoxes(boxes, false))}>
                 All off
               </Button>
             </div>

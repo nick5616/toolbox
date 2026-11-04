@@ -34,7 +34,7 @@ async function copyPath(path: string) {
 
 function Tile({ text, aspect }: { text: string; aspect: number }) {
   return (
-    <div className={styles.tile} style={{ aspectRatio: String(aspect) }}>
+    <div className={styles.tile} style={{ aspectRatio: String(aspect) }} data-tip="The image could not be previewed here; the file itself is fine">
       <Icon name="image" size={22} />
       <span>{text}</span>
     </div>
@@ -106,11 +106,13 @@ function PreviewDialog({ item, onClose }: { item: ResultItem; onClose: () => voi
         onKeyDown={onKeyDown}
       >
         <div className={styles.dialogHead}>
-          <h2 id={titleId} className={styles.dialogTitle} title={item.output}>
+          <h2 id={titleId} className={styles.dialogTitle} data-tip={item.output}>
             {item.title}
           </h2>
-          <span className={styles.mono}>{item.meta}</span>
-          <IconButton icon="x" label="Close preview" size="sm" onClick={onClose} />
+          <span className={styles.mono} data-tip="Size of the result and what was done">
+            {item.meta}
+          </span>
+          <IconButton icon="x" label="Close preview" size="sm" kbd="Esc" data-tip="Close the large preview and go back to the results" onClick={onClose} />
         </div>
         <Compare item={item} dim={1600} />
       </div>
@@ -137,15 +139,23 @@ export function ResultCards({ items, preview, onPreview, empty }: ResultCardsPro
         {items.map((item) => (
           <article key={item.id} className={styles.resultCard} aria-label={item.title}>
             <div className={styles.cardHead}>
-              <span className={styles.name} title={item.output}>
+              <span className={styles.name} data-tip={item.output}>
                 {item.title}
               </span>
-              <IconButton icon="maximize-2" size="sm" label={`Enlarge ${item.title}`} onClick={() => onPreview(item.id)} />
+              <IconButton
+                icon="maximize-2"
+                size="sm"
+                label={`Enlarge ${item.title}`}
+                data-tip="Open a large before and after comparison"
+                onClick={() => onPreview(item.id)}
+              />
             </div>
             <Compare item={item} dim={800} />
             <div className={styles.meta}>
-              <span className={styles.metaText}>{item.meta}</span>
-              <IconButton icon="copy" size="sm" label="Copy path" onClick={() => void copyPath(item.output)} />
+              <span className={styles.metaText} data-tip="Size of the result and what was done">
+                {item.meta}
+              </span>
+              <IconButton icon="copy" size="sm" label="Copy path" data-tip="Copy the full path of the result file" onClick={() => void copyPath(item.output)} />
               <FileActions outputId={item.outputId} path={item.output} disabled={item.missing} />
             </div>
           </article>

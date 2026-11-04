@@ -7,6 +7,8 @@ export interface RadioCardOption<T extends string> {
   label: string;
   hint?: string;
   note?: string;
+  /** Tooltip text explaining the option. */
+  tip?: string;
 }
 
 export interface RadioCardsProps<T extends string> {
@@ -54,6 +56,7 @@ export function RadioCards<T extends string>({ options, value, onChange, ...aria
           className={cx(styles.card, o.value === value && styles.selected)}
           onClick={() => onChange(o.value)}
           onKeyDown={(e) => onKeyDown(e, i)}
+          data-tip={o.tip}
         >
           <span className={styles.cardLabel}>{o.label}</span>
           {o.hint && <span className={styles.cardNote}>{o.hint}</span>}
