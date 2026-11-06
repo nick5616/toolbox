@@ -19,6 +19,8 @@ import { CommandPalette } from "./CommandPalette";
 import { CompositionBar } from "./CompositionBar";
 import { ConstituentDrawer } from "./ConstituentDrawer";
 import { DropOverlay } from "./DropOverlay";
+import { FocusPill } from "./FocusPill";
+import { useFocusNotices } from "./focusShell";
 import { PoppedOutPlaceholder } from "./PoppedOutPlaceholder";
 import { JobTray } from "./JobTray";
 import { ShortcutsOverlay } from "./ShortcutsOverlay";
@@ -83,6 +85,7 @@ export function Shell() {
   useShellShortcuts();
   useGlobalPaste();
   useJobToasts();
+  useFocusNotices();
   // --- pipelines ---
   usePipelineNotices();
   // --- end pipelines ---
@@ -98,6 +101,7 @@ export function Shell() {
           </div>
           <div ref={setSlot} className={cx(styles.slot, styles.noDrag)} data-testid="header-slot" />
           <div className={cx(styles.actions, styles.noDrag)}>
+            <FocusPill />
             {popOutName ? (
               <IconButton
                 icon="picture-in-picture-2"

@@ -59,13 +59,14 @@ const (
 // DefaultHotkeys returns the default global hotkeys (SPEC.md §3.2).
 func DefaultHotkeys() map[string]string {
 	return map[string]string{
-		HotkeyClipboard: "CmdOrCtrl+Alt+V",
-		HotkeyQuickOpen: "CmdOrCtrl+Alt+Space",
+		HotkeyClipboard:  "CmdOrCtrl+Alt+V",
+		HotkeyQuickOpen:  "CmdOrCtrl+Alt+Space",
+		HotkeyFocusStart: "", // no default binding (Phase 18)
 	}
 }
 
 // HotkeyActions lists the known hotkey actions in UI order.
-func HotkeyActions() []string { return []string{HotkeyClipboard, HotkeyQuickOpen} }
+func HotkeyActions() []string { return []string{HotkeyClipboard, HotkeyQuickOpen, HotkeyFocusStart} }
 
 // DefaultClipboardSettings: recording is opt-in.
 func DefaultClipboardSettings() ClipboardSettings {

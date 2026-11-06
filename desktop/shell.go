@@ -7,6 +7,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"sync"
+	"sync/atomic"
 
 	"toolbox/core"
 	"toolbox/core/lan"
@@ -82,6 +83,8 @@ type Shell struct {
 	needMu      sync.Mutex
 	needYou     int
 	needYouName string
+	// quitBlocked: a quit was refused during a focus session (Phase 18).
+	quitBlocked atomic.Bool
 	// --- end pipelines ---
 }
 
@@ -154,8 +157,9 @@ func (s *Shell) Start() error {
 	// Hotkeys. Callbacks may arrive on any thread; the window calls used
 	// below marshal to the UI thread themselves (InvokeSync inside Wails).
 	s.hk = newHotkeyManager(wailsRegistrar{o.App.GlobalShortcut}, o.Emitter, map[string]func(){
-		core.HotkeyClipboard: func() { _ = s.TogglePopup() },
-		core.HotkeyQuickOpen: func() { _ = s.ShowMain("palette") },
+		core.HotkeyClipboard:  func() { _ = s.TogglePopup() },
+		core.HotkeyQuickOpen:  func() { _ = s.ShowMain("palette") },
+		core.HotkeyFocusStart: func() { s.startLastFocus() },
 	})
 	s.hk.Apply(o.Settings.Current().Hotkeys)
 	o.Settings.OnChange(func(old, new core.Settings) {
@@ -164,6 +168,7 @@ func (s *Shell) Start() error {
 		}
 	})
 
+	s.watchFocus()
 	s.tray.start()
 	return nil
 }

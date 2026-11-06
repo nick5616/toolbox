@@ -49,12 +49,13 @@ func TestHotkeyApply(t *testing.T) {
 	em := &emitRec{}
 	hit := ""
 	m := newHotkeyManager(reg, em, map[string]func(){
-		core.HotkeyClipboard: func() { hit = "clip" },
-		core.HotkeyQuickOpen: func() { hit = "open" },
+		core.HotkeyClipboard:  func() { hit = "clip" },
+		core.HotkeyQuickOpen:  func() { hit = "open" },
+		core.HotkeyFocusStart: func() { hit = "focus" },
 	})
 
 	st := m.Apply(map[string]string{core.HotkeyClipboard: "Ctrl+Alt+V", core.HotkeyQuickOpen: ""})
-	if len(st) != 2 || !st[0].Registered || st[1].Registered || st[1].Error != "" {
+	if len(st) != 3 || !st[0].Registered || st[1].Registered || st[1].Error != "" {
 		t.Fatalf("status = %+v", st)
 	}
 	if st[0].Action != core.HotkeyClipboard || st[1].Action != core.HotkeyQuickOpen {
@@ -64,6 +65,16 @@ func TestHotkeyApply(t *testing.T) {
 	if hit != "clip" {
 		t.Fatal("handler not wired")
 	}
+	st = m.Apply(map[string]string{core.HotkeyClipboard: "Ctrl+Alt+V", core.HotkeyFocusStart: "Ctrl+Alt+F"})
+	if !st[2].Registered || st[2].Action != core.HotkeyFocusStart {
+		t.Fatalf("focus status = %+v", st[2])
+	}
+	reg.live["Ctrl+Alt+F"]()
+	if hit != "focus" {
+		t.Fatal("focus handler not wired")
+	}
+	reg.log = nil
+	em.names = em.names[:1]
 	if len(em.names) != 1 || em.names[0] != core.EventHotkeysStatus {
 		t.Fatalf("emit: %v", em.names)
 	}

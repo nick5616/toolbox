@@ -81,7 +81,7 @@ describe("Settings → General / Clipboard / ExifTool", () => {
     });
     render(<SettingsView />);
     expect(screen.getByText("In use by another app")).toBeTruthy();
-    expect(screen.getAllByText("Disabled")).toHaveLength(2);
+    expect(screen.getAllByText("Disabled")).toHaveLength(4);
     useDesktop.setState({ hotkeys: [{ action: "clipboard", accelerator: "CmdOrCtrl+Alt+V", registered: true, error: "" }] });
     expect(await screen.findByText("Active")).toBeTruthy();
   });
@@ -90,7 +90,7 @@ describe("Settings → General / Clipboard / ExifTool", () => {
     useSettings.setState({ settings: { ...defaultSettings(), hotkeys: { clipboard: "", quickOpen: "CmdOrCtrl+Alt+Q" } } });
     render(<SettingsView />);
     fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }));
-    expect(update).toHaveBeenCalledWith({ hotkeys: DEFAULT_HOTKEYS });
+    expect(update).toHaveBeenCalledWith({ hotkeys: { ...DEFAULT_HOTKEYS, focusStart: "" } });
   });
 
   it("installs ExifTool from the dependencies table", async () => {

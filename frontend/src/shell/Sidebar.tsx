@@ -12,6 +12,7 @@ import { isRunActive, useNeedsYou, usePipelines } from "@/state/pipelines";
 // --- end pipelines ---
 import { PIPELINES_ITEM, RECENT_ITEM, SETTINGS_ITEM, useNavGroups, type NavItem } from "./nav";
 import logoUrl from "@/assets/logo.svg";
+import { FOCUS_MODULE_ID, isActive as focusIsActive, useFocus } from "@/state/focus";
 import styles from "./Sidebar.module.css";
 
 interface ItemProps {
@@ -22,6 +23,8 @@ interface ItemProps {
   running?: boolean;
   /** Local File Transfer is listening. */
   receiving?: boolean;
+  /** A focus session is on (Phase 18). */
+  focusing?: boolean;
   /** Pipelines: number of steps waiting for the user. */
   badge?: number;
   /** Mod+digit that opens this tool. */
@@ -31,7 +34,7 @@ interface ItemProps {
   onClick: () => void;
 }
 
-function SidebarItem({ item, collapsed, active, dot, running, receiving, badge, digit, tool, onClick }: ItemProps) {
+function SidebarItem({ item, collapsed, active, dot, running, receiving, badge, digit, tool, focusing, onClick }: ItemProps) {
   const tipText = item.tip ? `${item.label}: ${item.tip}` : item.label;
   const btn = (
     <button
@@ -54,6 +57,7 @@ function SidebarItem({ item, collapsed, active, dot, running, receiving, badge, 
         </span>
       ) : null}
       {running && <span className={styles.running} data-tip="A job from this tool is running" data-testid="running-indicator" />}
+      {focusing && <span className={styles.running} data-tip="A focus session is on" data-testid="focus-indicator" />}
       {receiving && <span className={styles.receiving} data-tip="Receiving files from other devices" data-testid="receiving-indicator" />}
       {dot && <span className={cx(styles.dot, styles[dot])} data-testid={`dot-${dot}`} data-tip={dot === "danger" ? "A required component failed to install: open Settings" : "A required component is missing: open Settings to install it"} />}
     </button>
@@ -134,6 +138,7 @@ export function Sidebar() {
   }, [deps]);
 
   // --- pipelines ---
+  const focusOn = useFocus((s) => focusIsActive(s.state));
   const needsYou = useNeedsYou().length;
   const pipelinesRunning = usePipelines((st) => Object.values(st.runs).some(isRunActive));
   // --- end pipelines ---
@@ -157,6 +162,7 @@ export function Sidebar() {
       dot={dot}
       running={extra?.running ?? runningModules.has(it.id)}
       receiving={it.id === "lan-share" && lanListening}
+      focusing={it.id === FOCUS_MODULE_ID && focusOn}
       badge={extra?.badge}
       onClick={() => navigate(it.id)}
     />
