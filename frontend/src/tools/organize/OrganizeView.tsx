@@ -1,14 +1,13 @@
 import { useMemo, useRef, useState } from "react";
-import { Button, ClickIn, Field, Icon, IconButton, Section, SegmentedControl, Select, Slider, TextField, toast } from "@/components";
+import { Button, ClickIn, Field, IconButton, Section, SegmentedControl, Select, Slider, TextField, toast } from "@/components";
 import { FilesService, JobStatus, LibraryService, OrganizeDupMode, OrganizeGroupBy, OrganizeService, type OrganizeOptions } from "@/lib/api";
 import { useCommands } from "@/lib/commands";
 import { useToolHandoff } from "@/lib/embed";
 import { toAppError } from "@/lib/errors";
 import { type JobView, useOrderedJobs } from "@/state/jobs";
 import type { ToolViewProps } from "@/tools";
-import { EmptyLine, FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { EmptyLine, FileToolLayout, ResultRow, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
-import { formatResultDate } from "@/tools/_kit/format";
 import {
   ACTION_OPTIONS,
   DEFAULT_ORGANIZE_OPTIONS,
@@ -141,21 +140,19 @@ function ResultRowView({ job }: { job: JobView }) {
     `${sum.copied} organized`,
     sum.duplicates > 0 && `${sum.duplicates} ${sum.duplicates === 1 ? "duplicate" : "duplicates"}${sum.skipped > 0 ? " left out" : ""}`,
     sum.failed > 0 && `${sum.failed} failed`,
-    formatResultDate(job.finishedAt),
   ].filter(Boolean);
+  const folder = baseName(sum.root);
   return (
-    <li className={styles.result}>
-      <Icon name="folder-output" size={16} className={styles.resultIcon} />
-      <span className={styles.resultText}>
-        <span className={styles.resultName} data-tip={sum.root}>
-          {baseName(sum.root)}
-        </span>
-        <span className={styles.resultMeta}>{meta.join(" · ")}</span>
-      </span>
-      <span className={styles.resultActions}>
-        <IconButton icon="folder-open" label="Open folder" data-tip="Show the organized folder" onClick={() => LibraryService.RevealPath(sum.root).catch(fail)} />
-        {report && <IconButton icon="file-text" label="Open report" data-tip="Open report.csv: where every file went and which are duplicates" onClick={() => LibraryService.Open(report.id).catch(fail)} />}
-      </span>
+    <li>
+      <ResultRow
+        path={report?.path ?? sum.root}
+        outputId={report?.id}
+        name={report ? `${folder} / report.csv` : folder}
+        icon={report ? "file-text" : "folder-output"}
+        at={job.finishedAt}
+        meta={meta.join(" · ")}
+        extra={<IconButton icon="folder-open" label="Open folder" data-tip={`Show the organized folder: ${sum.root}`} onClick={() => LibraryService.RevealPath(sum.root).catch(fail)} />}
+      />
     </li>
   );
 }
