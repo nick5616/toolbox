@@ -204,7 +204,16 @@ The Lab sits **right next to the brushes**: its own tab in the brush library and
 
 Lab tools come in two kinds: algorithmic tools (§1.4.1), which use no training data, and perception tools (§1.4.2), which use models.
 
-#### 1.4.1 Algorithmic tools (no training data at all)
+#### 1.4.0 Lab tools are devices (added 2026-11-06)
+Each Lab tool presents as a **device**, like the devices in an Ableton Live device chain.
+- **Header:** a title bar with an on/off toggle, the predictability badge and the origin card.
+- **Controls:** a row of compact knobs and sliders, one per param, with value readouts, units and double-click to reset. Choices are small segmented switches and toggles are pill switches.
+- **Rand:** the header's **Rand** button randomises every param not marked `rand: false` and not locked by the user (right-click a control → Lock from Rand), within its range.
+  - Rand has its own seed, and Rand states have back/forward, so a lucky roll can be found again.
+  - Rand sits beside the tool's **Seed** (lock and re-roll), which varies the tool's own randomness: the parameters stay the same, and the marks change.
+- **Saved devices:** a device's current settings can be saved as a named variant, kept with the user's brushes.
+
+
 These run on the GPU or CPU in the frontend, and are deterministic given a seed. The effects apply at dab rate with the brush's spacing, so stroke speed shapes the result.
 
 | Tool | What it does | Predictability |
