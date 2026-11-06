@@ -126,6 +126,14 @@ func run() error {
 	reg := core.NewRegistry()
 	depSvc := deps.New(paths.BinDir, deps.Catalog(), reg, emitter)
 	jobs := core.NewJobs(db, db, reg, emitter, depSvc.Resolve, settings.Current, paths.TmpDir)
+	jobs.SetLineage(db)
+	go func() { // Phase 19: lineage for outputs made before it existed (cheap, idempotent)
+		if n, err := db.BackfillLineage(context.Background()); err != nil {
+			slog.Warn("lineage backfill", "err", err)
+		} else if n > 0 {
+			slog.Info("lineage backfilled", "rows", n)
+		}
+	}()
 
 	// Audio engine: a virtual dependency plus a lazily started sidecar.
 	engine := sidecar.NewManager(paths, func() (string, error) { return depSvc.Resolve(sidecar.DepID) }, emitter)
