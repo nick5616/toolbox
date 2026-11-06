@@ -4,6 +4,7 @@ import { toAppError } from "@/lib/errors";
 import { toast } from "@/components";
 import { useJobs, type JobView as Job } from "@/state/jobs";
 import { useModules } from "@/state/modules";
+import { FOCUS_MODULE_ID } from "@/state/focus";
 import { useUI } from "@/state/ui";
 import { useBatchResults } from "./batchResults";
 
@@ -32,6 +33,8 @@ export function notifyDone(moduleId: string, jobs: Job[]): void {
   const ui = useUI.getState();
   // Looking at the tool's results already: no toast.
   if (ui.view === moduleId || ui.trayOpen) return;
+  // Focus jobs start or end a session: the top-bar pill and focus toasts say so.
+  if (moduleId === FOCUS_MODULE_ID) return;
   const outputs = jobs.flatMap((j) => j.outputs ?? []);
   const mod = useModules.getState().byId[moduleId]?.name ?? "Job";
   if (jobs.length === 1) {

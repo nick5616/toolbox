@@ -186,6 +186,16 @@ describe("completion toasts", () => {
     expect(toasts()[0]!.action?.label).toBe("Reveal");
   });
 
+  it("no completion toast for Focus jobs (the pill and focus toasts cover them)", () => {
+    vi.useFakeTimers();
+    useUI.setState({ view: "library" });
+    renderHook(() => useJobToasts());
+    act(() => void useJobs.getState().upsert(job("f", "focus", JobStatus.JobRunning, 1000, 0)));
+    act(() => void useJobs.getState().upsert(job("f", "focus", JobStatus.JobDone, 1000, 0)));
+    act(() => void vi.advanceTimersByTime(BATCH_SETTLE_MS + 10));
+    expect(toasts()).toHaveLength(0);
+  });
+
   it("no toast when that tool is on screen", () => {
     vi.useFakeTimers();
     useUI.setState({ view: "stems" });
