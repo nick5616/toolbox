@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import vectors from "../../../core/testdata/vars.json";
-import { escapeTemplate, expandVars, templateVars } from "./vars";
+import { BUILTIN_VARS, escapeTemplate, expandVars, templateVars } from "./vars";
 
 describe("pipeline variables", () => {
   it("matches the Go vectors", () => {
@@ -19,5 +19,11 @@ describe("pipeline variables", () => {
   it("escapes braces", () => {
     const tpl = escapeTemplate("{x}");
     expect(expandVars(tpl).out).toBe("{x}");
+  });
+});
+
+describe("built-in variables", () => {
+  it("include the run weekday (Go: Mon … Sun)", () => {
+    expect(BUILTIN_VARS.map((v) => v.name)).toEqual(["item", "name", "ext", "role", "n", "date", "time", "weekday", "pipeline"]);
   });
 });

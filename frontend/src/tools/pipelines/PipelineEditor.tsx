@@ -13,6 +13,8 @@ import { touchedKeep, useDraft } from "./draftStore";
 import { duplicateStep, firstProblem, stepsOf, insertStep, moveStep, newStep, removeStep, withEntry } from "./editorModel";
 import { PipelinesTabs } from "./PipelinesTabs";
 import { useEditorMode } from "./editorMode";
+import { runWithoutFiles } from "./runNoFiles";
+import { scheduleOf } from "./scheduleModel";
 import { GraphEditor } from "./GraphEditor";
 import { RunHistoryBody, TriggersBody, stepPanelSummary, triggersSummary } from "./panels";
 import { StepCard } from "./StepCard";
@@ -196,9 +198,11 @@ function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => voi
 
   const flush = () => useDraft.getState().flush();
 
+  const noFiles = check.takesFiles === false;
   const runNow = async () => {
     await flush();
-    openRunSheet(pipelineId);
+    if (noFiles) await runWithoutFiles({ ...entry, pipeline: draftRef.current, check });
+    else openRunSheet(pipelineId);
   };
 
   const duplicatePipeline = async () => {
@@ -244,15 +248,26 @@ function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => voi
   const status = check.ready ? "Ready" : missing.length > 0 && pipelineProblems.length === 0 ? "Tools missing" : "Has problems";
 
   const historyText = `${runCount === 0 ? "no runs yet" : `${runCount} ${runCount === 1 ? "run" : "runs"}`}${lastRun ? ` · last: ${RUN_STATUS_TEXT[lastRun.status] ?? lastRun.status} ${formatRelativeTime(lastRun.at)}` : ""}`;
-  const watchText = triggersSummary(draft.watch.folder, draft.watch.enabled, draft.clip);
+  const watchText = triggersSummary(draft.watch.folder, draft.watch.enabled, draft.clip, scheduleOf(draft.schedule));
   const watchMessage = draft.watch.enabled ? entry.watch.message : "";
   const clipActive = draft.clip.enabled && entry.clip.active;
   const clipMessage = draft.clip.enabled ? entry.clip.message : "";
 
+  const schedActive = draft.schedule?.enabled === true && entry.schedule?.active === true;
+  const schedMessage = draft.schedule?.enabled ? (entry.schedule?.message ?? "") : "";
+  const schedNext = schedActive ? (entry.schedule?.next ?? 0) : 0;
+
   // What the panels (and popped-out copies of them) show comes from here.
   useEffect(() => {
-    useDraft.getState().setLive({ watchMessage, clipStatus: { active: clipActive, message: clipMessage }, runText: historyText, runCount, catalog: [...catalog] });
-  }, [watchMessage, clipActive, clipMessage, historyText, runCount, catalog]);
+    useDraft.getState().setLive({
+      watchMessage,
+      clipStatus: { active: clipActive, message: clipMessage },
+      scheduleStatus: { active: schedActive, message: schedMessage, next: schedNext },
+      runText: historyText,
+      runCount,
+      catalog: [...catalog],
+    });
+  }, [watchMessage, clipActive, clipMessage, schedActive, schedMessage, schedNext, historyText, runCount, catalog]);
 
   const openStep = (id: string, pointer?: string) => {
     useDraft.getState().select(id);
@@ -306,7 +321,7 @@ function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => voi
         </div>
         <span className={styles.statusInline}>
           <span className={styles.takes} data-tip="The kinds of files you can start this pipeline with">
-            Takes: {describeAccepts(check.accepts)}
+            {noFiles ? "Takes no files" : `Takes: ${describeAccepts(check.accepts)}`}
             {" · "}
           </span>
           <span data-tip={check.ready ? "Every step is set up and its tools are installed" : missing.length > 0 ? "Install the missing tool packs to run this" : "Fix the problems listed to run this"} className={check.ready ? styles.ok : missing.length > 0 ? styles.warn : styles.bad}>● {status}</span>
@@ -330,9 +345,9 @@ function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => voi
             {saveState.kind === "error" && <span className={styles.saveError}>Couldn&apos;t save: {saveState.message}</span>}
           </span>
           {showNew && <IconButton size="sm" icon="plus" label="New pipeline" data-tip="Create a pipeline from a ready-made template or from scratch" onClick={onNew} />}
-          <Tooltip label={blocked ? problem || "Fix the problems first" : "Run on files or links"} side="bottom">
+          <Tooltip label={blocked ? problem || "Fix the problems first" : noFiles ? "Run now" : "Run on files or links"} side="bottom">
             <Button size="sm" variant="primary" icon="play" disabled={blocked} onClick={() => void runNow()}>
-              Run…
+              {noFiles ? "Run" : "Run…"}
             </Button>
           </Tooltip>
           <MenuButton

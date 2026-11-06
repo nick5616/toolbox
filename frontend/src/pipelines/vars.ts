@@ -84,5 +84,6 @@ export const BUILTIN_VARS: ReadonlyArray<{ name: string; label: string }> = [
   { name: "n", label: "Item number" },
   { name: "date", label: "Date" },
   { name: "time", label: "Time" },
+  { name: "weekday", label: "Weekday" },
   { name: "pipeline", label: "Pipeline name" },
 ];

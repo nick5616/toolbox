@@ -159,3 +159,7 @@
 .modeSwitch {
   margin-left: auto;
 }
+
+.scheduled {
+  color: var(--fg-muted);
+}

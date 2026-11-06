@@ -9,6 +9,7 @@ import { typeStyle } from "./graph/wireStyle";
 import { ParamField, type ParamFieldType } from "./ParamField";
 import { baseName } from "./RunGridModel";
 import { inputAccepted, isLink, mergeInputs } from "./RunSheetModel";
+import { startsWithoutFiles } from "./runNoFiles";
 import styles from "./RunSheet.module.css";
 
 // The Run sheet (SPEC.md §11.5): choose the files or links, enter the
@@ -63,7 +64,8 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
     const t = fromWireType(p.type);
     return t !== "file" && t !== "files" && !validParamValue(t, valueOf(p), p.choices ?? []);
   });
-  const canStart = ready && !busy && accepted.length > 0 && !tooMany && !missingSecret && !badParam;
+  const noFiles = startsWithoutFiles(entry);
+  const canStart = ready && !busy && (noFiles || accepted.length > 0) && !tooMany && !missingSecret && !badParam;
 
   const choose = async () => {
     try {
@@ -83,7 +85,7 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
       for (const s of needs) sec[secretKey(s.stepId, s.key)] = secrets[secretKey(s.stepId, s.key)] ?? "";
       const params: Record<string, string> = {};
       for (const p of runParams) params[p.name] = valueOf(p);
-      const run = await PipelinesService.Start({ pipelineId, inputs: accepted, secrets: sec, params });
+      const run = await PipelinesService.Start({ pipelineId, inputs: noFiles ? [] : accepted, secrets: sec, params });
       usePipelines.getState().upsertRun(run);
       close();
       usePipelines.getState().showRun(run.id);
@@ -118,7 +120,7 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
         <h2 id={titleId} className={styles.title}>
           Run {name}
         </h2>
-        <p className={styles.sub}>Takes {takes}.</p>
+        <p className={styles.sub}>{noFiles ? "Starts without files." : `Takes ${takes}.`}</p>
 
         {!ready && (
           <Banner tone="warn" title="This pipeline can't run yet">
@@ -126,6 +128,7 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
           </Banner>
         )}
 
+        {!noFiles && (
         <DropZone
           id={`pipeline-run:${pipelineId}`}
           label="Drop files here"
@@ -136,8 +139,9 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
             Choose files
           </Button>
         </DropZone>
+        )}
 
-        {accepts.urls && (
+        {!noFiles && accepts.urls && (
           <label className={styles.field}>
             <span className={styles.fieldLabel}>Links</span>
             <TextArea
@@ -153,7 +157,7 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
           </label>
         )}
 
-        {all.length > 0 && (
+        {!noFiles && all.length > 0 && (
           <ul className={styles.inputs} aria-label="Inputs">
             {all.map((i) => {
               const ok = inputAccepted(accepts, i);
@@ -224,7 +228,7 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
             Cancel
           </Button>
           <Button variant="primary" icon="play" disabled={!canStart} data-tip={!ready ? "The pipeline cannot run yet; see the message above" : accepted.length === 0 ? "Add at least one file or link this pipeline accepts" : tooMany ? `Remove some inputs; a run takes at most ${MAX_INPUTS}` : missingSecret ? "Enter the passwords the steps need" : badParam ? `Check “${badParam.label}”: that value doesn't fit` : "Start the run on the listed inputs"} onClick={() => void start()}>
-            {accepted.length > 1 ? `Start with ${accepted.length} files` : "Start"}
+            {noFiles ? "Run" : accepted.length > 1 ? `Start with ${accepted.length} files` : "Start"}
           </Button>
         </div>
       </div>
