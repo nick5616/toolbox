@@ -22,7 +22,7 @@ func (o *outputs) register(path string) {
 		return
 	}
 	o.seen[path] = true
-	if _, err := o.job.Output(path); err != nil && o.err == nil {
+	if _, err := o.job.OutputFrom(path, o.job.Inputs[:min(1, len(o.job.Inputs))]...); err != nil && o.err == nil {
 		o.err = err
 	}
 }

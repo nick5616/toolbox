@@ -23,6 +23,7 @@ import (
 type Jobs struct {
 	store      JobStore
 	outputs    OutputStore
+	lineage    LineageStore
 	reg        *Registry
 	em         Emitter
 	tools      func(depID string) (string, error)
