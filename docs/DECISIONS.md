@@ -616,3 +616,31 @@ Newest last. Format: date — decision — why.
     - **(a) Pen pressure in WebView2** needs a pen on this PC, which a session can't use. P1 builds velocity pressure as the fallback, and the user checks real pressure at first use (acceptance 1).
     - **(b) Dab throughput** is measured by P1 in PaintLab.
     - **(c) MI-GAN/LaMa crop timings** are measured by P4 with the installed engine.
+- **2026-11-06: Phase 19 Wave 1, Go side merged (P3, P4, L1).**
+  - **Paint+ export:**
+    - A frontend-flattened render goes to `<tmp>/paint/flat-<id>.png` and the job options hold `file:<path>`, so no multi-MB PNG lands in the DB. Such a job can't be retried after the file is gone.
+    - JPG of a transparent canvas is refused ("background required").
+    - Outputs are capped at 16384 px a side and 100 MP.
+    - ORA keeps clipping as a `paintplus-clip` attribute.
+  - **Paint+ tiles:**
+    - Edge tiles are stored cropped (the frontend must accept tiles smaller than 512 px).
+    - `saveDoc` keeps the stored `Source` whatever the client sends.
+    - A step job is told from an export by its `action` key.
+  - **Overlay/dissolve steps:**
+    - Overlay composites without the project background.
+    - Dissolve masks are binary and stretched to the photo.
+    - Outputs are `<stem> painted.png` / `<stem> dissolved.png`.
+  - **Lab crops:**
+    - They never go in job options: `submitAI` parks them in memory under a token, and `Run` writes them to `<tmp>/paint/<jobID>/`.
+    - Results are re-readable by index (the Generations strip re-reads passes); the spec said read-once.
+    - Directories are pruned on failure/cancel, after an hour, and at start.
+    - Enhance input is capped at 1.5 MP.
+  - **New pack component `upscale-photo`** (Real-ESRGAN x4plus CPU model, 67 MB, in the Image pack) is what Enhance needs. The `upscaler` component is upscayl-bin, which Paint+ doesn't use. `upscale.Module` is now a `ModelProvider` for the `photo` preset only, fetched through `paint.prefetch`.
+  - **Fill readiness:** Fill is ready with either inpaint model. MI-GAN (Fast) has no pack component; it's fetched by Object Eraser on first Fast use, as before.
+  - **SAM 2.1 select:** ≈12.5 s for the first call (load + embedding), then 47 ms per extra click on the same image.
+  - **Library:**
+    - Cursors are tied to their sort.
+    - `Chain` follows the newest same-tool child.
+    - `Rename` keeps the extension unless one with a letter is typed, and refuses Windows device names.
+    - `Trash` only takes regular files inside the library, refuses paths over 259 characters on Windows, and uses `FOF_WANTNUKEWARNING` (a file too big for the bin prompts instead of being deleted).
+    - `core/trash`'s macOS cgo code has not been compiled yet (first Mac build).

@@ -48,6 +48,12 @@ type Config struct {
 	Emitter     core.Emitter
 	LibraryDir  func() string
 	Resolve     func(depID string) (string, error) // FFmpeg for WebP export
+	// SaveDialog asks where to save a file ("" = cancelled); set in main.go
+	// (modules never import Wails). Used by ExportAs.
+	SaveDialog func(title, filename string) (string, error)
+	// SavedMask returns the PNG path of an Object Eraser saved mask (white =
+	// selected); set in main.go. Used by the Dissolve step.
+	SavedMask func(id string) (string, error)
 	// Models resolves the perception models through the modules that own
 	// them (eraser, bgremove, editstudio matte, upscale); set in main.go.
 	Models ModelResolver

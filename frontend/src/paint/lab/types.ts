@@ -12,10 +12,16 @@ export type LabOrigin =
   /** model: the Origin.Model name from PaintService.Origins(). */
   | { kind: "model"; model: string };
 
+/**
+ * A tool parameter, shown as a device control (Ableton-style knob, slider or
+ * switch). `rand: false` keeps it out of the device's Rand button (e.g. a
+ * colour palette the user picked on purpose); every other param is
+ * randomised within its range. `unit` labels the readout ("px", "%", "°").
+ */
 export type LabParam =
-  | { id: string; label: string; type: "number"; min: number; max: number; step?: number; default: number; tip: string }
-  | { id: string; label: string; type: "choice"; choices: Array<{ value: string; label: string }>; default: string; tip: string }
-  | { id: string; label: string; type: "toggle"; default: boolean; tip: string };
+  | { id: string; label: string; type: "number"; min: number; max: number; step?: number; default: number; tip: string; rand?: boolean; unit?: string; curve?: "linear" | "exp" }
+  | { id: string; label: string; type: "choice"; choices: Array<{ value: string; label: string }>; default: string; tip: string; rand?: boolean }
+  | { id: string; label: string; type: "toggle"; default: boolean; tip: string; rand?: boolean };
 
 export type LabParams = Record<string, number | string | boolean>;
 

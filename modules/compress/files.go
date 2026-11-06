@@ -36,7 +36,7 @@ func saveOutput(job *core.JobContext, tmp, stem, ext string) (string, error) {
 	if err := moveFile(tmp, final); err != nil {
 		return "", core.Errorf(core.CodeToolFailed, "Couldn't save the compressed file").WithCause(err)
 	}
-	if _, err := job.Output(final); err != nil {
+	if _, err := registerFrom(job, final); err != nil {
 		return "", fmt.Errorf("register output: %w", err)
 	}
 	return final, nil
@@ -52,7 +52,7 @@ func copyOutput(job *core.JobContext, src string) (string, error) {
 	if err := copyFile(src, final); err != nil {
 		return "", core.Errorf(core.CodeToolFailed, "Couldn't copy the file").WithCause(err)
 	}
-	if _, err := job.Output(final); err != nil {
+	if _, err := registerFrom(job, final); err != nil {
 		return "", fmt.Errorf("register output: %w", err)
 	}
 	return final, nil
@@ -99,4 +99,13 @@ func overLimit(reached, limit int64, hint string) error {
 		e = e.WithHint(hint)
 	}
 	return e
+}
+
+// registerFrom registers final in the library, made from the job's one input
+// (Phase 19 lineage).
+func registerFrom(job *core.JobContext, final string) (core.Output, error) {
+	if len(job.Inputs) == 1 {
+		return job.OutputFrom(final, job.Inputs[0])
+	}
+	return job.Output(final)
 }

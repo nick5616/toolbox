@@ -170,6 +170,12 @@ func Components() []ComponentSpec {
 			Sizes: map[string]Size{Windows: {Download: 224_005_088, Disk: 224_005_088}, MacARM: {Download: 224_005_088, Disk: 224_005_088}},
 		},
 		{
+			// Phase 19: Paint+'s Enhance (Real-ESRGAN x4plus, photos only; the CPU model the engine runs).
+			ID: "upscale-photo", Name: "Real-ESRGAN x4plus (photo)", Href: "https://github.com/xinntao/Real-ESRGAN", License: "BSD-3-Clause",
+			Kind: core.ComponentModel, Module: "upscaler", Preset: "photo",
+			Sizes: same(Size{Download: 67_040_989, Disk: 67_040_989}),
+		},
+		{
 			ID: "face-detect", Name: "YuNet face detector", Href: "https://huggingface.co/opencv/face_detection_yunet", License: "MIT",
 			Kind: core.ComponentModel, Module: "redact", Preset: "faces",
 			Sizes: same(Size{Download: 232_589, Disk: 232_589}),
@@ -263,7 +269,7 @@ func Catalog() []PackSpec {
 		{
 			ID: "image", Name: "Image", Icon: "wand-sparkles",
 			Description: "Paint+ with the Lab, cut out backgrounds, upscale, erase objects, blur faces and plates, edit metadata",
-			Components:  []string{"engine", "ffmpeg", "bg-default", "upscaler", "exiftool", "face-detect", "plate-detect", "inpaint", "matte-select"},
+			Components:  []string{"engine", "ffmpeg", "bg-default", "upscaler", "exiftool", "face-detect", "plate-detect", "inpaint", "matte-select", "upscale-photo"},
 			Unlocks: []Unlock{
 				{Module: "bg-remover", Needs: []string{"engine", "bg-default"}},
 				{Module: "upscaler", Needs: []string{"upscaler"}},

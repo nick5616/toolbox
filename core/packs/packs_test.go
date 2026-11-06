@@ -140,7 +140,7 @@ func newFixture(t *testing.T, goos, goarch string) *fixture {
 			t.Fatal(err)
 		}
 	}
-	for _, id := range []string{"stems", "transcribe", "bg-remover", "llm-chat", "audio-cleanup", "redact", "object-eraser", "visualizer", "tts", "edit-studio"} {
+	for _, id := range []string{"stems", "transcribe", "bg-remover", "llm-chat", "audio-cleanup", "redact", "object-eraser", "visualizer", "tts", "edit-studio", "upscaler"} {
 		if err := reg.Register(&fakeModels{w: w, id: id}); err != nil {
 			t.Fatal(err)
 		}
@@ -415,7 +415,7 @@ func TestInstallSkipsPresentAndSharesComponents(t *testing.T) {
 	if _, err := f.runInstall("image"); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"bg-remover/balanced", deps.Upscayl, deps.ExifTool, "redact/faces", "redact/plates", "object-eraser/best", "edit-studio/select"}; !slices.Equal(f.w.log, want) {
+	if want := []string{"bg-remover/balanced", deps.Upscayl, deps.ExifTool, "redact/faces", "redact/plates", "object-eraser/best", "edit-studio/select", "upscaler/photo"}; !slices.Equal(f.w.log, want) {
 		t.Errorf("second pack installed %v, want %v", f.w.log, want)
 	}
 
