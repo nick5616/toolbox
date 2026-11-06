@@ -1,0 +1,18 @@
+.img {
+  flex: none;
+  object-fit: contain;
+  border-radius: var(--r-sm);
+}
+
+.tile {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
