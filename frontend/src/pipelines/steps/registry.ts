@@ -26,6 +26,11 @@ export interface StepUI<T = unknown> {
    * defaults; mark internal ones `hidden`.
    */
   params?: ParamOverrides;
+  /**
+   * Phase 18: which parameters matter for these options (a Focus "wait" has no
+   * minutes). Others are left off the node and the panel unless wired.
+   */
+  relevant?: (options: Record<string, unknown>, pointer: string) => boolean;
 }
 
 const registry = new Map<string, StepUI>();

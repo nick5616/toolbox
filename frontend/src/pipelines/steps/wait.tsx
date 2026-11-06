@@ -78,9 +78,10 @@ export const waitSteps: ReadonlyArray<StepUI<never>> = [
         primary: true,
       },
       "/minutes": { label: "Minutes", min: 1, max: MAX_WAIT_MINUTES, primary: true },
-      "/at": { label: "Time (HH:MM)", tip: "24 hour, local time" },
+      "/at": { label: "Time (HH:MM)", tip: "24 hour, local time", primary: true },
       "/note": { label: "Note" },
     },
+    relevant: (o: Record<string, unknown>, pointer: string) => (pointer === "/minutes" ? o.mode !== "until" : pointer === "/at" ? o.mode === "until" : true),
   } as unknown as StepUI<never>,
 ];
 

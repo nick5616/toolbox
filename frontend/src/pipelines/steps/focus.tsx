@@ -210,6 +210,14 @@ function FocusEditor({ value, onChange }: StepEditorProps<FocusStepOptions>) {
   );
 }
 
+/** Only a start has settings; its length shows minutes or a time, not both. */
+export function focusRelevant(o: Record<string, unknown>, pointer: string): boolean {
+  if (o.action !== "start") return false;
+  if (pointer === "/minutes") return o.mode !== "until";
+  if (pointer === "/at") return o.mode === "until";
+  return true;
+}
+
 export const focusSteps: ReadonlyArray<StepUI<never>> = [
   {
     type: "focus",
@@ -227,7 +235,7 @@ export const focusSteps: ReadonlyArray<StepUI<never>> = [
         ],
       },
       "/minutes": { label: "Minutes", min: 1, max: MAX_FOCUS_MINUTES, primary: true },
-      "/at": { label: "Until (HH:MM)", tip: "24 hour, local time" },
+      "/at": { label: "Until (HH:MM)", tip: "24 hour, local time", primary: true },
       "/strength": { label: "Strength", type: "choice", choices: STRENGTHS.map((s) => ({ value: s.value, label: s.label })) },
       "/onStart": {
         label: "Programs already open",
@@ -247,6 +255,7 @@ export const focusSteps: ReadonlyArray<StepUI<never>> = [
         ],
       },
     },
+    relevant: focusRelevant,
   } as unknown as StepUI<never>,
 ];
 

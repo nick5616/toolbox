@@ -73,7 +73,7 @@ export function RunGraph({ run }: { run: RunView }) {
   const stats = useMemo(() => new Map(run.steps.map((s) => [s.id, stepStats(run, s.id)] as const)), [run]);
   const progress = useMemo(() => new Map(run.steps.map((s) => [s.id, stepProgress(run, s.id, (c) => cellProgress(c, byId))] as const)), [run, byId]);
   const needs = useMemo(() => needsYouSteps(run), [run]);
-  const files = useMemo(() => run.items.filter((i) => i.merged.length === 0).length, [run.items]);
+  const files = useMemo(() => (run.inputs.length === 0 ? 0 : run.items.filter((i) => i.merged.length === 0).length), [run.inputs, run.items]);
 
   const setView = (next: View | ((v: View) => View)) => {
     const v = typeof next === "function" ? next(latest.current.view) : next;
@@ -222,7 +222,7 @@ export function RunGraph({ run }: { run: RunView }) {
                   selected={selected === n.id}
                   readOnly
                   className={cx(st.needsYou > 0 && styles.attention, st.failed > 0 && styles.failed)}
-                  summary={isInput ? (filesText(files) || "Starts every run") : statsText(st)}
+                  summary={isInput ? (filesText(files) || (run.inputs.length === 0 ? "No files" : "Starts every run")) : statsText(st)}
                   footer={isInput ? undefined : <RunFoot stats={st} progress={progress.get(n.id) ?? -1} />}
                   inKind={graph.wires.find((w) => w.to === n.id && w.channel === "files")?.kind}
                   wired={wiredBy.get(n.id)}

@@ -17,6 +17,7 @@ import {
   type ValueType,
   type WireCheck,
 } from "@/pipelines/params";
+import { stepUI } from "@/pipelines/steps/registry";
 import { BUILTIN_VARS } from "@/pipelines/vars";
 import { CHECK_TYPE } from "./editorModel";
 import { stepName } from "./stepHelpers";
@@ -102,8 +103,11 @@ export function stepParams(step: PipelineStep, type: StepType | undefined): Step
     const defaults = type?.defaultsJson && type.defaultsJson !== "{}" ? type.defaultsJson : step.optionsJson;
     const defs = paramsOf(step.type, defaults);
     const defaultObj = parseOptions(defaults);
+    const relevant = stepUI(step.type)?.relevant;
+    const bound = new Set((step.binds ?? []).map((b) => b.option));
     let primaries = 0;
     for (const d of defs) {
+      if (relevant && !bound.has(d.pointer) && !relevant({ ...(defaultObj as Record<string, unknown>), ...(options as Record<string, unknown>) }, d.pointer)) continue;
       const primary = d.primary && primaries < 4;
       if (d.primary) primaries++;
       // An option the step doesn't store yet reads as its default.
