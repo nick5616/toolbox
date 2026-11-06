@@ -7,6 +7,8 @@ export interface ToastOptions {
   description?: string;
   tone?: ToastTone;
   action?: { label: string; onClick: () => void };
+  /** A second text action next to `action` ("Show in Library" beside "Reveal"). */
+  secondaryAction?: { label: string; onClick: () => void };
   /** Auto-dismiss delay in ms (default 5000). 0 keeps it until dismissed. */
   duration?: number;
 }
