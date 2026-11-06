@@ -342,6 +342,8 @@ func run() error {
 		return err
 	}
 	focusEng.Subscribe(func(focus.State) { runner.WakeTimeWaits() })
+	focusSvc := focusmod.NewService(focusEng)
+	focusSvc.SetCacheDir(filepath.Join(paths.CacheDir, "focus-icons"))
 	// --- end Phase 8 ---
 
 	// HEIC photos: FFmpeg stitches iPhone tile grids, the AI engine is the
@@ -451,7 +453,7 @@ func run() error {
 			application.NewServiceWithOptions(lanSvc, opts),
 			application.NewServiceWithOptions(silence.NewService(jobs, depSvc.Resolve), opts),
 			application.NewServiceWithOptions(compress.NewService(jobs, depSvc.Resolve), opts),
-			application.NewServiceWithOptions(focusmod.NewService(focusEng), opts),
+			application.NewServiceWithOptions(focusSvc, opts),
 			application.NewServiceWithOptions(tts.NewService(jobs, ttsMod), opts),
 			application.NewServiceWithOptions(imagebatch.NewService(jobs, depSvc.Resolve, paths.TmpDir), opts),
 			application.NewServiceWithOptions(subtitles.NewService(jobs, subtitlesMod), opts),
