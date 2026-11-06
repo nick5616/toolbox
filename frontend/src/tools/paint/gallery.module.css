@@ -1,0 +1,277 @@
+.root {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  padding: 28px 40px 40px;
+  background: var(--p-canvas-bg);
+  color: var(--p-ink);
+  font-size: var(--p-body);
+}
+
+[data-compact="true"].root,
+.root[data-compact="true"] {
+  padding: 16px 20px 24px;
+}
+
+.inner {
+  display: grid;
+  gap: 28px;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.tagline {
+  margin: 4px 0 0;
+  color: var(--p-ink-dim);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.h {
+  margin: 0 0 10px;
+  font-size: var(--p-label);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--p-ink-faint);
+}
+
+.presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 14px;
+  border: 1px solid var(--p-island-border);
+  border-radius: var(--p-radius-m);
+  background: var(--p-island);
+  color: var(--p-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--p-fast) var(--p-ease),
+    background var(--p-fast) ease;
+}
+
+.tile:hover {
+  background: var(--p-hover);
+  transform: translateY(-2px);
+}
+
+.tile:focus-visible,
+.card:focus-visible {
+  outline: 2px solid var(--p-focus);
+  outline-offset: 2px;
+}
+
+.tileFirst {
+  grid-column: span 2;
+}
+
+.shape {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 72px;
+}
+
+.shape span {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 4px;
+  background: var(--p-field);
+  box-shadow: inset 0 0 0 1.5px var(--p-ink-faint);
+}
+
+.tileName {
+  font-weight: 600;
+}
+
+.tileDims {
+  color: var(--p-ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--p-ink-dim);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--p-island-border);
+  border-radius: var(--p-radius-m);
+  background: var(--p-island);
+  cursor: pointer;
+  transition: transform var(--p-fast) var(--p-ease);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+}
+
+.thumb {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--p-radius-s);
+  background-color: var(--p-checker-b);
+  background-image:
+    linear-gradient(45deg, var(--p-checker-a) 25%, transparent 25%, transparent 75%, var(--p-checker-a) 75%),
+    linear-gradient(45deg, var(--p-checker-a) 25%, transparent 25%, transparent 75%, var(--p-checker-a) 75%);
+  background-size: 14px 14px;
+  background-position:
+    0 0,
+    7px 7px;
+  color: var(--p-ink-faint);
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.cardInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cardName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.cardMeta {
+  color: var(--p-ink-dim);
+  font-size: var(--p-label);
+}
+
+.cardMenu {
+  opacity: 0;
+  transition: opacity var(--p-fast) ease;
+}
+
+.card:hover .cardMenu,
+.card:focus-within .cardMenu {
+  opacity: 1;
+}
+
+.open {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.open:focus-visible {
+  outline: 2px solid var(--p-focus);
+  outline-offset: 2px;
+}
+
+.cardMenu,
+.cardInfo > :not(.cardName) {
+  position: relative;
+  z-index: 1;
+}
+
+.kit {
+  /* The kit's result rows, restyled through Paint+'s tokens. */
+  --fg: var(--p-ink);
+  --fg-muted: var(--p-ink-dim);
+  --fg-subtle: var(--p-ink-faint);
+  --fg-faint: var(--p-ink-faint);
+  --bg-hover: var(--p-hover);
+  --bg-active: var(--p-active);
+  --bg-panel: transparent;
+  --bg-raised: var(--p-field);
+  --bg-inset: var(--p-field);
+  --bg-app: var(--p-island-solid);
+  --line: var(--p-line);
+  --line-strong: var(--p-line);
+  --accent: var(--p-accent);
+  --accent-fg: var(--p-on-accent);
+  --accent-soft: var(--p-selected);
+  --danger: var(--p-danger);
+  --focus-ring: var(--p-focus);
+  border-radius: var(--p-radius-m);
+  background: var(--p-island);
+  padding: 8px 10px;
+}
+
+.field {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--p-radius-s);
+  background: var(--p-field);
+  color: var(--p-ink);
+  font: inherit;
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--p-focus);
+}
+
+.swatchInput {
+  width: 32px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dropHint {
+  position: sticky;
+  bottom: 0;
+  margin-top: 8px;
+  color: var(--p-ink-faint);
+  text-align: center;
+}

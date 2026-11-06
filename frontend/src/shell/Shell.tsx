@@ -44,6 +44,9 @@ const COMPOSITION_LABEL_FROM = 1150;
 
 const NON_TOOL_VIEWS = new Set(["library", "settings", "gallery", "setup"]);
 
+/** The tool that may take over the window in Studio mode (Phase 19 §0: bespoke tools). */
+const STUDIO_TOOL = "paint";
+
 /** A tool that's open in its own window shows a placeholder here instead. */
 function ToolSlot({ view }: { view: string }) {
   const out = useToolPoppedOut(view);
@@ -80,6 +83,8 @@ export function Shell() {
   // A tool header needs the room: Search is an icon then (Mod+K still works).
   const tightSearch = headers > 0 || (topbarWidth > 0 && topbarWidth < SEARCH_ICON_BELOW);
   const popOutName = !NON_TOOL_VIEWS.has(shown) && toolViews[shown] ? byId[shown]?.name : undefined;
+  // Studio mode (Phase 19): a bespoke tool (Paint+) takes the window; its own strip replaces the top bar.
+  const studio = useUI((s) => s.studio) && shown === STUDIO_TOOL && !!toolViews[shown];
 
   useBuiltinCommands();
   useShellShortcuts();
@@ -91,9 +96,10 @@ export function Shell() {
   // --- end pipelines ---
 
   return (
-    <div id="app-root" className={cx(styles.root, collapsed && styles.collapsed)} data-file-drop-target>
-      <Sidebar />
+    <div id="app-root" className={cx(styles.root, collapsed && styles.collapsed, studio && styles.studio)} data-file-drop-target data-studio={studio ? "true" : undefined}>
+      {studio ? null : <Sidebar />}
       <div className={styles.main}>
+        {studio ? null : (
         <header ref={setTopbar} className={cx(styles.topbar, isMac && styles.drag)}>
           <div className={styles.titleGroup}>
             <h1 className={styles.title}>{viewTitle(view, byId)}</h1>
@@ -120,9 +126,10 @@ export function Shell() {
             )}
           </div>
         </header>
-        <ToolsFolderBanner />
+        )}
+        {studio ? null : <ToolsFolderBanner />}
         {/* --- pipelines --- */}
-        <PipelineBanner view={shown} />
+        {studio ? null : <PipelineBanner view={shown} />}
         {/* --- end pipelines --- */}
         <HeaderPresenceContext.Provider value={reportHeader}>
           <HeaderSlotProvider value={slot}>
