@@ -104,6 +104,8 @@ interface UIState {
   collapsedGroups: string[];
   /** The keyboard shortcuts overlay. */
   shortcutsOpen: boolean;
+  /** Studio mode (Phase 19, Paint+): a bespoke tool takes the whole window and the shell hides its sidebar and top bar. Per session (sessionStorage), main window only. */
+  studio: boolean;
   /** Failed job ids the user has already seen in the open tray (session only). */
   seenFailed: string[];
 
@@ -126,6 +128,7 @@ interface UIState {
   togglePin: (moduleId: string) => void;
   toggleGroup: (groupId: string) => void;
   setShortcutsOpen: (v: boolean) => void;
+  setStudio: (v: boolean) => void;
   markFailedSeen: (ids: string[]) => void;
 }
 
@@ -164,6 +167,28 @@ function initialView(saved: Partial<Persisted>): ViewId {
 /** Only the main window writes the shared `toolbox.ui` entry; pop-outs and popups would clobber it. */
 const persists = currentWindow().kind === "main";
 
+const STUDIO_KEY = "toolbox.studio";
+
+/** Studio mode lives for the session only: sessionStorage, the main window only. */
+function loadStudio(): boolean {
+  if (!persists) return false;
+  try {
+    return sessionStorage.getItem(STUDIO_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveStudio(on: boolean): void {
+  if (!persists) return;
+  try {
+    if (on) sessionStorage.setItem(STUDIO_KEY, "1");
+    else sessionStorage.removeItem(STUDIO_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 const saved = load();
 
 export const useUI = create<UIState>((set, get) => ({
@@ -181,6 +206,7 @@ export const useUI = create<UIState>((set, get) => ({
   recentTools: strings(saved.recentTools).slice(0, RECENT_TOOLS),
   collapsedGroups: strings(saved.collapsedGroups),
   shortcutsOpen: false,
+  studio: loadStudio(),
   seenFailed: [],
 
   navigate: (view) =>
@@ -204,6 +230,10 @@ export const useUI = create<UIState>((set, get) => ({
   togglePin: (id) => set((s) => ({ pinned: s.pinned.includes(id) ? s.pinned.filter((p) => p !== id) : [...s.pinned, id] })),
   toggleGroup: (id) => set((s) => ({ collapsedGroups: s.collapsedGroups.includes(id) ? s.collapsedGroups.filter((g) => g !== id) : [...s.collapsedGroups, id] })),
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+  setStudio: (studio) => {
+    saveStudio(studio);
+    set({ studio });
+  },
   markFailedSeen: (ids) =>
     set((s) => {
       const add = ids.filter((id) => !s.seenFailed.includes(id));

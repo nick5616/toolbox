@@ -81,3 +81,12 @@
   overflow-y: auto;
   background: var(--bg-panel);
 }
+
+/* Studio mode (Phase 19): the tool owns the window; no sidebar, no top bar. */
+.studio {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.studio .view {
+  overflow: hidden;
+}
