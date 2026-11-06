@@ -17,7 +17,7 @@ import { FilesService, VaultService, type VaultEntry, type VaultState } from "@/
 import { useToolHandoff } from "@/lib/embed";
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
-import { isActive, useOrderedJobs } from "@/state/jobs";
+import { announceWhenDone, isActive, useOrderedJobs } from "@/state/jobs";
 import { useClickIn } from "@/components/ClickIn";
 import { ToolHeader } from "@/components/ToolHeader";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -169,6 +169,8 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
   const exportIds = (ids: string[]) =>
     void act(async () => {
       const jobsOut = await VaultService.Export(ids);
+      // Each finished export toasts with Reveal, even though the Vault is on screen.
+      for (const j of jobsOut ?? []) announceWhenDone(j.id);
       toast({ title: `${jobsOut?.length ?? ids.length} ${ids.length === 1 ? "file" : "files"} exporting`, tone: "success" });
     });
 

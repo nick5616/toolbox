@@ -17,6 +17,7 @@ const svc = vi.hoisted(() => ({
   Preview: vi.fn(),
   Export: vi.fn(),
 }));
+const saveText = vi.hoisted(() => vi.fn());
 const listeners = vi.hoisted(() => ({ cb: null as ((s: unknown) => void) | null }));
 
 vi.mock("@/lib/events", () => ({
@@ -32,7 +33,7 @@ vi.mock("@/lib/api", async (orig) => {
   return {
     ...actual,
     VaultService: svc,
-    FilesService: { Pick: async () => ["/x.txt"], Stat: async () => [] },
+    FilesService: { Pick: async () => ["/x.txt"], Stat: async () => [], SaveText: (...a: unknown[]) => saveText(...a) },
   };
 });
 
@@ -79,6 +80,9 @@ describe("Vault create flow", () => {
     await waitFor(() => expect(svc.Create).toHaveBeenCalledWith("correct horse"));
 
     expect((await screen.findByTestId("recovery-key")).textContent).toBe("AGE-SECRET-KEY-1ABC");
+    saveText.mockResolvedValue("/lib/key.txt");
+    await user.click(screen.getByRole("button", { name: "Save as…" }));
+    expect(saveText).toHaveBeenCalledWith("Toolbox Vault recovery key.txt", "AGE-SECRET-KEY-1ABC");
     const open = screen.getByRole("button", { name: "Open vault" }) as HTMLButtonElement;
     expect(open.disabled).toBe(true);
     await user.click(screen.getByRole("switch", { name: "I've saved it" }));

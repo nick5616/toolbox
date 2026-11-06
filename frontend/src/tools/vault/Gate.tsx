@@ -1,29 +1,26 @@
 import { useState, type FormEvent } from "react";
 import { Banner, Button, Field, Switch, TextField, toast } from "@/components";
 import { VaultService } from "@/lib/api";
+import { copyText } from "@/lib/copy";
 import { toAppError } from "@/lib/errors";
+import { saveTextAs } from "@/lib/saveText";
 import { passphraseStrength } from "./useVaultState";
 import styles from "./vault.module.css";
 
 export const MIN_PASSPHRASE = 8;
 
 export function RecoveryKeyBox({ recoveryKey }: { recoveryKey: string }) {
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(recoveryKey);
-      toast({ title: "Recovery key copied", tone: "success" });
-    } catch (e) {
-      toast({ title: toAppError(e).message, tone: "danger" });
-    }
-  };
   return (
     <>
       <div className={styles.keyBox} data-testid="recovery-key" data-tip="Your recovery key: it opens the vault if you forget the passphrase">
         {recoveryKey}
       </div>
       <div className={styles.actions}>
-        <Button size="sm" variant="secondary" icon="copy" data-tip="Copy the recovery key so you can store it in a password manager" onClick={() => void copy()}>
+        <Button size="sm" variant="secondary" icon="copy" data-tip="Copy the recovery key so you can store it in a password manager" onClick={() => void copyText(recoveryKey, { what: "recovery key" })}>
           Copy
+        </Button>
+        <Button size="sm" variant="secondary" icon="download" data-tip="Save the recovery key as a text file, for example onto a USB stick or into a password manager's attachments" onClick={() => void saveTextAs(recoveryKey, "Toolbox Vault recovery key.txt").catch((e: unknown) => toast({ title: toAppError(e).message, tone: "danger" }))}>
+          Save as…
         </Button>
       </div>
     </>
