@@ -101,6 +101,8 @@ func TestPhase15TemplateWiring(t *testing.T) {
 		TplSongEverything:    {"stems:stems", "tempo:bpm-key", "name:pipelines.rename", "melody:audio-to-midi", "video:visualizer", "zip:pipelines.zip"},
 		TplVerticalCut:       {"cut:silence", "vertical:video-studio", "post:post-builder"},
 		TplSendToMyComputer:  {"shrink:imagebatch", "send:lan-share"},
+		TplMusicSession:      {"focus:focus", "daw:pipelines.open", "until:focus"},
+		TplSampleAndMake:     {"focus:focus", "download:downloader", "stems:stems", "tempo:bpm-key", "name:pipelines.rename", "open:pipelines.open"},
 	}
 	for id, steps := range want {
 		if got := stepTypes(template(t, id).Pipeline); !slices.Equal(got, steps) {
