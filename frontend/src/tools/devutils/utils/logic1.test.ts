@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { base64ToBytes, decodeText, encodeText, mimeForPath, reshapeBase64, toDataUrl } from "./base64.logic";
-import { matchingAlgo, normalizeDigest, parseHashResult } from "./hash.logic";
+import { checksumText, matchingAlgo, normalizeDigest, parseHashResult } from "./hash.logic";
 import { caretExcerpt, findJsonError, formatJson, jsonToYaml, minifyJson, parseJson, parseYaml, sortKeys } from "./json.logic";
 import { claimStatus, decodeJwt } from "./jwt.logic";
 import { buildUrl, decodeComponent, encodeComponent, parseUrl } from "./url.logic";
@@ -112,6 +112,15 @@ describe("hash helpers", () => {
     expect(matchingAlgo({ md5: "aa", sha256: "abcdef12" }, "ABCDEF12")).toBe("sha256");
     expect(matchingAlgo({ md5: "aa" }, "")).toBeNull();
     expect(matchingAlgo({ md5: "aa" }, "bb")).toBeNull();
+  });
+  it("writes checksums in sha256sum format", () => {
+    const files = [
+      { path: "C:\\x\\a.bin", size: 1, hashes: { sha256: "aa", md5: "bb" } },
+      { path: "/y/b.bin", size: 2, hashes: { sha256: "cc", md5: "dd" } },
+    ];
+    expect(checksumText(files, ["sha256"])).toBe("aa  a.bin\ncc  b.bin\n");
+    expect(checksumText(files, ["md5", "sha256"])).toBe("# MD5\nbb  a.bin\ndd  b.bin\n\n# SHA-256\naa  a.bin\ncc  b.bin\n");
+    expect(checksumText([], ["sha256"])).toBe("");
   });
   it("parses job results", () => {
     expect(parseHashResult('{"files":[{"path":"/a","size":3,"hashes":{"md5":"x"}}]}')).toEqual([{ path: "/a", size: 3, hashes: { md5: "x" } }]);

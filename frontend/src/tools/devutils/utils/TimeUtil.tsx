@@ -61,18 +61,18 @@ export default function TimeUtil() {
         <>
           <p className={styles.note}>Read as {parsed.unit === "iso" ? "an ISO 8601 date" : { s: "seconds", ms: "milliseconds", us: "microseconds" }[parsed.unit]}.</p>
           <div className={styles.cols}>
-            <OutputBox label="Unix seconds" value={toUnix(parsed.date).s} />
-            <OutputBox label="Unix milliseconds" value={toUnix(parsed.date).ms} />
-            <OutputBox label="Unix microseconds" value={toUnix(parsed.date).us} />
-            <OutputBox label="ISO 8601 (UTC)" value={parsed.date.toISOString()} />
-            <OutputBox label={`Local (${localZone()})`} value={formatInZone(parsed.date, localZone())} />
-            <OutputBox label="Relative" value={relativeTime(parsed.date, now)} />
+            <OutputBox label="Unix seconds" value={toUnix(parsed.date).s} filename="time.txt" />
+            <OutputBox label="Unix milliseconds" value={toUnix(parsed.date).ms} filename="time.txt" />
+            <OutputBox label="Unix microseconds" value={toUnix(parsed.date).us} filename="time.txt" />
+            <OutputBox label="ISO 8601 (UTC)" value={parsed.date.toISOString()} filename="time.txt" />
+            <OutputBox label={`Local (${localZone()})`} value={formatInZone(parsed.date, localZone())} filename="time.txt" />
+            <OutputBox label="Relative" value={relativeTime(parsed.date, now)} filename="time.txt" />
           </div>
           <div className={styles.col}>
             <span className={styles.label}>Time zone</span>
             <Select aria-label="Time zone" data-tip="Show the same moment as local time in another place" value={zone} onChange={setZone} options={zoneOptions} />
           </div>
-          <OutputBox label={`In ${zone}`} value={formatInZone(parsed.date, zone)} />
+          <OutputBox label={`In ${zone}`} value={formatInZone(parsed.date, zone)} filename="time.txt" />
         </>
       )}
     </div>

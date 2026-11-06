@@ -93,7 +93,7 @@ export default function JsonUtil() {
         {r.error && <p className={styles.error}>{r.error}</p>}
         {r.caret && <pre className={styles.caret} data-tip="The spot where parsing failed">{r.caret}</pre>}
       </div>
-      <OutputBox label={mode === "to-yaml" ? "YAML" : "JSON"} value={r.output} />
+      <OutputBox label={mode === "to-yaml" ? "YAML" : "JSON"} value={r.output} filename={mode === "to-yaml" ? "data.yaml" : "data.json"} />
     </div>
   );
 }

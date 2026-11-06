@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const copy = vi.hoisted(() => vi.fn(async () => undefined));
 const hashText = vi.hoisted(() => vi.fn());
+const saveText = vi.hoisted(() => vi.fn(async (_n: string, _t: string) => "C:/x/data.json"));
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -11,7 +12,7 @@ vi.mock("@/lib/api", async (orig) => {
     ...actual,
     ClipboardService: { CopyText: (...a: unknown[]) => copy(...(a as [])) },
     DevUtilsService: { HashText: (...a: unknown[]) => hashText(...a), Enqueue: async () => [], FileBase64: async () => "QQ==" },
-    FilesService: { Pick: async () => [], Stat: async () => [] },
+    FilesService: { Pick: async () => [], Stat: async () => [], SaveText: (n: string, t: string) => saveText(n, t) },
     SettingsService: { ModuleState: async () => "", SetModuleState: async () => undefined },
   };
 });
@@ -56,7 +57,9 @@ describe("DevUtilsView", () => {
 
     fireEvent.change(input, { target: { value: '{"b":1,"a":2}' } });
     await waitFor(() => expect(screen.getByLabelText("JSON").textContent).toContain('"b": 1'));
-    await user.click(screen.getAllByRole("button", { name: "Copy" })[0]!);
+    await user.click(screen.getAllByRole("button", { name: "Save as…" })[0]!);
+    await waitFor(() => expect(saveText).toHaveBeenCalledWith("data.json", '{\n  "b": 1,\n  "a": 2\n}'));
+    await user.click(screen.getAllByRole("button", { name: "Copy JSON" })[0]!);
     await waitFor(() => expect(copy).toHaveBeenCalledWith('{\n  "b": 1,\n  "a": 2\n}'));
   });
 

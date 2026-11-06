@@ -55,10 +55,10 @@ export default function ColorUtil() {
       </div>
       {color && (
         <div className={styles.cols}>
-          <OutputBox label="Hex" value={formatHex(color)} />
-          <OutputBox label="RGB" value={formatRgb(color)} />
-          <OutputBox label="HSL" value={formatHsl(color)} />
-          <OutputBox label="OKLCH" value={formatOklch(color)} />
+          <OutputBox label="Hex" value={formatHex(color)} filename="color-hex.txt" />
+          <OutputBox label="RGB" value={formatRgb(color)} filename="color-rgb.txt" />
+          <OutputBox label="HSL" value={formatHsl(color)} filename="color-hsl.txt" />
+          <OutputBox label="OKLCH" value={formatOklch(color)} filename="color-oklch.txt" />
         </div>
       )}
 

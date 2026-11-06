@@ -58,10 +58,10 @@ export default function JwtUtil() {
             </table>
           )}
           <div className={styles.cols}>
-            <OutputBox label="Header" value={r.jwt.headerText} />
-            <OutputBox label="Payload" value={r.jwt.payloadText} />
+            <OutputBox label="Header" value={r.jwt.headerText} filename="jwt-header.json" />
+            <OutputBox label="Payload" value={r.jwt.payloadText} filename="jwt-payload.json" />
           </div>
-          <OutputBox label="Signature (not verified)" value={r.jwt.signature} />
+          <OutputBox label="Signature (not verified)" value={r.jwt.signature} filename="jwt-signature.txt" />
         </>
       )}
     </div>
