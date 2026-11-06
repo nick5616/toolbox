@@ -1,6 +1,6 @@
 # Toolbox — Phase 19 Spec: Paint+ and the Library browser
 
-Status: **DRAFT 2026-11-06 (revised after your note on Procreate, brushes, design language and model ethics). Waiting for your review.** Edit it directly. When you say "approved", it's final, and I build it end to end without asking.
+Status: **APPROVED 2026-11-06, built the same day** (see docs/DECISIONS.md for every deviation).
 
 Phase 18 (Focus Lock + pipeline timing) is archived in `docs/specs/phase-18.md`. Every earlier rule still holds unless §0 below changes it:
 - **every tool stands on its own** (CLAUDE.md, 2026-11-06);
