@@ -4,6 +4,7 @@ import { LibraryService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { startPathsDrag } from "@/lib/fileDrag";
 import { FileActions } from "./FileActions";
+import { InlinePlay, isInlineAudio } from "./InlinePlay";
 import { formatBytes, formatResultDate } from "./format";
 import styles from "./results.module.css";
 
@@ -112,6 +113,7 @@ export function ResultRow({ path, outputId, missing, name, sizeBytes, at, icon =
         </span>
       ) : null}
       <span className={styles.rowActions}>
+        {isInlineAudio(path) && !missing && <InlinePlay path={path} />}
         {extra}
         <FileActions outputId={outputId} path={path} disabled={missing} moduleId={moduleId} />
       </span>
