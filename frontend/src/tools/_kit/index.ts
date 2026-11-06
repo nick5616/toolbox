@@ -15,6 +15,8 @@ export { recordSubmitted, useSessionJobIds, useToolJobs, sessionFirst } from "./
 export { sendToMenuItems } from "./sendTo";
 export { useKitTool } from "./toolContext";
 export { FileActions } from "./FileActions";
+export { TextActions } from "./TextActions";
+export type { TextActionsProps } from "./TextActions";
 export { summarize } from "./summary";
 export { EmptyLine } from "./EmptyLine";
 export { ResultRow } from "./ResultRow";

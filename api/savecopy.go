@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -84,22 +85,82 @@ func copyToNew(src, dst string) error {
 		return core.Errorf(core.CodeNotFound, "%s can't be read", filepath.Base(sa)).WithCause(err)
 	}
 	defer in.Close()
-	tmp, err := os.CreateTemp(filepath.Dir(da), ".toolbox-copy-*")
+	return writeAtomic(da, in)
+}
+
+// writeAtomic writes r to dst through a temporary file next to it, so a
+// failed write never leaves half a file. An existing dst is replaced.
+func writeAtomic(dst string, r io.Reader) error {
+	tmp, err := os.CreateTemp(filepath.Dir(dst), ".toolbox-copy-*")
 	if err != nil {
-		return core.Errorf(core.CodeConflict, "Can't write to %s", filepath.Dir(da)).WithCause(err)
+		return core.Errorf(core.CodeConflict, "Can't write to %s", filepath.Dir(dst)).WithCause(err)
 	}
 	tmpName := tmp.Name()
-	_, cerr := io.Copy(tmp, in)
+	_, cerr := io.Copy(tmp, r)
 	if err := tmp.Close(); cerr == nil {
 		cerr = err
 	}
 	if cerr != nil {
 		_ = os.Remove(tmpName)
-		return fmt.Errorf("copying %s: %w", filepath.Base(sa), cerr)
+		return fmt.Errorf("writing %s: %w", filepath.Base(dst), cerr)
 	}
-	if err := os.Rename(tmpName, da); err != nil {
+	if err := os.Rename(tmpName, dst); err != nil {
 		_ = os.Remove(tmpName)
-		return core.Errorf(core.CodeConflict, "Can't save %s", filepath.Base(da)).WithCause(err)
+		return core.Errorf(core.CodeConflict, "Can't save %s", filepath.Base(dst)).WithCause(err)
 	}
 	return nil
+}
+
+// MaxSaveTextBytes caps SaveText.
+const MaxSaveTextBytes = 64 << 20
+
+// SaveText asks where to save text a tool produced (a transcript, OCR text,
+// a chat answer, a table) and writes it there as UTF-8. filename is the
+// suggested name including its extension (".txt", ".md", ".csv", ".json", …);
+// the dialog starts in the library folder. Cancelling returns "".
+func (s *FilesService) SaveText(filename, text string) (string, error) {
+	if len(text) > MaxSaveTextBytes {
+		return "", core.Errorf(core.CodeValidation, "That text is too big to save (over %d MB)", MaxSaveTextBytes>>20)
+	}
+	name := cleanSaveName(filename)
+	dst, err := application.Get().Dialog.SaveFileWithOptions(&application.SaveFileDialogOptions{
+		CanCreateDirectories: true,
+		Title:                "Save as",
+		Directory:            s.Settings.Current().LibraryDir,
+		Filename:             name,
+		ButtonText:           "Save",
+	}).PromptForSingleSelection()
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if dst == "" {
+		return "", nil
+	}
+	if filepath.Ext(dst) == "" {
+		dst += filepath.Ext(name)
+	}
+	if err := writeAtomic(dst, strings.NewReader(text)); err != nil {
+		return "", err
+	}
+	return dst, nil
+}
+
+// cleanSaveName makes a suggested file name safe for a save dialog: no
+// folders, no characters Windows refuses, never empty.
+func cleanSaveName(name string) string {
+	name = strings.ReplaceAll(name, "\\", "/")
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		name = name[i+1:]
+	}
+	name = strings.Map(func(r rune) rune {
+		if r < 32 || strings.ContainsRune(`<>:"/\|?*`, r) {
+			return '_'
+		}
+		return r
+	}, name)
+	name = strings.Trim(name, " .")
+	if name == "" || name == "_" {
+		return "Untitled.txt"
+	}
+	return name
 }

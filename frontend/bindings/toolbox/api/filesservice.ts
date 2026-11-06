@@ -85,6 +85,16 @@ export function ReadText(path: string, maxBytes: number): $CancellablePromise<st
 }
 
 /**
+ * SaveText asks where to save text a tool produced (a transcript, OCR text,
+ * a chat answer, a table) and writes it there as UTF-8. filename is the
+ * suggested name including its extension (".txt", ".md", ".csv", ".json", …);
+ * the dialog starts in the library folder. Cancelling returns "".
+ */
+export function SaveText(filename: string, text: string): $CancellablePromise<string> {
+    return $Call.ByID(1383989183, filename, text);
+}
+
+/**
  * Stat describes paths for input lists.
  */
 export function Stat(paths: string[] | null): $CancellablePromise<core$0.FileInfo[] | null> {

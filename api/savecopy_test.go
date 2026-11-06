@@ -51,3 +51,20 @@ func TestCopyToNew(t *testing.T) {
 		})
 	}
 }
+
+func TestCleanSaveName(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"Transcript.txt", "Transcript.txt"},
+		{`..\..\evil.txt`, "evil.txt"},
+		{"dir/sub/notes.md", "notes.md"},
+		{`a:b?c*.txt`, "a_b_c_.txt"},
+		{"", "Untitled.txt"},
+		{"  . ", "Untitled.txt"},
+		{"line\nbreak.txt", "line_break.txt"},
+	}
+	for _, tt := range tests {
+		if got := cleanSaveName(tt.in); got != tt.want {
+			t.Errorf("cleanSaveName(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
