@@ -444,7 +444,7 @@ func (e *Engine) safeToStopLocked(p ProcInfo, w *watcher) bool {
 	if p.PID == 0 || p.Session != e.interactive || p.PID == e.self.PID {
 		return false
 	}
-	if _, ok := w.toolbox[p.PID]; ok {
+	if c, ok := w.toolbox[p.PID]; ok && c == p.Created {
 		return false
 	}
 	if e.o.Scope != nil && !e.o.Scope(p) {
@@ -548,6 +548,9 @@ func (e *Engine) tick(ctx context.Context, w *watcher) {
 	for k, ent := range w.seen {
 		if ent.goneAt == 0 && !alive[k] {
 			ent.goneAt = now
+			if c, ok := w.toolbox[k.pid]; ok && c == k.created && k.pid != e.self.PID {
+				delete(w.toolbox, k.pid) // a reused PID is a new program
+			}
 		}
 	}
 	dry := e.dryLocked()

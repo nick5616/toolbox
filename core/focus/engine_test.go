@@ -950,7 +950,7 @@ func TestSafeToStopGuards(t *testing.T) {
 		t.Fatal("pid 0")
 	}
 	w.toolbox[9] = 1
-	if ok(ProcInfo{PID: 9, Session: 1, Path: blockedExe}) {
+	if ok(ProcInfo{PID: 9, Created: 1, Session: 1, Path: blockedExe}) {
 		t.Fatal("toolbox descendant")
 	}
 	h.e.session.DryRun = true

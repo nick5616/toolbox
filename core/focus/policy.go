@@ -161,7 +161,7 @@ func isSystemPath(path []string, systemRoot string) bool {
 }
 
 // descendsFromToolbox reports whether p is Toolbox or one of its seen descendants.
-func descendsFromToolbox(p ProcInfo, s *SessionPolicy) bool {
+func descendsFromToolbox(p ProcInfo, s *SessionPolicy, seen Ancestry) bool {
 	if p.PID != 0 && p.PID == s.Self.PID && (s.Self.Created == 0 || p.Created == s.Self.Created) {
 		return true
 	}
@@ -169,7 +169,14 @@ func descendsFromToolbox(p ProcInfo, s *SessionPolicy) bool {
 		return true
 	}
 	if pc, ok := s.ToolboxPIDs[p.ParentPID]; ok && pc <= p.Created {
-		return true
+		// The parent PID may have been reused by another program: trust it only
+		// while the process seen under that PID is the Toolbox one.
+		if seen == nil {
+			return true
+		}
+		if info, _, found := seen.Lookup(p.ParentPID); !found || info.Created == pc {
+			return true
+		}
 	}
 	if p.ParentPID == s.Self.PID && p.ParentPID != 0 && s.Self.Created <= p.Created {
 		return true
@@ -184,7 +191,7 @@ func Decide(p ProcInfo, s *SessionPolicy, seen Ancestry) Verdict {
 		return Verdict{Allow: true, Reason: "other-session"}
 	}
 	// 2. Toolbox and its descendants, and apps it launched.
-	if descendsFromToolbox(p, s) {
+	if descendsFromToolbox(p, s, seen) {
 		return Verdict{Allow: true, Confer: true, Reason: "toolbox"}
 	}
 	path := segments(p.Path)
