@@ -304,7 +304,6 @@ export default function Gallery({ openImages, onOpen, studio, onToggleStudio, co
           <p style={{ margin: 0 }}>The painting and all its layers are removed. Pictures you exported stay in your library, and the original photo it was made from is never touched.</p>
         </Dialog>
       ) : null}
-      {openImages.dialogs}
     </section>
   );
 }

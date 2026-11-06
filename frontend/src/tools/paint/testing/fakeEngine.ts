@@ -202,7 +202,7 @@ export class FakeEngine implements PaintEngine {
     this.dab(p, p);
   }
 
-  extendStroke(points: InputPoint[]): void {
+  extendStroke(points: InputPoint[], _predicted?: InputPoint[]): void {
     const s = this.stroke;
     if (!s) return;
     for (const p of points) {
@@ -474,9 +474,9 @@ export class FakeEngine implements PaintEngine {
   }
 
   async encodeTile(layerId: string, key: string): Promise<Blob | null> {
+    if (IS_JSDOM) return this.pix.has(layerId) ? new Blob([`${layerId}/${key}`], { type: "image/png" }) : null;
     const src = this.pix.get(layerId)?.canvas;
     if (!src) return null;
-    if (IS_JSDOM) return new Blob([`${layerId}/${key}`], { type: "image/png" });
     const [tx, ty] = key.split("_").map(Number);
     const t = document.createElement("canvas");
     t.width = TILE;

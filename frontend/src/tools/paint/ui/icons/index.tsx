@@ -380,8 +380,55 @@ export const PAINT_ICONS: Record<string, ReactNode> = {
   ),
 };
 
-export function hasPaintIcon(name: string): boolean {
+PAINT_ICONS.bulge = S(
+  <>
+    <circle cx="12" cy="12" r="3.500" />
+    <circle cx="12" cy="12" r="7" opacity=".6" />
+    <circle cx="12" cy="12" r="10" opacity=".3" />
+  </>,
+);
+PAINT_ICONS.twirl = S(<path d="M12 12c0-1.500 2-1.500 2 0s-3 2.500-4 0 1-5 4-5 6 3 6 6-3 7-8 7-8-4-8-8" />);
+PAINT_ICONS.wave = S(<path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0" />);
+
+/** Lab tools name their icons in kebab-case; these are the ones drawn under a different name. */
+const ALIASES: Record<string, string> = {
+  "echo-fill": "echo",
+  "echo-trail": "echo",
+  "edge-erode": "edge",
+  "enhance-brush": "enhance",
+  "extend-canvas": "extend",
+  "upscale-canvas": "enhance",
+  "flow-field": "flow",
+  "ink-bleed": "ink",
+  "pixel-sort": "sort",
+  "reaction-diffusion": "reaction",
+  "select-object": "object",
+  "select-subject": "subject",
+  "subject-stamp": "subject",
+  "history-brush": "historyBrush",
+  chromatic: "glitch",
+  vhs: "glitch",
+  pixelate: "pixel",
+  posterize: "halftone",
+  duotone: "adjust",
+  mirror: "symmetry",
+};
+
+/** The drawn icon a (possibly kebab-case or aliased) name stands for, or "" when there isn't one. */
+export function resolveIconName(name: string): string {
+  if (hasOwn(name)) return name;
+  const alias = ALIASES[name];
+  if (alias) return alias;
+  const camel = name.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
+  return hasOwn(camel) ? camel : "";
+}
+
+function hasOwn(name: string): boolean {
   return Object.prototype.hasOwnProperty.call(PAINT_ICONS, name);
+}
+
+export function hasPaintIcon(name: string): boolean {
+  return resolveIconName(name) !== "";
 }
 
 export interface PaintIconProps {
@@ -391,7 +438,8 @@ export interface PaintIconProps {
 }
 
 export function PaintIcon({ name, size = 20, className }: PaintIconProps) {
-  const known = hasPaintIcon(name);
+  const resolved = resolveIconName(name);
+  const known = resolved !== "";
   return (
     <svg
       width={size}
@@ -405,9 +453,9 @@ export function PaintIcon({ name, size = 20, className }: PaintIconProps) {
       className={className}
       aria-hidden="true"
       focusable="false"
-      data-icon={known ? name : "flask"}
+      data-icon={known ? resolved : "flask"}
     >
-      {PAINT_ICONS[known ? name : "flask"]}
+      {PAINT_ICONS[known ? resolved : "flask"]}
     </svg>
   );
 }
