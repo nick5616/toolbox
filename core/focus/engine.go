@@ -1001,6 +1001,10 @@ func (e *Engine) RequestWeaken(a Weaken, rule *AllowRule) (Friction, error) {
 			e.mu.Unlock()
 			return Friction{}, core.ValidationError("Pick an app to allow", map[string]string{"rule": "Pick an app to allow"})
 		}
+		if len(s.Extra) >= MaxExtra {
+			e.mu.Unlock()
+			return Friction{}, errExtraCap()
+		}
 		c := *rule
 		if c.ID == "" {
 			c.ID = core.NewID()
@@ -1032,7 +1036,13 @@ func (e *Engine) RequestWeaken(a Weaken, rule *AllowRule) (Friction, error) {
 	return out, nil
 }
 
-var spaceRe = strings.NewReplacer("’", "'", "‘", "'", "ʼ", "'")
+// errExtraCap is the refusal when a session already allows MaxExtra extra apps.
+func errExtraCap() error {
+	return core.ValidationError("This session already allows 20 extra apps", map[string]string{"extra": "At most 20 extra apps per session"}).
+		WithHint("End the session to start one with a different list.")
+}
+
+var spaceRe =strings.NewReplacer("’", "'", "‘", "'", "ʼ", "'")
 
 func normPhrase(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(spaceRe.Replace(s)), " "))
@@ -1057,6 +1067,10 @@ func (e *Engine) ConfirmWeaken(a Weaken, phrase string) error {
 	if f.Phrase != "" && normPhrase(phrase) != normPhrase(f.Phrase) {
 		e.mu.Unlock()
 		return core.Errorf(CodePhrase, "That doesn't match the phrase").WithHint(`Type: ` + f.Phrase)
+	}
+	if a == WeakenAllow && f.Rule != nil && len(e.session.Extra) >= MaxExtra {
+		e.mu.Unlock()
+		return errExtraCap()
 	}
 	e.friction = nil
 	switch a {
