@@ -526,7 +526,7 @@ Newest last. Format: date — decision — why.
     - the engine's phrase check is lenient (case, spacing, curly apostrophes), while the dialog checks exactly, so a typed phrase the dialog accepts is never refused;
     - `Extend` clamps to 12 h from the start;
     - failed stops are logged once per program per session;
-    - the macOS broad-folder list (§1.7 gives none) is `/`, `/Applications`, `/System`, `/Library`, `/Users`, the home folder and its Desktop/Documents/Downloads/Library;
+    - the macOS broad-folder list (§1.7 gives none) is `broadMac` in `policy.go`: `/`, `/Applications`, `/System`, `/Library`, `/Users`, `/Volumes`, `/usr`, `/opt`, `/private`, …, plus `~` and its Applications, Library, Desktop, Downloads and Documents;
     - the engine assigns IDs to profiles and rules saved with an empty ID.
   - **Focus step and catalog (F2):**
     - Focus wait follows the session's current `EndsAt`, so an extension moves it (it ignores `req.Until`);
