@@ -14,12 +14,13 @@ const svc = vi.hoisted(() => ({
   ImageDataURL: vi.fn(),
   OpenPopup: vi.fn(),
 }));
+const files = vi.hoisted(() => ({ SaveText: vi.fn(async (_n: string, _t: string) => "C:/x/clip.txt"), Stat: vi.fn(async () => []) }));
 const desktop = vi.hoisted(() => ({ HidePopup: vi.fn(), ShowMain: vi.fn(), HotkeyStatus: vi.fn() }));
 const handlers = vi.hoisted(() => new Map<string, Set<(data: unknown) => void>>());
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
-  return { ...actual, ClipboardService: svc, DesktopService: desktop };
+  return { ...actual, ClipboardService: svc, DesktopService: desktop, FilesService: { ...actual.FilesService, ...files } };
 });
 vi.mock("@/lib/events", () => ({
   on: (name: string, cb: (data: unknown) => void) => {
@@ -163,6 +164,21 @@ describe("ClipboardView", () => {
     await waitFor(() => expect(document.querySelector("img")?.getAttribute("src")).toBe("data:image/png;base64,AAAA"));
     expect(svc.ImageDataURL).toHaveBeenCalledWith("i1");
     expect(svc.ImageDataURL).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves a text item as clip.txt and offers file actions on images", async () => {
+    svc.ImageDataURL.mockResolvedValue("data:image/png;base64,AAAA");
+    svc.List.mockResolvedValue(
+      page(
+        clip("t1", { preview: "hello world", text: "hello world, in full" }),
+        clip("i1", { kind: ClipKind.ClipImage, text: "", preview: "", imagePath: "C:/s/clipboard/i1.png", width: 4, height: 4, byteSize: 10 }),
+      ),
+    );
+    render(<ClipboardView moduleId="clipboard" />);
+    await screen.findByText("hello world");
+    await userEvent.click(screen.getByRole("button", { name: "Save as…", hidden: true }));
+    await waitFor(() => expect(files.SaveText).toHaveBeenCalledWith("clip.txt", "hello world, in full"));
+    expect(screen.getByRole("button", { name: /Send to/, hidden: true })).toBeTruthy();
   });
 
   it("debounces search and filters by kind", async () => {

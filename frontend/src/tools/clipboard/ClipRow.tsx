@@ -1,6 +1,8 @@
 import { memo, useRef, type MouseEvent } from "react";
 import { Icon, IconButton, cx } from "@/components";
 import { ClipKind, type ClipItem } from "@/lib/api";
+import { saveTextAs } from "@/lib/saveText";
+import { FileActions } from "@/tools/_kit";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { charCount, clipLabel } from "./clips";
 import { useImageThumb } from "./useImageThumb";
@@ -75,6 +77,12 @@ function ClipRowImpl({ item, domId, selected, compact, index, now, onSelect, onA
       {!compact && (
         <div className={styles.actions}>
           {onCopy && <IconButton size="sm" icon="copy" label="Copy" data-tip="Put this item back on the clipboard" tabIndex={-1} onClick={stop(() => onCopy(item.id))} />}
+          {!isImage && item.text && <IconButton size="sm" icon="download" label="Save as…" data-tip="Save this text as a file" tabIndex={-1} onClick={stop(() => void saveTextAs(item.text, "clip.txt"))} />}
+          {isImage && item.imagePath && (
+            <span className={styles.fileActions} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+              <FileActions path={item.imagePath} moduleId="clipboard" />
+            </span>
+          )}
           {onPin && (
             <button
               type="button"
