@@ -206,7 +206,6 @@ export default function OrganizeView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => OrganizeService.Enqueue(paths, opts), paths, ["Organizer run", "Organizer runs"]);
     setRunning(false);
     setSubmitErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   const pickFolder = async () => {

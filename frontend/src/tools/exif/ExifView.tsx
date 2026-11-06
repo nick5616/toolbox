@@ -64,7 +64,6 @@ export default function ExifView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => ExifService.Enqueue(actionable, opts), actionable, noun);
     setRunning(false);
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
     return res.ok;
   };
 

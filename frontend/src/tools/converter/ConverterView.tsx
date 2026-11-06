@@ -66,7 +66,6 @@ export default function ConverterView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => ConverterService.Enqueue(paths, opts), paths, ["conversion", "conversions"]);
     setRunning(false);
     setSubmitErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   return (

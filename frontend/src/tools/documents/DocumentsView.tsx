@@ -284,7 +284,6 @@ export default function DocumentsView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => DocumentsService.Enqueue(convertible, opts), convertible, ["document", "documents"]);
     setRunning(false);
     setSubmitErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   useCommands([{ id: "documents.convert", title: "Convert document…", section: "Documents", icon: "file-text", keywords: ["docx", "pdf", "markdown", "epub", "pandoc"], run: () => inputs.pick() }]);

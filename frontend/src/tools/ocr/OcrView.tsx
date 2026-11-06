@@ -161,7 +161,6 @@ export default function OcrView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => OcrService.Enqueue(paths, opts), paths, ["file", "files"]);
     setRunning(false);
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   return (

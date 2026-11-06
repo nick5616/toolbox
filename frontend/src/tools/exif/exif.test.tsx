@@ -131,7 +131,8 @@ describe("ExifView", () => {
     await waitFor(() =>
       expect(enqueue).toHaveBeenCalledWith(["/a.jpg"], { action: "strip-location", keepOrientation: true, fields: {} }),
     );
-    await waitFor(() => expect(screen.queryByRole("heading", { name: "a.jpg" })).toBeNull());
+    // The file stays after a run (every tool stands on its own: tweak and run again).
+    expect(screen.getByRole("heading", { name: "a.jpg" })).toBeTruthy();
 
     enqueue.mockClear();
     await user.click(screen.getByRole("button", { name: "Add files…" }));

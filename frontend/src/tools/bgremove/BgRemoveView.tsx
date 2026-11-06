@@ -78,7 +78,6 @@ export default function BgRemoveView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => BgRemoveService.Enqueue(paths, submitOptions(opts)), paths, ["image", "images"]);
     setRunning(false);
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   return (

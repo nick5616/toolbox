@@ -107,7 +107,6 @@ export default function CompressView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => CompressService.Enqueue(paths, opts), paths, ["file", "files"]);
     setRunning(false);
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   const rows = useMemo(() => {

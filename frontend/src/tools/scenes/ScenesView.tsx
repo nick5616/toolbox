@@ -130,7 +130,6 @@ export default function ScenesView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => ScenesService.Enqueue(paths, opts), paths, ["video", "videos"]);
     setRunning(false);
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   return (

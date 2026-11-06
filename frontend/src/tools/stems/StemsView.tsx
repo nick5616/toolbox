@@ -156,7 +156,6 @@ export default function StemsView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => StemsService.Enqueue(paths, opts), paths, ["track", "tracks"]);
     setRunning(false);
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   return (

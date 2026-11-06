@@ -132,7 +132,6 @@ export default function ImageBatchView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => ImageBatchService.Enqueue(paths, opts), paths, ["picture", "pictures"]);
     setRunning(false);
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   const pickLogo = async () => {

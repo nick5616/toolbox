@@ -83,7 +83,6 @@ export default function SilenceView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => SilenceService.Enqueue(paths, opts), paths, ["file", "files"]);
     setRunning(false);
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   const rows = useMemo(() => {

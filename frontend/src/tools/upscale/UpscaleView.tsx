@@ -151,7 +151,6 @@ export default function UpscaleView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => UpscaleService.Enqueue(paths, opts), paths, ["image", "images"]);
     setRunning(false);
     setSubmitErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   const okCount = verdicts.filter((x) => x.v.kind !== "over").length;

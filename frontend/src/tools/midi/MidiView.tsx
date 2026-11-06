@@ -40,7 +40,6 @@ export default function MidiView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => MidiService.Enqueue(paths, opts), paths, ["transcription", "transcriptions"]);
     setRunning(false);
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   return (

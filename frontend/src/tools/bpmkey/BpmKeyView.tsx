@@ -34,7 +34,6 @@ export default function BpmKeyView({ moduleId }: ToolViewProps) {
     const res = await submitJobs(() => BpmKeyService.Enqueue(paths), paths, ["analysis", "analyses"]);
     setRunning(false);
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   const clearResults = () => {

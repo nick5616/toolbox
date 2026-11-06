@@ -84,7 +84,8 @@ describe("StemsView", () => {
     await user.click(btn);
     await waitFor(() => expect(enqueue).toHaveBeenCalledWith(["/a.mp3"], { preset: "vocals-fast", format: "flac" }));
     expect(JSON.parse(String(setState.mock.calls.at(-1)?.[1]))).toEqual({ preset: "vocals-fast", format: "flac" });
-    await waitFor(() => expect(screen.queryByText("a.mp3")).toBeNull());
+    // The file stays after a run, so a setting can be changed and run again.
+    expect(screen.getByText("a.mp3")).toBeTruthy();
   });
 
   it("selects FLAC by default and shows the per-minute size hint", async () => {

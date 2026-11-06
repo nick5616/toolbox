@@ -303,7 +303,6 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
     );
     setRunning(false);
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   const rows = useMemo(() => {
