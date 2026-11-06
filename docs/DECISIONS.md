@@ -580,3 +580,11 @@ Newest last. Format: date — decision — why.
 - **2026-11-05: Step parameters follow the options.** `StepUI.relevant(options, pointer)` leaves options off the node and panel when they don't matter, unless they're wired:
   - a Focus wait or end shows none;
   - a start or Wait shows minutes or a time, depending on the mode.
+- **2026-11-05: Phase 18 audit fixes.** An audit of SPEC §1–§6 against the code found 9 gaps and 8 bugs, all now fixed with tests. Choices made along the way:
+  - **Wildcard rules:** a folder rule is refused when its `*` segment is exactly `*`, or when its parent is a broad folder and the segment has fewer than 8 fixed characters. So `WindowsApps\Microsoft.WindowsTerminal_*` stays valid, while `C:\*`, `%ProgramFiles%\*` and `WindowsApps\Foo*` are refused.
+  - **"Until" starts after their time:** with a session on, the step counts as reached (no extension; files pass through). With no session, tomorrow's time is used only if it's within 12 h; otherwise the step fails with a clear message.
+  - **Closing windows:** WM_CLOSE goes only to unowned windows. Tool windows aren't filtered, because the spec doesn't ask for it.
+  - **macOS polite closes** run off the tick (at most 4 at a time, joined on Stop), and one request is shared per bundle. Only the app's own executable in `Contents/MacOS` counts as windowed.
+  - **The end-early dialog** hides on Esc or a backdrop click. Only Cancel calls `CancelWeaken`, and "Ending early in 0:23 · Show" reopens it.
+  - **`subscribeFocus`** is reference-counted.
+  - **The engine starts before the runner** in `main.go`.
