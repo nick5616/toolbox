@@ -516,3 +516,37 @@ Newest last. Format: date — decision — why.
   - **`HotkeyFocusStart` is declared in Wave 0 but added to `HotkeyActions` by WP-S1**, together with the desktop hotkey test it changes.
 - **2026-11-05: Commits are back on.** The user said "commit everything and continue working". The staged rounds went in as one commit (its tree is exactly the old `phase-10-11` branch, whose 50 commits were then recorded on main with an `-s ours` merge so their history isn't lost), and the unstaged rounds (Phases 13–17, the drop fix, Phase 18 Wave 0) as a second. Root `shots/` (QA screenshots) is now ignored. Builders commit on their worktree branches again and the architect merges them.
 - **2026-11-05: Two more frozen seams before Wave 1.** `focus.BroadFolder(path) bool` (WP-F1 implements the §1.3/§1.7 list; WP-F2's install-root guess uses it to fall back to an exe rule) and stub `AppPicker`/`AppIcon` components exported from `blocks/app-picker/index.ts` (WP-U1 implements them; WP-U2's Open in app step imports them), so the parallel packages compile against each other.
+- **2026-11-05: Phase 18 Wave 1 merged (F1, F2, T1, O1, U1, U2).** Choices the builders made where SPEC.md was silent, accepted at review:
+  - **Engine (F1):**
+    - every terminate or close passes a last-line check first: never in a dry run or learn mode, never another session, PID 0, Toolbox or its descendants, the OS folder, the Windows extras, or anything outside `Options.Scope`;
+    - the first tick treats running processes as `existing` (OnStart applies), and a resumed session never acts on them;
+    - a time end sets `EndedAt = EndsAt`;
+    - at Strict, `RequestWeaken` for end/allow/quit returns a conflict, so only Emergency unlock is offered; at Soft and Firm, Emergency costs the same as End;
+    - repeating a request keeps its running countdown;
+    - the engine's phrase check is lenient (case, spacing, curly apostrophes), while the dialog checks exactly, so a typed phrase the dialog accepts is never refused;
+    - `Extend` clamps to 12 h from the start;
+    - failed stops are logged once per program per session;
+    - the macOS broad-folder list (§1.7 gives none) is `/`, `/Applications`, `/System`, `/Library`, `/Users`, the home folder and its Desktop/Documents/Downloads/Library;
+    - the engine assigns IDs to profiles and rules saved with an empty ID.
+  - **Focus step and catalog (F2):**
+    - Focus wait follows the session's current `EndsAt`, so an extension moves it (it ignores `req.Until`);
+    - the install-root rule goes up exactly one level;
+    - the Studio suggestion is a service method (`StudioSuggestion`);
+    - `JobOptions.Carry` carries the run's files with their roles through the job.
+  - **Runner (T1):**
+    - `OnRunFinished` hooks run on a tracked goroutine, not the loop, so a hook may call back into the runner;
+    - a schedule counts from the moment it's saved (enabling at 9:40 never fires 9:30);
+    - a timer or the 30 s tick may fire a slot up to 90 s late even with catch-up 0;
+    - days and times are normalised on save;
+    - a duplicated pipeline's schedule is off;
+    - `{file}`/`{files}` are allowed in templated `/args` pointers (Open in app) and still refused elsewhere.
+  - **Open in app (O1):**
+    - an exit 0 within 2 s counts as a single-instance hand-off (success);
+    - macOS launches with `open -a` and has no PID, so closing goes by bundle path;
+    - launches are remembered in memory only (13 h) and not across restarts;
+    - the architect added `Launcher.Current` so close-when-focus-ends arms from the real state, and `CloseOpened` at shutdown.
+  - **UI (U1, U2):**
+    - a Focus step's profile is a text parameter, because choices must be a fixed list;
+    - the span band covers every step from the start to its wait;
+    - the pipeline list refetches once a minute while a schedule is on, because the runner doesn't emit when "next" simply passes.
+  - **The resume toast has no State field.** The shell infers it: on the first state after launch, an active session that started before the app did.
