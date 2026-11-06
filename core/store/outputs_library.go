@@ -134,6 +134,27 @@ func (d *DB) QueryLibrary(ctx context.Context, q core.LibraryQuery, libraryDir s
 	return page, nil
 }
 
+// OutputModulesUnder maps every registered output path inside dir (at any
+// depth) to its module ID. The Library's folder tree uses it for counts.
+func (d *DB) OutputModulesUnder(ctx context.Context, dir string) (map[string]string, error) {
+	prefix := strings.TrimRight(dir, `/\`) + string(os.PathSeparator)
+	rows, err := d.sql.QueryContext(ctx, `SELECT path, module_id FROM outputs WHERE lower(substr(path, 1, ?)) = lower(?)`,
+		utf8.RuneCountInString(prefix), prefix)
+	if err != nil {
+		return nil, fmt.Errorf("output paths: %w", err)
+	}
+	defer rows.Close()
+	res := map[string]string{}
+	for rows.Next() {
+		var p, m string
+		if err := rows.Scan(&p, &m); err != nil {
+			return nil, fmt.Errorf("scan output path: %w", err)
+		}
+		res[p] = m
+	}
+	return res, rows.Err()
+}
+
 // OutputByPath returns the output registered at path.
 func (d *DB) OutputByPath(ctx context.Context, path string) (core.Output, bool, error) {
 	outs, err := d.queryOutputs(ctx, `SELECT `+outputCols+` FROM outputs WHERE path = ?`, path)
