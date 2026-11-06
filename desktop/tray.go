@@ -32,6 +32,8 @@ type tray struct {
 	// --- local file transfer (Phase 13) ---
 	lanResume bool   // the tray stopped an "always" receiver: offer to start it again
 	lanPrompt string // alias of the device whose transfer prompt is open
+	// focus minute ticker (Phase 18)
+	focusTimer *time.Timer
 }
 
 func newTray(s *Shell) *tray { return &tray{s: s} }
@@ -120,6 +122,9 @@ func (t *tray) state() trayState {
 	}
 	// --- end vault ---
 	st.NeedYou, st.NeedYouName = t.s.pipelinesNeedYou()
+	if eng := t.s.focusEngine(); eng != nil {
+		focusTray(&st, eng, time.Now())
+	}
 	if o.Lan != nil {
 		ls := o.Lan.State()
 		st.LanListening, st.LanAlias = ls.Listening, ls.Alias
@@ -222,6 +227,10 @@ func (t *tray) handler(id string, st trayState) func(*application.Context) {
 				_ = s.o.Lan.SetReceive(lan.ReceiveAlways)
 			}
 			t.refresh()
+		case id == itemFocus:
+			_ = s.ShowMain(NavigateFocus)
+		case id == itemFocusStart:
+			s.startLastFocus()
 		case id == itemPipelines:
 			_ = s.ShowMain(NavigatePipelineRuns)
 		case id == itemSettings:

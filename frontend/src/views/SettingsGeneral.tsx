@@ -6,10 +6,20 @@ import { useDesktop } from "@/state/desktop";
 import { DEFAULT_HOTKEYS, useSettings } from "@/state/settings";
 import styles from "./SettingsGeneral.module.css";
 
+/** Defaults including the actions that ship unbound. */
+const RESET_HOTKEYS: Record<string, string> = { ...DEFAULT_HOTKEYS, focusStart: "" };
+
 const HOTKEY_ROWS: Array<{ action: string; label: string }> = [
   { action: "clipboard", label: "Open clipboard history" },
   { action: "quickOpen", label: "Quick open (command palette)" },
+  { action: "focusStart", label: "Start focus with the last profile" },
 ];
+
+const HOTKEY_TIPS: Record<string, string> = {
+  clipboard: "Opens the clipboard history popup from anywhere",
+  quickOpen: "Opens the search palette from anywhere",
+  focusStart: "Starts a focus session with the last profile, length and strength you used (no shortcut by default)",
+};
 
 function StatusBadge({ accelerator, status }: { accelerator: string; status: HotkeyStatus | undefined }) {
   if (!accelerator) return <Badge tip="No shortcut is set for this action">Disabled</Badge>;
@@ -51,7 +61,7 @@ export function SettingsGeneral() {
   };
 
   const hotkeys = settings.hotkeys ?? {};
-  const isDefault = HOTKEY_ROWS.every((r) => (hotkeys[r.action] ?? "") === (DEFAULT_HOTKEYS[r.action] ?? ""));
+  const isDefault = HOTKEY_ROWS.every((r) => (hotkeys[r.action] ?? "") === (RESET_HOTKEYS[r.action] ?? ""));
 
   return (
     <Section label="General" tip="Tray, start-up and global shortcuts">
@@ -86,7 +96,7 @@ export function SettingsGeneral() {
             variant="ghost"
             disabled={isDefault}
             data-tip={isDefault ? "Shortcuts already have their default keys" : "Put every global shortcut back to its original keys"}
-            onClick={() => void apply({ hotkeys: { ...DEFAULT_HOTKEYS } }, HOTKEY_ROWS.map((r) => `hotkeys.${r.action}`))}
+            onClick={() => void apply({ hotkeys: { ...RESET_HOTKEYS } }, HOTKEY_ROWS.map((r) => `hotkeys.${r.action}`))}
           >
             Reset to defaults
           </Button>
@@ -97,7 +107,7 @@ export function SettingsGeneral() {
             const err = errors[`hotkeys.${action}`];
             return (
               <li key={action} className={styles.shortcut}>
-                <span className={styles.shortcutLabel} data-tip={action === "clipboard" ? "Opens the clipboard history popup from anywhere" : "Opens the search palette from anywhere"}>{label}</span>
+                <span className={styles.shortcutLabel} data-tip={HOTKEY_TIPS[action]}>{label}</span>
                 <HotkeyRecorder
                   label={`${label} shortcut`}
                   value={accel}

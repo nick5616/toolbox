@@ -20,11 +20,13 @@ const (
 	// --- vault (VA1) ---
 	itemLockVault = "lock-vault"
 	// --- end vault ---
-	itemLanStatus = "lan-status"
-	itemLanStop   = "lan-stop"
-	itemLanStart  = "lan-start"
-	itemPipelines = "pipelines"
-	itemSep       = "-"
+	itemLanStatus  = "lan-status"
+	itemLanStop    = "lan-stop"
+	itemLanStart   = "lan-start"
+	itemPipelines  = "pipelines"
+	itemFocus      = "focus"
+	itemFocusStart = "focus-start"
+	itemSep        = "-"
 )
 
 const maxRecent = 5
@@ -40,8 +42,12 @@ type trayState struct {
 	// --- vault (VA1) ---
 	VaultUnlocked bool
 	// --- end vault ---
-	NeedYou     int    // pipeline steps waiting for the user
-	NeedYouName string // the first such run's name
+	NeedYou int // pipeline steps waiting for the user
+	// --- focus lock (Phase 18) ---
+	FocusActive    bool   // a session is on
+	FocusLeft      string // "42 min left"
+	FocusStartName string // last profile name when idle ("" = no item)
+	NeedYouName    string // the first such run's name
 	// --- local file transfer (Phase 13) ---
 	LanListening bool   // receiving is on
 	LanAlias     string // this computer's alias
@@ -77,7 +83,14 @@ func trayModel(s trayState) []trayItem {
 		}
 		m = append(m, item(itemPipelines, label), trayItem{ID: itemSep, Separator: true})
 	}
-	m = append(m, item(itemOpen, "Open Toolbox"), item(itemClipboard, clip))
+	m = append(m, item(itemOpen, "Open Toolbox"))
+	switch {
+	case s.FocusActive:
+		m = append(m, item(itemFocus, "Focus · "+s.FocusLeft))
+	case s.FocusStartName != "":
+		m = append(m, item(itemFocusStart, "Start focus ("+s.FocusStartName+")"))
+	}
+	m = append(m, item(itemClipboard, clip))
 	if s.ClipboardEnabled {
 		p := item(itemPause, "Pause clipboard history")
 		p.Checkbox = true
