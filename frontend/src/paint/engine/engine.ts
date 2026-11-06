@@ -24,7 +24,7 @@ import { isEmpty, newBuf, premultiplied, rectsIntersect, straightImage, tileKey,
 import { TilePixels, tilesOf } from "./region";
 import { resizeBuf, type Resample } from "./sample";
 import { SelectionImpl, featherMask, maskBounds } from "./selection";
-import { TransformImpl } from "./transform";
+import { TransformImpl, type TransformState } from "./transform";
 import { ViewImpl } from "./view";
 import {
   PaintGLError,
@@ -90,6 +90,10 @@ export interface PaintEngineExt {
   beginPreview(layerId?: string): PreviewSession;
   /** Premultiplied pixels of r, synchronously (adjustments, tests). */
   readPixels(r: Rect, src: "layer" | "merged", layerId?: string): PixelBuf;
+  /** The running transform's geometry for on-canvas handles (null when none). */
+  transformState(): TransformState | null;
+  /** A small PNG data URL of a layer (the Layers panel); "" when the layer is empty or unknown. */
+  layerThumb(id: string, maxDim: number): string;
   /** The id of the last applied history step (0 = none). */
   historyCursor(): number;
   /** Is a stroke running? */
@@ -1369,6 +1373,65 @@ class Engine implements PaintEngine, PaintEngineExt {
     const l = layerId ? this.layers.find((x) => x.id === layerId) : this.activeLayer();
     if (!l) return newBuf(r.w, r.h);
     return new TilePixels(this.backend(), l.tiles, null, this.canvasRect()).read(r);
+  }
+
+  transformState(): TransformState | null {
+    return this.transform.state();
+  }
+
+  layerThumb(id: string, maxDim: number): string {
+    const l = this.layers.find((x) => x.id === id);
+    if (!l || this.docW === 0 || typeof document === "undefined") return "";
+    const W = this.docW;
+    const H = this.docH;
+    const buf = new TilePixels(this.backend(), l.tiles, null, this.canvasRect()).read({ x: 0, y: 0, w: W, h: H });
+    if (isEmpty(buf.data)) return "";
+    const k = Math.min(1, maxDim / Math.max(W, H));
+    const tw = Math.max(1, Math.round(W * k));
+    const th = Math.max(1, Math.round(H * k));
+    // Sparse box average in premultiplied space (a thumbnail doesn't need every pixel), then back to straight alpha.
+    const out = new Uint8ClampedArray(tw * th * 4);
+    for (let y = 0; y < th; y++) {
+      const y0 = Math.floor((y * H) / th);
+      const y1 = Math.max(y0 + 1, Math.floor(((y + 1) * H) / th));
+      const sy = Math.max(1, Math.floor((y1 - y0) / 3));
+      for (let x = 0; x < tw; x++) {
+        const x0 = Math.floor((x * W) / tw);
+        const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * W) / tw));
+        const sx = Math.max(1, Math.floor((x1 - x0) / 3));
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let a = 0;
+        let n = 0;
+        for (let yy = y0; yy < y1; yy += sy) {
+          for (let xx = x0; xx < x1; xx += sx) {
+            const i = (yy * W + xx) * 4;
+            r += buf.data[i] as number;
+            g += buf.data[i + 1] as number;
+            b += buf.data[i + 2] as number;
+            a += buf.data[i + 3] as number;
+            n++;
+          }
+        }
+        const al = a / n;
+        if (al > 0) {
+          const o = (y * tw + x) * 4;
+          const un = 255 / al;
+          out[o] = Math.min(255, (r / n) * un);
+          out[o + 1] = Math.min(255, (g / n) * un);
+          out[o + 2] = Math.min(255, (b / n) * un);
+          out[o + 3] = al;
+        }
+      }
+    }
+    const c = document.createElement("canvas");
+    c.width = tw;
+    c.height = th;
+    const ctx = c.getContext("2d");
+    if (!ctx) return "";
+    ctx.putImageData(makeImageData(tw, th, out), 0, 0);
+    return c.toDataURL("image/png");
   }
 
   async readRegion(r: Rect, src: "layer" | "merged"): Promise<ImageData> {

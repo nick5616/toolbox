@@ -26,6 +26,15 @@ export interface TransformHost {
   changed(): void;
 }
 
+/** What the handles need: the lifted rect and the current matrix / corners / mesh (canvas px). */
+export interface TransformState {
+  mode: TransformMode;
+  rect: Rect;
+  matrix: number[];
+  corners: Point[];
+  mesh: Point[];
+}
+
 interface Active {
   layer: Layer;
   rect: Rect;
@@ -73,6 +82,13 @@ export class TransformImpl implements TransformAPI {
 
   get active(): boolean {
     return this.a !== null;
+  }
+
+  /** The running transform's geometry (on-canvas handles); null when none. */
+  state(): TransformState | null {
+    const a = this.a;
+    if (!a) return null;
+    return { mode: this.mode, rect: { ...a.rect }, matrix: this.matrix.slice(), corners: this.corners.map((p) => ({ ...p })), mesh: this.mesh.map((p) => ({ ...p })) };
   }
 
   begin(mode: TransformMode): void {
