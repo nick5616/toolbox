@@ -60,7 +60,10 @@ func ParseMyb(name string, data []byte) (*Preset, []string, error) {
 	if hasOp {
 		p.Opacity = clamp(op.Base, 0, 1)
 	}
-	pressurePts := append(append([][2]float64{}, op.Inputs["pressure"]...), om.Inputs["pressure"]...)
+	pressurePts := op.Inputs["pressure"]
+	if len(pressurePts) < 2 {
+		pressurePts = om.Inputs["pressure"]
+	}
 	if len(pressurePts) > 0 {
 		if d, ok := mapMybInput("pressure", "opacity", pressurePts, 1, &n); ok {
 			p.Dynamics = append(p.Dynamics, d)

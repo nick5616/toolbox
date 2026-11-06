@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BRUSH_SCHEMA_VERSION, type BrushPreset, type Curve, type Tip } from "../schema";
 import manifest from "./manifest.json";
-import { LIBRARY_PRESETS, OPEN_PRESETS, OWN_PRESETS, isLibraryRef, libraryPresetsIn, resolveLibraryAsset } from "./index";
+import { LIBRARY_PRESETS, OPEN_PRESETS, OWN_PRESETS, SET_NAMES, isLibraryRef, libraryPresetsIn, librarySetNames, resolveLibraryAsset } from "./index";
 
 // SPEC 1.3.1: the set contents, in order.
 const SPEC_SETS: Record<string, string[]> = {
@@ -141,6 +141,9 @@ describe("bundled brush library", () => {
   });
 
   it("credits every open-licence brush", () => {
+    expect(OPEN_PRESETS.length).toBeGreaterThanOrEqual(20);
+    expect(librarySetNames().slice(0, 10)).toEqual([...SET_NAMES]);
+    expect(librarySetNames().length).toBeGreaterThan(SET_NAMES.length);
     for (const p of OPEN_PRESETS) {
       expect(p.credit, p.id).not.toBe("");
       expect(p.license, p.id).toMatch(/^(CC0-1\.0|CC-BY-3\.0)$/);
