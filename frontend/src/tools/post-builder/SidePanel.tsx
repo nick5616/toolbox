@@ -1,4 +1,5 @@
 import { Badge, Button, Field, Icon, SegmentedControl, Select, Switch, TextArea, cx, toast } from "@/components";
+import { copyText as copy } from "@/lib/copy";
 import type { PostIssue, PostLimits, PostSlide } from "@/lib/api";
 import { CAROUSEL_ASPECTS, FORMAT_LABELS, FORMAT_TIPS, aspectFor, captionStats, countChars, type PostDoc, type PostFormat } from "./logic";
 import styles from "./SidePanel.module.css";
@@ -6,12 +7,7 @@ import styles from "./SidePanel.module.css";
 const FORMAT_OPTIONS = (Object.keys(FORMAT_LABELS) as PostFormat[]).map((value) => ({ value, label: FORMAT_LABELS[value], tip: FORMAT_TIPS[value] }));
 
 export async function copyText(text: string, done: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast({ title: done, tone: "success" });
-  } catch {
-    toast({ title: "Couldn't copy to the clipboard", tone: "danger" });
-  }
+  if (await copy(text, { quiet: true })) toast({ title: done, tone: "success" });
 }
 
 export interface ShapePanelProps {
