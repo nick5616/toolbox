@@ -31,6 +31,7 @@ const TOOLS: Tool[] = [
   { id: "gif", name: "GIF & Contact Sheet", category: Category.CategoryMedia, order: 139, accepts: acc([".mp4"]) },
   { id: "tts", name: "Text to Speech", category: Category.CategoryAudio, order: 150, accepts: acc([".txt", ".md"]) },
   { id: "silence", name: "Silence Cutter", category: Category.CategoryMedia, order: 140, accepts: acc([".mp4", ".mp3"]) },
+  { id: "focus", name: "Focus Lock", category: Category.CategoryUtility, order: 235, accepts: acc([], { any: true }) },
   { id: "compress", name: "Compress to Size", category: Category.CategoryUtility, order: 225, accepts: acc([], { any: true }) },
   { id: "subtitles", name: "Subtitles", category: Category.CategoryMedia, order: 13, accepts: acc([".mp4", ".mp3"]), base: "transcribe" },
   { id: "video-studio", name: "Video Editor", category: Category.CategoryMedia, order: 14, accepts: acc([".mp4", ".jpg"]) },
@@ -106,6 +107,7 @@ export const STEP_DEFAULTS: Record<string, string> = {
   "downloader": "{\"mode\":\"audio\",\"audioFormat\":\"mp3\",\"audioQuality\":\"320\",\"maxResolution\":\"1080\",\"trimEnabled\":false,\"trimStart\":\"\",\"trimEnd\":\"\",\"embedMetadata\":true,\"embedThumbnail\":true,\"playlist\":false}",
   "edit-studio": "{\"recipeId\":\"downbeat\",\"seed\":1,\"order\":\"recipe\",\"song\":\"\",\"startMs\":0,\"lengthMs\":30000,\"aspect\":\"9:16\",\"fps\":30,\"height\":1080,\"name\":\"\"}",
   "exif": "{\"action\":\"strip-location\",\"keepOrientation\":true,\"fields\":{}}",
+  "focus": "{\"action\":\"start\",\"profileId\":\"\",\"mode\":\"for\",\"minutes\":50,\"at\":\"17:00\",\"strength\":\"firm\",\"extra\":[],\"onStart\":\"close\",\"ifActive\":\"extend\"}",
   "gif": "{\"mode\":\"gif\",\"startSec\":0,\"lengthSec\":5,\"fps\":12,\"width\":480,\"loop\":true,\"columns\":4,\"rows\":4,\"cellWidth\":320,\"labels\":true}",
   "imagebatch": "{\"resize\":\"longSide\",\"longSide\":2048,\"noEnlarge\":true,\"width\":1080,\"height\":1080,\"aspect\":\"\",\"fit\":\"crop\",\"background\":\"#ffffff\",\"format\":\"jpg\",\"quality\":85,\"strip\":true,\"watermark\":{\"kind\":\"none\",\"text\":\"\",\"font\":\"Arial\",\"color\":\"#ffffff\",\"logo\":\"\",\"corner\":\"br\",\"opacity\":0.6,\"size\":5},\"name\":\"{name}\"}",
   "llm-chat": "{\"mode\":\"write\",\"system\":\"\",\"prompt\":\"\",\"fields\":[],\"outputName\":\"{item} (notes)\",\"format\":\"md\",\"saveJson\":false,\"temperature\":0.3}",
@@ -118,6 +120,8 @@ export const STEP_DEFAULTS: Record<string, string> = {
   "photo-composer": "{\"templateId\":\"\",\"templateName\":\"\",\"format\":\"\",\"scale\":1,\"name\":\"\"}",
   "pipelines": "{\"pipelineId\":\"\"}",
   "pipelines.check": "{}",
+  "pipelines.open": "{\"app\":\"\",\"label\":\"\",\"args\":[],\"files\":\"none\",\"window\":\"normal\",\"closeWhen\":\"never\"}",
+  "pipelines.wait": "{\"mode\":\"for\",\"minutes\":25,\"at\":\"17:00\",\"note\":\"\"}",
   "pipelines.copy": "{\"folder\":\"\",\"subfolder\":\"\"}",
   "pipelines.rename": "{\"template\":\"{name}\"}",
   "pipelines.table": "{\"name\":\"{pipeline} {date}\",\"columns\":[{\"header\":\"File\",\"value\":\"{item}\"}]}",
@@ -160,6 +164,8 @@ const BUILTINS: StepType[] = [
   step("pipelines.table", "Make a table", { moduleId: "pipelines", builtin: true }),
   step("pipelines.zip", "Zip", { moduleId: "pipelines", builtin: true }),
   step("pipelines.copy", "Copy to folder", { moduleId: "pipelines", builtin: true }),
+  step("pipelines.wait", "Wait", { moduleId: "pipelines", builtin: true }),
+  step("pipelines.open", "Open in app", { moduleId: "pipelines", builtin: true }),
   step("pipelines", "Run another pipeline", { moduleId: "pipelines", builtin: true, accepts: acc([], { urls: true, any: true }) }),
 ];
 
@@ -176,7 +182,7 @@ export const GO_STEP_TYPES: StepType[] = [
       step(t.stepId ?? t.id, t.name, {
         moduleId: t.id === "clipboard" ? "clipboard-copy" : t.id,
         category: t.category,
-        manual: !["clipboard", "dev-utils", "post-builder", "photo-composer", "video-studio", "edit-studio", "documents", "archiver"].includes(t.id),
+        manual: !["clipboard", "dev-utils", "post-builder", "photo-composer", "video-studio", "edit-studio", "documents", "archiver", "focus"].includes(t.id),
         accepts: t.accepts ?? acc([]),
       }),
     ),

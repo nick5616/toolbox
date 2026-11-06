@@ -1,5 +1,6 @@
 import { CellStatus, RunStatus, WaitKind, type PipelineStep } from "@/lib/api";
 import type { ChipStatus } from "@/components";
+import { clockText } from "./timeWait";
 import { isRunActive, type RunCellView, type RunItemView, type RunView } from "@/state/pipelines";
 
 // Pure helpers for the Runs tab (SPEC.md §11.5).
@@ -93,6 +94,7 @@ export function cellLook(c: RunCellView): CellLook {
     case CellStatus.CellMerged:
       return { icon: "merge", label: "Gathered", tone: "muted" };
     case CellStatus.CellWaiting:
+      if (c.wait === WaitKind.WaitTime) return { icon: "timer", label: c.until > 0 ? `Until ${clockText(c.until)}` : "Waiting", tone: "warn" };
       return c.wait === WaitKind.WaitManual || c.wait === WaitKind.WaitCheck
         ? { icon: "hand", label: "Needs you", tone: "accent" }
         : { icon: "circle-pause", label: "Waiting", tone: "warn" };

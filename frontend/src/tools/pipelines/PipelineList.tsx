@@ -1,9 +1,11 @@
 import { useEffect } from "react";
 import { Button, EmptyState, Icon, IconButton, cx } from "@/components";
-import type { PipelineEntry, StepType } from "@/lib/api";
+import { PipelinesService, type PipelineEntry, type StepType } from "@/lib/api";
 import { describeAccepts } from "@/pipelines/compat";
 import { usePipelines } from "@/state/pipelines";
 import { createPipeline } from "./createPipeline";
+import { runWithoutFiles, startsWithoutFiles } from "./runNoFiles";
+import { scheduleLine } from "./scheduleModel";
 import styles from "./PipelineList.module.css";
 
 // The pipeline list (SPEC.md §11.2). Props frozen (Wave 0).
@@ -58,6 +60,18 @@ export function PipelineList({ onNew }: PipelineListProps) {
 
   usePipelineListEffects();
 
+  // The runner doesn't announce a next-fire time that simply passes, so refetch the list once a minute while a schedule is on.
+  const scheduled = entries.some((e) => e.pipeline.schedule?.enabled === true);
+  useEffect(() => {
+    if (!scheduled) return;
+    const id = setInterval(() => {
+      PipelinesService.List()
+        .then((list) => usePipelines.getState().setEntries(list ?? []))
+        .catch(() => undefined);
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [scheduled]);
+
   if (entries.length === 0) {
     const quick = QUICK_TEMPLATES.map((id) => templates.find((t) => t.id === id)).filter((t) => t !== undefined);
     return (
@@ -99,6 +113,8 @@ export function PipelineList({ onNew }: PipelineListProps) {
           const p = e.pipeline;
           const status = pipelineStatus(e);
           const watching = p.watch.enabled;
+          const noFiles = startsWithoutFiles(e);
+          const schedule = scheduleLine(p.schedule?.enabled === true, e.schedule);
           return (
             <li
               key={p.id}
@@ -129,7 +145,15 @@ export function PipelineList({ onNew }: PipelineListProps) {
                   ))}
                 </span>
                 <span className={styles.meta}>
-                  <span data-tip="The kinds of files this pipeline can start with">Takes: {describeAccepts(e.check.accepts)}</span>
+                  <span data-tip={noFiles ? "This pipeline starts without files: press Run" : "The kinds of files this pipeline can start with"}>
+                    {noFiles ? "Takes no files" : `Takes: ${describeAccepts(e.check.accepts)}`}
+                  </span>
+                  {schedule && (
+                    <span className={styles.watch} data-tip={e.schedule?.message ? "Why the schedule can't run right now" : "When this pipeline runs by itself while Toolbox is open"}>
+                      <Icon name="calendar-clock" size={12} />
+                      {schedule}
+                    </span>
+                  )}
                   {watching && (
                     <span className={styles.watch} data-tip={e.watch.message || (e.watch.active ? "Runs automatically on new files in the watched folder" : "Folder watching is paused or not working")}>
                       <Icon name="eye" size={12} />
@@ -141,18 +165,18 @@ export function PipelineList({ onNew }: PipelineListProps) {
               <IconButton
                 icon="play"
                 label={`Run ${p.name}`}
-                data-tip={e.check.ready ? "Run this pipeline on files or links you choose" : "Fix this pipeline's problems before running it"}
+                data-tip={e.check.ready ? (noFiles ? "Run this pipeline now" : "Run this pipeline on files or links you choose") : "Fix this pipeline's problems before running it"}
                 variant="ghost"
                 size="sm"
                 className={styles.run}
                 disabled={!e.check.ready}
-                onClick={() => openRunSheet(p.id)}
+                onClick={() => (noFiles ? void runWithoutFiles(e) : openRunSheet(p.id))}
               />
             </li>
           );
         })}
       </ul>
-      <p className={styles.hint}>Drop files on a card to run it.</p>
+      <p className={styles.hint}>Drop files on a card to run it, or press its play button.</p>
     </div>
   );
 }

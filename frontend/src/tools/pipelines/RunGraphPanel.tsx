@@ -8,6 +8,8 @@ import { NeedsYouCard } from "./NeedsYouCard";
 import { cellLook, stepName } from "./RunGridModel";
 import { isNeedsYou, stepCells } from "./RunGraphModel";
 import { RunFileRow } from "./RunResultsFileRow";
+import { isTimeWait } from "./timeWait";
+import { TimeWaitCard } from "./TimeWaitCard";
 import styles from "./RunGraph.module.css";
 
 /** The cells of one step, per item: status, error, and the files as draggable rows with Send to. A waiting step shows its Continue / Skip card. */
@@ -41,6 +43,7 @@ export function RunGraphPanel({ run, step, onClose }: { run: RunView; step: Pipe
           if (isNeedsYou(cell)) {
             return <NeedsYouCard key={item.index} w={{ run, item, cell, step, stepIndex, kind: cell.wait }} />;
           }
+          if (isTimeWait(cell)) return <TimeWaitCard key={item.index} run={run} item={item} cell={cell} />;
           return (
             <section key={item.index} className={styles.cellRow} aria-label={`${item.label}: ${look.label}`}>
               <div className={styles.cellHead}>

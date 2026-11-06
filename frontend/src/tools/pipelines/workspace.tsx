@@ -11,7 +11,7 @@ import { AboutPanel, RunHistoryPanel, StepPanel, TriggersPanel } from "./panels"
 
 type Shared = Pick<
   DraftState,
-  "pipelineId" | "draft" | "check" | "catalog" | "stepId" | "watchMessage" | "clipStatus" | "runText" | "runCount"
+  "pipelineId" | "draft" | "check" | "catalog" | "stepId" | "watchMessage" | "clipStatus" | "scheduleStatus" | "runText" | "runCount"
 >;
 
 export const pipelinesBridge: Omit<BridgeSpec<DraftState, Shared>, "name"> = {
@@ -23,11 +23,12 @@ export const pipelinesBridge: Omit<BridgeSpec<DraftState, Shared>, "name"> = {
     stepId: s.stepId,
     watchMessage: s.watchMessage,
     clipStatus: s.clipStatus,
+    scheduleStatus: s.scheduleStatus,
     runText: s.runText,
     runCount: s.runCount,
   }),
   apply: (store, values) => store.setState(values),
-  actions: ["select", "patchStep", "keepTouched", "removeStep", "duplicateStep", "updateParam", "removeParam", "setName", "setDescription", "setWatchEnabled", "chooseFolder", "setClip", "openClipboardSettings", "openRuns", "undo", "redo"],
+  actions: ["select", "patchStep", "keepTouched", "removeStep", "duplicateStep", "updateParam", "removeParam", "setName", "setDescription", "setWatchEnabled", "chooseFolder", "setClip", "setSchedule", "openClipboardSettings", "openRuns", "undo", "redo"],
 };
 
 export const pipelinesWorkspace = defineWorkspace<DraftState, Shared>({

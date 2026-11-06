@@ -118,10 +118,10 @@ describe("node ports and heights", () => {
     const i = node(build(steps3(), "", { params }), INPUT_NODE);
     expect(i.values.map((v) => v.id)).toEqual(["voice"]);
     expect(i.values[0]?.type).toBe("choice");
-    expect(i.more).toMatchObject({ side: "right", count: 8, expanded: false });
+    expect(i.more).toMatchObject({ side: "right", count: 9, expanded: false });
     const open = serializeLayout({ v: 1, nodes: {}, view: { x: 0, y: 0, zoom: 1 }, expanded: [INPUT_NODE] }, [INPUT_NODE, A, B, C]);
     const o = node(build(steps3(), open, { params }), INPUT_NODE);
-    expect(o.values.map((v) => v.id)).toEqual(["item", "name", "ext", "role", "n", "date", "time", "pipeline", "voice"]);
+    expect(o.values.map((v) => v.id)).toEqual(["item", "name", "ext", "role", "n", "date", "time", "weekday", "pipeline", "voice"]);
     expect(o.values.find((v) => v.id === "n")?.type).toBe("number");
     expect(o.more?.expanded).toBe(true);
   });

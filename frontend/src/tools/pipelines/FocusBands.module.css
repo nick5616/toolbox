@@ -1,0 +1,18 @@
+.band {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--accent) 30%, transparent);
+  pointer-events: none;
+}
+
+.label {
+  position: absolute;
+  top: 3px;
+  left: 10px;
+  font-size: var(--text-xs);
+  line-height: 1;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}

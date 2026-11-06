@@ -5,7 +5,8 @@ import { useElementSize } from "@/lib/useElementSize";
 import { hasTool, readTool } from "@/lib/fileDrag";
 import type { ModuleView } from "@/state/modules";
 import type { RunView } from "@/state/pipelines";
-import { newStepId, stepsOf } from "./editorModel";
+import { focusBands, focusSpans, newStepId, stepsOf } from "./editorModel";
+import { FocusBands } from "./FocusBands";
 import {
   ALL_PORT,
   addGraphStep,
@@ -151,6 +152,7 @@ export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, o
     [graph.nodes, move],
   );
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n] as const)), [nodes]);
+  const bands = useMemo(() => focusBands(focusSpans(steps), nodes), [steps, nodes]);
   const wiredBy = useMemo(() => wiredPortsByNode(graph), [graph]);
 
   // Latest values for handlers registered on window.
@@ -887,6 +889,7 @@ export function GraphEditor({ pipeline, check, catalog, modules, runs, onEdit, o
                 );
               })}
             </svg>
+            <FocusBands bands={bands} />
             {nodes.map((n) => {
               const step = steps.find((s) => s.id === n.id);
               const dropState = wiring?.kind === "files" && hover?.id === n.id ? (hover.reason ? "bad" : "ok") : undefined;
