@@ -19,6 +19,7 @@ import {
   toggleFormat,
   wasAutoDetected,
 } from "./options";
+import { TranscriptActions } from "./TranscriptActions";
 import { PreviewPanel } from "./PreviewPanel";
 import styles from "./TranscribeView.module.css";
 
@@ -103,6 +104,7 @@ function TranscriptGroup({
           >
             Preview
           </Button>
+          {preview && <TranscriptActions path={preview} />}
           {preview && <AskChat path={preview} title={job.title} />}
         </span>
       </div>
