@@ -14,6 +14,7 @@ import { useBeforePopOut } from "@/lib/popout";
 import { matches, useShortcut } from "@/lib/shortcuts";
 import { PaintGLError, type PaintEngine, type PaintDoc, type TileSource } from "@/paint/engine/types";
 import type { BrushPreset } from "@/paint/brushes/schema";
+import type { PaintEngineExt } from "@/paint/engine/engine";
 import type { PerceptionToolInfo } from "@/paint/lab/types";
 import { actionCombos, buildActions } from "./actions";
 import type { InputController, OverlayShape } from "./canvasInput";
@@ -66,6 +67,9 @@ function tileSource(projectId: string, onFail: (layerId: string, keys: string[])
   };
 }
 
+/** What the real engine offers beyond the frozen contract (absent on the stand-in engine). */
+type Ext = PaintEngine & Partial<PaintEngineExt>;
+
 function guidesJSON(): string {
   const g = usePaintUI.getState().guides;
   return JSON.stringify(g) === JSON.stringify(DEFAULT_GUIDES) ? "" : JSON.stringify(g);
@@ -89,7 +93,7 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
   const [name, setName] = useState(initialName);
   const nameRef = useRef(name);
   nameRef.current = name;
-  const [saver] = useState(() => new Saver({ engine, projectId, getName: () => nameRef.current, getGuides: guidesJSON, onState: (s, e) => usePaintUI.getState().setSave(s, e) }));
+  const [saver] = useState(() => new Saver({ engine, projectId, getName: () => nameRef.current, getGuides: () => ((engine as Ext).setGuides ? engine.doc.guides : guidesJSON()), onState: (s, e) => usePaintUI.getState().setSave(s, e) }));
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const areaRef = useRef<HTMLDivElement>(null);
   const anchors = useRef<Record<string, HTMLElement | null>>({});
@@ -137,11 +141,12 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
       await engine.load(doc, tileSource(projectId, (layerId, keys) => setFailedTiles((f) => [...f, { layerId, keys }])));
       if (off) return;
       try {
-        if (doc.guides) usePaintUI.setState({ guides: { ...DEFAULT_GUIDES, ...(JSON.parse(doc.guides) as object) } });
+        if (doc.guides && !(engine as Ext).setGuides) usePaintUI.setState({ guides: { ...DEFAULT_GUIDES, ...(JSON.parse(doc.guides) as object) } });
       } catch {
         /* unreadable guides: defaults */
       }
-      runtime.applyGuides(engine, usePaintUI.getState().guides);
+      if (!(engine as Ext).setGuides) runtime.applyGuides(engine, usePaintUI.getState().guides);
+      (engine as Ext).setViewport?.(areaRef.current?.clientWidth ?? 0, areaRef.current?.clientHeight ?? 0);
       saver.start();
       engine.view.fit();
       setReady(true);
@@ -166,10 +171,23 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
   useEffect(() => {
     const el = areaRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => engine.render());
+    const fit = () => (engine as Ext).setViewport?.(el.clientWidth, el.clientHeight);
+    fit();
+    const ro = new ResizeObserver(() => {
+      fit();
+      engine.render();
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [engine]);
+
+  // The real engine loads a brush's tip and grain images when the brush is picked.
+  useEffect(() => {
+    if (!ready) return;
+    const prep = (b: Record<string, BrushPreset | null>) => Object.values(b).forEach((x) => x && void (engine as Ext).prepareBrush?.(x));
+    prep(usePaintUI.getState().brushes);
+    return usePaintUI.subscribe((s, prev) => s.brushes !== prev.brushes && prep(s.brushes));
+  }, [ready, engine]);
 
   // Save on blur and when the window hides.
   useEffect(() => {
