@@ -423,3 +423,13 @@ func TestOpenExpiredLaunchesAreForgotten(t *testing.T) {
 	tr.onRunFinished("new")
 	waitClose(t, f)
 }
+
+func TestOpenDescribeProblemStillTakesNoFiles(t *testing.T) {
+	info, err := (&openStep{}).DescribeStep(mustJSON(t, DefaultOpen()))
+	if err == nil {
+		t.Fatal("an empty app should be a problem")
+	}
+	if !info.NoFiles {
+		t.Error("a step with a problem must still say it takes no files")
+	}
+}

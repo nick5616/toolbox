@@ -78,12 +78,19 @@ func usesFileVars(arg string) bool {
 }
 
 func (o *openStep) DescribeStep(options json.RawMessage) (core.StepInfo, error) {
+	// A step with a problem still takes no files of its own (or the runner
+	// adds a misleading "needs files" problem next to the real one).
+	bad := core.StepInfo{
+		Accepts: core.Accepts{Extensions: []string{}, URLs: true, Any: true}, NoFiles: true,
+		Produces: []core.StepProduct{{Many: true}}, Vars: []core.StepVar{}, Secrets: []core.StepSecret{},
+		Templates: []string{}, Warnings: []string{}, Summary: "Open in app",
+	}
 	s, err := decodeStep(options, DefaultOpen())
 	if err != nil {
-		return core.StepInfo{}, err
+		return bad, err
 	}
 	if err := checkOpenStep(s); err != nil {
-		return core.StepInfo{}, err
+		return bad, err
 	}
 	// App is never a template. Arguments that use {file}/{files} are left out
 	// of the variable check, because those exist only here.
