@@ -5,7 +5,7 @@ import { CropOverlay, MediaPlayer, Timeline, formatMs, parseTimecodeMs, useMedia
 import { JobsService, MediaService, TrimAspect, TrimJoin, TrimMode, TrimmerService, type Job } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { useShortcut, isEditableTarget } from "@/lib/shortcuts";
-import { isActive, useJob } from "@/state/jobs";
+import { announceWhenDone, isActive, useJob } from "@/state/jobs";
 import { useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { ResultRow } from "@/tools/_kit/ResultRow";
 import { recordSubmitted } from "@/tools/_kit/session";
@@ -237,6 +237,7 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
     try {
       const jobs: Job[] | null = await TrimmerService.Enqueue([path], buildOptions(segs, settings, hasVideo, durationMs));
       recordSubmitted((jobs ?? []).map((j) => j.id));
+      (jobs ?? []).forEach((j) => announceWhenDone(j.id));
       setJobId(jobs?.[0]?.id ?? "");
     } catch (e) {
       const a = toAppError(e);
