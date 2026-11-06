@@ -1,4 +1,5 @@
 /** Canvas overlays: pending perception regions, the marquee/lasso, the brush HUD. */
+import { useMemo } from "react";
 import { PaintIcon } from "./ui";
 import { useEditor, useEngineEvents, useQueueVersion } from "./context";
 import type { OverlayShape } from "./canvasInput";
@@ -65,6 +66,44 @@ export function ShapeOverlay({ shape }: { shape: OverlayShape | null }) {
             return <circle key={i} cx={s.x} cy={s.y} r="6" className={p.positive ? ed.pointPos : ed.pointNeg} />;
           })
         : null}
+    </svg>
+  );
+}
+
+/** A Select-object preview mask (white, alpha = mask) as a tinted data URL. */
+function tintedURL(mask: ImageData): string {
+  if (typeof document === "undefined") return "";
+  const c = document.createElement("canvas");
+  c.width = mask.width;
+  c.height = mask.height;
+  const g = c.getContext("2d");
+  if (!g) return "";
+  const out = new Uint8ClampedArray(mask.data.length);
+  for (let i = 0; i < out.length; i += 4) {
+    out[i] = 70;
+    out[i + 1] = 140;
+    out[i + 2] = 255;
+    out[i + 3] = mask.data[i + 3] as number;
+  }
+  g.putImageData(new ImageData(out, mask.width, mask.height), 0, 0);
+  return c.toDataURL("image/png");
+}
+
+/** The live Select-object mask, laid over the canvas with the view's transform (zoom, pan, rotation, flip). */
+export function MaskPreview({ mask }: { mask: ImageData | null }) {
+  const { engine } = useEditor();
+  useEngineEvents(engine, ["view"]);
+  const url = useMemo(() => (mask ? tintedURL(mask) : ""), [mask]);
+  if (!mask || !url) return null;
+  const o = engine.view.canvasToScreen({ x: 0, y: 0 });
+  const ux = engine.view.canvasToScreen({ x: 1, y: 0 });
+  const uy = engine.view.canvasToScreen({ x: 0, y: 1 });
+  const sx = engine.doc.width / mask.width;
+  const sy = engine.doc.height / mask.height;
+  const m = [ux.x - o.x, ux.y - o.y, uy.x - o.x, uy.y - o.y, o.x, o.y];
+  return (
+    <svg className={ed.shapes} aria-hidden="true" data-testid="mask-preview">
+      <image href={url} width={mask.width} height={mask.height} opacity={0.55} transform={`matrix(${m.join(" ")}) scale(${sx} ${sy})`} />
     </svg>
   );
 }

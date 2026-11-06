@@ -14,6 +14,9 @@ export interface ChromeActions {
   onShowLibrary(): void;
   onDuplicate(): void;
   onClose(): void;
+  onAdjust(id: string): void;
+  onSelectSubject(): void;
+  onCutSubject(): void;
 }
 
 function useAnchor() {
@@ -132,7 +135,7 @@ export function TopLeftIsland({ actions, compact }: { actions: ChromeActions; co
       item("dock-dock", "Always dock panels", () => setDock("dock"), { checked: dockMode === "dock" }),
       item("dock-pop", "Panels always float", () => setDock("pop"), { checked: dockMode === "pop" }),
     ],
-    adjust: adj.map((a) => item(a.id, a.label, () => undefined, { icon: a.icon, disabled: !a.available, ...(a.reason ? { reason: a.reason } : {}) })),
+    adjust: adj.map((a) => item(a.id, a.label, () => (close(), actions.onAdjust(a.id)), { icon: a.icon, disabled: !a.available, ...(a.reason ? { reason: a.reason } : {}) })),
     select: [
       item("rect", "Rectangle", () => setTool("rect"), { icon: "rect", kbd: "M" }),
       item("ellipse", "Ellipse", () => setTool("ellipse"), { icon: "ellipse" }),
@@ -142,6 +145,10 @@ export function TopLeftIsland({ actions, compact }: { actions: ChromeActions; co
       item("all", "Select all", () => engine.selection.rect({ x: 0, y: 0, w: engine.doc.width, h: engine.doc.height }), { kbd: "Ctrl+A" }),
       item("none", "Deselect", () => engine.selection.clear(), { kbd: "Ctrl+D", disabled: !engine.selection.active, reason: "Nothing is selected" }),
       item("inv", "Invert", () => engine.selection.invert(), { kbd: "Ctrl+Shift+I", disabled: !engine.selection.active, reason: "Nothing is selected" }),
+      sep(),
+      item("subj", "Select subject", actions.onSelectSubject, { icon: "subject" }),
+      item("cut", "Cut subject to new layer", actions.onCutSubject, { icon: "subject" }),
+      sep(),
       item("grow", "Grow by 4 px", () => engine.selection.grow(4), { disabled: !engine.selection.active, reason: "Nothing is selected" }),
       item("shrink", "Shrink by 4 px", () => engine.selection.grow(-4), { disabled: !engine.selection.active, reason: "Nothing is selected" }),
       item("feather", "Feather 8 px", () => engine.selection.feather(8), { disabled: !engine.selection.active, reason: "Nothing is selected" }),
@@ -158,7 +165,9 @@ export function TopLeftIsland({ actions, compact }: { actions: ChromeActions; co
       item("rr", "Rotate 90° right", () => { begin("free"); engine.transform.rotate90(1); }),
     ],
   };
+  // The menus sit beside the island, not inside it: a popover is placed against its positioned parent (the island is only 46 px tall).
   return (
+    <>
     <Island label="Tools and actions" className={ed.topLeft} data-testid="top-left">
       <IconButton icon="gallery" label="Gallery" onClick={actions.onBack} iconSize={sz} />
       <IslandDivider />
@@ -166,11 +175,12 @@ export function TopLeftIsland({ actions, compact }: { actions: ChromeActions; co
       <IconButton ref={setB} icon="adjust" label="Adjustments" pressed={menu === "adjust"} onClick={() => toggle("adjust")} iconSize={sz} aria-haspopup="menu" />
       <IconButton ref={setC} icon="select" label="Select" pressed={menu === "select"} onClick={() => toggle("select")} iconSize={sz} aria-haspopup="menu" />
       <IconButton ref={setD} icon="transform" label="Transform" kbd="V" pressed={menu === "transform"} onClick={() => toggle("transform")} iconSize={sz} aria-haspopup="menu" />
-      <Menu open={menu === "actions"} title="Actions" anchor={aActions} entries={entries.actions} onClose={close} width={280} />
-      <Menu open={menu === "adjust"} title="Adjustments" anchor={aAdjust} entries={entries.adjust} onClose={close} width={260} />
-      <Menu open={menu === "select"} title="Select" anchor={aSelect} entries={entries.select} onClose={close} />
-      <Menu open={menu === "transform"} title="Transform" anchor={aTransform} entries={entries.transform} onClose={close} />
     </Island>
+    <Menu open={menu === "actions"} title="Actions" anchor={aActions} entries={entries.actions} onClose={close} width={280} />
+    <Menu open={menu === "adjust"} title="Adjustments" anchor={aAdjust} entries={entries.adjust} onClose={close} width={260} />
+    <Menu open={menu === "select"} title="Select" anchor={aSelect} entries={entries.select} onClose={close} />
+    <Menu open={menu === "transform"} title="Transform" anchor={aTransform} entries={entries.transform} onClose={close} />
+    </>
   );
 }
 

@@ -55,7 +55,7 @@ function DeviceFor({ info, origins, reason }: { info: LabToolInfo; origins: Pain
   const run = () => {
     if (info.id === "extend-canvas") return openDialog("extend");
     if (info.id === "upscale-canvas") return openDialog("upscale");
-    runtime.runLabAction(info.id, { engine, queue }).catch((e) => toast({ title: toAppError(e).message, tone: "danger" }));
+    runtime.runLabAction(info.id, { engine, queue, params }).catch((e) => toast({ title: toAppError(e).message, tone: "danger" }));
   };
   return (
     <Device

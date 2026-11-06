@@ -10,7 +10,15 @@ import "./ui/tokens.css";
 import styles from "./PaintView.module.css";
 
 // The editor (engine, panels, Lab) loads when a painting opens; the gallery is light.
-const Editor = lazy(() => import("./Editor"));
+/**
+ * The real engine, library and AI queue go live when the editor first loads (the vitest suites keep the fakes).
+ * Without WebGL 2 the real engine refuses to attach and the editor shows "Paint+ needs WebGL 2".
+ */
+async function loadEditor() {
+  if (import.meta.env.MODE !== "test") (await import("./engine-real")).enableRealRuntime();
+  return import("./Editor");
+}
+const Editor = lazy(loadEditor);
 
 /**
  * Paint+ (Phase 19): the start-screen gallery and the editor, in Paint+'s own

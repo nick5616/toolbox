@@ -11,7 +11,8 @@ import { toAppError } from "@/lib/errors";
 import { formatResultDate, RecentResults } from "../_kit";
 import { PRESETS, MAX_PIXELS, MAX_SIDE, sizeProblem, type CanvasPreset } from "./limits";
 import type { OpenImages } from "./useOpenImages";
-import { Dialog, FieldRow, IconButton, MenuButton, PaintIcon, Segmented, Stepper, TextButton, item, sep } from "./ui";
+import { Dialog, FieldRow, IconButton, MenuButton, PaintIcon, Segmented, Stepper, TextButton, Toggle, item, sep } from "./ui";
+import { markPaper } from "./paper";
 import styles from "./gallery.module.css";
 
 const thumbCache = new Map<string, string>();
@@ -43,7 +44,7 @@ function Thumb({ info }: { info: ProjectInfo }) {
 
 type Bg = "paper" | "transparent" | "color";
 
-function NewCanvasDialog({ preset, bg, color, onClose, onCreated }: { preset: { w: number; h: number }; bg: Bg; color: string; onClose(): void; onCreated(id: string): void }) {
+function NewCanvasDialog({ preset, bg, color, texture, onClose, onCreated }: { preset: { w: number; h: number }; bg: Bg; color: string; texture: boolean; onClose(): void; onCreated(id: string): void }) {
   const [w, setW] = useState(preset.w);
   const [h, setH] = useState(preset.h);
   const [name, setName] = useState("Untitled");
@@ -53,6 +54,7 @@ function NewCanvasDialog({ preset, bg, color, onClose, onCreated }: { preset: { 
     setBusy(true);
     try {
       const id = await PaintService.Create(name.trim() || "Untitled", w, h, bg === "transparent" ? "transparent" : bg === "color" ? color : "#ffffff");
+      if (texture && bg !== "transparent") markPaper(id);
       onCreated(id);
     } catch (e) {
       toast({ title: "Couldn't make the canvas", description: toAppError(e).message, tone: "danger" });
@@ -102,6 +104,7 @@ export interface GalleryProps {
 export default function Gallery({ openImages, onOpen, studio, onToggleStudio, compact }: GalleryProps) {
   const [projects, setProjects] = useState<ProjectInfo[] | null>(null);
   const [bg, setBg] = useState<Bg>("paper");
+  const [texture, setTexture] = useState(false);
   const [color, setColor] = useState("#f5f1ea");
   const [custom, setCustom] = useState(false);
   const [renaming, setRenaming] = useState<{ info: ProjectInfo; name: string } | null>(null);
@@ -123,6 +126,7 @@ export default function Gallery({ openImages, onOpen, studio, onToggleStudio, co
   const create = async (p: CanvasPreset) => {
     try {
       const id = await PaintService.Create("Untitled", p.w, p.h, bg === "transparent" ? "transparent" : bg === "color" ? color : "#ffffff");
+      if (texture && bg !== "transparent") markPaper(id);
       onOpen(id);
     } catch (e) {
       toast({ title: "Couldn't make the canvas", description: toAppError(e).message, tone: "danger" });
@@ -201,6 +205,7 @@ export default function Gallery({ openImages, onOpen, studio, onToggleStudio, co
               onChange={setBg}
             />
             {bg === "color" ? <input type="color" className={styles.swatchInput} aria-label="Background colour" data-tip="Background colour" value={color} onChange={(e) => setColor(e.target.value)} /> : null}
+            {bg !== "transparent" ? <Toggle label="Paper texture" tip="Bake a paper grain into a locked bottom layer" checked={texture} onChange={setTexture} /> : null}
           </div>
         </div>
 
@@ -248,7 +253,7 @@ export default function Gallery({ openImages, onOpen, studio, onToggleStudio, co
         <p className={styles.dropHint}>Drop pictures anywhere here to start a new canvas from each.</p>
       </div>
 
-      {custom ? <NewCanvasDialog preset={{ w: 1920, h: 1080 }} bg={bg} color={color} onClose={() => setCustom(false)} onCreated={(id) => { setCustom(false); onOpen(id); }} /> : null}
+      {custom ? <NewCanvasDialog preset={{ w: 1920, h: 1080 }} bg={bg} color={color} texture={texture} onClose={() => setCustom(false)} onCreated={(id) => { setCustom(false); onOpen(id); }} /> : null}
       {renaming ? (
         <Dialog
           title="Rename painting"

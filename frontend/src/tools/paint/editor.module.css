@@ -425,3 +425,51 @@
   background: var(--p-drop);
   pointer-events: none;
 }
+
+.handles {
+  pointer-events: none;
+}
+
+.handle {
+  fill: var(--p-ring);
+  stroke: var(--p-ring-shadow);
+  stroke-width: 2;
+  pointer-events: all;
+  cursor: grab;
+}
+
+.handle:focus-visible {
+  outline: 2px solid var(--p-ring);
+}
+
+.handleRot {
+  fill: var(--p-ok);
+}
+
+.maskPreview {
+  pointer-events: none;
+}
+
+.adjust {
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-gap);
+  max-width: min(560px, 100%);
+  max-height: 46vh;
+  overflow: auto;
+  pointer-events: auto;
+}
+
+.adjustTitle {
+  font-weight: 600;
+}
+
+.adjustActions {
+  display: flex;
+  gap: var(--p-gap);
+  justify-content: flex-end;
+}
+
+.chip {
+  pointer-events: auto;
+}

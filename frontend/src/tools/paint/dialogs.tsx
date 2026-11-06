@@ -104,8 +104,8 @@ function ExtendDialog({ onClose }: { onClose(): void }) {
   );
 }
 
-function UpscaleDialog({ onClose }: { onClose(): void }) {
-  const { engine } = useEditor();
+function UpscaleDialog({ name, onClose }: { name: string; onClose(): void }) {
+  const { engine, queue, openProject } = useEditor();
   const [scale, setScale] = useState<"2" | "4">("2");
   const [inPlace, setInPlace] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -115,7 +115,8 @@ function UpscaleDialog({ onClose }: { onClose(): void }) {
   const run = async () => {
     setBusy(true);
     try {
-      await runtime.upscaleCanvas({ engine, scale: Number(scale) as 2 | 4, inPlace });
+      const id = await runtime.upscaleCanvas({ engine, queue, name, scale: Number(scale) as 2 | 4, inPlace });
+      if (id) openProject(id);
       onClose();
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
@@ -156,7 +157,7 @@ export function EditorDialogs({ open, name, onClose, onExportJob }: { open: Edit
     case "extend":
       return <ExtendDialog onClose={onClose} />;
     case "upscale":
-      return <UpscaleDialog onClose={onClose} />;
+      return <UpscaleDialog name={name} onClose={onClose} />;
     default:
       return null;
   }

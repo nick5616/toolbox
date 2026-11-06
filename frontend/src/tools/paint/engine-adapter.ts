@@ -22,7 +22,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { PaintService, type PaintAIModelInfo, type PaintOrigin } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { on } from "@/lib/events";
 import type { PerceptionQueue, PendingRegion, GenerationGroup } from "@/paint/ai/types";
+import type { ObjectSelector, StampTips } from "@/paint/ai/ops";
 import type { BrushPreset } from "@/paint/brushes/schema";
 import type { PaintEngine, StrokeResult } from "@/paint/engine/types";
 import type { LabParams, LabToolInfo, PerceptionToolInfo } from "@/paint/lab/types";
@@ -34,12 +36,50 @@ import { FakeEngine } from "./testing/fakeEngine";
 import { renderFakeStroke } from "./testing/fakeStroke";
 import { createFakeQueue } from "./testing/fakeQueue";
 
+/** The source pixels an adjustment effect reads (straight RGBA). */
+export interface AdjustSource {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+export type AdjustEffect = (src: AdjustSource) => ImageData;
+
 export interface AdjustmentInfo {
   id: string;
   label: string;
   icon: string;
   available: boolean;
   reason?: string;
+  /** The device's controls (absent for Liquify, which is a brush mode). */
+  tool?: LabToolInfo;
+  /** The effect for the current control values. */
+  build?(values: LabParams): AdjustEffect;
+  /** Liquify: drag with the brush to push, twirl, pinch, expand or crystallise. */
+  liquify?: boolean;
+}
+
+/** A running adjustment on the active layer (the selection's bounds, or the whole layer). */
+export interface AdjustHandle {
+  /** Run the effect and show it live (no history). */
+  preview(effect: AdjustEffect): void;
+  /** Run the effect without showing it (Pencil mode). */
+  render(effect: AdjustEffect): void;
+  /** Pencil mode: apply the last rendered effect under a stroke's mask. */
+  applyThroughMask(mask: ImageData, at: { x: number; y: number }): void;
+  commit(): void;
+  cancel(): void;
+}
+
+export type LiquifyMode = "push" | "twirl" | "pinch" | "expand" | "crystals";
+
+/** A Liquify displacement field over the adjustment's rectangle. */
+export interface LiquifyHandle {
+  /** One dab at canvas coordinates; (mx, my) is the drag since the last dab. */
+  dab(mode: LiquifyMode, x: number, y: number, radius: number, strength: number, mx: number, my: number): void;
+  /** The effect that warps the snapshot through the field so far. */
+  effect(): AdjustEffect;
+  /** Where the adjustment's rectangle sits on the canvas. */
+  rect(): { x: number; y: number; w: number; h: number };
 }
 
 export interface GuidesState {
@@ -80,14 +120,27 @@ export interface PaintRuntime {
   labTools(): LabToolInfo[];
   /** Draws a stroke of `brush` into `canvas` (library previews and the Brush Studio pad). */
   renderBrushStroke(brush: BrushPreset, canvas: HTMLCanvasElement, opts?: StrokePreviewOptions): void;
-  createQueue(engine: PaintEngine): PerceptionQueue;
+  createQueue(engine: PaintEngine, projectId: () => string): PerceptionQueue;
+  /** Starts the AI engine and loads the fast fill model once (no download). */
+  warm(): void;
+  /** A bundled or set image (a grain, a tip) as straight RGBA; null when it isn't available. */
+  grainImage(ref: string): Promise<{ data: Uint8ClampedArray; width: number; height: number } | null>;
+  /** Select object's live selector (null = not available here). */
+  createObjectSelector(a: { engine: PaintEngine; queue: PerceptionQueue; params: LabParams }): ObjectSelector | null;
+  /** Subject stamp's cut-out cache (null = not available here). */
+  createStampTips(a: { engine: PaintEngine; queue: PerceptionQueue }): StampTips | null;
   runPerceptionStroke(a: PerceptionStrokeArgs): Promise<void>;
   /** Extend / Upscale canvas (perception, canvas-level). Rejects with a user-facing message when unavailable. */
   extendCanvas(a: { engine: PaintEngine; queue: PerceptionQueue; sides: { left: number; right: number; top: number; bottom: number }; model: "fast" | "best" }): Promise<void>;
-  upscaleCanvas(a: { engine: PaintEngine; scale: 2 | 4; inPlace: boolean }): Promise<void>;
+  /** Resolves with the new project's id when it made one ("" when done in place). */
+  upscaleCanvas(a: { engine: PaintEngine; queue: PerceptionQueue; name: string; scale: 2 | 4; inPlace: boolean }): Promise<string>;
   /** One-shot Lab actions with no stroke (Select subject). Rejects with a user-facing message. */
-  runLabAction(toolId: string, a: { engine: PaintEngine; queue: PerceptionQueue; points?: Array<{ x: number; y: number; positive: boolean }> }): Promise<void>;
+  runLabAction(toolId: string, a: { engine: PaintEngine; queue: PerceptionQueue; params?: LabParams }): Promise<void>;
   adjustments(): AdjustmentInfo[];
+  /** Starts an adjustment on the active layer; null when there is nothing to adjust. */
+  beginAdjust(engine: PaintEngine, label: string): AdjustHandle | null;
+  /** Starts Liquify on the active layer (null when unavailable). */
+  beginLiquify(engine: PaintEngine, label: string): { adjust: AdjustHandle; field: LiquifyHandle } | null;
   applyGuides(engine: PaintEngine, g: GuidesState): void;
   /** Local origin cards used when PaintService.Origins() isn't available (tests, early builds). */
   fallbackOrigins(): PaintOrigin[];
@@ -102,7 +155,11 @@ const fakeRuntime: PaintRuntime = {
   // Real P2 + P6 infos (both frozen LabToolInfo); the engine registers the algorithmic ones with registerAll(registerLabTool).
   labTools: () => [...ALGORITHMIC_TOOLS, ...PERCEPTION_TOOLS],
   renderBrushStroke: renderFakeStroke,
-  createQueue: createFakeQueue,
+  createQueue: (engine) => createFakeQueue(engine),
+  warm: () => undefined,
+  grainImage: async () => null,
+  createObjectSelector: () => null,
+  createStampTips: () => null,
   runPerceptionStroke: async ({ queue, tool, result, seed }) => {
     if (!result.history && result.bounds.w === 0) return;
     await queue.submit(tool.id, result.bounds, { op: tool.op as never, model: "fast", passes: 1, ghost: 0, drift: 0, driftDir: "", offset: [0, 0], seed, scale: 2, points: null, source: new ImageData(1, 1) });
@@ -110,7 +167,7 @@ const fakeRuntime: PaintRuntime = {
   extendCanvas: async () => {
     throw new Error("Extend canvas with fill needs the AI engine to be wired in");
   },
-  upscaleCanvas: async () => {
+  upscaleCanvas: async (): Promise<string> => {
     throw new Error("Upscale canvas needs the AI engine to be wired in");
   },
   runLabAction: async () => {
@@ -124,6 +181,8 @@ const fakeRuntime: PaintRuntime = {
       available: false,
       reason: "Adjustments arrive with the paint engine",
     })),
+  beginAdjust: () => null,
+  beginLiquify: () => null,
   applyGuides: () => undefined,
   fallbackOrigins: () => FAKE_ORIGINS,
 };
@@ -189,6 +248,10 @@ export function useAIStatus(refreshKey: unknown = 0): AIStatus {
       cancelled = true;
     };
   }, [n, refreshKey]);
+  useEffect(() => {
+    const offs = [on("deps:changed", () => setN((v) => v + 1)), on("packs:changed", () => setN((v) => v + 1))];
+    return () => offs.forEach((off) => off());
+  }, []);
   const refresh = useCallback(() => setN((v) => v + 1), []);
   return { loaded, models, error, refresh, reasonFor: (op) => reasonFor(models, loaded, op) };
 }
