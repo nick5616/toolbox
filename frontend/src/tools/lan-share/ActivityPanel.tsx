@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Button, Icon, IconButton, toast } from "@/components";
 import { LanShareService, LibraryService, type LanActivity, type LanMessage } from "@/lib/api";
+import { copyText } from "@/lib/copy";
 import { toAppError } from "@/lib/errors";
 import { formatRelativeTime } from "@/lib/format";
 import { JobRow } from "@/shell/JobRow";
@@ -36,14 +37,7 @@ function ReceivedGroup({ job }: { job: JobView }) {
 }
 
 function MessageCard({ m }: { m: LanMessage }) {
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(m.text);
-      toast({ tone: "success", title: "Copied" });
-    } catch (e) {
-      report(e);
-    }
-  };
+  const copy = () => copyText(m.text);
   const save = async () => {
     try {
       const out = await LanShareService.SaveMessage(m.id);

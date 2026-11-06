@@ -1,4 +1,5 @@
-import { EmptyState, IconButton, Section, toast } from "@/components";
+import { EmptyState, IconButton, Section } from "@/components";
+import { copyText } from "@/lib/copy";
 import { OutputKind } from "@/lib/api";
 import { FailedJobs } from "@/tools/_kit/FailedJobs";
 import { ResultRow } from "@/tools/_kit/ResultRow";
@@ -16,15 +17,6 @@ const KIND_ICON: Record<string, string> = {
   [OutputKind.KindDocument]: "file-text",
 };
 
-async function copyPath(path: string) {
-  try {
-    await navigator.clipboard.writeText(path);
-    toast({ title: "Path copied", tone: "success", duration: 1500 });
-  } catch {
-    toast({ title: "Couldn't copy to the clipboard", tone: "danger" });
-  }
-}
-
 function OutputRow({ o }: { o: OutputView }) {
   return (
     <li>
@@ -37,7 +29,7 @@ function OutputRow({ o }: { o: OutputView }) {
         at={o.createdAt}
         icon={KIND_ICON[o.kind] ?? "file"}
         moduleId={MODULE_ID}
-        extra={<IconButton size="sm" icon="copy" label="Copy path" data-tip="Copy the full path of this file" onClick={() => void copyPath(o.path)} />}
+        extra={<IconButton size="sm" icon="copy" label="Copy path" data-tip="Copy the full path of this file" onClick={() => void copyText(o.path, { what: "path" })} />}
       />
     </li>
   );
