@@ -8,7 +8,7 @@ import { NeedsYouCard } from "./NeedsYouCard";
 import { RunGraph } from "./RunGraph";
 import { useRunMode } from "./RunGraphMode";
 import { RunGrid } from "./RunGrid";
-import { hasTemporaryFiles, runChip, runProgress, sortRuns } from "./RunGridModel";
+import { hasTemporaryFiles, runChip, runProgressText, sortRuns } from "./RunGridModel";
 import { RunResults } from "./RunResults";
 import { runParamsText } from "./RunSheetModel";
 import styles from "./RunsPanel.module.css";
@@ -28,7 +28,6 @@ const TRIGGER: Record<string, string> = {
 
 function RunRow({ run, selected, onSelect }: { run: RunView; selected: boolean; onSelect: () => void }) {
   const chip = runChip(run.status);
-  const { done, total } = runProgress(run);
   return (
     <li>
       <button type="button" className={cx(styles.row, selected && styles.selected)} aria-current={selected ? "true" : undefined} data-tip="Show this run's progress and results" onClick={onSelect}>
@@ -37,7 +36,7 @@ function RunRow({ run, selected, onSelect }: { run: RunView; selected: boolean; 
           <StatusChip status={chip.status} label={chip.label} />
         </span>
         <span className={styles.rowMeta}>
-          <span data-tip="Files that finished all their steps, out of all files in this run">{`${done} of ${total} ${total === 1 ? "file" : "files"}`}</span>
+          <span data-tip={run.inputs.length === 0 && run.items.length === 1 && run.items[0]?.input === "" ? "Steps finished in this run (it takes no files)" : "Files that finished all their steps, out of all files in this run"}>{runProgressText(run)}</span>
           <span>{formatRelativeTime(run.createdAt)}</span>
           {run.trigger === "schedule" && (
             <span className={styles.scheduled} data-tip="Started by this pipeline's schedule">

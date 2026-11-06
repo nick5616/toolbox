@@ -27,6 +27,19 @@ export function runProgress(run: RunView): { done: number; total: number } {
   return { done: files.filter(isItemDone).length, total: files.length };
 }
 
+const FINISHED_CELL: ReadonlySet<string> = new Set<string>([CellStatus.CellDone, CellStatus.CellSkipped]);
+
+/** The run list's progress line: "3 of 5 files", or steps for a run without files. */
+export function runProgressText(run: RunView): string {
+  const only = run.items.length === 1 ? run.items[0] : undefined;
+  if (run.inputs.length === 0 && only && only.input === "" && only.mergedAt === "") {
+    const done = only.cells.filter((c) => FINISHED_CELL.has(c.status)).length;
+    return `${done} of ${only.cells.length} ${only.cells.length === 1 ? "step" : "steps"}`;
+  }
+  const { done, total } = runProgress(run);
+  return `${done} of ${total} ${total === 1 ? "file" : "files"}`;
+}
+
 /** Items in grid order: merged items sit right after the last item they gather. */
 export function orderItems(items: readonly RunItemView[]): RunItemView[] {
   const plain = items.filter((i) => !isMergedItem(i));
