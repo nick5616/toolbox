@@ -10,8 +10,10 @@ export interface FrictionDialogProps {
   busy?: boolean;
   /** Called with the typed phrase once Confirm is enabled and clicked. */
   onConfirm: (phrase: string) => void;
-  /** Cancels the weakening (the host calls FocusService.CancelWeaken). */
+  /** Cancels the weakening (the host calls FocusService.CancelWeaken). Only the Cancel button does this. */
   onCancel: () => void;
+  /** Hides the dialog (Esc, backdrop) without cancelling: the countdown keeps running. */
+  onHide: () => void;
   /** Clock override for tests. */
   now?: () => number;
 }
@@ -56,7 +58,7 @@ export function confirmBlocker(phrase: string, typed: string, secondsLeft: numbe
 const FOCUSABLE = "button, input";
 
 /** Modal friction for weakening a session (SPEC §2.3, §5.1): phrase check plus an engine-owned countdown. */
-export function FrictionDialog({ friction, busy, onConfirm, onCancel, now = Date.now }: FrictionDialogProps) {
+export function FrictionDialog({ friction, busy, onConfirm, onCancel, onHide, now = Date.now }: FrictionDialogProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -89,7 +91,7 @@ export function FrictionDialog({ friction, busy, onConfirm, onCancel, now = Date
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
-      onCancel();
+      onHide();
     } else if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") {
       e.preventDefault();
       confirm();
@@ -109,7 +111,7 @@ export function FrictionDialog({ friction, busy, onConfirm, onCancel, now = Date
   };
 
   return (
-    <div className={styles.backdrop} onMouseDown={onCancel}>
+    <div className={styles.backdrop} onMouseDown={onHide}>
       <div ref={panelRef} className={styles.panel} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKeyDown}>
         <h2 id={titleId} className={styles.title}>
           {frictionTitle(friction)}
@@ -140,7 +142,7 @@ export function FrictionDialog({ friction, busy, onConfirm, onCancel, now = Date
           </div>
         )}
         <div className={styles.footer}>
-          <Button variant="secondary" data-tip="Close this without doing anything" data-tip-kbd="Esc" onClick={onCancel}>
+          <Button variant="secondary" data-tip="Drop this request and its countdown. Esc only hides the dialog" onClick={onCancel}>
             Cancel
           </Button>
           <Button variant={danger ? "danger" : "primary"} disabled={blocker !== ""} data-tip={blocker || "Confirm"} onClick={confirm}>

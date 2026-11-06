@@ -150,3 +150,18 @@
   font-size: var(--text-sm);
   color: var(--fg-subtle);
 }
+
+.pending {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}

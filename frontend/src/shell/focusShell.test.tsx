@@ -12,7 +12,9 @@ import {
   createBlockedBatcher,
   focusDuration,
   focusMinutesLeft,
+  failedTitle,
   focusPillLabel,
+  maybeEngineErrorToast,
   maybeResumeToast,
   programName,
 } from "./focusShell";
@@ -50,7 +52,8 @@ describe("focus labels", () => {
     expect(programName({ name: "", path: "/Applications/Discord.app" })).toBe("Discord.app".replace(".app", ""));
     expect(blockedTitle(["Steam"], null, false)).toBe("Stopped Steam");
     expect(blockedTitle(["A", "B", "C"], null, true)).toBe("Would stop A and 2 more");
-    expect(blockedTitle(["Steam"], new Date(2026, 0, 1, 17, 30).getTime(), false)).toMatch(/^Stopped Steam · Focus until .*30/);
+    expect(blockedTitle(["Steam"], new Date(2026, 0, 1, 17, 30).getTime(), false)).toBe("Stopped Steam · Focus until 17:30");
+    expect(blockedTitle(["Steam"], new Date(2026, 0, 1, 7, 5).getTime(), false)).toBe("Stopped Steam · Focus until 07:05");
   });
 });
 
@@ -67,7 +70,7 @@ describe("blocked toast batcher", () => {
     b.add(ev("Steam")); // same program inside the throttle
     vi.advanceTimersByTime(BLOCK_TOAST_SETTLE_MS + 1);
     expect(emit).toHaveBeenCalledTimes(1);
-    expect(emit).toHaveBeenLastCalledWith(["Steam", "Discord"], []);
+    expect(emit).toHaveBeenLastCalledWith(["Steam", "Discord"], [], []);
 
     t = BLOCK_TOAST_THROTTLE_MS - 1;
     b.add(ev("Steam"));
@@ -89,7 +92,35 @@ describe("blocked toast batcher", () => {
     b.add(ev("C", { result: "failed" }));
     vi.advanceTimersByTime(BLOCK_TOAST_SETTLE_MS + 1);
     expect(emit).toHaveBeenCalledTimes(1);
-    expect(emit).toHaveBeenLastCalledWith([], ["C"]);
+    expect(emit).toHaveBeenLastCalledWith([], ["C"], [""]);
+  });
+});
+
+describe("failed and error toasts", () => {
+  beforeEach(() => useToastStore.setState({ toasts: [] }));
+
+  it("names the reason for one program and stays short for a batch", () => {
+    expect(failedTitle(["Steam"], ["It runs as administrator"])).toBe("Couldn't stop Steam: it runs as administrator");
+    expect(failedTitle(["Steam"], [""])).toBe("Couldn't stop Steam");
+    expect(failedTitle(["A", "B"], ["x", "y"])).toBe("Couldn't stop A and B");
+  });
+
+  it("passes the BlockEvent error to the batch", () => {
+    vi.useFakeTimers();
+    const emit = vi.fn();
+    const b = createBlockedBatcher(emit, () => 0);
+    b.add(ev("Steam", { result: "failed", error: "It runs as administrator" }));
+    vi.advanceTimersByTime(BLOCK_TOAST_SETTLE_MS + 1);
+    expect(emit).toHaveBeenCalledWith([], ["Steam"], ["It runs as administrator"]);
+    vi.useRealTimers();
+  });
+
+  it("toasts an engine error once per session", () => {
+    const st: FocusState = { ...EMPTY_FOCUS_STATE, last: session({ id: "err1", endedAt: 5, endReason: "error" }) };
+    expect(maybeEngineErrorToast(st)).toBe(true);
+    expect(maybeEngineErrorToast(st)).toBe(false);
+    expect(useToastStore.getState().toasts[0]?.title).toBe("Focus stopped: Toolbox couldn't read the process list");
+    expect(maybeEngineErrorToast({ ...EMPTY_FOCUS_STATE, last: session({ id: "ok", endedAt: 5, endReason: "time" }) })).toBe(false);
   });
 });
 

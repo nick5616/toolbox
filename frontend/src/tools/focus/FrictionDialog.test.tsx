@@ -54,7 +54,7 @@ describe("confirmBlocker", () => {
 describe("FrictionDialog", () => {
   it("shows the phrase and keeps Confirm aria-disabled until typed", async () => {
     const onConfirm = vi.fn();
-    render(<FrictionDialog friction={friction()} onConfirm={onConfirm} onCancel={() => undefined} />);
+    render(<FrictionDialog friction={friction()} onConfirm={onConfirm} onCancel={() => undefined} onHide={() => undefined} />);
     expect(screen.getByTestId("friction-phrase").textContent).toBe(PHRASE);
     expect(confirmButton().getAttribute("aria-disabled")).toBe("true");
     await userEvent.click(confirmButton());
@@ -67,13 +67,13 @@ describe("FrictionDialog", () => {
   });
 
   it("accepts the straight apostrophe too", async () => {
-    render(<FrictionDialog friction={friction()} onConfirm={() => undefined} onCancel={() => undefined} />);
+    render(<FrictionDialog friction={friction()} onConfirm={() => undefined} onCancel={() => undefined} onHide={() => undefined} />);
     await userEvent.type(screen.getByLabelText("Type the phrase"), PHRASE);
     expect(confirmButton().getAttribute("aria-disabled")).toBeNull();
   });
 
   it("a wrong case keeps it disabled", async () => {
-    render(<FrictionDialog friction={friction()} onConfirm={() => undefined} onCancel={() => undefined} />);
+    render(<FrictionDialog friction={friction()} onConfirm={() => undefined} onCancel={() => undefined} onHide={() => undefined} />);
     await userEvent.type(screen.getByLabelText("Type the phrase"), "i'm choosing to stop early");
     expect(confirmButton().getAttribute("aria-disabled")).toBe("true");
   });
@@ -82,7 +82,7 @@ describe("FrictionDialog", () => {
     vi.useFakeTimers();
     let clock = 1_000_000;
     const now = () => clock;
-    render(<FrictionDialog friction={friction({ phrase: "", readyAt: clock + 30_000 })} now={now} onConfirm={() => undefined} onCancel={() => undefined} />);
+    render(<FrictionDialog friction={friction({ phrase: "", readyAt: clock + 30_000 })} now={now} onConfirm={() => undefined} onCancel={() => undefined} onHide={() => undefined} />);
     expect(screen.getByTestId("friction-countdown").textContent).toContain("0:30");
     expect(confirmButton().getAttribute("aria-disabled")).toBe("true");
     expect(confirmButton().getAttribute("data-tip")).toBe("Wait 0:30");
@@ -103,7 +103,7 @@ describe("FrictionDialog", () => {
 
   it("needs both the phrase and the countdown", async () => {
     const now = () => 5_000;
-    render(<FrictionDialog friction={friction({ readyAt: 5_000 + 20_000 })} now={now} onConfirm={() => undefined} onCancel={() => undefined} />);
+    render(<FrictionDialog friction={friction({ readyAt: 5_000 + 20_000 })} now={now} onConfirm={() => undefined} onCancel={() => undefined} onHide={() => undefined} />);
     await userEvent.type(screen.getByLabelText("Type the phrase"), PHRASE);
     expect(confirmButton().getAttribute("aria-disabled")).toBe("true");
     expect(confirmButton().getAttribute("data-tip")).toBe("Wait 0:20");
@@ -111,17 +111,21 @@ describe("FrictionDialog", () => {
 
   it("soft friction has no phrase field and confirms at once", async () => {
     const onConfirm = vi.fn();
-    render(<FrictionDialog friction={friction({ phrase: "" })} onConfirm={onConfirm} onCancel={() => undefined} />);
+    render(<FrictionDialog friction={friction({ phrase: "" })} onConfirm={onConfirm} onCancel={() => undefined} onHide={() => undefined} />);
     expect(screen.queryByLabelText("Type the phrase")).toBeNull();
     await userEvent.click(confirmButton());
     expect(onConfirm).toHaveBeenCalledWith("");
   });
 
-  it("Escape and Cancel cancel", async () => {
+  it("Escape and the backdrop only hide; Cancel cancels", async () => {
     const onCancel = vi.fn();
-    render(<FrictionDialog friction={friction()} onConfirm={() => undefined} onCancel={onCancel} />);
+    const onHide = vi.fn();
+    const { container } = render(<FrictionDialog friction={friction()} onConfirm={() => undefined} onCancel={onCancel} onHide={onHide} />);
     await userEvent.keyboard("{Escape}");
+    await userEvent.pointer({ keys: "[MouseLeft]", target: container.firstElementChild as Element });
+    expect(onHide).toHaveBeenCalledTimes(2);
+    expect(onCancel).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(onCancel).toHaveBeenCalledTimes(2);
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });

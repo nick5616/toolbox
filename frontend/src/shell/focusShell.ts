@@ -4,6 +4,7 @@ import type { FocusBlockEvent, FocusState } from "@/lib/api";
 import { on } from "@/lib/events";
 import { FOCUS_MODULE_ID, isActive, subscribeFocus, useFocus } from "@/state/focus";
 import { useUI } from "@/state/ui";
+import { formatClock } from "@/tools/focus/model";
 
 // Focus Lock in the shell (Phase 18): the top-bar pill's text, the focus
 // toasts (blocked programs, resumed session) and the live subscription.
@@ -32,9 +33,8 @@ export function focusPillLabel(state: FocusState, nowMs: number): string | null 
   return `Focus · ${focusDuration(focusMinutesLeft(state.session.endsAt, nowMs))}`;
 }
 
-function clock(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
+// 24-hour HH:MM, the same as the Focus tool shows.
+const clock = formatClock;
 
 /** A program's display name ("Steam.exe" becomes "Steam"). */
 export function programName(e: Pick<FocusBlockEvent, "name" | "path">): string {
@@ -53,19 +53,45 @@ export function blockedTitle(names: string[], until: number | null, dry: boolean
   return `${verb} ${what}${until ? ` · Focus until ${clock(until)}` : ""}`;
 }
 
+/** "Couldn't stop Steam: it runs as administrator"; a batch stays short. */
+export function failedTitle(failed: string[], reasons: string[]): string {
+  const reason = failed.length === 1 ? (reasons[0] ?? "").trim().replace(/[.\s]+$/, "") : "";
+  const lower = reason ? reason.charAt(0).toLowerCase() + reason.slice(1) : "";
+  return `Couldn't stop ${failed.join(" and ")}${lower ? `: ${lower}` : ""}`;
+}
+
+/** The title of the toast for a session the engine stopped on an error. */
+export const ENGINE_ERROR_TITLE = "Focus stopped: Toolbox couldn't read the process list";
+
+const errorToasted = new Set<string>();
+
+/** Toasts once per session id when a session ended with endReason "error". */
+export function maybeEngineErrorToast(state: FocusState): boolean {
+  for (const s of [state.session, state.last]) {
+    if (!s || s.endedAt === 0 || s.endReason !== "error" || errorToasted.has(s.id)) continue;
+    errorToasted.add(s.id);
+    toast({ tone: "warn", title: ENGINE_ERROR_TITLE, duration: 8000 });
+    return true;
+  }
+  return false;
+}
+
 /** Throttle + batch for blocked events; `emit` gets one call per settled batch. */
-export function createBlockedBatcher(emit: (names: string[], failed: string[]) => void, now: () => number = Date.now) {
+export function createBlockedBatcher(emit: (names: string[], failed: string[], reasons: string[]) => void, now: () => number = Date.now) {
   const last = new Map<string, number>();
   let names: string[] = [];
   let failed: string[] = [];
+  let reasons: string[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
   const flush = () => {
     timer = undefined;
     const n = names;
     const f = failed;
+    const r = reasons;
     names = [];
     failed = [];
-    if (n.length || f.length) emit(n, f);
+    reasons = [];
+    if (n.length || f.length) emit(n, f, r);
   };
   return {
     add(e: FocusBlockEvent) {
@@ -78,7 +104,10 @@ export function createBlockedBatcher(emit: (names: string[], failed: string[]) =
       last.set(key, t);
       const name = programName(e);
       if (e.result === "failed") {
-        if (!failed.includes(name)) failed.push(name);
+        if (!failed.includes(name)) {
+          failed.push(name);
+          reasons.push(e.error);
+        }
       } else if (!names.includes(name)) names.push(name);
       if (timer) clearTimeout(timer);
       timer = setTimeout(flush, BLOCK_TOAST_SETTLE_MS);
@@ -121,16 +150,17 @@ export function maybeResumeToast(state: FocusState, nowMs: number, appStart: num
 export function useFocusNotices(): void {
   useEffect(() => {
     const unsub = subscribeFocus();
-    const batcher = createBlockedBatcher((names, failed) => {
+    const batcher = createBlockedBatcher((names, failed, reasons) => {
       if (useUI.getState().view === FOCUS_MODULE_ID) return; // the tool shows it itself
       const st = useFocus.getState().state;
       const until = isActive(st) && st.session ? st.session.endsAt : null;
       if (names.length) toast({ tone: "neutral", title: blockedTitle(names, until, st.dryRun || !!st.session?.dryRun), duration: 4000 });
-      if (failed.length) toast({ tone: "warn", title: `Couldn't stop ${failed.join(" and ")}`, duration: 6000 });
+      if (failed.length) toast({ tone: "warn", title: failedTitle(failed, reasons), duration: 6000 });
     });
     const off = on("focus:blocked", (e) => batcher.add(e));
     const stop = useFocus.subscribe((s, prev) => {
       if (s.loaded && !prev.loaded) maybeResumeToast(s.state, Date.now());
+      if (s.loaded && s.state !== prev.state) maybeEngineErrorToast(s.state);
     });
     if (useFocus.getState().loaded) maybeResumeToast(useFocus.getState().state, Date.now());
     return () => {

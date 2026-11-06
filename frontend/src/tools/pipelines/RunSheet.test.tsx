@@ -18,9 +18,9 @@ import { RunSheet } from "./RunSheet";
 import { acc, check, entry, pipeline, step, stepCheck } from "./testFixtures";
 import { run } from "./RunGridFixtures";
 
-function setup(opts: { accepts?: ReturnType<typeof acc>; secrets?: { stepId: string; key: string; label: string }[]; inputs?: string[]; ready?: boolean; params?: PipelineParam[] } = {}) {
+function setup(opts: { accepts?: ReturnType<typeof acc>; secrets?: { stepId: string; key: string; label: string }[]; inputs?: string[]; ready?: boolean; takesFiles?: boolean; params?: PipelineParam[] } = {}) {
   const p = pipeline("p1", [step("s1", "stems")], { name: "Stems", params: opts.params ?? [] });
-  const c = check([stepCheck("s1")], { accepts: opts.accepts ?? acc([".mp3", ".wav"], { urls: true }), secrets: opts.secrets ?? [], ready: opts.ready ?? true });
+  const c = check([stepCheck("s1")], { accepts: opts.accepts ?? acc([".mp3", ".wav"], { urls: true }), secrets: opts.secrets ?? [], ready: opts.ready ?? true, takesFiles: opts.takesFiles ?? true });
   usePipelines.setState({ entries: [entry(p, c)], runs: {}, runSheet: { pipelineId: "p1", inputs: opts.inputs ?? [] }, loaded: true });
   return render(<RunSheet pipelineId="p1" />);
 }
@@ -54,6 +54,13 @@ describe("RunSheet", () => {
   it("disables Start with nothing acceptable", () => {
     setup({ inputs: ["/a/notes.txt"] });
     expect((screen.getByRole("button", { name: "Start" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("a pipeline that takes no files has a Run button whose tip doesn't ask for files", () => {
+    setup({ takesFiles: false });
+    const btn = screen.getByRole("button", { name: "Run" }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    expect(btn.getAttribute("data-tip")).not.toMatch(/Add at least/);
   });
 
   it("takes links when the pipeline accepts them", async () => {

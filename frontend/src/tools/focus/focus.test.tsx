@@ -250,11 +250,56 @@ describe("Focus view: active", () => {
   });
 
   it("an engine-owned friction (e.g. quit) opens the dialog on its own", async () => {
+    useFocus.setState({ frictionHidden: false });
     setState({ session: session(), friction: { action: FocusWeaken.WeakenQuit, phrase: "I'm choosing to stop early", readyAt: Date.now() + 30_000, rule: null } });
     render(<FocusView {...props} />);
     expect(await screen.findByRole("dialog", { name: /Quit Toolbox/ })).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(svc.CancelWeaken).toHaveBeenCalled();
+  });
+
+  it("Escape hides the dialog without cancelling; the active panel offers Show; Cancel cancels", async () => {
+    setState({ session: session(), friction: { action: FocusWeaken.WeakenEnd, phrase: "I'm choosing to stop early", readyAt: Date.now() + 30_000, rule: null } });
+    render(<FocusView {...props} />);
+    await screen.findByRole("dialog");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(svc.CancelWeaken).not.toHaveBeenCalled();
+    expect(useFocus.getState().state.friction).not.toBeNull();
+    const pending = screen.getByTestId("friction-pending");
+    expect(pending.textContent).toMatch(/^Ending early in 0:\d\d · Show$/);
+    await userEvent.click(within(pending).getByRole("button", { name: "Show" }));
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(svc.CancelWeaken).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("friction-pending")).toBeNull();
+  });
+
+  it("reopening End early shows the hidden dialog again", async () => {
+    const f = { action: FocusWeaken.WeakenEnd, phrase: "x", readyAt: Date.now() + 30_000, rule: null };
+    svc.RequestWeaken.mockResolvedValue(f);
+    setState({ session: session(), friction: f });
+    useFocus.setState({ frictionHidden: true });
+    render(<FocusView {...props} />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await userEvent.click(await screen.findByRole("button", { name: "End early" }));
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+  });
+
+  it("the minutes-left badge ticks", () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    try {
+      vi.setSystemTime(NOW);
+      setState({ session: session({ endsAt: NOW + 42 * 60_000 }) });
+      render(<FocusView {...props} />);
+      expect(screen.getByText("42 min left")).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(5 * 60_000);
+      });
+      expect(screen.getByText("37 min left")).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("a focus:changed update flips the view", async () => {

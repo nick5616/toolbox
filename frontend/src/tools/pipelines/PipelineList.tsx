@@ -119,7 +119,7 @@ export function PipelineList({ onNew }: PipelineListProps) {
             <li
               key={p.id}
               id={`pipeline-drop:${p.id}`}
-              data-file-drop-target=""
+              data-file-drop-target={noFiles ? undefined : ""}
               className={cx(styles.card, p.id === selected && styles.selected)}
             >
               <button
@@ -127,7 +127,7 @@ export function PipelineList({ onNew }: PipelineListProps) {
                 className={styles.main}
                 aria-current={p.id === selected ? "true" : undefined}
                 aria-label={p.name}
-                data-tip="Select to edit this pipeline. Drop files on the card to run it"
+                data-tip={noFiles ? "Select to edit this pipeline" : "Select to edit this pipeline. Drop files on the card to run it"}
                 onClick={() => selectPipeline(p.id)}
               >
                 <span className={styles.top}>
@@ -176,7 +176,7 @@ export function PipelineList({ onNew }: PipelineListProps) {
           );
         })}
       </ul>
-      <p className={styles.hint}>Drop files on a card to run it, or press its play button.</p>
+      <p className={styles.hint}>{entries.some((e) => !startsWithoutFiles(e)) ? "Drop files on a card to run it, or press its play button." : "Press a card's play button to run it."}</p>
     </div>
   );
 }

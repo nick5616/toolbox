@@ -89,6 +89,22 @@ describe("PipelineList", () => {
     }
   });
 
+  it("cards of pipelines that take no files are not drop targets and the hint says so", () => {
+    const p1 = pipeline("p1", [step("aaaaaaaa", "stems")]);
+    const p2 = pipeline("p2", [step("aaaaaaaa", "focus")]);
+    usePipelines.setState({ entries: [entry(p1), entry(p2, check([stepCheck("aaaaaaaa")], { takesFiles: false }))] });
+    const { unmount } = render(<PipelineList onNew={() => undefined} />);
+    expect(document.getElementById("pipeline-drop:p1")?.hasAttribute("data-file-drop-target")).toBe(true);
+    const card2 = document.getElementById("pipeline-drop:p2")!;
+    expect(card2.hasAttribute("data-file-drop-target")).toBe(false);
+    expect(card2.querySelector("button")?.getAttribute("data-tip")).not.toMatch(/Drop files/);
+    expect(screen.getByText(/Drop files on a card/)).toBeTruthy();
+    unmount();
+    usePipelines.setState({ entries: [entry(p2, check([stepCheck("aaaaaaaa")], { takesFiles: false }))] });
+    render(<PipelineList onNew={() => undefined} />);
+    expect(screen.queryByText(/Drop files/)).toBeNull();
+  });
+
   it("shows name, step icons, takes, watch and status; selects and runs", () => {
     const p1 = pipeline("p1", [step("aaaaaaaa", "downloader"), step("bbbbbbbb", "stems")], { name: "Clips", watch: { enabled: true, folder: "C:\\w" } });
     const p2 = pipeline("p2", [step("aaaaaaaa", "stems")], { name: "Broken" });
