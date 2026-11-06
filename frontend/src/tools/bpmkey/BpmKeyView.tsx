@@ -58,7 +58,7 @@ export default function BpmKeyView({ moduleId }: ToolViewProps) {
               rows={rows}
               columns={columns}
               rowKey={(r) => r.id}
-              label="BPM and key"
+              label="BPM and key" fileName="bpm-and-key.csv"
               empty={<EmptyLine title="No analyses yet." body="Add tracks to detect their tempo and key." />}
               actions={
                 <Button
