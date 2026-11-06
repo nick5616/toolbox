@@ -1,20 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Section, SegmentedControl, Select, Switch, ToolClickIn, toast } from "@/components";
+import { Section, SegmentedControl, Select, Switch, ToolClickIn, toast } from "@/components";
 import {
   FilesService,
   JobStatus,
-  LibraryService,
   OcrImageOutput,
   OcrLanguage,
   OcrPdfOutput,
   OcrService,
   type OcrLanguageInfo,
 } from "@/lib/api";
-import { copyText } from "@/lib/copy";
-import { toAppError } from "@/lib/errors";
 import { useCompositionInputs } from "@/state/composition";
 import { useToolJobs } from "@/tools/_kit/session";
-import { EmptyLine, FileToolLayout, ResultRow, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { EmptyLine, FileToolLayout, ResultRow, TextActions, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import type { ToolViewProps } from "../index";
 import { DEFAULT_OCR_OPTIONS, FALLBACK_LANGUAGES, downloadNote, sanitizeOcrOptions, toOcrResult, type OcrResultItem } from "./options";
@@ -29,21 +26,27 @@ const PDF_LABEL: Record<string, string> = {
 };
 
 const CHAT_PROMPTS = ["Summarise", "Extract a table", "Fix typos"];
-const MAX_CHAT_TEXT = 200_000;
+/** FilesService.ReadText never returns more than 256 KB. */
+const MAX_FULL_TEXT = 256 * 1024;
 
-/** "Ask Local Chat" on a result: the recognised text goes to the chat as context. */
-function AskChat({ item, textPath }: { item: OcrResultItem; textPath: string }) {
-  const [body, setBody] = useState(item.preview);
+/** The whole recognised text, read from the saved .txt (the job's preview is cut at 2000 characters and empty for PDFs). */
+function useFullText(textPath: string, fallback: string): string {
+  const [body, setBody] = useState(fallback);
   useEffect(() => {
     if (textPath === "") return;
     let live = true;
-    FilesService.ReadText(textPath, MAX_CHAT_TEXT)
+    FilesService.ReadText(textPath, MAX_FULL_TEXT)
       .then((t) => live && setBody(t))
       .catch(() => undefined);
     return () => {
       live = false;
     };
   }, [textPath]);
+  return body;
+}
+
+/** "Ask Local Chat" on a result: the recognised text goes to the chat as context. */
+function AskChat({ item, body }: { item: OcrResultItem; body: string }) {
   const fileName = item.title;
   return (
     <ToolClickIn
@@ -80,13 +83,9 @@ function ResultCard({ item }: { item: OcrResultItem }) {
   const textFile = item.files.find((f) => f.path.toLowerCase().endsWith(".txt")) ?? item.files[0];
   const textPath = textFile && textFile.path.toLowerCase().endsWith(".txt") && !textFile.missing ? textFile.path : "";
 
-  // copyText goes through Go (self-copy marker) and shows its own toast.
-  const copy = () => void copyText(item.preview);
-  const saveAs = () => {
-    if (!textFile) return;
-    const p = textFile.id ? LibraryService.Reveal(textFile.id) : LibraryService.RevealPath(textFile.path);
-    p.catch((e: unknown) => toast({ title: toAppError(e).message, tone: "danger" }));
-  };
+  const fullText = useFullText(textPath, item.preview);
+  const hasText = textPath !== "" || item.preview !== "";
+  const textName = textFile && textPath !== "" ? textFile.name || textPath.split(/[\\/]/).pop() || "text.txt" : "text.txt";
 
   return (
     <article className={styles.card} aria-label={item.title}>
@@ -97,20 +96,17 @@ function ResultCard({ item }: { item: OcrResultItem }) {
       {item.files.map((f) => (
         <ResultRow key={f.path} path={f.path} outputId={f.id || undefined} missing={f.missing} name={f.name} />
       ))}
-      {item.preview !== "" && (
+      {hasText && (
         <>
-          <AskChat item={item} textPath={textPath} />
+          <AskChat item={item} body={fullText} />
           <SaveAsDocument textPath={textPath} />
-          <pre className={styles.preview} aria-label="Text preview" data-tip="The text that was read, as it will be copied">
-            {item.preview}
-          </pre>
+          {item.preview !== "" && (
+            <pre className={styles.preview} aria-label="Text preview" data-tip="The start of the text that was read; Copy and Save as… take all of it">
+              {item.preview}
+            </pre>
+          )}
           <div className={styles.previewActions}>
-            <Button size="sm" variant="secondary" icon="copy" data-tip="Copy all the recognised text to the clipboard" onClick={() => void copy()}>
-              Copy text
-            </Button>
-            <Button size="sm" variant="ghost" icon="folder-open" data-tip="Show the saved text file so you can copy or move it" onClick={saveAs}>
-              Show file
-            </Button>
+            <TextActions text={fullText} filename={textName} what="text" disabled={fullText === ""} />
           </div>
         </>
       )}
