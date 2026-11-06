@@ -27,6 +27,13 @@ import { fromEntry, fromOutput, fromPath, type LibItem } from "./items";
 import { sendToItems } from "./sendTo";
 import styles from "./Library.module.css";
 
+/** Hidden (system) modules that still write library files: friendly names for them. */
+const HIDDEN_MODULE_NAMES: Record<string, string> = {
+  "lan-receive": "Received (Local File Transfer)",
+  "paint-ai": "Paint+ Lab",
+  "media-proxy": "Preview copies",
+};
+
 export { sendToItems };
 
 function fail(e: unknown): void {
@@ -114,7 +121,7 @@ export function LibraryView() {
   const [refreshNonce, setRefreshNonce] = useState(0);
   const newestWanted = useRef<{ nonce: number; list: unknown } | null>(null);
 
-  const moduleName = useCallback((id: string) => byId[id]?.name ?? id, [byId]);
+  const moduleName = useCallback((id: string) => byId[id]?.name ?? HIDDEN_MODULE_NAMES[id] ?? id, [byId]);
   const moduleIcon = useCallback((id: string) => byId[id]?.icon ?? "box", [byId]);
   const hasTool = useCallback((id: string) => {
     const m = byId[id];
