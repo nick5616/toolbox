@@ -187,7 +187,6 @@ export default function ExportPanel() {
   const endMs = useSel ? selection.endMs : 0;
   const rangeSec = ((useSel ? endMs : durationMs) - startMs) / 1000;
   const [previewStart, setPreviewStart] = useState(Math.max(0, Math.min(playheadMs, Math.max(0, durationMs - 1000))));
-  const [previewPath, setPreviewPath] = useState("");
 
   // A 2160p choice that this computer can't encode falls back.
   useEffect(() => {
@@ -198,11 +197,9 @@ export default function ExportPanel() {
     if (prefs.audio === "instrumental" && !hasStems) onPrefs({ audio: "original" });
   }, [hasStems, prefs.audio, onPrefs]);
 
-  const preview = useVizJob((job) => {
-    const r = parseVizResult(job.resultJson);
-    if (r?.previewPath) setPreviewPath(r.previewPath);
-  });
-  const render = useVizJob();
+  const preview = useVizJob("preview");
+  const render = useVizJob("render");
+  const previewPath = preview.job?.status === JobStatus.JobDone ? (parseVizResult(preview.job.resultJson)?.previewPath ?? "") : "";
   const busy = preview.busy || render.busy;
 
   const problem = useMemo(() => {
@@ -233,7 +230,7 @@ export default function ExportPanel() {
 
   const go = (run: VizJob, action: VisualizerAction) => {
     if (!input || blocker) return;
-    setPreviewPath("");
+    if (run !== preview) preview.clear();
     void run.start([input], options(action));
   };
 
