@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -39,7 +40,8 @@ func (p *paintLabSink) handle(msg, origin string) bool {
 	if p == nil || !strings.HasPrefix(msg, paintLabPrefix) {
 		return false
 	}
-	if !p.origins[origin] {
+	// WebView2 reports the full page URL as the origin: compare scheme://host.
+	if !p.origins[labOrigin(origin)] {
 		return true
 	}
 	rest := strings.TrimPrefix(msg, paintLabPrefix)
@@ -86,4 +88,13 @@ func queryEscape(s string) string {
 		}
 	}
 	return b.String()
+}
+
+// labOrigin reduces a page URL to scheme://host (as core/viz's broker does).
+func labOrigin(s string) string {
+	u, err := url.Parse(s)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return s
+	}
+	return u.Scheme + "://" + u.Host
 }
