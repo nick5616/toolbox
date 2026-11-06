@@ -16,6 +16,7 @@ require (
 	golang.org/x/net v0.60.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0
+	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9
 	modernc.org/sqlite v1.61.0
 )
 

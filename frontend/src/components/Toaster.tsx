@@ -13,7 +13,7 @@ const iconFor: Record<ToastTone, string> = {
 };
 
 function ToastItem({ data }: { data: ToastItemData }) {
-  const { id, title, description, action, leaving } = data;
+  const { id, title, description, action, secondaryAction, leaving } = data;
   const tone = data.tone ?? "neutral";
   const duration = data.duration ?? DEFAULT_TOAST_DURATION;
 
@@ -53,18 +53,25 @@ function ToastItem({ data }: { data: ToastItemData }) {
       <div className={styles.content}>
         <div className={styles.title}>{title}</div>
         {description && <div className={styles.description}>{description}</div>}
-        {action && (
-          <button
-            type="button"
-            className={styles.action}
-            data-tip={`${action.label} (this also closes the notification)`}
-            onClick={() => {
-              action.onClick();
-              dismissToast(id);
-            }}
-          >
-            {action.label}
-          </button>
+        {(action || secondaryAction) && (
+          <div className={styles.actions}>
+            {[action, secondaryAction].map((a) =>
+              a ? (
+                <button
+                  key={a.label}
+                  type="button"
+                  className={styles.action}
+                  data-tip={`${a.label} (this also closes the notification)`}
+                  onClick={() => {
+                    a.onClick();
+                    dismissToast(id);
+                  }}
+                >
+                  {a.label}
+                </button>
+              ) : null,
+            )}
+          </div>
         )}
       </div>
       <IconButton size="sm" icon="x" label="Dismiss" data-tip="Close this notification" onClick={() => dismissToast(id)} />

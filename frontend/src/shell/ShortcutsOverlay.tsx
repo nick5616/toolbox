@@ -17,6 +17,7 @@ export const GLOBAL_SHORTCUTS: Row[] = [
   { id: "palette", label: "Search tools, actions and files", combo: "Mod+K" },
   { id: "add", label: "Add files in the current tool", combo: "Mod+O" },
   { id: "digits", label: "Open pinned tools 1 to 9 (the digits show in the sidebar tooltips)", combo: "Mod+1" },
+  { id: "library", label: "Library", combo: "Mod+L" },
   { id: "settings", label: "Settings", combo: "Mod+," },
   { id: "keys", label: "This list", combo: "?" },
 ];

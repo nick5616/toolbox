@@ -5,6 +5,7 @@ import { toast } from "@/components";
 import { takeAnnounced, useJobs, type JobView as Job } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { FOCUS_MODULE_ID } from "@/state/focus";
+import { openLibrary } from "@/lib/openLibrary";
 import { useUI } from "@/state/ui";
 import { useBatchResults } from "./batchResults";
 
@@ -48,6 +49,7 @@ export function notifyDone(moduleId: string, jobs: Job[]): void {
       tone: "success",
       title: out ? `Saved ${out.name}` : `Finished ${j.title || j.id}`,
       action: out ? { label: "Reveal", onClick: () => reveal(out) } : undefined,
+      secondaryAction: out ? { label: "Show in Library", onClick: () => openLibrary({ moduleId, path: out.path, outputId: out.id }) } : undefined,
     });
     return;
   }

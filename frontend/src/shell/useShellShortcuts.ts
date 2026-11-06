@@ -29,6 +29,9 @@ export function useShellShortcuts(): void {
   });
   useShortcut("Mod+O", () => void runAddFiles());
   useShortcut("?", () => useUI.getState().setShortcutsOpen(!useUI.getState().shortcutsOpen));
+  // The Downloader owns Mod+L (focus the link box) while it is open.
+  const view = useUI((s) => s.view);
+  useShortcut("Mod+L", () => useUI.getState().navigate("library"), { when: view !== "downloader" });
   useShortcut("Mod+,", () => useUI.getState().navigate("settings"));
   useShortcut("Mod+J", () => useUI.getState().setTrayOpen(!useUI.getState().trayOpen));
   useShortcut("Mod+Backslash", () => useUI.getState().toggleSidebar());
