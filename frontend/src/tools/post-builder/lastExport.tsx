@@ -15,6 +15,8 @@ export interface PostExportResult {
   postId: string;
   folder: string;
   files: string[];
+  /** Library output id of the first file (enables Open). */
+  outputId?: string;
 }
 
 interface State {
@@ -34,6 +36,7 @@ export function PostExportRow({ postId }: { postId: string }) {
       label="Post exported"
       icon="check"
       path={first}
+      outputId={r.outputId}
       name={r.folder.split(/[\\/]+/).filter(Boolean).pop() ?? r.folder}
       dragPaths={r.files.length > 0 ? r.files : [r.folder]}
       moduleId={MODULE_ID}

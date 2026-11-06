@@ -68,7 +68,7 @@ export function PostHeader() {
         const pid = exportPost.current || st().postId;
         st().persist({ ...cur, exports: { ...cur.exports, [pid]: folder } });
         // The result row under the stage carries Send to and the drag; no toast.
-        useLastPostExport.getState().set({ postId: pid, folder, files: outcome?.files ?? [] });
+        useLastPostExport.getState().set({ postId: pid, folder, files: outcome?.files ?? [], outputId: (job.outputs.find((o) => o.path === outcome?.files?.[0]) ?? job.outputs[0])?.id });
       } else {
         toast({ tone: "success", title: "Post exported" });
       }

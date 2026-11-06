@@ -7,6 +7,7 @@ import type { TextLine } from "@/viz/analysis";
 import { DEFAULT_TEXT_STYLE, parseTextStyle, serializeCaptionLines, serializeTextStyle } from "@/viz/edit/schema";
 import type { TextStyle } from "@/viz/types";
 import { useEditStudio, useProject } from "@/editor/store";
+import { TextActions } from "@/tools/_kit";
 import { exportSrt } from "./exportSrt";
 import { deleteLine, effectiveLines, insertAfter, linesInRange, mergeNext, setLineText, setLineTime, setWordText, setWordTime, splitLine } from "./lines";
 import { WordList, type RowAction } from "./WordList";
@@ -52,6 +53,7 @@ export function CaptionsPanel() {
   const captions = project?.captions ?? null;
   const song = project?.song ?? null;
   const style = useMemo(() => (captions ? parseTextStyle(captions.style).value : DEFAULT_TEXT_STYLE), [captions?.style]); // eslint-disable-line react-hooks/exhaustive-deps
+  const projectName = useEditStudio((s) => s.name);
   const lines = useMemo(() => effectiveLines(captions, analysis), [captions, analysis]);
   const rows = useMemo(() => (song ? linesInRange(lines, song.startMs, song.endMs).map((index) => ({ index, line: lines[index] as TextLine })) : []), [lines, song]);
 
@@ -194,6 +196,7 @@ export function CaptionsPanel() {
               <Button size="sm" icon="download" data-tip="Save the captions as an .srt subtitle file you can use in other apps" onClick={() => void exportSrt()}>
                 Export SRT
               </Button>
+              <TextActions text={() => lines.map((l) => l.text).join("\n")} filename={`${projectName || "Captions"}.txt`} what="caption text" disabled={lines.length === 0} />
             </div>
           </Section>
         </>

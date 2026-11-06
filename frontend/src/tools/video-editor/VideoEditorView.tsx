@@ -21,6 +21,7 @@ import { useShortcut } from "@/lib/shortcuts";
 import { useJob, useJobs } from "@/state/jobs";
 import { useUI, type PostSlideSeed } from "@/state/ui";
 import { DepsGate, useDepsGate } from "@/tools/_kit";
+import { LastExport } from "@/editor/export/LastExport";
 import type { ToolViewProps } from "@/tools";
 import { SourceLoaders, type ClipSource, type SourceMap, type SourceRequest } from "./ClipSources";
 import { ExactPlayer } from "./ExactPlayer";
@@ -137,7 +138,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
   const [planJobId, setPlanJobId] = useState("");
   const [exportJobId, setExportJobId] = useState("");
   const [previewJobId, setPreviewJobId] = useState("");
-  const [exported, setExported] = useState<{ path: string; name: string } | null>(null);
+  const [exported, setExported] = useState<{ path: string; name: string; outputId: string } | null>(null);
   const [exact, setExact] = useState<{ path: string; at: number; doc: VideoProject } | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -545,7 +546,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
     if (exportJob.status === JobStatus.JobDone) {
       const out = exportJob.outputs[0];
       if (out) {
-        setExported({ path: out.path, name: out.name });
+        setExported({ path: out.path, name: out.name, outputId: out.id });
         toast({
           title: "Exported",
           description: out.name,
@@ -878,24 +879,23 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
       <JobBar label="Rendering the preview" jobId={previewJobId} />
       <JobBar label="Building your vlog" jobId={planJobId} />
       {exported && (
-        <Banner
-          tone="info"
-          className={styles.banner}
-          title={`Exported ${exported.name}`}
-          action={
-            <div className={styles.exportActions}>
-              <Button size="sm" data-tip="Show the exported file in your file manager" onClick={() => void LibraryService.RevealPath(exported.path).catch(() => undefined)}>
-                {revealLabel}
-              </Button>
+        <LastExport
+          label="Exported"
+          path={exported.path}
+          outputId={exported.outputId}
+          name={exported.name}
+          moduleId={moduleId}
+          extra={
+            <>
               <Button size="sm" data-tip="Open the exported video in Subtitles to transcribe and add captions" onClick={() => useUI.getState().handOff({ moduleId: "subtitles", inputs: [exported.path] })}>
                 Add captions with Subtitles
               </Button>
               <Button size="sm" data-tip="Add the exported video to an Instagram post in Post Builder" onClick={() => useUI.getState().handOff({ moduleId: "post-builder", inputs: [exported.path] })}>
                 Add to post…
               </Button>
-              <IconButton size="sm" icon="x" label="Dismiss" data-tip="Hide this message" onClick={() => setExported(null)} />
-            </div>
+            </>
           }
+          onDismiss={() => setExported(null)}
         />
       )}
       {exact && (

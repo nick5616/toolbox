@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { Button, Icon, cx } from "@/components";
 import { FilesService, JobStatus, OutputKind, WaitKind, type RunFile } from "@/lib/api";
-import { revealLabel } from "@/lib/platform";
 import { useJobs } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import type { WaitingCell } from "@/state/pipelines";
 import { useUI } from "@/state/ui";
 import { baseName } from "./RunGridModel";
 import { adoptedJobs, continueCheck, continueManual, hasDoneAdopted, skipStep, stopItem } from "./NeedsYouCardActions";
-import { KIND_ICON, openRunFile, revealRunFile } from "./RunResultsFileRow";
+import { FileActions } from "@/tools/_kit";
+import { KIND_ICON } from "./RunResultsFileRow";
 import styles from "./NeedsYouCard.module.css";
 
 function Thumb({ file }: { file: RunFile }) {
@@ -53,12 +53,7 @@ function CheckBody({ w }: { w: WaitingCell }) {
             <span className={styles.fileName} data-tip={f.path}>
               {f.name || baseName(f.path)}
             </span>
-            <Button size="sm" variant="ghost" disabled={!f.outputId} onClick={() => openRunFile(f)} aria-label={`Open ${f.name}`} data-tip={f.outputId ? "Open this file with your default app to look at it" : "This file is not in the Library, so it cannot be opened from here"}>
-              Open
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => revealRunFile(f)} aria-label={`${revealLabel}: ${f.name}`} data-tip="Show this file in your file manager">
-              Reveal
-            </Button>
+            <FileActions path={f.path} outputId={f.outputId || undefined} disabled={f.missing} moduleId="pipelines" />
           </li>
         ))}
       </ul>

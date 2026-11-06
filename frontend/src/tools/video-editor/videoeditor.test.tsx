@@ -20,6 +20,7 @@ const h = vi.hoisted(() => ({
   moduleState: vi.fn(),
   setState: vi.fn(),
   revealPath: vi.fn(),
+  reveal: vi.fn(),
   sources: vi.fn(),
   closeWindow: vi.fn(async (_k: string) => undefined),
   dropHandler: null as null | ((info: { paths: string[]; x: number; y: number }) => void),
@@ -89,7 +90,7 @@ vi.mock("@/lib/api", async (orig) => {
     SettingsService: { ModuleState: (...a: unknown[]) => h.moduleState(...a), SetModuleState: (...a: unknown[]) => h.setState(...a) },
     JobsService: { Cancel: async () => undefined },
     DesktopService: { CloseWindow: (k: string) => h.closeWindow(k), OpenWindows: async () => [] },
-    LibraryService: { RevealPath: (...a: unknown[]) => h.revealPath(...a), Reveal: async () => undefined, Open: async () => undefined },
+    LibraryService: { RevealPath: (...a: unknown[]) => h.revealPath(...a), Reveal: (...a: unknown[]) => h.reveal(...a), Open: async () => undefined },
   };
 });
 
@@ -195,6 +196,7 @@ beforeEach(() => {
   h.pick.mockResolvedValue([]);
   h.pickWith.mockResolvedValue([]);
   h.revealPath.mockResolvedValue(undefined);
+  h.reveal.mockResolvedValue(undefined);
   useJobs.setState({ byId: {} } as Partial<ReturnType<typeof useJobs.getState>>);
   useUI.setState({ handoff: null, view: "video-editor" });
 });
@@ -411,13 +413,13 @@ describe("export", () => {
         job("jr", { status: JobStatus.JobDone, outputs: [{ id: "o1", jobId: "jr", moduleId: "video-editor", path: "/lib/Edits/Beach day.mp4", name: "Beach day.mp4" }] as Job["outputs"] }),
       ),
     );
-    await screen.findByText("Exported Beach day.mp4");
+    await screen.findByText("Beach day.mp4", { selector: "span" });
     await userEvent.click(screen.getByRole("button", { name: "Add captions with Subtitles" }));
     expect(useUI.getState().handoff).toEqual({ moduleId: "subtitles", inputs: ["/lib/Edits/Beach day.mp4"] });
     await userEvent.click(screen.getByRole("button", { name: "Add to post…" }));
     expect(useUI.getState().handoff).toEqual({ moduleId: "post-builder", inputs: ["/lib/Edits/Beach day.mp4"] });
     await userEvent.click(screen.getAllByRole("button", { name: /Explorer|Finder/ })[0]!);
-    expect(h.revealPath).toHaveBeenCalledWith("/lib/Edits/Beach day.mp4");
+    expect(h.reveal).toHaveBeenCalledWith("o1");
   });
 
   it("plays the exact preview with a banner that goes stale when the project changes", async () => {
