@@ -17,6 +17,15 @@ async function run(p: Promise<unknown>) {
   }
 }
 
+async function saveCopy(outputId: string | undefined, path: string) {
+  try {
+    const dst = await LibraryService.SaveCopy(outputId ?? "", path);
+    if (dst) toast({ title: `Saved a copy to ${dst}`, tone: "success" });
+  } catch (e) {
+    toast({ title: toAppError(e).message, tone: "danger" });
+  }
+}
+
 export interface FileActionsProps {
   /** Library output id; without it Open is disabled and Reveal falls back to the path. */
   outputId?: string;
@@ -30,8 +39,9 @@ export interface FileActionsProps {
  * Result-row actions for a file: **Use** (only inside another tool that wants
  * results back, Phase 11), **Send to** (always visible: every ready tool that
  * accepts the file, "Add to post…" and the saved pipelines that take it), and
- * Reveal and Open, which show on row hover and keyboard focus (they stay in the
- * tab order).
+ * Reveal, Open and Save a copy. Inside a result row (`useResultBehaviour`) those
+ * three show on row hover and keyboard focus (they stay in the tab order);
+ * anywhere else they are always visible.
  */
 export function FileActions({ outputId, path, disabled, moduleId }: FileActionsProps) {
   const embed = useEmbed();
@@ -94,6 +104,14 @@ export function FileActions({ outputId, path, disabled, moduleId }: FileActionsP
           onClick={() => {
             if (outputId) void run(LibraryService.Open(outputId));
           }}
+        />
+        <IconButton
+          size="sm"
+          icon="download"
+          label="Save a copy…"
+          data-tip={disabled ? "The file is missing" : "Save a copy somewhere else; the one in your library stays"}
+          disabled={disabled}
+          onClick={() => void saveCopy(outputId, path)}
         />
       </span>
     </>

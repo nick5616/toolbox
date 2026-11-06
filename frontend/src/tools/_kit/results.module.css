@@ -58,21 +58,25 @@
   opacity: 0.5;
 }
 
-/* Result rows (Phase 14): Reveal and Open show on hover or focus; Send to is always visible. */
+/* Result rows (Phase 14): inside a result row, Reveal/Open/Save a copy show on hover or
+   focus; Send to is always visible. Outside a row (a tool's result bar) they always show. */
 .hoverActions {
   display: inline-flex;
-  opacity: 0;
   transition: opacity var(--dur-fast, 120ms);
+}
+
+:global([data-result-row]) .hoverActions {
+  opacity: 0;
 }
 
 :global([data-result-row]):hover .hoverActions,
 :global([data-result-row]):focus-within .hoverActions,
-.hoverActions:focus-within {
+:global([data-result-row]) .hoverActions:focus-within {
   opacity: 1;
 }
 
 @media (hover: none) {
-  .hoverActions {
+  :global([data-result-row]) .hoverActions {
     opacity: 1;
   }
 }

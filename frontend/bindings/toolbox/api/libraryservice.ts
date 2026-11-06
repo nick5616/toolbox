@@ -56,3 +56,12 @@ export function Reveal(outputID: string): $CancellablePromise<void> {
 export function RevealPath(path: string): $CancellablePromise<void> {
     return $Call.ByID(3843007883, path);
 }
+
+/**
+ * SaveCopy asks where to save a copy of a library output (or of a file inside
+ * the library or app folder when outputID is "") and copies it there. The
+ * original is never moved or changed. Cancelling returns "".
+ */
+export function SaveCopy(outputID: string, path: string): $CancellablePromise<string> {
+    return $Call.ByID(3465844009, outputID, path);
+}

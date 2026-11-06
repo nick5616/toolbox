@@ -52,6 +52,11 @@ function baseName(p: string): string {
   return i >= 0 ? p.slice(i + 1) : p;
 }
 
+function parentName(p: string): string {
+  const parts = p.split(/[\\/]+/).filter(Boolean);
+  return parts.length >= 2 ? (parts[parts.length - 2] ?? "") : "";
+}
+
 function parseWarning(resultJson: string): string {
   try {
     const r = JSON.parse(resultJson) as { warning?: unknown };
@@ -513,8 +518,8 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
           <span className={styles.resultName} data-tip={output.path}>
             {output.name}
           </span>
-          <span className={styles.label} data-tip="File size on disk">
-            {formatBytes(output.sizeBytes)}
+          <span className={styles.label} data-tip={`Saved automatically in your library: ${output.path}`}>
+            {formatBytes(output.sizeBytes)} · saved in {parentName(output.path)}
           </span>
           <FileActions outputId={output.id} path={output.path} />
         </div>
