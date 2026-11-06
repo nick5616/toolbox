@@ -106,7 +106,7 @@ describe("Runs graph", () => {
     const panel = screen.getByRole("complementary", { name: "Stem Splitter: files and progress" });
     const a = within(panel).getByRole("region", { name: "a.mp3: Done" });
     expect(within(a).getByText("a-vocals.wav")).toBeTruthy();
-    expect(within(a).getByRole("button", { name: /Send a-vocals.wav to/ })).toBeTruthy();
+    expect(within(within(a).getByRole("group", { name: "a-vocals.wav" })).getByRole("button", { name: "Send to…" })).toBeTruthy();
     const b = within(panel).getByRole("region", { name: "b.mp3: Failed" });
     expect(within(b).getByText("Stem model missing")).toBeTruthy();
     expect(within(b).getByText("Install the AI engine")).toBeTruthy();

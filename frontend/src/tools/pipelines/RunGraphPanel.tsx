@@ -1,6 +1,5 @@
 import { Icon, IconButton, cx } from "@/components";
 import { CellStatus } from "@/lib/api";
-import { startPathsDrag } from "@/lib/fileDrag";
 import { useModules } from "@/state/modules";
 import { usePipelines, type RunView } from "@/state/pipelines";
 import type { PipelineStep } from "@/lib/api";
@@ -60,16 +59,7 @@ export function RunGraphPanel({ run, step, onClose }: { run: RunView; step: Pipe
                 cell.message && <div className={styles.cellMsg}>{cell.message}</div>
               )}
               {cell.files.map((f) => (
-                <ul
-                  key={f.path}
-                  className={styles.fileList}
-                  draggable={!f.missing}
-                  aria-label={`${f.name || f.path}`}
-                  data-tip={f.missing ? undefined : "Drag this file into another tool or a folder"}
-                  onDragStart={(e) => startPathsDrag(e, [f.path])}
-                >
-                  <RunFileRow file={f} />
-                </ul>
+                <RunFileRow key={f.path} file={f} />
               ))}
             </section>
           );

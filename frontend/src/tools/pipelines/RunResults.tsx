@@ -4,6 +4,7 @@ import { toast } from "@/components";
 import { toAppError } from "@/lib/errors";
 import type { RunFileView, RunView } from "@/state/pipelines";
 import { orderItems } from "./RunGridModel";
+import { ResultTable } from "@/tools/_kit";
 import { RunFileRow } from "./RunResultsFileRow";
 import styles from "./RunResults.module.css";
 
@@ -47,34 +48,23 @@ export function RunResults({ run }: { run: RunView }) {
       {groups.map(({ item, files }) => (
         <div key={item.index} className={styles.group}>
           <div className={styles.groupLabel}>{item.label}</div>
-          <ul className={styles.files}>
+          <div className={styles.files}>
             {files.map((f) => (
               <RunFileRow key={f.path} file={f} />
             ))}
-          </ul>
+          </div>
         </div>
       ))}
       {varRows.length > 0 && (
-        <table className={styles.vars} aria-label="Variables">
-          <thead>
-            <tr>
-              <th data-tip="The input file or link">File</th>
-              {varKeys.map((k) => (
-                <th key={k} data-tip={`Value of {${k}} made for each file`}>{k}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {varRows.map((i) => (
-              <tr key={i.index}>
-                <td>{i.label}</td>
-                {varKeys.map((k) => (
-                  <td key={k}>{i.vars[k] ?? ""}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ResultTable
+          label="Variables"
+          rows={varRows}
+          rowKey={(i) => String(i.index)}
+          columns={[
+            { key: "_file", header: "File", render: (i) => i.label, text: (i) => i.label },
+            ...varKeys.map((k) => ({ key: k, header: k, render: (i: (typeof varRows)[number]) => i.vars[k] ?? "", text: (i: (typeof varRows)[number]) => i.vars[k] ?? "" })),
+          ]}
+        />
       )}
     </section>
   );

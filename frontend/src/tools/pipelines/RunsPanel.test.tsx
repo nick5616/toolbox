@@ -187,7 +187,7 @@ describe("CellPopover", () => {
     expect(useUI.getState().trayOpen).toBe(true);
     expect(useUI.getState().expandedLogJobId).toBe("j9");
 
-    fireEvent.click(within(pop).getByRole("button", { name: /Open a-vocals.wav/ }));
+    fireEvent.click(within(within(pop).getByRole("group", { name: "a-vocals.wav" })).getByRole("button", { name: "Open" }));
     expect(h.open).toHaveBeenCalledWith("o1");
   });
 
@@ -196,8 +196,8 @@ describe("CellPopover", () => {
     render(<RunsPanel />);
     fireEvent.click(gridCell(/Stem Splitter, a.mp3: Done/));
     const pop = screen.getByRole("dialog");
-    expect((within(pop).getByRole("button", { name: /Open x.wav/ }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(within(pop).getByRole("button", { name: /: x.wav/ }));
+    expect((within(within(pop).getByRole("group", { name: "x.wav" })).getByRole("button", { name: "Open" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(within(within(pop).getByRole("group", { name: "x.wav" })).getByRole("button", { name: /Explorer|Finder/ }));
     expect(h.revealPath).toHaveBeenCalledWith("/lib/x.wav");
   });
 
@@ -273,7 +273,7 @@ describe("Needs-you cards", () => {
     fireEvent.click(within(card).getByRole("checkbox", { name: "1.png" }));
     fireEvent.click(within(card).getByRole("button", { name: "Continue with 1 file" }));
     expect(h.cont).toHaveBeenCalledWith({ runId: "r", item: 3, stepId: "s2", keep: ["/lib/2.wav"], passThrough: false });
-    fireEvent.click(within(card).getByRole("button", { name: "Open 1.png" }));
+    fireEvent.click(within(card).getAllByRole("button", { name: "Open" })[0]!);
     expect(h.open).toHaveBeenCalledWith("o1");
     fireEvent.click(within(card).getByRole("button", { name: "Stop this file" }));
     expect(h.stop).toHaveBeenCalledWith("r", 3);

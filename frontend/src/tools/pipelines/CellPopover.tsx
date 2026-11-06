@@ -104,11 +104,11 @@ export function CellPopover({ run, item, stepIndex, anchor, onClose }: CellPopov
       {cell.files.length > 0 && (
         <div className={styles.section}>
           <div className={styles.label} data-tip="Files this step made">Files</div>
-          <ul className={styles.list}>
+          <div className={styles.list}>
             {cell.files.map((f) => (
               <RunFileRow key={f.path} file={f} />
             ))}
-          </ul>
+          </div>
         </div>
       )}
 
