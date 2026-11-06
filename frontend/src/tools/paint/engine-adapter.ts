@@ -26,8 +26,10 @@ import type { PerceptionQueue, PendingRegion, GenerationGroup } from "@/paint/ai
 import type { BrushPreset } from "@/paint/brushes/schema";
 import type { PaintEngine, StrokeResult } from "@/paint/engine/types";
 import type { LabParams, LabToolInfo, PerceptionToolInfo } from "@/paint/lab/types";
+import { PERCEPTION_TOOLS } from "@/paint/ai/tools";
+import { ALGORITHMIC_TOOLS } from "@/paint/lab";
 import { attachCanvasInput, type InputController } from "./canvasInput";
-import { FAKE_ALGORITHMIC, FAKE_BRUSHES, FAKE_ORIGINS, FAKE_PERCEPTION, FAKE_SET_NAMES } from "./testing/fakes";
+import { FAKE_BRUSHES, FAKE_ORIGINS, FAKE_SET_NAMES } from "./testing/fakes";
 import { FakeEngine } from "./testing/fakeEngine";
 import { renderFakeStroke } from "./testing/fakeStroke";
 import { createFakeQueue } from "./testing/fakeQueue";
@@ -83,6 +85,8 @@ export interface PaintRuntime {
   /** Extend / Upscale canvas (perception, canvas-level). Rejects with a user-facing message when unavailable. */
   extendCanvas(a: { engine: PaintEngine; queue: PerceptionQueue; sides: { left: number; right: number; top: number; bottom: number }; model: "fast" | "best" }): Promise<void>;
   upscaleCanvas(a: { engine: PaintEngine; scale: 2 | 4; inPlace: boolean }): Promise<void>;
+  /** One-shot Lab actions with no stroke (Select subject). Rejects with a user-facing message. */
+  runLabAction(toolId: string, a: { engine: PaintEngine; queue: PerceptionQueue; points?: Array<{ x: number; y: number; positive: boolean }> }): Promise<void>;
   adjustments(): AdjustmentInfo[];
   applyGuides(engine: PaintEngine, g: GuidesState): void;
   /** Local origin cards used when PaintService.Origins() isn't available (tests, early builds). */
@@ -95,7 +99,8 @@ const fakeRuntime: PaintRuntime = {
   brushLibrary: () => FAKE_BRUSHES,
   brushSetNames: () => FAKE_SET_NAMES,
   assetChoices: (kind) => (kind === "tip" ? [{ value: "round", label: "Round" }, { value: "square", label: "Square" }, { value: "lib:leaf-oak.png", label: "Oak leaf" }] : [{ value: "", label: "None" }, { value: "lib:paper.png", label: "Paper" }]),
-  labTools: () => [...FAKE_ALGORITHMIC, ...FAKE_PERCEPTION],
+  // Real P2 + P6 infos (both frozen LabToolInfo); the engine registers the algorithmic ones with registerAll(registerLabTool).
+  labTools: () => [...ALGORITHMIC_TOOLS, ...PERCEPTION_TOOLS],
   renderBrushStroke: renderFakeStroke,
   createQueue: createFakeQueue,
   runPerceptionStroke: async ({ queue, tool, result, seed }) => {
@@ -107,6 +112,9 @@ const fakeRuntime: PaintRuntime = {
   },
   upscaleCanvas: async () => {
     throw new Error("Upscale canvas needs the AI engine to be wired in");
+  },
+  runLabAction: async () => {
+    throw new Error("This action needs the AI engine to be wired in");
   },
   adjustments: () =>
     ["Hue, saturation, brightness", "Colour balance", "Curves", "Gradient map", "Gaussian blur", "Motion blur", "Sharpen", "Noise", "Liquify"].map((label, i) => ({

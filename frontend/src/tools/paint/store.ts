@@ -12,7 +12,7 @@ import { DEFAULT_GUIDES, type GuidesState } from "./engine-adapter";
 
 export type ToolId = "brush" | "smudge" | "eraser" | "fill" | "eyedropper" | "transform" | "lasso" | "rect" | "ellipse" | "wand" | "lab" | "history";
 export type BrushToolId = "brush" | "smudge" | "eraser";
-export type PanelId = "brushes" | "brushstudio" | "color" | "layers" | "history" | "lab" | "guides" | "actions" | "adjust" | "select" | "transform";
+export type PanelId = "brushes" | "brushstudio" | "color" | "layers" | "history" | "lab" | "guides";
 export type DockMode = "auto" | "dock" | "pop";
 export type SaveState = "saved" | "dirty" | "saving" | "error";
 
@@ -76,6 +76,8 @@ export interface PaintUIState {
   setUIHidden(v: boolean): void;
   setHud(v: boolean): void;
   setLabParam(toolId: string, id: string, v: number | string | boolean): void;
+  setLabParams(toolId: string, p: LabParams): void;
+  setLabSeed(toolId: string, seed: number): void;
   rollSeed(toolId: string): number;
   toggleSeedLock(toolId: string): void;
   setWand(w: Partial<PaintUIState["wand"]>): void;
@@ -148,6 +150,8 @@ export const usePaintUI = create<PaintUIState>((set, get) => ({
   setUIHidden: (uiHidden) => set({ uiHidden }),
   setHud: (hud) => set({ hud }),
   setLabParam: (toolId, id, v) => set((s) => ({ labParams: { ...s.labParams, [toolId]: { ...(s.labParams[toolId] ?? {}), [id]: v } } })),
+  setLabParams: (toolId, p) => set((s) => ({ labParams: { ...s.labParams, [toolId]: p } })),
+  setLabSeed: (toolId, seed) => set((s) => ({ labSeeds: { ...s.labSeeds, [toolId]: { seed, locked: s.labSeeds[toolId]?.locked ?? false } } })),
   rollSeed: (toolId) => {
     const seed = nextSeed();
     set((s) => ({ labSeeds: { ...s.labSeeds, [toolId]: { seed, locked: s.labSeeds[toolId]?.locked ?? false } } }));

@@ -164,7 +164,7 @@ export function Badge({ value, compact }: { value: Predictability; compact?: boo
 export interface SegmentedProps<T extends string> {
   label: string;
   value: T;
-  options: ReadonlyArray<{ value: T; label: ReactNode; tip: string; icon?: string }>;
+  options: ReadonlyArray<{ value: NoInfer<T>; label: ReactNode; tip: string; icon?: string }>;
   onChange(v: T): void;
   className?: string;
 }

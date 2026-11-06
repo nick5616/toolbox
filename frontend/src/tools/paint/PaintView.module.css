@@ -1,11 +1,16 @@
-.root {
+.host {
+  position: relative;
   height: 100%;
-  display: grid;
-  place-items: center;
+  min-height: 0;
+  overflow: hidden;
   background: var(--p-canvas-bg);
-  color: var(--p-ink-dim);
+  color: var(--p-ink);
 }
 
-.note {
+.loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--p-ink-dim);
   font-size: var(--p-body);
 }

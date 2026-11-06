@@ -7,4 +7,6 @@ export type { MenuEntry } from "./Menu";
 export { VerticalSlider, HSlider } from "./Sliders";
 export { Dialog } from "./Dialog";
 export { OriginCard } from "./OriginCard";
+export { Device } from "./Device";
+export { Knob } from "./Knob";
 export { default as ui } from "./ui.module.css";

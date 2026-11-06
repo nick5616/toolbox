@@ -1,0 +1,453 @@
+.stack {
+  display: grid;
+  gap: var(--p-gap-l);
+}
+
+.section {
+  display: grid;
+  gap: 6px;
+}
+
+.h {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--p-ink-faint);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wrap {
+  flex-wrap: wrap;
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--p-radius-s);
+  background: var(--p-field);
+}
+
+.tab {
+  flex: 1;
+  min-height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--p-ink-dim);
+  font: inherit;
+  font-size: var(--p-body);
+  cursor: pointer;
+}
+
+.tab[aria-selected="true"] {
+  background: var(--p-island-solid);
+  color: var(--p-ink);
+}
+
+.tab:focus-visible,
+.listBtn:focus-visible,
+.swatch:focus-visible,
+.sv:focus-visible,
+.layerRow:focus-visible,
+.gen:focus-visible,
+.brushBtn:focus-visible {
+  outline: 2px solid var(--p-focus);
+  outline-offset: 1px;
+}
+
+/* ---- brush library ---- */
+.setList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.brushList {
+  display: grid;
+  gap: 2px;
+}
+
+.brushBtn {
+  display: grid;
+  grid-template-columns: 1fr 132px;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--p-ink);
+  font: inherit;
+  font-size: var(--p-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.brushBtn:hover {
+  background: var(--p-hover);
+}
+
+.brushBtn[aria-pressed="true"] {
+  background: var(--p-selected);
+}
+
+.preview {
+  width: 132px;
+  height: 36px;
+  border-radius: 6px;
+  background: var(--p-field);
+}
+
+.fidelity {
+  margin: 0;
+  padding: 8px 10px;
+  list-style: none;
+  border-radius: var(--p-radius-s);
+  background: var(--p-field);
+  font-size: var(--p-label);
+  line-height: 1.45;
+  color: var(--p-ink-dim);
+}
+
+.fidelity li::before {
+  content: "• ";
+}
+
+.fail {
+  color: var(--p-danger);
+}
+
+/* ---- colour ---- */
+.sv {
+  position: relative;
+  height: 150px;
+  border-radius: var(--p-radius-s);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.svDot,
+.hueDot {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  border: 2px solid var(--p-ring);
+  box-shadow: 0 0 0 1px var(--p-ring-shadow);
+  pointer-events: none;
+}
+
+.hue {
+  position: relative;
+  height: 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.hueDot {
+  top: 50%;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid var(--p-island-border);
+  border-radius: 50%;
+  background: var(--sw);
+  cursor: pointer;
+}
+
+.swatch[aria-pressed="true"] {
+  border-color: var(--p-ring);
+}
+
+.current {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--p-ring);
+  box-shadow: 0 0 0 1px var(--p-ring-shadow);
+  background: var(--p-current);
+}
+
+/* ---- layers ---- */
+.layers {
+  display: grid;
+  gap: 3px;
+}
+
+.layerRow {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 4px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--p-ink);
+  cursor: pointer;
+}
+
+.layerRow:hover {
+  background: var(--p-hover);
+}
+
+.layerRow[aria-selected="true"] {
+  background: var(--p-selected);
+}
+
+.layerRow[data-drop="true"] {
+  box-shadow: 0 -2px 0 0 var(--p-accent);
+}
+
+.layerRow[data-hidden="true"] .layerName {
+  opacity: 0.45;
+}
+
+.thumb {
+  width: 44px;
+  height: 32px;
+  border-radius: 5px;
+  background-color: var(--p-checker-b);
+  background-image:
+    linear-gradient(45deg, var(--p-checker-a) 25%, transparent 25%, transparent 75%, var(--p-checker-a) 75%),
+    linear-gradient(45deg, var(--p-checker-a) 25%, transparent 25%, transparent 75%, var(--p-checker-a) 75%);
+  background-size: 10px 10px;
+  background-position:
+    0 0,
+    5px 5px;
+  object-fit: contain;
+}
+
+.layerName {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  font-size: var(--p-body);
+}
+
+.layerName input {
+  width: 100%;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--p-field);
+  color: var(--p-ink);
+  font: inherit;
+}
+
+.layerMeta {
+  font-size: 10px;
+  color: var(--p-ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select {
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--p-field);
+  color: var(--p-ink);
+  font: inherit;
+  font-size: var(--p-body);
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--p-focus);
+}
+
+/* ---- history ---- */
+.histRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--p-ink);
+  font: inherit;
+  font-size: var(--p-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.histRow:hover {
+  background: var(--p-hover);
+}
+
+.histRow[aria-current="true"] {
+  background: var(--p-selected);
+}
+
+.histRow[aria-disabled="true"] {
+  opacity: 0.4;
+}
+
+.meter {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--p-track);
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  background: var(--p-accent);
+}
+
+/* ---- lab ---- */
+.groupHead {
+  margin: 4px 0 0;
+}
+
+.gate {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--p-radius-s);
+  background: var(--p-field);
+  box-shadow: inset 0 0 0 1px var(--p-seeded);
+  font-size: var(--p-body);
+  color: var(--p-ink);
+}
+
+/* ---- brush studio ---- */
+.pad {
+  width: 100%;
+  height: 120px;
+  border-radius: var(--p-radius-s);
+  background: var(--p-field);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.curve {
+  width: 100%;
+  height: 90px;
+  border-radius: 6px;
+  background: var(--p-field);
+  touch-action: none;
+}
+
+.curveLine {
+  fill: none;
+  stroke: var(--p-accent);
+  stroke-width: 2;
+}
+
+.curvePt {
+  fill: var(--p-thumb);
+  stroke: var(--p-accent);
+  stroke-width: 1.5;
+  cursor: grab;
+}
+
+.dyn {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: var(--p-radius-s);
+  background: var(--p-field);
+}
+
+.nameField {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--p-radius-s);
+  background: var(--p-field);
+  color: var(--p-ink);
+  font: inherit;
+  font-size: var(--p-body);
+}
+
+.nameField:focus-visible {
+  outline: 2px solid var(--p-focus);
+}
+
+/* ---- generations ---- */
+.gens {
+  display: flex;
+  gap: 6px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.gen {
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-width: 52px;
+  height: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--p-field);
+  color: var(--p-ink-dim);
+  font: inherit;
+  font-size: var(--p-label);
+  cursor: pointer;
+}
+
+.gen[aria-pressed="true"] {
+  background: var(--p-selected);
+  color: var(--p-ink);
+}
+
+.gen img {
+  width: 40px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.listBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--p-field);
+  color: var(--p-ink-dim);
+  font: inherit;
+  font-size: var(--p-label);
+  cursor: pointer;
+}
+
+.listBtn[aria-pressed="true"] {
+  background: var(--p-selected);
+  color: var(--p-ink);
+}

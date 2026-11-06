@@ -101,12 +101,21 @@ export class Saver {
 
   /** Reads the loaded document's tile lists; call after the engine has loaded, then it listens for changes. */
   start(): void {
+    this.disposed = false;
+    this.sync();
+    if (this.offs.length) return;
+    const e = this.opts.engine;
+    this.offs.push(e.on("change", () => this.markDirty()), e.on("layers", () => this.markDirty()));
+  }
+
+  /** Re-reads the tile lists and revisions of the engine's document (after a reload). */
+  sync(): void {
+    this.tiles.clear();
+    this.revs.clear();
     for (const l of this.opts.engine.doc.layers ?? []) {
       this.tiles.set(l.id, new Set(l.tiles ?? []));
       this.revs.set(l.id, l.rev);
     }
-    const e = this.opts.engine;
-    this.offs.push(e.on("change", () => this.markDirty()), e.on("layers", () => this.markDirty()));
   }
 
   markDirty(): void {
