@@ -38,6 +38,8 @@ const noTiles: TileSource = { load: async () => new Map() };
 const INK: RGBA = { r: 0.08, g: 0.1, b: 0.16, a: 1 };
 const LIGHT: RGBA = { r: 1, g: 0.72, b: 0.32, a: 1 };
 const LIGHT2: RGBA = { r: 0.4, g: 0.7, b: 1, a: 1 };
+const GREEN: RGBA = { r: 0.2, g: 0.55, b: 0.24, a: 1 };
+const GREEN2: RGBA = { r: 0.85, g: 0.7, b: 0.2, a: 1 };
 const SEC: RGBA = { r: 0.9, g: 0.4, b: 0.2, a: 1 };
 const codec = browserCodec();
 
@@ -107,11 +109,13 @@ async function renderPreset(engine: PaintEngine & PaintEngineExt, preset: BrushP
   await engine.load(blankDocForLab(CELL_W, CELL_H, dark ? DARK : PAPER), noTiles);
   await engine.prepareBrush(p);
   const smudge = isSmudge(p);
+  // Colour jitter only shows on a mid-saturation colour.
+  const colourful = p.set === "Nature" || p.color.hueJitter > 0 || p.color.satJitter > 0;
   if (smudge || isEraser(p)) prepaint(engine, smudge);
   for (const s of testStrokes(p)) {
     const t: ToolState = smudge
       ? { kind: "smudge", brush: p, seed: s.seed }
-      : { kind: "brush", brush: p, color: dark ? LIGHT : INK, secondary: dark ? LIGHT2 : SEC, seed: s.seed };
+      : { kind: "brush", brush: p, color: dark ? LIGHT : colourful ? GREEN : INK, secondary: dark ? LIGHT2 : colourful ? GREEN2 : SEC, seed: s.seed };
     play(engine, t, s.pts);
   }
   const px = engine.readPixels({ x: 0, y: 0, w: CELL_W, h: CELL_H }, "merged");
