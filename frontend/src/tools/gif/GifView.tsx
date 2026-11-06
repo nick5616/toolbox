@@ -7,6 +7,7 @@ import { EmptyLine, FileToolLayout, ResultRow, runLabel, summarize, useFileInput
 import { submitJobs } from "@/tools/_kit/enqueue";
 import { useThumb } from "@/tools/_kit/image/common";
 import type { ToolViewProps } from "../index";
+import { VideoPreview } from "./VideoPreview";
 import { DEFAULT_GIF_OPTIONS, gifSummary, sanitizeGifOptions, toGifResult, type GifResultItem } from "./options";
 import styles from "./gif.module.css";
 
@@ -107,6 +108,16 @@ export default function GifView({ moduleId }: ToolViewProps) {
       inputErrors={inputErrors}
       primary={
         <div className={styles.options}>
+          {inputs.files[0] && (
+            <VideoPreview
+              key={inputs.files[0].path}
+              path={inputs.files[0].path}
+              startSec={opts.startSec}
+              picking={!sheet}
+              onStart={(startSec) => setOpts((o) => ({ ...o, startSec: Math.min(36000, startSec) }))}
+              onLength={(lengthSec) => setOpts((o) => ({ ...o, lengthSec }))}
+            />
+          )}
           <SegmentedControl<GifMode> aria-label="Make" value={opts.mode} options={MODE_OPTIONS} onChange={(mode) => setOpts((o) => ({ ...o, mode }))} />
           {sheet ? (
             <div className={styles.times}>
