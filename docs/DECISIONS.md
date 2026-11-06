@@ -596,3 +596,23 @@ Newest last. Format: date — decision — why.
     - `LastExport` takes an `extra` slot, which Post Builder uses for Open folder.
     - The Downloader button says "Downloads folder" again.
     - Object Eraser names the library folder it saved to.
+- **2026-11-06: Phase 19 approved and Wave 0 laid down.** The spec's defaults stand: no prompted generation (Q1), the Library rebuilt rather than a separate Artifacts tool (Q2), Delete goes to the trash (Q3), 8192 px / 40 MP (Q4), mouse pressure simulation (Q5), ORA (Q6), the bespoke design language for Paint+ only (Q9), 16:9 as both the layout target and the preset order (Q10), and all four importers (Q11).
+  - **Contract changes made in Wave 0:**
+    - `LibraryService.Folders()` returns the root `LibraryFolder` with `Children` rather than a slice, so the root's counts come along.
+    - `Descriptor.Quiet` is mirrored onto each job snapshot as `Job.quiet`, since hidden modules aren't in the frontend's module list. Both fields are `omitempty`, so existing fixtures stay valid.
+    - `ListDir` returns `LibraryListing{Entries, Truncated}`.
+    - `PaintService.AIResult(jobID, index)` gives every Dissolve pass; `AIResultInfo` has no file list.
+  - **Packs:** the Image pack now includes `matte-select` (SAM 2.1 tiny) for Select object. It is shared with Music edits, and components already appear in several packs (the engine does).
+  - **Licences checked against primary sources (Wave 0 spike d):**
+    - **MyPaint brushes:** CC0, every pack, per `Licenses.dep5`.
+    - **Krita default brush tips:** CC BY 3.0, per `krita/data/README`, crediting David Revoy and the Blender Foundation.
+    - **David Revoy's Krita packs:** CC0, per the article bodies. His site footer says CC BY 4.0 with "AI derivation prohibited", so he is credited and his brushes are never used as training data.
+    - **Not bundled:** Krita's other patterns (no licence file) and its DITH patterns (CC BY-SA 4.0, kept out to avoid ShareAlike on a modified set).
+  - **Model origins checked (spike e):** LaMa big-lama (Places-Challenge, Apache-2.0), MI-GAN (Places2, MIT), BiRefNet (photo segmentation and matting sets, MIT), SAM 2.1 (SA-1B licensed photos + SA-V + internal licensed video, Apache-2.0) and Real-ESRGAN x4plus (DIV2K/Flickr2K/OST, BSD-3). None is prompt-driven or trained on artwork.
+    - The Real-ESRGAN anime model's training data isn't documented, so the Lab never uses it.
+    - The IS-Net general-use weights have no stated licence or data; Select subject prefers BiRefNet presets.
+    - The text is in `modules/paint/origins.go`.
+  - **Spikes not run here:**
+    - **(a) Pen pressure in WebView2** needs a pen on this PC, which a session can't use. P1 builds velocity pressure as the fallback, and the user checks real pressure at first use (acceptance 1).
+    - **(b) Dab throughput** is measured by P1 in PaintLab.
+    - **(c) MI-GAN/LaMa crop timings** are measured by P4 with the installed engine.
