@@ -11,11 +11,21 @@ export interface MaskData extends MaskTex {
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
 
-/** Analytic tip coverage at normalised coordinates (n = -1..1 across the dab). */
-export function analyticCoverage(shape: "round" | "square", nx: number, ny: number, hard: number, aaw: number, aa: boolean): number {
-  const d = shape === "square" ? Math.max(Math.abs(nx), Math.abs(ny)) : Math.hypot(nx, ny);
+/** Analytic tip coverage at normalised coordinates (n = -1..1 across the dab); ix, iy are one pixel in those units. */
+export function analyticCoverage(shape: "round" | "square", nx: number, ny: number, hard: number, ix: number, iy: number, aa: boolean): number {
+  let d: number;
+  let g: number;
+  if (shape === "square") {
+    const ax = Math.abs(nx);
+    const ay = Math.abs(ny);
+    d = Math.max(ax, ay);
+    g = ax > ay ? ix : iy;
+  } else {
+    d = Math.hypot(nx, ny);
+    g = Math.hypot(nx * ix, ny * iy) / Math.max(d, 0.0001);
+  }
   if (!aa) return d <= 1 ? 1 : 0;
-  const w = Math.max(1 - hard, aaw);
+  const w = Math.max(1 - hard, g);
   return smooth(clamp((1 - d) / w, 0, 1));
 }
 
@@ -55,13 +65,13 @@ export function sampleMask(m: MaskData, u: number, v: number, wrap: boolean, lin
   return a * (1 - ty) + b * ty;
 }
 
-export function tipCoverage(tip: TipStyle, nx: number, ny: number, aaw: number, aa: boolean): number {
+export function tipCoverage(tip: TipStyle, nx: number, ny: number, ix: number, iy: number, aa: boolean): number {
   if (tip.shape === "image") {
     if (!tip.tex || nx < -1 || nx > 1 || ny < -1 || ny > 1) return 0;
     const c = sampleMask(tip.tex as MaskData, nx * 0.5 + 0.5, ny * 0.5 + 0.5, false, aa);
     return tip.invert ? 1 - c : c;
   }
-  const c = analyticCoverage(tip.shape, nx, ny, tip.hardness, aaw, aa);
+  const c = analyticCoverage(tip.shape, nx, ny, tip.hardness, ix, iy, aa);
   return tip.invert ? 1 - c : c;
 }
 
@@ -80,13 +90,15 @@ export interface DabGeo {
   dcs: number;
   dsn: number;
   dScale: number;
-  aaw: number;
+  /** One pixel in the tip's normalised coordinates, along x and y. */
+  ix: number;
+  iy: number;
   /** Half the bounding box (px) to loop over. */
   reach: number;
 }
 
 export function newGeo(): DabGeo {
-  return { x: 0, y: 0, size: 0, hw: 0, hh: 0, cs: 1, sn: 0, alpha: 0, gx: 0, gy: 0, dcs: 1, dsn: 0, dScale: 1, aaw: 1, reach: 0 };
+  return { x: 0, y: 0, size: 0, hw: 0, hh: 0, cs: 1, sn: 0, alpha: 0, gx: 0, gy: 0, dcs: 1, dsn: 0, dScale: 1, ix: 1, iy: 1, reach: 0 };
 }
 
 /** Unpack dab `o` of `f`; false when it paints nothing. */
@@ -108,7 +120,8 @@ export function loadDab(g: DabGeo, f: Float32Array, o: number): boolean {
   g.dcs = Math.cos(da);
   g.dsn = Math.sin(da);
   g.dScale = f[o + D.DSCALE] as number;
-  g.aaw = 1 / g.hw;
+  g.ix = 1 / g.hw;
+  g.iy = 1 / g.hh;
   g.reach = Math.hypot(g.hw, g.hh) + 1;
   return true;
 }
@@ -120,13 +133,13 @@ export function dabAlpha(style: DabStyle, g: DabGeo, wx: number, wy: number): nu
   const lx = fx * g.cs + fy * g.sn;
   const ly = -fx * g.sn + fy * g.cs;
   const aa = style.antialias;
-  let cov = tipCoverage(style.tip, lx / g.hw, ly / g.hh, g.aaw, aa);
+  let cov = tipCoverage(style.tip, lx / g.hw, ly / g.hh, g.ix, g.iy, aa);
   if (cov <= 0) return 0;
   if (style.dual) {
     const ex = lx * g.dcs + ly * g.dsn;
     const ey = -lx * g.dsn + ly * g.dcs;
     const dr = Math.max(style.dual.roundness, 0.0001);
-    cov *= tipCoverage(style.dual, ex / (g.hw * g.dScale), ey / (g.hw * g.dScale * dr), g.aaw, aa);
+    cov *= tipCoverage(style.dual, ex / (g.hw * g.dScale), ey / (g.hw * g.dScale * dr), g.ix / g.dScale, g.ix / (g.dScale * dr), aa);
     if (cov <= 0) return 0;
   }
   let a = cov * g.alpha;

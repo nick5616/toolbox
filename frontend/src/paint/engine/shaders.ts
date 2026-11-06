@@ -54,15 +54,26 @@ uniform float u_grainContrast;
 uniform vec2 u_grainTex;
 out vec4 outColor;
 
-float analytic(int shape, vec2 n, float hard, float aaw) {
-  float d = shape == 1 ? max(abs(n.x), abs(n.y)) : length(n);
+// px = the size of one pixel in the tip's normalised coordinates (1/hw, 1/hh): an
+// edge is smoothed over one pixel on every side, however thin the tip is.
+float analytic(int shape, vec2 n, float hard, vec2 px) {
+  float d;
+  float g;
+  if (shape == 1) {
+    vec2 a = abs(n);
+    d = max(a.x, a.y);
+    g = a.x > a.y ? px.x : px.y;
+  } else {
+    d = length(n);
+    g = length(n * px) / max(d, 0.0001);
+  }
   if (u_aa == 0) return d <= 1.0 ? 1.0 : 0.0;
-  float w = max(1.0 - hard, aaw);
+  float w = max(1.0 - hard, g);
   float t = clamp((1.0 - d) / w, 0.0, 1.0);
   return t * t * (3.0 - 2.0 * t);
 }
 
-float tipCov(int shape, sampler2D tex, vec2 n, float hard, int inv, float aaw) {
+float tipCov(int shape, sampler2D tex, vec2 n, float hard, int inv, vec2 aaw) {
   if (shape == 2) {
     if (abs(n.x) > 1.0 || abs(n.y) > 1.0) return 0.0;
     float c = textureLod(tex, n * 0.5 + 0.5, 0.0).r;
@@ -80,14 +91,14 @@ void main() {
   vec2 wp = u_origin + gl_FragCoord.xy;
   vec2 fp = wp - f0.xy;
   vec2 l = vec2(fp.x * c + fp.y * s, -fp.x * s + fp.y * c);
-  float aaw = 1.0 / hw;
+  vec2 aaw = vec2(1.0 / hw, 1.0 / hh);
   float cov = tipCov(u_tipShape, u_tip, vec2(l.x / hw, l.y / hh), u_hard.x, u_invert.x, aaw);
   if (u_hasDual == 1) {
     float dc = cos(f2.w);
     float ds = sin(f2.w);
     vec2 e = vec2(l.x * dc + l.y * ds, -l.x * ds + l.y * dc);
     float dr = max(u_dualRound, 0.0001);
-    cov *= tipCov(u_dualShape, u_dual, vec2(e.x / (hw * f3.x), e.y / (hw * f3.x * dr)), u_hard.y, u_invert.y, aaw);
+    cov *= tipCov(u_dualShape, u_dual, vec2(e.x / (hw * f3.x), e.y / (hw * f3.x * dr)), u_hard.y, u_invert.y, vec2(1.0 / hw) / vec2(f3.x, f3.x * dr));
   }
   float a = cov * f1.y;
   if (u_hasGrain == 1) {
