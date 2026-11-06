@@ -78,4 +78,6 @@ type Launcher struct {
 	NoteLaunch func(path string)
 	// Subscribe follows focus state changes (closeWhen focusEnds).
 	Subscribe func(fn func(focus.State)) (unsubscribe func())
+	// Current is the focus state now (arms closeWhen focusEnds exactly); optional.
+	Current func() focus.State
 }

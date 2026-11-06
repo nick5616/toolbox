@@ -330,12 +330,14 @@ func run() error {
 	})
 	defer runner.Stop()
 	clipHistory.OnRecorded(runner.ClipboardCopied)
-	if _, err := pipelines.Register(reg, pipelines.Config{
+	pipeMod, err := pipelines.Register(reg, pipelines.Config{
 		Runner: runner, Chat: chatSvc, Outputs: db, Emitter: emitter, LibraryDir: libraryDir,
-		Launcher: pipelines.Launcher{NoteLaunch: focusEng.NoteLaunch, Subscribe: focusEng.Subscribe},
-	}); err != nil {
+		Launcher: pipelines.Launcher{NoteLaunch: focusEng.NoteLaunch, Subscribe: focusEng.Subscribe, Current: focusEng.State},
+	})
+	if err != nil {
 		return err
 	}
+	defer pipeMod.CloseOpened()
 	if _, err := focusmod.Register(reg, focusEng, runner.WakeTimeWaits); err != nil {
 		return err
 	}

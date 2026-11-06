@@ -344,6 +344,21 @@ func TestOpenFocusEndsWaitsForASession(t *testing.T) {
 	waitClose(t, f)
 }
 
+func TestOpenFocusEndsUsesCurrentState(t *testing.T) {
+	// Launcher.Current says idle at launch: the first idle event must not close
+	// the app (no session has run since it opened).
+	f := newOpenFixture(t)
+	f.m.launcher.Current = func() focus.State { return focus.State{} }
+	if _, err := f.run(openOptions(appPath(t), CloseFocusEnds, "r")); err != nil {
+		t.Fatal(err)
+	}
+	f.send(focus.State{})
+	noClose(t, f)
+	f.send(focus.State{Session: &focus.Session{ID: "s"}})
+	f.send(focus.State{})
+	waitClose(t, f)
+}
+
 func TestOpenNeverClosesWithoutRequest(t *testing.T) {
 	f := newOpenFixture(t)
 	if _, err := f.run(openOptions(appPath(t), CloseNever, "r")); err != nil {

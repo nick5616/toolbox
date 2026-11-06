@@ -262,9 +262,20 @@ func (t *openedApps) remember(m *Module, a *openedApp) {
 	if a.closeWhen == CloseNever {
 		return
 	}
+	// Ask before locking: the engine may be emitting to onFocus under its own lock.
+	known := 0
+	if a.closeWhen == CloseFocusEnds && m.launcher.Current != nil {
+		known = -1
+		if m.launcher.Current().Session != nil {
+			known = 1
+		}
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.pruneLocked()
+	if known != 0 {
+		t.active = known
+	}
 	switch a.closeWhen {
 	case CloseFocusEnds:
 		// Launched in a session, or not known yet (assumed to be): armed.
