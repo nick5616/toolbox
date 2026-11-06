@@ -1,6 +1,9 @@
 package focus
 
-import "toolbox/core/focus"
+import (
+	"toolbox/core"
+	"toolbox/core/focus"
+)
 
 // Step actions (SPEC.md §4.1).
 const (
@@ -49,11 +52,13 @@ type JobOptions struct {
 	Start    *focus.StartRequest `json:"start"`
 	IfActive string              `json:"ifActive"`
 	RunID    string              `json:"runId"`
+	Carry    []core.RunFile      `json:"carry"` // the step's files, passed on unchanged
 }
 
 // JobResult is what a focus job records (its step variables and the files it
 // passes through).
 type JobResult struct {
 	Session *focus.Session    `json:"session"`
-	Vars    map[string]string `json:"vars"` // focus_ends, focus_minutes, focus_profile
+	Vars    map[string]string `json:"vars"`  // focus_ends, focus_minutes, focus_profile
+	Files   []core.RunFile    `json:"files"` // the files passed through
 }
