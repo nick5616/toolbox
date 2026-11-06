@@ -6,13 +6,18 @@ import type { AsyncLabTool } from "./ext";
 import { ext } from "./ext";
 import type { LabContext, LabParam } from "./types";
 
-/** Leaf tips come from the brush library (B1); "brush" uses the current tip. */
+/**
+ * Leaf tips come from the bundled brush library (paint/brushes/library/tips/): the value is the
+ * library reference `resolveLibraryAsset` accepts; "brush" uses the current tip.
+ */
 export const LEAF_TIPS = [
   { value: "brush", label: "Current brush" },
-  { value: "lib:leaf-simple", label: "Simple leaf" },
-  { value: "lib:leaf-oak", label: "Oak leaf" },
-  { value: "lib:leaf-fern", label: "Fern frond" },
-  { value: "lib:leaf-needle", label: "Needle" },
+  { value: "lib:tips/leaf-round.png", label: "Simple leaf" },
+  { value: "lib:tips/leaf-oak.png", label: "Oak leaf" },
+  { value: "lib:tips/leaf-maple.png", label: "Maple leaf" },
+  { value: "lib:tips/leaf-willow.png", label: "Willow leaf" },
+  { value: "lib:tips/fern-frond.png", label: "Fern frond" },
+  { value: "lib:tips/pine-needle.png", label: "Needle" },
 ];
 
 const hex = (r: number, g: number, b: number): RGBA => ({ r: (r / 255) ** 2.2, g: (g / 255) ** 2.2, b: (b / 255) ** 2.2, a: 1 });

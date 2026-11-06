@@ -109,9 +109,9 @@ export function createGLBackend(canvas: HTMLCanvasElement): GLBackend {
   const g = (s: Surface) => s as GLSurface;
 
   function tipUniforms(prefixShape: string, hard: string, t: TipStyle, unit: number, aa: boolean, idx: 0 | 1): void {
-    gl.uniform1i(U.dab[prefixShape] ?? null, t.shape === "square" ? 1 : t.shape === "image" ? 2 : 0);
+    gl.uniform1i(U.dab[prefixShape] ?? null, t.shape === "square" ? 1 : t.shape === "image" ? 2 : t.shape === "color" ? 3 : 0);
     void hard;
-    const tex = t.shape === "image" && t.tex ? (t.tex as GLMask).tex : dummy;
+    const tex = (t.shape === "image" || t.shape === "color") && t.tex ? (t.tex as GLMask).tex : dummy;
     bindTex(unit, tex, aa ? samplers.lc : samplers.nc);
     void idx;
   }
@@ -170,6 +170,29 @@ export function createGLBackend(canvas: HTMLCanvasElement): GLBackend {
       const f = new Float32Array(w * h);
       for (let i = 0; i < f.length; i++) f[i] = (data[i] as number) / 255;
       return { w, h, tex, data: f } as GLMask;
+    },
+    createColorMask(rgba: Uint8ClampedArray, w: number, h: number): MaskTex {
+      // Premultiplied in the texture so the linear filter never bleeds the colour of transparent texels.
+      const pm = new Uint8Array(w * h * 4);
+      for (let i = 0; i < w * h; i++) {
+        const a = rgba[i * 4 + 3] as number;
+        pm[i * 4] = Math.round(((rgba[i * 4] as number) * a) / 255);
+        pm[i * 4 + 1] = Math.round(((rgba[i * 4 + 1] as number) * a) / 255);
+        pm[i * 4 + 2] = Math.round(((rgba[i * 4 + 2] as number) * a) / 255);
+        pm[i * 4 + 3] = a;
+      }
+      const tex = mkTex(w, h, gl.RGBA8);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pm);
+      const alpha = new Float32Array(w * h);
+      const rgb = new Float32Array(w * h * 3);
+      for (let i = 0; i < w * h; i++) {
+        alpha[i] = (rgba[i * 4 + 3] as number) / 255;
+        rgb[i * 3] = (rgba[i * 4] as number) / 255;
+        rgb[i * 3 + 1] = (rgba[i * 4 + 1] as number) / 255;
+        rgb[i * 3 + 2] = (rgba[i * 4 + 2] as number) / 255;
+      }
+      return { w, h, tex, data: alpha, rgb } as GLMask;
     },
     destroyMask(m: MaskTex): void {
       gl.deleteTexture((m as GLMask).tex);

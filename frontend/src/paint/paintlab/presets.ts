@@ -1,26 +1,26 @@
-// The brushes PaintLab renders: the bundled library (B1's JSON files under
-// paint/brushes/library/, found by glob so this works before and after they
-// land) plus four built-ins that need no images.
+// The brushes PaintLab renders: every bundled library preset (our own 64 and
+// the open sets) plus four built-ins that need no images.
 
 import type { AssetImage, AssetResolver } from "../brushes/assets";
 import { defaultBrush } from "../brushes/defaults";
+import { LIBRARY_PRESETS, resolveLibraryAsset } from "../brushes/library";
 import type { BrushPreset } from "../brushes/schema";
 
-const jsonFiles = import.meta.glob("../brushes/library/**/*.json", { eager: true, import: "default" }) as Record<string, unknown>;
-const pngUrls = import.meta.glob("../brushes/library/**/*.png", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
-
-function isPreset(v: unknown): v is BrushPreset {
-  const o = v as Partial<BrushPreset> | null;
-  return !!o && typeof o === "object" && typeof o.size === "number" && !!o.tip && typeof o.id === "string";
-}
-
-function collect(v: unknown, out: BrushPreset[]): void {
-  if (isPreset(v)) out.push(v);
-  else if (Array.isArray(v)) v.forEach((x) => collect(x, out));
-  else if (v && typeof v === "object") for (const x of Object.values(v as Record<string, unknown>)) collect(x, out);
-}
+const bareUrls = import.meta.glob("../brushes/library/**/*.png", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
 
 export const BUILTIN: BrushPreset[] = [
+  // A coloured stamp (like Subject stamp's cut-outs): paints its own colours, not the ink's.
+  defaultBrush({
+    id: "lab-colour-stamp",
+    name: "Colour stamp (own colours)",
+    set: "Built-in",
+    size: 56,
+    spacing: 1.1,
+    scatter: 0.15,
+    tip: { shape: "stamp:lab", hardness: 0, roundness: 1, angle: 0, angleMode: "fixed", rotationJitter: 0.15, invert: false },
+    dynamics: [{ input: "pressure", target: "size", amount: 0.5, curve: [[0, 0], [1, 1]] }],
+    minSize: 0.5,
+  }),
   defaultBrush({ id: "lab-hard-round", name: "Hard round", set: "Built-in", size: 18, dynamics: [{ input: "pressure", target: "size", amount: 1, curve: [[0, 0], [1, 1]] }], minSize: 0.15 }),
   defaultBrush({ id: "lab-soft-round", name: "Soft round", set: "Built-in", size: 40, flow: 0.35, tip: { shape: "round", hardness: 0, roundness: 1, angle: 0, angleMode: "fixed", rotationJitter: 0, invert: false }, spacing: 0.08 }),
   defaultBrush({
@@ -45,20 +45,59 @@ export const BUILTIN: BrushPreset[] = [
   }),
 ];
 
+/** The built-ins plus every bundled preset, de-duplicated by id. */
 export function allPresets(only?: string | null): BrushPreset[] {
-  const lib: BrushPreset[] = [];
-  for (const v of Object.values(jsonFiles)) collect(v, lib);
-  const all = [...BUILTIN, ...lib];
+  const seen = new Set<string>();
+  const all: BrushPreset[] = [];
+  for (const p of [...BUILTIN, ...LIBRARY_PRESETS]) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    all.push(p);
+  }
   return only ? all.filter((p) => p.id === only) : all;
 }
 
-/** `lib:<file>` → the bundled PNG with that file name (any folder under library/). */
+/** `lib:<path>` → the bundled PNG (`tips/x.png`, `open/krita/tips/x.png`; a bare file name is searched for). */
+/** A little flower with a yellow centre, drawn in code: a coloured cut-out with soft edges and transparency. */
+function labStamp(): AssetImage {
+  const n = 96;
+  const c = new OffscreenCanvas(n, n);
+  const ctx = c.getContext("2d", { willReadFrequently: true }) as OffscreenCanvasRenderingContext2D;
+  ctx.translate(n / 2, n / 2);
+  const petals = ["#e8463c", "#f08a2c", "#d93a7a", "#9b4bd6", "#3c7be8"];
+  for (let k = 0; k < 10; k++) {
+    ctx.save();
+    ctx.rotate((k / 10) * Math.PI * 2);
+    const g = ctx.createLinearGradient(0, 0, 0, -n * 0.46);
+    g.addColorStop(0, "#fff3c0");
+    g.addColorStop(1, petals[k % petals.length] as string);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(0, -n * 0.27, n * 0.085, n * 0.19, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle = "#ffd23c";
+  ctx.beginPath();
+  ctx.arc(0, 0, n * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  const d = ctx.getImageData(0, 0, n, n);
+  return { data: d.data, width: n, height: n };
+}
+
 export const libResolver: AssetResolver = async (ref) => {
+  if (ref === "stamp:lab") return labStamp();
   if (!ref.startsWith("lib:")) return null;
-  const file = ref.slice(4);
-  const key = Object.keys(pngUrls).find((k) => k.endsWith(`/${file}`) || k === file);
-  if (!key) return null;
-  const blob = await (await fetch(pngUrls[key] as string)).blob();
+  let url: string;
+  try {
+    url = resolveLibraryAsset(ref);
+  } catch {
+    const file = ref.slice(4);
+    const key = Object.keys(bareUrls).find((k) => k.endsWith(`/${file}`));
+    if (!key) return null;
+    url = bareUrls[key] as string;
+  }
+  const blob = await (await fetch(url)).blob();
   const bmp = await createImageBitmap(blob, { premultiplyAlpha: "none" });
   const c = new OffscreenCanvas(bmp.width, bmp.height);
   const ctx = c.getContext("2d", { willReadFrequently: true }) as OffscreenCanvasRenderingContext2D;

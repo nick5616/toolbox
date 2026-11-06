@@ -371,7 +371,6 @@ export class StrokeRenderer {
       pullY = -uy * wet.pull * size * 0.5;
     }
     const rng = w.rng;
-    const spacing = Math.max(this.pixel ? 1 : 0.5, p.spacing * size);
     const count = Math.max(1, Math.min(16, Math.round(p.count)));
     const scatter = (p.scatter + scatterAdd) * size;
     const sec = this.cfg.secondary;
@@ -380,6 +379,21 @@ export class StrokeRenderer {
     let base = tipAngle;
     if (p.tip.angleMode === "stroke") base += Math.atan2(uy, ux);
     else if (p.tip.angleMode === "tilt" && (s.tiltX !== 0 || s.tiltY !== 0)) base += Math.atan2(s.tiltY, s.tiltX);
+    // Spacing is measured in the dab's own (elliptical) space, as MyPaint does: along a flat
+    // tip's thin side the dabs sit closer, so its edges stay smooth in every direction.
+    let ellipse = 1;
+    const rnd = Math.max(0.05, p.tip.roundness);
+    if (rnd < 0.999) {
+      const phi = Math.atan2(uy, ux) - base;
+      const cx = Math.cos(phi);
+      const sy = Math.sin(phi) / rnd;
+      ellipse = Math.min(6, Math.sqrt(cx * cx + sy * sy));
+    }
+    let spacing = Math.max(this.pixel ? 1 : 0.5, (p.spacing * size) / ellipse);
+    // A hard straight edge that isn't square to the stroke leaves a sawtooth as tall as the
+    // spacing times the edge's slope; a pixel apart keeps it under one pixel.
+    if (!this.pixel && p.tip.shape === "square") spacing = Math.min(spacing, 1);
+    else if (!this.pixel && rnd < 0.999 && p.tip.shape === "round" && p.tip.hardness >= 0.85) spacing = Math.min(spacing, 1.5);
     const dualAngle = p.dual ? (p.dual.angle * Math.PI) / 180 : 0;
     const mix = p.color.secondaryMix * (1 - clamp01(s.pressure));
     const cr = col.r + (sec.r - col.r) * mix;

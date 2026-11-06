@@ -112,15 +112,15 @@ const STROKE = { angleMode: "stroke" } as const;
 // ---- Sketching ----
 const sketching = [
   mk("Sketching", "HB", {
-    size: 6, minSize: 0.35, opacity: 0.85, spacing: 0.07, tip: tp("pencil-grain", { roundness: 0.9 }),
-    grain: gr("paper", { mode: "texturised", depth: 0.55 }),
-    dynamics: [d("pressure", "opacity", 0.6, FIRM), d("pressure", "size", 0.25), d("tilt", "size", 0.4)],
+    size: 9, minSize: 0.3, opacity: 0.9, flow: 0.55, spacing: 0.06, tip: tp("pencil-grain", { roundness: 0.9, rotationJitter: 0.3 }),
+    grain: gr("paper", { mode: "texturised", depth: 0.95, scale: 0.55, contrast: 1.5 }),
+    dynamics: [d("pressure", "opacity", 0.8, FIRM), d("pressure", "flow", 0.5, FIRM), d("pressure", "size", 0.2), d("tilt", "size", 0.5)],
     smoothing: { streamline: 0.15 },
   }),
   mk("Sketching", "6B", {
-    size: 13, minSize: 0.25, opacity: 0.92, spacing: 0.06, tip: tp("pencil-grain", { roundness: 0.8, rotationJitter: 0.2 }),
-    grain: gr("paper", { mode: "texturised", depth: 0.7, scale: 1.2 }),
-    dynamics: [d("pressure", "opacity", 0.8, FIRM), d("pressure", "size", 0.4), d("tilt", "size", 0.7)],
+    size: 18, minSize: 0.25, opacity: 0.95, flow: 0.65, spacing: 0.06, tip: tp("pencil-grain", { roundness: 0.8, rotationJitter: 0.4 }),
+    grain: gr("paper", { mode: "texturised", depth: 1, scale: 0.8, contrast: 1.4 }),
+    dynamics: [d("pressure", "opacity", 0.9, FIRM), d("pressure", "flow", 0.5, FIRM), d("pressure", "size", 0.4), d("tilt", "size", 0.7)],
     smoothing: { streamline: 0.2 },
   }),
   mk("Sketching", "Mechanical", {
@@ -219,20 +219,20 @@ const painting = [
     wet: { mix: 0.4, charge: 0.9, pull: 0.3 }, dynamics: [d("pressure", "size", 0.3)],
   }),
   mk("Painting", "Watercolour", {
-    size: 54, minSize: 0.5, opacity: 0.5, flow: 0.6, spacing: 0.1, tip: { hardness: 0.5 },
-    grain: gr("watercolour-bloom", { mode: "texturised", depth: 0.6, scale: 1.5 }),
+    size: 54, minSize: 0.5, opacity: 0.85, flow: 0.9, spacing: 0.08, tip: { hardness: 0.4 }, rendering: "uniform-glaze",
+    grain: gr("watercolour-bloom", { mode: "texturised", depth: 0.8, scale: 1.5 }),
     wet: { mix: 0.3, dilution: 0.9, charge: 0.4, edges: 0.8, bleed: 0.7 }, color: { satJitter: 0.03 },
     dynamics: [d("pressure", "opacity", 0.8, SOFT)], smoothing: { streamline: 0.35 },
   }),
   mk("Painting", "Wash", {
-    size: 120, minSize: 0.6, opacity: 0.35, flow: 0.5, spacing: 0.12, tip: { hardness: 0.3 },
-    grain: gr("watercolour-bloom", { mode: "texturised", depth: 0.5, scale: 2 }),
+    size: 120, minSize: 0.6, opacity: 0.45, flow: 0.8, spacing: 0.12, tip: { hardness: 0.3 }, rendering: "uniform-glaze",
+    grain: gr("watercolour-bloom", { mode: "texturised", depth: 0.35, scale: 2 }),
     wet: { mix: 0.15, dilution: 1, charge: 0.2, edges: 0.5, bleed: 1 }, dynamics: [d("pressure", "opacity", 1, SOFT)],
     smoothing: { streamline: 0.5, stabilisation: 0.1 },
   }),
   mk("Painting", "Glaze", {
-    size: 70, minSize: 0.6, opacity: 0.25, flow: 0.35, spacing: 0.08, rendering: "uniform-glaze", tip: { hardness: 0.6 },
-    grain: gr("linen", { mode: "texturised", depth: 0.3 }), wet: { mix: 0.05, dilution: 0.3 },
+    size: 70, minSize: 0.6, opacity: 0.4, flow: 0.7, spacing: 0.08, rendering: "uniform-glaze", tip: { hardness: 0.6 },
+    grain: gr("linen", { mode: "texturised", depth: 0.15 }), wet: { mix: 0.05, dilution: 0.3 },
     dynamics: [d("pressure", "opacity", 0.5)],
   }),
 ];
@@ -240,18 +240,18 @@ const painting = [
 // ---- Airbrush ----
 const airbrush = [
   mk("Airbrush", "Soft", {
-    size: 80, minSize: 0.4, flow: 0.25, spacing: 0.05, tip: { hardness: 0 }, dynamics: [d("pressure", "flow", 0.9, SOFT), d("pressure", "size", 0.2)],
+    size: 80, minSize: 0.4, flow: 0.08, spacing: 0.08, tip: { hardness: 0 }, dynamics: [d("pressure", "flow", 0.9, SOFT), d("pressure", "size", 0.2)],
   }),
   mk("Airbrush", "Hard", {
-    size: 60, minSize: 0.5, flow: 0.3, spacing: 0.04, tip: { hardness: 0.8 }, dynamics: [d("pressure", "flow", 0.8, SOFT)],
+    size: 60, minSize: 0.5, flow: 0.1, spacing: 0.06, tip: { hardness: 0.8 }, dynamics: [d("pressure", "flow", 0.8, SOFT)],
   }),
   mk("Airbrush", "Grainy", {
-    size: 70, minSize: 0.4, flow: 0.35, spacing: 0.05, tip: { hardness: 0 },
+    size: 70, minSize: 0.4, flow: 0.18, spacing: 0.06, tip: { hardness: 0 },
     grain: gr("noise", { mode: "texturised", depth: 0.85, scale: 0.6, contrast: 1.3 }),
     dynamics: [d("pressure", "flow", 0.9, SOFT)],
   }),
   mk("Airbrush", "Spray can", {
-    size: 70, minSize: 0.5, flow: 0.8, spacing: 0.08, scatter: 0.5, count: 3, tip: tp("spatter", { rotationJitter: 1 }),
+    size: 60, minSize: 0.5, flow: 0.6, spacing: 0.2, scatter: 0.45, count: 2, tip: tp("spatter", { rotationJitter: 1 }),
     dynamics: [d("pressure", "flow", 0.5), d("velocity", "flow", 0.6, INV), d("velocity", "scatter", 0.3, INV)],
   }),
 ];
@@ -259,14 +259,14 @@ const airbrush = [
 // ---- Nature ----
 function leafBrush(name: string, tipName: string, o: Spec): BrushPreset {
   return mk("Nature", name, {
-    spacing: 0.55, scatter: 0.6, tip: tp(tipName, { ...STROKE, rotationJitter: 0.35 }),
+    spacing: 0.55, scatter: 0.6, tip: tp(tipName, { ...STROKE, rotationJitter: 0.7 }),
     dynamics: [d("pressure", "size", 0.4)], taper: { end: 0.3 }, ...o,
   });
 }
 const nature = [
-  leafBrush("Leaf scatter (oak)", "leaf-oak", { size: 36, minSize: 0.4, color: { hueJitter: 0.06, satJitter: 0.12, briJitter: 0.15 } }),
-  leafBrush("Leaf scatter (maple)", "leaf-maple", { size: 40, minSize: 0.4, spacing: 0.6, color: { hueJitter: 0.1, satJitter: 0.14, briJitter: 0.14 } }),
-  leafBrush("Leaf scatter (round)", "leaf-round", { size: 28, minSize: 0.35, spacing: 0.4, scatter: 0.5, color: { hueJitter: 0.05, satJitter: 0.1, briJitter: 0.18 } }),
+  leafBrush("Leaf scatter (oak)", "leaf-oak", { size: 48, minSize: 0.4, color: { hueJitter: 0.1, satJitter: 0.15, briJitter: 0.22 } }),
+  leafBrush("Leaf scatter (maple)", "leaf-maple", { size: 52, minSize: 0.4, spacing: 0.6, color: { hueJitter: 0.14, satJitter: 0.15, briJitter: 0.2 } }),
+  leafBrush("Leaf scatter (round)", "leaf-round", { size: 38, minSize: 0.35, spacing: 0.4, scatter: 0.5, color: { hueJitter: 0.1, satJitter: 0.15, briJitter: 0.22 } }),
   leafBrush("Leaf scatter (willow)", "leaf-willow", {
     size: 60, minSize: 0.4, spacing: 0.35, scatter: 0.3, count: 2, tip: tp("leaf-willow", { ...STROKE, rotationJitter: 0.2 }),
     color: { hueJitter: 0.04, satJitter: 0.1, briJitter: 0.12 },

@@ -549,10 +549,15 @@ grain("watercolour-bloom", (u, v) => {
   return 0.82 - ring * 0.4 - ring2 * 0.22 + (fbm(u, v, 40, 2, 152) - 0.5) * 0.14 - (a - 0.5) * 0.35;
 });
 
-grain("halftone", (_u, _v, i, j) => {
-  const p = 16;
-  const d = (Math.cos((2 * Math.PI * (i + j)) / p) + Math.cos((2 * Math.PI * (i - j)) / p)) / 2;
-  return smooth(-0.1, 0.12, d) * 0.92 + 0.04;
+// A 45-degree dot screen: round dots on a diagonal lattice, a little uneven like a printed screen.
+grain("halftone", (u, v, i, j) => {
+  const p = 16; // lattice period along i+j and i-j; 512 is a multiple, so it tiles
+  const x = mod(i + j, p) / p - 0.5;
+  const y = mod(i - j, p) / p - 0.5;
+  const d = (Math.hypot(x, y) * p) / Math.SQRT2; // px from the dot centre
+  const wob = fbm(u, v, 8, 2, 171);
+  const r = 3.1 + (wob - 0.5) * 2.4;
+  return smooth(r + 0.7, r - 0.7, d) * 0.94 + 0.04;
 });
 
 grain("crosshatch", (u, v, i, j) => {
