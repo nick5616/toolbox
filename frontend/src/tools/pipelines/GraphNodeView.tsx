@@ -4,6 +4,7 @@ import type { PipelineStep, StepCheck, StepType } from "@/lib/api";
 import { VALUE_TYPE_LABELS } from "@/pipelines/params";
 import { typeStyle } from "./graph/wireStyle";
 import { ALL_PORT, bodyRows, countsText, HEAD_H, INPUT_NODE, PORT_H, SUMMARY_H, type GraphNode, type StepRunCounts, type WireKind } from "./graphModel";
+import { isTimeStep } from "./editorModel";
 import { stepName } from "./stepHelpers";
 import styles from "./GraphEditor.module.css";
 
@@ -232,6 +233,11 @@ export function GraphNodeView({ node, step, type, check, counts, selected, dropS
       <div className={styles.head} style={{ height: HEAD_H }}>
         <Icon name={isInput ? "arrow-down-to-line" : (type?.icon ?? "box")} size={16} className={styles.nodeIcon} />
         <span className={styles.nodeName}>{name}</span>
+        {isTimeStep(step) && (
+          <span className={styles.clock} data-clock-badge="" data-tip="This step waits for a time or for a focus session to end">
+            <Icon name="timer" size={13} />
+          </span>
+        )}
         {needsYou && <Badge tone="accent" tip="A run is waiting for you at this step">Needs you</Badge>}
         {step?.manual && !needsYou && <Badge tone="accent" tip="The pipeline pauses here for you to do this step in its tool">Manual</Badge>}
         {problems.length > 0 && (

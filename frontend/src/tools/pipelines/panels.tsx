@@ -5,13 +5,29 @@
  * replica and every action runs on the host).
  */
 import { useMemo } from "react";
-import { Button, EmptyState, Field, PathText, Switch, TextField } from "@/components";
+import { Button, EmptyState, Field, IconButton, PathText, Select, Switch, TextField, cx } from "@/components";
 import type { ClipTrigger, Pipeline, StepCheck, StepType } from "@/lib/api";
 import { useDraft } from "./draftStore";
 import { stepsOf } from "./editorModel";
 import { INPUT_NODE } from "./graphModel";
 import { InputPanelBody } from "./RunParamsPanel";
 import { StepOptions } from "./StepOptions";
+import {
+  addTime,
+  CATCH_UP_CHOICES,
+  DAY_CHIPS,
+  EVERY_DAY,
+  MAX_SCHEDULE_TIMES,
+  removeTimeAt,
+  sameDays,
+  scheduleOf,
+  scheduleProblem,
+  scheduleSummary,
+  setTimeAt,
+  toggleDay,
+  WEEKDAYS,
+  type Schedule,
+} from "./scheduleModel";
 import { stepName } from "./stepHelpers";
 import styles from "./panels.module.css";
 
@@ -27,13 +43,15 @@ export const CLIP_KINDS = [
 ] as const;
 
 /** The Triggers panel's one-line summary: every trigger that is on, or Off. */
-export function triggersSummary(folder: string, watchOn: boolean, clip: Pick<ClipTrigger, "enabled" | "kinds">): string {
+export function triggersSummary(folder: string, watchOn: boolean, clip: Pick<ClipTrigger, "enabled" | "kinds">, schedule?: Schedule): string {
   const parts: string[] = [];
   if (watchOn) parts.push(watchSummary(folder, true));
   if (clip.enabled) {
     const names = CLIP_KINDS.filter((k) => (clip.kinds ?? []).includes(k.id)).map((k) => k.label.toLowerCase());
     parts.push(`On copying ${names.length ? names.join(", ") : "(nothing chosen)"}`);
   }
+  const sched = schedule ? scheduleSummary(schedule) : "";
+  if (sched) parts.push(sched);
   return parts.length ? parts.join(" · ") : "Off";
 }
 
@@ -99,6 +117,7 @@ export function TriggersBody() {
         </p>
       )}
       <ClipTriggerBody />
+      <ScheduleBody />
       <p className={styles.muted}>Also: drop files on this pipeline, Library → Send to, or the command palette.</p>
     </>
   );
@@ -157,6 +176,98 @@ export function ClipTriggerBody() {
               </Button>
             )}
           </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** "Run on a schedule": days, times and the catch-up window (Phase 18). Only for pipelines that take no files. */
+export function ScheduleBody() {
+  const raw = useDraft((s) => s.draft?.schedule);
+  const status = useDraft((s) => s.scheduleStatus);
+  const takesFiles = useDraft((s) => s.check.takesFiles);
+  const setSchedule = useDraft((s) => s.setSchedule);
+  const sched = useMemo(() => scheduleOf(raw), [raw]);
+  if (!raw) return null;
+  const problem = scheduleProblem(sched);
+  const blocked = takesFiles === true;
+  const catchUps = CATCH_UP_CHOICES.some((c) => c.value === sched.catchUpMin) ? CATCH_UP_CHOICES : [...CATCH_UP_CHOICES, { value: sched.catchUpMin, label: `${sched.catchUpMin} min` }];
+  return (
+    <div className={styles.clip} role="group" aria-label="Run on a schedule">
+      <Switch
+        checked={sched.enabled}
+        onChange={(enabled) => setSchedule({ enabled })}
+        label="Run on a schedule"
+        tip={blocked ? "A scheduled run starts with no files, but a step reads the run's files" : "Start this pipeline by itself at set times while Toolbox is running"}
+      />
+      {sched.enabled && (
+        <>
+          <div className={styles.days} role="group" aria-label="Days">
+            {DAY_CHIPS.map((c) => (
+              <button
+                key={c.day}
+                type="button"
+                className={cx(styles.chip, sched.days.includes(c.day) && styles.chipOn)}
+                aria-pressed={sched.days.includes(c.day)}
+                aria-label={c.long}
+                data-tip={c.long}
+                onClick={() => setSchedule({ days: toggleDay(sched.days, c.day) })}
+              >
+                {c.label}
+              </button>
+            ))}
+            <Button size="sm" variant="ghost" aria-pressed={sameDays(sched.days, WEEKDAYS)} data-tip="Monday to Friday" onClick={() => setSchedule({ days: [...WEEKDAYS] })}>
+              Weekdays
+            </Button>
+            <Button size="sm" variant="ghost" aria-pressed={sameDays(sched.days, EVERY_DAY)} data-tip="Every day of the week" onClick={() => setSchedule({ days: [...EVERY_DAY] })}>
+              Every day
+            </Button>
+          </div>
+          <div className={styles.times} role="group" aria-label="Times">
+            {sched.times.map((t, i) => (
+              <div key={i} className={styles.time}>
+                <TextField
+                  size="sm"
+                  type="time"
+                  aria-label={`Time ${i + 1}`}
+                  value={t}
+                  invalid={!TIME_RE.test(t) || sched.times.indexOf(t) !== i}
+                  onChange={(e) => setSchedule({ times: setTimeAt(sched.times, i, e.target.value) })}
+                />
+                <IconButton size="sm" icon="x" label={`Remove time ${i + 1}`} onClick={() => setSchedule({ times: removeTimeAt(sched.times, i) })} />
+              </div>
+            ))}
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="plus"
+              aria-disabled={sched.times.length >= MAX_SCHEDULE_TIMES}
+              data-tip={sched.times.length >= MAX_SCHEDULE_TIMES ? `At most ${MAX_SCHEDULE_TIMES} times` : "Add another time of day"}
+              onClick={() => sched.times.length < MAX_SCHEDULE_TIMES && setSchedule({ times: addTime(sched.times) })}
+            >
+              Add time
+            </Button>
+          </div>
+          <label className={styles.catchUp}>
+            <span>If Toolbox wasn&apos;t running: catch up within</span>
+            <Select
+              size="sm"
+              aria-label="Catch up within"
+              value={String(sched.catchUpMin)}
+              options={catchUps.map((c) => ({ value: String(c.value), label: c.label }))}
+              onChange={(v) => setSchedule({ catchUpMin: Number(v) })}
+            />
+          </label>
+          {problem && (
+            <p className={styles.watchMessage} role="alert">
+              {problem}
+            </p>
+          )}
+          {!problem && status.message && <p className={styles.watchMessage}>{status.message}</p>}
+          {blocked && !status.message && <p className={styles.watchMessage}>A scheduled run starts with no files, so no step may read the run&apos;s files.</p>}
         </>
       )}
     </div>

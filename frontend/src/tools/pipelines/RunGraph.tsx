@@ -8,6 +8,8 @@ import { WireCanvas, type WireSpec } from "./graph/WireCanvas";
 import { svgWireStyle } from "./graph/wireStyle";
 import { GraphNodeView } from "./GraphNodeView";
 import { cellProgress } from "./RunGrid";
+import { focusBands, focusSpans } from "./editorModel";
+import { FocusBands } from "./FocusBands";
 import { RunGraphPanel } from "./RunGraphPanel";
 import { emptyStats, filesText, needsYouSteps, runGraph, runWireState, statsText, stepProgress, stepStats, wrapRunGraph, type StepRunStats } from "./RunGraphModel";
 import graphStyles from "./GraphEditor.module.css";
@@ -67,6 +69,7 @@ export function RunGraph({ run }: { run: RunView }) {
   const graph = useMemo(() => wrapRunGraph(runGraph(run.steps, { catalog, params: runParams }), size.width), [run.steps, catalog, runParams, size.width]);
   const nodeById = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n] as const)), [graph.nodes]);
   const wiredBy = useMemo(() => wiredPortsByNode(graph), [graph]);
+  const bands = useMemo(() => focusBands(focusSpans(run.steps ?? []), graph.nodes), [run.steps, graph.nodes]);
   const stats = useMemo(() => new Map(run.steps.map((s) => [s.id, stepStats(run, s.id)] as const)), [run]);
   const progress = useMemo(() => new Map(run.steps.map((s) => [s.id, stepProgress(run, s.id, (c) => cellProgress(c, byId))] as const)), [run, byId]);
   const needs = useMemo(() => needsYouSteps(run), [run]);
@@ -204,6 +207,7 @@ export function RunGraph({ run }: { run: RunView }) {
                 />
               ))}
             </svg>
+            <FocusBands bands={bands} />
             {graph.nodes.map((n) => {
               const step = run.steps.find((s) => s.id === n.id);
               const st = stats.get(n.id) ?? emptyStats();

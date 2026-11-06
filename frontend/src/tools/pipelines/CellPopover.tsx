@@ -7,6 +7,8 @@ import type { RunItemView, RunView } from "@/state/pipelines";
 import { useUI } from "@/state/ui";
 import { cellLook, stepName } from "./RunGridModel";
 import { RunFileRow } from "./RunResultsFileRow";
+import { isTimeWait } from "./timeWait";
+import { TimeWaitCard } from "./TimeWaitCard";
 import styles from "./CellPopover.module.css";
 
 export interface CellPopoverProps {
@@ -76,6 +78,8 @@ export function CellPopover({ run, item, stepIndex, anchor, onClose }: CellPopov
       ) : (
         cell.message && <div className={styles.message}>{cell.message}</div>
       )}
+
+      {isTimeWait(cell) && <TimeWaitCard run={run} item={item} cell={cell} />}
 
       {cell.jobIds.length > 0 && (
         <div className={styles.section}>

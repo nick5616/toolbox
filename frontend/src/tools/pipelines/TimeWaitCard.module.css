@@ -1,0 +1,44 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.icon {
+  flex: none;
+  color: var(--warn);
+}
+
+.item {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.until {
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.msg {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.actions {
+  display: flex;
+}

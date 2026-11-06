@@ -216,3 +216,103 @@ export function firstProblem(check: PipelineCheck | undefined): string {
   if ((check.missing?.length ?? 0) > 0) return "Some tools this pipeline needs aren't installed";
   return "";
 }
+
+// ── Focus and waiting (Phase 18, SPEC §5.3) ──────────────────────────────────
+
+export const WAIT_TYPE = "pipelines.wait";
+export const FOCUS_TYPE = "focus";
+
+/** What the timing helpers need of a step (a pipeline step or a run's snapshot of one). */
+export interface TimingStep {
+  id: string;
+  type: string;
+  optionsJson: string;
+}
+
+function optionsObject(json: string): Record<string, unknown> {
+  try {
+    const v: unknown = JSON.parse(json);
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The action of a Focus step ("start" | "wait" | "end"); "" for any other step. */
+export function focusAction(step: TimingStep): "start" | "wait" | "end" | "" {
+  if (step.type !== FOCUS_TYPE) return "";
+  const a = optionsObject(step.optionsJson).action;
+  return a === "wait" || a === "end" ? a : "start";
+}
+
+/** True for the steps that wait on the clock or on a session: Wait and Focus wait (they get a clock badge). */
+export function isTimeStep(step: TimingStep | undefined): boolean {
+  return !!step && (step.type === WAIT_TYPE || focusAction(step) === "wait");
+}
+
+export interface FocusSpan {
+  startId: string;
+  waitId: string;
+  /** Step positions (start < wait). */
+  startIndex: number;
+  waitIndex: number;
+  /** Every step from the start to the wait, in order (the band covers all of them). */
+  ids: string[];
+  /** The session length as the start step sets it: "50 min", "1 h 30 min", "until 17:00"; "" when unreadable. */
+  label: string;
+}
+
+function spanLabel(start: TimingStep): string {
+  const o = optionsObject(start.optionsJson);
+  if (o.mode === "until") return typeof o.at === "string" && /^\d{2}:\d{2}$/.test(o.at) ? `until ${o.at}` : "";
+  const m = typeof o.minutes === "number" && Number.isFinite(o.minutes) ? Math.round(o.minutes) : 0;
+  if (m <= 0) return "";
+  if (m < 60) return `${m} min`;
+  return m % 60 === 0 ? `${m / 60} h` : `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+
+/**
+ * The focus sessions a pipeline draws as bands: each Focus start is paired with
+ * the next Focus wait after it in step order. A start followed by another start
+ * before any wait stays unpaired (the later one owns the wait), and a wait
+ * belongs to at most one start.
+ */
+export function focusSpans(steps: readonly TimingStep[]): FocusSpan[] {
+  const out: FocusSpan[] = [];
+  let open: { step: TimingStep; index: number } | null = null;
+  steps.forEach((s, i) => {
+    const a = focusAction(s);
+    if (a === "start") open = { step: s, index: i };
+    else if (a === "wait" && open) {
+      out.push({ startId: open.step.id, waitId: s.id, startIndex: open.index, waitIndex: i, ids: steps.slice(open.index, i + 1).map((x) => x.id), label: spanLabel(open.step) });
+      open = null;
+    }
+  });
+  return out;
+}
+
+export interface BandRect {
+  startId: string;
+  waitId: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label: string;
+}
+
+/** The band behind a span's nodes: their bounding box plus padding (a span whose nodes aren't in the graph is dropped). */
+export function focusBands(spans: readonly FocusSpan[], nodes: ReadonlyArray<{ id: string; x: number; y: number; w: number; h: number }>, pad = 14): BandRect[] {
+  const byId = new Map(nodes.map((n) => [n.id, n] as const));
+  const out: BandRect[] = [];
+  for (const sp of spans) {
+    if (!byId.has(sp.startId) || !byId.has(sp.waitId)) continue;
+    const inside = sp.ids.map((id) => byId.get(id)).filter((n) => n !== undefined);
+    const x0 = Math.min(...inside.map((n) => n.x));
+    const y0 = Math.min(...inside.map((n) => n.y));
+    const x1 = Math.max(...inside.map((n) => n.x + n.w));
+    const y1 = Math.max(...inside.map((n) => n.y + n.h));
+    out.push({ startId: sp.startId, waitId: sp.waitId, x: x0 - pad, y: y0 - pad - 8, w: x1 - x0 + pad * 2, h: y1 - y0 + pad * 2 + 8, label: sp.label });
+  }
+  return out;
+}

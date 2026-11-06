@@ -714,3 +714,10 @@
     transform: none;
   }
 }
+
+.clock {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  color: var(--fg-muted);
+}

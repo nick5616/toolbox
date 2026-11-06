@@ -18,7 +18,13 @@ function report(e: unknown): void {
   toast({ tone: "danger", title: err.message, description: err.hint });
 }
 
-const TRIGGER: Record<string, string> = { manual: "Started by you", watch: "Started by a watched folder" };
+const TRIGGER: Record<string, string> = {
+  manual: "Started by you",
+  watch: "Started by a watched folder",
+  clipboard: "Started by a copy",
+  schedule: "Scheduled",
+  pipeline: "Started by another pipeline",
+};
 
 function RunRow({ run, selected, onSelect }: { run: RunView; selected: boolean; onSelect: () => void }) {
   const chip = runChip(run.status);
@@ -33,6 +39,11 @@ function RunRow({ run, selected, onSelect }: { run: RunView; selected: boolean; 
         <span className={styles.rowMeta}>
           <span data-tip="Files that finished all their steps, out of all files in this run">{`${done} of ${total} ${total === 1 ? "file" : "files"}`}</span>
           <span>{formatRelativeTime(run.createdAt)}</span>
+          {run.trigger === "schedule" && (
+            <span className={styles.scheduled} data-tip="Started by this pipeline's schedule">
+              Scheduled
+            </span>
+          )}
           {run.needsYou > 0 && <Badge tone="accent" tip="A step is waiting for you to check or do something">Needs you</Badge>}
         </span>
       </button>

@@ -9,7 +9,7 @@
  */
 import { create } from "zustand";
 import { toast } from "@/components";
-import { FilesService, PipelinesService, type ClipTrigger, type Pipeline, type PipelineCheck, type PipelineEntry, type PipelineStep, type StepType } from "@/lib/api";
+import { FilesService, PipelinesService, type ClipTrigger, type Pipeline, type PipelineCheck, type PipelineEntry, type PipelineStep, type ScheduleTrigger, type StepType } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { adoptParkedHistory, registerHistory } from "@/lib/parkedHistory";
 import { newHistory, pushHistory, redo as redoHistory, undo as undoHistory, type History } from "@/lib/history";
@@ -17,6 +17,7 @@ import { normalizeEntry, usePipelines } from "@/state/pipelines";
 import { useUI } from "@/state/ui";
 import { newStepId, stepsOf, withEntry } from "./editorModel";
 import { deleteSteps, duplicateSteps, INPUT_NODE, MAX_STEPS, parseLayout, serializeLayout, withSteps } from "./graphModel";
+import { addTime, DEFAULT_TIME, WEEKDAYS } from "./scheduleModel";
 import { unbindVar } from "./wiring";
 
 export const SAVE_DELAY_MS = 600;
@@ -36,6 +37,8 @@ export interface DraftState {
   watchMessage: string;
   /** Whether the "When I copy…" trigger is working, and why not (PipelineEntry.clip). */
   clipStatus: { active: boolean; message: string };
+  /** Whether the schedule is working, when it fires next, and why not (PipelineEntry.schedule). */
+  scheduleStatus: { active: boolean; message: string; next: number };
   runText: string;
   runCount: number;
   canUndo: boolean;
@@ -68,9 +71,11 @@ export interface DraftState {
   chooseFolder: () => Promise<void>;
   /** Edits the "When I copy…" trigger. */
   setClip: (patch: Partial<ClipTrigger>) => void;
+  /** Edits the schedule trigger. */
+  setSchedule: (patch: Partial<ScheduleTrigger>) => void;
   openClipboardSettings: () => void;
   openRuns: () => void;
-  setLive: (v: Partial<Pick<DraftState, "watchMessage" | "clipStatus" | "runText" | "runCount" | "catalog">>) => void;
+  setLive: (v: Partial<Pick<DraftState, "watchMessage" | "clipStatus" | "scheduleStatus" | "runText" | "runCount" | "catalog">>) => void;
   /** Saves now if dirty. */
   flush: () => Promise<void>;
 }
@@ -195,6 +200,7 @@ export const useDraft = create<DraftState>()((set, get) => {
     stepId: null,
     watchMessage: "",
     clipStatus: { active: false, message: "" },
+    scheduleStatus: { active: false, message: "", next: 0 },
     runText: "",
     runCount: 0,
     canUndo: false,
@@ -335,6 +341,17 @@ export const useDraft = create<DraftState>()((set, get) => {
         // Switching it on with nothing chosen starts with links, the common case.
         if (patch.enabled && next.kinds.length === 0) next.kinds = ["link"];
         return { ...p, clip: next };
+      }),
+
+    setSchedule: (patch) =>
+      edit((p) => {
+        const next = { ...p.schedule, ...patch, days: patch.days ?? p.schedule?.days ?? [], times: patch.times ?? p.schedule?.times ?? [] };
+        // Switching it on with nothing chosen starts with weekdays at 09:00, the common case.
+        if (patch.enabled) {
+          if (next.days.length === 0) next.days = [...WEEKDAYS];
+          if (next.times.length === 0) next.times = addTime([], DEFAULT_TIME);
+        }
+        return { ...p, schedule: next };
       }),
 
     openClipboardSettings: () => useUI.getState().navigate("settings"),
