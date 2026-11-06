@@ -350,6 +350,17 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Trust:** Toolbox peers present their identity cert as a TLS client cert, so a paired device is verified and may auto-accept; LocalSend senders are never verified and always ask. Never auto-accept on a claimed fingerprint.
 - **Received files** go to `<library>/Received/<device>/` through `lan-receive` jobs (hidden module), names sanitised in `core/lan/names.go`, never overwriting, never opened. No download API (browser share), no plain-HTTP peers.
 
+## Every tool stands on its own (2026-11-06)
+
+Composition is extra, never the only way. Send to, Use, pipelines, embeds and pop-outs come **on top of** a tool that is completely usable by itself. A tool opened alone, with no other tool in mind, must let the user:
+- **see where its result went**: the file (or folder) name on screen, the full path on hover, and which library folder it went to;
+- **get to the result**: Show in folder, Open in its default app and **Save a copy…** to a place they choose. These are visible without hovering anywhere except inside a dense result *row*;
+- **keep what they made**: text and data results (transcripts, OCR text, chat answers, tables, colours, hashes, …) can be copied *and* saved to a file. Project tools save, and their exports name the file with Reveal;
+- **find past results again**: the tool's own list, or the Library filtered to the tool;
+- **know when something finished**: a job the tool doesn't show a result for gets the completion toast with Reveal even while the tool is on screen (`announceWhenDone(jobId)` in `state/jobs`).
+
+How: use the kit's `FileActions` (inside `ResultRow` / `ResultTable` / `ResultCards`, or alone in a result bar) or `LastExport`. **Never render Send to without Reveal, Open and Save a copy next to it**, and never drop a standalone action because a pipeline or another tool "can do it". A polish pass may move an action, but never hide it out of reach. Reviewing a tool means checking all five points with no other tool open.
+
 ## Polish rules (every screen)
 
 Full list in docs/specs/phase-12.md §13.1. In short:
