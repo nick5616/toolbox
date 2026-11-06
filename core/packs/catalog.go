@@ -262,8 +262,8 @@ func Catalog() []PackSpec {
 		},
 		{
 			ID: "image", Name: "Image", Icon: "wand-sparkles",
-			Description: "Cut out backgrounds, upscale, erase objects, blur faces and plates, edit metadata",
-			Components:  []string{"engine", "ffmpeg", "bg-default", "upscaler", "exiftool", "face-detect", "plate-detect", "inpaint"},
+			Description: "Paint+ with the Lab, cut out backgrounds, upscale, erase objects, blur faces and plates, edit metadata",
+			Components:  []string{"engine", "ffmpeg", "bg-default", "upscaler", "exiftool", "face-detect", "plate-detect", "inpaint", "matte-select"},
 			Unlocks: []Unlock{
 				{Module: "bg-remover", Needs: []string{"engine", "bg-default"}},
 				{Module: "upscaler", Needs: []string{"upscaler"}},
@@ -271,6 +271,7 @@ func Catalog() []PackSpec {
 				{Module: "exif", Needs: []string{"exiftool"}},
 				{Module: "redact", Needs: []string{"engine", "ffmpeg", "face-detect", "plate-detect"}},
 				{Module: "object-eraser", Needs: []string{"engine", "inpaint"}},
+				{Module: "paint", Needs: []string{}}, // the Lab's perception tools gate on engine, inpaint, bg-default, matte-select, upscaler per tool
 			},
 		},
 		{

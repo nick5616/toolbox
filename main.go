@@ -34,6 +34,7 @@ import (
 	"toolbox/core/pipeline"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
+	"toolbox/core/trash"
 	"toolbox/core/viz"
 	"toolbox/desktop"
 	"toolbox/modules/archiver"
@@ -59,6 +60,7 @@ import (
 	"toolbox/modules/midi"
 	"toolbox/modules/ocr"
 	"toolbox/modules/organize"
+	"toolbox/modules/paint"
 	"toolbox/modules/pdf"
 	"toolbox/modules/pipelines"
 	"toolbox/modules/placeholders"
@@ -389,6 +391,16 @@ func run() error {
 	go editMod.PruneCache() // start-up cleanup of cache/editstudio (30 days, 10 GB)
 	// --- end Phase 9 ---
 
+	// --- Phase 19: Paint+ (architect) ---
+	paintMod := paint.New(paint.Config{
+		Store: db, ProjectsDir: projectsDir, SupportDir: paths.SupportDir, TmpDir: paths.TmpDir,
+		Engine: engine, Jobs: jobs, Outputs: db, Emitter: emitter, LibraryDir: libraryDir, Resolve: depSvc.Resolve,
+	})
+	if err := paint.Register(reg, paintMod); err != nil {
+		return err
+	}
+	// --- end Phase 19 ---
+
 	settings.OnChange(func(old, new core.Settings) {
 		if old.Concurrency != new.Concurrency {
 			jobs.SetConcurrency(new.Concurrency)
@@ -427,7 +439,11 @@ func run() error {
 		Services: []application.Service{
 			application.NewServiceWithOptions(&api.ModulesService{Reg: reg}, opts),
 			application.NewServiceWithOptions(&api.JobsService{Jobs: jobs}, opts),
-			application.NewServiceWithOptions(&api.LibraryService{Outputs: db, Settings: settings, Paths: paths, Em: emitter}, opts),
+			application.NewServiceWithOptions(&api.LibraryService{
+				Outputs: db, Settings: settings, Paths: paths, Em: emitter,
+				Lineage: db, JobStore: db, Projects: db, Reg: reg, Trasher: trash.Default(),
+				SavedMasks: eraserSavedMasks(eraserMod),
+			}, opts),
 			application.NewServiceWithOptions(&api.SettingsService{Settings: settings, Paths: paths}, opts),
 			application.NewServiceWithOptions(&api.DepsService{Deps: depSvc, Jobs: jobs, Reg: reg, Engine: engine, Paths: paths, StopExiftool: exifMod.Close}, opts),
 			application.NewServiceWithOptions(&api.FilesService{Reg: reg, Settings: settings, Paths: paths}, opts),
@@ -472,6 +488,7 @@ func run() error {
 			application.NewServiceWithOptions(videoeditor.NewService(jobs, videoMod), opts),
 			application.NewServiceWithOptions(posts.NewService(jobs, postsMod), opts),
 			application.NewServiceWithOptions(editstudio.NewService(jobs, editMod), opts),
+			application.NewServiceWithOptions(paint.NewService(jobs, paintMod), opts),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

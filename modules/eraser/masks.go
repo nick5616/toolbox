@@ -199,3 +199,6 @@ func (m *Module) maskDataURL(id string) (string, error) {
 	}
 	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(b), nil
 }
+
+// SavedMasks lists the saved masks (the Library's "Other places", Phase 19).
+func (m *Module) SavedMasks() ([]SavedMask, error) { return m.listMasks() }

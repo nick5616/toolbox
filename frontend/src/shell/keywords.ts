@@ -31,6 +31,7 @@ export const TOOL_KEYWORDS: Record<string, string[]> = {
   documents: ["word", "docx", "epub", "markdown", "text", "convert", "ebook"],
   redact: ["blur", "censor", "faces", "hide", "plates", "privacy", "pixelate"],
   "object-eraser": ["remove", "inpaint", "erase", "clone", "retouch", "watermark"],
+  paint: ["draw", "paint", "sketch", "procreate", "brush", "layers", "illustrate", "art", "canvas", "pen", "dissolve"],
   archiver: ["save page", "website", "offline", "web archive", "snapshot", "html", "link"],
   pipelines: ["automate", "batch", "workflow", "recipe", "watch folder", "chain"],
   "photo-composer": ["collage", "design", "poster", "layers", "template", "canvas", "photo"],

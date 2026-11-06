@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { toAppError } from "@/lib/errors";
 import { Button, Icon, IconButton, Kbd, Meter, toast, cx, type MeterStatus } from "@/components";
 import { JobStatus } from "@/lib/api";
-import { useJobs, useJobCounts, useOrderedJobs } from "@/state/jobs";
+import { isActive, useJobs, useJobCounts, useOrderedJobs } from "@/state/jobs";
 import { useUI } from "@/state/ui";
 import { JobRow } from "./JobRow";
 import styles from "./JobTray.module.css";
@@ -21,7 +21,9 @@ export function JobTray() {
   const setOpen = useUI((s) => s.setTrayOpen);
   const setHeight = useUI((s) => s.setTrayHeight);
   const counts = useJobCounts();
-  const jobs = useOrderedJobs();
+  const ordered = useOrderedJobs();
+  // Quiet jobs (Paint+'s per-stroke Lab calls) leave the list once finished.
+  const jobs = useMemo(() => ordered.filter((j) => isActive(j) || !j.quiet), [ordered]);
   const byId = useJobs((s) => s.byId);
   const [resizing, setResizing] = useState(false);
   const rootRef = useRef<HTMLElement>(null);

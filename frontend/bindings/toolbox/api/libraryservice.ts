@@ -15,6 +15,29 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as core$0 from "../core/models.js";
 
 /**
+ * Detail describes one file: by output ID, or by absolute path inside the
+ * library (unregistered files).
+ */
+export function Detail(outputIDOrPath: string): $CancellablePromise<core$0.OutputDetail> {
+    return $Call.ByID(571429280, outputIDOrPath);
+}
+
+/**
+ * Folders returns the library folder tree (depth ≤ 6) with counts.
+ */
+export function Folders(): $CancellablePromise<core$0.LibraryFolder> {
+    return $Call.ByID(2835897798);
+}
+
+/**
+ * ListDir lists one library folder's files and subfolders (≤ limit, max
+ * 5000), joined with registered outputs by path.
+ */
+export function ListDir(rel: string, limit: number): $CancellablePromise<core$0.LibraryListing> {
+    return $Call.ByID(1111524684, rel, limit);
+}
+
+/**
  * Open opens the output with its default application.
  */
 export function Open(outputID: string): $CancellablePromise<void> {
@@ -29,6 +52,21 @@ export function OpenLibraryFolder(subdir: string): $CancellablePromise<void> {
 }
 
 /**
+ * Places lists projects (every kind) and saved masks.
+ */
+export function Places(): $CancellablePromise<core$0.LibraryPlaces> {
+    return $Call.ByID(2995858281);
+}
+
+/**
+ * Query pages through outputs with server-side filters (supersedes Recent
+ * for the Library view).
+ */
+export function Query(q: core$0.LibraryQuery): $CancellablePromise<core$0.OutputPage> {
+    return $Call.ByID(975713127, q);
+}
+
+/**
  * Recent pages through outputs, newest first.
  */
 export function Recent(q: core$0.OutputQuery): $CancellablePromise<core$0.OutputPage> {
@@ -40,6 +78,14 @@ export function Recent(q: core$0.OutputQuery): $CancellablePromise<core$0.Output
  */
 export function Remove(outputID: string): $CancellablePromise<void> {
     return $Call.ByID(2223510081, outputID);
+}
+
+/**
+ * Rename renames an output's file in its folder (sanitised, never
+ * overwriting) and moves the output row.
+ */
+export function Rename(outputID: string, newName: string): $CancellablePromise<core$0.Output> {
+    return $Call.ByID(1077493647, outputID, newName);
 }
 
 /**
@@ -58,10 +104,33 @@ export function RevealPath(path: string): $CancellablePromise<void> {
 }
 
 /**
+ * SaveCopies asks for a folder and copies every output there (non-overwriting
+ * names). Cancelling returns "".
+ */
+export function SaveCopies(outputIDs: string[] | null): $CancellablePromise<string> {
+    return $Call.ByID(1611107749, outputIDs);
+}
+
+/**
  * SaveCopy asks where to save a copy of a library output (or of a file inside
  * the library or app folder when outputID is "") and copies it there. The
  * original is never moved or changed. Cancelling returns "".
  */
 export function SaveCopy(outputID: string, path: string): $CancellablePromise<string> {
     return $Call.ByID(3465844009, outputID, path);
+}
+
+/**
+ * Trash moves library files (by output ID or by path) to the Recycle Bin /
+ * Trash and forgets their outputs.
+ */
+export function Trash(outputIDs: string[] | null, paths: string[] | null): $CancellablePromise<core$0.TrashResult> {
+    return $Call.ByID(4163034897, outputIDs, paths);
+}
+
+/**
+ * TrashAvailable says whether Delete can move files to the OS trash here.
+ */
+export function TrashAvailable(): $CancellablePromise<boolean> {
+    return $Call.ByID(271825564);
 }

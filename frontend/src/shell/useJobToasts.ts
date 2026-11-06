@@ -37,6 +37,8 @@ export function notifyDone(moduleId: string, jobs: Job[]): void {
   if (!announced && (ui.view === moduleId || ui.trayOpen)) return;
   // Focus jobs start or end a session: the top-bar pill and focus toasts say so.
   if (moduleId === FOCUS_MODULE_ID) return;
+  // Quiet jobs (Paint+'s Lab calls) report in their own tool.
+  if (jobs.some((j) => j.quiet)) return;
   const outputs = jobs.flatMap((j) => j.outputs ?? []);
   const mod = useModules.getState().byId[moduleId]?.name ?? "Job";
   if (jobs.length === 1) {
@@ -113,7 +115,7 @@ export function useJobToasts(): void {
           if (batch) clearTimeout(batch.timer);
           continue;
         }
-        if (j.status === JobStatus.JobFailed && !useUI.getState().trayOpen) {
+        if (j.status === JobStatus.JobFailed && !useUI.getState().trayOpen && !j.quiet) {
           const mod = useModules.getState().byId[j.moduleId]?.name ?? "Job";
           const title = j.title || j.inputs?.[0] || j.id;
           toast({

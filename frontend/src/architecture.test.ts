@@ -24,7 +24,7 @@ const EDITOR_ALLOWED = new Set(["@/tools/_kit", "@/tools/_kit/accepts"]);
 
 const ROOTS = [/^tools\/index\.ts$/, /^parts\/index\.ts$/, /^shell\//, /^views\//, /^pipelines\//, /^App\.tsx$/, /^main\.tsx$/, /architecture\.test\.ts$/];
 
-const SHARED = [/^blocks\//, /^components\//, /^editor\//, /^lib\//, /^state\//, /^viz\//, /^workspace\//, /^parts\//];
+const SHARED = [/^blocks\//, /^components\//, /^editor\//, /^lib\//, /^state\//, /^viz\//, /^workspace\//, /^parts\//, /^paint\//];
 
 const SPECIFIER = /(?:\bfrom|\bimport\(|\bvi\.mock\(|\bvi\.importActual(?:<[^>]*>)?\()\s*["']([^"']+)["']/g;
 

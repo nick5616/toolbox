@@ -192,6 +192,7 @@ type PipelineTag struct{ RunID, StepID string }
 
 // changed emits a persisted snapshot and passes it to the observers.
 func (m *Jobs) changed(j Job) {
+	m.markQuiet(&j)
 	m.em.Emit(EventJobsChanged, j)
 	m.obsMu.Lock()
 	fns := make([]func(Job), 0, len(m.observers))
@@ -508,22 +509,10 @@ func (m *Jobs) execute(aj *activeJob, lg *jobLog) (err error) {
 			m.update(aj, func(j *Job) { j.Title = title })
 		},
 		Output: func(path string) (Output, error) {
-			o, e := NewOutput(path, job.ID, job.ModuleID)
-			if e != nil {
-				return Output{}, e
-			}
-			o, e = m.outputs.UpsertOutput(context.Background(), o)
-			if e != nil {
-				return Output{}, e
-			}
-			m.mu.Lock()
-			if !slices.ContainsFunc(aj.job.Outputs, func(x Output) bool { return x.ID == o.ID }) {
-				aj.job.Outputs = append(aj.job.Outputs, o)
-			}
-			m.mu.Unlock()
-			m.em.Emit(EventLibraryAdded, o)
-			m.publish(aj)
-			return o, nil
+			return m.registerOutput(aj, job, path, nil)
+		},
+		OutputFrom: func(path string, inputs []string) (Output, error) {
+			return m.registerOutput(aj, job, path, inputs)
 		},
 		Tool: m.tools,
 		Result: func(r json.RawMessage) {
@@ -582,7 +571,17 @@ func (m *Jobs) List(ctx context.Context, f JobFilter) ([]Job, error) {
 		m.overlay(&jobs[i])
 	}
 	m.mu.Unlock()
+	for i := range jobs {
+		m.markQuiet(&jobs[i])
+	}
 	return jobs, nil
+}
+
+// markQuiet copies the module's Descriptor.Quiet onto a job snapshot.
+func (m *Jobs) markQuiet(j *Job) {
+	if d, ok := m.reg.Descriptor(j.ModuleID); ok {
+		j.Quiet = d.Quiet
+	}
 }
 
 // Get returns one job.
@@ -594,6 +593,7 @@ func (m *Jobs) Get(ctx context.Context, id string) (Job, error) {
 	m.mu.Lock()
 	m.overlay(&j)
 	m.mu.Unlock()
+	m.markQuiet(&j)
 	return j, nil
 }
 
@@ -775,4 +775,26 @@ func (m *Jobs) HasActive(moduleIDs ...string) bool {
 		}
 	}
 	return false
+}
+
+// registerOutput adds a finished file to the library and records its
+// lineage (explicit inputs, or nil for the default rule).
+func (m *Jobs) registerOutput(aj *activeJob, job Job, path string, inputs []string) (Output, error) {
+	o, e := NewOutput(path, job.ID, job.ModuleID)
+	if e != nil {
+		return Output{}, e
+	}
+	o, e = m.outputs.UpsertOutput(context.Background(), o)
+	if e != nil {
+		return Output{}, e
+	}
+	m.recordLineage(o, inputs, job.Inputs)
+	m.mu.Lock()
+	if !slices.ContainsFunc(aj.job.Outputs, func(x Output) bool { return x.ID == o.ID }) {
+		aj.job.Outputs = append(aj.job.Outputs, o)
+	}
+	m.mu.Unlock()
+	m.em.Emit(EventLibraryAdded, o)
+	m.publish(aj)
+	return o, nil
 }

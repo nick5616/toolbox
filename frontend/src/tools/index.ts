@@ -47,6 +47,7 @@ export const toolViews: Record<string, LazyExoticComponent<ComponentType<ToolVie
   "video-studio": lazy(() => import("./video-studio/VideoEditorView")), // the Video Editor (multitrack); Edit Studio is composed on it
   "edit-studio": lazy(() => import("./edit-studio/EditStudioView")),
   "post-builder": lazy(() => import("./post-builder/PostBuilderView")),
+  paint: lazy(() => import("./paint/PaintView")),
 };
 
 // The composition root (Phase 11, SPEC §3.4): code outside a tool reaches tool

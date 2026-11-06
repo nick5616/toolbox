@@ -16,8 +16,11 @@ type JobHooks struct {
 	Log      func(stream LogStream, line string)
 	Title    func(title string)
 	Output   func(path string) (Output, error)
-	Tool     func(depID string) (string, error)
-	Result   func(result json.RawMessage)
+	// OutputFrom registers path with explicit lineage inputs (nil = the
+	// default rule, LineageInputs). When nil, OutputFrom falls back to Output.
+	OutputFrom func(path string, inputs []string) (Output, error)
+	Tool       func(depID string) (string, error)
+	Result     func(result json.RawMessage)
 }
 
 // JobContext is what Module.Run receives.
@@ -69,12 +72,26 @@ func (j *JobContext) SetTitle(title string) {
 	}
 }
 
-// Output registers a finished file in the library.
+// Output registers a finished file in the library. Its lineage (what it was
+// made from) follows the default rule over the job's inputs (LineageInputs).
 func (j *JobContext) Output(path string) (Output, error) {
 	if j.hooks.Output == nil {
 		return Output{}, fmt.Errorf("register output %q: no output hook", path)
 	}
 	return j.hooks.Output(path)
+}
+
+// OutputFrom registers a finished file made from exactly these inputs
+// (Phase 19 lineage; use it in multi-input jobs so the Library can say which
+// input each output came from).
+func (j *JobContext) OutputFrom(path string, inputs ...string) (Output, error) {
+	if j.hooks.OutputFrom == nil {
+		return j.Output(path)
+	}
+	if inputs == nil {
+		inputs = []string{}
+	}
+	return j.hooks.OutputFrom(path, inputs)
 }
 
 // Tool resolves an external dependency to an absolute path, or returns an

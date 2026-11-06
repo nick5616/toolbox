@@ -45,6 +45,9 @@ type Job struct {
 	// pipeline run (SPEC.md §9.2); "" for ordinary jobs.
 	PipelineRunID  string `json:"pipelineRunId"`
 	PipelineStepID string `json:"pipelineStepId"`
+	// Quiet mirrors the module's Descriptor.Quiet (not stored): the UI keeps
+	// these jobs out of toasts and the tray's finished list (Phase 19).
+	Quiet bool `json:"quiet,omitempty"`
 }
 
 // JobFilter selects jobs, newest first.

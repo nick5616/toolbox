@@ -6,6 +6,7 @@ import "./documents";
 import "./builtin";
 import "./phase14";
 import "./phase14media";
+import "./paint";
 import "./scenes";
 import "./gif";
 import "./organize";

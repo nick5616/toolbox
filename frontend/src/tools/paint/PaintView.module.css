@@ -1,0 +1,11 @@
+.root {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--p-canvas-bg);
+  color: var(--p-ink-dim);
+}
+
+.note {
+  font-size: var(--p-body);
+}

@@ -538,6 +538,13 @@ export interface Descriptor {
     "hidden": boolean;
 
     /**
+     * Quiet modules' jobs never toast on completion, drop out of the job
+     * tray's finished list and register no library outputs (Phase 19: the
+     * hidden "paint-ai" module runs one job per AI stroke).
+     */
+    "quiet"?: boolean;
+
+    /**
      * JobLess modules have a UI but never run jobs (e.g. Clipboard History);
      * Jobs.Submit rejects them.
      */
@@ -699,6 +706,12 @@ export interface Job {
      */
     "pipelineRunId": string;
     "pipelineStepId": string;
+
+    /**
+     * Quiet mirrors the module's Descriptor.Quiet (not stored): the UI keeps
+     * these jobs out of toasts and the tray's finished list (Phase 19).
+     */
+    "quiet"?: boolean;
 }
 
 /**
@@ -758,6 +771,199 @@ export enum JobStatus {
 export interface JobsRemoved {
     "ids": string[] | null;
 }
+
+/**
+ * LibraryEntry is one file or folder inside a library folder.
+ */
+export interface LibraryEntry {
+    "name": string;
+    "path": string;
+    "rel": string;
+    "isDir": boolean;
+    "sizeBytes": number;
+
+    /**
+     * Unix ms
+     */
+    "modTime": number;
+
+    /**
+     * by extension (folders: "other")
+     */
+    "kind": OutputKind;
+
+    /**
+     * the registered output at this path, nil = not from a job
+     */
+    "output": Output | null;
+}
+
+/**
+ * LibraryFolder is one folder of the library tree.
+ */
+export interface LibraryFolder {
+    /**
+     * library-relative, "/"-separated; "" = the root
+     */
+    "rel": string;
+
+    /**
+     * last path element ("Toolbox" for the root)
+     */
+    "name": string;
+
+    /**
+     * absolute
+     */
+    "path": string;
+
+    /**
+     * every file directly inside
+     */
+    "files": number;
+
+    /**
+     * of which are library outputs
+     */
+    "registered": number;
+
+    /**
+     * Unix ms of the newest file directly inside, 0 = empty
+     */
+    "newestMod": number;
+
+    /**
+     * tools whose OutputSubdir is this folder (or that wrote into it)
+     */
+    "moduleIds": string[] | null;
+
+    /**
+     * depth ≤ 6
+     */
+    "children": LibraryFolder[] | null;
+}
+
+/**
+ * LibraryListing is a folder's entries.
+ */
+export interface LibraryListing {
+    "entries": LibraryEntry[] | null;
+
+    /**
+     * more than the limit
+     */
+    "truncated": boolean;
+}
+
+/**
+ * LibraryPlaces are things the user made that live outside the library folder.
+ */
+export interface LibraryPlaces {
+    "projects": LibraryProject[] | null;
+    "savedMasks": LibrarySavedMask[] | null;
+}
+
+/**
+ * LibraryProject is a creator-tool project shown under "Other places".
+ */
+export interface LibraryProject {
+    "id": string;
+    "kind": ProjectKind;
+
+    /**
+     * the tool that opens it
+     */
+    "moduleId": string;
+    "name": string;
+
+    /**
+     * path, "" if none
+     */
+    "thumb": string;
+
+    /**
+     * path, "" if none
+     */
+    "render": string;
+    "updatedAt": number;
+}
+
+/**
+ * LibraryQuery pages through outputs with server-side filters. It
+ * supersedes OutputQuery for the Library view (Recent stays for tools).
+ */
+export interface LibraryQuery {
+    /**
+     * "" = every tool
+     */
+    "moduleId": string;
+
+    /**
+     * name contains, case-insensitive
+     */
+    "search": string;
+
+    /**
+     * empty = every kind
+     */
+    "kinds": OutputKind[] | null;
+
+    /**
+     * Unix ms, 0 = no bound
+     */
+    "since": number;
+
+    /**
+     * Unix ms, 0 = no bound
+     */
+    "until": number;
+
+    /**
+     * "" = newest
+     */
+    "sort": LibrarySort;
+
+    /**
+     * library-relative folder ("" = everywhere); direct children only
+     */
+    "folder": string;
+
+    /**
+     * default 100, max 500
+     */
+    "limit": number;
+
+    /**
+     * opaque; "" = first page
+     */
+    "cursor": string;
+}
+
+/**
+ * LibrarySavedMask is a saved Object Eraser mask.
+ */
+export interface LibrarySavedMask {
+    "id": string;
+    "name": string;
+    "width": number;
+    "height": number;
+    "createdAt": number;
+}
+
+/**
+ * LibrarySort orders a library query.
+ */
+export enum LibrarySort {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SortNewest = "newest",
+    SortOldest = "oldest",
+    SortName = "name",
+    SortSize = "size",
+};
 
 /**
  * LogLine is one line of job output.
@@ -851,6 +1057,62 @@ export interface Output {
      * Missing is computed on read: the file no longer exists.
      */
     "missing": boolean;
+}
+
+/**
+ * OutputDetail is everything the Library's detail panel shows for one file.
+ */
+export interface OutputDetail {
+    /**
+     * for an unregistered file: ID "" and fields from the file
+     */
+    "output": Output;
+
+    /**
+     * "" when the job is gone
+     */
+    "jobTitle": string;
+
+    /**
+     * the job's options JSON ("" when unknown)
+     */
+    "options": string;
+
+    /**
+     * a one-line settings summary when the module offers one
+     */
+    "summary": string;
+
+    /**
+     * input paths
+     */
+    "madeFrom": string[] | null;
+
+    /**
+     * outputs whose lineage includes this path
+     */
+    "madeInto": Output[] | null;
+
+    /**
+     * single-input same-tool chain through this file, oldest first (≤ 200); empty if none
+     */
+    "chain": Output[] | null;
+
+    /**
+     * this file's index in Chain
+     */
+    "chainAt": number;
+
+    /**
+     * images (0 = unknown)
+     */
+    "width": number;
+    "height": number;
+
+    /**
+     * no lineage recorded ("Origin unknown")
+     */
+    "unknown": boolean;
 }
 
 /**
@@ -1441,6 +1703,11 @@ export enum ProjectKind {
      * Edit Studio (Phase 9)
      */
     ProjectEdit = "edit",
+
+    /**
+     * Paint+ (Phase 19)
+     */
+    ProjectPaint = "paint",
 };
 
 export interface RunBrief {
@@ -1967,6 +2234,21 @@ export interface ToolsDirInfo {
      * the folder exists
      */
     "available": boolean;
+}
+
+/**
+ * TrashResult reports a move to the Recycle Bin / Trash.
+ */
+export interface TrashResult {
+    /**
+     * paths moved to the trash
+     */
+    "trashed": string[] | null;
+
+    /**
+     * path → reason
+     */
+    "failed": { [_ in string]?: string } | null;
 }
 
 /**

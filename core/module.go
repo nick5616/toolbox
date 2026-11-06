@@ -52,6 +52,10 @@ type Descriptor struct {
 	OutputSubdir string       `json:"outputSubdir"` // relative to the library dir; "" = no outputs
 	Order        int          `json:"order"`
 	Hidden       bool         `json:"hidden"` // system modules: not listed, not matched
+	// Quiet modules' jobs never toast on completion, drop out of the job
+	// tray's finished list and register no library outputs (Phase 19: the
+	// hidden "paint-ai" module runs one job per AI stroke).
+	Quiet bool `json:"quiet,omitempty"`
 	// JobLess modules have a UI but never run jobs (e.g. Clipboard History);
 	// Jobs.Submit rejects them.
 	JobLess bool `json:"jobLess"`

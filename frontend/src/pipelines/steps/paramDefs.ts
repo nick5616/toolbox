@@ -497,6 +497,20 @@ const BASE: Readonly<Record<string, ParamOverrides>> = {
     "/pipelineId": { hidden: true },
   },
 
+  // ── paint.tsx (Phase 19) ──
+  paint: {
+    "/action": { label: "What it does", type: "choice", choices: ch(["overlay", "Draw a painting over"], ["dissolve", "Dissolve with a mask"]), primary: true },
+    "/project": { hidden: true },
+    "/layer": { hidden: true },
+    "/mask": { hidden: true },
+    "/fit": { label: "Fit", type: "choice", choices: ch(["contain", "Contain"], ["cover", "Cover"], ["stretch", "Stretch"]) },
+    "/passes": { label: "Passes", min: 1, max: 12, primary: true },
+    "/ghost": { label: "Ghost", min: 0, max: 1 },
+    "/drift": { label: "Drift", min: 0, max: 1 },
+    "/seed": { label: "Seed" },
+    "/model": { label: "Fill", type: "choice", choices: ch(["fast", "Fast"], ["best", "Best"]) },
+  },
+
   // ── phase14media.tsx ──
   "photo-composer": {
     "/templateId": { hidden: true },

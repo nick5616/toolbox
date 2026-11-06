@@ -34,6 +34,20 @@ type OutputStore interface {
 	MoveOutput(ctx context.Context, id, newPath string) (Output, error)
 }
 
+// LineageStore records which inputs each output was made from (Phase 19,
+// SPEC.md §3.3; table output_inputs, migration 0009).
+type LineageStore interface {
+	// AddOutputInputs records inputs for an output (idempotent).
+	AddOutputInputs(ctx context.Context, outputID string, inputs []string) error
+	// OutputInputs lists the input paths an output was made from.
+	OutputInputs(ctx context.Context, outputID string) ([]string, error)
+	// OutputsFromInput lists outputs made from path, newest first.
+	OutputsFromInput(ctx context.Context, path string) ([]Output, error)
+	// BackfillLineage fills output_inputs from jobs.inputs for outputs that
+	// still have a job and no lineage yet; it returns the rows added.
+	BackfillLineage(ctx context.Context) (int, error)
+}
+
 // PipelineStore persists pipelines, their runs and watch-folder state
 // (SPEC.md §9.1).
 type PipelineStore interface {

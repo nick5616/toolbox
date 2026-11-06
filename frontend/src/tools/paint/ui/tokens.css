@@ -1,0 +1,83 @@
+/*
+ * Paint+ design language (Phase 19, SPEC §0, §1.5). Bespoke tokens scoped to
+ * the tool's root: <div data-design="paint">. Colours in Paint+ come only
+ * from this file. SKELETON (Wave 0): names are frozen; P5 tunes the values.
+ */
+
+[data-design="paint"] {
+  /* surfaces */
+  --p-canvas-bg: #1a1a1c; /* around the canvas */
+  --p-island: rgba(28, 28, 32, 0.72); /* floating controls */
+  --p-island-solid: #1f1f23;
+  --p-island-border: rgba(255, 255, 255, 0.06);
+  --p-island-blur: 18px;
+  --p-popover: rgba(32, 32, 36, 0.86);
+  --p-scrim: rgba(0, 0, 0, 0.35);
+
+  /* ink */
+  --p-ink: #ececee;
+  --p-ink-dim: #a6a6ad;
+  --p-ink-faint: #6c6c74;
+
+  /* accent: the current paint colour is set inline as --p-current */
+  --p-accent: #8ab4ff;
+  --p-current: #ffffff;
+  --p-danger: #ff7a6b;
+  --p-focus: #8ab4ff;
+
+  /* predictability badges */
+  --p-exact: #7fd6a4;
+  --p-seeded: #f2c46d;
+  --p-wild: #e58ad6;
+
+  /* shape and motion */
+  --p-radius-s: 8px;
+  --p-radius-m: 14px;
+  --p-radius-l: 20px;
+  --p-shadow: 0 8px 28px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --p-ease: cubic-bezier(0.2, 0.9, 0.25, 1.15);
+  --p-fast: 120ms;
+  --p-med: 180ms;
+
+  /* type */
+  --p-label: 11px;
+  --p-body: 12px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) [data-design="paint"] {
+    --p-canvas-bg: #d9d6d1;
+    --p-island: rgba(246, 244, 240, 0.78);
+    --p-island-solid: #f4f2ee;
+    --p-island-border: rgba(0, 0, 0, 0.06);
+    --p-popover: rgba(250, 248, 245, 0.9);
+    --p-scrim: rgba(0, 0, 0, 0.18);
+    --p-ink: #1e1e22;
+    --p-ink-dim: #5d5d66;
+    --p-ink-faint: #93939c;
+    --p-accent: #3d6fd6;
+    --p-focus: #3d6fd6;
+    --p-exact: #23935a;
+    --p-seeded: #b9861e;
+    --p-wild: #b24ea0;
+    --p-shadow: 0 8px 28px rgba(0, 0, 0, 0.14), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  }
+}
+
+:root[data-theme="light"] [data-design="paint"] {
+  --p-canvas-bg: #d9d6d1;
+  --p-island: rgba(246, 244, 240, 0.78);
+  --p-island-solid: #f4f2ee;
+  --p-island-border: rgba(0, 0, 0, 0.06);
+  --p-popover: rgba(250, 248, 245, 0.9);
+  --p-scrim: rgba(0, 0, 0, 0.18);
+  --p-ink: #1e1e22;
+  --p-ink-dim: #5d5d66;
+  --p-ink-faint: #93939c;
+  --p-accent: #3d6fd6;
+  --p-focus: #3d6fd6;
+  --p-exact: #23935a;
+  --p-seeded: #b9861e;
+  --p-wild: #b24ea0;
+  --p-shadow: 0 8px 28px rgba(0, 0, 0, 0.14), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}

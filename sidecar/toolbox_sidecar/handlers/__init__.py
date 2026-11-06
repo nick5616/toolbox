@@ -9,6 +9,7 @@ from . import (  # noqa: F401
     matte,
     midi,
     ocr,
+    paint,
     redact,
     stems,
     system,

@@ -31,6 +31,7 @@ import (
 	"toolbox/modules/midi"
 	"toolbox/modules/ocr"
 	"toolbox/modules/organize"
+	"toolbox/modules/paint"
 	"toolbox/modules/pdf"
 	"toolbox/modules/placeholders"
 	"toolbox/modules/redact"
@@ -93,6 +94,7 @@ func TestEveryToolIsInOnePack(t *testing.T) {
 		func() error { _, err := lyricvideo.Register(reg, nil, nil, "", ""); return err },
 		func() error { _, err := redact.Register(reg, nil, nil, "", ""); return err },
 		func() error { _, err := eraser.Register(reg, nil, "", ""); return err },
+		func() error { return paint.Register(reg, paint.New(paint.Config{})) },
 		func() error { return devutils.Register(reg) },
 		func() error { return documents.Register(reg, "") },
 		func() error { return archiver.Register(reg) },

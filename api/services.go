@@ -15,6 +15,7 @@ import (
 	"toolbox/core"
 	"toolbox/core/deps"
 	"toolbox/core/sidecar"
+	"toolbox/core/trash"
 )
 
 // ModulesService exposes the registry.
@@ -77,6 +78,15 @@ type LibraryService struct {
 	Settings *core.SettingsService
 	Paths    core.Paths
 	Em       core.Emitter
+
+	// Phase 19 Library browser (api/library.go).
+	Lineage  core.LineageStore
+	JobStore core.JobStore
+	Projects core.ProjectStore
+	Reg      *core.Registry
+	Trasher  trash.Trasher
+	// SavedMasks lists Object Eraser's saved masks (nil = none).
+	SavedMasks func() ([]core.LibrarySavedMask, error)
 }
 
 // Recent pages through outputs, newest first.

@@ -490,3 +490,33 @@ export type {
   StepOptions as TtsStepOptions,
   VoiceInfo as TtsVoiceInfo,
 } from "@bindings/modules/tts/models";
+
+// --- Phase 19: Paint+ and the Library browser ---
+export * as PaintService from "@bindings/modules/paint/service";
+export { AIOp as PaintAIOp, ExportFormat as PaintExportFormat, StepAction as PaintStepAction } from "@bindings/modules/paint/models";
+export type {
+  AIModelInfo as PaintAIModelInfo,
+  AIPoint as PaintAIPoint,
+  AIRequest as PaintAIRequest,
+  AIResultInfo as PaintAIResultInfo,
+  BrushImportResult,
+  BrushInfo,
+  BrushSet,
+  ExportOptions as PaintExportOptions,
+  Origin as PaintOrigin,
+  PaintDoc,
+  PaintLayer,
+  StepOptions as PaintStepOptions,
+} from "@bindings/modules/paint/models";
+export { LibrarySort } from "@bindings/core/models";
+export type {
+  LibraryEntry,
+  LibraryFolder,
+  LibraryListing,
+  LibraryPlaces,
+  LibraryProject,
+  LibraryQuery,
+  LibrarySavedMask,
+  OutputDetail,
+  TrashResult,
+} from "@bindings/core/models";
