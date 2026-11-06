@@ -3,8 +3,8 @@
 package focus
 
 import (
-	"context"
 	"encoding/json"
+	"time"
 
 	"toolbox/core"
 )
@@ -15,7 +15,8 @@ const ModuleID = "focus"
 // Module implements core.Module (start/end jobs) and core.Chainable.
 type Module struct {
 	eng  Engine
-	wake func() // Runner.WakeTimeWaits; optional
+	wake func()           // Runner.WakeTimeWaits; optional
+	now  func() time.Time // tests set it; nil = time.Now
 }
 
 // Register adds the module. wake is called after a step changes the session.
@@ -41,9 +42,4 @@ func (m *Module) Descriptor() core.Descriptor {
 func (m *Module) Validate(inputs []string, options json.RawMessage) error {
 	_, err := core.DecodeOptionsJSON[JobOptions](options)
 	return err
-}
-
-// Run implements core.Module. Wave 0 stub; WP-F2 implements it.
-func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
-	return core.NotImplemented("Focus Lock")
 }

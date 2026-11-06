@@ -1,7 +1,9 @@
 package focus
 
 import (
-	"toolbox/core"
+	"sync"
+	"time"
+
 	"toolbox/core/focus"
 )
 
@@ -14,16 +16,36 @@ type App struct {
 	Store bool            `json:"store"` // a Microsoft Store app (WindowsApps)
 }
 
-// Service is the Focus Lock Wails service. Wave 0: the engine pass-throughs
-// work once WP-F1 lands; Apps/Running/AppFor/AppIcon are WP-F2's.
+// Service is the Focus Lock Wails service: engine pass-throughs plus the app
+// catalog (apps.go) and icons (icons.go).
 type Service struct {
 	eng Engine
+
+	mu       sync.Mutex
+	cacheDir string                       // <support>/cache/focus-icons; "" = no disk cache
+	platform focus.Platform               // lazily focus.NewPlatform(); tests set it
+	clock    func() time.Time             // tests set it
+	scan     func() []App                 // the installed-apps scan; tests set it
+	apps     []App                        // cached Apps()
+	appsAt   time.Time                    // when apps was scanned
+	icons    map[string]string            // in-memory icon cache by path+mtime
+	iconFn   func(string) ([]byte, error) // renders a PNG; tests set it
 }
 
 // NewService builds the service.
-func NewService(eng Engine) *Service { return &Service{eng: eng} }
+func NewService(eng Engine) *Service {
+	return &Service{eng: eng, clock: time.Now, icons: map[string]string{}}
+}
 
-func todo() error { return core.NotImplemented("Focus Lock") }
+// plat returns the OS platform, built on first use.
+func (s *Service) plat() focus.Platform {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.platform == nil {
+		s.platform = focus.NewPlatform()
+	}
+	return s.platform
+}
 
 // State is the current state (also pushed as focus:changed).
 func (s *Service) State() focus.State { return s.eng.State() }
@@ -87,18 +109,6 @@ func (s *Service) LearnList() ([]focus.LearnEntry, error) { return s.eng.LearnLi
 
 // IgnoreLearn forgets one program's learn entries ("" = all).
 func (s *Service) IgnoreLearn(path string) error { return s.eng.IgnoreLearn(path) }
-
-// Apps lists installed programs (Start menu / Applications), cached 10 min.
-func (s *Service) Apps() ([]App, error) { return []App{}, todo() }
-
-// Running lists programs with a window that are running now.
-func (s *Service) Running() ([]App, error) { return []App{}, todo() }
-
-// AppFor turns a browsed path into an App with its suggested rule.
-func (s *Service) AppFor(path string) (App, error) { return App{}, todo() }
-
-// AppIcon is a program's 32 px icon as a PNG data URL ("" = none).
-func (s *Service) AppIcon(path string) string { return "" }
 
 // WindowsExtras lists the always-allowed system folders outside the OS's own
 // folder (read-only in the tool).
