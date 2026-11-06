@@ -53,6 +53,11 @@ type JobOptions struct {
 	IfActive string              `json:"ifActive"`
 	RunID    string              `json:"runId"`
 	Carry    []core.RunFile      `json:"carry"` // the step's files, passed on unchanged
+	// Reached: an "until" start whose time today has passed while a session
+	// is already on. The step is done as it is (nothing is extended) and the
+	// files pass through. Note says why, for the job's log.
+	Reached bool   `json:"reached,omitempty"`
+	Note    string `json:"note,omitempty"`
 }
 
 // JobResult is what a focus job records (its step variables and the files it
