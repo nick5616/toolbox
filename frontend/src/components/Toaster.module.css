@@ -70,8 +70,12 @@
   overflow-wrap: anywhere;
 }
 
-.action {
+.actions {
+  display: flex;
+  gap: var(--space-3);
   margin-top: var(--space-2);
+}
+.action {
   padding: 0;
   border: 0;
   background: transparent;
