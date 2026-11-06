@@ -38,6 +38,9 @@ export interface FocusStore {
   state: FocusState;
   /** Recent block events, oldest first (capped). */
   blocked: FocusBlockEvent[];
+  /** The friction dialog was closed without cancelling: the countdown keeps running in the engine. */
+  frictionHidden: boolean;
+  setFrictionHidden: (hidden: boolean) => void;
   setState: (s: FocusState) => void;
   addBlocked: (e: FocusBlockEvent) => void;
   load: () => Promise<void>;
@@ -47,7 +50,9 @@ export const useFocus = create<FocusStore>((set) => ({
   loaded: false,
   state: EMPTY_FOCUS_STATE,
   blocked: [],
-  setState: (s) => set({ state: normalizeFocusState(s) }),
+  frictionHidden: false,
+  setFrictionHidden: (hidden) => set({ frictionHidden: hidden }),
+  setState: (s) => set((st) => ({ state: normalizeFocusState(s), frictionHidden: s.friction ? st.frictionHidden : false })),
   addBlocked: (e) =>
     set((st) => {
       const next = [...st.blocked, e];
@@ -59,22 +64,31 @@ export const useFocus = create<FocusStore>((set) => ({
   },
 }));
 
-let unsubscribers: Array<() => void> = [];
+let subscribers = 0;
+let teardown: Array<() => void> = [];
 
 /**
  * Subscribes the store to `focus:changed` / `focus:blocked` and loads the state.
- * Idempotent: a second call replaces the first. Every window may call it.
+ * Reference-counted: one underlying listener while any subscriber is alive; the
+ * returned function only decrements. Every window may call it.
  */
 export function subscribeFocus(): () => void {
-  for (const u of unsubscribers) u();
   const s = useFocus.getState;
-  const subs = [on("focus:changed", (v) => s().setState(v)), on("focus:blocked", (e) => s().addBlocked(e))];
-  unsubscribers = subs;
+  if (subscribers === 0) {
+    teardown = [on("focus:changed", (v) => s().setState(v)), on("focus:blocked", (e) => s().addBlocked(e))];
+  }
+  subscribers++;
   void s()
     .load()
     .catch(() => undefined);
+  let done = false;
   return () => {
-    for (const u of subs) u();
-    unsubscribers = unsubscribers.filter((u) => !subs.includes(u));
+    if (done) return;
+    done = true;
+    subscribers--;
+    if (subscribers === 0) {
+      for (const u of teardown) u();
+      teardown = [];
+    }
   };
 }

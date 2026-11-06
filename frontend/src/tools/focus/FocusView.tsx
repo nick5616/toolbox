@@ -13,11 +13,21 @@ import { StartCard } from "./StartCard";
 import { report, useFocusData } from "./useFocusData";
 import styles from "./FocusView.module.css";
 
+function useTick(ms: number): number {
+  const [t, setT] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setT(Date.now()), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+  return t;
+}
+
 /** Focus Lock (Phase 18, SPEC §5.1): idle, active and ended states of a form tool. */
 export default function FocusView({ moduleId }: ToolViewProps) {
   const state = useFocus((s) => s.state);
   const loaded = useFocus((s) => s.loaded);
   const data = useFocusData();
+  const nowMs = useTick(1000);
   const [chosenId, setChosenId] = useState("");
   const [confirming, setConfirming] = useState(false);
 
@@ -82,6 +92,8 @@ export default function FocusView({ moduleId }: ToolViewProps) {
       setConfirming(false);
     }
   };
+  const frictionHidden = useFocus((s) => s.frictionHidden);
+  const hide = () => useFocus.getState().setFrictionHidden(true);
   const cancel = () => {
     const st = useFocus.getState();
     st.setState({ ...st.state, friction: null });
@@ -96,7 +108,7 @@ export default function FocusView({ moduleId }: ToolViewProps) {
         <span className={styles.status} data-testid="focus-status">
           {status}
         </span>
-        {session && <Badge tone="accent">{formatLength(Math.max(0, session.endsAt - Date.now()))} left</Badge>}
+        {session && <Badge tone="accent">{formatLength(Math.max(0, session.endsAt - nowMs))} left</Badge>}
         {!session && state.dryRun && <Badge tone="warn">Dry run</Badge>}
       </ToolHeader>
 
@@ -160,7 +172,7 @@ export default function FocusView({ moduleId }: ToolViewProps) {
         )}
       </div>
 
-      {friction && <FrictionDialog friction={friction} busy={confirming} onConfirm={(p) => void confirm(p)} onCancel={cancel} />}
+      {friction && !frictionHidden && <FrictionDialog friction={friction} busy={confirming} onConfirm={(p) => void confirm(p)} onCancel={cancel} onHide={hide} />}
     </div>
   );
 }

@@ -18,7 +18,7 @@ const HOTKEY_ROWS: Array<{ action: string; label: string }> = [
 const HOTKEY_TIPS: Record<string, string> = {
   clipboard: "Opens the clipboard history popup from anywhere",
   quickOpen: "Opens the search palette from anywhere",
-  focusStart: "Starts a focus session with the last profile, length and strength you used (no shortcut by default)",
+  focusStart: "Starts a focus session with the last profile and length you used, at your default strength (no shortcut by default)",
 };
 
 function StatusBadge({ accelerator, status }: { accelerator: string; status: HotkeyStatus | undefined }) {

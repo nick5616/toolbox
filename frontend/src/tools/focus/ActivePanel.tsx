@@ -3,7 +3,7 @@ import { AppIcon } from "@/blocks/app-picker";
 import { Badge, Button, Section, cx } from "@/components";
 import { FocusService, FocusStrength, FocusWeaken, type FocusBlockedApp, type FocusOpenApp, type FocusSession } from "@/lib/api";
 import { useFocus } from "@/state/focus";
-import { blockedResultLabel, formatClock, formatLength, formatMmSs, formatWhen, strengthLabel, MAC_LINE } from "./model";
+import { blockedResultLabel, secondsUntil, formatClock, formatLength, formatMmSs, formatWhen, strengthLabel, MAC_LINE } from "./model";
 import { report } from "./useFocusData";
 import styles from "./ActivePanel.module.css";
 
@@ -34,8 +34,22 @@ export async function requestWeaken(action: FocusWeaken, rule: Parameters<typeof
     const friction = await FocusService.RequestWeaken(action, rule);
     const st = useFocus.getState();
     st.setState({ ...st.state, friction });
+    st.setFrictionHidden(false);
   } catch (e) {
     report(e);
+  }
+}
+
+function pendingLabel(a: FocusWeaken): string {
+  switch (a) {
+    case FocusWeaken.WeakenEmergency:
+      return "Emergency unlock";
+    case FocusWeaken.WeakenQuit:
+      return "Quitting Toolbox";
+    case FocusWeaken.WeakenAllow:
+      return "Allowing an app";
+    default:
+      return "Ending early";
   }
 }
 
@@ -45,6 +59,8 @@ export function ActivePanel({ session, blocked, stillOpen, mac, now = Date.now }
   const total = Math.max(1, session.endsAt - session.startedAt);
   const left = Math.max(0, session.endsAt - t);
   const strict = session.strength === FocusStrength.StrengthStrict;
+  const friction = useFocus((s) => s.state.friction);
+  const frictionHidden = useFocus((s) => s.frictionHidden);
   const dash = RING_C * Math.min(1, left / total);
 
   const extend = (m: number) => void FocusService.Extend(m).catch(report);
@@ -101,6 +117,15 @@ export function ActivePanel({ session, blocked, stillOpen, mac, now = Date.now }
               </>
             )}
           </div>
+          {friction && frictionHidden && (
+            <p className={styles.pending} data-testid="friction-pending">
+              {pendingLabel(friction.action)}
+              {secondsUntil(friction.readyAt, t) > 0 ? ` in ${formatMmSs(secondsUntil(friction.readyAt, t))}` : " is ready"} ·{" "}
+              <button type="button" className={styles.link} onClick={() => useFocus.getState().setFrictionHidden(false)}>
+                Show
+              </button>
+            </p>
+          )}
           {mac && <p className={styles.mac}>{MAC_LINE}</p>}
         </div>
       </div>

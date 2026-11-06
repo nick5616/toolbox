@@ -227,7 +227,7 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
           <Button variant="secondary" data-tip="Close without starting" data-tip-kbd="Esc" onClick={close}>
             Cancel
           </Button>
-          <Button variant="primary" icon="play" disabled={!canStart} data-tip={!ready ? "The pipeline cannot run yet; see the message above" : accepted.length === 0 ? "Add at least one file or link this pipeline accepts" : tooMany ? `Remove some inputs; a run takes at most ${MAX_INPUTS}` : missingSecret ? "Enter the passwords the steps need" : badParam ? `Check “${badParam.label}”: that value doesn't fit` : "Start the run on the listed inputs"} onClick={() => void start()}>
+          <Button variant="primary" icon="play" disabled={!canStart} data-tip={!ready ? "The pipeline cannot run yet; see the message above" : accepted.length === 0 && !noFiles ? "Add at least one file or link this pipeline accepts" : tooMany ? `Remove some inputs; a run takes at most ${MAX_INPUTS}` : missingSecret ? "Enter the passwords the steps need" : badParam ? `Check “${badParam.label}”: that value doesn't fit` : noFiles ? "Run this pipeline now" : "Start the run on the listed inputs"} onClick={() => void start()}>
             {noFiles ? "Run" : accepted.length > 1 ? `Start with ${accepted.length} files` : "Start"}
           </Button>
         </div>
