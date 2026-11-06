@@ -51,6 +51,9 @@ type Config struct {
 	// Models resolves the perception models through the modules that own
 	// them (eraser, bgremove, editstudio matte, upscale); set in main.go.
 	Models ModelResolver
+	// Dialogs are the file dialogs for brush import and export (modules can't
+	// import Wails); set in main.go. Nil functions make those calls fail cleanly.
+	Dialogs BrushDialogs
 }
 
 // ModelResolver finds (never downloads) a perception model's files. Each

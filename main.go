@@ -395,6 +395,19 @@ func run() error {
 	paintMod := paint.New(paint.Config{
 		Store: db, ProjectsDir: projectsDir, SupportDir: paths.SupportDir, TmpDir: paths.TmpDir,
 		Engine: engine, Jobs: jobs, Outputs: db, Emitter: emitter, LibraryDir: libraryDir, Resolve: depSvc.Resolve,
+		Dialogs: paint.BrushDialogs{ // brush import/export file dialogs (B1)
+			Open: func() ([]string, error) {
+				return application.Get().Dialog.OpenFileWithOptions(&application.OpenFileDialogOptions{
+					CanChooseFiles: true, AllowsMultipleSelection: true, Title: "Import brushes", ButtonText: "Import",
+					Filters: []application.FileFilter{{DisplayName: "Brush files", Pattern: "*.brushset;*.brush;*.myb;*.abr;*.bundle;*.paintplus-brushes"}},
+				}).PromptForMultipleSelection()
+			},
+			Save: func(name string) (string, error) {
+				return application.Get().Dialog.SaveFileWithOptions(&application.SaveFileDialogOptions{
+					CanCreateDirectories: true, Title: "Export brush set", Filename: name, ButtonText: "Export",
+				}).PromptForSingleSelection()
+			},
+		},
 	})
 	if err := paint.Register(reg, paintMod); err != nil {
 		return err
