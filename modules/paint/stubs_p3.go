@@ -72,7 +72,6 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 	return core.NotImplemented("Paint+ jobs")
 }
 
-
 func (m *Module) prepareStep(ctx context.Context, req core.StepRequest) ([]core.StepJob, error) {
 	return nil, core.NotImplemented("Paint+ pipeline step")
 }
