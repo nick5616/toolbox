@@ -18,6 +18,7 @@ describe("focusSpans", () => {
     ["two sessions in a row", [f("s1", "start", { minutes: 25 }), f("w1", "wait"), f("s2", "start", { minutes: 120 }), f("w2", "wait")], [["s1", "w1", "25 min"], ["s2", "w2", "2 h"]]],
     ["a second wait has no start left", [f("s", "start", { minutes: 25 }), f("w1", "wait"), f("w2", "wait")], [["s", "w1", "25 min"]]],
     ["until mode labels the time", [f("s", "start", { mode: "until", at: "17:30" }), f("w", "wait")], [["s", "w", "until 17:30"]]],
+    ["a bound length is only known at run time", [{ ...f("s", "start", { minutes: 25 }), binds: [{ option: "/minutes", var: "work_minutes" }] }, f("w", "wait")], [["s", "w", ""]]],
     ["unreadable options label nothing", [{ id: "s", type: "focus", optionsJson: "oops" }, f("w", "wait")], [["s", "w", ""]]],
   ])("%s", (_name, steps, want) => {
     expect(focusSpans(steps).map((s) => [s.startId, s.waitId, s.label])).toEqual(want);

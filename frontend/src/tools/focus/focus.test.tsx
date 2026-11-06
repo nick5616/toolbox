@@ -287,6 +287,7 @@ describe("model helpers", () => {
   it("ended summary covers none stopped and early ends", () => {
     expect(endedSummary(session({ endedAt: NOW, startedAt: NOW - 25 * 60_000, blocked: 0, endReason: "user" }), [])).toBe("Focused 25 min · nothing needed stopping · ended early");
     expect(endedSummary(session({ endedAt: NOW, startedAt: NOW - 25 * 60_000, blocked: 1, endReason: "time" }), [])).toBe("Focused 25 min · stopped 1 launch");
+    expect(endedSummary(session({ endedAt: NOW, startedAt: NOW - 25 * 60_000, blocked: 2, endReason: "time", dryRun: true }), [])).toBe("Focused 25 min · would have stopped 2 launches");
   });
   it("learn summary", () => {
     expect(learnSummary(0, 0)).toBe("Watching · nothing would have been stopped yet");

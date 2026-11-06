@@ -158,7 +158,7 @@ export function endedSummary(session: FocusSession, apps: readonly FocusBlockedA
   if (session.blocked > 0) {
     const n = session.blocked;
     const detail = blockedBreakdown(apps);
-    parts.push(`stopped ${n} launch${n === 1 ? "" : "es"}${detail ? ` (${detail})` : ""}`);
+    parts.push(`${session.dryRun ? "would have stopped" : "stopped"} ${n} launch${n === 1 ? "" : "es"}${detail ? ` (${detail})` : ""}`);
   } else {
     parts.push("nothing needed stopping");
   }

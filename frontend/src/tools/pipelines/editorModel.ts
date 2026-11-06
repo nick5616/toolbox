@@ -227,6 +227,8 @@ export interface TimingStep {
   id: string;
   type: string;
   optionsJson: string;
+  /** Option pointers wired to variables: a bound length is only known at run time. */
+  binds?: ReadonlyArray<{ option: string; var: string }> | null;
 }
 
 function optionsObject(json: string): Record<string, unknown> {
@@ -264,6 +266,8 @@ export interface FocusSpan {
 
 function spanLabel(start: TimingStep): string {
   const o = optionsObject(start.optionsJson);
+  const bound = (ptr: string) => start.binds?.some((b) => b.option === ptr) === true;
+  if (o.mode === "until" ? bound("/at") : bound("/minutes")) return "";
   if (o.mode === "until") return typeof o.at === "string" && /^\d{2}:\d{2}$/.test(o.at) ? `until ${o.at}` : "";
   const m = typeof o.minutes === "number" && Number.isFinite(o.minutes) ? Math.round(o.minutes) : 0;
   if (m <= 0) return "";
