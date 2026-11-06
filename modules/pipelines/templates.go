@@ -51,7 +51,7 @@ func Templates() []core.PipelineTemplate {
 		foreignVideo(), receipts(), lecture(), beforeSharing(), musicVideo(), readingList(),
 		readItToMe(), audiobook(), tightLecture(), podcastPolish(), cameraRoll(), shopShots(), storyboard(),
 		meetingMinutes(), linkToNotes(), highlightReel(), reactionGIF(), narratedSlideshow(), songEverything(), verticalCut(),
-		sendToMyComputer(),
+		sendToMyComputer(), musicSession(), pomodoro(), morningDeepWork(), sampleThenMake(),
 	}
 	for i := range all {
 		all[i].Group = templateGroups[all[i].ID]
@@ -73,6 +73,8 @@ var templateGroups = map[string]string{
 	TplPodcastPolish: core.TemplateGroupPractical, TplCameraRoll: core.TemplateGroupPractical, TplShopShots: core.TemplateGroupPractical,
 	TplStoryboard: core.TemplateGroupPractical, TplMeetingMinutes: core.TemplateGroupPractical, TplLinkToNotes: core.TemplateGroupPractical,
 	TplSendToMyComputer: core.TemplateGroupPractical,
+	TplMusicSession:     core.TemplateGroupPractical, TplPomodoro: core.TemplateGroupPractical, TplDeepWork: core.TemplateGroupPractical,
+	TplSampleAndMake: core.TemplateGroupCool,
 }
 
 // NewStepID returns 8 random characters from [a-z0-9].

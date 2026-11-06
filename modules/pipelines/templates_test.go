@@ -19,6 +19,7 @@ import (
 	"toolbox/modules/documents"
 	"toolbox/modules/downloader"
 	"toolbox/modules/editstudio"
+	focusmod "toolbox/modules/focus"
 	"toolbox/modules/gif"
 	"toolbox/modules/imagebatch"
 	"toolbox/modules/lanshare"
@@ -74,6 +75,7 @@ var strictDecoders = map[string]func(json.RawMessage) error{
 	stEditStudio:   decodes[editstudio.BeatRequest],
 	stPostBuilder:  decodes[posts.StepOptions],
 	stPhotoCompose: decodes[composer.StepOptions],
+	stFocus:        decodes[focusmod.StepOptions],
 }
 
 func decodes[T any](raw json.RawMessage) error {
@@ -95,6 +97,7 @@ var toolVars = map[string][]string{
 	stScenes:      {"scene", "scene_total"},
 	stOrganize:    {"folder"},
 	stPostBuilder: {"post_folder", "caption"},
+	stFocus:       {"focus_ends", "focus_minutes", "focus_profile"},
 }
 
 var builtinVars = []string{"item", "name", "ext", "role", "n", "date", "time", "pipeline"}
@@ -131,7 +134,8 @@ func TestTemplatesShape(t *testing.T) {
 	want := []string{TplSocialClip, TplPodcast, TplSampling, TplKaraoke, TplProductPhotos, TplPaperArchive, TplPaperToWord,
 		TplForeignVideo, TplReceipts, TplLecture, TplBeforeSharing, TplMusicVideo, TplReadingList,
 		TplReadItToMe, TplAudiobook, TplTightLecture, TplPodcastPolish, TplCameraRoll, TplShopShots, TplStoryboard,
-		TplMeetingMinutes, TplLinkToNotes, TplHighlightReel, TplReactionGIF, TplNarratedSlideshow, TplSongEverything, TplVerticalCut, TplSendToMyComputer}
+		TplMeetingMinutes, TplLinkToNotes, TplHighlightReel, TplReactionGIF, TplNarratedSlideshow, TplSongEverything, TplVerticalCut, TplSendToMyComputer,
+		TplMusicSession, TplPomodoro, TplDeepWork, TplSampleAndMake}
 	tpls := Templates()
 	if len(tpls) != len(want) {
 		t.Fatalf("%d templates, want %d", len(tpls), len(want))
@@ -145,7 +149,7 @@ func TestTemplatesShape(t *testing.T) {
 			if tpl.ID != want[i] || tpl.Pipeline.TemplateID != tpl.ID {
 				t.Fatalf("id = %q / %q", tpl.ID, tpl.Pipeline.TemplateID)
 			}
-			if tpl.Blurb == "" || tpl.Icon == "" || tpl.Pipeline.Name == "" || len(tpl.Packs) == 0 {
+			if tpl.Blurb == "" || tpl.Icon == "" || tpl.Pipeline.Name == "" || tpl.Packs == nil || (len(tpl.Packs) == 0 && !focusOnly(tpl)) {
 				t.Fatalf("incomplete: %+v", tpl)
 			}
 			for _, p := range tpl.Packs {
@@ -164,6 +168,7 @@ func TestTemplatesShape(t *testing.T) {
 				}
 				seen[s.ID] = i
 				switch {
+				case i == 0 && s.From == "none" && s.Type == stFocus: // Phase 18: focus-first templates read nothing
 				case i == 0 && s.From != "input":
 					t.Errorf("step 1 must read the run's inputs, has From %q", s.From)
 				case s.From == "input" || s.From == "none":
@@ -182,7 +187,7 @@ func TestTemplatesShape(t *testing.T) {
 					t.Errorf("step %d: manual steps carry {}", i+1)
 				}
 			}
-			if last := steps[len(steps)-1]; !last.Keep && last.Type != stVault && last.Type != stClipboard {
+			if last := steps[len(steps)-1]; !last.Keep && last.Type != stVault && last.Type != stClipboard && last.Type != TypeOpen {
 				t.Errorf("the last step should keep its files (or end in the Vault or the clipboard)")
 			}
 		})
@@ -191,10 +196,12 @@ func TestTemplatesShape(t *testing.T) {
 
 func TestTemplatesDecodeAndDescribe(t *testing.T) {
 	h := newHarness(t, &fakeTG{reply: nil})
-	reg := map[string]*step{}
+	reg := map[string]interface {
+		DescribeStep(json.RawMessage) (core.StepInfo, error)
+	}{}
 	for _, b := range h.m.builtins() {
-		if s, ok := b.a.(*step); ok {
-			reg[b.t.ID] = s
+		if b.a != nil {
+			reg[b.t.ID] = b.a
 		}
 	}
 	for _, tpl := range Templates() {
@@ -215,6 +222,9 @@ func TestTemplatesDecodeAndDescribe(t *testing.T) {
 					continue
 				case reg[s.Type] != nil:
 					info, err := reg[s.Type].DescribeStep(raw)
+					if s.Type == TypeOpen && err != nil && core.AsAppError(err).Message == "Pick an app to open" {
+						continue // the app is the user's choice (flagged by the describe test)
+					}
 					if err != nil {
 						t.Fatalf("step %d (%s): %v", i+1, s.Type, err)
 					}

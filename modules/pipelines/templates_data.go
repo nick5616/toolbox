@@ -58,6 +58,7 @@ type tstep struct {
 	keep          bool
 	note          string
 	binds         []core.StepBind
+	label         string
 }
 
 func buildTemplate(id, name, icon, blurb string, packs []string, steps ...tstep) core.PipelineTemplate {
@@ -89,7 +90,7 @@ func buildTemplate(id, name, icon, blurb string, packs []string, steps ...tstep)
 		out[i] = core.PipelineStep{
 			ID: t.id, Type: t.typ, OptionsJSON: optionsJSON, From: from, Filter: f,
 			Manual: t.manual, AutoContinue: t.autoContinue, Keep: t.keep, Note: t.note,
-			Binds: append([]core.StepBind{}, t.binds...),
+			Binds: append([]core.StepBind{}, t.binds...), Label: t.label,
 		}
 		prev = t.id
 	}

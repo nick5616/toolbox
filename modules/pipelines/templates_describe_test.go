@@ -19,6 +19,7 @@ import (
 	"toolbox/modules/documents"
 	"toolbox/modules/downloader"
 	"toolbox/modules/editstudio"
+	focusmod "toolbox/modules/focus"
 	"toolbox/modules/gif"
 	"toolbox/modules/imagebatch"
 	"toolbox/modules/lanshare"
@@ -81,6 +82,7 @@ func realRunner(t *testing.T) *pipeline.Runner {
 		func() error { return composer.Register(reg, composer.New(composer.Config{})) },
 		func() error { return posts.Register(reg, posts.New(posts.Config{})) },
 		func() error { return editstudio.Register(reg, editstudio.New(editstudio.Config{})) },
+		func() error { _, err := focusmod.Register(reg, fakeFocus{}, nil); return err },
 	} {
 		if err := register(); err != nil {
 			t.Fatal(err)
@@ -99,6 +101,10 @@ func realRunner(t *testing.T) *pipeline.Runner {
 var userChoices = map[string]map[string]string{
 	TplShopShots:        {"fill": "Pick a template"},
 	TplSendToMyComputer: {"send": "Pick a device"},
+	TplMusicSession:     {"focus": "Pick a profile", "daw": "Pick an app"},
+	TplPomodoro:         {"work1": "Pick a profile", "work2": "Pick a profile", "work3": "Pick a profile", "work4": "Pick a profile"},
+	TplDeepWork:         {"focus": "Pick a profile"},
+	TplSampleAndMake:    {"focus": "Pick a profile", "open": "Pick an app"},
 }
 
 func TestTemplatesDescribeAgainstRealModules(t *testing.T) {
