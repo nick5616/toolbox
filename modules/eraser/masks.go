@@ -202,3 +202,16 @@ func (m *Module) maskDataURL(id string) (string, error) {
 
 // SavedMasks lists the saved masks (the Library's "Other places", Phase 19).
 func (m *Module) SavedMasks() ([]SavedMask, error) { return m.listMasks() }
+
+// SavedMaskPNG returns the path of a saved mask's PNG (white = selected), for
+// tools that read masks (Paint+'s Dissolve step). Unknown IDs are not found.
+func (m *Module) SavedMaskPNG(id string) (string, error) {
+	if _, err := m.readMask(id); err != nil {
+		return "", err
+	}
+	base, err := m.maskFile(id)
+	if err != nil {
+		return "", err
+	}
+	return base + ".png", nil
+}
