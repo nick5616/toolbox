@@ -288,7 +288,15 @@ func (r *runner) outPath(stem, suffix string) string {
 
 // register adds a finished file to the job's outputs and the result.
 func (r *runner) register(path string) error {
-	if _, err := r.job.Output(path); err != nil {
+	// Merge and images-to-PDF make one file from every input; the other
+	// actions have one input per job (the default lineage rule applies).
+	var err error
+	if r.opts.Action == ActionMerge || r.opts.Action == ActionImagesToPDF {
+		_, err = r.job.OutputFrom(path, r.job.Inputs...)
+	} else {
+		_, err = r.job.Output(path)
+	}
+	if err != nil {
 		return fmt.Errorf("register output: %w", err)
 	}
 	r.res.Outputs = append(r.res.Outputs, path)

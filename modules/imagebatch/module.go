@@ -115,7 +115,7 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 			job.Logf("%s: %v", filepath.Base(in), err)
 			continue
 		}
-		if _, err := job.Output(fr.Output); err != nil {
+		if _, err := job.OutputFrom(fr.Output, in); err != nil {
 			return fmt.Errorf("register output: %w", err)
 		}
 		res.Files = append(res.Files, fr)

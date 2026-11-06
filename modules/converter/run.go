@@ -124,7 +124,7 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 	if err := moveFile(tmpOut, final); err != nil {
 		return core.Errorf(core.CodeToolFailed, "Couldn't save the converted file").WithCause(err)
 	}
-	if _, err := job.Output(final); err != nil {
+	if _, err := job.OutputFrom(final, input); err != nil {
 		return fmt.Errorf("register output: %w", err)
 	}
 	job.Progress(1, "Saved "+filepath.Base(final))

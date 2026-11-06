@@ -251,7 +251,7 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 	if err != nil {
 		return core.Errorf(core.CodeToolFailed, "Couldn't save the upscaled image").WithCause(err)
 	}
-	if _, err := job.Output(final); err != nil {
+	if _, err := job.OutputFrom(final, input); err != nil {
 		return fmt.Errorf("register output: %w", err)
 	}
 	res := Result{
