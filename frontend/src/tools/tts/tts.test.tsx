@@ -113,7 +113,10 @@ describe("TtsView", () => {
     await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
     await user.click(button);
     await waitFor(() => expect(svc.SpeakText).toHaveBeenCalledWith("Hello there", { ...DEFAULT_TTS_OPTIONS, preview: false }));
-    await waitFor(() => expect((screen.getByLabelText("Text to read aloud") as HTMLTextAreaElement).value).toBe(""));
+    // The typed text stays so another voice or speed can be tried.
+    expect((screen.getByLabelText("Text to read aloud") as HTMLTextAreaElement).value).toBe("Hello there");
+    await user.click(screen.getByRole("button", { name: "Clear text" }));
+    expect((screen.getByLabelText("Text to read aloud") as HTMLTextAreaElement).value).toBe("");
   });
 
   it("enqueues dropped files with the advanced options", async () => {
@@ -129,5 +132,7 @@ describe("TtsView", () => {
     await waitFor(() =>
       expect(svc.Enqueue).toHaveBeenCalledWith(["/a.txt"], { ...DEFAULT_TTS_OPTIONS, split: TtsSplit.SplitHeadings, format: TtsFormat.FormatMP3, preview: false }),
     );
+    // The file list stays after a run so the user can run again.
+    expect(screen.getByRole("list", { name: "Input files" })).toBeTruthy();
   });
 });
