@@ -588,3 +588,11 @@ Newest last. Format: date — decision — why.
   - **The end-early dialog** hides on Esc or a backdrop click. Only Cancel calls `CancelWeaken`, and "Ending early in 0:23 · Show" reopens it.
   - **`subscribeFocus`** is reference-counted.
   - **The engine starts before the runner** in `main.go`.
+- **2026-11-06: Result actions are reachable again.** Phase 14 made Reveal and Open hover-only, but the rule only showed them inside `[data-result-row]`. Result bars that aren't rows hid them for good: Object Eraser, `LastExport` (Photo Composer, Video/Edit Studio, Post Builder), and the Lyric Video, Subtitles and Visualizer results.
+  - **Rows only:** `FileActions` hides them only inside a result row. Everywhere else they always show.
+  - **Save a copy…:** a new `LibraryService.SaveCopy(outputID, path)` shows a save dialog and copies the file atomically. It never overwrites the source, and the library copy stays. It applies to library outputs, or to paths inside the library or support dir.
+  - **Announced jobs:** `announceWhenDone(jobId)` (`state/jobs`) gets the completion toast even while the tool is on screen. Edit Studio's SRT and marker exports use it, because they show no result of their own.
+  - **Smaller fixes:**
+    - `LastExport` takes an `extra` slot, which Post Builder uses for Open folder.
+    - The Downloader button says "Downloads folder" again.
+    - Object Eraser names the library folder it saved to.
