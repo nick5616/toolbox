@@ -494,7 +494,8 @@ class Engine implements PaintEngine, PaintEngineExt {
 
   addLayer(opts: Partial<LayerProps> = {}, index?: number): string {
     if (this.layers.length >= MAX_LAYERS) return this.activeId;
-    const layer = this.makeLayer({ name: `Layer ${this.nextLayerNum}`, ...opts });
+    const named = this.layers.reduce((m, l) => Math.max(m, Number(/^Layer (\d+)$/.exec(l.props.name)?.[1] ?? 0)), 0);
+    const layer = this.makeLayer({ name: `Layer ${Math.max(this.nextLayerNum, named + 1)}`, ...opts });
     const at = clamp(index ?? this.layers.findIndex((l) => l.id === this.activeId) + 1, 0, this.layers.length);
     const prevActive = this.activeId;
     this.insertLayer(layer, at);
@@ -1389,16 +1390,16 @@ class Engine implements PaintEngine, PaintEngineExt {
     const k = Math.min(1, maxDim / Math.max(W, H));
     const tw = Math.max(1, Math.round(W * k));
     const th = Math.max(1, Math.round(H * k));
-    // Sparse box average in premultiplied space (a thumbnail doesn't need every pixel), then back to straight alpha.
+    // Box average in premultiplied space (every pixel, every second one on huge canvases) so thin lines survive, then back to straight alpha.
     const out = new Uint8ClampedArray(tw * th * 4);
     for (let y = 0; y < th; y++) {
       const y0 = Math.floor((y * H) / th);
       const y1 = Math.max(y0 + 1, Math.floor(((y + 1) * H) / th));
-      const sy = Math.max(1, Math.floor((y1 - y0) / 3));
+      const sy = W * H > 9_000_000 ? 2 : 1;
       for (let x = 0; x < tw; x++) {
         const x0 = Math.floor((x * W) / tw);
         const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * W) / tw));
-        const sx = Math.max(1, Math.floor((x1 - x0) / 3));
+        const sx = sy;
         let r = 0;
         let g = 0;
         let b = 0;

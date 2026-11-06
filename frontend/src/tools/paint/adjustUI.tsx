@@ -113,7 +113,7 @@ export function AdjustPanel({ run, onApply, onCancel, liquify }: AdjustPanelProp
   }
   if (!info.tool) return null;
   return (
-    <div className={ed.adjust} data-testid="adjust-panel" data-adjust={info.id}>
+    <Island label={info.label} className={ed.adjust} data-testid="adjust-panel" data-adjust={info.id}>
       <Device
         info={info.tool}
         params={values}
@@ -137,6 +137,6 @@ export function AdjustPanel({ run, onApply, onCancel, liquify }: AdjustPanelProp
           </>
         }
       />
-    </div>
+    </Island>
   );
 }

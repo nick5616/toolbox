@@ -200,6 +200,23 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The real engine draws only when asked: one render per animation frame after anything that changes what is on screen.
+  useEffect(() => {
+    let raf = 0;
+    const kick = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        engine.render();
+      });
+    };
+    const offs = (["change", "view", "layers", "selection", "history"] as const).map((ev) => engine.on(ev, kick));
+    return () => {
+      offs.forEach((off) => off());
+      cancelAnimationFrame(raf);
+    };
+  }, [engine]);
+
   // Keep the canvas sharp when its box changes.
   useEffect(() => {
     const el = areaRef.current;
@@ -417,7 +434,7 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
     }
     const t = buildToolState({ ...s, tool: "brush" }, seed, false);
     if (!t || t.kind !== "brush") return null;
-    return { ...t, brush: { ...t.brush, tip: { ...t.brush.tip, shape: `stamp:${stampSrc.current}`, hardness: 1, roundness: 1, angle: 0 }, spacing: Math.max(t.brush.spacing, 0.9), scatter: Math.max(t.brush.scatter, 0.3) } };
+    return { ...t, brush: { ...t.brush, tip: { ...t.brush.tip, shape: `stamp:${stampSrc.current}`, hardness: 0, roundness: 1, angle: 0 }, spacing: Math.max(t.brush.spacing, 0.9), scatter: Math.max(t.brush.scatter, 0.3) } };
   }
   useEffect(
     () =>

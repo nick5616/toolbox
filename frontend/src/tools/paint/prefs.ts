@@ -32,7 +32,8 @@ export async function loadPrefs(lib: BrushPreset[]): Promise<void> {
   }
   const s = usePaintUI.getState();
   const pick = (id: string | undefined, fallback: (b: BrushPreset) => boolean): BrushPreset | null => lib.find((b) => b.id === id) ?? lib.find(fallback) ?? lib[0] ?? null;
-  const brush = pick(saved.brushIds?.brush, (b) => b.blend === "normal");
+  // A first run starts on Soft round: plain, predictable, and it paints a continuous line with any input.
+  const brush = pick(saved.brushIds?.brush, (b) => b.name === "Soft round" && b.blend === "normal") ?? pick(undefined, (b) => b.blend === "normal");
   const smudge = pick(saved.brushIds?.smudge, (b) => /smudge|blend/i.test(b.name));
   const eraser = pick(saved.brushIds?.eraser, (b) => b.blend === "erase");
   usePaintUI.setState({

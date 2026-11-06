@@ -165,7 +165,9 @@ export function TopLeftIsland({ actions, compact }: { actions: ChromeActions; co
       item("rr", "Rotate 90° right", () => { begin("free"); engine.transform.rotate90(1); }),
     ],
   };
+  // The menus sit beside the island, not inside it: a popover is placed against its positioned parent (the island is only 46 px tall).
   return (
+    <>
     <Island label="Tools and actions" className={ed.topLeft} data-testid="top-left">
       <IconButton icon="gallery" label="Gallery" onClick={actions.onBack} iconSize={sz} />
       <IslandDivider />
@@ -173,11 +175,12 @@ export function TopLeftIsland({ actions, compact }: { actions: ChromeActions; co
       <IconButton ref={setB} icon="adjust" label="Adjustments" pressed={menu === "adjust"} onClick={() => toggle("adjust")} iconSize={sz} aria-haspopup="menu" />
       <IconButton ref={setC} icon="select" label="Select" pressed={menu === "select"} onClick={() => toggle("select")} iconSize={sz} aria-haspopup="menu" />
       <IconButton ref={setD} icon="transform" label="Transform" kbd="V" pressed={menu === "transform"} onClick={() => toggle("transform")} iconSize={sz} aria-haspopup="menu" />
-      <Menu open={menu === "actions"} title="Actions" anchor={aActions} entries={entries.actions} onClose={close} width={280} />
-      <Menu open={menu === "adjust"} title="Adjustments" anchor={aAdjust} entries={entries.adjust} onClose={close} width={260} />
-      <Menu open={menu === "select"} title="Select" anchor={aSelect} entries={entries.select} onClose={close} />
-      <Menu open={menu === "transform"} title="Transform" anchor={aTransform} entries={entries.transform} onClose={close} />
     </Island>
+    <Menu open={menu === "actions"} title="Actions" anchor={aActions} entries={entries.actions} onClose={close} width={280} />
+    <Menu open={menu === "adjust"} title="Adjustments" anchor={aAdjust} entries={entries.adjust} onClose={close} width={260} />
+    <Menu open={menu === "select"} title="Select" anchor={aSelect} entries={entries.select} onClose={close} />
+    <Menu open={menu === "transform"} title="Transform" anchor={aTransform} entries={entries.transform} onClose={close} />
+    </>
   );
 }
 
