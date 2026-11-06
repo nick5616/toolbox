@@ -404,7 +404,8 @@ func run() error {
 		Store: db, ProjectsDir: projectsDir, SupportDir: paths.SupportDir, TmpDir: paths.TmpDir,
 		Engine: engine, Jobs: jobs, Outputs: db, Emitter: emitter, LibraryDir: libraryDir, Resolve: depSvc.Resolve,
 		SaveDialog: paintSaveDialog, SavedMask: eraserMod.SavedMaskPNG,
-		Models: newPaintModels(paths.ModelsDir, eraserMod, editMod),
+		Models:  newPaintModels(paths.ModelsDir, eraserMod, editMod),
+		Dialogs: paintBrushDialogs(),
 	})
 	if err := paint.Register(reg, paintMod); err != nil {
 		return err

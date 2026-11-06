@@ -1,0 +1,166 @@
+{
+  "tips": [
+    {
+      "file": "tips/soft-round.png",
+      "size": 256
+    },
+    {
+      "file": "tips/hard-round.png",
+      "size": 256
+    },
+    {
+      "file": "tips/square.png",
+      "size": 256
+    },
+    {
+      "file": "tips/chalk.png",
+      "size": 256
+    },
+    {
+      "file": "tips/charcoal.png",
+      "size": 256
+    },
+    {
+      "file": "tips/pencil-grain.png",
+      "size": 128
+    },
+    {
+      "file": "tips/bristle.png",
+      "size": 256
+    },
+    {
+      "file": "tips/flat.png",
+      "size": 256
+    },
+    {
+      "file": "tips/spatter.png",
+      "size": 256
+    },
+    {
+      "file": "tips/stipple.png",
+      "size": 256
+    },
+    {
+      "file": "tips/snow.png",
+      "size": 256
+    },
+    {
+      "file": "tips/sponge.png",
+      "size": 256
+    },
+    {
+      "file": "tips/leaf-oak.png",
+      "size": 256
+    },
+    {
+      "file": "tips/leaf-round.png",
+      "size": 256
+    },
+    {
+      "file": "tips/leaf-willow.png",
+      "size": 256
+    },
+    {
+      "file": "tips/leaf-maple.png",
+      "size": 256
+    },
+    {
+      "file": "tips/grass-blade.png",
+      "size": 256
+    },
+    {
+      "file": "tips/fern-frond.png",
+      "size": 256
+    },
+    {
+      "file": "tips/pine-needle.png",
+      "size": 256
+    },
+    {
+      "file": "tips/petal.png",
+      "size": 256
+    },
+    {
+      "file": "tips/cloud-puff.png",
+      "size": 256
+    },
+    {
+      "file": "tips/smoke.png",
+      "size": 256
+    },
+    {
+      "file": "tips/star.png",
+      "size": 256
+    },
+    {
+      "file": "tips/sparkle.png",
+      "size": 256
+    },
+    {
+      "file": "tips/flare.png",
+      "size": 256
+    },
+    {
+      "file": "tips/pixel-square.png",
+      "size": 16
+    },
+    {
+      "file": "tips/dither-checker.png",
+      "size": 16
+    },
+    {
+      "file": "tips/twig.png",
+      "size": 256
+    },
+    {
+      "file": "tips/bubbles.png",
+      "size": 256
+    },
+    {
+      "file": "tips/streak.png",
+      "size": 256
+    },
+    {
+      "file": "tips/flame.png",
+      "size": 256
+    },
+    {
+      "file": "tips/fibre.png",
+      "size": 256
+    }
+  ],
+  "grains": [
+    {
+      "file": "grains/paper.png",
+      "size": 512
+    },
+    {
+      "file": "grains/canvas-weave.png",
+      "size": 512
+    },
+    {
+      "file": "grains/rough.png",
+      "size": 512
+    },
+    {
+      "file": "grains/noise.png",
+      "size": 512
+    },
+    {
+      "file": "grains/linen.png",
+      "size": 512
+    },
+    {
+      "file": "grains/watercolour-bloom.png",
+      "size": 512
+    },
+    {
+      "file": "grains/halftone.png",
+      "size": 512
+    },
+    {
+      "file": "grains/crosshatch.png",
+      "size": 512
+    }
+  ]
+}
