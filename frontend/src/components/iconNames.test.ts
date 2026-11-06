@@ -5,7 +5,9 @@
 import { describe, expect, it } from "vitest";
 import { iconNames } from "./Icon";
 
-const files = import.meta.glob(["../**/*.{ts,tsx}", "!../**/*.test.{ts,tsx}"], { eager: true, query: "?raw", import: "default" }) as Record<string, string>;
+// Paint+ (src/paint, tools/paint) names its icons in its own icon set
+// (tools/paint/ui/icons, bespoke design language), not in Icon.tsx.
+const files = import.meta.glob(["../**/*.{ts,tsx}", "!../**/*.test.{ts,tsx}", "!../paint/**", "!../tools/paint/**"], { eager: true, query: "?raw", import: "default" }) as Record<string, string>;
 const PATTERN = /\bicon(?:=|:\s*)"([a-z0-9-]+)"/g;
 
 describe("icon names", () => {

@@ -78,12 +78,14 @@ describe("extendBands", () => {
   it("covers every new pixel exactly once and none of the old", () => {
     const m = { top: 100, right: 1300, bottom: 600, left: 513 };
     const { hits, newW, newH } = cover(300, 200, m);
+    let wrong = 0; // one expect at the end: ~2M expect() calls time out under a loaded full run
     for (let y = 0; y < newH; y++) {
       for (let x = 0; x < newW; x++) {
         const inOld = x >= m.left && x < m.left + 300 && y >= m.top && y < m.top + 200;
-        expect(hits[y * newW + x]).toBe(inOld ? 0 : 1);
+        if (hits[y * newW + x] !== (inOld ? 0 : 1)) wrong++;
       }
     }
+    expect(wrong).toBe(0);
   });
   it("uses bands of at most 512 px, outward from the edge", () => {
     const bands = extendBands(100, 100, { top: 0, right: 1100, bottom: 0, left: 0 });
