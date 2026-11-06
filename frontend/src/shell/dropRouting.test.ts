@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { ModuleStatus, type Descriptor, type FilesDropped } from "@/lib/api";
 import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
-import { routeFilesDropped } from "./dropRouting";
+import { ownsDrop, routeFilesDropped } from "./dropRouting";
+import { parseWindow, setCurrentWindowForTest } from "@/lib/windows";
 
 function mod(id: string, status = ModuleStatus.StatusReady): Descriptor {
   return { id, name: id, tagline: "", description: "", icon: "box", status, accepts: { extensions: [".mp3"], urls: false }, requires: null, recommends: null } as Descriptor;
@@ -62,5 +63,30 @@ describe("routeFilesDropped", () => {
     routeFilesDropped(drop("tool-drop:soon", ["/a.mp3"]));
     expect(useUI.getState().drop).not.toBeNull();
     expect(useUI.getState().handoff).toBeNull();
+  });
+});
+
+describe("drops in pop-out windows", () => {
+  it("ownsDrop matches the window key (main = empty)", () => {
+    expect(ownsDrop({ window: "" }, "main")).toBe(true);
+    expect(ownsDrop({ window: "tool:stems" }, "main")).toBe(false);
+    expect(ownsDrop({ window: "tool:stems" }, "tool:stems")).toBe(true);
+    expect(ownsDrop({ window: "" }, "tool:stems")).toBe(false);
+  });
+
+  it("a tool window routes only its own drops, to its tool", () => {
+    useModules.getState().setAll([mod("stems")]);
+    useUI.setState({ drop: null, handoff: null, view: "stems" });
+    setCurrentWindowForTest(parseWindow("?window=tool&view=stems&key=tool:stems"));
+    try {
+      const other = { ...drop("", ["/a.mp3"]), window: "" } as FilesDropped;
+      routeFilesDropped(other);
+      expect(useUI.getState().handoff).toBeNull();
+      expect(useUI.getState().drop).toBeNull();
+      routeFilesDropped({ ...drop("", ["/a.mp3"]), window: "tool:stems" } as FilesDropped);
+      expect(useUI.getState().handoff).toEqual({ moduleId: "stems", inputs: ["/a.mp3"] });
+    } finally {
+      setCurrentWindowForTest(null);
+    }
   });
 });

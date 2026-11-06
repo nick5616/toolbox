@@ -100,15 +100,37 @@
   font-weight: 600;
 }
 
+.options {
+  width: 100%;
+  max-width: 420px;
+}
+
+.drawer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cardsCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
   align-items: center;
   gap: var(--space-2);
 }
 
 .summary {
   margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--fg-muted);

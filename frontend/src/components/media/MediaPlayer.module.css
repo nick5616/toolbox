@@ -17,6 +17,10 @@
   background: var(--bg-app);
 }
 
+.stageHidden {
+  display: none;
+}
+
 .video {
   position: absolute;
   inset: 0;

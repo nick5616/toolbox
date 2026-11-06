@@ -1,20 +1,28 @@
 .root {
   display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
   background: var(--bg-app);
 }
 
-.nav {
-  width: 200px;
+.bar {
   flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--line);
+}
+
+.pickerRow {
+  width: clamp(180px, 30vw, 280px);
+}
+
+.picker {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border-right: 1px solid var(--line);
-  background: var(--bg-sidebar);
-  overflow-y: auto;
 }
 
 .navList {
@@ -63,13 +71,6 @@
   min-width: 0;
   overflow-y: auto;
   padding: var(--space-5) var(--space-6);
-}
-
-.title {
-  margin: 0 0 var(--space-1);
-  font-size: var(--text-xl);
-  line-height: var(--text-xl-lh);
-  color: var(--fg);
 }
 
 .note {
@@ -283,4 +284,13 @@
   .cols {
     grid-template-columns: 1fr;
   }
+}
+
+/* A utility inside a drawer or its own window. */
+.panelBody {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--bg-app);
 }

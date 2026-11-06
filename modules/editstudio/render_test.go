@@ -322,7 +322,7 @@ func TestRunRenderUsesUprightSizeForTheStreamTier(t *testing.T) {
 
 func TestRunRenderRejectsAnInvalidProject(t *testing.T) {
 	env := newExportEnv(t)
-	env.doc.Song = nil
+	env.doc.Song.Path = filepath.Join(env.dir, "gone.mp3")
 	if _, err := env.m.docs.Save(context.Background(), env.id, "My Edit", env.doc); err != nil {
 		t.Fatal(err)
 	}

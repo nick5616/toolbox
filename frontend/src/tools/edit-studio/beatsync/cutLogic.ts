@@ -7,7 +7,7 @@ import type { EditClip } from "@/lib/api";
 import type { Analysis } from "@/viz/analysis";
 import type { NormalProject } from "@/viz/edit/defaults";
 import { editLength, type Marker, type MarkerLane } from "@/viz/edit/types";
-import { newTrack } from "../doc";
+import { newTrack } from "@/editor/doc";
 import type { EditSourceState as SourceState } from "@/lib/api";
 import { autofill, validateShape } from "../autofill/autofill";
 import type { AutofillSource, Recipe, RecipeRule } from "../autofill/types";

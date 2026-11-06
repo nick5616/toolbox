@@ -8,6 +8,7 @@ import {
   SettingsService,
 } from "@/lib/api";
 import { on } from "@/lib/events";
+import { currentWindow } from "@/lib/windows";
 import { routeFilesDropped } from "@/shell/dropRouting";
 import { notifyHiddenToTray } from "@/shell/hiddenToTray";
 import { useDesktop } from "./desktop";
@@ -18,12 +19,16 @@ import { useModules } from "./modules";
 import { usePipelines } from "./pipelines";
 import { useSettings } from "./settings";
 import { useUI } from "./ui";
+import { loadWindows, subscribeWindows } from "./windows";
 
 let unsubscribers: Array<() => void> = [];
 
 /** Subscribes every store to backend events. Idempotent. */
 export function subscribeAll(): void {
   for (const u of unsubscribers) u();
+  // Only the main window navigates on app:navigate and tells about the tray; the others
+  // (tool and part windows) take drops only when `drop.window` is theirs (routeFilesDropped).
+  const isMain = currentWindow().kind === "main";
   unsubscribers = [
     on("jobs:changed", (j) => useJobs.getState().upsert(j)),
     on("jobs:removed", (p) => useJobs.getState().removeLocal(p.ids ?? [])),
@@ -34,18 +39,23 @@ export function subscribeAll(): void {
     on("deps:changed", (p) => useDeps.getState().setAll(p.deps ?? [], true)),
     on("settings:changed", (s) => useSettings.getState().set(s)),
     on("app:files-dropped", routeFilesDropped),
-    on("app:navigate", (n) => {
-      if (n.target === "palette") useUI.getState().setPaletteOpen(true);
-      else if (n.target === "pipelines-runs") {
-        usePipelines.getState().setTab("runs");
-        useUI.getState().navigate("pipelines");
-      } else useUI.getState().navigate(n.target);
-    }),
+    ...(isMain
+      ? [
+          on("app:navigate", (n) => {
+            if (n.target === "palette") useUI.getState().setPaletteOpen(true);
+            else if (n.target === "pipelines-runs") {
+              usePipelines.getState().setTab("runs");
+              useUI.getState().navigate("pipelines");
+            } else useUI.getState().navigate(n.target);
+          }),
+          on("app:hidden-to-tray", () => notifyHiddenToTray()),
+        ]
+      : []),
+    subscribeWindows(),
     on("pipelines:changed", (p) => usePipelines.getState().setEntries(p.pipelines ?? [])),
     on("pipelines:run", (r) => usePipelines.getState().upsertRun(r)),
     on("pipelines:runs-removed", (p) => usePipelines.getState().removeRuns(p.ids ?? [])),
     ...subscribeDesktop(),
-    on("app:hidden-to-tray", () => notifyHiddenToTray()),
   ];
 }
 
@@ -96,6 +106,7 @@ export async function bootstrap(): Promise<void> {
     ClipboardService.State(),
     DesktopService.HotkeyStatus(),
     usePipelines.getState().load(),
+    loadWindows(),
   ]);
   useSettings.getState().set(settings);
   useSettings.getState().setAppInfo(appInfo);
@@ -108,6 +119,7 @@ export async function bootstrap(): Promise<void> {
   useDesktop.getState().setHotkeys(hotkeys ?? []);
 
   // Fall back to the first ready module if the remembered view no longer exists.
+  if (currentWindow().kind === "part") return;
   const ui = useUI.getState();
   const known = new Set(["library", "settings", ...(modules ?? []).map((m) => m.id)]);
   if (!known.has(ui.view)) ui.navigate("downloader");

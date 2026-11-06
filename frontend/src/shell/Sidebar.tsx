@@ -27,14 +27,15 @@ function SidebarItem({ item, collapsed, active, dot, running, badge, onClick }: 
   const btn = (
     <button
       type="button"
-      className={cx(styles.item, active && styles.active, item.soon && styles.soon)}
+      className={cx(styles.item, active && styles.active, item.soon && styles.soon, item.variantOf && styles.variant)}
       aria-current={active ? "page" : undefined}
       aria-label={collapsed ? item.label : undefined}
       data-tip={collapsed ? (item.tip ? `${item.label}: ${item.tip}` : item.label) : item.tip}
       data-tip-side="right"
       onClick={onClick}
     >
-      <Icon name={item.icon} size={16} />
+      <Icon name={item.icon} size={item.variantOf && !collapsed ? 14 : 16} />
+      {collapsed && item.variantOf && <span className={styles.variantBadge} aria-hidden="true" data-testid="variant-badge" />}
       {!collapsed && <span className={styles.label}>{item.label}</span>}
       {!collapsed && item.soon && <Badge tip="Not available yet">SOON</Badge>}
       {!collapsed && badge ? (

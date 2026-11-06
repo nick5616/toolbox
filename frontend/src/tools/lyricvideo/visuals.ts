@@ -2,8 +2,8 @@
 import { PackComponentState, type AnalyzeOptions, type TimedLine, type VisualsSpec } from "@/lib/api";
 import { pickerAnalyzeOptions, parseShow } from "@/components/viz/pickerModel";
 import type { ToolSeed } from "@/state/ui";
-import { withoutText } from "@/tools/visualizer/designer/model";
-import { applyTemplate } from "@/tools/visualizer/designer/model";
+import { withoutText } from "@/blocks/visuals/designer/model";
+import { applyTemplate } from "@/blocks/visuals/designer/model";
 import { PRESETS, presetById, showFromPreset } from "@/viz/presets";
 import type { Show } from "@/viz/types";
 import type { PackView } from "@/views/setup/packSizes";
@@ -18,6 +18,13 @@ export function componentInstalled(packs: readonly PackView[], id: string): bool
     if (c) return c.state === PackComponentState.ComponentInstalled || c.state === PackComponentState.ComponentSystem;
   }
   return false;
+}
+
+/** One-line state of the Instruments click-in. */
+export function instrumentsState(stemsOn: boolean, installed: boolean, saved: boolean): string {
+  if (!installed) return "Model not downloaded";
+  if (!stemsOn) return "Off";
+  return saved ? "Separated · saved to Library" : "Separated";
 }
 
 export const ASPECT_VALUE: Record<string, number> = { "16:9": 16 / 9, "9:16": 9 / 16, "1:1": 1 };

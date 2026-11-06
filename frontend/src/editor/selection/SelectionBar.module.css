@@ -1,0 +1,93 @@
+.bar {
+  display: flex;
+  flex: 1;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  height: 28px;
+  overflow: hidden;
+}
+
+.hint {
+  color: var(--fg-subtle);
+  font-size: var(--text-sm);
+}
+
+.name {
+  flex: none;
+  max-width: 14ch;
+  overflow: hidden;
+  color: var(--fg);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+}
+
+.volume {
+  display: inline-flex;
+  flex: none;
+  width: 84px;
+}
+
+.fit {
+  flex: none;
+  max-width: 120px;
+}
+
+.chips {
+  display: flex;
+  flex: 1;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Compact chips: the click-in row, shrunk (the doubled class beats its own styling). */
+.chips .chip,
+.bar .chip {
+  width: auto;
+  min-height: 26px;
+  padding: 0 var(--space-2);
+  gap: var(--space-1);
+  border-color: transparent;
+  background: var(--bg-raised);
+  font-size: var(--text-sm);
+}
+
+.chips .chip:hover,
+.bar .chip:hover {
+  border-color: var(--line-strong);
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* The chevron is noise on a compact chip. */
+.chip > svg:last-child {
+  display: none;
+}
+
+.chip {
+  flex: none;
+  white-space: nowrap;
+}

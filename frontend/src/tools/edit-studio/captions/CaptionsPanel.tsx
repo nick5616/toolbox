@@ -6,7 +6,7 @@ import { EditStudioService, type EditCaptions } from "@/lib/api";
 import type { TextLine } from "@/viz/analysis";
 import { DEFAULT_TEXT_STYLE, parseTextStyle, serializeCaptionLines, serializeTextStyle } from "@/viz/edit/schema";
 import type { TextStyle } from "@/viz/types";
-import { useEditStudio, useProject } from "../store";
+import { useEditStudio, useProject } from "@/editor/store";
 import { exportSrt } from "./exportSrt";
 import { deleteLine, effectiveLines, insertAfter, linesInRange, mergeNext, setLineText, setLineTime, setWordText, setWordTime, splitLine } from "./lines";
 import { WordList, type RowAction } from "./WordList";

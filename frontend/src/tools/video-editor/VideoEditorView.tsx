@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Banner, Button, IconButton, Meter, SegmentedControl, Select, Slider, TextField, toast } from "@/components";
+import { Banner, Button, ClickIn, ClickInHost, IconButton, Meter, Select, Slider, TextField, toast } from "@/components";
 import { formatMs, useMediaSource } from "@/components/media";
 import {
   FilesService,
@@ -16,6 +16,7 @@ import {
 } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { revealLabel } from "@/lib/platform";
+import { closeWindow, currentWindow } from "@/lib/windows";
 import { useShortcut } from "@/lib/shortcuts";
 import { useJob, useJobs } from "@/state/jobs";
 import { useUI, type PostSlideSeed } from "@/state/ui";
@@ -147,7 +148,8 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
   const [stitch, setStitch] = useState<StitchState | null>(null);
   const stitchRef = useRef<StitchState | null>(null);
   stitchRef.current = stitch;
-  const [sideTab, setSideTab] = useState<"inspector" | "sources">("inspector");
+  /** A title whose Text click-in should open and take focus. */
+  const [titleFocus, setTitleFocus] = useState<string | null>(null);
 
   const live = useRef({ projectId, name, doc, timeMs, vlogOpen });
   live.current = { projectId, name, doc, timeMs, vlogOpen };
@@ -402,15 +404,26 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
     void (async () => {
       const list = await refreshProjects();
       let last = "";
+      let quickVlog = false;
       try {
         const raw = await SettingsService.ModuleState(moduleId);
-        if (raw) last = (JSON.parse(raw) as { lastProjectId?: string }).lastProjectId ?? "";
+        if (raw) {
+          const st = JSON.parse(raw) as { lastProjectId?: string; quickVlog?: boolean };
+          last = st.lastProjectId ?? "";
+          quickVlog = st.quickVlog === true;
+        }
       } catch {
         /* no remembered project */
       }
       if (cancelled || started.current || live.current.projectId) return;
       const pending = useUI.getState().handoff;
       if (pending?.moduleId === moduleId) return;
+      if (quickVlog) {
+        // Asked for from the Video Editor's home (Phase 10): open the Quick vlog dialog once.
+        void SettingsService.SetModuleState(moduleId, JSON.stringify({ lastProjectId: last })).catch(() => undefined);
+        setVlogOpen(true);
+        return;
+      }
       if (last && list.some((p) => p.id === last)) await openProject(last, list.find((p) => p.id === last));
     })();
     LyricVideoService.Fonts().then(
@@ -694,12 +707,17 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
     const t = newTitle(Math.min(timeMs, Math.max(totalMs - 500, 0)));
     edit({ ...doc, titles: [...titlesOf(doc), t] });
     setSelection({ kind: "title", id: t.id });
+    setTitleFocus(t.id);
   };
 
   const backToPost = async () => {
     await doSave();
     const ps = postSlideRef.current;
-    if (ps) useUI.getState().handOff({ moduleId: "post-builder", inputs: [], postSlide: ps });
+    if (!ps) return;
+    // In its own window there is no Post Builder here: closing returns to the post, which refreshes itself.
+    const w = currentWindow();
+    if (w.kind !== "main") await closeWindow(w.key).catch(() => undefined);
+    else useUI.getState().handOff({ moduleId: "post-builder", inputs: [], postSlide: ps });
   };
 
   // ---- render ----
@@ -803,7 +821,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
   }
 
   return (
-    <div className={styles.root}>
+    <ClickInHost className={styles.root}>
       <DepsGate moduleId={moduleId} />
       <div className={styles.header}>
         <IconButton icon="arrow-left" label="All videos" data-tip="Save and go back to the list of your video projects" onClick={() => void closeProject()} />
@@ -833,23 +851,18 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
         <span className={styles.saveState} role="status" data-state={saveState} data-tip={saveState === "error" ? saveError || "The project could not be saved" : "Changes are saved automatically as you edit"}>
           {saveState === "saving" ? "Saving…" : saveState === "error" ? "Couldn't save" : saveState === "saved" ? "Saved" : ""}
         </span>
-        {warnings.length > 0 && (
-          <Badge tone="warn" mono tip={warnings.join(" · ")}>
-            {warnings.length} {warnings.length === 1 ? "warning" : "warnings"}
-          </Badge>
-        )}
         <span className={styles.spacer} />
         <IconButton icon="undo-2" label="Undo" data-tip="Undo the last edit" kbd="Mod+Z" disabled={!hist || hist.past.length === 0} onClick={doUndo} />
         <IconButton icon="redo-2" label="Redo" data-tip="Redo the edit you just undid" kbd="Mod+Shift+Z" disabled={!hist || hist.future.length === 0} onClick={doRedo} />
         {postSlide && (
-          <Button size="sm" icon="arrow-left" data-tip="Save and return to the post this video belongs to" onClick={() => void backToPost()}>
+          <Button size="sm" icon="arrow-left" collapsible data-tip="Save and return to the post this video belongs to" onClick={() => void backToPost()}>
             Back to post
           </Button>
         )}
-        <Button size="sm" icon="play" data-tip={blocked ? "Install the missing tools first" : clips.length === 0 ? "Add a clip first" : "Render a short exact preview with titles, transitions and music, as the export will look"} loading={busyPreview} disabled={blocked || clips.length === 0} onClick={() => void submit("preview")}>
+        <Button size="sm" icon="play" collapsible data-tip={blocked ? "Install the missing tools first" : clips.length === 0 ? "Add a clip first" : "Render a short exact preview with titles, transitions and music, as the export will look"} loading={busyPreview} disabled={blocked || clips.length === 0} onClick={() => void submit("preview")}>
           Render preview
         </Button>
-        <Button size="sm" variant="primary" icon="download" data-tip={blocked ? "Install the missing tools first" : clips.length === 0 ? "Add a clip first" : "Render the final video file into your library"} loading={busyExport} disabled={blocked || clips.length === 0} onClick={() => void submit("export")}>
+        <Button size="sm" variant="primary" icon="download" collapsible data-tip={blocked ? "Install the missing tools first" : clips.length === 0 ? "Add a clip first" : "Render the final video file into your library"} loading={busyExport} disabled={blocked || clips.length === 0} onClick={() => void submit("export")}>
           Export
         </Button>
       </div>
@@ -927,26 +940,6 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
             <span data-tip="Drag to move the playhead through the video" style={{ display: "contents" }}><Slider aria-label="Position" min={0} max={Math.max(totalMs, 1)} step={10} value={Math.min(timeMs, Math.max(totalMs, 1))} format={() => ""} onChange={seek} disabled={totalMs <= 0} /></span>
             <IconButton icon="scissors" label="Split at the playhead" data-tip="Cut the clip under the playhead into two clips" kbd="S" disabled={clips.length === 0} onClick={split} />
           </div>
-        </div>
-        <div className={styles.inspector}>
-          {postSlide && (
-            <div className={styles.inspectorTabs}>
-              <SegmentedControl
-                size="sm"
-                fullWidth
-                aria-label="Side panel"
-                value={sideTab}
-                onChange={setSideTab}
-                options={[
-                  { value: "inspector", label: "Inspector", tip: "Settings for the selected clip, title or song" },
-                  { value: "sources", label: "Sources", tip: "Photos and videos in this post that you can add to the timeline" },
-                ]}
-              />
-            </div>
-          )}
-          {postSlide && sideTab === "sources" ? (
-            <SourcesTab postId={postSlide.postId} onAdd={(paths) => void addPaths(paths)} />
-          ) : (
           <Inspector
             doc={doc}
             selection={selection}
@@ -954,11 +947,19 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
             infos={infos}
             fonts={fonts}
             titleTextRef={titleText}
+            titleFocus={titleFocus}
+            onTitleFocused={() => setTitleFocus(null)}
             onChange={edit}
             onPickMusic={() => void pickSong(false)}
             onSelect={setSelection}
+            trailing={
+              postSlide ? (
+                <ClickIn icon="images" title="Sources" summary="Photos and videos in this post" tip="Photos and videos in this post that you can add to the timeline" width={380} className={styles.launcher}>
+                  <SourcesTab postId={postSlide.postId} onAdd={(paths) => void addPaths(paths)} />
+                </ClickIn>
+              ) : undefined
+            }
           />
-          )}
         </div>
       </div>
 
@@ -975,7 +976,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
         onChange={edit}
         onEditTitle={(id) => {
           setSelection({ kind: "title", id });
-          requestAnimationFrame(() => titleText.current?.focus());
+          setTitleFocus(id);
         }}
         onAddClips={() => void pickClips()}
         onAddTitle={addTitle}
@@ -984,6 +985,6 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
       />
       {loaders}
       {dialog}
-    </div>
+    </ClickInHost>
   );
 }

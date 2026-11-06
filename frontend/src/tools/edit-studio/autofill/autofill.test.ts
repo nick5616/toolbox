@@ -4,7 +4,7 @@ import { normalizeProject, type NormalProject } from "@/viz/edit/defaults";
 import { buildEditFixture, fixtureKicks, fixtureProject } from "@/viz/edit/fixture";
 import { parseEffects, parseSpeed, parseTransition } from "@/viz/edit/schema";
 import type { Marker, MarkerLane } from "@/viz/edit/types";
-import { newClip } from "../doc";
+import { newClip } from "@/editor/doc";
 import { autofill, validateShape } from "./autofill";
 import { RECIPES } from "./recipes";
 import type { AutofillInput, AutofillOptions, AutofillSource, Recipe } from "./types";

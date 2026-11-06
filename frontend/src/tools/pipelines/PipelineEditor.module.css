@@ -44,6 +44,7 @@
   background: transparent;
   color: var(--fg);
   font: inherit;
+  text-overflow: ellipsis;
 }
 
 .name {
@@ -201,6 +202,52 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+/* Graph mode: the canvas takes all the height that is left. */
+.scrollGraph {
+  overflow: hidden;
+  gap: var(--space-2);
+}
+
+.footer {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.footerItem {
+  flex: 1;
+  min-width: 0;
+}
+
+.drawerPad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+/* Graph mode: one compact header row. */
+.headerGraph {
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) 0;
+}
+
+.headerGraph .titles {
+  flex: 1 1 120px;
+  min-width: 80px;
+}
+
+.statusInline {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--fg-muted);
   font-size: var(--text-sm);
 }

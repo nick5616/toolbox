@@ -6,6 +6,8 @@ import {
   classify,
   countLabel,
   effectParams,
+  effectSummary,
+  sensitivitySummary,
   fromOverlay,
   imageApplyOptions,
   initialVideoState,
@@ -32,6 +34,17 @@ const track = (over: Partial<RedactTrack>): RedactTrack => ({
     { ms: 1000, x: 0.5, y: 0.5, w: 0.2, h: 0.2 },
   ],
   ...over,
+});
+
+describe("click-in summaries", () => {
+  it("effectSummary", () => {
+    expect(effectSummary(DEFAULT_SETTINGS)).toBe("Blur · strength 6 · 15% padding");
+    expect(effectSummary({ ...DEFAULT_SETTINGS, style: "solid" as typeof DEFAULT_SETTINGS.style, stripMetadata: false })).toBe("Solid · 15% padding · keeps location");
+  });
+  it("sensitivitySummary", () => {
+    expect(sensitivitySummary(DEFAULT_SETTINGS)).toBe("Normal");
+    expect(sensitivitySummary({ sensitivity: "high" as typeof DEFAULT_SETTINGS.sensitivity })).toContain("High");
+  });
 });
 
 describe("image boxes", () => {

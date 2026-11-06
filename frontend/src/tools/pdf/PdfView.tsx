@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import { Button, DropZone, FileList, Icon, Section, cx } from "@/components";
+import { Button, ClickInHost, DropZone, FileList, Icon, Section, ToolClickIn, cx } from "@/components";
 import { PdfAction, PdfService } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 import { JobRow } from "@/shell/JobRow";
-import { isActive, useOrderedJobs } from "@/state/jobs";
+import { isActive } from "@/state/jobs";
+import { useToolJobs } from "@/tools/_kit/session";
+import { useCompositionInputs } from "@/state/composition";
 import { useModules } from "@/state/modules";
 import { useModuleOptions, useFileInputs } from "@/tools/_kit";
 import { DepsGate } from "@/tools/_kit/DepsGate";
@@ -47,12 +49,16 @@ export default function PdfView({ moduleId }: ToolViewProps) {
   const inputs = useFileInputs(moduleId);
   const [ui, setUi, loaded] = useModuleOptions(moduleId, DEFAULT_PDF_UI, sanitizePdfUi);
   const mod = useModules((s) => s.byId[moduleId]);
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
   const active = jobs.filter(isActive);
   const [password, setPassword] = useState("");
   const [order, setOrder] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
+
+  // Make searchable: the PDFs in the list go to OCR.
+  const pdfPaths = useMemo(() => inputs.files.map((f) => f.path).filter(isPdfPath), [inputs.files]);
+  useCompositionInputs(moduleId, { ocr: pdfPaths });
 
   const meta = actionMeta(ui.action);
   const uiRef = useRef(ui);
@@ -134,13 +140,11 @@ export default function PdfView({ moduleId }: ToolViewProps) {
   }
 
   return (
+    <ClickInHost className={styles.host}>
     <section className={styles.root} aria-label={mod?.name ?? "PDF Toolkit"}>
-      <header>
-        <h1 className={styles.title}>{mod?.name ?? "PDF Toolkit"}</h1>
-        {mod?.tagline && <p className={styles.tagline}>{mod.tagline}</p>}
-      </header>
       <DepsGate moduleId={moduleId} />
       <div className={styles.body}>
+        <div className={styles.rail}>
         <div role="radiogroup" aria-label="PDF action" className={styles.picker}>
           {ACTIONS.map((a) => (
             <button
@@ -161,13 +165,21 @@ export default function PdfView({ moduleId }: ToolViewProps) {
                 if (n) setUi((u) => ({ ...u, action: n.id }));
               }}
             >
-              <Icon name={a.icon} size={16} className={styles.actionIcon} />
-              <span className={styles.actionText}>
-                <span className={styles.actionTitle}>{a.title}</span>
-                <span className={styles.actionDesc}>{a.desc}</span>
-              </span>
+              <Icon name={a.icon} size={18} className={styles.actionIcon} />
+              <span className={styles.actionTitle}>{a.title}</span>
             </button>
           ))}
+        </div>
+        <ToolClickIn
+          host={moduleId}
+          module="ocr"
+          variant="icon"
+          icon="scan-text"
+          title="Make searchable"
+          inputs={pdfPaths}
+          tip="Read the text of scanned PDFs so you can search and select it (opens OCR here)"
+          disabledReason={pdfPaths.length === 0 ? "Add a PDF first" : undefined}
+        />
         </div>
 
         <div className={styles.main}>
@@ -274,5 +286,6 @@ export default function PdfView({ moduleId }: ToolViewProps) {
         </div>
       </div>
     </section>
+    </ClickInHost>
   );
 }

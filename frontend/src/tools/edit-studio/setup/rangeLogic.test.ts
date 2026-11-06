@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeProject } from "@/viz/edit/defaults";
 import { buildEditFixture, fixtureProject } from "@/viz/edit/fixture";
 import { parseSpeed, parseTransform } from "@/viz/edit/schema";
-import { findClip, newClip } from "../doc";
+import { findClip, newClip } from "@/editor/doc";
 import { changeRange, clampRange, nearestOf, quickPicks, shiftClips, snapRange, trimParamStart } from "./rangeLogic";
 
 const a = buildEditFixture();

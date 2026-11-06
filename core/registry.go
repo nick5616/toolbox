@@ -49,6 +49,9 @@ func (r *Registry) add(d Descriptor) error {
 		exts[i] = strings.ToLower(e)
 	}
 	d.Accepts.Extensions = exts
+	if d.Parts == nil {
+		d.Parts = []string{}
+	}
 	if d.Requires == nil {
 		d.Requires = []string{}
 	}

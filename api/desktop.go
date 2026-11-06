@@ -10,6 +10,13 @@ type DesktopShell interface {
 	PastePermission() string
 	RequestPastePermission() error
 	PasteAfterCopy() error
+	// Pop-out windows (Phase 10).
+	PopOut(req core.PopOutRequest) error
+	CloseWindow(key string) error
+	FocusWindow(key string) error
+	OpenWindows() []string
+	TakeHandoff(key string) string
+	Relay(r core.WindowRelay) error
 }
 
 // DesktopService exposes the desktop shell (tray, hotkeys, popup) to the UI.
@@ -82,4 +89,61 @@ func (s *DesktopService) PasteAfterCopy() error {
 		return err
 	}
 	return sh.PasteAfterCopy()
+}
+
+// --- pop-out windows (Phase 10, SPEC.md §4) ---
+
+// PopOut opens a tool or part in its own window, or focuses it if open.
+func (s *DesktopService) PopOut(req core.PopOutRequest) error {
+	sh, err := s.shell()
+	if err != nil {
+		return err
+	}
+	return sh.PopOut(req)
+}
+
+// CloseWindow closes a pop-out window (no-op if it isn't open).
+func (s *DesktopService) CloseWindow(key string) error {
+	sh, err := s.shell()
+	if err != nil {
+		return err
+	}
+	return sh.CloseWindow(key)
+}
+
+// FocusWindow shows and focuses a window: a pop-out's key, or "main".
+func (s *DesktopService) FocusWindow(key string) error {
+	sh, err := s.shell()
+	if err != nil {
+		return err
+	}
+	return sh.FocusWindow(key)
+}
+
+// OpenWindows lists the open pop-out windows' keys (also sent as windows:changed).
+func (s *DesktopService) OpenWindows() []string {
+	sh, err := s.shell()
+	if err != nil {
+		return []string{}
+	}
+	return sh.OpenWindows()
+}
+
+// TakeHandoff returns and clears the handoff JSON waiting for a pop-out ("" = none).
+func (s *DesktopService) TakeHandoff(key string) string {
+	sh, err := s.shell()
+	if err != nil {
+		return ""
+	}
+	return sh.TakeHandoff(key)
+}
+
+// Relay sends a message to every window (windows:relay); windows filter by
+// channel and To. Payloads are opaque JSON up to 8 MiB.
+func (s *DesktopService) Relay(r core.WindowRelay) error {
+	sh, err := s.shell()
+	if err != nil {
+		return err
+	}
+	return sh.Relay(r)
 }

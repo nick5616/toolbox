@@ -1,4 +1,10 @@
 import { SubtitlesAction, SubtitleStyle, type SubtitlesOptions, type SubtitlesResult } from "@/lib/api";
+import { isSpeechModel, type SpeechSettings } from "@/blocks/speech";
+
+/** The speech-block view of the prefs (model, spoken language, translate to English). */
+export function speechOf(p: Pick<Prefs, "model" | "language" | "translateToEnglish">): SpeechSettings {
+  return { model: p.model, language: p.language, translate: p.translateToEnglish };
+}
 
 /** What the view remembers between sessions (never the cues). */
 export interface Prefs {
@@ -42,7 +48,6 @@ export const DEFAULT_PREFS: Prefs = {
   backgroundPath: "",
 };
 
-const MODELS = ["base", "small", "turbo"];
 const STYLES: string[] = [SubtitleStyle.StyleClassic, SubtitleStyle.StyleBoxed, SubtitleStyle.StyleYellow, SubtitleStyle.StyleMinimal];
 
 function str(v: unknown, fallback: string): string {
@@ -55,7 +60,7 @@ export function sanitizePrefs(saved: unknown, d: Prefs): Prefs {
   const formats = Array.isArray(s.formats) ? s.formats.filter((f): f is string => f === "srt" || f === "vtt") : [];
   const lineChars = typeof s.maxLineChars === "number" ? Math.round(s.maxLineChars) : d.maxLineChars;
   return {
-    model: MODELS.includes(str(s.model, "")) ? str(s.model, d.model) : d.model,
+    model: isSpeechModel(s.model) ? s.model : d.model,
     language: str(s.language, d.language),
     translateToEnglish: typeof s.translateToEnglish === "boolean" ? s.translateToEnglish : d.translateToEnglish,
     maxLineChars: lineChars >= 32 && lineChars <= 60 ? lineChars : d.maxLineChars,
@@ -120,12 +125,6 @@ export function parseResult(json: string): SubtitlesResult | null {
   }
 }
 
-export const MODEL_CHOICES = [
-  { value: "base", label: "Base (fast)", tip: "Fastest and smallest; fine for clear speech" },
-  { value: "small", label: "Small (balanced)", tip: "A good balance of speed and accuracy" },
-  { value: "turbo", label: "Turbo (best)", tip: "Most accurate, especially for accents and noise; slowest" },
-];
-
 export const CANVAS_CHOICES = [
   { value: "16:9", label: "16:9", tip: "Widescreen, for YouTube and TVs" },
   { value: "9:16", label: "9:16", tip: "Tall, for Reels, Shorts and TikTok" },
@@ -142,6 +141,24 @@ export const BACKGROUND_CHOICES = [
   { value: "color", label: "Colour", tip: "A single plain colour behind the subtitles" },
   { value: "image", label: "Image", tip: "Your own picture behind the subtitles" },
 ];
+
+/** State of the Source step's "Subtitle text" click-in: "42 characters · 2 lines · to English". */
+export function splitSummary(p: Pick<Prefs, "maxLineChars" | "maxLines" | "translateToEnglish">): string {
+  return `${p.maxLineChars} characters · ${p.maxLines} ${p.maxLines === 1 ? "line" : "lines"}${p.translateToEnglish ? " · to English" : ""}`;
+}
+
+/** State of the Export step's "Text" click-in: "Medium · bottom · Arial". */
+export function textSummary(p: Pick<Prefs, "size" | "position" | "font">): string {
+  const size = SIZE_CHOICES.find((c) => c.value === p.size)?.label ?? p.size;
+  return `${size} · ${p.position} · ${p.font}`;
+}
+
+/** State of the "Video" click-in (audio only): "16:9 · 1080p · Visualizer". */
+export function videoSummary(p: Pick<Prefs, "canvas" | "canvasHeight" | "background" | "backgroundPath">): string {
+  const bg = BACKGROUND_CHOICES.find((c) => c.value === p.background)?.label ?? p.background;
+  const need = p.background === "image" && !p.backgroundPath ? " (choose one)" : "";
+  return `${p.canvas} · ${p.canvasHeight}p · ${bg}${need}`;
+}
 
 /** Canvas shape as width / height. */
 export function canvasAspect(canvas: string): number {

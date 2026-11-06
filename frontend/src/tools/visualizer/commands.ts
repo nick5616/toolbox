@@ -3,16 +3,15 @@ import { FilesService } from "@/lib/api";
 import type { Command } from "@/lib/commands";
 import { toAppError } from "@/lib/errors";
 import { useUI } from "@/state/ui";
-import { useVisualizer, type VisualizerStep } from "./store";
+import { useVisualizer } from "./store";
 
 const MODULE_ID = "visualizer";
 
-/** Goes to a step when its prerequisites exist, else to Source. */
-function go(step: VisualizerStep) {
+/** Opens the workspace on a panel when there is something to put in it (an analysed song for Export); else just the tool. */
+function go(panel: "export" | null) {
   useUI.getState().navigate(MODULE_ID);
   const s = useVisualizer.getState();
-  const ok = step === "source" || (step === "analyze" && !!s.input) || (step === "design" && !!s.ref) || (step === "export" && !!s.ref && !!s.show);
-  s.setStep(ok ? step : "source");
+  if (panel === "export" && s.analysis && s.show) s.requestPanel("export");
 }
 
 /** Palette entries for the Visualizer. Merged by shell/useBuiltinCommands. */
@@ -36,7 +35,7 @@ export function visualizerCommands(): Command[] {
         try {
           const paths = (await FilesService.Pick(MODULE_ID)) ?? [];
           if (paths[0]) useUI.getState().handOff({ moduleId: MODULE_ID, inputs: [paths[0]] });
-          else go("source");
+          else go(null);
         } catch (e) {
           toast({ title: toAppError(e).message, tone: "danger" });
         }
@@ -64,7 +63,7 @@ export function visualizerCommands(): Command[] {
       section: "Actions",
       icon: "maximize",
       run: () => {
-        go("design");
+        go(null);
         setTimeout(() => {
           const el = document.querySelector<HTMLElement>('[data-testid="design-stage"]');
           void el?.requestFullscreen?.().catch(() => undefined);

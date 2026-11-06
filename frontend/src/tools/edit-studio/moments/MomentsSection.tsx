@@ -3,8 +3,8 @@ import { useMemo, useState } from "react";
 import { Button, Section, Select, Slider, Spinner, Switch, toast } from "@/components";
 import type { EditClip } from "@/lib/api";
 import { parseEffects, parseSpeed, serializeEffects, serializeSpeed } from "@/viz/edit/schema";
-import { useEditStudio, useMarkers } from "../store";
-import { patchClip } from "../inspector/inspectorState";
+import { useEditStudio, useMarkers } from "@/editor/store";
+import { patchClip } from "@/editor/inspector/inspectorState";
 import styles from "./moments.module.css";
 import {
   accentMoments,

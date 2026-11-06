@@ -40,8 +40,10 @@ func (m *Module) Descriptor() core.Descriptor {
 		Description: "Transcribe audio and video locally with Whisper, exporting text and subtitles.",
 		Status:      core.StatusReady,
 		Accepts:     core.Accepts{Extensions: Accepts()},
-		Requires:    []string{sidecar.DepID},
-		Order:       170, OutputSubdir: "Transcripts",
+		// Phase 11: a transcript opens in Local Chat ("Ask about it") inside this tool.
+		Parts:    []string{"llm-chat"},
+		Requires: []string{sidecar.DepID},
+		Order:    170, OutputSubdir: "Transcripts",
 		SplitInputs: true, MaxConcurrent: 1, MaxInputs: 100,
 	}
 }

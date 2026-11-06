@@ -77,7 +77,8 @@ describe("StemsView", () => {
     enqueue.mockResolvedValue([{}]);
     const { user, btn } = await addFile();
     await user.click(screen.getByRole("radio", { name: /Vocals \+ instrumental/ }));
-    await user.click(screen.getByRole("radio", { name: "flac" }));
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
+    await user.click(await screen.findByRole("radio", { name: "flac" }));
     await waitFor(() => expect(setState).toHaveBeenCalled());
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
     await user.click(btn);
@@ -88,6 +89,10 @@ describe("StemsView", () => {
 
   it("selects FLAC by default and shows the per-minute size hint", async () => {
     render(<StemsView moduleId="stems" />);
+    await screen.findByRole("radio", { name: /4 stems/ });
+    const row = screen.getByRole("button", { name: /Advanced/ });
+    expect(row.textContent).toContain("FLAC");
+    await userEvent.setup().click(row);
     const flac = await screen.findByRole("radio", { name: "flac" });
     expect(flac.getAttribute("aria-checked")).toBe("true");
     expect(screen.getByText(STEMS_SIZE_HINT)).toBeTruthy();

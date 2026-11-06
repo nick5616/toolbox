@@ -6,8 +6,8 @@
 import { create } from "zustand";
 import { Select, Slider } from "@/components";
 import type { EditClip } from "@/lib/api";
-import { editDoc } from "../inspector/inspectorState";
-import { useEditStudio, useMarkers } from "../store";
+import { editDoc } from "@/editor/inspector/inspectorState";
+import { useEditStudio, useMarkers } from "@/editor/store";
 import { withVelocity } from "./applyVelocity";
 import { DEFAULT_VELOCITY, VELOCITY_HITS, VELOCITY_SHAPES, type VelocitySettings } from "./velocityRamp";
 import styles from "./beatsync.module.css";

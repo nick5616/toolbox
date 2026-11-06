@@ -1,0 +1,100 @@
+.bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  --wails-draggable: no-drag;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.label {
+  margin-right: 4px;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  color: var(--fg-subtle);
+}
+
+.chipWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 var(--space-2);
+  background: none;
+  border: 0;
+  border-radius: var(--r-md);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.chip:hover,
+.chip:focus-visible {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0;
+  height: 22px;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--r-md);
+  color: var(--fg-subtle);
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.chipWrap:hover .pop,
+.chipWrap:focus-within .pop {
+  width: 18px;
+  opacity: 1;
+}
+
+.pop:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+/* The Uses chip hover menu (Open here / its own window / Go to). */
+.popMenu {
+  display: inline-flex;
+  width: 0;
+  height: 22px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.chipWrap:hover .popMenu,
+.chipWrap:focus-within .popMenu {
+  width: 22px;
+  opacity: 1;
+}

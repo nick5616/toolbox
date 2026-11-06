@@ -9,8 +9,8 @@ import { Banner, Button, Meter, SegmentedControl, Select, TextArea, Tooltip } fr
 import { EditStudioService, JobsService, JobStatus, TranscribeService, WordsSource, type AnalysisRef } from "@/lib/api";
 import { toAppError, type AppErrorShape } from "@/lib/errors";
 import { isActive, useJob, useJobs } from "@/state/jobs";
-import { useEditStudio, useProject } from "../store";
-import { flushEdit } from "../useEditAutosave";
+import { useEditStudio, useProject } from "@/editor/store";
+import { flushEdit } from "@/editor/useEditAutosave";
 import styles from "./Setup.module.css";
 
 /** Go's viz.MaxLyricsChars. */

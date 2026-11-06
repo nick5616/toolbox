@@ -18,6 +18,12 @@ const RETENTION: ReadonlyArray<SelectOption<string>> = [
   { value: "0", label: "Forever" },
 ];
 
+/** One-line state for the settings click-in: "Text + images · 30 days". */
+export function clipboardSummary(clip: Pick<ClipboardSettings, "images" | "retentionDays" | "autoPaste">): string {
+  const keep = RETENTION.find((r) => r.value === String(clip.retentionDays))?.label ?? `${clip.retentionDays} days`;
+  return [clip.images ? "Text + images" : "Text only", clip.retentionDays === 0 ? "kept forever" : `${keep}`, clip.autoPaste ? "auto-paste" : ""].filter(Boolean).join(" · ");
+}
+
 type FieldName = "images" | "retentionDays" | "maxItems";
 
 /** Finds the error for a setting in AppError.fields (`clipboard.maxItems`, `maxItems`, …). */

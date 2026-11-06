@@ -97,7 +97,7 @@ export function AltPanel({ slide, index, limits, onChange }: AltPanelProps) {
   return (
     <section className={styles.section} aria-label="Alt text">
       <div className={styles.rowHead}>
-        <h3 className={styles.h} data-tip="A description of the picture for screen readers and when images fail to load">Alt text{slide ? ` for slide ${index + 1}` : ""}</h3>
+        <h3 className={styles.h} data-tip="A description of the picture for screen readers and when images fail to load">{slide ? `Slide ${index + 1}` : "No slide selected"}</h3>
         <span className={cx(styles.counter, n > limits.maxAltTextChars && styles.over)} data-tip="Characters used / the most Instagram allows for alt text">
           {n}/{limits.maxAltTextChars}
         </span>
@@ -130,7 +130,7 @@ export function ChecksPanel({ issues, slides, onSelect }: ChecksPanelProps) {
   return (
     <section className={styles.section} aria-label="Checks">
       <div className={styles.rowHead}>
-        <h3 className={styles.h} data-tip="Problems that would stop Instagram accepting the post, or make it look wrong">Checks</h3>
+        <span className={styles.hint}>{issues.length === 0 ? "Nothing to fix." : "Problems that would stop Instagram accepting the post, or make it look wrong."}</span>
         {issues.length === 0 ? <Badge tone="ok" tip="Nothing to fix; the post is ready to export">All clear</Badge> : errors > 0 ? <Badge tone="danger" mono tip="Errors must be fixed before you can export">{errors} to fix</Badge> : <Badge tone="warn" mono tip="Warnings and notes; you can still export">{issues.length}</Badge>}
       </div>
       {issues.length > 0 && (

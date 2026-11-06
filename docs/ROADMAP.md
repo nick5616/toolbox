@@ -9,8 +9,10 @@ Agreed on 2026-10-28; the Visualizer was cut in line as Phase 7 on 2026-10-29 an
 | 7 (done) | **Visualizer**: reactive visuals for songs, lyrics and subtitled videos, built from the `song-visualizer` repo's ideas on a GPU engine; reacts to separated instruments, beat and sections, chords, words and their mood. See `docs/specs/phase-7.md`. |
 | 8 (done) | **Pipelines** page: user-defined chains of tools, plus the built-in templates below (SPEC.md Part A). **Creator tools** (Part B): Post Builder, Photo Composer, Video Editor for Instagram-ready post folders. |
 | 9 | **Edit Studio**: beat-synced music edits. A song's beats, kicks, drops and words as snap markers, a multitrack timeline on the Visualizer's GPU engine, auto-fill recipes, marker-driven effects, people/subject cut-outs and captions. Cut in on 2026-11-03. See `SPEC.md`. |
-| 10 | Documents: Pandoc conversion (+ Typst for PDF), maybe Calibre ebook conversion; the Web Archiver placeholder. |
-| 11 (last) | LAN file transfer, LocalSend-protocol compatible. Opt-in, listens only while the Share panel is open, pairing + accept prompt. Needs an explicit amendment to the "no network listeners" app rule. |
+| 10 | **Composable tools** (2026-11-04): baselines and variants (Edit Studio composed on a new multitrack Video Editor), parts and pop-out windows for every tool and panel, minimal surfaces with click-ins across the app, and a node-graph pipeline builder. See `SPEC.md`. |
+| 11 | **Composable everything** (2026-11-04): every constituent opens inside its host (and pops out), results come back with Use; every workspace tool gets store-backed poppable panels and previews; the step wizards become workspaces; shared building blocks in `blocks/`; Send to on every result. See `SPEC.md`. |
+| 12 | Documents: Pandoc conversion (+ Typst for PDF), maybe Calibre ebook conversion; the Web Archiver placeholder. |
+| 13 (last) | LAN file transfer, LocalSend-protocol compatible. Opt-in, listens only while the Share panel is open, pairing + accept prompt. Needs an explicit amendment to the "no network listeners" app rule. |
 
 ## Pipelines (Phase 8) — intended model
 

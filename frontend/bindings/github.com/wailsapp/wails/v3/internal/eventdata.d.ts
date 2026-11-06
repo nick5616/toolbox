@@ -42,6 +42,9 @@ declare module "@wailsio/runtime" {
             "viz:render-ack": viz$0.RenderAck;
             "viz:render-cancel": viz$0.RenderCancel;
             "window:show": core$0.ShowView;
+            "windows:changed": core$0.WindowsChanged;
+            "windows:handoff": core$0.WindowHandoff;
+            "windows:relay": core$0.WindowRelay;
         }
     }
 }

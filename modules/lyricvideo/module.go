@@ -49,6 +49,7 @@ func (m *Module) Descriptor() core.Descriptor {
 		Requires:    []string{"ffmpeg", "ffprobe"},
 		Recommends:  []string{sidecar.DepID},
 		Order:       115, OutputSubdir: "Lyric videos",
+		Parts:     []string{"stems", "transcribe", "visualizer"},
 		MaxInputs: 1,
 	}
 }

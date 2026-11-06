@@ -30,13 +30,16 @@ vi.mock("@/lib/events", () => ({
   },
 }));
 
-import { ClipKind, type ClipItem } from "@/lib/api";
+import { ClipKind, ModuleStatus, type ClipItem, type Descriptor } from "@/lib/api";
+import { useEmbed } from "@/lib/embed";
+import { registerToolViews } from "@/lib/toolActions";
+import { useModules } from "@/state/modules";
 import { useDesktop } from "@/state/desktop";
 import { defaultSettings, useSettings } from "@/state/settings";
 import { useToastStore } from "@/components/toast";
 import ClipboardPopup from "./ClipboardPopup";
 import ClipboardView from "./ClipboardView";
-import { ClipboardSettingsPanel } from "./ClipboardSettingsPanel";
+import { ClipboardSettingsPanel, clipboardSummary } from "./ClipboardSettingsPanel";
 import { clearThumbCache } from "./useImageThumb";
 import { compareClips, matchesFilters } from "./clips";
 
@@ -251,10 +254,17 @@ describe("ClipboardView", () => {
     await waitFor(() => expect(toasts()).toContain("Cleared 3 items"));
   });
 
+  it("summarises the settings on the click-in row", async () => {
+    expect(clipboardSummary({ images: true, retentionDays: 30, autoPaste: false })).toBe("Text + images · 30 days");
+    expect(clipboardSummary({ images: false, retentionDays: 0, autoPaste: true })).toBe("Text only · kept forever · auto-paste");
+    render(<ClipboardView moduleId="clipboard" />);
+    expect(screen.getByRole("button", { name: /Clipboard settings/ }).textContent).toMatch(/days|forever/);
+  });
+
   it("turns recording off from the settings area", async () => {
     const user = userEvent.setup();
     render(<ClipboardView moduleId="clipboard" />);
-    await user.click(screen.getByRole("button", { name: "Clipboard settings" }));
+    await user.click(screen.getByRole("button", { name: /Clipboard settings/ }));
     await user.click(screen.getByRole("button", { name: "Turn off recording" }));
     expect(update).toHaveBeenCalledWith({ clipboard: expect.objectContaining({ enabled: false }) });
   });
@@ -352,5 +362,22 @@ describe("ClipboardPopup", () => {
     expect(await screen.findByText("Clipboard history is off — enable it in Toolbox")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Open Toolbox" }));
     expect(desktop.ShowMain).toHaveBeenCalledWith("clipboard");
+  });
+
+  it("opens the selected text item in Dev Utilities, with the text as the hand-off", async () => {
+    function FakeUtils() {
+      const t = useEmbed()?.handoff.text;
+      return <p>utils: {t?.title} | {t?.body}</p>;
+    }
+    registerToolViews({ "dev-utils": FakeUtils });
+    const d = (id: string, name: string) => ({ id, name, icon: "box", status: ModuleStatus.StatusReady, accepts: { extensions: [], urls: false, any: false } }) as unknown as Descriptor;
+    useModules.getState().setAll([d("dev-utils", "Dev Utilities"), d("clipboard", "Clipboard History")]);
+    svc.List.mockResolvedValue(page(clip("a", { text: "{\"k\":1}" }), clip("b")));
+    const user = userEvent.setup();
+    render(<ClipboardView moduleId="clipboard" />);
+    await screen.findByText("preview a");
+    await user.click(screen.getByRole("button", { name: /Open in Dev Utilities/ }));
+    expect(await screen.findByText(/^utils:/)).toBeTruthy();
+    expect(screen.getByText(/^utils:/).textContent).toBe("utils: Copied text | {\"k\":1}");
   });
 });

@@ -111,14 +111,17 @@ func Register(reg *core.Registry, m *Module) error { return reg.Register(m) }
 // Descriptor implements core.Module.
 func (m *Module) Descriptor() core.Descriptor {
 	return core.Descriptor{
-		ID: ModuleID, Name: "Video Editor", Icon: "clapperboard", Category: core.CategoryMedia,
+		ID: ModuleID, Name: "Sequence Editor", Icon: "film", Category: core.CategoryMedia,
 		Tagline:      "Stitch clips and photos into one video, with music and titles",
 		Description:  "Order, trim and frame clips and photos, add transitions, music and titles, or build a quick vlog that cuts on the beat.",
 		Status:       core.StatusReady,
 		Accepts:      core.Accepts{Extensions: slices.Concat(media.VideoExtensions(), media.ImageExtensions(), media.AudioExtensions())},
 		Requires:     []string{"ffmpeg", "ffprobe"},
 		Recommends:   []string{sidecar.DepID},
-		OutputSubdir: "Edits", Order: 13, MaxConcurrent: 1, NotAStep: true,
+		OutputSubdir: "Edits", Order: 16, MaxConcurrent: 1, NotAStep: true,
+		// Phase 10: a part of Post Builder (its video slides) and reachable from
+		// the Video Editor's home; the sidebar's Video Editor is the multitrack one.
+		Hidden: true,
 	}
 }
 

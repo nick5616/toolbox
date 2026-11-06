@@ -57,6 +57,43 @@ export const BACKGROUNDS = ["blur-cover", "cover", "color", "gradient", "image",
 const SAVED_BACKGROUNDS = [...BACKGROUNDS, "visualizer"] as const;
 export const ASPECTS = ["16:9", "9:16", "1:1"] as const;
 
+const BACKGROUND_LABEL: Record<string, string> = {
+  "blur-cover": "Blurred cover",
+  cover: "Cover and blur",
+  color: "Colour",
+  gradient: "Gradient",
+  image: "Image",
+  video: "Video",
+  visualizer: "Visuals",
+};
+
+function fileName(path: string): string {
+  const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return i >= 0 ? path.slice(i + 1) : path;
+}
+
+/** One-line state of the Background click-in: "Blurred cover", "Image · bg.png", "Image · choose a file". */
+export function backgroundSummary(look: Pick<RememberedLook, "background" | "backgroundPath">): string {
+  const label = BACKGROUND_LABEL[look.background] ?? look.background;
+  if (look.background === "image" || look.background === "video") return `${label} · ${look.backgroundPath ? fileName(look.backgroundPath) : "choose a file"}`;
+  return label;
+}
+
+/** One-line state of the Text click-in: "Arial · karaoke · centre". */
+export function textSummary(look: Pick<RememberedLook, "font" | "karaoke" | "position" | "showNext">): string {
+  const parts = [look.font, look.karaoke ? "karaoke" : "plain", look.position === "lower" ? "lower" : "centre"];
+  if (!look.showNext) parts.push("no next line");
+  return parts.join(" · ");
+}
+
+/** One-line state of the Extras click-in: "Title card · wave". */
+export function extrasSummary(look: Pick<RememberedLook, "titleCard" | "visualizer" | "background">): string {
+  const parts: string[] = [];
+  if (look.titleCard) parts.push("title card");
+  if (look.background !== "visualizer" && look.visualizer !== "none") parts.push(look.visualizer);
+  return parts.length === 0 ? "None" : parts.join(" · ");
+}
+
 function pick(v: unknown, allowed: readonly string[], fallback: string): string {
   return typeof v === "string" && allowed.includes(v) ? v : fallback;
 }

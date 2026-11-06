@@ -71,7 +71,7 @@ describe("UpscaleView", () => {
     enqueue.mockResolvedValue([{}]);
     const user = userEvent.setup();
     render(<UpscaleView moduleId="upscaler" />);
-    await screen.findByRole("radio", { name: /Photo/ });
+    await screen.findByRole("radio", { name: "2×" });
     await user.click(screen.getByRole("button", { name: "Add files…" }));
     expect(await screen.findByText("640×480 → 2560×1920")).toBeTruthy();
     expect(screen.getByText("HEIC")).toBeTruthy();
@@ -88,11 +88,13 @@ describe("UpscaleView", () => {
   it("shows a CPU time estimate for the CPU processor", async () => {
     const user = userEvent.setup();
     render(<UpscaleView moduleId="upscaler" />);
-    await screen.findByRole("radio", { name: /Photo/ });
-    await user.selectOptions(screen.getByLabelText("Processor"), "cpu");
+    await screen.findByRole("radio", { name: "2×" });
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
+    await user.selectOptions(await screen.findByLabelText("Processor"), "cpu");
     expect(screen.getByText(/much slower than a GPU/)).toBeTruthy();
+    expect(await screen.findByRole("radio", { name: /Photo/ })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Add files…" }));
     // 640x480 = 0.3072 MP x 100 s/MP; the 30 MP file is over the CPU cap and not counted.
-    expect(await screen.findByText(/Estimated time about 31 s/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole("button", { name: /Advanced/ }).textContent).toContain("CPU, est. about 31 s"));
   });
 });

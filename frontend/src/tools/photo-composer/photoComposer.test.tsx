@@ -17,11 +17,12 @@ const m = vi.hoisted(() => ({
   exportComposition: vi.fn(),
   applyLayout: vi.fn(),
   sources: vi.fn(),
+  closeWindow: vi.fn(async (_k: string) => undefined),
   drop: { current: null as null | ((info: { paths: string[]; x: number; y: number }) => void) },
 }));
 
-vi.mock("../post-builder/sourceDrag", async (orig) => {
-  const actual = await orig<typeof import("../post-builder/sourceDrag")>();
+vi.mock("@/blocks/sources/sourceDrag", async (orig) => {
+  const actual = await orig<typeof import("@/blocks/sources/sourceDrag")>();
   return {
     ...actual,
     useSourceDropTarget: (_ref: unknown, onDrop: (info: { paths: string[]; x: number; y: number }) => void) => {
@@ -30,7 +31,7 @@ vi.mock("../post-builder/sourceDrag", async (orig) => {
   };
 });
 
-vi.mock("../post-builder/SourceGrid", () => ({
+vi.mock("@/blocks/sources/SourceGrid", () => ({
   SourceGrid: (p: { sources: Array<{ path: string; name: string }>; onActivate?: (path: string) => void; emptyLabel?: string }) => (
     <ul aria-label="Sources">
       {p.sources.length === 0 && <li>{p.emptyLabel}</li>}
@@ -69,6 +70,7 @@ vi.mock("@/lib/api", async (orig) => {
     SettingsService: { ModuleState: async () => "", SetModuleState: async () => undefined },
     FilesService: { PickWith: async () => [], ImageThumb: async () => "data:image/png;base64,AAAA" },
     LibraryService: { Reveal: async () => undefined },
+    DesktopService: { CloseWindow: (k: string) => m.closeWindow(k), OpenWindows: async () => [], Relay: async () => undefined },
   };
 });
 
@@ -98,6 +100,7 @@ import { JobStatus, type Composition, type Job, type ProjectInfo } from "@/lib/a
 import { addLayer, newComposition, newImageLayer, newTextLayer } from "@/composer/model";
 import { useJobs } from "@/state/jobs";
 import { useUI } from "@/state/ui";
+import { useComposer } from "./store";
 import PhotoComposerView from "./PhotoComposerView";
 import { discardedProjects } from "./useAutosave";
 import { displayToDocIndex, dropIndex, fitScale, moveWithSnap, nudge, panBackground, scaleByHandle } from "./logic";
@@ -122,6 +125,13 @@ function renderView() {
 
 const layerList = () => screen.getByRole("list", { name: "Layers" });
 const layerNames = () => within(layerList()).getAllByRole("listitem").map((li) => li.querySelector("span[title]")?.textContent ?? "");
+
+/** Opens a click-in drawer by its launcher (one drawer is open at a time). */
+async function showPanel(name: string) {
+  const launcher = screen.getByRole("button", { name: new RegExp(`^${name}$`) });
+  if (launcher.getAttribute("aria-expanded") !== "true") await userEvent.click(launcher);
+  await screen.findByRole("dialog", { name });
+}
 
 async function openProject(name: string) {
   await userEvent.click(await screen.findByRole("button", { name: `Open ${name}` }));
@@ -166,7 +176,19 @@ describe("projects strip", () => {
   it("lists compositions and opens one", async () => {
     renderView();
     await openProject("Market");
+    expect(screen.queryByRole("button", { name: "Open Market" })).toBeNull(); // the strip is only on the home
+    await showPanel("Layers");
     expect(layerNames()).toEqual(["b", "a"]);
+  });
+
+  it("shows summaries on the click-in launchers", async () => {
+    renderView();
+    await openProject("Market");
+    const tip = (n: string) => screen.getByRole("button", { name: n }).getAttribute("data-tip") ?? "";
+    expect(tip("Layers")).toContain("2 layers");
+    expect(tip("Background")).toContain("Colour");
+    expect(tip("Canvas")).toContain("4:5");
+    expect(screen.queryByRole("button", { name: "Sources" })).toBeNull();
   });
 
   it("creates a new composition from the New dialog", async () => {
@@ -201,6 +223,7 @@ describe("editor", () => {
       useUI.getState().handOff({ moduleId: "photo-composer", inputs: ["C:/x/one.jpg", "C:/x/two.png"] });
     });
     await screen.findByRole("toolbar", { name: "Composer tools" });
+    await showPanel("Layers");
     await waitFor(() => expect(layerNames()).toEqual(["two", "one"]));
     expect(useUI.getState().handoff).toBeNull();
   });
@@ -208,46 +231,57 @@ describe("editor", () => {
   it("selects, nudges and deletes a layer from the keyboard", async () => {
     renderView();
     await openProject("Market");
+    await showPanel("Layers");
     const rowB = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
     fireEvent.pointerDown(rowB, { button: 0, clientY: 10 });
     fireEvent.pointerUp(rowB);
+    await showPanel("Layer");
+    const tool = screen.getByRole("toolbar", { name: "Composer tools" });
     const x = screen.getByLabelText("X") as HTMLInputElement;
     expect(x.value).toBe("540");
-    fireEvent.keyDown(rowB, { key: "ArrowRight" });
+    fireEvent.keyDown(tool, { key: "ArrowRight" });
     await waitFor(() => expect((screen.getByLabelText("X") as HTMLInputElement).value).toBe("541"));
-    fireEvent.keyDown(rowB, { key: "ArrowDown", shiftKey: true });
+    fireEvent.keyDown(tool, { key: "ArrowDown", shiftKey: true });
     await waitFor(() => expect((screen.getByLabelText("Y") as HTMLInputElement).value).toBe("685"));
-    fireEvent.keyDown(rowB, { key: "Delete" });
+    fireEvent.keyDown(tool, { key: "Delete" });
+    await showPanel("Layers");
     await waitFor(() => expect(layerNames()).toEqual(["a"]));
   });
 
   it("undoes with Ctrl+Z", async () => {
     renderView();
     await openProject("Market");
+    await showPanel("Layers");
     const rowB = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
     fireEvent.pointerDown(rowB, { button: 0 });
     fireEvent.pointerUp(rowB);
     fireEvent.keyDown(rowB, { key: "Delete" });
     await waitFor(() => expect(layerNames()).toEqual(["a"]));
-    fireEvent.keyDown(screen.getByRole("toolbar"), { key: "z", ctrlKey: true });
+    fireEvent.keyDown(screen.getByRole("toolbar", { name: "Composer tools" }), { key: "z", ctrlKey: true });
     await waitFor(() => expect(layerNames()).toEqual(["b", "a"]));
   });
 
   it("reorders layers with the arrange buttons", async () => {
     renderView();
     await openProject("Market");
+    await showPanel("Layers");
     const rowB = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
     fireEvent.pointerDown(rowB, { button: 0 });
     fireEvent.pointerUp(rowB);
+    await showPanel("Layer");
     await userEvent.click(screen.getByRole("button", { name: "Backward" }));
+    await showPanel("Layers");
     expect(layerNames()).toEqual(["a", "b"]);
+    await showPanel("Layer");
     await userEvent.click(screen.getByRole("button", { name: "Front" }));
+    await showPanel("Layers");
     expect(layerNames()).toEqual(["b", "a"]);
   });
 
   it("reorders layers by dragging a row", async () => {
     renderView();
     await openProject("Market");
+    await showPanel("Layers");
     const rows = within(layerList()).getAllByRole("listitem") as HTMLElement[];
     rows.forEach((r, i) => {
       r.getBoundingClientRect = () => ({ top: i * 40, height: 40, bottom: i * 40 + 40, left: 0, right: 100, width: 100, x: 0, y: i * 40, toJSON() {} });
@@ -262,6 +296,7 @@ describe("editor", () => {
   it("hides, locks and renames a layer", async () => {
     renderView();
     await openProject("Market");
+    await showPanel("Layers");
     const rowB = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
     await userEvent.click(within(rowB).getByRole("button", { name: "Hide layer" }));
     expect(within(rowB).getByRole("button", { name: "Show layer" })).toBeTruthy();
@@ -277,9 +312,11 @@ describe("editor", () => {
   it("edits properties of the selected layer", async () => {
     renderView();
     await openProject("Market");
+    await showPanel("Layers");
     const rowB = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
     fireEvent.pointerDown(rowB, { button: 0 });
     fireEvent.pointerUp(rowB);
+    await showPanel("Layer");
     fireEvent.change(screen.getByLabelText("Rotation"), { target: { value: "30" } });
     await userEvent.click(screen.getByRole("switch", { name: "Shadow" }));
     await userEvent.click(screen.getByRole("switch", { name: "Mirror" }));
@@ -294,8 +331,8 @@ describe("editor", () => {
   it("applies a layout from the menu", async () => {
     renderView();
     await openProject("Market");
-    await userEvent.click(screen.getByRole("button", { name: "Layouts" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: /^Grid/ }));
+    await showPanel("Layouts");
+    await userEvent.click(await screen.findByRole("button", { name: /^Grid/ }));
     expect(m.applyLayout).toHaveBeenCalled();
     expect(m.applyLayout.mock.calls[0]?.[1]).toBe("grid");
   });
@@ -303,9 +340,10 @@ describe("editor", () => {
   it("adds a text layer and opens it for editing", async () => {
     renderView();
     await openProject("Market");
-    await userEvent.click(screen.getByRole("button", { name: "Add text" }));
-    expect(layerNames()[0]).toBe("Text");
+    await addText();
     expect(screen.getByLabelText("Edit text")).toBeTruthy();
+    await showPanel("Layers");
+    expect(layerNames()[0]).toBe("Text");
   });
 });
 
@@ -316,6 +354,7 @@ describe("remove background", () => {
   async function selectB() {
     renderView();
     await openProject("Market");
+    await showPanel("Layers");
     const rowB = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
     fireEvent.pointerDown(rowB, { button: 0 });
     fireEvent.pointerUp(rowB);
@@ -326,9 +365,11 @@ describe("remove background", () => {
     await selectB();
     await userEvent.click(screen.getAllByRole("button", { name: "Remove background" })[0] as HTMLElement);
     expect(m.removeBg).toHaveBeenCalledWith("C:/photos/b.jpg");
+    await showPanel("Layers");
     expect(screen.getAllByRole("status", { name: "Removing background" }).length).toBeGreaterThan(0);
 
     act(() => useJobs.getState().upsert(job(JobStatus.JobDone, [{ path: "C:/out/b-cut.png" }])));
+    await showPanel("Layer");
     const restore = await screen.findByRole("button", { name: "Restore original" });
     await waitFor(() => expect(m.save).toHaveBeenCalledTimes(1));
     let saved = m.save.mock.calls.at(-1)?.[2] as Composition;
@@ -359,7 +400,7 @@ describe("autosave", () => {
     await openProject("Market");
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add text" }));
+      useComposer.getState().addText();
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(700);
@@ -383,7 +424,7 @@ describe("autosave", () => {
     await openProject("Market");
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add text" }));
+      useComposer.getState().addText();
       await vi.advanceTimersByTimeAsync(900);
     });
     expect(screen.getByText("Couldn't save")).toBeTruthy();
@@ -392,7 +433,7 @@ describe("autosave", () => {
   it("saves pending changes when leaving the view", async () => {
     const { unmount } = renderView();
     await openProject("Market");
-    await userEvent.click(screen.getByRole("button", { name: "Add text" }));
+    await addText();
     expect(m.save).not.toHaveBeenCalled();
     unmount();
     await waitFor(() => expect(m.save).toHaveBeenCalledTimes(1));
@@ -413,7 +454,7 @@ describe("post handoff", () => {
 
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add text" }));
+      useComposer.getState().addText();
       await vi.advanceTimersByTimeAsync(900);
     });
     expect(m.save).toHaveBeenCalled();
@@ -425,7 +466,7 @@ describe("post handoff", () => {
 
     // Later saves do not link again.
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add text" }));
+      useComposer.getState().addText();
       await vi.advanceTimersByTimeAsync(900);
     });
     expect(m.postsSave).toHaveBeenCalledTimes(1);
@@ -438,11 +479,30 @@ describe("post handoff", () => {
     });
     await screen.findByRole("toolbar", { name: "Composer tools" });
     expect(m.create).not.toHaveBeenCalled();
+    await showPanel("Layers");
     expect(layerNames()).toEqual(["b", "a"]);
     await userEvent.click(screen.getByRole("button", { name: "Back to post" }));
     await waitFor(() => expect(useUI.getState().handoff?.moduleId).toBe("post-builder"));
     expect(useUI.getState().handoff?.postSlide).toEqual({ ...slide, projectId: "p1" });
     expect(m.postsSave).not.toHaveBeenCalled();
+  });
+
+  it("in its own window, Back to post links, saves and closes the window instead of handing off", async () => {
+    const { setCurrentWindowForTest, parseWindow } = await import("@/lib/windows");
+    setCurrentWindowForTest(parseWindow("?window=tool&view=photo-composer&key=tool:photo-composer"));
+    try {
+      renderView();
+      await act(async () => {
+        useUI.getState().handOff({ moduleId: "photo-composer", inputs: [], postSlide: slide });
+      });
+      await screen.findByRole("toolbar", { name: "Composer tools" });
+      await userEvent.click(screen.getByRole("button", { name: "Back to post" }));
+      await waitFor(() => expect(m.closeWindow).toHaveBeenCalledWith("tool:photo-composer"));
+      expect(m.postsSave).toHaveBeenCalledTimes(1);
+      expect(useUI.getState().handoff).toBeNull();
+    } finally {
+      setCurrentWindowForTest(null);
+    }
   });
 
   it("links an untouched new composition when going back to the post", async () => {
@@ -485,6 +545,7 @@ describe("collage build", () => {
 
   it("adds every other source as a layer, cuts them out one job each, and lays out twice", async () => {
     await startBuild();
+    await showPanel("Layers");
     await waitFor(() => expect(layerNames()).toEqual(["3", "2", "1"]));
     await waitFor(() => expect(m.removeBg.mock.calls.map((c) => c[0])).toEqual(["C:/s/1.jpg", "C:/s/2.jpg", "C:/s/3.jpg"]));
     // Shimmer on the stage and a spinner per layer while they are being cut out.
@@ -507,6 +568,7 @@ describe("collage build", () => {
 
   it("uses a colour background and skips cut-outs when asked", async () => {
     await startBuild({ background: "", color: "#112233", cutouts: false });
+    await showPanel("Layers");
     await waitFor(() => expect(layerNames()).toHaveLength(4));
     await waitFor(() => expect(m.applyLayout).toHaveBeenCalledTimes(1));
     expect(m.removeBg).not.toHaveBeenCalled();
@@ -517,6 +579,7 @@ describe("collage build", () => {
   it("does not rearrange after the user moved a layer", async () => {
     await startBuild();
     await waitFor(() => expect(m.removeBg).toHaveBeenCalledTimes(3));
+    await showPanel("Layers");
     const row = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
     fireEvent.pointerDown(row, { button: 0, clientY: 10 });
     fireEvent.pointerUp(row);
@@ -564,14 +627,16 @@ describe("batch remove background", () => {
     m.removeBg.mockImplementation(async (path: string) => cutJob(path, JobStatus.JobRunning));
     renderView();
     await openProject("Market");
+    await showPanel("Layers");
     const rows = within(layerList()).getAllByRole("listitem") as HTMLElement[];
     fireEvent.pointerDown(rows[0] as HTMLElement, { button: 0 });
     fireEvent.pointerUp(rows[0] as HTMLElement);
     ctrlClick(rows[1] as HTMLElement);
-    expect(screen.getByText("2 layers selected")).toBeTruthy();
+    expect(screen.getByText("2 layers")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Remove background (2)" }));
     await waitFor(() => expect(m.removeBg.mock.calls.map((c) => c[0])).toEqual(["C:/photos/b.jpg", "C:/photos/a.jpg"]));
+    await showPanel("Layers");
     expect(screen.getAllByRole("status", { name: "Removing background" }).length).toBeGreaterThanOrEqual(2);
 
     act(() => {
@@ -615,21 +680,22 @@ describe("sources tab", () => {
   it("is only there when the composition came from a post", async () => {
     renderView();
     await openProject("Market");
-    expect(screen.queryByRole("radio", { name: "Sources" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Sources/ })).toBeNull();
     expect(m.sources).not.toHaveBeenCalled();
   });
 
   it("lists the photos and adds one at the centre on activation", async () => {
     m.sources.mockResolvedValue(sources);
     await openFromPost();
-    await userEvent.click(screen.getByRole("radio", { name: "Sources" }));
+    await showPanel("Sources");
     expect(m.sources).toHaveBeenCalledWith("post1");
     expect(await screen.findByText("x.jpg")).toBeTruthy();
     expect(screen.queryByText("clip.mp4")).toBeNull();
 
     fireEvent.doubleClick(screen.getByText("x.jpg"));
-    await userEvent.click(screen.getByRole("radio", { name: "Layers" }));
+    await showPanel("Layers");
     await waitFor(() => expect(layerNames()).toEqual(["x", "b", "a"]));
+    await showPanel("Layer");
     expect((screen.getByLabelText("X") as HTMLInputElement).value).toBe("540");
     expect((screen.getByLabelText("Y") as HTMLInputElement).value).toBe("675");
   });
@@ -642,7 +708,9 @@ describe("sources tab", () => {
     await act(async () => {
       m.drop.current?.({ paths: ["C:/s/x.jpg"], x: 150, y: 200 });
     });
+    await showPanel("Layers");
     await waitFor(() => expect(layerNames()).toEqual(["x", "b", "a"]));
+    await showPanel("Layer");
     expect((screen.getByLabelText("X") as HTMLInputElement).value).toBe("270");
     expect((screen.getByLabelText("Y") as HTMLInputElement).value).toBe("337.5");
   });
@@ -650,7 +718,7 @@ describe("sources tab", () => {
   it("explains when the sources can't be listed and refreshes on demand", async () => {
     m.sources.mockRejectedValueOnce(new Error("not implemented")).mockResolvedValue(sources);
     await openFromPost();
-    await userEvent.click(screen.getByRole("radio", { name: "Sources" }));
+    await showPanel("Sources");
     expect((await screen.findByRole("alert")).textContent).toContain("Couldn't list");
     await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
     expect(await screen.findByText("x.jpg")).toBeTruthy();
@@ -710,3 +778,8 @@ describe("stage geometry", () => {
     expect(panBackground(doc, { w: 2160, h: 1080 }, { panX: 0.9, panY: 0 }, -1000, 0).panX).toBe(1);
   });
 });
+
+async function addText() {
+  await userEvent.click(screen.getByRole("button", { name: "Add" }));
+  await userEvent.click(await screen.findByRole("menuitem", { name: "Add text" }));
+}

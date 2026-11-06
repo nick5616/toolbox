@@ -31,6 +31,7 @@ import type { Pipeline, PipelineEntry } from "@/lib/api";
 import { registerSteps } from "@/pipelines/steps";
 import { usePipelines } from "@/state/pipelines";
 import { PipelineEditor } from "./PipelineEditor";
+import { useEditorModeStore } from "./editorMode";
 import { stepsOf } from "./editorModel";
 import { CATALOG, check, entry, pipeline, product, step, stepCheck } from "./testFixtures";
 
@@ -61,6 +62,7 @@ function lastSaved(): Pipeline {
 }
 
 beforeEach(() => {
+  localStorage.setItem("toolbox.pipelines.editorMode", "list");
   vi.useFakeTimers();
   h.save.mockImplementation(async (p: Pipeline) => entry(p));
   h.describe.mockImplementation(async (p: Pipeline) => check(stepsOf(p).map((s) => stepCheck(s.id))));
@@ -72,6 +74,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
   usePipelines.setState({ entries: [], selectedPipelineId: null, runs: {} });
+  useEditorModeStore.setState({ mode: null });
 });
 
 describe("PipelineEditor", () => {

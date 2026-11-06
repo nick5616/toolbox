@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, EmptyState, Section, SegmentedControl, Select, Switch, toast } from "@/components";
+import { Button, EmptyState, Section, SegmentedControl, Select, Switch, ToolClickIn, toast } from "@/components";
 import {
+  FilesService,
   JobStatus,
   LibraryService,
   OcrImageOutput,
@@ -11,14 +12,49 @@ import {
 } from "@/lib/api";
 import { copyText } from "@/lib/copy";
 import { toAppError } from "@/lib/errors";
-import { useOrderedJobs } from "@/state/jobs";
-import { FileActions, FileToolLayout, runLabel, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { useCompositionInputs } from "@/state/composition";
+import { useToolJobs } from "@/tools/_kit/session";
+import { FileActions, FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import type { ToolViewProps } from "../index";
 import { DEFAULT_OCR_OPTIONS, FALLBACK_LANGUAGES, downloadNote, sanitizeOcrOptions, toOcrResult, type OcrResultItem } from "./options";
 import styles from "./ocr.module.css";
 
 const MAX_RESULTS = 24;
+
+const PDF_LABEL: Record<string, string> = {
+  [OcrPdfOutput.PDFSearchable]: "searchable PDF",
+  [OcrPdfOutput.PDFText]: "PDFs as text",
+  [OcrPdfOutput.PDFBoth]: "PDF + text",
+};
+
+const CHAT_PROMPTS = ["Summarise", "Extract a table", "Fix typos"];
+const MAX_CHAT_TEXT = 200_000;
+
+/** "Ask Local Chat" on a result: the recognised text goes to the chat as context. */
+function AskChat({ item, textPath }: { item: OcrResultItem; textPath: string }) {
+  const [body, setBody] = useState(item.preview);
+  useEffect(() => {
+    if (textPath === "") return;
+    let live = true;
+    FilesService.ReadText(textPath, MAX_CHAT_TEXT)
+      .then((t) => live && setBody(t))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [textPath]);
+  const fileName = item.title;
+  return (
+    <ToolClickIn
+      host="ocr"
+      module="llm-chat"
+      title="Ask Local Chat"
+      extra={{ text: { title: `Text of ${fileName}`, body, prompts: CHAT_PROMPTS } }}
+      disabledReason={body.trim() === "" ? "No text was found to ask about" : undefined}
+    />
+  );
+}
 
 function ResultCard({ item }: { item: OcrResultItem }) {
   const textFile = item.files.find((f) => f.path.toLowerCase().endsWith(".txt")) ?? item.files[0];
@@ -47,6 +83,7 @@ function ResultCard({ item }: { item: OcrResultItem }) {
       ))}
       {item.preview !== "" && (
         <>
+          <AskChat item={item} textPath={textFile && textFile.path.toLowerCase().endsWith(".txt") && !textFile.missing ? textFile.path : ""} />
           <pre className={styles.preview} aria-label="Text preview" data-tip="The text that was read, as it will be copied">
             {item.preview}
           </pre>
@@ -70,7 +107,8 @@ export default function OcrView({ moduleId }: ToolViewProps) {
   const [languages, setLanguages] = useState<OcrLanguageInfo[]>([]);
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
+  useCompositionInputs(moduleId, { "llm-chat": [] });
 
   useEffect(() => {
     let cancelled = false;
@@ -121,57 +159,62 @@ export default function OcrView({ moduleId }: ToolViewProps) {
       onRun={onRun}
       running={running}
       inputErrors={inputErrors}
-      options={
-        <Section label="Options" tip="Choose the language and what kind of files to write">
-          <div className={styles.options}>
-            <div className={styles.optRow}>
-              <span id="ocr-language-label" className={styles.optLabel} data-tip="The language of the text in your scans; a wrong choice gives poor results">
-                Language
-              </span>
-              <Select<OcrLanguage>
-                aria-labelledby="ocr-language-label"
-                data-tip="Language of the text in your files; some languages need a one-time model download shown in brackets"
-                value={opts.language}
-                options={langOptions}
-                onChange={(language) => setOpts((o) => ({ ...o, language }))}
-              />
-              {selected && selected.downloadBytes > 0 && (
-                <span className={styles.help} data-tip="Size of the language model downloaded the first time you use it">{downloadNote(selected.downloadBytes)}</span>
-              )}
-            </div>
-            <div className={styles.optRow}>
-              <span className={styles.optLabel} data-tip="What to produce when the input is a PDF">PDF output</span>
-              <SegmentedControl
-                aria-label="PDF output"
-                value={opts.pdfOutput}
-                onChange={(pdfOutput) => setOpts((o) => ({ ...o, pdfOutput }))}
-                options={[
-                  { value: OcrPdfOutput.PDFSearchable, label: "Searchable PDF", tip: "A copy of the PDF with an invisible text layer so you can search and select text" },
-                  { value: OcrPdfOutput.PDFText, label: "Text", tip: "Only a plain text file with the recognised text" },
-                  { value: OcrPdfOutput.PDFBoth, label: "Both", tip: "Write the searchable PDF and a text file" },
-                ]}
-              />
-            </div>
-            <div className={styles.optRow}>
-              <span className={styles.optLabel} data-tip="What to produce when the input is a photo or scan">Image output</span>
-              <SegmentedControl
-                aria-label="Image output"
-                value={opts.imageOutput}
-                onChange={(imageOutput) => setOpts((o) => ({ ...o, imageOutput }))}
-                options={[
-                  { value: OcrImageOutput.ImageText, label: "Text", tip: "A plain text file with the recognised text" },
-                  { value: OcrImageOutput.ImageJSON, label: "Text + positions (JSON)", tip: "Also save where every word sits on the image, for scripts and other programs" },
-                ]}
-              />
-            </div>
-            <Switch
-              checked={opts.skipText}
-              onChange={(skipText) => setOpts((o) => ({ ...o, skipText }))}
-              label="Skip pages that already have text"
-              tip="Leave pages with real text alone, which is faster and keeps their original text"
+      primary={
+        <div className={styles.optRow}>
+          <span id="ocr-language-label" className={styles.optLabel} data-tip="The language of the text in your scans; a wrong choice gives poor results">
+            Language
+          </span>
+          <Select<OcrLanguage>
+            aria-labelledby="ocr-language-label"
+            data-tip="Language of the text in your files; some languages need a one-time model download shown in brackets"
+            value={opts.language}
+            options={langOptions}
+            onChange={(language) => setOpts((o) => ({ ...o, language }))}
+          />
+          {selected && selected.downloadBytes > 0 && (
+            <span className={styles.help} data-tip="Size of the language model downloaded the first time you use it">{downloadNote(selected.downloadBytes)}</span>
+          )}
+        </div>
+      }
+      advancedSummary={summarize(
+        PDF_LABEL[opts.pdfOutput] ?? opts.pdfOutput,
+        opts.imageOutput === OcrImageOutput.ImageJSON ? "images as JSON" : "images as text",
+        opts.skipText && "skips pages with text",
+      )}
+      advanced={
+        <div className={styles.options}>
+          <div className={styles.optRow}>
+            <span className={styles.optLabel} data-tip="What to produce when the input is a PDF">PDF output</span>
+            <SegmentedControl
+              aria-label="PDF output"
+              value={opts.pdfOutput}
+              onChange={(pdfOutput) => setOpts((o) => ({ ...o, pdfOutput }))}
+              options={[
+                { value: OcrPdfOutput.PDFSearchable, label: "Searchable PDF", tip: "A copy of the PDF with an invisible text layer so you can search and select text" },
+                { value: OcrPdfOutput.PDFText, label: "Text", tip: "Only a plain text file with the recognised text" },
+                { value: OcrPdfOutput.PDFBoth, label: "Both", tip: "Write the searchable PDF and a text file" },
+              ]}
             />
           </div>
-        </Section>
+          <div className={styles.optRow}>
+            <span className={styles.optLabel} data-tip="What to produce when the input is a photo or scan">Image output</span>
+            <SegmentedControl
+              aria-label="Image output"
+              value={opts.imageOutput}
+              onChange={(imageOutput) => setOpts((o) => ({ ...o, imageOutput }))}
+              options={[
+                { value: OcrImageOutput.ImageText, label: "Text", tip: "A plain text file with the recognised text" },
+                { value: OcrImageOutput.ImageJSON, label: "Text + positions (JSON)", tip: "Also save where every word sits on the image, for scripts and other programs" },
+              ]}
+            />
+          </div>
+          <Switch
+            checked={opts.skipText}
+            onChange={(skipText) => setOpts((o) => ({ ...o, skipText }))}
+            label="Skip pages that already have text"
+            tip="Leave pages with real text alone, which is faster and keeps their original text"
+          />
+        </div>
       }
       results={
         <Section label="Results" tip="Recognised text with its files; copy it or open the saved file">

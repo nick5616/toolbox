@@ -43,7 +43,7 @@ import { usePipelineNotices } from "./usePipelineNotices";
 function mod(id: string, name: string): Descriptor {
   return {
     id, name, tagline: "", description: "", icon: "box", category: Category.$zero, status: ModuleStatus.StatusReady,
-    accepts: { extensions: [".mp4"], urls: false, any: false }, requires: null, recommends: null, outputSubdir: "", order: 1, hidden: false, jobLess: false, maxInputs: 0,
+    accepts: { extensions: [".mp4"], urls: false, any: false }, requires: null, recommends: null, outputSubdir: "", order: 1, hidden: false, jobLess: false, maxInputs: 0, base: "", parts: null,
   };
 }
 
@@ -156,8 +156,8 @@ describe("Library Send to", () => {
     h.match.mockResolvedValue({ matches: [{ module: mod("stems", "Stem Splitter"), paths: ["/a.mp3"] }], unmatched: [] });
     usePipelines.setState({ entries: entries() });
     const items = await sendToItems("/a.mp3");
-    expect(items.map((i) => i.label)).toEqual(["Stem Splitter", "Pipeline: Stems"]);
-    items[1]?.onSelect();
+    expect(items.map((i) => i.label)).toEqual(["Open in Stem Splitter", "Open in Stem Splitter (new window)", "Pipeline: Stems"]);
+    items[2]?.onSelect();
     expect(usePipelines.getState().runSheet).toEqual({ pipelineId: "p1", inputs: ["/a.mp3"] });
     expect(useUI.getState().view).toBe("pipelines");
   });

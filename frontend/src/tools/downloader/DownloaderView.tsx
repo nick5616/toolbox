@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, PathText, toast } from "@/components";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Button, ClickInHost, toast } from "@/components";
 import { DownloaderService, DownloadMode, LibraryService, type DownloaderOptions } from "@/lib/api";
 import { useCommands } from "@/lib/commands";
+import { useToolHandoff } from "@/lib/embed";
 import { toAppError } from "@/lib/errors";
 import { useShortcut } from "@/lib/shortcuts";
 import { useSettings } from "@/state/settings";
-import { useUI } from "@/state/ui";
 import type { ToolViewProps } from "@/tools";
 import { DepsBanner, useDepsBlockReason } from "./DepsBanner";
 import { OptionsPanel } from "./OptionsPanel";
@@ -26,7 +26,6 @@ export default function DownloaderView(_props: ToolViewProps) {
   const [submitting, setSubmitting] = useState(false);
 
   const libraryDir = useSettings((s) => s.settings.libraryDir);
-  const handoff = useUI((s) => s.handoff);
   const blockReason = useDepsBlockReason();
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -34,14 +33,11 @@ export default function DownloaderView(_props: ToolViewProps) {
 
 
   // Handoff from drop/paste.
-  useEffect(() => {
-    if (handoff?.moduleId !== MODULE_ID) return;
-    const h = useUI.getState().takeHandoff(MODULE_ID);
-    if (!h) return;
+  useToolHandoff(MODULE_ID, (h) => {
     setText(h.inputs.join("\n"));
     setServerUrlErrors({});
     requestAnimationFrame(() => submitRef.current?.focus());
-  }, [handoff]);
+  });
 
   const parsed = useMemo(() => parseUrls(text), [text]);
   const urls = useMemo(() => validUrls(parsed), [parsed]);
@@ -121,24 +117,8 @@ export default function DownloaderView(_props: ToolViewProps) {
   const canSubmit = !!options && urls.length > 0 && !listError && !blockReason && Object.keys(trimErrors).length === 0;
 
   return (
+    <ClickInHost className={styles.host}>
     <div className={styles.root}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Downloader</h1>
-          <p className={styles.tagline}>Save audio or video from links.</p>
-        </div>
-        {destination && (
-          <button
-            type="button"
-            className={styles.destination}
-            data-tip="Open the folder where finished downloads are saved"
-            onClick={() => void LibraryService.OpenLibraryFolder("Downloads").catch((e: unknown) => toast({ title: toAppError(e).message, tone: "danger" }))}
-          >
-            <PathText path={destination} />
-          </button>
-        )}
-      </header>
-
       <DepsBanner />
 
       <UrlInput ref={inputRef} value={text} onChange={onText} parsed={parsed} serverErrors={serverUrlErrors} listError={listError} />
@@ -162,6 +142,16 @@ export default function DownloaderView(_props: ToolViewProps) {
         >
           {urls.length > 0 ? `Download ${urls.length}` : "Download"}
         </Button>
+        {destination && (
+          <Button
+            variant="ghost"
+            icon="folder-open"
+            data-tip={`Open the folder where finished downloads are saved (${destination})`}
+            onClick={() => void LibraryService.OpenLibraryFolder("Downloads").catch((e: unknown) => toast({ title: toAppError(e).message, tone: "danger" }))}
+          >
+            Downloads folder
+          </Button>
+        )}
         {blockReason && (
           <p className={styles.reason} data-tip="Why downloading is unavailable">
             {blockReason}
@@ -171,5 +161,6 @@ export default function DownloaderView(_props: ToolViewProps) {
 
       <RecentDownloads />
     </div>
+    </ClickInHost>
   );
 }

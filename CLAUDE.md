@@ -94,6 +94,9 @@ core/pdfium shared PDF page renderer (go-pdfium WebAssembly, no FS mounts)
 core/imaging  pure-Go image sizes + scaled previews (jpg/png/gif/webp/bmp/tiff; no HEIC)
 core/media ffprobe probing, keyframes, webview playability, FFmpeg progress, ASS writer, fonts, preview copies
 modules/   one folder per module (downloader, placeholders, …)
+frontend/src/editor/  the multitrack Video Editor core; tools/edit-studio is the music layer on it (Phase 10)
+frontend/src/blocks/  shared building blocks several tools compose (visual designer, Song Map, source grid); never import a tool (Phase 11)
+frontend/src/workspace/  defineWorkspace: store-backed panels + preview parts + rail/bars/studio layout for workspace tools (Phase 11)
 sidecar/   Python "AI engine" (stems, BPM/key, MIDI, transcription, background removal, CPU upscaling, HEIC decoding) over stdio JSON lines
 ```
 
@@ -259,6 +262,29 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
   - **Generated clips** (kinds `text`, `visual`) register with `viz/edit/generated.ts` and draw a full-frame premultiplied picture; the engine treats it like a photo.
   - **Track mattes:** `Track.Matte` makes the track above the matte. That track isn't drawn by itself, so titles go on their own track.
   - **Blend modes** beyond normal/add/screen/multiply use `BLEND_FS`.
+
+## Composable tools and pop-outs (Phase 10)
+
+- **Baselines and variants.** `Descriptor.Base` names the tool a variant is built on (Edit Studio → `video-studio`, Subtitles → `transcribe`); `Descriptor.Parts` lists the tools it's made of. The sidebar nests variants under their base; the top bar's `CompositionBar` shows "Built on" / "Variants" / "Uses" chips.
+- **The editor** lives in `frontend/src/editor/` and is the **Video Editor** (`video-studio`, works without a song). **Edit Studio** is `editor/` + the music layer in `tools/edit-studio/`, plugged in through `EditorProfile` (`editor/profile.ts`). **Nothing in `src/editor/` imports `src/tools/`** (a test enforces it); add music features as profile slots. Both tools share one `useEditStudio` store and one document kind (`edit`). The old sequence editor is `video-editor` ("Sequence Editor", hidden; Post Builder's video slides).
+- **Pop-outs:** any tool (`popOutTool`) or part (`popOutPart`, `<PartFrame>`) can open in its own window (`lib/windows.ts`, `DesktopService.PopOut`). Windows talk only through `DesktopService.Relay` → `windows:relay` (no sockets). Only the main window mounts `RenderHost`, shows job toasts, handles `app:navigate` and persists `useUI`. Drops carry `window` (the pop-out key, `""` = main) and only that window routes them.
+- **Store bridge** (`state/bridge.ts`): a host window mirrors picked store values to replica windows and runs the actions they forward. Bridged values must be JSON-serialisable; load heavy data (analyses) locally in the replica.
+- Tools register `useBeforePopOut(moduleId, flush)` (`lib/popout.ts`) so a pop-out never loses unsaved work. Tools of one family (base + variants) are popped out together because they share a store.
+- **Minimal surfaces (SPEC §7b, §13):** a tool's top level is its input, one or two primary settings, the preview/result and the primary action. Everything else is a `ClickIn` (`components/ClickIn.tsx`; the tool root is a `ClickInHost`) with a one-line summary of its state. Bars never wrap (measure with `useElementSize`, overflow to "More…"), rails never scroll, show file names not paths, never repeat the shell's title. File tools put secondary options in the kit's `advanced` slot.
+- **Editor layout:** `editor/EditorShell.tsx` (header, `Rail`, preview in a `PartFrame`, one-line `selection/` bar, tracks). Constituent surfaces are `EditorPanel`s (`editor/panels.ts`, registered in `editor/panelDefs.tsx` and `tools/edit-studio/panels.tsx`) and take no props. Pop-out parts come from `editor/editorParts.tsx` (`<moduleId>.preview`, `<moduleId>.panel`), registered via `tools/*/parts.ts` in `parts/index.ts`.
+- **Opening another tool with inputs:** `openTool(moduleId, inputs, extra, { window })` / `openToolItems(...)` in `lib/openTool.ts` — never call `handOff` directly for a new hand-off.
+- **Icons:** add any new lucide icon to `components/Icon.tsx`; `components/iconNames.test.ts` fails on unregistered names.
+- **Dev handles for QA:** `window.__ui` and `window.__edit` (dev builds only).
+
+## Composable everything (Phase 11)
+
+- **Tools never import each other.** Shared pieces live in `blocks/` (never import a tool); a variant may import its base; composition roots (`tools/index.ts`, `parts/index.ts`, `shell/`, `views/`, `pipelines/`) may import tools. `src/architecture.test.ts` enforces it. Cross-tool actions go through `lib/toolActions.ts` (register in `tools/index.ts`); tool views are looked up with `getToolView(id)`.
+- **Constituents open inside their host**: `<ToolClickIn host module inputs onUse useLabel />` (components) renders the constituent's own view in a drawer and pops it out with the same handoff; results return through `onUse` (also from the popped-out window, over the `embed` relay channel). Tool views take hand-offs only through `useToolHandoff(moduleId, cb)` (`lib/embed.ts`), never `useUI().takeHandoff` directly, and check `useEmbed()` to render compactly. Hosts report what each part would get with `useCompositionInputs(host, {...})` so the CompositionBar's "Uses" chips open the part inside the host.
+- **Workspaces** (`src/workspace/`): a workspace tool keeps its document in a zustand store and calls `defineWorkspace({moduleId, store, bridge, isOpen, panels, preview, useReplica})` in `tools/<id>/workspace.ts(x)` (auto-discovered by `parts/index.ts`); its view calls `ws.useHost()` and lays out with `StudioLayout`, `WorkspaceRail`, `WorkspacePanel`, `OneLineBar`, `WorkspacePreviewFrame`. Panels take no props; replicas (`ws.isReplica()`) never save or submit jobs; bitmaps/analyses load locally in `useReplica`.
+- **Every result row can be sent on**: the kit's `FileActions` offers Send to (tools that accept the file, also in a new window) and Use when embedded.
+- **Click-ins inside a drawer stack over it** (their own width); `useClickIn()` inside a drawer addresses the drawer's own host. Panels that pick files or submit jobs are `poppable: false`.
+- **Big local images in an `<img>`**: use `wholeImageUrl(path)` (`lib/wholeImage.ts`), never a bare media URL (media responses stop at 4 MiB and `<img>` never asks for the rest); `FilesService.ImageThumb` for previews.
+- **One-time window state** (a tool window's start-up handoff, a parked session) must survive React StrictMode's double effects in dev: take it once per page, not once per effect run.
 
 ## Conventions
 

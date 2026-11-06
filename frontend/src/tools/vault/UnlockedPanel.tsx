@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
+  ClickIn,
   ConfirmDialog,
   DropZone,
   EmptyState,
@@ -13,10 +14,11 @@ import {
   toast,
 } from "@/components";
 import { FilesService, VaultService, type VaultEntry, type VaultState } from "@/lib/api";
+import { useToolHandoff } from "@/lib/embed";
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { isActive, useOrderedJobs } from "@/state/jobs";
-import { useUI } from "@/state/ui";
+import { useClickIn } from "@/components/ClickIn";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import { formatLockIn, useNow } from "./useVaultState";
 import styles from "./vault.module.css";
@@ -151,12 +153,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
   };
 
   // Files dropped onto the Vault while it is unlocked.
-  const handoff = useUI((s) => s.handoff);
-  useEffect(() => {
-    if (handoff?.moduleId !== "vault") return;
-    const h = useUI.getState().takeHandoff("vault");
-    if (h) void addPaths(h.inputs);
-  }, [handoff, addPaths]);
+  useToolHandoff("vault", (h) => void addPaths(h.inputs));
 
   const act = async (fn: () => Promise<unknown>, done?: string) => {
     try {
@@ -214,6 +211,8 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
     setDialog({ kind: "move", ids });
   };
 
+  const clickIn = useClickIn();
+  const folderLabel = folder === ALL ? "All files" : folder === ROOT ? "Unfiled" : folder;
   const deleteCount = dialog?.kind === "delete" ? dialog.ids.length : 0;
 
   return (
@@ -223,6 +222,34 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
           <Icon name="lock" size={16} className={styles.statusIcon} />
           <span aria-live="off">{lockIn ? `Unlocked · locks in ${lockIn}` : "Unlocked"}</span>
         </div>
+        <ClickIn icon="folder" title="Folders" summary={folderLabel} tip="Choose which vault folder to show, or make a new one" className={styles.foldersRow} width={300}>
+          <nav className={styles.folders} aria-label="Folders">
+            {[
+              { id: ALL, label: "All files", icon: "archive" },
+              { id: ROOT, label: "Unfiled", icon: "folder" },
+              ...allFolders.map((f) => ({ id: f, label: f, icon: "folder" })),
+            ].map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={`${styles.folder} ${folder === f.id ? styles.folderActive : ""}`}
+                aria-current={folder === f.id ? "page" : undefined}
+                data-tip={f.id === ALL ? "Show every file in the vault" : f.id === ROOT ? "Files not in any folder" : `Show the files in ${f.label}`}
+                onClick={() => {
+                  setFolder(f.id);
+                  setSelected(new Set());
+                  clickIn.close();
+                }}
+              >
+                <Icon name={f.icon} size={14} />
+                <span className={styles.folderName}>{f.label}</span>
+              </button>
+            ))}
+            <Button size="sm" variant="ghost" icon="folder-plus" data-tip="Make a folder to organise vault files; it appears once you move a file into it" onClick={() => { setText(""); clickIn.close(); setFolderDialog(true); }}>
+              New folder
+            </Button>
+          </nav>
+        </ClickIn>
         <Button variant="secondary" icon="lock" data-tip="Lock now: forget the key from memory and delete any opened temporary copies" onClick={() => void VaultService.Lock().catch(fail)}>
           Lock
         </Button>
@@ -232,32 +259,6 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
       </div>
 
       <div className={styles.body}>
-        <nav className={styles.folders} aria-label="Folders">
-          {[
-            { id: ALL, label: "All files", icon: "archive" },
-            { id: ROOT, label: "Unfiled", icon: "folder" },
-            ...allFolders.map((f) => ({ id: f, label: f, icon: "folder" })),
-          ].map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              className={`${styles.folder} ${folder === f.id ? styles.folderActive : ""}`}
-              aria-current={folder === f.id ? "page" : undefined}
-              data-tip={f.id === ALL ? "Show every file in the vault" : f.id === ROOT ? "Files not in any folder" : `Show the files in ${f.label}`}
-              onClick={() => {
-                setFolder(f.id);
-                setSelected(new Set());
-              }}
-            >
-              <Icon name={f.icon} size={14} />
-              <span className={styles.folderName}>{f.label}</span>
-            </button>
-          ))}
-          <Button size="sm" variant="ghost" icon="folder-plus" data-tip="Make a folder to organise vault files; it appears once you move a file into it" onClick={() => { setText(""); setFolderDialog(true); }}>
-            New folder
-          </Button>
-        </nav>
-
         <div className={styles.main}>
           <div className={styles.toolbar}>
             <TextField
@@ -273,13 +274,13 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
             {selected.size > 0 && (
               <>
                 <span className={styles.selection} data-tip="Files ticked in the list">{selected.size} selected</span>
-                <Button size="sm" variant="secondary" icon="arrow-down-to-line" data-tip="Decrypt copies of the selected files into a folder you choose" onClick={() => exportIds(selectedIds)}>
+                <Button size="sm" variant="secondary" icon="arrow-down-to-line" collapsible data-tip="Decrypt copies of the selected files into a folder you choose" onClick={() => exportIds(selectedIds)}>
                   Export selected
                 </Button>
-                <Button size="sm" variant="secondary" data-tip="Move the selected files to another vault folder" onClick={() => openMove(selectedIds)}>
+                <Button size="sm" variant="secondary" icon="folder-input" collapsible data-tip="Move the selected files to another vault folder" onClick={() => openMove(selectedIds)}>
                   Move selected…
                 </Button>
-                <Button size="sm" variant="danger" icon="trash-2" data-tip="Permanently delete the selected files from the vault" onClick={() => setDialog({ kind: "delete", ids: selectedIds })}>
+                <Button size="sm" variant="danger" icon="trash-2" collapsible data-tip="Permanently delete the selected files from the vault" onClick={() => setDialog({ kind: "delete", ids: selectedIds })}>
                   Delete selected
                 </Button>
               </>

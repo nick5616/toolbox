@@ -1,3 +1,6 @@
+import { useMemo } from "react";
+import { popOutTool } from "@/lib/windows";
+import { isReady, useModules } from "@/state/modules";
 import { ClipboardService, LibraryService, PdfAction, Theme, VaultService } from "@/lib/api";
 import { usePdfIntent } from "@/tools/pdf/intent";
 import { useCommands, type Command } from "@/lib/commands";
@@ -59,7 +62,23 @@ export function useBuiltinCommands(): void {
   // --- pipelines ---
   const pipelineEntries = usePipelines((s) => s.entries);
   // --- end pipelines ---
+  const modules = useModules((s) => s.list);
+  const popOutCommands = useMemo<Command[]>(
+    () =>
+      modules
+        .filter((m) => !m.hidden && isReady(m))
+        .map((m) => ({
+          id: `window.pop-out.${m.id}`,
+          title: `Open ${m.name} in its own window`,
+          section: "Actions",
+          icon: "external-link",
+          keywords: ["pop out", "window", "detach", m.name],
+          run: guard(() => popOutTool(m.id, { title: `${m.name} — Toolbox` })),
+        })),
+    [modules],
+  );
   const cmds: Command[] = [
+    ...popOutCommands,
     {
       id: "shell.toggle-tray",
       title: "Toggle job tray",

@@ -116,7 +116,7 @@ describe("ExifView", () => {
   it("enqueues remove location and remove all with options", async () => {
     enqueue.mockResolvedValue([{}]);
     const user = await load();
-    await user.click(screen.getByRole("button", { name: "Remove location" }));
+    await user.click(screen.getByRole("button", { name: /Remove location from 1 file/ }));
     await waitFor(() =>
       expect(enqueue).toHaveBeenCalledWith(["/a.jpg"], { action: "strip-location", keepOrientation: true, fields: {} }),
     );
@@ -125,7 +125,9 @@ describe("ExifView", () => {
     enqueue.mockClear();
     await user.click(screen.getByRole("button", { name: "Add files…" }));
     await screen.findByRole("heading", { name: "a.jpg" });
-    await user.click(screen.getByRole("switch", { name: "Keep orientation & colour profile" }));
+    expect(screen.getByRole("button", { name: /Advanced/ }).textContent).toContain("keeps orientation");
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
+    await user.click(await screen.findByRole("switch", { name: "Keep orientation & colour profile" }));
     await user.click(screen.getByRole("button", { name: "Remove all metadata" }));
     await waitFor(() =>
       expect(enqueue).toHaveBeenCalledWith(["/a.jpg"], { action: "strip-all", keepOrientation: false, fields: {} }),

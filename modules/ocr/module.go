@@ -50,8 +50,10 @@ func (m *Module) Descriptor() core.Descriptor {
 		Description: "Extract text from images and make scanned PDFs searchable, offline.",
 		Status:      core.StatusReady,
 		Accepts:     core.Accepts{Extensions: Accepts()},
-		Requires:    []string{sidecar.DepID},
-		Order:       195, OutputSubdir: "OCR",
+		// Phase 11: recognised text opens in Local Chat inside this tool.
+		Parts:    []string{"llm-chat"},
+		Requires: []string{sidecar.DepID},
+		Order:    195, OutputSubdir: "OCR",
 		SplitInputs: true, MaxConcurrent: 1, MaxInputs: 200,
 	}
 }

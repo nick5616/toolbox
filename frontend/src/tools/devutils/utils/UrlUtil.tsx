@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Button, IconButton, TextArea, TextField } from "@/components";
 import { OutputBox, useDebounced } from "./shared";
 import { buildUrl, decodeComponent, encodeComponent, parseUrl, type QueryParam, type UrlParts } from "./url.logic";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 const PART_FIELDS: { key: keyof Omit<UrlParts, "params">; label: string }[] = [
@@ -15,12 +16,12 @@ const PART_FIELDS: { key: keyof Omit<UrlParts, "params">; label: string }[] = [
 ];
 
 export default function UrlUtil() {
-  const [text, setText] = useState("");
+  const [text, setText] = useUtilState("url", "text", "");
   const debouncedText = useDebounced(text);
   const encoded = useMemo(() => encodeComponent(debouncedText), [debouncedText]);
   const decoded = useMemo(() => decodeComponent(debouncedText), [debouncedText]);
 
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useUtilState("url", "url", "");
   const debouncedUrl = useDebounced(url);
   const parsed = useMemo(() => parseUrl(debouncedUrl), [debouncedUrl]);
   // Edits to the parts table override the parsed URL until the URL text changes.

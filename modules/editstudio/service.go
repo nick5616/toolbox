@@ -212,7 +212,7 @@ func (s *Service) submit(o Options) (core.Job, error) {
 	if err != nil {
 		return core.Job{}, fmt.Errorf("marshal edit studio options: %w", err)
 	}
-	jobs, err := s.jobs.Submit(context.Background(), ModuleID, nil, string(raw))
+	jobs, err := s.jobs.Submit(context.Background(), s.moduleForOptions(context.Background(), o), nil, string(raw))
 	if err != nil {
 		return core.Job{}, err
 	}
@@ -249,9 +249,13 @@ func (s *Service) preparing(fps int) map[string]bool {
 	if s.jobs == nil {
 		return busy
 	}
-	jobs, err := s.jobs.List(context.Background(), core.JobFilter{ModuleID: ModuleID, Statuses: []core.JobStatus{core.JobQueued, core.JobRunning}, Limit: 500})
-	if err != nil {
-		return busy
+	var jobs []core.Job
+	for _, id := range []string{ModuleID, VideoModuleID} { // plain videos are filed under the Video Editor
+		part, err := s.jobs.List(context.Background(), core.JobFilter{ModuleID: id, Statuses: []core.JobStatus{core.JobQueued, core.JobRunning}, Limit: 500})
+		if err != nil {
+			return busy
+		}
+		jobs = append(jobs, part...)
 	}
 	for _, j := range jobs {
 		var o Options

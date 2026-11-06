@@ -120,6 +120,10 @@ describe("ObjectEraserView", () => {
   it("opens the photo with tools, model hint and a disabled Erase", async () => {
     await loaded();
     expect(screen.getByLabelText("Painting tools")).toBeTruthy();
+    // The model is a click-in whose summary carries the state; the details are inside.
+    const row = await screen.findByRole("button", { name: /^Model/ });
+    expect(row.textContent).toContain("Best · downloads 208 MB");
+    await userEvent.setup().click(row);
     expect(screen.getByText(/Best · 208 MB · Fast · 28 MB/)).toBeTruthy();
     expect(await screen.findByText(/downloads 208 MB on first use/)).toBeTruthy();
     const erase = screen.getByRole("button", { name: /^Erase/ }) as HTMLButtonElement;
@@ -151,7 +155,10 @@ describe("ObjectEraserView", () => {
   it("sends the mask PNG and the chosen model to Erase", async () => {
     h.erase.mockResolvedValue({ id: "j1" });
     const user = await loaded();
+    expect(screen.queryByRole("radio", { name: "Fast" })).toBeNull();
+    await user.click(await screen.findByRole("button", { name: /^Model/ }));
     await user.click(screen.getByRole("radio", { name: "Fast" }));
+    expect(screen.getByRole("button", { name: /^Model/ }).textContent).toContain("Fast · ready");
     paint();
     await user.keyboard("{Enter}");
     await waitFor(() => expect(h.erase).toHaveBeenCalledTimes(1));

@@ -20,6 +20,7 @@ vi.mock("@/lib/api", async (orig) => {
     },
     FilesService: {
       Pick: async () => ["/a.png"],
+      ReadText: async () => "Hello Toolbox OCR (full)",
       Stat: async (p: string[]) =>
         p.map((path) => ({ path, name: path, sizeBytes: 10, exists: true, isDir: false, kind: "image" })),
     },
@@ -28,7 +29,10 @@ vi.mock("@/lib/api", async (orig) => {
   };
 });
 
-import { ErrorCode, JobStatus } from "@/lib/api";
+import { ErrorCode, JobStatus, ModuleStatus, type Descriptor } from "@/lib/api";
+import { useEmbed } from "@/lib/embed";
+import { registerToolViews } from "@/lib/toolActions";
+import { useModules } from "@/state/modules";
 import { useJobs } from "@/state/jobs";
 import OcrView from "./OcrView";
 import { DEFAULT_OCR_OPTIONS, sanitizeOcrOptions } from "./options";
@@ -60,8 +64,10 @@ describe("OcrView", () => {
     expect(screen.queryByText("downloads ~13 MB on first use")).toBeNull();
     await user.selectOptions(screen.getByLabelText("Language"), "cyrillic");
     expect(screen.getByText("downloads ~13 MB on first use")).toBeTruthy();
-    await user.click(screen.getByRole("radio", { name: "Both" }));
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
+    await user.click(await screen.findByRole("radio", { name: "Both" }));
     await user.click(screen.getByRole("switch", { name: "Skip pages that already have text" }));
+    expect(screen.getByRole("button", { name: /Advanced/ }).textContent).toContain("PDF + text");
 
     await user.click(screen.getByRole("button", { name: "Add files…" }));
     const run = await screen.findByRole("button", { name: /Read text from/ });
@@ -110,6 +116,17 @@ describe("OcrView", () => {
     render(<OcrView moduleId="ocr" />);
     expect(await screen.findByText(/2 lines · 17 characters · 93% confidence/)).toBeTruthy();
     expect(screen.getByLabelText("Text preview").textContent).toBe("Hello\nToolbox OCR");
+    // Ask Local Chat: the chat gets the recognised text and prompts.
+    function FakeChat() {
+      const t = useEmbed()?.handoff.text;
+      return <p>chat: {t?.title} | {t?.body} | {t?.prompts?.join(",")}</p>;
+    }
+    registerToolViews({ "llm-chat": FakeChat });
+    const d = (id: string, name: string) => ({ id, name, icon: "box", status: ModuleStatus.StatusReady, accepts: { extensions: [], urls: false, any: false } }) as unknown as Descriptor;
+    useModules.getState().setAll([d("llm-chat", "Local Chat"), d("ocr", "OCR")]);
+    await user.click(screen.getByRole("button", { name: /Ask Local Chat/ }));
+    expect((await screen.findByText(/^chat:/)).textContent).toBe("chat: Text of a.png | Hello Toolbox OCR (full) | Summarise,Extract a table,Fix typos");
+    await user.keyboard("{Escape}");
     await user.click(screen.getByRole("button", { name: "Copy text" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("Hello\nToolbox OCR"));
     await user.click(screen.getByRole("button", { name: "Save as…" }));

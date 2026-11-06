@@ -31,7 +31,26 @@
 
 .controls {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.launcher {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 260px;
+}
+
+.framing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.framingRow {
+  display: flex;
   align-items: center;
   gap: var(--space-2);
 }
@@ -40,9 +59,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-width: 220px;
-  flex: 1 1 220px;
-  max-width: 360px;
 }
 
 .label {
@@ -50,10 +66,6 @@
   font-size: var(--text-sm);
 }
 
-.projectName {
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
-}
 
 .clip {
   display: flex;

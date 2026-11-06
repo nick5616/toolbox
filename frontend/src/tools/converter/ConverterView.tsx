@@ -3,7 +3,7 @@ import { EmptyState, Field, Icon, Section, Select, Switch, cx } from "@/componen
 import { ConverterService, MaxHeight, OutputKind, type PresetInfo } from "@/lib/api";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { useRecentOutputs } from "@/state/library";
-import { FileToolLayout, runLabel, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -54,6 +54,7 @@ export default function ConverterView({ moduleId }: ToolViewProps) {
 
   const preset = presets.find((p) => p.id === opts.preset);
   const hasHeight = preset?.kind === OutputKind.KindVideo || preset?.kind === OutputKind.KindImage;
+  const heightLabel = HEIGHTS.find((h) => h.value === opts.maxHeight)?.label ?? "";
   const kindErrors = useMemo(() => incompatibleInputs(inputs.files, preset), [inputs.files, preset]);
   const inputErrors = useMemo(() => ({ ...submitErrors, ...kindErrors }), [submitErrors, kindErrors]);
   const compatible = inputs.files.filter((f) => !kindErrors[f.path]);
@@ -78,38 +79,39 @@ export default function ConverterView({ moduleId }: ToolViewProps) {
       running={running}
       inputErrors={inputErrors}
       runDisabledReason={allBad ? `No selected file fits ${preset?.label ?? "this preset"}` : undefined}
-      options={
-        <Section label="Options" tip="Choose the output format and quality">
-          <div className={styles.stack}>
-            <Field label="Preset" hint={presetHint(preset)}>
+      primary={
+        <Field label="Preset" hint={presetHint(preset)}>
+          {(c) => (
+            <Select
+              id={c.id}
+              aria-describedby={c["aria-describedby"]}
+              data-tip={preset ? `${preset.label}: ${presetHint(preset)}` : "Pick the kind of file to produce; each preset sets format and quality for you"}
+              value={opts.preset}
+              options={presetSelectOptions(presets)}
+              onChange={(id) => setOpts((o) => ({ ...o, preset: id }))}
+            />
+          )}
+        </Field>
+      }
+      advancedSummary={summarize(hasHeight && (heightLabel === "Keep original" ? "Original size" : `Up to ${heightLabel}`), opts.keepMetadata ? "keep metadata" : "strip metadata")}
+      advanced={
+        <div className={styles.stack}>
+          {hasHeight && (
+            <Field label="Max height">
               {(c) => (
                 <Select
                   id={c.id}
-                  aria-describedby={c["aria-describedby"]}
-                  data-tip={preset ? `${preset.label}: ${presetHint(preset)}` : "Pick the kind of file to produce; each preset sets format and quality for you"}
-                  value={opts.preset}
-                  options={presetSelectOptions(presets)}
-                  onChange={(id) => setOpts((o) => ({ ...o, preset: id }))}
-                />
+                  value={opts.maxHeight}
+                  options={HEIGHTS}
+                  data-tip="Shrink anything taller than this; smaller sizes make smaller files. Never enlarges"
+                  onChange={(maxHeight) => setOpts((o) => ({ ...o, maxHeight }))} />
               )}
             </Field>
-            {hasHeight && (
-              <Field label="Max height">
-                {(c) => (
-                  <Select
-                    id={c.id}
-                    value={opts.maxHeight}
-                    options={HEIGHTS}
-                    data-tip="Shrink anything taller than this; smaller sizes make smaller files. Never enlarges"
-                    onChange={(maxHeight) => setOpts((o) => ({ ...o, maxHeight }))} />
-                )}
-              </Field>
-            )}
-            <Switch
-              tip="Copy tags, dates and camera info from the original; turn off to strip them for privacy"
-              label="Keep metadata" checked={opts.keepMetadata} onChange={(keepMetadata) => setOpts((o) => ({ ...o, keepMetadata }))} />
-          </div>
-        </Section>
+          )}
+          <Switch
+            tip="Copy tags, dates and camera info from the original; turn off to strip them for privacy"
+            label="Keep metadata" checked={opts.keepMetadata} onChange={(keepMetadata) => setOpts((o) => ({ ...o, keepMetadata }))} />
+        </div>
       }
       results={
         <Section label="Recent conversions" tip="Files this tool converted lately">

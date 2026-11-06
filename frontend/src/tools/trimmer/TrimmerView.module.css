@@ -6,20 +6,25 @@
   min-height: 0;
   padding: var(--space-5);
   overflow: auto;
+  container-type: inline-size;
+}
+
+.host {
+  overflow: hidden;
 }
 
 .header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-start;
   gap: var(--space-3);
+  min-width: 0;
 }
 
-.title {
-  margin: 0;
-  font-size: var(--text-xl);
-  line-height: var(--text-xl-lh);
-  font-weight: 600;
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .fileName {
@@ -232,7 +237,8 @@
   color: var(--fg-subtle);
 }
 
-@media (max-width: 900px) {
+/* Container-driven: the same layout in a 520 px drawer as in a narrow window. */
+@container (max-width: 700px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }

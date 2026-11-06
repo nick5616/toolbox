@@ -1,12 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { AudioFormat, AudioQuality, DownloadMode, MaxResolution, type DownloaderOptions } from "@/lib/api";
-import { mergeOptions } from "./options";
+import { extrasSummary, formatSummary, mergeOptions, trimSummary } from "./options";
 
 const defaults: DownloaderOptions = {
   mode: DownloadMode.ModeAudio, audioFormat: AudioFormat.FormatMP3, audioQuality: AudioQuality.QualityBest,
   maxResolution: MaxResolution.ResBest, trimEnabled: false, trimStart: "", trimEnd: "",
   embedMetadata: true, embedThumbnail: true, playlist: false,
 };
+
+describe("click-in summaries", () => {
+  it("formatSummary", () => {
+    expect(formatSummary({ ...defaults, audioQuality: AudioQuality.Quality320 })).toBe("MP3 · 320k");
+    expect(formatSummary({ ...defaults, audioQuality: AudioQuality.QualityBest })).toBe("MP3 · best");
+    expect(formatSummary({ ...defaults, audioFormat: AudioFormat.FormatFLAC })).toBe("FLAC");
+    expect(formatSummary({ ...defaults, mode: DownloadMode.ModeVideo, maxResolution: MaxResolution.Res720 })).toBe("MP4 · 720p");
+    expect(formatSummary({ ...defaults, mode: DownloadMode.ModeVideo })).toBe("MP4 · best");
+  });
+  it("trimSummary", () => {
+    expect(trimSummary(defaults)).toBe("Whole file");
+    expect(trimSummary({ ...defaults, trimEnabled: true, trimStart: "0:05" })).toBe("0:05 – end");
+  });
+  it("extrasSummary", () => {
+    expect(extrasSummary(defaults)).toBe("metadata · thumbnail");
+    expect(extrasSummary({ ...defaults, audioFormat: AudioFormat.FormatWAV, playlist: true })).toBe("metadata · playlists");
+    expect(extrasSummary({ ...defaults, embedMetadata: false, embedThumbnail: false })).toBe("Nothing embedded");
+  });
+});
 
 describe("mergeOptions", () => {
   it("returns defaults for empty or broken input", () => {

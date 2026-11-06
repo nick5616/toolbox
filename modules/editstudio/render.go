@@ -93,7 +93,7 @@ type interpNeed struct {
 // cut offset) and muted tracks need nothing.
 func collectNeeds(doc EditProject) exportNeeds {
 	var n exportNeeds
-	d := float64(songLen(doc))
+	d := float64(editLen(doc))
 	off := float64(doc.CutOffsetFrames) * 1000 / float64(doc.FPS)
 	seen := map[string]bool{}
 	once := func(key string) bool {
@@ -255,9 +255,15 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, projectID 
 	if err != nil {
 		return err
 	}
-	ref, ok := m.cfg.Analyzer.Lookup(doc.AnalysisKey)
-	if !ok {
-		return core.ValidationError("The song's analysis isn't cached any more. Analyze it again", map[string]string{"analysisKey": "Analyze the song again"})
+	// Without an analysis (a Video Editor project) the plan carries the zero ref
+	// and the worker renders against an empty analysis.
+	var ref viz.AnalysisRef
+	if doc.AnalysisKey != "" {
+		var ok bool
+		ref, ok = m.cfg.Analyzer.Lookup(doc.AnalysisKey)
+		if !ok {
+			return core.ValidationError("The song's analysis isn't cached any more. Analyze it again", map[string]string{"analysisKey": "Analyze the song again"})
+		}
 	}
 	cancelled := func(err error) error {
 		if ctx.Err() != nil {
@@ -279,11 +285,7 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, projectID 
 	if len(pj) > maxProjectJSON {
 		return core.ValidationError("This edit is too large to export", nil)
 	}
-	plan := viz.RenderPlan{
-		Analysis: ref, Width: outW, Height: outH, FPS: doc.FPS,
-		StartMs: doc.Song.StartMs, EndMs: doc.Song.EndMs, Mode: viz.ModeOpaque, Seed: doc.Seed,
-		Edit: &viz.EditPlan{ProjectJSON: string(pj), Streams: streams, Images: images},
-	}
+	plan := newRenderPlan(doc, ref, outW, outH, string(pj), streams, images)
 	enc, err := exportRenderFn(ctx, m.cfg.Broker, job.Scoped(exportSourcesTo, exportRenderTo), plan)
 	if err != nil {
 		return cancelled(err)
@@ -321,7 +323,7 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, projectID 
 	}
 	res := Result{Action: ActionRender, Outputs: []string{dst}, Encoder: enc.Encoder}
 	if wall := exportNowFn().Sub(start).Seconds(); wall > 0 {
-		res.Speed = float64(songLen(doc)) / 1000 / wall
+		res.Speed = float64(editLen(doc)) / 1000 / wall
 	}
 	job.Progress(1, "Saved "+filepath.Base(dst))
 	return job.SetResult(res)
@@ -356,4 +358,18 @@ func exportMove(src, dst string) error {
 	}
 	_ = os.Remove(src)
 	return nil
+}
+
+// newRenderPlan builds the broker's plan: the song's range, or 0..D without a
+// song; ref is the zero AnalysisRef when the edit has no analysis.
+func newRenderPlan(doc EditProject, ref viz.AnalysisRef, w, h int, projectJSON string, streams map[string]viz.EditPlanStream, images map[string]string) viz.RenderPlan {
+	startMs, endMs := int64(0), editLen(doc)
+	if doc.Song != nil {
+		startMs, endMs = doc.Song.StartMs, doc.Song.EndMs
+	}
+	return viz.RenderPlan{
+		Analysis: ref, Width: w, Height: h, FPS: doc.FPS,
+		StartMs: startMs, EndMs: endMs, Mode: viz.ModeOpaque, Seed: doc.Seed,
+		Edit: &viz.EditPlan{ProjectJSON: projectJSON, Streams: streams, Images: images},
+	}
 }

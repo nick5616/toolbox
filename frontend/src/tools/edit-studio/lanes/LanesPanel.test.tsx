@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeProject } from "@/viz/edit/defaults";
 import { buildEditFixture, fixtureProject } from "@/viz/edit/fixture";
-import { useEditStudio } from "../store";
+import { useEditStudio } from "@/editor/store";
 import { LanesPanel } from "./LanesPanel";
 import { SectionBands } from "./SectionBands";
 

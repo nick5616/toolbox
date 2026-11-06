@@ -110,6 +110,9 @@ func (r *Runner) normalize(p *core.Pipeline, others []core.Pipeline) error {
 	if utf8.RuneCountInString(p.Description) > 300 {
 		return fieldErr("description", "The description is too long (300 characters at most)")
 	}
+	if len(p.Layout) > 32<<10 {
+		return fieldErr("layout", "The canvas layout is too large")
+	}
 	if len(p.Steps) < 1 || len(p.Steps) > MaxSteps {
 		return fieldErr("steps", fmt.Sprintf("A pipeline needs 1–%d steps", MaxSteps))
 	}

@@ -35,6 +35,8 @@ vi.mock("@/lib/api", async (orig) => {
 });
 
 import { PdfAction, type Descriptor } from "@/lib/api";
+import { useEmbed } from "@/lib/embed";
+import { registerToolViews } from "@/lib/toolActions";
 import { useToastStore } from "@/components/toast";
 import { normalizeModule, useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
@@ -112,6 +114,8 @@ describe("PdfView", () => {
 
   it("shows live range chips and the file count for split", async () => {
     const user = await open(["/a.pdf"], PdfAction.ActionSplit);
+    expect(screen.getByRole("button", { name: /Options/ }).textContent).toContain("Every 1 page");
+    await user.click(screen.getByRole("button", { name: /Options/ }));
     await user.click(screen.getByRole("radio", { name: "Custom ranges" }));
     await user.type(screen.getByRole("textbox", { name: "Page ranges" }), "1-3, 5, 6-");
     const chips = screen.getByRole("list", { name: "Parsed ranges" });
@@ -163,6 +167,11 @@ describe("PdfView", () => {
     ]);
   });
 
+  it("summarises the per-action options on the click-in row", async () => {
+    await open(["/a.pdf"], PdfAction.ActionPDFToImages);
+    expect(screen.getByRole("button", { name: /Options/ }).textContent).toContain("PNG · 150 dpi · all pages");
+  });
+
   it("requires matching passwords when protecting and never puts them in options", async () => {
     const user = await open(["/a.pdf"], PdfAction.ActionProtect);
     await user.type(screen.getByLabelText("New password"), "secret");
@@ -183,5 +192,17 @@ describe("PdfView", () => {
     usePdfIntent.getState().request(PdfAction.ActionCompress);
     render(<PdfView moduleId="pdf" />);
     await waitFor(() => expect(checked().textContent).toMatch(/Compress PDF/));
+  });
+
+  it("Make searchable opens OCR with the PDFs in the list", async () => {
+    function FakeOcr() {
+      return <p>ocr gets: {useEmbed()?.handoff.inputs.join(",")}</p>;
+    }
+    registerToolViews({ ocr: FakeOcr });
+    const ocr = { ...desc, id: "ocr", name: "OCR", accepts: { extensions: [".pdf"], urls: false } } as unknown as Descriptor;
+    useModules.setState({ byId: { pdf: normalizeModule(desc), ocr: normalizeModule(ocr) } });
+    const user = await open(["/a.pdf", "/b.png"]);
+    await user.click(screen.getByRole("button", { name: /Make searchable/ }));
+    expect(await screen.findByText("ocr gets: /a.pdf")).toBeTruthy();
   });
 });

@@ -194,3 +194,27 @@ export function cropFromWindow(
 ): { x: number; y: number; w: number; h: number } {
   return { x: clamp(cx - win.w / 2, 0, 1 - win.w), y: clamp(cy - win.h / 2, 0, 1 - win.h), w: win.w, h: win.h };
 }
+
+// ---- click-in summaries ----
+
+const fileBase = (p: string): string => p.split(/[\\/]/).pop() ?? p;
+
+/** "5 layers" for the Layers click-in. */
+export function layersSummary(count: number): string {
+  if (count === 0) return "No layers yet";
+  return `${count} ${count === 1 ? "layer" : "layers"}`;
+}
+
+/** What the Properties click-in is about: the selected layer's name, or how many are selected. */
+export function propertiesSummary(selected: readonly ComposerLayer[]): string {
+  if (selected.length === 0) return "Nothing selected";
+  if (selected.length > 1) return `${selected.length} selected`;
+  return selected[0]?.name ?? "";
+}
+
+/** "Colour #ffffff", "Gradient" or "Photo · name" for the Background click-in. */
+export function backgroundSummary(b: Composition["background"]): string {
+  if (b.kind === "gradient") return "Gradient";
+  if (b.kind === "image") return b.image?.path ? `Photo · ${fileBase(b.image.path)}` : "Photo";
+  return `Colour ${b.color}`;
+}

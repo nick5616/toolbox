@@ -28,6 +28,8 @@ type Docs struct {
 	Kind  core.ProjectKind
 	// Summarize fills ProjectInfo.Items/Missing (nil = 0, 0).
 	Summarize Summarize
+	// Flags fills ProjectInfo.Flags (nil = none).
+	Flags func(data string) []string
 }
 
 // Dir is the project's folder (not created).
@@ -51,12 +53,17 @@ func CleanName(name string) string {
 
 // Info builds a listing row.
 func (d *Docs) Info(p core.StoredProject) core.ProjectInfo {
-	info := core.ProjectInfo{ID: p.ID, Kind: p.Kind, Name: p.Name, UpdatedAt: p.UpdatedAt}
+	info := core.ProjectInfo{ID: p.ID, Kind: p.Kind, Name: p.Name, UpdatedAt: p.UpdatedAt, Flags: []string{}}
 	if _, err := os.Stat(d.ThumbPath(p.ID)); err == nil {
 		info.Thumb = d.ThumbPath(p.ID)
 	}
 	if d.Summarize != nil {
 		info.Items, info.Missing = d.Summarize(p.Data)
+	}
+	if d.Flags != nil {
+		if f := d.Flags(p.Data); f != nil {
+			info.Flags = f
+		}
 	}
 	return info
 }

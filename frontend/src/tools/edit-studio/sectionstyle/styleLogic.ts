@@ -10,7 +10,7 @@
 import type { EditClip, EditMoment, EditSourceState } from "@/lib/api";
 import type { Analysis } from "@/viz/analysis";
 import type { NormalProject } from "@/viz/edit/defaults";
-import { clipSourceSpan, newClip, newId, newTrack } from "../doc";
+import { clipSourceSpan, newClip, newId, newTrack } from "@/editor/doc";
 import { parseTransform, serializeEffects, serializeTransform, serializeTransition } from "@/viz/edit/schema";
 import { editLength, type EditPost, type Marker, type MarkerLane } from "@/viz/edit/types";
 import { postDef } from "@/viz/post/registry";
@@ -18,7 +18,7 @@ import type { TransitionKind } from "@/viz/types";
 import { autofill, validateShape } from "../autofill/autofill";
 import type { AutofillSource, Recipe, RecipeRule } from "../autofill/types";
 import { HIT_LANES, readHit, writeHit } from "../beatsync/hits";
-import { FX_STACKS } from "../inspector/FxStacks";
+import { FX_STACKS } from "@/editor/inspector/FxStacks";
 import { withVelocity } from "../beatsync/applyVelocity";
 import type { VelocityShape } from "../beatsync/velocityRamp";
 

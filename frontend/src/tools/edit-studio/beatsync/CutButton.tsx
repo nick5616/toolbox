@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Button, SegmentedControl, Select, toast } from "@/components";
-import { useEditStudio, useMarkers, useProject } from "../store";
+import { useEditStudio, useMarkers, useProject } from "@/editor/store";
 import { cutToBeat, readySources, type CutOptions } from "./cutLogic";
 import { HIT_LANES, HIT_LANE_TIPS } from "./hits";
 import styles from "./beatsync.module.css";

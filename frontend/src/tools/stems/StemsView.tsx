@@ -3,8 +3,9 @@ import { Badge, Button, EmptyState, Icon, Section, SegmentedControl, cx, toast }
 import { JobStatus, LibraryService, StemsFormat, StemsService, type PresetInfo, type StemsPreset } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
-import { useOrderedJobs, type JobView } from "@/state/jobs";
-import { FileToolLayout, runLabel, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { type JobView } from "@/state/jobs";
+import { useToolJobs } from "@/tools/_kit/session";
+import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -136,7 +137,7 @@ export default function StemsView({ moduleId }: ToolViewProps) {
   const [presets, setPresets] = useState<PresetInfo[]>([]);
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
   const done = useMemo(
     () => jobs.filter((j) => j.status === JobStatus.JobDone && parseStemsResult(j.resultJson)).slice(0, MAX_GROUPS),
     [jobs],
@@ -172,25 +173,28 @@ export default function StemsView({ moduleId }: ToolViewProps) {
       onRun={onRun}
       running={running}
       inputErrors={inputErrors}
-      options={
-        <Section label="Options" tip="Pick how many stems to make and the file format">
-          <div className={styles.options}>
-            <PresetCards presets={presets} value={opts.preset} onChange={(id) => setOpts((o) => ({ ...o, preset: id as StemsPreset }))} />
-            <SegmentedControl
-              aria-label="Format"
-              value={opts.format}
-              onChange={(format) => setOpts((o) => ({ ...o, format }))}
-              options={[
-                { value: StemsFormat.FormatWAV, label: "wav", tip: "Uncompressed and lossless; biggest files, best for editing in a DAW" },
-                { value: StemsFormat.FormatFLAC, label: "flac", tip: "Lossless but compressed; about half the size of WAV" },
-                { value: StemsFormat.FormatMP3, label: "mp3", tip: "Small lossy files; fine for listening or sharing, not for further mixing" },
-              ]}
-            />
-            <p className={styles.hint} data-tip="Rough output size for each format, per stem">
-              {STEMS_SIZE_HINT}
-            </p>
-          </div>
-        </Section>
+      primary={<PresetCards presets={presets} value={opts.preset} onChange={(id) => setOpts((o) => ({ ...o, preset: id as StemsPreset }))} />}
+      advancedSummary={summarize(opts.format.toUpperCase(), opts.format === StemsFormat.FormatMP3 ? "small lossy files" : "lossless")}
+      advanced={
+        <div className={styles.options}>
+          <Section label="File format" tip="The format of every stem file">
+            <div className={styles.options}>
+              <SegmentedControl
+                aria-label="Format"
+                value={opts.format}
+                onChange={(format) => setOpts((o) => ({ ...o, format }))}
+                options={[
+                  { value: StemsFormat.FormatWAV, label: "wav", tip: "Uncompressed and lossless; biggest files, best for editing in a DAW" },
+                  { value: StemsFormat.FormatFLAC, label: "flac", tip: "Lossless but compressed; about half the size of WAV" },
+                  { value: StemsFormat.FormatMP3, label: "mp3", tip: "Small lossy files; fine for listening or sharing, not for further mixing" },
+                ]}
+              />
+              <p className={styles.hint} data-tip="Rough output size for each format, per stem">
+                {STEMS_SIZE_HINT}
+              </p>
+            </div>
+          </Section>
+        </div>
       }
       results={
         <Section label="Results" tip="Finished tracks; each shows its stems with open and reveal actions">

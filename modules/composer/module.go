@@ -64,6 +64,7 @@ func (m *Module) Descriptor() core.Descriptor {
 		Accepts:      core.Accepts{Extensions: slices.Clone(media.ImageExtensions())},
 		Recommends:   []string{sidecar.DepID},
 		OutputSubdir: "Compositions", Order: 12, JobLess: true, NotAStep: true,
+		Parts: []string{"bg-remover", "object-eraser", "upscaler"},
 	}
 }
 

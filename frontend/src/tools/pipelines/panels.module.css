@@ -1,0 +1,47 @@
+.pad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  min-width: 0;
+}
+
+.watch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.watchMessage {
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--text-sm);
+}
+
+.muted {
+  margin: 0;
+  color: var(--fg-subtle);
+  font-size: var(--text-sm);
+}
+
+.history {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.stepBody {
+  padding: var(--space-3);
+  min-width: 0;
+}

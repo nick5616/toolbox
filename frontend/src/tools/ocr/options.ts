@@ -1,6 +1,6 @@
 import { OcrImageOutput, OcrLanguage, OcrPdfOutput, type OcrOptions } from "@/lib/api";
 import type { JobView } from "@/state/jobs";
-import { basename, num, parseJson, str } from "../image/common";
+import { basename, num, parseJson, str } from "@/tools/_kit/image/common";
 
 /** Mirrors Go's DefaultOptions() (modules/ocr). */
 export const DEFAULT_OCR_OPTIONS: OcrOptions = {

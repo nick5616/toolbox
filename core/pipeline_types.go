@@ -10,8 +10,12 @@ type Pipeline struct {
 	TemplateID  string         `json:"templateId"`  // the template it came from ("" = blank)
 	Steps       []PipelineStep `json:"steps"`       // 1–30
 	Watch       WatchConfig    `json:"watch"`
-	CreatedAt   int64          `json:"createdAt"`
-	UpdatedAt   int64          `json:"updatedAt"`
+	// Layout is the node editor's canvas state (Phase 10): JSON
+	// {"v":1,"nodes":{"<stepId>|input":{"x":0,"y":0}},"view":{"x":0,"y":0,"zoom":1}}.
+	// Opaque to the runner; ≤ 32 KiB; "" = auto layout.
+	Layout    string `json:"layout"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
 }
 
 // PipelineStep is one step of a pipeline.

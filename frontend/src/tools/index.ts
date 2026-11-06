@@ -1,9 +1,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
+import { registerToolActions, registerToolViews, type ToolViewProps } from "@/lib/toolActions";
 
-/** Props every tool view receives. */
-export interface ToolViewProps {
-  moduleId: string;
-}
+export type { ToolViewProps };
 
 /**
  * Module id → its UI. Modules without an entry render the ComingSoon view.
@@ -34,10 +32,18 @@ export const toolViews: Record<string, LazyExoticComponent<ComponentType<ToolVie
   visualizer: lazy(() => import("./visualizer/VisualizerView")),
   pipelines: lazy(() => import("./pipelines/PipelinesView")),
   "photo-composer": lazy(() => import("./photo-composer/PhotoComposerView")),
-  "video-editor": lazy(() => import("./video-editor/VideoEditorView")),
+  "video-editor": lazy(() => import("./video-editor/VideoEditorView")), // the Sequence Editor (Post Builder's video slides)
+  "video-studio": lazy(() => import("./video-studio/VideoEditorView")), // the Video Editor (multitrack); Edit Studio is composed on it
   "edit-studio": lazy(() => import("./edit-studio/EditStudioView")),
   "post-builder": lazy(() => import("./post-builder/PostBuilderView")),
 };
+
+// The composition root (Phase 11, SPEC §3.4): code outside a tool reaches tool
+// views and cross-tool actions through lib/toolActions, never by importing them.
+registerToolViews(toolViews);
+registerToolActions({
+  addToPost: (path) => import("./post-builder/AddToPostDialog").then((m) => m.openAddToPostDialog(path)),
+});
 
 /**
  * Views a popup window can show (`/?window=popup&view=<id>`), rendered by

@@ -4,7 +4,7 @@ import type { PostIssue, PostSlide, ProjectInfo } from "@/lib/api";
 import { FramedMedia } from "./FramedMedia";
 import { indexAtY, isPending, worstLevel } from "./logic";
 import { stripDrop, type StripDrop } from "./pool";
-import { useSourceDropTarget, type SourceDropInfo } from "./sourceDrag";
+import { useSourceDropTarget, type SourceDropInfo } from "@/blocks/sources/sourceDrag";
 import { useSlideVisual } from "./useSlideVisual";
 import styles from "./SlideStrip.module.css";
 

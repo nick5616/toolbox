@@ -7,6 +7,8 @@ import {
   aspectRatio,
   buildOptions,
   estimateBytes,
+  frameSummary,
+  outputSummary,
   keyframeAtOrBefore,
   keyframeNote,
   keyframeShiftMs,
@@ -22,6 +24,18 @@ import {
 
 const seg = (id: string, startMs: number, endMs: number): Seg => ({ id, startMs, endMs });
 const MB = 1024 * 1024;
+
+describe("click-in summaries", () => {
+  it("frameSummary", () => {
+    expect(frameSummary(DEFAULT_SETTINGS)).toBe("Original shape");
+    expect(frameSummary({ aspect: TrimAspect.AspectPortrait })).toBe("Crop 9:16");
+  });
+  it("outputSummary lists only what differs from the defaults", () => {
+    expect(outputSummary(DEFAULT_SETTINGS, 1)).toBe("Original size");
+    expect(outputSummary(DEFAULT_SETTINGS, 2)).toBe("One file");
+    expect(outputSummary({ ...DEFAULT_SETTINGS, join: TrimJoin.JoinSeparate, maxSizeMB: 25, maxHeight: 720, removeAudio: true }, 3)).toBe("Separate files · ≤ 25 MB · ≤ 720p · no audio");
+  });
+});
 
 describe("sanitizeSettings", () => {
   it("keeps valid values and drops bad ones", () => {

@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { Button, SegmentedControl, Slider, Stepper, Switch } from "@/components";
 import { laneSettings } from "@/viz/edit/defaults";
 import type { MarkerLane } from "@/viz/edit/types";
-import { useEditStudio, useProject } from "../store";
+import { useEditStudio, useProject } from "@/editor/store";
 import { LANE_LABELS, resetLaneOverrides, resetLaneSettings, withLane } from "./laneLogic";
 import styles from "./Lanes.module.css";
 

@@ -3,8 +3,12 @@ import { bootstrap, bootstrapPopup } from "@/state/bootstrap";
 import { usePacksSync } from "@/state/packs";
 import { useSettings } from "@/state/settings";
 import { toAppError, type AppErrorShape } from "@/lib/errors";
+import { currentWindow } from "@/lib/windows";
+import "@/parts";
+import { PartWindowShell } from "@/shell/PartWindowShell";
 import { PopupShell } from "@/shell/PopupShell";
 import { Shell } from "@/shell/Shell";
+import { ToolWindowShell } from "@/shell/ToolWindowShell";
 import { BootError } from "@/views/BootError";
 import { SetupView } from "@/views/setup/SetupView";
 import RenderHost from "@/viz/RenderHost";
@@ -33,24 +37,44 @@ function MainWindow() {
   );
 }
 
+/** Tool and part windows share the full data bootstrap but never mount the render host (main only). */
+function ToolWindow({ view }: { view: string }) {
+  usePacksSync();
+  return <ToolWindowShell view={view} />;
+}
+
+function PartWindow({ part }: { part: string }) {
+  usePacksSync();
+  return <PartWindowShell part={part} />;
+}
+
 export function App() {
   const [boot, setBoot] = useState<BootState>({ kind: "loading" });
-  const [win] = useState(() => windowKind());
+  const [win] = useState(() => currentWindow());
 
   useEffect(() => {
-    (win.popup ? bootstrapPopup() : bootstrap()).then(
+    (win.kind === "popup" ? bootstrapPopup() : bootstrap()).then(
       () => setBoot({ kind: "ready" }),
       (e: unknown) => setBoot({ kind: "error", error: toAppError(e) }),
     );
-  }, [win.popup]);
+  }, [win.kind]);
 
   if (boot.kind === "loading") return null;
   if (boot.kind === "error") return <BootError error={boot.error} onReload={() => window.location.reload()} />;
-  if (win.vizlab)
-    return (
-      <Suspense fallback={null}>
-        <VizLab />
-      </Suspense>
-    );
-  return win.popup ? <PopupShell view={win.view} /> : <MainWindow />;
+  switch (win.kind) {
+    case "vizlab":
+      return (
+        <Suspense fallback={null}>
+          <VizLab />
+        </Suspense>
+      );
+    case "popup":
+      return <PopupShell view={win.view} />;
+    case "tool":
+      return <ToolWindow view={win.view} />;
+    case "part":
+      return <PartWindow part={win.part} />;
+    default:
+      return <MainWindow />;
+  }
 }

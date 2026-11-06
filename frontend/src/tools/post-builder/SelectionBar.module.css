@@ -1,0 +1,28 @@
+.wrap {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-1) var(--space-3);
+}
+
+.name {
+  display: inline-block;
+  max-width: 18ch;
+  overflow: hidden;
+  color: var(--fg);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Compact chips: a click-in row or a button, shrunk to the bar's height. */
+.wrap .chip {
+  width: auto;
+  min-height: 26px;
+  padding: 0 var(--space-2);
+  gap: var(--space-1);
+  background: var(--bg-raised);
+  font-size: var(--text-sm);
+}

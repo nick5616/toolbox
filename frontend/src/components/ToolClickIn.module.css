@@ -1,0 +1,4 @@
+/* The embedded tool fills its drawer (or window); its own root scrolls. */
+.embed {
+  height: 100%;
+}

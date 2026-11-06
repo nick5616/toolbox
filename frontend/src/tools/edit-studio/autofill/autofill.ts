@@ -12,7 +12,7 @@
  * - `result.clips` holds only the NEW clips; the caller drops `result.removed`
  *   from the track and merges the two lists.
  */
-import { newClip } from "../doc";
+import { newClip } from "@/editor/doc";
 import type { EditClip } from "@/lib/api";
 import { serializeEffects, serializeSpeed, serializeTransition, CUT } from "@/viz/edit/schema";
 import { editLength, type EditParam, type EditPost, type EditTransition, type Key, type MarkerLane } from "@/viz/edit/types";

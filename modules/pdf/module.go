@@ -46,8 +46,10 @@ func (m *Module) Descriptor() core.Descriptor {
 		Description: "Everyday PDF operations without uploading documents anywhere.",
 		Status:      core.StatusReady,
 		Accepts:     core.Accepts{Extensions: Accepts()},
-		Requires:    []string{},
-		Order:       190, OutputSubdir: "PDF",
+		// Phase 11: "Make searchable" opens OCR on the chosen PDFs inside this tool.
+		Parts:    []string{"ocr"},
+		Requires: []string{},
+		Order:    190, OutputSubdir: "PDF",
 		SplitInputs: false, MaxConcurrent: 2, MaxInputs: 500,
 	}
 }

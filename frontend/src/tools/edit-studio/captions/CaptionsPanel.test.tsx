@@ -5,12 +5,12 @@ vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
   return { ...actual, EditStudioService: { Fonts: async () => ["Arial", "Impact"], ExportText: async () => ({}) } };
 });
-vi.mock("../useEditAutosave", () => ({ flushEdit: async () => undefined }));
+vi.mock("@/editor/useEditAutosave", () => ({ flushEdit: async () => undefined }));
 
 import { normalizeProject } from "@/viz/edit/defaults";
 import { buildEditFixture, fixtureProject } from "@/viz/edit/fixture";
 import { parseCaptionLines } from "@/viz/edit/schema";
-import { useEditStudio } from "../store";
+import { useEditStudio } from "@/editor/store";
 import { CaptionsPanel, wordsSource } from "./CaptionsPanel";
 
 function open(captions: boolean, withAnalysis = true) {

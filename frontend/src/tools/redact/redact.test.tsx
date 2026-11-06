@@ -94,8 +94,15 @@ describe("RedactView", () => {
 
   it("shows options after choosing a photo and sends the detect job", async () => {
     const user = await load();
+    // Faces and plates are the top-level choice; the rest sit in click-ins that say what they are set to.
+    expect(await screen.findByRole("switch", { name: "Find faces" })).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: "Pixelate" })).toBeNull();
+    expect(screen.getByRole("button", { name: /^Effect/ }).textContent).toContain("Blur · strength 6 · 15% padding");
+    await user.click(screen.getByRole("button", { name: /^Effect/ }));
     expect(await screen.findByRole("radio", { name: "Pixelate" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /^Sensitivity/ }));
     await user.click(screen.getByRole("radio", { name: "High" }));
+    expect(screen.getByRole("button", { name: /^Sensitivity/ }).textContent).toContain("High");
     await user.click(screen.getByRole("button", { name: "Find faces and plates" }));
     await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(1));
     expect(h.enqueue.mock.calls[0]?.[0]).toEqual(["/photo.jpg"]);
@@ -120,7 +127,7 @@ describe("RedactView", () => {
     finish(job({ status: JobStatus.JobFailed, error: "Face model missing", errorHint: "Install the models" }));
     expect(await screen.findByText("Face model missing")).toBeTruthy();
     expect(screen.getByText("Install the models")).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "Blur" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Effect/ })).toBeTruthy();
   });
 
   it("reviews one image straight away; dropping a box then saving sends the edited boxes", async () => {

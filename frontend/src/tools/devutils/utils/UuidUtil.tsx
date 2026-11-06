@@ -1,14 +1,15 @@
-import { useState } from "react";
+
 import { Button, SegmentedControl, Stepper, Switch } from "@/components";
 import { clampCount, generateIds, type IdKind } from "./uuid.logic";
 import { OutputBox } from "./shared";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 export default function UuidUtil() {
-  const [kind, setKind] = useState<IdKind>("v4");
-  const [count, setCount] = useState(5);
-  const [upper, setUpper] = useState(false);
-  const [ids, setIds] = useState<string[]>(() => generateIds("v4", 5, false));
+  const [kind, setKind] = useUtilState<IdKind>("uuid", "kind", "v4");
+  const [count, setCount] = useUtilState("uuid", "count", 5);
+  const [upper, setUpper] = useUtilState("uuid", "upper", false);
+  const [ids, setIds] = useUtilState<string[]>("uuid", "ids", () => generateIds("v4", 5, false));
 
   const regenerate = (k = kind, n = count, u = upper) => setIds(generateIds(k, n, u));
   const all = ids.join("\n");

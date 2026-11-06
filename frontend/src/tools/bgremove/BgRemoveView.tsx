@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { ColorSwatchPicker, Section, SegmentedControl, Stepper, Switch } from "@/components";
 import { BgOutput, BgRemoveService, JobStatus, type PresetInfo } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
-import { useOrderedJobs } from "@/state/jobs";
-import { FileToolLayout, runLabel, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { useToolJobs } from "@/tools/_kit/session";
+import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import type { ToolViewProps } from "../index";
-import { RadioCards } from "../image/RadioCards";
-import { ResultCards } from "../image/ResultCards";
-import imageStyles from "../image/image.module.css";
+import { RadioCards } from "@/tools/_kit/image/RadioCards";
+import { ResultCards } from "@/tools/_kit/image/ResultCards";
+import imageStyles from "@/tools/_kit/image/image.module.css";
 import { DEFAULT_BG_OPTIONS, sanitizeBgOptions, submitOptions, toResultItem } from "./options";
 
 const MAX_RESULTS = 24;
@@ -38,7 +38,7 @@ export default function BgRemoveView({ moduleId }: ToolViewProps) {
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<string | null>(null);
-  const jobs = useOrderedJobs(moduleId);
+  const jobs = useToolJobs(moduleId);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,72 +89,84 @@ export default function BgRemoveView({ moduleId }: ToolViewProps) {
       onRun={onRun}
       running={running}
       inputErrors={inputErrors}
-      options={
-        <Section label="Options" tip="Choose the quality model and what replaces the background">
-          <div className={imageStyles.options}>
+      primary={
+        <div className={imageStyles.optRow}>
+          <span className={imageStyles.optLabel} data-tip="What the area behind the subject becomes">Background</span>
+          <SegmentedControl
+            aria-label="Background"
+            value={opts.output}
+            onChange={(output) => setOpts((o) => ({ ...o, output }))}
+            options={[
+              { value: BgOutput.OutputTransparent, label: "Transparent", tip: "Save a PNG with a see-through background" },
+              { value: BgOutput.OutputColor, label: "Colour", tip: "Fill the background with a solid colour of your choice" },
+              { value: BgOutput.OutputMask, label: "Mask only", tip: "Save a black and white cut-out mask instead of the photo, for use in other editors" },
+            ]}
+          />
+          {opts.output === BgOutput.OutputColor && (
+            <ColorSwatchPicker
+              aria-label="Background colour"
+              value={opts.color}
+              onChange={(color) => setOpts((o) => ({ ...o, color }))}
+            />
+          )}
+        </div>
+      }
+      advancedSummary={summarize(
+        opts.model.charAt(0).toUpperCase() + opts.model.slice(1),
+        opts.crop && `crop ${opts.padding} px`,
+        opts.cleanEdges && "clean edges",
+        opts.refine && "refine edges",
+      )}
+      advanced={
+        <div className={imageStyles.options}>
+          <Section label="Model" tip="Quality versus speed of the cut-out model">
             <RadioCards
               aria-label="Model"
               options={cardOptions}
               value={opts.model}
               onChange={(model) => setOpts((o) => ({ ...o, model }))}
             />
-            <div className={imageStyles.optRow}>
-              <span className={imageStyles.optLabel} data-tip="What the area behind the subject becomes">Background</span>
-              <SegmentedControl
-                aria-label="Background"
-                value={opts.output}
-                onChange={(output) => setOpts((o) => ({ ...o, output }))}
-                options={[
-                  { value: BgOutput.OutputTransparent, label: "Transparent", tip: "Save a PNG with a see-through background" },
-                  { value: BgOutput.OutputColor, label: "Colour", tip: "Fill the background with a solid colour of your choice" },
-                  { value: BgOutput.OutputMask, label: "Mask only", tip: "Save a black and white cut-out mask instead of the photo, for use in other editors" },
-                ]}
-              />
-              {opts.output === BgOutput.OutputColor && (
-                <ColorSwatchPicker
-                  aria-label="Background colour"
-                  value={opts.color}
-                  onChange={(color) => setOpts((o) => ({ ...o, color }))}
+          </Section>
+          <Section label="Cut-out" tip="How the cut-out is trimmed and cleaned">
+            <div className={imageStyles.options}>
+              <div className={imageStyles.optRow}>
+                <Switch
+                  checked={opts.crop}
+                  onChange={(crop) => setOpts((o) => ({ ...o, crop }))}
+                  label="Crop to subject"
+                  tip="Trim the empty space around the subject so the file is only as big as the cut-out"
                 />
-              )}
-            </div>
-            <div className={imageStyles.optRow}>
+                {opts.crop && (
+                  <Stepper
+                    aria-label="Padding"
+                    data-tip="Empty margin kept around the subject, in pixels"
+                    value={opts.padding}
+                    min={0}
+                    max={500}
+                    step={8}
+                    unit="px"
+                    onChange={(padding) => setOpts((o) => ({ ...o, padding }))}
+                  />
+                )}
+              </div>
               <Switch
-                checked={opts.crop}
-                onChange={(crop) => setOpts((o) => ({ ...o, crop }))}
-                label="Crop to subject"
-                tip="Trim the empty space around the subject so the file is only as big as the cut-out"
+                checked={opts.cleanEdges}
+                onChange={(cleanEdges) => setOpts((o) => ({ ...o, cleanEdges }))}
+                label="Clean edges"
+                tip="Removes the faint halo and stray specks around the cut-out edge"
               />
-              {opts.crop && (
-                <Stepper
-                  aria-label="Padding"
-                  data-tip="Empty margin kept around the subject, in pixels"
-                  value={opts.padding}
-                  min={0}
-                  max={500}
-                  step={8}
-                  unit="px"
-                  onChange={(padding) => setOpts((o) => ({ ...o, padding }))}
+              <div>
+                <Switch
+                  checked={opts.refine}
+                  onChange={(refine) => setOpts((o) => ({ ...o, refine }))}
+                  label="Refine edges"
+                  tip="Extra pass for finer hair and fur detail; can let background show through on busy scenes"
                 />
-              )}
+                <p className={imageStyles.help}>Sharper hair, may leak on busy backgrounds</p>
+              </div>
             </div>
-            <Switch
-              checked={opts.cleanEdges}
-              onChange={(cleanEdges) => setOpts((o) => ({ ...o, cleanEdges }))}
-              label="Clean edges"
-              tip="Removes the faint halo and stray specks around the cut-out edge"
-            />
-            <div>
-              <Switch
-                checked={opts.refine}
-                onChange={(refine) => setOpts((o) => ({ ...o, refine }))}
-                label="Refine edges"
-                tip="Extra pass for finer hair and fur detail; can let background show through on busy scenes"
-              />
-              <p className={imageStyles.help}>Sharper hair, may leak on busy backgrounds</p>
-            </div>
-          </div>
-        </Section>
+          </Section>
+        </div>
       }
       results={
         <Section label="Results" tip="Finished cut-outs; drag the slider on a card to compare with the original">

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MAX_KEYS } from "@/viz/edit/schema";
 import type { EditParam, EditPost, Key, Marker } from "@/viz/edit/types";
-import { paramKeys } from "../inspector/paramOps";
+import { paramKeys } from "@/editor/inspector/paramOps";
 import {
   accentMoments,
   applyUnuse,

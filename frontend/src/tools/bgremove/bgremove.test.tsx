@@ -64,13 +64,17 @@ describe("BgRemoveView", () => {
     enqueue.mockResolvedValue([{}]);
     const user = userEvent.setup();
     render(<BgRemoveView moduleId="bg-remover" />);
-    await screen.findByRole("radio", { name: /Best/ });
+    await screen.findByRole("radio", { name: "Colour" });
     expect(screen.queryByLabelText("Hex colour")).toBeNull();
     await user.click(screen.getByRole("radio", { name: "Colour" }));
     expect(screen.getByLabelText("Hex colour")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Black" }));
+    expect(screen.getByRole("button", { name: /Advanced/ }).textContent).toContain("Balanced");
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
+    await screen.findByRole("radio", { name: /Best/ });
     await user.click(screen.getByRole("switch", { name: "Crop to subject" }));
     expect(screen.getByLabelText("Padding")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Advanced/ }).textContent).toContain("crop");
 
     await user.click(screen.getByRole("button", { name: "Add files…" }));
     const run = await screen.findByRole("button", { name: /Remove background/ });

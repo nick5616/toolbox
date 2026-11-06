@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { FilesDropped, TimedLine } from "@/lib/api";
 import { matchesNow, NARROW_QUERY, useMediaQuery } from "@/lib/media";
+import { currentWindow } from "@/lib/windows";
 
 /** View ids: "library", "settings", "setup" (the setup overlay), or a module id. */
 export type ViewId = string;
@@ -12,6 +13,32 @@ export interface Handoff {
   seed?: ToolSeed;
   /** A Post Builder slide to make or edit (SPEC.md Part B §B7.5): Photo Composer and Video Editor. */
   postSlide?: PostSlideSeed;
+  /** A piece of text for the tool (Phase 11 §5): Local Chat starts a conversation about it; Dev Utilities opens it in the matching utility. */
+  text?: TextSeed;
+  /** Set when the tool was opened from another tool's click-in into its own window: its "Use" sends results back (Phase 11 §4). */
+  embed?: EmbedLink;
+}
+
+/** Text handed to a tool (a transcript, OCR text, a clipboard item). */
+export interface TextSeed {
+  /** What the text is, for headings and the first message ("Transcript of interview.mp3"). */
+  title: string;
+  body: string;
+  /** Local Chat: one-click prompts offered above the composer ("Summarise", "Key points"). */
+  prompts?: string[];
+}
+
+/** How a tool window returns results to the click-in it was popped out of (lib/embed.ts). */
+export interface EmbedLink {
+  /** Random per click-in; the host listens for it on the "embed" relay channel. */
+  token: string;
+  /** Host module id and name ("photo-composer", "Photo Composer"). */
+  host: string;
+  hostName: string;
+  /** The host's window key ("main" or a pop-out key): where results go. */
+  hostWindow: string;
+  /** The label of the Use button ("Use as layer"); "" = the window only shows results. */
+  useLabel: string;
 }
 
 /** Opens Photo Composer or Video Editor for a slide of a post. */
@@ -99,9 +126,13 @@ function load(): Partial<Persisted> {
 }
 
 function initialView(saved: Partial<Persisted>): ViewId {
+  // A tool window's view is its `view` parameter (never the main window's saved one).
   const fromQuery = new URLSearchParams(window.location.search).get("view");
   return fromQuery || saved.view || "downloader";
 }
+
+/** Only the main window writes the shared `toolbox.ui` entry; pop-outs and popups would clobber it. */
+const persists = currentWindow().kind === "main";
 
 const saved = load();
 
@@ -138,6 +169,7 @@ export const useUI = create<UIState>((set, get) => ({
 }));
 
 useUI.subscribe((s) => {
+  if (!persists) return;
   const p: Persisted = {
     view: s.view,
     sidebarCollapsed: s.sidebarCollapsed,

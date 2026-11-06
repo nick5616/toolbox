@@ -205,3 +205,44 @@
   flex: none;
 }
 /* --- end pipelines --- */
+
+/* --- composition (Phase 10): a variant sits under its base --- */
+.variant {
+  width: calc(100% - var(--space-4));
+  margin-left: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.variant::after {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-3));
+  top: -50%;
+  height: 100%;
+  width: var(--space-2);
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-bottom-left-radius: var(--r-md);
+  pointer-events: none;
+}
+
+.collapsed .variant {
+  width: 100%;
+  margin-left: 0;
+}
+
+.collapsed .variant::after {
+  display: none;
+}
+
+.variantBadge {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1px solid var(--fg-subtle);
+  background: var(--bg-sidebar);
+  pointer-events: none;
+}

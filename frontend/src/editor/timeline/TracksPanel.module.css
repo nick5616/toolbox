@@ -1,0 +1,328 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--line);
+}
+
+.toolbar {
+  display: flex;
+  flex: none;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: var(--space-1) var(--space-3);
+}
+
+.rows {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  user-select: none;
+}
+
+.row {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+}
+
+.locked .timeArea {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px);
+}
+
+.header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  width: 168px;
+  padding: 0 var(--space-2);
+  border-right: 1px solid var(--line-strong);
+  background: var(--bg-raised);
+  color: var(--fg);
+  font-size: var(--text-sm);
+}
+
+.headerSelected {
+  background: var(--accent-soft);
+}
+
+.headerIcon {
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.trackName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rename {
+  flex: 1;
+  min-width: 0;
+  height: var(--control-h-compact);
+  padding: 0 var(--space-1);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--bg-inset);
+  color: var(--fg);
+  font: inherit;
+}
+
+.timeArea {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-inset);
+}
+
+.adjustArea {
+  background: color-mix(in srgb, var(--bg-inset) 85%, var(--accent));
+}
+
+.clip {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--bg-active);
+  color: var(--fg);
+  cursor: grab;
+  touch-action: none;
+}
+
+.kind_adjust {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.kind_color {
+  border-color: var(--line-strong);
+}
+
+/* Part B: generated clips. */
+.kind_text {
+  background: color-mix(in srgb, var(--lane-word, var(--accent)) 22%, var(--bg-raised));
+  border-color: color-mix(in srgb, var(--lane-word, var(--accent)) 70%, transparent);
+}
+
+.kind_visual {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, var(--bg-raised)), color-mix(in srgb, var(--lane-section) 30%, var(--bg-raised)));
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  z-index: 2;
+}
+
+.auto {
+  border-style: dotted;
+}
+
+.missing {
+  background-image: repeating-linear-gradient(135deg, var(--danger-soft) 0 6px, transparent 6px 12px);
+  border-color: var(--danger);
+}
+
+.preparing {
+  background-image: repeating-linear-gradient(45deg, var(--warn-soft) 0 6px, transparent 6px 12px);
+}
+
+.pastEnd {
+  border-color: var(--warn);
+  opacity: 0.7;
+}
+
+.strip {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.clipInfo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: 1px var(--space-1);
+  font-size: var(--text-xs);
+  pointer-events: none;
+  text-shadow: 0 1px 2px var(--bg-app);
+}
+
+.clipName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  color: var(--fg);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.trim {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.trimStart {
+  left: 0;
+}
+
+.trimEnd {
+  right: 0;
+}
+
+.trim:hover {
+  background: var(--accent-soft);
+}
+
+.endLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed var(--warn);
+  pointer-events: none;
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px solid var(--accent);
+  margin-left: -1px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.playheadGrip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  width: 11px;
+  cursor: ew-resize;
+  pointer-events: auto;
+}
+
+.playheadGrip:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.hint {
+  position: absolute;
+  top: 2px;
+  z-index: 6;
+  transform: translateX(-50%);
+  padding: 1px var(--space-2);
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: var(--text-xs);
+  pointer-events: none;
+}
+
+.marquee {
+  position: absolute;
+  z-index: 4;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+
+.songRow {
+  border-top: 1px solid var(--line-strong);
+}
+
+.songCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.songRange {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent-soft);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.fades {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.fadeShape {
+  fill: var(--bg-app);
+  fill-opacity: 0.55;
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+
+.fadeHandle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: var(--bg-raised);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.fadeHandle:hover {
+  background: var(--accent);
+}
+
+/* Part B: a matte track's clips only cut the track below; they're drawn dashed. */
+.matteArea {
+  background-image: repeating-linear-gradient(90deg, transparent 0 10px, color-mix(in srgb, var(--accent) 10%, transparent) 10px 12px);
+}
+
+.matteArea > * {
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.songRow[data-empty] .timeArea {
+  display: flex;
+  align-items: center;
+  padding-left: var(--space-3);
+}

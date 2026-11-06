@@ -1,6 +1,6 @@
 /** The auto-fill presets (Phase 9 SPEC §13.3). */
 import type { EditParam, EditPost } from "@/viz/edit/types";
-import { fxStack } from "../inspector/FxStacks";
+import { fxStack } from "@/editor/inspector/FxStacks";
 import type { Recipe } from "./types";
 
 /** A param driven by a marker lane: base 0 plus one exponential pulse per marker. */

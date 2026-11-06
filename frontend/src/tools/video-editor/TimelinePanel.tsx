@@ -17,8 +17,8 @@ import {
   SNAP_PX,
 } from "./panelLogic";
 import { MAX_TRANSITION_MS, MIN_TRANSITION_MS, type Span } from "./timeline";
-import { useSourceDropTarget } from "@/tools/post-builder/sourceDrag";
-import { useThumb, useWaveform } from "./useThumbs";
+import { useSourceDropTarget } from "@/blocks/sources/sourceDrag";
+import { useThumb, useWaveform } from "@/blocks/media/useThumbs";
 import type { Selection } from "./types";
 import styles from "./TimelinePanel.module.css";
 import { useMiddleDragScroll } from "@/lib/useDragScroll";

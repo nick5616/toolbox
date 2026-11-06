@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Button, TextArea } from "@/components";
 import { CASE_LABEL, LINE_OP_LABEL, convertCase, countText, lineOp, slugify, type CaseKind, type LineOp } from "./text.logic";
 import { OutputBox, useDebounced } from "./shared";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 const CASES = Object.keys(CASE_LABEL) as CaseKind[];
@@ -16,7 +17,7 @@ const LINE_OP_TIP: Record<LineOp, string> = {
 const LINE_OPS = Object.keys(LINE_OP_LABEL) as LineOp[];
 
 export default function TextUtil() {
-  const [text, setText] = useState("");
+  const [text, setText] = useUtilState("text", "text", "");
   const d = useDebounced(text);
   const counts = useMemo(() => countText(d), [d]);
 

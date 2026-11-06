@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { PostIssue, PostSlideSource } from "@/lib/api";
 import {
   DEFAULT_LIMITS,
-  bodyLayout,
+  altSummary,
+  checksSummary,
+  editWindowClosed,
+  formatSummary,
+  framingSummary,
+  sourcesSummary,
   aspectFor,
   blankSlide,
   captionStats,
@@ -128,18 +133,32 @@ describe("saved state", () => {
   });
 });
 
-describe("bodyLayout", () => {
-  const src = { width: 280, collapsed: false, forcedOpen: false };
-  it("keeps the full layout when there's room (or before measuring)", () => {
-    expect(bodyLayout(0, src)).toMatchObject({ sources: 280, strip: 170, right: 340, autoCollapsed: false });
-    expect(bodyLayout(1400, src)).toMatchObject({ sources: 280, strip: 170, right: 340 });
+describe("click-in summaries", () => {
+  it("summarises format, sources, checks, alt text and framing", () => {
+    expect(formatSummary({ format: "carousel", aspect: "1:1" })).toBe("Carousel · 1:1");
+    expect(formatSummary({ format: "reel", aspect: "4:5" })).toBe("Reel · 9:16");
+    expect(sourcesSummary({ folder: "", extra: [] })).toBe("No folder");
+    expect(sourcesSummary({ folder: "C:\\Photos\\Trip\\", extra: ["a", "b"] })).toBe("Trip + 2 files");
+    expect(sourcesSummary({ folder: "", extra: ["a"] })).toBe("1 file");
+    const issue = (level: string) => ({ level, message: "x", slideId: "" }) as PostIssue;
+    expect(checksSummary([])).toBe("All clear");
+    expect(checksSummary([issue("warning"), issue("error")])).toBe("1 to fix");
+    expect(checksSummary([issue("note")])).toBe("1 note");
+    const slide = blankSlide("photo", { path: "a.jpg", altText: "A dog" });
+    expect(altSummary(undefined, -1)).toBe("Select a slide");
+    expect(altSummary(slide, 1)).toBe("Slide 2 · written");
+    expect(altSummary({ ...slide, altText: " " }, 0)).toBe("Slide 1 · empty");
+    expect(framingSummary(slide)).toBe("Fills the frame");
+    expect(framingSummary({ ...slide, zoom: 1.5, rotation: 90 })).toBe("1.50× · 90°");
   });
-  it("narrows the side columns, then makes Sources a rail on small windows", () => {
-    expect(bodyLayout(1100, src)).toMatchObject({ sources: 280, strip: 140, right: 280, sourcesCollapsed: false });
-    expect(bodyLayout(860, src)).toMatchObject({ sources: 32, strip: 140, right: 280, sourcesCollapsed: true, autoCollapsed: true });
-  });
-  it("lets the user open Sources anyway, and keeps a chosen rail", () => {
-    expect(bodyLayout(860, { ...src, forcedOpen: true })).toMatchObject({ sources: 280, sourcesCollapsed: false, autoCollapsed: true });
-    expect(bodyLayout(860, { ...src, collapsed: true })).toMatchObject({ sources: 32, sourcesCollapsed: true, autoCollapsed: false });
+});
+
+describe("editing windows", () => {
+  it("notices when Photo Composer or the Sequence Editor window closes", () => {
+    expect(editWindowClosed(["tool:photo-composer"], [])).toBe(true);
+    expect(editWindowClosed(["tool:video-editor", "tool:chat"], ["tool:chat"])).toBe(true);
+    expect(editWindowClosed(["tool:photo-composer"], ["tool:photo-composer"])).toBe(false);
+    expect(editWindowClosed(["tool:chat"], [])).toBe(false);
+    expect(editWindowClosed([], ["tool:photo-composer"])).toBe(false);
   });
 });

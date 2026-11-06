@@ -54,6 +54,8 @@ func (m *Module) Descriptor() core.Descriptor {
 		Requires:    []string{"ffmpeg", "ffprobe"},
 		Recommends:  []string{sidecar.DepID},
 		Order:       172, OutputSubdir: "Subtitles",
+		Base:      "transcribe",
+		Parts:     []string{"trimmer", "visualizer"},
 		MaxInputs: 1,
 	}
 }

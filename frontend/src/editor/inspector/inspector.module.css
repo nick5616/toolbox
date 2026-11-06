@@ -1,0 +1,391 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--text-md-lh);
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.rowGrow {
+  flex: 1;
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.hint {
+  margin: 0;
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+}
+
+.warn {
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+/* ---- parameters ---- */
+.param {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.paramHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.paramTools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.reactive {
+  color: var(--accent);
+}
+
+.keyed {
+  color: var(--accent);
+}
+
+.easeSelect {
+  width: 84px;
+}
+
+.linkBtn {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.linkBtn:disabled {
+  color: var(--fg-faint);
+  cursor: default;
+}
+
+/* ---- reactions ---- */
+.mods {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.mod {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.modTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.modTimes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.signalSelect {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--fg-faint);
+}
+
+.nativeSelect {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  height: var(--control-h-compact);
+  padding: 0 var(--space-2);
+  background: var(--bg-inset);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  color: var(--fg);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+}
+
+.nativeSelect:hover {
+  border-color: var(--fg-faint);
+}
+
+.nativeSelect option,
+.nativeSelect optgroup {
+  background: var(--bg-raised);
+  color: var(--fg);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.chip {
+  padding: 1px var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+
+.liveMeter {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+
+.liveFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+  transition: width 200ms linear;
+}
+
+/* ---- effects, masks ---- */
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.item[data-dragging="true"] {
+  opacity: 0.6;
+  border-color: var(--accent);
+}
+
+.item[data-drop="before"] {
+  box-shadow: 0 -2px 0 var(--accent);
+}
+
+.item[data-drop="after"] {
+  box-shadow: 0 2px 0 var(--accent);
+}
+
+.itemHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.grip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 24px;
+  color: var(--fg-subtle);
+  cursor: grab;
+  touch-action: none;
+}
+
+.itemName {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.itemName[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.addRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.menuGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.colorRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.diamondBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.diamondBtn:hover {
+  background: var(--bg-hover);
+}
+
+.diamond {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--fg-subtle);
+  background: transparent;
+  transform: rotate(45deg);
+}
+
+.diamondBtn[data-keyed] .diamond {
+  border-color: var(--accent);
+}
+
+.diamondBtn[aria-pressed="true"] .diamond {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.listItem {
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.listItem:hover {
+  background: var(--bg-hover);
+}

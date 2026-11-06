@@ -30,6 +30,13 @@ export function modelHint(models: Array<{ id: string; label: string; downloadByt
   return `${by("best", "Best", 208)} · ${by("fast", "Fast", 28)}`;
 }
 
+/** One-line state of the Model click-in: "Best · ready" or "Fast · downloads 28 MB". */
+export function summarizeModel(model: EraserOptions["model"], info: { present: boolean; downloadBytes: number } | undefined): string {
+  const label = model === EraserModel.ModelFast ? "Fast" : "Best";
+  const state = info && !info.present && info.downloadBytes > 0 ? `downloads ${Math.round(info.downloadBytes / (1024 * 1024))} MB` : "ready";
+  return `${label} · ${state}`;
+}
+
 const RASTER_EXT = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"];
 const THUMB_EXT = [".tif", ".tiff", ".heic", ".heif"];
 

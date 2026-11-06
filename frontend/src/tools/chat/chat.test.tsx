@@ -52,6 +52,7 @@ import {
 import { useDeps } from "@/state/deps";
 import { useJobs } from "@/state/jobs";
 import ChatView from "./ChatView";
+import { chatSummary, temperatureWord } from "./ChatSettingsDrawer";
 import { groupConversations } from "./grouping";
 
 function emit(name: string, data: unknown) {
@@ -156,6 +157,25 @@ describe("groupConversations", () => {
       ["Earlier", ["b"]],
     ]);
     expect(groupConversations([], now)).toEqual([]);
+  });
+});
+
+describe("Chat settings click-in", () => {
+  it("maps temperature to a word and builds the summary", () => {
+    expect(temperatureWord(0.2)).toBe("precise");
+    expect(temperatureWord(0.7)).toBe("balanced");
+    expect(temperatureWord(1.2)).toBe("creative");
+    expect(chatSummary("Qwen3 4B", 1.2)).toBe("Qwen3 4B · creative");
+  });
+
+  it("shows the model and style on the row, and the prompt inside the drawer", async () => {
+    const user = userEvent.setup();
+    await ready();
+    const row = screen.getByRole("button", { name: /Chat settings/ });
+    expect(row.textContent).toContain("Qwen3 4B Instruct · balanced");
+    expect(screen.queryByLabelText("System prompt for this conversation")).toBeNull();
+    await user.click(row);
+    expect(screen.getByLabelText("System prompt for this conversation")).toBeTruthy();
   });
 });
 

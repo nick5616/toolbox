@@ -1,0 +1,462 @@
+.root {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 360px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-inset);
+  overflow: hidden;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  outline: none;
+  cursor: grab;
+  background-image: radial-gradient(var(--line-strong) 1px, transparent 1px);
+  background-size: 24px 24px;
+  touch-action: none;
+}
+
+.viewport:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+.wires {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* File kinds map to existing tokens (the GL layer reads the same names). */
+.k_audio { --kind: var(--lane-bass); }
+.k_video { --kind: var(--lane-kick); }
+.k_image { --kind: var(--lane-hats); }
+.k_document { --kind: var(--lane-break); }
+.k_text { --kind: var(--lane-phrase); }
+.k_other { --kind: var(--lane-other); }
+.k_any { --kind: var(--accent); }
+
+.wire {
+  fill: none;
+  stroke: var(--kind, var(--fg-muted));
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.wireOn {
+  stroke-width: 3;
+  opacity: 1;
+}
+
+.wireFailed {
+  stroke: var(--danger);
+}
+
+/* Hidden while the GL layer draws the wire; the path stays for layout. */
+.wireHidden {
+  opacity: 0;
+}
+
+.wireHit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.wireDelete {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--bg-raised);
+  color: var(--fg);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wireDelete:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.node {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  color: var(--fg);
+  cursor: default;
+  user-select: none;
+}
+
+.nodeSelected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.nodeProblem {
+  border-color: var(--danger);
+}
+
+.nodeInput {
+  border-style: dashed;
+}
+
+.dropOk {
+  box-shadow: 0 0 0 2px var(--ok);
+}
+
+.dropBad {
+  box-shadow: 0 0 0 2px var(--danger);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  min-width: 0;
+}
+
+.nodeIcon {
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.nodeName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.summary {
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  line-height: 20px;
+}
+
+.summaryBad {
+  color: var(--danger);
+}
+
+.portRow {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--space-3);
+}
+
+.portLabel {
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+}
+
+.inPort,
+.outDot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid var(--bg-raised);
+  border-radius: 50%;
+}
+
+.inPort {
+  left: -7px;
+  background: var(--kind, var(--fg-muted));
+  box-shadow: 0 0 6px var(--kind, transparent);
+}
+
+.outDot {
+  right: -7px;
+  top: 4px;
+  background: var(--kind, var(--fg-muted));
+  box-shadow: 0 0 7px var(--kind, transparent);
+  cursor: crosshair;
+  transition: transform var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.outDot:hover,
+.inPort:hover {
+  transform: scale(1.45);
+  box-shadow: 0 0 14px 2px var(--kind, transparent);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.box {
+  position: absolute;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+
+.refusal {
+  position: absolute;
+  z-index: 5;
+  max-width: 250px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  color: var(--danger);
+  font-size: var(--text-sm);
+  pointer-events: none;
+}
+
+.toolbar {
+  position: absolute;
+  left: var(--space-2);
+  top: var(--space-2);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+}
+
+.toolbarSep {
+  width: 1px;
+  height: 16px;
+  margin: 0 var(--space-1);
+  background: var(--line-strong);
+}
+
+.zoom {
+  min-width: 36px;
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.drawer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 6;
+  width: min(360px, 90%);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line-strong);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-pop);
+}
+
+.drawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.drawerTitle {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawerBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Tool store */
+
+.store {
+  flex: none;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-right: 1px solid var(--line);
+  background: var(--bg-panel);
+  min-height: 0;
+}
+
+.storeList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.storeNone {
+  padding: var(--space-3);
+  color: var(--fg-subtle);
+  font-size: var(--text-sm);
+}
+
+.groupLabel {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-panel);
+  padding: var(--space-3) var(--space-1) var(--space-1);
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tool {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 2px;
+  padding: 5px var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: grab;
+}
+
+.tool:hover {
+  background: var(--bg-hover);
+  border-color: var(--line-strong);
+}
+
+.ghost {
+  position: fixed;
+  left: -1000px;
+  top: -1000px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-3);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  color: var(--fg);
+  font-size: var(--text-md);
+  box-shadow: var(--shadow-pop);
+}
+
+.tool:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.toolOff {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.toolOff:hover {
+  background: var(--bg-raised);
+  border-color: var(--line);
+}
+
+.toolIcon {
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.toolText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.toolName {
+  font-size: var(--text-md);
+}
+
+.toolDesc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+}
+
+.quick {
+  position: absolute;
+  z-index: 7;
+  width: 240px;
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--pop-border);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+  cursor: default;
+}
+
+.quickList {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .outDot:hover,
+  .inPort:hover {
+    transform: none;
+  }
+}

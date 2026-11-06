@@ -241,27 +241,50 @@ export function sanitizeState(saved: unknown): PostBuilderState {
   return out;
 }
 
-export interface BodyLayout {
-  sources: number;
-  strip: number;
-  right: number;
-  sourcesCollapsed: boolean;
-  /** The Sources panel is a rail only because the window is narrow (the user's choice isn't changed). */
-  autoCollapsed: boolean;
+// ---- click-in summaries and pop-out edit windows ----
+
+const lastSegment = (p: string): string => p.split(/[\\/]+/).filter(Boolean).pop() ?? "";
+
+/** "Carousel · 4:5" for the Format click-in. */
+export function formatSummary(doc: Pick<PostDoc, "format" | "aspect">): string {
+  return `${FORMAT_LABELS[doc.format as PostFormat] ?? "Post"} · ${doc.format === "carousel" ? doc.aspect : "9:16"}`;
 }
 
-/** Below this the slide stage is too small to work in: narrower columns, then a Sources rail. */
-const STAGE_MIN = 300;
-const GAPS = 3 * 16;
+/** The folder's name (not its path) plus how many single files were added; "No folder" when the pool is empty. */
+export function sourcesSummary(doc: Pick<PostDoc, "folder" | "extra">): string {
+  const parts: string[] = [];
+  if (doc.folder) parts.push(lastSegment(doc.folder));
+  if (doc.extra.length > 0) parts.push(`${doc.extra.length} ${doc.extra.length === 1 ? "file" : "files"}`);
+  return parts.length > 0 ? parts.join(" + ") : "No folder";
+}
 
-/** Column widths of the editor body for its width (0 = not measured yet: the full layout). */
-export function bodyLayout(width: number, sources: { width: number; collapsed: boolean; forcedOpen: boolean }): BodyLayout {
-  const wide = { strip: 170, right: 340 };
-  const narrow = { strip: 140, right: 280 };
-  const stage = (src: number, c: { strip: number; right: number }) => width - GAPS - src - c.strip - c.right;
-  const open = sources.collapsed ? 32 : sources.width;
-  if (width <= 0 || stage(open, wide) >= STAGE_MIN) return { sources: open, ...wide, sourcesCollapsed: sources.collapsed, autoCollapsed: false };
-  if (stage(open, narrow) >= STAGE_MIN || sources.collapsed) return { sources: open, ...narrow, sourcesCollapsed: sources.collapsed, autoCollapsed: false };
-  if (sources.forcedOpen) return { sources: open, ...narrow, sourcesCollapsed: false, autoCollapsed: true };
-  return { sources: 32, ...narrow, sourcesCollapsed: true, autoCollapsed: true };
+/** "All clear", "2 to fix" or "3 notes" for the Checks click-in. */
+export function checksSummary(issues: readonly PostIssue[]): string {
+  if (issues.length === 0) return "All clear";
+  const errors = issues.filter((i) => i.level === "error").length;
+  if (errors > 0) return `${errors} to fix`;
+  return `${issues.length} ${issues.length === 1 ? "note" : "notes"}`;
+}
+
+/** "Slide 2 · written" / "Slide 2 · empty" for the Alt text click-in. */
+export function altSummary(slide: PostSlide | undefined, index: number): string {
+  if (!slide) return "Select a slide";
+  return `Slide ${index + 1} · ${slide.altText.trim() ? "written" : "empty"}`;
+}
+
+/** "Fills the frame" or "1.50× · 90°" for the Framing click-in. */
+export function framingSummary(slide: Pick<PostSlide, "zoom" | "panX" | "panY" | "rotation">): string {
+  const moved = slide.zoom !== 1 || slide.panX !== 0 || slide.panY !== 0 || slide.rotation !== 0;
+  if (!moved) return "Fills the frame";
+  const parts = [`${slide.zoom.toFixed(2)}×`];
+  if (slide.rotation !== 0) parts.push(`${slide.rotation}°`);
+  return parts.join(" · ");
+}
+
+/** Window keys of the tools a slide can be edited in. */
+export const EDIT_WINDOW_KEYS: readonly string[] = ["tool:photo-composer", "tool:video-editor"];
+
+/** An editing window (Photo Composer / Sequence Editor) was open and now isn't. */
+export function editWindowClosed(prev: readonly string[], next: readonly string[]): boolean {
+  return EDIT_WINDOW_KEYS.some((k) => prev.includes(k) && !next.includes(k));
 }

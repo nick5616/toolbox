@@ -1,30 +1,25 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Banner, Button, ConfirmDialog, EmptyState, MenuButton, PathText, Switch, Tooltip, cx, toast } from "@/components";
-import {
-  FilesService,
-  PipelinesService,
-  RunStatus,
-  type Pipeline,
-  type PipelineCheck,
-  type PipelineEntry,
-  type PipelineStep,
-  type StepCheck,
-  type StepType,
-} from "@/lib/api";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { Banner, Button, ClickInHost, ConfirmDialog, EmptyState, IconButton, MenuButton, SegmentedControl, Tooltip, cx, toast, useClickIn } from "@/components";
+import { PipelinesService, RunStatus, type PipelineEntry, type PipelineStep, type StepCheck, type StepType } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
 import { toAppError } from "@/lib/errors";
 import { describeAccepts } from "@/pipelines/compat";
-import { isRunActive, normalizeEntry, usePipelineEntry, usePipelines } from "@/state/pipelines";
+import { useModules } from "@/state/modules";
+import { isRunActive, usePipelineEntry, usePipelines } from "@/state/pipelines";
+import { panelDrawerId, WorkspacePanel } from "@/workspace";
 import { AddStepMenu } from "./AddStepMenu";
 import { openToolPacks } from "./createPipeline";
+import { touchedKeep, useDraft } from "./draftStore";
 import { duplicateStep, firstProblem, stepsOf, insertStep, moveStep, newStep, removeStep, withEntry } from "./editorModel";
+import { PipelinesTabs } from "./PipelinesTabs";
+import { useEditorMode } from "./editorMode";
+import { GraphEditor } from "./GraphEditor";
+import { RunHistoryBody, TriggersBody, stepPanelSummary, watchSummary } from "./panels";
 import { StepCard } from "./StepCard";
+import { pipelinesWorkspace } from "./workspace";
 import styles from "./PipelineEditor.module.css";
 
-export const SAVE_DELAY_MS = 600;
-export const DESCRIBE_DELAY_MS = 250;
-
-type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "error"; message: string };
+export { SAVE_DELAY_MS, DESCRIBE_DELAY_MS } from "./draftStore";
 
 const RUN_STATUS_TEXT: Record<string, string> = {
   [RunStatus.RunRunning]: "running",
@@ -35,20 +30,13 @@ const RUN_STATUS_TEXT: Record<string, string> = {
   [RunStatus.RunCancelled]: "cancelled",
 };
 
-function normalizeCheck(pipeline: Pipeline, check: PipelineCheck): PipelineCheck {
-  return normalizeEntry({ pipeline, check, watch: { active: false, message: "" }, lastRun: null }).check;
-}
-
-/** Saves a pipeline and tells the store about it. */
-async function persist(p: Pipeline): Promise<PipelineEntry> {
-  const saved = await PipelinesService.Save(p);
-  const s = usePipelines.getState();
-  s.setEntries(withEntry(s.entries, saved));
-  return saved;
-}
-
 /** The editor of the selected pipeline (SPEC.md §11.2). */
-export function PipelineEditor() {
+export interface PipelineEditorProps {
+  /** Opens the template gallery; with it, Graph mode shows a pipeline switcher (the list is hidden then). */
+  onNew?: () => void;
+}
+
+export function PipelineEditor({ onNew }: PipelineEditorProps = {}) {
   const selected = usePipelines((s) => s.selectedPipelineId);
   const entry = usePipelineEntry(selected);
   if (!entry) {
@@ -58,103 +46,79 @@ export function PipelineEditor() {
       </div>
     );
   }
-  return <EditorBody key={entry.pipeline.id} entry={entry} />;
+  return <EditorBody key={entry.pipeline.id} entry={entry} onNew={onNew} />;
 }
 
-function EditorBody({ entry }: { entry: PipelineEntry }) {
+function EditorBody({ entry, onNew }: { entry: PipelineEntry; onNew?: () => void }) {
+  const pipelineId = entry.pipeline.id;
+  const ready = useDraft((s) => s.pipelineId === pipelineId && s.draft !== null);
+  // Layout effect: the previous pipeline's body has already flushed (its cleanup runs first).
+  useLayoutEffect(() => {
+    useDraft.getState().open(entry);
+    return () => useDraft.getState().close();
+    // The draft is opened once per pipeline; later entry updates (after saves) must not reset it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipelineId]);
+  if (!ready) return null;
+  return (
+    <ClickInHost className={styles.root}>
+      <EditorInner entry={entry} onNew={onNew} />
+    </ClickInHost>
+  );
+}
+
+function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => void }) {
   const pipelineId = entry.pipeline.id;
   const catalog = usePipelines((s) => s.catalog);
   const runs = usePipelines((s) => s.runs);
-  const setTab = usePipelines((s) => s.setTab);
-  const setRunFilter = usePipelines((s) => s.setRunFilter);
+  const selectPipeline = usePipelines((s) => s.selectPipeline);
   const openRunSheet = usePipelines((s) => s.openRunSheet);
 
-  const [draft, setDraft] = useState<Pipeline>(entry.pipeline);
-  const [check, setCheck] = useState<PipelineCheck>(entry.check);
-  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
+  const draft = useDraft((s) => s.draft) ?? entry.pipeline;
+  const check = useDraft((s) => s.check);
+  const saveState = useDraft((s) => s.saveState);
+  const canUndo = useDraft((s) => s.canUndo);
+  const canRedo = useDraft((s) => s.canRedo);
+  const stepId = useDraft((s) => s.stepId);
+  const edit = useDraft((s) => s.edit);
+  const editLayout = useDraft((s) => s.editLayout);
+  const undo = useDraft((s) => s.undo);
+  const redo = useDraft((s) => s.redo);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [drag, setDrag] = useState<{ id: string; to: number } | null>(null);
+  const [mode, setMode] = useEditorMode();
+  const modules = useModules((s) => s.list);
+  const { open: openDrawer } = useClickIn();
+  pipelinesWorkspace.useHost();
 
-  const draftRef = useRef(draft);
-  const dirtyRef = useRef(false);
-  const savingRef = useRef(false);
-  const resaveRef = useRef(false);
-  const deletedRef = useRef(false);
-  const mountedRef = useRef(true);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const describeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const describeSeq = useRef(0);
-  const touchedKeep = useRef(new Set<string>());
   const focusHandle = useRef<string | null>(null);
   const cardEls = useRef(new Map<string, HTMLElement>());
   const dragCleanup = useRef<(() => void) | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
 
-  const runDescribe = useCallback(() => {
-    const p = draftRef.current;
-    const seq = ++describeSeq.current;
-    PipelinesService.Describe(p)
-      .then((c) => {
-        if (mountedRef.current && seq === describeSeq.current) setCheck(normalizeCheck(p, c));
-      })
-      .catch(() => undefined); // keep the last answer; saving still works
-  }, []);
+  useEffect(() => () => dragCleanup.current?.(), []);
 
-  const save = useCallback(async () => {
-    clearTimeout(saveTimer.current);
-    if (!dirtyRef.current || deletedRef.current) return;
-    if (savingRef.current) {
-      resaveRef.current = true;
-      return;
-    }
-    savingRef.current = true;
-    dirtyRef.current = false;
-    if (mountedRef.current) setSaveState({ kind: "saving" });
-    try {
-      await persist(draftRef.current);
-      if (mountedRef.current) setSaveState(dirtyRef.current ? { kind: "saving" } : { kind: "saved" });
-    } catch (e) {
-      dirtyRef.current = true;
-      if (mountedRef.current) setSaveState({ kind: "error", message: toAppError(e).message });
-    } finally {
-      savingRef.current = false;
-      if (resaveRef.current) {
-        resaveRef.current = false;
-        void save();
-      }
-    }
-  }, []);
-
-  const edit = useCallback(
-    (fn: (p: Pipeline) => Pipeline) => {
-      const next = fn(draftRef.current);
-      draftRef.current = next;
-      dirtyRef.current = true;
-      setDraft(next);
-      clearTimeout(saveTimer.current);
-      clearTimeout(describeTimer.current);
-      saveTimer.current = setTimeout(() => void save(), SAVE_DELAY_MS);
-      describeTimer.current = setTimeout(runDescribe, DESCRIBE_DELAY_MS);
-    },
-    [save, runDescribe],
-  );
-
-  // Flush a pending save when leaving this pipeline.
+  // Mod+Z / Mod+Shift+Z / Mod+Y; text fields keep their own undo.
   useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      clearTimeout(saveTimer.current);
-      clearTimeout(describeTimer.current);
-      dragCleanup.current?.();
-      if (dirtyRef.current && !deletedRef.current && !savingRef.current) {
-        dirtyRef.current = false;
-        void persist(draftRef.current).catch((e: unknown) =>
-          toast({ title: "Couldn't save the pipeline", description: toAppError(e).message, tone: "danger" }),
-        );
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const t = e.target instanceof Element ? e.target : null;
+      if (t?.closest("input, textarea, select, [contenteditable]")) return;
+      const k = e.key.toLowerCase();
+      if (k === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (k === "y" && !e.shiftKey) {
+        e.preventDefault();
+        redo();
       }
     };
-  }, []);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
 
   useLayoutEffect(() => {
     const id = focusHandle.current;
@@ -166,12 +130,11 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
   const checkById = useMemo(() => new Map<string, StepCheck>((check.steps ?? []).map((s) => [s.stepId, s] as const)), [check.steps]);
   const steps = stepsOf(draft);
 
-  const patchStep = (id: string, patch: Partial<PipelineStep>) =>
-    edit((p) => ({ ...p, steps: stepsOf(p).map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
+  const patchStep = (id: string, patch: Partial<PipelineStep>) => useDraft.getState().patchStep(id, patch);
 
   const addStep = (type: StepType, index: number) => {
     const s = newStep(type, stepsOf(draftRef.current), check, index);
-    edit((p) => ({ ...p, steps: insertStep(stepsOf(p), index, s, touchedKeep.current) }));
+    edit((p) => ({ ...p, steps: insertStep(stepsOf(p), index, s, touchedKeep) }));
     if (type.id === "visualizer") setExpanded(s.id);
   };
 
@@ -231,10 +194,7 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
     dragCleanup.current = stop;
   };
 
-  const flush = async () => {
-    clearTimeout(saveTimer.current);
-    await save();
-  };
+  const flush = () => useDraft.getState().flush();
 
   const runNow = async () => {
     await flush();
@@ -257,9 +217,7 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
     setConfirmDelete(false);
     try {
       await PipelinesService.Delete(pipelineId);
-      deletedRef.current = true;
-      dirtyRef.current = false;
-      clearTimeout(saveTimer.current);
+      useDraft.getState().markDeleted();
       const s = usePipelines.getState();
       s.setEntries(s.entries.filter((e) => e.pipeline.id !== pipelineId));
     } catch (e) {
@@ -267,60 +225,103 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
     }
   };
 
-  const chooseFolder = async () => {
-    try {
-      const dir = await FilesService.PickFolder("Watch folder");
-      if (dir) edit((p) => ({ ...p, watch: { ...p.watch, folder: dir } }));
-    } catch (e) {
-      toast({ title: "Couldn't choose a folder", description: toAppError(e).message, tone: "danger" });
-    }
-  };
-
-  const toggleWatch = (enabled: boolean) => {
-    edit((p) => ({ ...p, watch: { ...p.watch, enabled } }));
-    if (enabled && !draftRef.current.watch.folder) void chooseFolder();
-  };
-
   const myRuns = useMemo(() => Object.values(runs).filter((r) => r.pipelineId === pipelineId), [runs, pipelineId]);
-  const activeRuns = myRuns.filter(isRunActive).length;
+  const activeRunList = useMemo(() => myRuns.filter(isRunActive), [myRuns]);
+  const activeRuns = activeRunList.length;
   const lastRun = useMemo(() => {
     const newest = [...myRuns].sort((a, b) => b.createdAt - a.createdAt)[0];
     return newest ? { status: newest.status as string, at: newest.createdAt } : entry.lastRun ? { status: entry.lastRun.status as string, at: entry.lastRun.createdAt } : null;
   }, [myRuns, entry.lastRun]);
   const runCount = Math.max(myRuns.length, entry.lastRun ? 1 : 0);
 
+  const compact = mode === "graph" && !!onNew;
   const blocked = !check.ready;
   const problem = firstProblem(check);
   const pipelineProblems = check.problems ?? [];
   const missing = check.missing ?? [];
   const status = check.ready ? "Ready" : missing.length > 0 && pipelineProblems.length === 0 ? "Tools missing" : "Has problems";
 
+  const historyText = `${runCount === 0 ? "no runs yet" : `${runCount} ${runCount === 1 ? "run" : "runs"}`}${lastRun ? ` · last: ${RUN_STATUS_TEXT[lastRun.status] ?? lastRun.status} ${formatRelativeTime(lastRun.at)}` : ""}`;
+  const watchText = watchSummary(draft.watch.folder, draft.watch.enabled);
   const watchMessage = draft.watch.enabled ? entry.watch.message : "";
 
+  // What the panels (and popped-out copies of them) show comes from here.
+  useEffect(() => {
+    useDraft.getState().setLive({ watchMessage, runText: historyText, runCount, catalog: [...catalog] });
+  }, [watchMessage, historyText, runCount, catalog]);
+
+  const openStep = (id: string) => {
+    useDraft.getState().select(id);
+    openDrawer(panelDrawerId("step"));
+  };
+
   return (
-    <div className={styles.root}>
-      <header className={styles.header}>
+    <>
+      <header className={cx(styles.header, compact && styles.headerGraph)}>
+        {compact && <PipelinesTabs />}
+        {compact && (
+          <MenuButton
+            label="Pipelines"
+            icon="workflow"
+            variant="secondary"
+            size="sm"
+            tip="Switch to another pipeline or make a new one"
+            items={() => [
+              ...usePipelines.getState().entries.map((e) => ({
+                id: e.pipeline.id,
+                label: e.pipeline.name,
+                icon: e.pipeline.id === pipelineId ? "check" : "workflow",
+                tip: e.pipeline.id === pipelineId ? "The pipeline you are editing" : "Open this pipeline",
+                onSelect: () => selectPipeline(e.pipeline.id),
+              })),
+              { id: "__new", label: "New pipeline…", icon: "plus", tip: "Start from a template or an empty pipeline", onSelect: onNew },
+            ]}
+          />
+        )}
         <div className={styles.titles}>
           <input
             className={styles.name}
             aria-label="Pipeline name"
-            data-tip="The name shown in the list and the command palette"
+            data-tip={compact && draft.description ? draft.description : "The name shown in the list and the command palette"}
+            title={compact ? draft.description : undefined}
             value={draft.name}
             maxLength={80}
             placeholder="Name this pipeline"
-            onChange={(e) => edit((p) => ({ ...p, name: e.target.value }))}
+            onChange={(e) => useDraft.getState().setName(e.target.value)}
           />
-          <input
-            className={styles.description}
-            aria-label="Description"
-            data-tip="A note for yourself about what this pipeline is for"
-            value={draft.description}
-            maxLength={300}
-            placeholder="Add a description"
-            onChange={(e) => edit((p) => ({ ...p, description: e.target.value }))}
-          />
+          {!compact && (
+            <input
+              className={styles.description}
+              aria-label="Description"
+              data-tip={draft.description || "A note for yourself about what this pipeline is for"}
+              title={draft.description}
+              value={draft.description}
+              maxLength={300}
+              placeholder="Add a description"
+              onChange={(e) => useDraft.getState().setDescription(e.target.value)}
+            />
+            )}
         </div>
+        {compact && (
+          <span className={styles.statusInline}>
+            <span data-tip="The kinds of files you can start this pipeline with">Takes: {describeAccepts(check.accepts)}</span>
+            {" · "}
+            <span data-tip={check.ready ? "Every step is set up and its tools are installed" : missing.length > 0 ? "Install the missing tool packs to run this" : "Fix the problems listed to run this"} className={check.ready ? styles.ok : missing.length > 0 ? styles.warn : styles.bad}>● {status}</span>
+          </span>
+        )}
         <div className={styles.actions}>
+          <IconButton size="sm" icon="undo-2" label="Undo" disabled={!canUndo} onClick={undo} />
+          <IconButton size="sm" icon="redo-2" label="Redo" disabled={!canRedo} onClick={redo} />
+          <SegmentedControl
+            size="sm"
+            aria-label="Editor view"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "graph", label: "Graph", tip: "Wire tools together on a canvas" },
+              { value: "list", label: "List", tip: "Edit the steps as a list, top to bottom" },
+            ]}
+          />
           <span className={styles.saveState} role="status" aria-live="polite" data-tip="Changes save automatically a moment after you make them">
             {saveState.kind === "saving" && "Saving…"}
             {saveState.kind === "saved" && "Saved"}
@@ -344,11 +345,13 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
         </div>
       </header>
 
-      <div className={styles.scroll}>
+      <div className={cx(styles.scroll, mode === "graph" && styles.scrollGraph)}>
+        {!compact && (
         <div className={styles.status}>
           <span data-tip="The kinds of files you can start this pipeline with">Takes: {describeAccepts(check.accepts)}</span>
           <span data-tip={check.ready ? "Every step is set up and its tools are installed" : missing.length > 0 ? "Install the missing tool packs to run this" : "Fix the problems listed to run this"} className={cx(styles.statusDot, check.ready ? styles.ok : missing.length > 0 ? styles.warn : styles.bad)}>● {status}</span>
         </div>
+        )}
 
         {pipelineProblems.length > 0 && (
           <Banner tone="danger" title="This pipeline can't run yet">
@@ -373,6 +376,21 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
           </Banner>
         )}
 
+        {mode === "graph" ? (
+          <GraphEditor
+            pipeline={draft}
+            check={check}
+            catalog={catalog}
+            modules={modules}
+            runs={activeRunList}
+            dropTargetId={`pipeline-drop:${pipelineId}`}
+            onEdit={edit}
+            onLayout={editLayout}
+            onOpenStep={openStep}
+            touchedKeep={touchedKeep}
+          />
+        ) : (
+          <>
         <ol className={styles.steps} aria-label="Steps">
           {steps.map((s, i) => {
             const dropAbove = drag !== null && drag.to === i && drag.id !== s.id && steps.findIndex((x) => x.id === drag.id) > i;
@@ -394,7 +412,7 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
                     expanded={expanded === s.id}
                     onToggle={() => setExpanded((x) => (x === s.id ? null : s.id))}
                     onChange={(patch) => patchStep(s.id, patch)}
-                    onKeepTouched={() => touchedKeep.current.add(s.id)}
+                    onKeepTouched={() => touchedKeep.add(s.id)}
                     onDuplicate={() => duplicateById(s.id)}
                     onRemove={() => removeById(s.id)}
                     onMove={(d) => moveTo(i, i + d)}
@@ -413,41 +431,26 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
         <div className={styles.add}>
           <AddStepMenu variant="end" index={steps.length} catalog={catalog} check={check} onPick={(t) => addStep(t, steps.length)} />
         </div>
+          </>
+        )}
 
-        <section className={styles.section} aria-label="Triggers">
-          <h3 className={styles.sectionTitle} data-tip="Ways a run can start besides pressing Run">Triggers</h3>
-          <div className={styles.watch}>
-            <Switch checked={draft.watch.enabled} onChange={toggleWatch} label="Watch a folder" tip="Run this pipeline automatically on every new file that appears in a folder" />
-            {draft.watch.folder && <PathText path={draft.watch.folder} />}
-            <Button size="sm" variant="secondary" data-tip="Pick the folder to watch for new files" onClick={() => void chooseFolder()}>
-              Choose…
-            </Button>
-          </div>
-          {watchMessage && <p className={styles.watchMessage} data-tip="Status of the folder watcher">{watchMessage}</p>}
-          <p className={styles.muted}>Also: drop files on this pipeline, Library → Send to, or the command palette.</p>
-        </section>
+        {mode === "list" ? (
+          <>
+            <section className={styles.section} aria-label="Triggers">
+              <h3 className={styles.sectionTitle} data-tip="Ways a run can start besides pressing Run">Triggers</h3>
+              <TriggersBody />
+            </section>
 
-        <section className={styles.section} aria-label="Run history">
-          <div className={styles.history}>
-            <span>
-              Run history: {runCount === 0 ? "no runs yet" : `${runCount} ${runCount === 1 ? "run" : "runs"}`}
-              {lastRun && ` · last: ${RUN_STATUS_TEXT[lastRun.status] ?? lastRun.status} ${formatRelativeTime(lastRun.at)}`}
-            </span>
-            {runCount > 0 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                data-tip="See this pipeline's runs in the Runs tab"
-                onClick={() => {
-                  setRunFilter(pipelineId);
-                  setTab("runs");
-                }}
-              >
-                Runs →
-              </Button>
-            )}
+            <section className={styles.section} aria-label="Run history"><RunHistoryBody /></section>
+          </>
+        ) : (
+          <div className={styles.footer}>
+            <WorkspacePanel ws={pipelinesWorkspace} panel="step" summary={stepPanelSummary(stepId, draft, catalog)} className={styles.footerItem} />
+            <WorkspacePanel ws={pipelinesWorkspace} panel="triggers" summary={watchText} className={styles.footerItem} />
+            <WorkspacePanel ws={pipelinesWorkspace} panel="runs" summary={historyText} className={styles.footerItem} />
+            <WorkspacePanel ws={pipelinesWorkspace} panel="about" summary={draft.description || draft.name} className={styles.footerItem} />
           </div>
-        </section>
+        )}
       </div>
 
       <ConfirmDialog
@@ -463,6 +466,6 @@ function EditorBody({ entry }: { entry: PipelineEntry }) {
         onConfirm={() => void deletePipeline()}
         onCancel={() => setConfirmDelete(false)}
       />
-    </div>
+    </>
   );
 }

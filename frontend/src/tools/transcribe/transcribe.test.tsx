@@ -32,7 +32,10 @@ vi.mock("@/lib/api", async (orig) => {
   };
 });
 
-import { JobStatus, type Job } from "@/lib/api";
+import { JobStatus, ModuleStatus, type Descriptor, type Job } from "@/lib/api";
+import { useEmbed } from "@/lib/embed";
+import { registerToolViews } from "@/lib/toolActions";
+import { useModules } from "@/state/modules";
 import { useJobs } from "@/state/jobs";
 import TranscribeView from "./TranscribeView";
 import { DEFAULT_TRANSCRIBE_OPTIONS, previewPath, sanitizeTranscribeOptions, toggleFormat } from "./options";
@@ -70,16 +73,18 @@ describe("TranscribeView", () => {
     enqueue.mockResolvedValue([{}]);
     const user = userEvent.setup();
     render(<TranscribeView moduleId="transcribe" />);
-    await screen.findByRole("radio", { name: /Turbo/ });
-    expect(screen.getByText(/Slower on CPU/)).toBeTruthy();
     expect(await screen.findByRole("option", { name: "French" })).toBeTruthy();
-
-    await user.click(screen.getByRole("radio", { name: /Turbo/ }));
     await user.selectOptions(screen.getByLabelText("Language"), "fr");
-    await user.click(screen.getByRole("radio", { name: "Translate to English" }));
     await user.click(screen.getByRole("button", { name: "VTT" }));
     await user.click(screen.getByRole("button", { name: "SRT" }));
+
+    await user.click(screen.getByRole("button", { name: /Advanced/ }));
+    await screen.findByRole("radio", { name: /Turbo/ });
+    expect(screen.getByText(/Slower on CPU/)).toBeTruthy();
+    await user.click(screen.getByRole("radio", { name: /Turbo/ }));
+    await user.click(screen.getByRole("radio", { name: "Translate to English" }));
     await user.click(screen.getByRole("switch", { name: "Skip silence" }));
+    expect(screen.getByRole("button", { name: /Advanced/ }).textContent).toContain("translate to English");
 
     await user.click(screen.getByRole("button", { name: "Add files…" }));
     const run = await screen.findByRole("button", { name: /Transcribe 1 file/ });
@@ -99,7 +104,7 @@ describe("TranscribeView", () => {
   it("cannot turn off the last format", async () => {
     const user = userEvent.setup();
     render(<TranscribeView moduleId="transcribe" />);
-    await screen.findByRole("radio", { name: /Turbo/ });
+    await screen.findByRole("button", { name: "SRT" });
     await user.click(screen.getByRole("button", { name: "SRT" }));
     await user.click(screen.getByRole("button", { name: "TXT" }));
     expect(screen.getByRole("button", { name: "TXT" }).getAttribute("aria-pressed")).toBe("true");
@@ -145,5 +150,28 @@ describe("TranscribeView", () => {
     expect(panel.textContent).not.toContain("line 50");
     await user.click(screen.getByRole("button", { name: "Close preview" }));
     expect(screen.queryByRole("complementary")).toBeNull();
+  });
+
+  it("asks Local Chat about a transcript with the text attached", async () => {
+    readText.mockResolvedValue("hello world transcript");
+    function FakeChat() {
+      const e = useEmbed();
+      return <p>chat about: {e?.handoff.text?.title} / {e?.handoff.text?.body} / {e?.handoff.text?.prompts?.join(",")}</p>;
+    }
+    registerToolViews({ "llm-chat": FakeChat });
+    const d = (id: string, name: string) => ({ id, name, icon: "box", status: ModuleStatus.StatusReady, accepts: { extensions: [], urls: false, any: false } }) as unknown as Descriptor;
+    useModules.getState().setAll([d("llm-chat", "Local Chat"), d("transcribe", "Transcribe")]);
+    useJobs.getState().upsert({
+      id: "j2", moduleId: "transcribe", title: "talk.mp3", status: JobStatus.JobDone, progress: 1, message: "", inputs: ["/talk.mp3"],
+      optionsJson: "{}", errorCode: "", error: "", errorHint: "", attempt: 1, cancelRequested: false, createdAt: 1, startedAt: 1, finishedAt: 2, outputs: [],
+      resultJson: JSON.stringify({ language: "en", languageProbability: 1, durationSec: 5, segments: 2, outputs: ["/o/talk.txt"] }),
+    } as unknown as Job);
+    const user = userEvent.setup();
+    render(<TranscribeView moduleId="transcribe" />);
+    const ask = await screen.findByRole("button", { name: "Ask Local Chat" });
+    await waitFor(() => expect((ask as HTMLButtonElement).disabled).toBe(false));
+    expect(readText).toHaveBeenCalledWith("/o/talk.txt", 200_000);
+    await user.click(ask);
+    expect(await screen.findByText("chat about: Transcript of talk.mp3 / hello world transcript / Summarise,Key points,Action items")).toBeTruthy();
   });
 });

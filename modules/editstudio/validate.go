@@ -338,17 +338,18 @@ func (m *Module) validateDoc(ctx context.Context, projectID string, doc EditProj
 	if err := validateShape(doc); err != nil {
 		return err
 	}
-	if doc.Song == nil {
-		return vErr("song", "Pick a song first")
-	}
-	if !fileExists(doc.Song.Path) {
+	// The song is optional (a Video Editor project): when it is there its file
+	// must exist; an analysis is only needed when the edit points at one.
+	if doc.Song != nil && !fileExists(doc.Song.Path) {
 		return vErr("song.path", "The song "+baseName(doc.Song.Path)+" is missing")
 	}
-	if doc.AnalysisKey == "" || m.cfg.Analyzer == nil {
-		return vErr("analysisKey", "Analyze the song first")
-	}
-	if _, ok := m.cfg.Analyzer.Lookup(doc.AnalysisKey); !ok {
-		return vErr("analysisKey", "The song's analysis isn't cached any more. Analyze it again")
+	if doc.AnalysisKey != "" {
+		if m.cfg.Analyzer == nil {
+			return vErr("analysisKey", "Analyze the song first")
+		}
+		if _, ok := m.cfg.Analyzer.Lookup(doc.AnalysisKey); !ok {
+			return vErr("analysisKey", "The song's analysis isn't cached any more. Analyze it again")
+		}
 	}
 	visible := 0
 	for ti, t := range doc.Tracks {
@@ -372,7 +373,7 @@ func (m *Module) validateDoc(ctx context.Context, projectID string, doc EditProj
 					return vErr(f+".matte", "The cut-out of "+clipName(c)+" isn't ready. Rebuild it or remove it")
 				}
 			}
-			if t.Kind == "video" && c.StartMs < songLen(doc) {
+			if t.Kind == "video" && c.StartMs < editLen(doc) {
 				visible++
 			}
 		}
@@ -383,12 +384,19 @@ func (m *Module) validateDoc(ctx context.Context, projectID string, doc EditProj
 	return nil
 }
 
-// songLen is D (§4).
-func songLen(doc EditProject) int64 {
-	if doc.Song == nil {
-		return 0
+// editLen is D (§4): the song range's length; without a song, the end of the
+// last clip on any track, at least 1 s (mirrors editLength in viz/edit/types.ts).
+func editLen(doc EditProject) int64 {
+	if doc.Song != nil {
+		return doc.Song.EndMs - doc.Song.StartMs
 	}
-	return doc.Song.EndMs - doc.Song.StartMs
+	end := int64(0)
+	for _, t := range doc.Tracks {
+		for _, c := range t.Clips {
+			end = max(end, c.EndMs)
+		}
+	}
+	return max(end, 1000)
 }
 
 func clipName(c Clip) string {

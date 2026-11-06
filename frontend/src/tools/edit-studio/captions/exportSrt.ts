@@ -2,8 +2,8 @@
 import { toast } from "@/components";
 import { EditStudioService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
-import { flushEdit } from "../useEditAutosave";
-import { useEditStudio } from "../store";
+import { flushEdit } from "@/editor/useEditAutosave";
+import { useEditStudio } from "@/editor/store";
 import { effectiveLines, srtCues } from "./lines";
 
 /** Submits the text job with the open edit's caption lines inside the range. */

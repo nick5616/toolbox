@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { SegmentedControl, Stepper, TextField } from "@/components";
 import { clampWidth, formatBigInt, groupBits, parseBigInt, twosComplement, type Base } from "./numbers.logic";
 import { OutputBox, useDebounced } from "./shared";
+import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
 const BASES: { base: Base; label: string }[] = [
@@ -12,9 +13,9 @@ const BASES: { base: Base; label: string }[] = [
 ];
 
 export default function NumbersUtil() {
-  const [text, setText] = useState("255");
-  const [base, setBase] = useState<Base>(10);
-  const [width, setWidth] = useState(32);
+  const [text, setText] = useUtilState("numbers", "text", "255");
+  const [base, setBase] = useUtilState<Base>("numbers", "base", 10);
+  const [width, setWidth] = useUtilState("numbers", "width", 32);
   const debounced = useDebounced(text);
 
   const value = useMemo(() => (debounced.trim() === "" ? null : parseBigInt(debounced, base)), [debounced, base]);

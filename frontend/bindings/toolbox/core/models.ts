@@ -528,6 +528,21 @@ export interface Descriptor {
      * MaxInputs caps inputs per submission; 0 = no limit.
      */
     "maxInputs": number;
+
+    /**
+     * Composition (Phase 10, SPEC.md §3). Base is the tool this one is a
+     * variant of: the same core with a composition layered on top (Edit
+     * Studio is Video Editor + the music layer). The sidebar lists a variant
+     * under its base. "" = a baseline tool.
+     */
+    "base": string;
+
+    /**
+     * Parts are the other tools this one is built from (constituents), in
+     * display order. The tool header lists them; each can be opened inline
+     * or popped out into its own window. Never includes Base.
+     */
+    "parts": string[] | null;
 }
 
 /**
@@ -589,6 +604,12 @@ export interface FilesDropped {
      * routes straight to that tool).
      */
     "targetId": string;
+
+    /**
+     * Window is the key of the window the files were dropped on: "" for the
+     * main window, else a pop-out's key (Phase 10). Only that window routes it.
+     */
+    "window": string;
 }
 
 /**
@@ -1044,6 +1065,13 @@ export interface Pipeline {
      */
     "steps": PipelineStep[] | null;
     "watch": WatchConfig;
+
+    /**
+     * Layout is the node editor's canvas state (Phase 10): JSON
+     * {"v":1,"nodes":{"<stepId>|input":{"x":0,"y":0}},"view":{"x":0,"y":0,"zoom":1}}.
+     * Opaque to the runner; ≤ 32 KiB; "" = auto layout.
+     */
+    "layout": string;
     "createdAt": number;
     "updatedAt": number;
 }
@@ -1208,6 +1236,46 @@ export interface PipelinesChanged {
 }
 
 /**
+ * PopOutRequest opens (or focuses) a pop-out window.
+ */
+export interface PopOutRequest {
+    /**
+     * Key identifies the window: "tool:<moduleId>" or "part:<partId>" with an
+     * optional "@<instance>" suffix. Opening an open key focuses it.
+     */
+    "key": string;
+
+    /**
+     * window title; "" = "Toolbox"
+     */
+    "title": string;
+
+    /**
+     * Query is the page's query string without "?", e.g.
+     * "window=tool&view=edit-studio". It must start with "window=tool&" or
+     * "window=part&"; Go appends "&key=<Key>".
+     */
+    "query": string;
+
+    /**
+     * 0 = 1180; clamped to 480..4096
+     */
+    "width": number;
+
+    /**
+     * 0 = 760; clamped to 360..4096
+     */
+    "height": number;
+
+    /**
+     * Handoff is optional JSON the window takes once with TakeHandoff (a
+     * frontend Handoff: inputs, seeds). If the window is already open,
+     * windows:handoff tells it one is waiting.
+     */
+    "handoff": string;
+}
+
+/**
  * PresetInfo describes a module preset for the UI. Fields that don't apply to
  * a module are zero.
  */
@@ -1254,6 +1322,13 @@ export interface ProjectInfo {
      */
     "missing": number;
     "updatedAt": number;
+
+    /**
+     * Flags are per-kind facts for listings (Phase 10). Edit projects:
+     * "music" (has a song), "music-edit" (the song is analysed: an Edit
+     * Studio project). Never nil on the wire.
+     */
+    "flags": string[] | null;
 }
 
 /**
@@ -1805,4 +1880,43 @@ export interface WatchState {
      * "" = fine; else why it's paused ("Fix the problems in step 2")
      */
     "message": string;
+}
+
+/**
+ * WindowHandoff says a handoff waits for the window Key.
+ */
+export interface WindowHandoff {
+    "key": string;
+}
+
+/**
+ * WindowRelay is a message between windows. Go doesn't read Payload.
+ */
+export interface WindowRelay {
+    /**
+     * e.g. "bridge:edit-studio"
+     */
+    "channel": string;
+
+    /**
+     * sender's window key; "main" for the main window
+     */
+    "from": string;
+
+    /**
+     * "" = every window
+     */
+    "to": string;
+
+    /**
+     * JSON, ≤ MaxRelayBytes
+     */
+    "payload": string;
+}
+
+/**
+ * WindowsChanged lists the open pop-out windows' keys (sorted).
+ */
+export interface WindowsChanged {
+    "open": string[] | null;
 }

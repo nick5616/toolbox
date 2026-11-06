@@ -76,4 +76,12 @@ describe("LibraryView", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Remove from library" })[0] as HTMLElement);
     expect(remove).toHaveBeenCalledWith("a");
   });
+
+  it("keeps filters in a click-in with a summary", () => {
+    render(<LibraryView />);
+    const launcher = screen.getByRole("button", { name: /Filters/ });
+    expect(launcher.textContent).toContain("All tools");
+    fireEvent.click(launcher);
+    expect(screen.getByLabelText("Filter by tool")).toBeTruthy();
+  });
 });

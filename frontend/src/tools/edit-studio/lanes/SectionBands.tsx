@@ -7,9 +7,9 @@ import { useEffect, useMemo, useState } from "react";
 import { MenuButton } from "@/components";
 import { laneSettings } from "@/viz/edit/defaults";
 import { MAX_SECTION_LABEL, renameSection } from "./laneLogic";
-import { msToX } from "../geometry";
+import { msToX } from "@/editor/geometry";
 import { useSectionStyle } from "../sectionstyle/useSectionStyle";
-import { useEditStudio, useMarkers, useProject } from "../store";
+import { useEditStudio, useMarkers, useProject } from "@/editor/store";
 import styles from "./SectionBands.module.css";
 
 export interface SectionBandsProps {

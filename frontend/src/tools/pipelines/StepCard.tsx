@@ -1,11 +1,10 @@
 import { useMemo, type KeyboardEvent, type PointerEvent, type Ref } from "react";
-import { Badge, Button, Field, Icon, IconButton, SegmentedControl, Select, Switch, TextField, cx } from "@/components";
-import type { PipelineStep, StepCheck, StepProduct, StepType } from "@/lib/api";
+import { Badge, Icon, IconButton, cx } from "@/components";
+import type { PipelineStep, StepCheck, StepType } from "@/lib/api";
 import { FROM_INPUT, FROM_NONE } from "@/pipelines/compat";
-import { stepUI } from "@/pipelines/steps";
-import { BUILTIN_VARS } from "@/pipelines/vars";
-import { autoContinueFor, CHECK_TYPE, filterOf, isFilterEmpty, NO_FILES_TYPES, type Filter } from "./editorModel";
-import { FiltersPopover } from "./FiltersPopover";
+import { filterOf } from "./editorModel";
+import { roleProducts, filterText, stepName } from "./stepHelpers";
+import { StepOptions } from "./StepOptions";
 import styles from "./StepCard.module.css";
 
 export interface StepCardProps {
@@ -28,28 +27,6 @@ export interface StepCardProps {
   /** Being dragged right now. */
   dragging?: boolean;
   cardRef?: Ref<HTMLElement>;
-}
-
-/** "Step 2 · Stem Splitter" etc. */
-function stepName(step: PipelineStep, type: StepType | undefined): string {
-  return step.label.trim() || type?.name || step.type;
-}
-
-/** Roles a source step makes (deduplicated, with labels). */
-function roleProducts(products: readonly StepProduct[]): Array<{ role: string; label: string }> {
-  const out: Array<{ role: string; label: string }> = [];
-  for (const p of products) if (p.role && !out.some((o) => o.role === p.role)) out.push({ role: p.role, label: p.label || p.role });
-  return out;
-}
-
-function filterText(f: Filter, roles: ReadonlyArray<{ role: string; label: string }>): string {
-  const parts: string[] = [];
-  if (f.roles.length > 0) parts.push(f.roles.map((r) => roles.find((x) => x.role === r)?.label ?? r).join(", "));
-  if (f.kinds.length > 0) parts.push(f.kinds.join(", "));
-  if (f.exts.length > 0) parts.push(f.exts.join(", "));
-  const base = parts.length > 0 ? `${parts.join(" · ")} only` : "";
-  if (f.name.trim()) return [base, `name has “${f.name.trim()}”`].filter(Boolean).join(" · ");
-  return base;
 }
 
 /** One step of the pipeline: collapsed summary and expanded editor (SPEC.md §11.4). */
@@ -75,42 +52,17 @@ export function StepCard({
   const check = checkById.get(step.id);
   const problems = check?.problems ?? [];
   const name = stepName(step, type);
-  const toolName = type?.name ?? step.type;
-  const isCheck = step.type === CHECK_TYPE;
-  const noFiles = NO_FILES_TYPES.has(step.type) || check?.info.noFiles === true;
-  const canBoth = !!type && type.auto && type.manual;
-  const manualOnly = !!type && !type.auto && type.manual;
   const isLast = index === steps.length - 1;
 
   const fromIndex = steps.findIndex((s) => s.id === step.from);
   const source = fromIndex >= 0 ? steps[fromIndex] : undefined;
   const sourceProducts = source ? (checkById.get(source.id)?.info.produces ?? []) : [];
   const roles = roleProducts(sourceProducts);
-  // Selected roles the source doesn't (or no longer) make stay visible so they can be unselected.
-  const roleChips = [...roles, ...filter.roles.filter((r) => !roles.some((x) => x.role === r)).map((r) => ({ role: r, label: r }))];
 
   const summary = check?.info.summary ?? "";
   const filterLabel = filterText(filter, roles);
   const fromLabel = step.from === FROM_NONE ? "no files" : step.from === FROM_INPUT ? "the files you run it on" : `step ${fromIndex + 1}`;
   const showFromChip = filterLabel !== "" || (step.from === FROM_INPUT ? index > 0 : step.from === FROM_NONE ? true : fromIndex !== index - 1);
-
-  const ui = !step.manual && !isCheck ? stepUI(step.type) : undefined;
-  const value = useMemo(() => ui?.parse(step.optionsJson), [ui, step.optionsJson]);
-
-  const fromOptions = [
-    { value: FROM_INPUT, label: "The files you run it on" },
-    ...steps.slice(0, index).map((s, i) => ({ value: s.id, label: `Step ${i + 1} · ${stepName(s, catalog.find((t) => t.id === s.type))}` })),
-    ...(noFiles || step.from === FROM_NONE ? [{ value: FROM_NONE, label: "No files" }] : []),
-  ];
-
-  const toggleRole = (role: string) => {
-    const roles2 = filter.roles.includes(role) ? filter.roles.filter((r) => r !== role) : [...filter.roles, role];
-    onChange({ filter: { ...filter, roles: roles2 } });
-  };
-
-  const setManual = (manual: boolean) => {
-    onChange(manual ? { manual, autoContinue: autoContinueFor(step.type) } : { manual });
-  };
 
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
@@ -180,157 +132,18 @@ export function StepCard({
       )}
 
       {expanded && (
-        <div id={bodyId} className={styles.body}>
-          <div className={styles.row}>
-            <Field label="Files from" className={styles.grow}>
-              {(c) => (
-                <Select
-                  {...c}
-                  data-tip="Which files this step works on: the ones you start the run with, or what an earlier step made"
-                  size="sm"
-                  value={step.from}
-                  options={fromOptions}
-                  onChange={(from) => onChange({ from, filter: from === step.from ? filter : { ...filter, roles: [] } })}
-                />
-              )}
-            </Field>
-          </div>
-
-          {step.from !== FROM_NONE && (
-            <div className={styles.only}>
-              <span className={styles.onlyLabel} data-tip="Limit this step to certain kinds of files from its source">Only</span>
-              {roleChips.map((r) => (
-                <button
-                  key={r.role}
-                  type="button"
-                  className={cx(styles.chip, filter.roles.includes(r.role) && styles.chipOn)}
-                  aria-pressed={filter.roles.includes(r.role)}
-                  data-tip={filter.roles.includes(r.role) ? `Stop limiting to ${r.label}` : `Only take the "${r.label}" files from the source step`}
-                  onClick={() => toggleRole(r.role)}
-                >
-                  {r.label}
-                </button>
-              ))}
-              {roleChips.length === 0 && isFilterEmpty(filter) && <span className={styles.muted} data-tip="No filter: this step takes all files from its source">everything it gets</span>}
-              <FiltersPopover filter={filter} onChange={(filter) => onChange({ filter })} />
-            </div>
-          )}
-
-          {isCheck ? (
-            <>
-              <p className={styles.help}>The pipeline pauses here until you choose which files to carry on.</p>
-              <Field label="Note">
-                {(c) => (
-                  <TextField
-                    {...c}
-                    size="sm"
-                    maxLength={200}
-                    value={step.note}
-                    placeholder="What should you look for?"
-                    data-tip="A reminder shown when the pipeline pauses, e.g. what to check"
-                    onChange={(e) => onChange({ note: e.target.value })}
-                  />
-                )}
-              </Field>
-            </>
-          ) : (
-            <>
-              {canBoth && (
-                <div className={styles.how}>
-                  <SegmentedControl
-                    size="sm"
-                    aria-label="How"
-                    value={step.manual ? "manual" : "auto"}
-                    onChange={(v) => setManual(v === "manual")}
-                    options={[
-                      { value: "auto", label: "Automatically", tip: "Toolbox runs this step for you with the options below" },
-                      { value: "manual", label: `I'll do it myself in ${toolName}`, tip: `The pipeline pauses and opens ${toolName} with the files; you set it up and run it` },
-                    ]}
-                  />
-                </div>
-              )}
-              {step.manual || manualOnly ? (
-                <>
-                  <p className={styles.help}>{toolName} opens with the file loaded and uses its own settings.</p>
-                  <Switch
-                    checked={step.autoContinue}
-                    onChange={(autoContinue) => onChange({ autoContinue })}
-                    label={`Continue when ${toolName} finishes`}
-                    tip={`Carry on automatically once your ${toolName} job is done, instead of waiting for you to press Continue`}
-                  />
-                  <Field label="Note">
-                    {(c) => (
-                      <TextField
-                        {...c}
-                        size="sm"
-                        maxLength={200}
-                        value={step.note}
-                        placeholder="Shown on the “needs you” card"
-                        data-tip="A reminder shown on the waiting card, e.g. what settings to use"
-                        onChange={(e) => onChange({ note: e.target.value })}
-                      />
-                    )}
-                  </Field>
-                </>
-              ) : ui && value !== undefined ? (
-                <div className={styles.editor}>
-                  <ui.Editor
-                    value={value}
-                    onChange={(next) => onChange({ optionsJson: JSON.stringify(next) })}
-                    check={check}
-                    vars={check?.vars ?? [...BUILTIN_VARS]}
-                  />
-                </div>
-              ) : (
-                <div className={styles.unknown}>
-                  <strong>This step can&apos;t be edited here</strong>
-                  {summary && <span>{summary}</span>}
-                </div>
-              )}
-            </>
-          )}
-
-          {(check?.info.warnings ?? []).map((w) => (
-            <p key={w} className={styles.warning}>
-              {w}
-            </p>
-          ))}
-
-          <div className={styles.keep}>
-            <Switch
-              checked={step.keep}
-              onChange={(keep) => {
-                onKeepTouched();
-                onChange({ keep });
-              }}
-              label="Keep its files in the Library"
-              tip="On: this step's results stay in your Library. Off: they are temporary and deleted after a clean run"
-            />
-            <p className={styles.help}>Off: deleted when the run finishes without problems.</p>
-          </div>
-
-          <div className={styles.footer}>
-            <Field label="Label" className={styles.grow}>
-              {(c) => (
-                <TextField
-                  {...c}
-                  size="sm"
-                  maxLength={60}
-                  value={step.label}
-                  placeholder={toolName}
-                  data-tip="A custom name for this step in the list and in run results"
-                  onChange={(e) => onChange({ label: e.target.value })}
-                />
-              )}
-            </Field>
-            <Button size="sm" variant="secondary" icon="copy" data-tip="Add a copy of this step right after it, with the same options" onClick={onDuplicate}>
-              Duplicate
-            </Button>
-            <Button size="sm" variant="danger" icon="trash-2" data-tip="Take this step out of the pipeline" onClick={onRemove}>
-              Remove
-            </Button>
-          </div>
-        </div>
+        <StepOptions
+          id={bodyId}
+          step={step}
+          steps={steps}
+          index={index}
+          catalog={catalog}
+          checkById={checkById}
+          onChange={onChange}
+          onKeepTouched={onKeepTouched}
+          onDuplicate={onDuplicate}
+          onRemove={onRemove}
+        />
       )}
     </section>
   );

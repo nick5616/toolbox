@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Banner, Button, EmptyState, IconButton, Select, TextArea, toast, type SelectOption } from "@/components";
+import { Banner, Button, ClickIn, ClickInHost, EmptyState, toast, useClickIn, type SelectOption } from "@/components";
 import {
   ChatBackend,
   ChatServerState,
@@ -12,12 +12,16 @@ import {
   type ChatStatus,
 } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { useEmbed, useToolHandoff } from "@/lib/embed";
 import { on } from "@/lib/events";
 import { useSettings } from "@/state/settings";
+import type { TextSeed } from "@/state/ui";
 import type { ToolViewProps } from "@/tools";
 import { DepsGate, setRequiresOverride, useDepsGate } from "../_kit";
+import { ChatSettingsDrawer } from "./ChatSettingsDrawer";
 import { Composer } from "./Composer";
-import { ConversationList } from "./ConversationList";
+import { ContextCard, withContext } from "./ContextCard";
+import { ConversationList, type ConversationListProps } from "./ConversationList";
 import { ModelCards } from "./ModelCards";
 import { Thread } from "./Thread";
 import { isOllamaModel } from "./grouping";
@@ -43,7 +47,14 @@ function fail(e: unknown): void {
   });
 }
 
+/** The conversation list inside its click-in (embedded chat): choosing one closes the drawer. */
+function CompactList(p: ConversationListProps) {
+  const { close } = useClickIn();
+  return <ConversationList {...p} onSelect={(id) => { p.onSelect(id); close(); }} onNew={() => { p.onNew(); close(); }} />;
+}
+
 export default function ChatView({ moduleId }: ToolViewProps) {
+  const embedded = useEmbed() !== null;
   const defaults = useSettings((s) => s.settings.chat);
 
   const [models, setModels] = useState<ChatModelInfo[]>([]);
@@ -55,9 +66,9 @@ export default function ChatView({ moduleId }: ToolViewProps) {
   const [active, setActive] = useState<ChatConversation | null>(null);
   const [draftModel, setDraftModel] = useState("");
   const [draftPrompt, setDraftPrompt] = useState("");
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [promptText, setPromptText] = useState("");
   const [status, setStatus] = useState<ChatStatus>(EMPTY_STATUS);
+  /** Text a tool handed over: sent with the first message as context. */
+  const [seed, setSeed] = useState<TextSeed | null>(null);
 
   const loadList = useCallback(async (q: string, cursor: string) => {
     try {
@@ -126,7 +137,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
 
   const select = async (id: string) => {
     setActiveId(id);
-    setShowPrompt(false);
+    setSeed(null);
     try {
       const view = await ChatService.Conversation(id);
       setActive(view.conversation);
@@ -137,11 +148,20 @@ export default function ChatView({ moduleId }: ToolViewProps) {
   };
 
   const newChat = () => {
+    setSeed(null);
     setActiveId(null);
     setActive(null);
-    setShowPrompt(false);
     thread.clear();
   };
+
+  // A tool handed over text (OCR, transcript, clipboard): a fresh conversation about it.
+  useToolHandoff(moduleId, (h) => {
+    if (!h.text) return;
+    setActiveId(null);
+    setActive(null);
+    thread.clear();
+    setSeed(h.text);
+  });
 
   const ensureConversation = async (): Promise<ChatConversation> => {
     if (active) return active;
@@ -168,7 +188,12 @@ export default function ChatView({ moduleId }: ToolViewProps) {
     }
   };
 
-  const send = (text: string) => run((id) => ChatService.Send(id, text), { userText: text });
+  const send = async (text: string): Promise<boolean> => {
+    // The first message carries the handed-over text as context ahead of the question.
+    const withText = seed && messages.length === 0 ? withContext(seed, text) : text;
+    const ok = await run((id) => ChatService.Send(id, withText), { userText: text });
+    return ok;
+  };
   const retry = () => void run((id) => ChatService.Regenerate(id), { dropLastAssistant: true });
   const edit = (messageId: string, text: string) =>
     void run((id) => ChatService.EditAndResend(id, messageId, text), { userText: text, truncateFrom: messageId });
@@ -188,23 +213,18 @@ export default function ChatView({ moduleId }: ToolViewProps) {
     }
   };
 
-  const savePrompt = async () => {
+  const savePrompt = async (text: string): Promise<boolean> => {
     if (!active) {
-      setDraftPrompt(promptText);
-      setShowPrompt(false);
-      return;
+      setDraftPrompt(text);
+      return true;
     }
     try {
-      setActive(await ChatService.UpdateConversation(active.id, { title: null, model: null, systemPrompt: promptText }));
-      setShowPrompt(false);
+      setActive(await ChatService.UpdateConversation(active.id, { title: null, model: null, systemPrompt: text }));
+      return true;
     } catch (e) {
       fail(e);
+      return false;
     }
-  };
-
-  const togglePrompt = () => {
-    if (!showPrompt) setPromptText(active ? active.systemPrompt : draftPrompt);
-    setShowPrompt((v) => !v);
   };
 
   const rename = async (id: string, title: string) => {
@@ -242,64 +262,46 @@ export default function ChatView({ moduleId }: ToolViewProps) {
   }));
   if (modelId && !installed.some((m) => m.id === modelId)) modelOptions.unshift({ value: modelId, label: modelId });
 
+  const listProps: ConversationListProps = {
+    items: convs,
+    activeId,
+    search,
+    onSearch: setSearch,
+    onSelect: (id) => void select(id),
+    onNew: newChat,
+    onRename: (id, t) => void rename(id, t),
+    onDelete: (id) => void remove(id),
+    onExport: (id) => void exportChat(id),
+    hasMore: nextCursor !== "",
+    onMore: () => void loadList(search, nextCursor),
+  };
+  const prompts = seed && messages.length === 0 ? (seed.prompts ?? []) : [];
+
   return (
-    <div className={styles.root}>
-      <ConversationList
-        items={convs}
-        activeId={activeId}
-        search={search}
-        onSearch={setSearch}
-        onSelect={(id) => void select(id)}
-        onNew={newChat}
-        onRename={(id, t) => void rename(id, t)}
-        onDelete={(id) => void remove(id)}
-        onExport={(id) => void exportChat(id)}
-        hasMore={nextCursor !== ""}
-        onMore={() => void loadList(search, nextCursor)}
-      />
+    <ClickInHost>
+    <div className={embedded ? styles.rootCompact : styles.root}>
+      {embedded ? (
+        <div className={styles.compactBar}>
+          <ClickIn icon="message-square" title="Conversations" summary={active?.title || "New chat"} tip="Switch to an earlier conversation or start a new one" width={300}>
+            <CompactList {...listProps} />
+          </ClickIn>
+        </div>
+      ) : (
+        <ConversationList {...listProps} />
+      )}
       <section className={styles.main} aria-label="Chat">
-        <header className={styles.topbar}>
-          {modelOptions.length > 0 && (
-            <Select<string>
-              size="sm"
-              aria-label="Model"
-              data-tip="The model that answers in this conversation"
-              value={modelId}
-              options={modelOptions}
-              onChange={(v) => void changeModel(v)}
+        {!noModel && (
+          <header className={styles.topbar}>
+            <ChatSettingsDrawer
+              modelId={modelId}
+              modelOptions={modelOptions}
+              temperature={defaults.temperature}
+              prompt={active ? active.systemPrompt : draftPrompt}
+              defaultPrompt={defaults.systemPrompt}
+              onModel={(v) => void changeModel(v)}
+              onSavePrompt={savePrompt}
             />
-          )}
-          <span className={styles.spacer} />
-          <IconButton
-            icon="settings"
-            label="Chat settings"
-            data-tip="Edit the system prompt (standing instructions) for this conversation"
-            pressed={showPrompt}
-            onClick={togglePrompt}
-            disabled={noModel}
-          />
-        </header>
-        {showPrompt && (
-          <div className={styles.promptPanel}>
-            <label className={styles.promptLabel} htmlFor="chat-system-prompt">
-              System prompt for this conversation
-            </label>
-            <TextArea
-              id="chat-system-prompt"
-              data-tip="Instructions the assistant follows for the whole conversation"
-              value={promptText}
-              minRows={3}
-              maxLength={4000}
-              placeholder={defaults.systemPrompt}
-              onChange={(e) => setPromptText(e.target.value)}
-            />
-            <div className={styles.promptFoot}>
-              <span className={styles.hint}>Temperature is set in Settings → Chat.</span>
-              <Button size="sm" variant="primary" data-tip="Use this system prompt for this conversation" onClick={() => void savePrompt()}>
-                Save
-              </Button>
-            </div>
-          </div>
+          </header>
         )}
         <div className={styles.gate}>
           <DepsGate moduleId={moduleId} />
@@ -311,6 +313,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
         )}
         {status.notice && <Banner tone="info">{status.notice}</Banner>}
 
+        {seed && <ContextCard seed={seed} onRemove={messages.length === 0 ? () => setSeed(null) : undefined} />}
         {noModel && modelsLoaded ? (
           <div className={styles.empty}>
             <EmptyState
@@ -335,6 +338,15 @@ export default function ChatView({ moduleId }: ToolViewProps) {
         )}
 
         {thread.trimmed && <p className={styles.trimmed} data-tip="The model can only read so much; the oldest messages were skipped when answering">Older messages were left out to fit the context</p>}
+        {prompts.length > 0 && (
+          <div className={styles.chips} role="group" aria-label="Suggested prompts">
+            {prompts.map((q) => (
+              <Button key={q} size="sm" variant="secondary" disabled={blocked || loading} data-tip={`Ask: ${q}`} onClick={() => void send(q)}>
+                {q}
+              </Button>
+            ))}
+          </div>
+        )}
         <Composer
           loading={loading}
           blocked={blocked}
@@ -346,5 +358,6 @@ export default function ChatView({ moduleId }: ToolViewProps) {
         />
       </section>
     </div>
+    </ClickInHost>
   );
 }
