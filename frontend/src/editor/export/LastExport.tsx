@@ -5,6 +5,7 @@
  * pipeline hands the file(s) over. Shared by the workspace tools, so it lives
  * with the editor (shared code may use the kit's `FileActions`).
  */
+import type { ReactNode } from "react";
 import { Icon, IconButton } from "@/components";
 import { startPathsDrag } from "@/lib/fileDrag";
 import { FileActions } from "@/tools/_kit";
@@ -27,12 +28,14 @@ export interface LastExportProps {
   /** Small trailing note ("rendered ×3.2 real time"). */
   note?: string;
   icon?: string;
+  /** Extra actions after the file actions (e.g. Open folder for a multi-file export). */
+  extra?: ReactNode;
   onDismiss?(): void;
 }
 
 export const baseName = (p: string): string => p.split(/[\\/]+/).filter(Boolean).pop() ?? p;
 
-export function LastExport({ path, outputId, missing, moduleId, dragPaths, label = "Last export", name, note, icon = "check", onDismiss }: LastExportProps) {
+export function LastExport({ path, outputId, missing, moduleId, dragPaths, label = "Last export", name, note, icon = "check", extra, onDismiss }: LastExportProps) {
   const paths = dragPaths && dragPaths.length > 0 ? dragPaths : [path];
   return (
     <div
@@ -50,6 +53,7 @@ export function LastExport({ path, outputId, missing, moduleId, dragPaths, label
       </span>
       {note ? <span className={styles.note}>{note}</span> : null}
       <FileActions outputId={outputId} path={path} disabled={missing} moduleId={moduleId} />
+      {extra}
       {onDismiss ? <IconButton size="sm" icon="x" label="Dismiss" data-tip="Hide this row; the file stays in your library" onClick={onDismiss} /> : null}
     </div>
   );

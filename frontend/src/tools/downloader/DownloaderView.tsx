@@ -4,7 +4,6 @@ import { DownloaderService, DownloadMode, LibraryService, type DownloaderOptions
 import { useCommands } from "@/lib/commands";
 import { useToolHandoff } from "@/lib/embed";
 import { toAppError } from "@/lib/errors";
-import { revealLabel } from "@/lib/platform";
 import { useShortcut } from "@/lib/shortcuts";
 import { useSettings } from "@/state/settings";
 import type { ToolViewProps } from "@/tools";
@@ -150,7 +149,7 @@ export default function DownloaderView(_props: ToolViewProps) {
             data-tip={`Open the folder where finished downloads are saved (${destination})`}
             onClick={() => void LibraryService.OpenLibraryFolder("Downloads").catch((e: unknown) => toast({ title: toAppError(e).message, tone: "danger" }))}
           >
-            {revealLabel}
+            Downloads folder
           </Button>
         )}
         {blockReason && (

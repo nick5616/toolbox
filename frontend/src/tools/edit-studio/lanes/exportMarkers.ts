@@ -1,6 +1,7 @@
 /** Markers export (§5.6): CSV or JSON of the visible lanes, written into the Library by the text job. */
 import { toast } from "@/components";
 import { EditStudioService } from "@/lib/api";
+import { announceWhenDone } from "@/state/jobs";
 import { toAppError } from "@/lib/errors";
 import { deriveMarkers } from "@/viz/edit/markers";
 import { useEditStudio } from "@/editor/store";
@@ -31,8 +32,8 @@ export async function exportMarkers(format: "csv" | "json"): Promise<void> {
   }
   const meta = JSON.stringify({ project: s.name, song: p.song.path, startMs: p.song.startMs, endMs: p.song.endMs, fps: p.fps });
   try {
-    await EditStudioService.ExportText(s.projectId, { kind: format === "csv" ? "markers-csv" : "markers-json", name: `${s.name} markers`, markers: rows, cues: null, meta });
-    toast({ title: `Saving ${rows.length.toLocaleString()} markers`, description: "It will appear in your Library under Edits.", tone: "success" });
+    const job = await EditStudioService.ExportText(s.projectId, { kind: format === "csv" ? "markers-csv" : "markers-json", name: `${s.name} markers`, markers: rows, cues: null, meta });
+    announceWhenDone(job.id);
   } catch (e) {
     toast({ title: toAppError(e).message || "Couldn't save the markers", tone: "danger" });
   }

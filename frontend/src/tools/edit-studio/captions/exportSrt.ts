@@ -1,6 +1,7 @@
 /** SRT export (§14.9). */
 import { toast } from "@/components";
 import { EditStudioService } from "@/lib/api";
+import { announceWhenDone } from "@/state/jobs";
 import { toAppError } from "@/lib/errors";
 import { flushEdit } from "@/editor/useEditAutosave";
 import { useEditStudio } from "@/editor/store";
@@ -27,14 +28,14 @@ export async function exportSrt(): Promise<void> {
       toast({ title: "No words to export", description: "There are no caption lines inside this edit's song range.", tone: "warn" });
       return;
     }
-    await EditStudioService.ExportText(s.projectId, {
+    const job = await EditStudioService.ExportText(s.projectId, {
       kind: "srt",
       name: now.name || s.name,
       markers: [],
       cues: cues.map((c) => ({ startMs: c.startMs, endMs: c.endMs, text: c.text, words: [] })),
       meta: "",
     });
-    toast({ title: "Saving captions", description: "The SRT file will appear in your Library.", tone: "success" });
+    announceWhenDone(job.id);
   } catch (e) {
     toast({ title: "Couldn't export captions", description: toAppError(e).message, tone: "danger" });
   }

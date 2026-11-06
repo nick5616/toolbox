@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { JobStatus, LibraryService, type Output } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { toast } from "@/components";
-import { useJobs, type JobView as Job } from "@/state/jobs";
+import { takeAnnounced, useJobs, type JobView as Job } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { FOCUS_MODULE_ID } from "@/state/focus";
 import { useUI } from "@/state/ui";
@@ -31,8 +31,10 @@ function reveal(out: Output): void {
 /** The toast for a finished batch (`jobs` are the ones that succeeded). */
 export function notifyDone(moduleId: string, jobs: Job[]): void {
   const ui = useUI.getState();
-  // Looking at the tool's results already: no toast.
-  if (ui.view === moduleId || ui.trayOpen) return;
+  // Looking at the tool's results already: no toast, unless the tool asked for
+  // one because it doesn't show this result itself.
+  const announced = jobs.map((j) => takeAnnounced(j.id)).some(Boolean);
+  if (!announced && (ui.view === moduleId || ui.trayOpen)) return;
   // Focus jobs start or end a session: the top-bar pill and focus toasts say so.
   if (moduleId === FOCUS_MODULE_ID) return;
   const outputs = jobs.flatMap((j) => j.outputs ?? []);

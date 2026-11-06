@@ -1,11 +1,14 @@
 /**
  * The post's last export, shown as a result row under the stage (Phase 14,
- * SPEC §1.C): the folder's name, Reveal/Open and Send to for its first file,
- * and a drag that carries every exported file. Host window only (a replica
+ * SPEC §1.C): the folder's name, Reveal/Open/Save a copy and Send to for its
+ * first file, Open folder, and a drag that carries every exported file. Host window only (a replica
  * never exports), not part of the bridged post state.
  */
 import { create } from "zustand";
+import { IconButton, toast } from "@/components";
 import { LastExport } from "@/editor/export/LastExport";
+import { LibraryService } from "@/lib/api";
+import { toAppError } from "@/lib/errors";
 import { MODULE_ID } from "./postStore";
 
 export interface PostExportResult {
@@ -35,6 +38,15 @@ export function PostExportRow({ postId }: { postId: string }) {
       dragPaths={r.files.length > 0 ? r.files : [r.folder]}
       moduleId={MODULE_ID}
       note={r.files.length > 1 ? `${r.files.length} files` : undefined}
+      extra={
+        <IconButton
+          size="sm"
+          icon="folder"
+          label="Open folder"
+          data-tip="Open the folder with every file of this export"
+          onClick={() => void LibraryService.RevealPath(r.folder).catch((e: unknown) => toast({ title: toAppError(e).message, tone: "danger" }))}
+        />
+      }
       onDismiss={() => useLastPostExport.getState().set(null)}
     />
   );

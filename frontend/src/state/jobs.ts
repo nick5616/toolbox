@@ -16,6 +16,20 @@ export function isActive(j: Job): boolean {
   return j.status === JobStatus.JobQueued || j.status === JobStatus.JobRunning;
 }
 
+/**
+ * Jobs whose finish should toast (with Reveal) even while their tool is on
+ * screen: for jobs the tool doesn't show a result for itself (Edit Studio's
+ * SRT and marker exports). The shell's job toasts read and clear it.
+ */
+const announced = new Set<string>();
+export function announceWhenDone(jobId: string): void {
+  if (jobId) announced.add(jobId);
+}
+/** True (once) when the job was marked with `announceWhenDone`. */
+export function takeAnnounced(jobId: string): boolean {
+  return announced.delete(jobId);
+}
+
 interface JobsState {
   byId: Record<string, JobView>;
   logs: Record<string, LogLine[]>;
