@@ -284,10 +284,36 @@ func CheckRule(r AllowRule) error {
 	if style.windows && strings.ContainsAny(p, "?\"<>|") {
 		return bad("path", "That path has characters Windows doesn't allow")
 	}
-	if r.Kind == RuleFolder && BroadFolder(p) {
+	if r.Kind == RuleFolder && (BroadFolder(p) || wildcardTooBroad(p)) {
 		return bad("path", tooBroadMessage)
 	}
 	return nil
+}
+
+// minWildcardLiteral is how many fixed characters a wildcard segment needs
+// when it sits directly inside a broad folder (`WindowsApps\Microsoft.WindowsTerminal_*`
+// is fine; `Program Files\Di*` isn't).
+const minWildcardLiteral = 8
+
+// wildcardTooBroad reports whether a folder rule with a "*" would cover too
+// many programs: the wildcard segment is just "*" (everything under its
+// parent), or its parent folder is broad and the segment has fewer than
+// minWildcardLiteral fixed characters.
+func wildcardTooBroad(p string) bool {
+	i := strings.IndexByte(p, '*')
+	if i < 0 {
+		return false
+	}
+	start := strings.LastIndexAny(p[:i], `\/`) + 1
+	end := len(p)
+	if j := strings.IndexAny(p[i:], `\/`); j >= 0 {
+		end = i + j
+	}
+	seg, parent := p[start:end], p[:start]
+	if seg == "*" {
+		return true
+	}
+	return len(seg)-1 < minWildcardLiteral && BroadFolder(parent)
 }
 
 func isAbsolute(p string) bool {
