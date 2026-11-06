@@ -3,6 +3,7 @@ package brushimport
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -83,6 +84,16 @@ func TestGenerateMyPaintLibrary(t *testing.T) {
 				t.Fatalf("%s/%s: %v", pk.dir, pk.file, err)
 			}
 			p.Set = s.name
+			// MyPaint sizes are tiny until the user scales them (a charcoal is 2 px); a bundled brush starts usable.
+			floor := 6.0
+			switch pk.name {
+			case "Liner", "Ballpoint", "Rigger brush", "Pen", "Slow line ink", "Inkster", "Textured ink":
+				floor = 3
+			}
+			if p.Size < floor {
+				p.Size = floor
+				p.Fidelity = append(p.Fidelity, fmt.Sprintf("The default size was raised to %g px (the original brush is smaller).", floor))
+			}
 			p.ID = Slug(s.name + " " + pk.name)
 			p.Credit = authors[pk.dir] + " (MyPaint brushes)"
 			p.License = "CC0-1.0"

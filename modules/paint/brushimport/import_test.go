@@ -149,13 +149,13 @@ func TestMyPaint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Size < 5.4 || p.Size > 5.5 { // 2*e
+	if p.Size < 10.9 || p.Size > 11 { // 2*e^(1+0.7): the radius is base + the pressure curve's largest value
 		t.Errorf("size = %v", p.Size)
 	}
 	if p.Tip.Hardness != 0.35 || p.Spacing != 0.125 || p.Wet.Mix != 0.6 || p.Wet.Pull != 0.4 {
 		t.Errorf("preset = %+v", p)
 	}
-	if p.Tip.Roundness != 0.5 || p.Tip.Angle != 30 || p.Smoothing.Streamline != 0.5 || p.Scatter != 0.2 {
+	if p.Tip.Roundness != 0.5 || p.Tip.Angle != 30 || p.Smoothing.Streamline != 0.5 || p.Scatter != 0.348 {
 		t.Errorf("shape = %+v scatter %v", p.Tip, p.Scatter)
 	}
 	if p.Opacity != 1 {
@@ -170,7 +170,7 @@ func TestMyPaint(t *testing.T) {
 			op = &p.Dynamics[i]
 		}
 	}
-	if size == nil || size.Input != "pressure" || size.Amount != 1 || size.Curve[0] != [2]float64{0, 0} || size.Curve[len(size.Curve)-1] != [2]float64{1, 1} {
+	if size == nil || size.Input != "pressure" || size.Amount != 1 || size.Curve[0] != [2]float64{0, 0.247} || size.Curve[len(size.Curve)-1] != [2]float64{1, 1} { // exp(-1.4) of the full size at zero pressure
 		t.Errorf("size dynamics = %+v", size)
 	}
 	if op == nil || op.Input != "pressure" {
@@ -376,5 +376,49 @@ func TestSlug(t *testing.T) {
 		if !SlugRe.MatchString(Slug(in)) {
 			t.Errorf("Slug(%q) isn't a valid ID", in)
 		}
+	}
+}
+
+// MyPaint's opaque_linearize: the dab alpha is lowered so the overlapping dabs add up
+// to the brush's opacity; the preset carries it as flow, never as the stroke cap.
+func TestMyPaintOpacityIsFlow(t *testing.T) {
+	src := `{"settings":{
+	  "radius_logarithmic":{"base_value":2,"inputs":{}},
+	  "opaque":{"base_value":0.5,"inputs":{}},
+	  "opaque_multiply":{"base_value":0,"inputs":{"pressure":[[0,0],[1,1]]}},
+	  "opaque_linearize":{"base_value":0.9,"inputs":{}},
+	  "dabs_per_actual_radius":{"base_value":4,"inputs":{}}}}`
+	p, _, err := ParseMyb("flowy", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Opacity != 1 {
+		t.Errorf("opacity = %v, the stroke cap stays 1", p.Opacity)
+	}
+	// 8 dabs per diameter, linearised: 1 + 0.9*7 = 7.3 overlapping dabs: 1-(1-0.5)^(1/7.3).
+	if p.Flow < 0.09 || p.Flow > 0.1 {
+		t.Errorf("flow = %v", p.Flow)
+	}
+	var size, op *Dynamics
+	for i := range p.Dynamics {
+		switch p.Dynamics[i].Target {
+		case "size":
+			size = &p.Dynamics[i]
+		case "opacity":
+			op = &p.Dynamics[i]
+		}
+	}
+	if size == nil || size.Amount != 0 || p.MinSize != 0 || p.Size != 14.778 {
+		t.Errorf("a brush without size inputs must not let pressure scale it: %+v min %v size %v", size, p.MinSize, p.Size)
+	}
+	if op == nil || op.Curve[0][1] != 0 {
+		t.Errorf("opacity dynamics = %+v", op)
+	}
+}
+
+func TestMyPaintSpacingAddsBothSettings(t *testing.T) {
+	p, _, err := ParseMyb("s", []byte(`{"settings":{"dabs_per_actual_radius":{"base_value":2,"inputs":{}},"dabs_per_basic_radius":{"base_value":4.63,"inputs":{}}}}`))
+	if err != nil || p.Spacing != 0.075 {
+		t.Errorf("%v %v", p.Spacing, err)
 	}
 }
