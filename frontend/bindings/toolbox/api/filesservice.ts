@@ -76,7 +76,7 @@ export function PickWith(title: string, extensions: string[] | null, multiple: b
 }
 
 /**
- * ReadText returns up to maxBytes (≤ 256 KB; ≤ 0 means 256 KB) of a text
+ * ReadText returns up to maxBytes (≤ 16 MB; ≤ 0 means 256 KB) of a text
  * file inside the library or the app's support folder, cut at a UTF-8
  * boundary.
  */

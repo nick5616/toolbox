@@ -9,8 +9,8 @@ import { basename } from "./options";
 export function TranscriptActions({ path }: { path: string }) {
   const read = async (): Promise<string | null> => {
     try {
-      // ReadText caps at 256 KB, plenty for a transcript.
-      return await FilesService.ReadText(path, 0);
+      // The whole file (ReadText allows up to 16 MB when asked explicitly).
+      return await FilesService.ReadText(path, 16 << 20);
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
       return null;

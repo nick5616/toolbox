@@ -26,7 +26,7 @@ const PDF_LABEL: Record<string, string> = {
 };
 
 const CHAT_PROMPTS = ["Summarise", "Extract a table", "Fix typos"];
-/** FilesService.ReadText never returns more than 256 KB. */
+/** Read eagerly per row, so capped (ReadText allows up to 16 MB; the row's Save a copy keeps the whole file). */
 const MAX_FULL_TEXT = 256 * 1024;
 
 /** The whole recognised text, read from the saved .txt (the job's preview is cut at 2000 characters and empty for PDFs). */

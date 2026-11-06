@@ -58,6 +58,9 @@ func TestReadText(t *testing.T) {
 	if got, _ := fs.ReadText(big, 1<<30); len(got) != MaxReadTextBytes {
 		t.Fatalf("cap: %d", len(got))
 	}
+	if got, _ := fs.ReadText(big, 0); len(got) != DefaultReadText {
+		t.Fatalf("default: %d", len(got))
+	}
 }
 
 func TestImageDataURL(t *testing.T) {

@@ -31,7 +31,8 @@ type FilesService struct {
 
 // File read limits (Phase 3 SPEC.md §8).
 const (
-	MaxReadTextBytes  = 256 << 10
+	MaxReadTextBytes  = 16 << 20  // explicit requests (Copy / Save as… of a whole transcript)
+	DefaultReadText   = 256 << 10 // maxBytes ≤ 0 (previews)
 	MaxImageDataBytes = 20 << 20
 )
 
@@ -132,11 +133,14 @@ var errDialogCancelled = errors.New("cancelled")
 // Stat describes paths for input lists.
 func (s *FilesService) Stat(paths []string) []core.FileInfo { return core.StatFiles(paths) }
 
-// ReadText returns up to maxBytes (≤ 256 KB; ≤ 0 means 256 KB) of a text
+// ReadText returns up to maxBytes (≤ 16 MB; ≤ 0 means 256 KB) of a text
 // file inside the library or the app's support folder, cut at a UTF-8
 // boundary.
 func (s *FilesService) ReadText(path string, maxBytes int) (string, error) {
-	if maxBytes <= 0 || maxBytes > MaxReadTextBytes {
+	if maxBytes <= 0 {
+		maxBytes = DefaultReadText
+	}
+	if maxBytes > MaxReadTextBytes {
 		maxBytes = MaxReadTextBytes
 	}
 	if !filepath.IsAbs(path) || (!core.IsWithin(path, s.Settings.Current().LibraryDir) && !core.IsWithin(path, s.Paths.SupportDir)) {
