@@ -400,11 +400,13 @@ func run() error {
 	if err := jobs.Start(ctx); err != nil {
 		return err
 	}
-	if err := runner.Start(ctx); err != nil {
-		return err
-	}
+	// Focus first: a restored Focus wait (or a catch-up schedule fire) must
+	// see the resumed session, not an engine that hasn't loaded it yet.
 	if err := focusEng.Start(ctx); err != nil {
 		slog.Warn("focus lock", "err", err) // fail-open: the app works without it
+	}
+	if err := runner.Start(ctx); err != nil {
+		return err
 	}
 	go depSvc.Detect(ctx)
 	clipHistory.Start(ctx)
