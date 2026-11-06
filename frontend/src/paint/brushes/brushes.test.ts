@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { analyticCoverage } from "../engine/dabmath";
 import { D, DAB_STRIDE } from "../engine/gl";
 import { RED, line, pt, testBrush } from "../engine/testing";
 import { Smoother } from "../input/smoothing";
@@ -29,6 +30,37 @@ describe("dab spacing", () => {
     const one = run(testBrush({ spacing: 0.5 }), line(0, 0, 100, 0)).dabs.count;
     const three = run(testBrush({ spacing: 0.5, count: 3 }), line(0, 0, 100, 0)).dabs.count;
     expect(three).toBe(one * 3);
+  });
+});
+
+describe("flat tips", () => {
+  it("space dabs in the tip's own (elliptical) space: closer along the thin side", () => {
+    const flat = (angle: number) => testBrush({ size: 20, spacing: 0.5, tip: { shape: "round", hardness: 0.5, roundness: 0.2, angle, angleMode: "fixed", rotationJitter: 0, invert: false } });
+    const along = run(flat(0), line(0, 0, 100, 0)).dabs.count; // the long side leads: plain spacing
+    const across = run(flat(90), line(0, 0, 100, 0)).dabs.count; // the thin side leads: up to 5× denser
+    expect(along).toBe(11);
+    expect(across).toBeGreaterThan(along * 3);
+  });
+
+  it("keep a hard straight edge under one pixel of sawtooth (spacing ≤ 1 px)", () => {
+    const sq = testBrush({ size: 40, spacing: 0.3, tip: { shape: "square", hardness: 1, roundness: 0.4, angle: 30, angleMode: "fixed", rotationJitter: 0, invert: false } });
+    const r = run(sq, line(0, 0, 60, 0));
+    const xs = Array.from({ length: r.dabs.count }, (_, i) => r.dabs.data[i * DAB_STRIDE + D.X]!);
+    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeLessThanOrEqual(1.0001);
+  });
+
+  it("smooth the edge over one pixel on both axes, however thin the tip is", () => {
+    // A 40 × 4 px tip: half-height 2 px, so one pixel is 0.5 in y and 0.05 in x.
+    const hw = 20;
+    const hh = 2;
+    const edgeY = [0.5, 0.75, 1, 1.25].map((ny) => analyticCoverage("square", 0, ny, 1, 1 / hw, 1 / hh, true));
+    expect(edgeY[0]).toBe(1);
+    expect(edgeY[1]).toBeGreaterThan(0.2);
+    expect(edgeY[1]).toBeLessThan(1);
+    expect(edgeY[3]).toBe(0);
+    const edgeX = analyticCoverage("square", 0.97, 0, 1, 1 / hw, 1 / hh, true);
+    expect(edgeX).toBeGreaterThan(0);
+    expect(edgeX).toBeLessThan(1);
   });
 });
 

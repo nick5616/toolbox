@@ -29,8 +29,14 @@ export function toMask(img: AssetImage): Uint8Array {
   return out;
 }
 
-/** "stamp:<layerId>" is a cut-out from P6's subject stamp, resolved by the host's resolver like the others. */
-const isImageRef = (s: string) => s.startsWith("lib:") || s.startsWith("set:") || s.startsWith("stamp:");
+/**
+ * "stamp:<layerId>" is a cut-out from P6's subject stamp, resolved by the host's resolver like the
+ * others. Its pixels keep their colours: the brush paints the cut-out as it is, and the tip's
+ * `hardness` is the tint toward the current colour (0 = the stamp's own colours, 1 = its
+ * silhouette in the current colour).
+ */
+const isStampRef = (s: string) => s.startsWith("stamp:");
+const isImageRef = (s: string) => s.startsWith("lib:") || s.startsWith("set:") || isStampRef(s);
 
 export class BrushAssets {
   private readonly cache = new Map<string, MaskTex | null>();
@@ -62,7 +68,9 @@ export class BrushAssets {
         let tex: MaskTex | null = null;
         try {
           const img = this.resolver ? await this.resolver(ref) : null;
-          if (img && img.width > 0 && img.height > 0) tex = this.backend().createMask(toMask(img), img.width, img.height);
+          if (img && img.width > 0 && img.height > 0) {
+            tex = isStampRef(ref) ? this.backend().createColorMask(img.data, img.width, img.height) : this.backend().createMask(toMask(img), img.width, img.height);
+          }
         } catch {
           tex = null;
         }
@@ -89,6 +97,7 @@ export class BrushAssets {
   private tip(t: Tip): TipStyle {
     if (t.shape === "round" || t.shape === "square") return { shape: t.shape, tex: null, hardness: t.hardness, invert: t.invert };
     const tex = this.cache.get(t.shape) ?? null;
+    if (tex && isStampRef(t.shape)) return { shape: "color", tex, hardness: t.hardness, invert: t.invert };
     if (!tex) {
       // Not loaded (yet) or missing: a round tip, and start loading it.
       if (isImageRef(t.shape)) void this.load(t.shape);
@@ -102,7 +111,8 @@ export class BrushAssets {
     if (p.grain.texture && !this.cache.has(p.grain.texture)) void this.load(p.grain.texture);
     return {
       tip: this.tip(p.tip),
-      dual: p.dual ? { ...this.tip(p.dual), roundness: p.dual.roundness } : null,
+      // A stamp as the dual tip has no colour to give: it falls back to a round tip.
+      dual: p.dual ? { ...this.tip(p.dual.shape.startsWith("stamp:") ? { ...p.dual, shape: "round" } : p.dual), roundness: p.dual.roundness } : null,
       grain: gtex
         ? { tex: gtex, texturised: p.grain.mode === "texturised", scale: Math.max(0.05, p.grain.scale), depth: p.grain.depth, contrast: p.grain.contrast }
         : null,

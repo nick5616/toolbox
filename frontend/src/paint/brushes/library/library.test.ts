@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BRUSH_SCHEMA_VERSION, type BrushPreset, type Curve, type Tip } from "../schema";
+import { LEAF_TIPS } from "../../lab/growth";
 import manifest from "./manifest.json";
 import { LIBRARY_PRESETS, OPEN_PRESETS, OWN_PRESETS, SET_NAMES, isLibraryRef, libraryPresetsIn, librarySetNames, resolveLibraryAsset } from "./index";
 
@@ -153,5 +154,24 @@ describe("bundled brush library", () => {
 
   it("lists presets by set", () => {
     expect(libraryPresetsIn("Pixel").length).toBe(3);
+  });
+
+  it("keeps MyPaint opacity as per-dab flow, never as a faint stroke cap", () => {
+    const mypaint = OPEN_PRESETS.filter((p) => p.set.startsWith("MyPaint"));
+    expect(mypaint.length).toBeGreaterThanOrEqual(40);
+    for (const p of mypaint) {
+      expect(p.opacity, p.id).toBe(1);
+      expect(p.flow, p.id).toBeGreaterThan(0);
+      // Pressure must never scale the size unless the brush says so: an explicit size dynamic is always present.
+      expect(p.dynamics.some((d) => d.target === "size"), p.id).toBe(true);
+      expect(p.minSize, p.id).toBe(0);
+    }
+  });
+
+  it("offers the Growth tool's leaf shapes as real bundled tips", () => {
+    for (const t of LEAF_TIPS) {
+      if (t.value === "brush") continue;
+      expect(() => resolveLibraryAsset(t.value), t.value).not.toThrow();
+    }
   });
 });

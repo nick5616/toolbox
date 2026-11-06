@@ -44,3 +44,22 @@ export function probeStroke(w: number, h: number, events: number): InputPoint[] 
   }
   return out;
 }
+
+/** A straight line with linearly changing pressure; tilt is constant. `speed` is px per event. */
+export function lineStroke(x0: number, x1: number, y: number, p0: number, p1: number, speed = 3, tiltX = 0, tiltY = 0): InputPoint[] {
+  const n = Math.max(2, Math.round(Math.abs(x1 - x0) / speed));
+  const out: InputPoint[] = [];
+  for (let i = 0; i <= n; i++) {
+    const u = i / n;
+    out.push(mk(x0 + (x1 - x0) * u, y, i, p0 + (p1 - p0) * u, tiltX, tiltY));
+  }
+  return out;
+}
+
+/** A vertical line (used to pre-paint stripes for smudge brushes). */
+export function vlineStroke(x: number, y0: number, y1: number, speed = 4): InputPoint[] {
+  const n = Math.max(2, Math.round(Math.abs(y1 - y0) / speed));
+  const out: InputPoint[] = [];
+  for (let i = 0; i <= n; i++) out.push(mk(x, y0 + ((y1 - y0) * i) / n, i, 0.8));
+  return out;
+}
