@@ -77,6 +77,13 @@
   border-radius: var(--r-md);
 }
 
+.insActions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: var(--space-1);
+  flex: none;
+}
+
 .insInfo {
   display: flex;
   flex-direction: column;

@@ -6,7 +6,8 @@ import { formatBytes } from "@/lib/format";
 import { isActive, useOrderedJobs } from "@/state/jobs";
 import { FailedJobs, useFileInputs } from "@/tools/_kit";
 import { mapInputErrors } from "@/tools/_kit/enqueue";
-import { ALGO_LABEL, HASH_ALGOS, matchingAlgo, parseHashResult, type HashAlgo } from "./hash.logic";
+import { ALGO_LABEL, HASH_ALGOS, checksumText, matchingAlgo, parseHashResult, type HashAlgo, type HashedFile } from "./hash.logic";
+import { TextActions } from "@/tools/_kit";
 import { CopyButton, useDebounced } from "./shared";
 import { useDevUtilsNav } from "../registry";
 import { useUtilState } from "../store";
@@ -53,13 +54,14 @@ export default function HashUtil() {
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
   const jobs = useOrderedJobs(DEV_UTILS_ID);
   const working = jobs.some(isActive);
+  // Every finished hash run of this session, newest first.
   const latest = useMemo(() => {
+    const all: HashedFile[] = [];
     for (const j of jobs) {
       if (j.status !== JobStatus.JobDone) continue;
-      const files = parseHashResult(j.resultJson);
-      if (files) return files;
+      all.push(...(parseHashResult(j.resultJson) ?? []));
     }
-    return null;
+    return all.length > 0 ? all : null;
   }, [jobs]);
 
   const toggle = (a: HashAlgo, on: boolean) => setAlgos((cur) => HASH_ALGOS.filter((x) => (x === a ? on : cur.includes(x))));
@@ -152,11 +154,20 @@ export default function HashUtil() {
 
       {latest && (
         <div className={styles.col}>
-          <span className={styles.label}>Results</span>
-          {latest.map((f) => {
+          <div className={styles.outHead}>
+            <span className={styles.label}>Results</span>
+            <span className={styles.row}>
+              <TextActions
+                text={() => checksumText(latest, shownAlgos)}
+                filename="checksums.sha256"
+                what="all checksums"
+              />
+            </span>
+          </div>
+          {latest.map((f, i) => {
             const hit = matchingAlgo(f.hashes, compare);
             return (
-              <div key={f.path} className={styles.col}>
+              <div key={`${i}:${f.path}`} className={styles.col}>
                 <div className={styles.row}>
                   <span className={styles.mono} data-tip={f.path}>{splitPath(f.path)[1]}</span>
                   <Badge tip="File size">{formatBytes(f.size)}</Badge>

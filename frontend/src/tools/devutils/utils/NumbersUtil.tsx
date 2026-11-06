@@ -41,7 +41,7 @@ export default function NumbersUtil() {
         <>
           <div className={styles.cols}>
             {BASES.map((b) => (
-              <OutputBox key={b.base} label={b.label} value={formatBigInt(value, b.base)} />
+              <OutputBox key={b.base} label={b.label} value={formatBigInt(value, b.base)} filename="number.txt" />
             ))}
           </div>
           {tc && (
@@ -49,11 +49,11 @@ export default function NumbersUtil() {
               <p className={tc.fits ? styles.note : styles.error}>
                 {tc.fits ? `Two's complement in ${width} bits` : `Doesn't fit in ${width} bits; showing the low ${width} bits`}
               </p>
-              <OutputBox label={`Bits (${width})`} value={groupBits(tc.bits)} />
+              <OutputBox label={`Bits (${width})`} value={groupBits(tc.bits)} filename="bits.txt" />
               <div className={styles.cols}>
-                <OutputBox label="Hex" value={tc.hex} />
-                <OutputBox label="As unsigned" value={tc.unsigned.toString()} />
-                <OutputBox label="As signed" value={tc.signed.toString()} />
+                <OutputBox label="Hex" value={tc.hex} filename="hex.txt" />
+                <OutputBox label="As unsigned" value={tc.unsigned.toString()} filename="unsigned.txt" />
+                <OutputBox label="As signed" value={tc.signed.toString()} filename="signed.txt" />
               </div>
             </>
           )}

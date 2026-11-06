@@ -55,7 +55,7 @@ export default function UuidUtil() {
           Generate
         </Button>
       </div>
-      <OutputBox label={`${ids.length} ${ids.length === 1 ? "ID" : "IDs"} (Copy all)`} value={all} />
+      <OutputBox label={`${ids.length} ${ids.length === 1 ? "ID" : "IDs"} (Copy all)`} value={all} filename="uuids.txt" />
     </div>
   );
 }

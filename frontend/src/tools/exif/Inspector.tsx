@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banner, Button, Icon, Spinner, TextField, toast } from "@/components";
+import { Banner, Button, Icon, Spinner, TextField } from "@/components";
 import { FilesService, type MetaGroup, type MetadataView } from "@/lib/api";
+import { copyText } from "@/lib/copy";
 import { formatBytes } from "@/lib/format";
-import { canThumbnail, formatCoordinates } from "./options";
+import { TextActions } from "@/tools/_kit";
+import { canThumbnail, formatCoordinates, metadataText } from "./options";
 import type { MetaState } from "./useMetadata";
 import styles from "./ExifView.module.css";
 
@@ -26,15 +28,6 @@ function Thumbnail({ path, sizeBytes }: { path: string; sizeBytes: number }) {
       <Icon name="image" size={24} />
     </span>
   );
-}
-
-async function copyCoordinates(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast({ title: "Coordinates copied" });
-  } catch {
-    toast({ title: "Couldn't copy to the clipboard", tone: "danger" });
-  }
 }
 
 function Group({
@@ -109,6 +102,14 @@ function Loaded({ view }: { view: MetadataView }) {
             </span>
           )}
         </div>
+        <span className={styles.insActions}>
+          <TextActions
+            text={() => metadataText(view)}
+            filename={`${view.name.replace(/\.[^.]*$/, "") || "photo"}.metadata.txt`}
+            what="metadata"
+            disabled={groups.length === 0}
+          />
+        </span>
       </header>
 
       {view.hasLocation && view.location && (
@@ -122,7 +123,7 @@ function Loaded({ view }: { view: MetadataView }) {
             variant="secondary"
             icon="copy"
             data-tip="Copy latitude and longitude as text"
-            onClick={() => view.location && void copyCoordinates(formatCoordinates(view.location.lat, view.location.lon))}
+            onClick={() => view.location && void copyText(formatCoordinates(view.location.lat, view.location.lon), { what: "coordinates" })}
           >
             Copy coordinates
           </Button>

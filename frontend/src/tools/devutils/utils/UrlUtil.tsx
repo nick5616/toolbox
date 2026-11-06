@@ -42,9 +42,9 @@ export default function UrlUtil() {
         <TextArea mono minRows={3} maxRows={10} value={text} onChange={(e) => setText(e.target.value)} aria-label="Text" data-tip="Text to percent-encode or decode, e.g. spaces as %20" spellCheck={false} />
       </div>
       <div className={styles.cols}>
-        <OutputBox label="Encoded" value={debouncedText === "" ? "" : encoded} />
+        <OutputBox label="Encoded" value={debouncedText === "" ? "" : encoded} filename="encoded.txt" />
         <div className={styles.col}>
-          <OutputBox label="Decoded" value={debouncedText === "" || !decoded.ok ? "" : decoded.value} />
+          <OutputBox label="Decoded" value={debouncedText === "" || !decoded.ok ? "" : decoded.value} filename="decoded.txt" />
           {debouncedText !== "" && !decoded.ok && <p className={styles.error}>{decoded.message}</p>}
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function UrlUtil() {
               </Button>
             </div>
           </div>
-          <OutputBox label="Rebuilt URL" value={rebuilt} />
+          <OutputBox label="Rebuilt URL" value={rebuilt} filename="url.txt" />
         </>
       )}
     </div>

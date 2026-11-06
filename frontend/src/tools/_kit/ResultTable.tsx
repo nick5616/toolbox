@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { Button, IconButton, toast, cx } from "@/components";
+import { Button, IconButton, cx } from "@/components";
+import { copyText as copyToClipboard } from "@/lib/copy";
+import { saveTextAs } from "@/lib/saveText";
 import { useResultBehaviour } from "./ResultRow";
 import styles from "./ResultTable.module.css";
 
@@ -27,6 +29,8 @@ export interface ResultTableProps<Row> {
   rowKey: (row: Row) => string;
   /** File name stem used for "Copy CSV" toasts / labels. */
   label: string;
+  /** Suggested file name for "Save CSV…" (default: the label as a slug + .csv). */
+  fileName?: string;
   empty?: ReactNode;
   actions?: ReactNode;
   /** The file a row stands for: makes the row draggable, and double-click or Enter open it. */
@@ -44,13 +48,13 @@ export function toCsv<Row>(rows: Row[], columns: ResultColumn<Row>[]): string {
   return lines.join("\r\n");
 }
 
-async function copyText(text: string, title: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast({ title });
-  } catch {
-    toast({ title: "Couldn't copy to the clipboard", tone: "danger" });
-  }
+function copyText(text: string, what: string): Promise<boolean> {
+  return copyToClipboard(text, { what });
+}
+
+function defaultFileName(label: string): string {
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return `${slug || "results"}.csv`;
 }
 
 /** A table row that behaves like a result row when it stands for a file. */
@@ -61,7 +65,7 @@ function FileTr({ file, children }: { file: ResultFile | undefined; children: Re
 }
 
 /** Dense results table with copy-row and copy-all-as-CSV. */
-export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions, rowFile }: ResultTableProps<Row>) {
+export function ResultTable<Row>({ rows, columns, rowKey, label, fileName, empty, actions, rowFile }: ResultTableProps<Row>) {
   return (
     <div className={styles.root}>
       {rows.length > 0 && (
@@ -77,9 +81,18 @@ export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions,
             icon="copy"
             disabled={rows.length === 0}
             data-tip={rows.length === 0 ? "Nothing to copy yet" : "Copy the whole table as CSV, ready to paste into a spreadsheet"}
-            onClick={() => void copyText(toCsv(rows, columns), `Copied ${label} as CSV`)}
+            onClick={() => void copyText(toCsv(rows, columns), `${label} as CSV`)}
           >
             Copy CSV
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="download"
+            data-tip="Save the whole table as a CSV file you can open in a spreadsheet"
+            onClick={() => void saveTextAs(toCsv(rows, columns), fileName ?? defaultFileName(label))}
+          >
+            Save CSV…
           </Button>
         </span>
       </div>
@@ -116,7 +129,7 @@ export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions,
                       label="Copy row"
                       data-tip="Copy this row as tab-separated text"
                       className={styles.copyBtn}
-                      onClick={() => void copyText(columns.map((c) => c.text(r)).join("\t"), "Row copied")}
+                      onClick={() => void copyText(columns.map((c) => c.text(r)).join("\t"), "row")}
                     />
                   </td>
                 </FileTr>

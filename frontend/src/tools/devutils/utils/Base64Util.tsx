@@ -73,7 +73,7 @@ export default function Base64Util() {
         />
         {result.error && <p className={styles.error}>{result.error}</p>}
       </div>
-      <OutputBox label={dir === "encode" ? "Base64" : "Text"} value={result.out} />
+      <OutputBox label={dir === "encode" ? "Base64" : "Text"} value={result.out} filename={dir === "encode" ? "data.b64.txt" : "decoded.txt"} />
 
       <div className={styles.col}>
         <span className={styles.label}>File (up to 10 MiB)</span>
@@ -86,8 +86,8 @@ export default function Base64Util() {
       </div>
       {fileB64 && (
         <>
-          <OutputBox label="File as Base64" value={fileOut} />
-          <OutputBox label="File as data URL" value={dataUrl} />
+          <OutputBox label="File as Base64" value={fileOut} filename="file.b64.txt" />
+          <OutputBox label="File as data URL" value={dataUrl} filename="file.dataurl.txt" />
         </>
       )}
     </div>

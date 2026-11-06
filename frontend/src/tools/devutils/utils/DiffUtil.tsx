@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Badge, SegmentedControl, Switch, TextArea } from "@/components";
 import { diffLines, diffStats, sideBySide, unifiedText, type DiffOp } from "./diff.logic";
-import { CopyButton, useDebounced } from "./shared";
+import { CopyButton, SaveButton, useDebounced } from "./shared";
 import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
@@ -62,6 +62,7 @@ export default function DiffUtil() {
             <Badge tone="ok" tip="Lines added in the changed text">+{stats.added}</Badge>
             <Badge tone="danger" tip="Lines removed from the original">-{stats.removed}</Badge>
             <CopyButton text={unifiedText(ops)} label="Copy diff" what="the diff" />
+            <SaveButton text={unifiedText(ops)} filename="changes.diff" what="the diff" />
           </>
         )}
       </div>

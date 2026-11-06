@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { TextArea, TextField } from "@/components";
 import { runRegex, segments } from "./regex.logic";
-import { CopyButton, OutputBox, useDebounced } from "./shared";
+import { CopyButton, OutputBox, SaveButton, useDebounced } from "./shared";
 import { useUtilState } from "../store";
 import styles from "../DevUtils.module.css";
 
@@ -95,10 +95,11 @@ export default function RegexUtil() {
         <span className={styles.label}>Replace with</span>
         <TextField mono value={replacement} onChange={(e) => setReplacement(e.target.value)} aria-label="Replacement" data-tip="Text to replace each match with. Use $1 for a group and $& for the whole match" placeholder="$1-$2, $<name>, $&" spellCheck={false} />
       </div>
-      {outcome.ok && outcome.replaced !== null && <OutputBox label="Replace preview" value={outcome.replaced} />}
+      {outcome.ok && outcome.replaced !== null && <OutputBox label="Replace preview" value={outcome.replaced} filename="replaced.txt" />}
       {outcome.ok && outcome.matches.length > 0 && (
         <div>
           <CopyButton text={outcome.matches.map((m) => m.text).join("\n")} label="Copy matches" />
+          <SaveButton text={outcome.matches.map((m) => m.text).join("\n")} filename="matches.txt" what="the matches" />
         </div>
       )}
     </div>

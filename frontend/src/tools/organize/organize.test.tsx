@@ -224,9 +224,11 @@ describe("OrganizeView", () => {
       },
     });
     render(<OrganizeView moduleId="organize" />);
-    expect(await screen.findByText("trip")).toBeTruthy();
+    expect(await screen.findByText("trip / report.csv")).toBeTruthy();
     expect(screen.getByText(/4 organized · 2 duplicates/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Open report" })).toBeTruthy();
+    // The report is a regular result row (Reveal, Open, Save a copy) whose name shows the folder.
+    expect(screen.getByRole("group", { name: "trip / report.csv" }).querySelector('[data-tip="/lib/Organized/trip/report.csv"]')).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Save a copy/ })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Open folder" }));
     expect(revealPath).toHaveBeenCalledWith("/lib/Organized/trip");
   });

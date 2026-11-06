@@ -6,6 +6,7 @@ import {
   ChatServerState,
   ChatService,
   ErrorCode,
+  LibraryService,
   type ChatConversation,
   type ChatDone,
   type ChatModelInfo,
@@ -15,6 +16,7 @@ import {
 import { toAppError } from "@/lib/errors";
 import { useEmbed, useToolHandoff } from "@/lib/embed";
 import { on } from "@/lib/events";
+import { revealLabel } from "@/lib/platform";
 import { useSettings } from "@/state/settings";
 import type { TextSeed } from "@/state/ui";
 import type { ToolViewProps } from "@/tools";
@@ -251,7 +253,12 @@ export default function ChatView({ moduleId }: ToolViewProps) {
   const exportChat = async (id: string) => {
     try {
       const path = await ChatService.Export(id);
-      toast({ title: "Chat exported", description: path, tone: "success" });
+      toast({
+        title: "Chat exported",
+        description: path,
+        tone: "success",
+        action: { label: revealLabel, onClick: () => void LibraryService.RevealPath(path).catch(fail) },
+      });
     } catch (e) {
       fail(e);
     }

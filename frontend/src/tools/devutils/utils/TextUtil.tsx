@@ -50,9 +50,9 @@ export default function TextUtil() {
       </table>
       <div className={styles.cols}>
         {CASES.map((k) => (
-          <OutputBox key={k} label={CASE_LABEL[k]} value={convertCase(d, k)} />
+          <OutputBox key={k} label={CASE_LABEL[k]} value={convertCase(d, k)} filename="text.txt" />
         ))}
-        <OutputBox label="Slug" value={slugify(d)} />
+        <OutputBox label="Slug" value={slugify(d)} filename="slug.txt" />
       </div>
     </div>
   );

@@ -5,7 +5,8 @@ const stat = vi.fn();
 const pick = vi.fn();
 const installEngine = vi.fn();
 const updateExiftool = vi.fn();
-const writeText = vi.fn().mockResolvedValue(undefined);
+const writeText = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const saveText = vi.hoisted(() => vi.fn().mockResolvedValue("C:/out/x.csv"));
 const installUpscaler = vi.hoisted(() => vi.fn());
 const installFfmpeg = vi.hoisted(() => vi.fn());
 
@@ -13,7 +14,8 @@ vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
   return {
     ...actual,
-    FilesService: { Stat: (p: string[]) => stat(p), Pick: (m: string) => pick(m) },
+    FilesService: { Stat: (p: string[]) => stat(p), Pick: (m: string) => pick(m), SaveText: (n: string, t: string) => saveText(n, t) },
+    ClipboardService: { CopyText: (t: string) => writeText(t) },
     DepsService: { InstallAudioEngine: () => installEngine(), UpdateExiftool: () => updateExiftool(), InstallUpscaler: () => installUpscaler(), InstallFFmpeg: () => installFfmpeg() },
     SettingsService: { ModuleState: vi.fn().mockResolvedValue(""), SetModuleState: vi.fn().mockResolvedValue(undefined) },
   };
@@ -63,7 +65,8 @@ beforeEach(() => {
   useFileInputsStore.getState().reset();
   useDeps.getState().setAll([]);
   useJobs.getState().setAll([]);
-  Object.assign(navigator, { clipboard: { writeText } });
+  writeText.mockClear();
+  saveText.mockClear();
   useToastStore.setState({ toasts: [] });
 });
 
@@ -201,6 +204,11 @@ describe("ResultTable", () => {
     render(<ResultTable rows={[{ name: "a", n: 1 }]} columns={cols} rowKey={(r) => r.name} label="results" />);
     fireEvent.click(screen.getByRole("button", { name: "Copy CSV" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("Name,N\r\na,1"));
+  });
+  it("saves the CSV with the suggested name", async () => {
+    render(<ResultTable rows={[{ name: "a", n: 1 }]} columns={cols} rowKey={(r) => r.name} label="results" fileName="tempo.csv" />);
+    fireEvent.click(screen.getByRole("button", { name: "Save CSV…" }));
+    await waitFor(() => expect(saveText).toHaveBeenCalledWith("tempo.csv", "Name,N\r\na,1"));
   });
   it("copies a row", async () => {
     render(<ResultTable rows={[{ name: "a", n: 1 }]} columns={cols} rowKey={(r) => r.name} label="results" />);

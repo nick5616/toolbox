@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const enqueue = vi.hoisted(() => vi.fn());
 const read = vi.hoisted(() => vi.fn());
+const copied = vi.hoisted(() => vi.fn(async (_t: string) => undefined));
+const saved = vi.hoisted(() => vi.fn(async (_n: string, _t: string) => "C:/x/a.metadata.txt"));
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -19,7 +21,9 @@ vi.mock("@/lib/api", async (orig) => {
       Pick: async () => ["/a.jpg"],
       Stat: async (p: string[]) => p.map((path) => ({ path, name: path, sizeBytes: 100, exists: true, isDir: false, kind: "image" })),
       ImageDataURL: async () => "data:image/png;base64,AAAA",
+      SaveText: (n: string, t: string) => saved(n, t),
     },
+    ClipboardService: { CopyText: (t: string) => copied(t) },
     SettingsService: { ModuleState: async () => "", SetModuleState: async () => undefined },
     LibraryService: { Reveal: async () => undefined, Open: async () => undefined, RevealPath: async () => undefined },
     DepsService: { UpdateExiftool: vi.fn() },
@@ -80,7 +84,6 @@ describe("ExifView", () => {
 
   it("renders groups with initial collapsed state, filter and location card", async () => {
     const user = await load();
-    const writeText = vi.spyOn(navigator.clipboard, "writeText");
     expect(screen.getByText("Canon R5", { exact: false })).toBeTruthy();
     expect(screen.getByText("Contains location: 48.8584, 2.2945")).toBeTruthy();
     expect(screen.getByText("ISO")).toBeTruthy();
@@ -94,7 +97,16 @@ describe("ExifView", () => {
     expect(screen.getByText("ISO")).toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "Copy coordinates" }));
-    expect(writeText).toHaveBeenCalledWith("48.8584, 2.2945");
+    await waitFor(() => expect(copied).toHaveBeenCalledWith("48.8584, 2.2945"));
+  });
+
+  it("copies and saves the tags as tab-separated text", async () => {
+    const user = await load();
+    const text = "Group\tTag\tValue\nEXIF\tIFD0:Make\tCanon\nEXIF\tExifIFD:ISO\t200\nMakerNotes\tMakerNotes:Lens\tRF 24-70\n";
+    await user.click(screen.getByRole("button", { name: "Copy metadata" }));
+    await waitFor(() => expect(copied).toHaveBeenCalledWith(text));
+    await user.click(screen.getByRole("button", { name: "Save as…" }));
+    await waitFor(() => expect(saved).toHaveBeenCalledWith("a.metadata.txt", text));
   });
 
   it("notes read-only RAW files and disables actions", async () => {

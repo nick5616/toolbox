@@ -61,6 +61,17 @@ export function formatCoordinates(lat: number, lon: number): string {
   return `${Number(lat.toFixed(6))}, ${Number(lon.toFixed(6))}`;
 }
 
+/**
+ * The tags of a photo as tab-separated text (group, tag, value) with a header
+ * line, for "Copy / Save as…". Tabs and line breaks inside values become spaces.
+ */
+export function metadataText(view: { groups: { name: string; fields: { tag: string; value: string }[] | null }[] | null }): string {
+  const clean = (v: string) => v.replace(/[\t\r\n]+/g, " ");
+  const lines = ["Group\tTag\tValue"];
+  for (const g of view.groups ?? []) for (const f of g.fields ?? []) lines.push(`${clean(g.name)}\t${clean(f.tag)}\t${clean(f.value)}`);
+  return lines.join("\n") + "\n";
+}
+
 export interface ExifJobResult {
   action: string;
   removedTags: number;

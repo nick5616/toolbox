@@ -50,3 +50,19 @@ export function parseHashResult(json: string | undefined | null): HashedFile[] |
     return null;
   }
 }
+
+/**
+ * Checksums in the `sha256sum` format (`<hex>  <filename>`, one per line) for the
+ * given files. With several algorithms each gets a `# <label>` section so the
+ * file stays readable; a single algorithm gives plain lines `sha256sum -c` accepts.
+ * Files without a value for an algorithm are skipped.
+ */
+export function checksumText(files: readonly HashedFile[], algos: readonly HashAlgo[]): string {
+  const sections: string[] = [];
+  for (const a of algos) {
+    const lines = files.filter((f) => a in f.hashes).map((f) => `${f.hashes[a]}  ${f.path.split(/[\\/]/).pop() ?? f.path}`);
+    if (lines.length === 0) continue;
+    sections.push(algos.length > 1 ? `# ${ALGO_LABEL[a]}\n${lines.join("\n")}` : lines.join("\n"));
+  }
+  return sections.join("\n\n") + (sections.length ? "\n" : "");
+}

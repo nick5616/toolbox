@@ -6,6 +6,8 @@ const enqueue = vi.hoisted(() => vi.fn());
 const reveal = vi.hoisted(() => vi.fn(async () => undefined));
 const copyTextMock = vi.hoisted(() => vi.fn(async (_text: string) => true));
 vi.mock("@/lib/copy", () => ({ copyText: (t: string) => copyTextMock(t) }));
+const saveTextMock = vi.hoisted(() => vi.fn(async (_text: string, _name: string) => "C:/x"));
+vi.mock("@/lib/saveText", () => ({ saveTextAs: (t: string, n: string) => saveTextMock(t, n) }));
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -127,10 +129,12 @@ describe("OcrView", () => {
     await user.click(screen.getByRole("button", { name: /Ask Local Chat/ }));
     expect((await screen.findByText(/^chat:/)).textContent).toBe("chat: Text of a.png | Hello Toolbox OCR (full) | Summarise,Extract a table,Fix typos");
     await user.keyboard("{Escape}");
+    // Copy and Save as… take the whole text from the saved file, not the 2000-character preview.
     await user.click(screen.getByRole("button", { name: "Copy text" }));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Hello\nToolbox OCR"));
-    await user.click(screen.getByRole("button", { name: "Show file" }));
-    expect(reveal).toHaveBeenCalledWith("o1");
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Hello Toolbox OCR (full)"));
+    await user.click(screen.getByRole("button", { name: "Save as…" }));
+    await waitFor(() => expect(saveTextMock).toHaveBeenCalledWith("Hello Toolbox OCR (full)", "a (text).txt"));
+    expect(screen.queryByRole("button", { name: "Show file" })).toBeNull();
   });
 
   it("offers Save as document… with the text file as the Document Converter's input", async () => {
