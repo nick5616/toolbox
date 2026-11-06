@@ -189,12 +189,7 @@ func (r *Runner) scheduleState(p core.Pipeline, check core.PipelineCheck) core.S
 		return core.ScheduleState{}
 	}
 	if !check.Ready {
-		for i, sc := range check.Steps {
-			if len(sc.Problems) > 0 {
-				return core.ScheduleState{Message: fmt.Sprintf("Fix the problems in step %d", i+1)}
-			}
-		}
-		return core.ScheduleState{Message: "Fix the problems first"}
+		return core.ScheduleState{Message: scheduleBlockedMessage(check)}
 	}
 	r.pmu.RLock()
 	msg := r.schedMsg[p.ID]
@@ -204,6 +199,33 @@ func (r *Runner) scheduleState(p core.Pipeline, check core.PipelineCheck) core.S
 		st.Next = nx.UnixMilli()
 	}
 	return st
+}
+
+// maxScheduleMsg is the longest problem text shown as a schedule message.
+const maxScheduleMsg = 80
+
+// scheduleBlockedMessage says why a schedule isn't live: "Fix the problems in
+// step N" for a step problem, else the first pipeline-level problem's own text
+// (shortened), else what is missing.
+func scheduleBlockedMessage(check core.PipelineCheck) string {
+	for i, sc := range check.Steps {
+		if len(sc.Problems) > 0 {
+			return fmt.Sprintf("Fix the problems in step %d", i+1)
+		}
+	}
+	if len(check.Problems) > 0 {
+		msg := strings.TrimSpace(check.Problems[0])
+		if rs := []rune(msg); len(rs) > maxScheduleMsg {
+			msg = strings.TrimSpace(string(rs[:maxScheduleMsg-1])) + "…"
+		}
+		if msg != "" {
+			return msg
+		}
+	}
+	if len(check.Missing) > 0 {
+		return "Install what this pipeline needs first"
+	}
+	return "Fix the problems first"
 }
 
 func (r *Runner) setScheduleMsg(id, msg string) {

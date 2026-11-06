@@ -1042,7 +1042,7 @@ func errExtraCap() error {
 		WithHint("End the session to start one with a different list.")
 }
 
-var spaceRe =strings.NewReplacer("’", "'", "‘", "'", "ʼ", "'")
+var spaceRe = strings.NewReplacer("’", "'", "‘", "'", "ʼ", "'")
 
 func normPhrase(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(spaceRe.Replace(s)), " "))
