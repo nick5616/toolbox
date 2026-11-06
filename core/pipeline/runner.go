@@ -46,6 +46,8 @@ type Config struct {
 	Tools    func(depID string) (string, error) // dependency check at Start
 	Settings func() core.Settings
 	Clock    func() time.Time // tests; nil = time.Now
+	// Location is the zone schedules are read in; nil = time.Local (tests).
+	Location *time.Location
 
 	// ProtectedDirs are folders a watch folder may not be inside (the support
 	// and tools directories). Optional.
@@ -77,12 +79,14 @@ type Runner struct {
 	started   bool
 	stopped   bool
 	stopFuncs []func()
+	finished  []func(core.PipelineRun)
 
 	// Pipelines (guarded by pmu).
 	pmu      sync.RWMutex
 	pipes    []core.Pipeline
 	lastRun  map[string]core.RunBrief
 	watchMsg map[string]string
+	schedMsg map[string]string // schedule messages (guarded by pmu)
 	loadOnce sync.Once
 	loadErr  error
 
@@ -99,6 +103,10 @@ type Runner struct {
 	obsSig chan struct{}
 
 	// Watch folders.
+	schedMu   sync.Mutex       // one schedule pass at a time
+	schedKick chan bool        // wake the schedule goroutine; true = catch up
+	schedLast map[string]int64 // last fire per pipeline when there is no store (guarded by schedMu)
+
 	watchMu sync.Mutex
 	watch   map[string]*watchTrack
 
@@ -107,6 +115,7 @@ type Runner struct {
 	emitEvery     time.Duration
 	persistEvery  time.Duration
 	watchEvery    time.Duration
+	wallEvery     time.Duration
 	stableAge     time.Duration
 	maxStateBytes int
 }
@@ -127,6 +136,8 @@ func New(cfg Config) *Runner {
 		aliases:       map[string]string{},
 		lastRun:       map[string]core.RunBrief{},
 		watchMsg:      map[string]string{},
+		schedMsg:      map[string]string{},
+		schedKick:     make(chan bool, 1),
 		inbox:         make(chan func(), 64),
 		quit:          make(chan struct{}),
 		loopDone:      make(chan struct{}),
@@ -136,6 +147,7 @@ func New(cfg Config) *Runner {
 		emitEvery:     RunEventInterval,
 		persistEvery:  250 * time.Millisecond,
 		watchEvery:    WatchInterval,
+		wallEvery:     WallCheckEvery,
 		stableAge:     3 * time.Second,
 		maxStateBytes: MaxRunStateBytes,
 	}
@@ -232,6 +244,7 @@ func (r *Runner) Start(ctx context.Context) error {
 	r.wg.Add(1)
 	go l.run()
 	r.startWatch(lctx)
+	r.startSchedule(lctx)
 	slog.Debug("pipelines runner started")
 	return nil
 }

@@ -37,6 +37,8 @@ func (l *loop) run() {
 	defer close(r.loopDone)
 	timer := time.NewTimer(time.Hour)
 	defer timer.Stop()
+	wall := time.NewTicker(r.wallEvery)
+	defer wall.Stop()
 
 	l.drainObserved()
 	for _, rs := range l.runs {
@@ -58,6 +60,8 @@ func (l *loop) run() {
 			l.drainObserved()
 		case <-timer.C:
 			l.onTimer()
+		case <-wall.C:
+			l.checkTimeWaits(false)
 		}
 		l.settle()
 	}
@@ -184,6 +188,7 @@ func (l *loop) recompute(rs *runState) {
 			slog.Debug("pipelines: run cleaned up", "run", r.ID, "files", n)
 		}
 		l.persist(rs) // terminal transitions are saved at once; the event follows the throttle
+		l.notifyFinished(rs)
 	}
 	if l.r.setLastRun(r.PipelineID, core.RunBrief{ID: r.ID, Status: r.Status, CreatedAt: r.CreatedAt}) {
 		l.r.emitPipelines()
@@ -397,6 +402,8 @@ func (l *loop) register(pr core.PipelineRun) *runState {
 				c.Status, c.Inputs = core.CellPending, []core.RunFile{}
 			case c.Status == core.CellWaiting && c.Wait == core.WaitCondition:
 				rs.cellRT(ii, si).retryAt = time.Now()
+			case c.Status == core.CellWaiting && c.Wait == core.WaitTime:
+				rs.cellRT(ii, si).retryAt = l.retryAtFor(c.Until)
 			}
 		}
 	}

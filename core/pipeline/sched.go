@@ -53,7 +53,7 @@ func (l *loop) advance(rs *runState) {
 				if c.Status != core.CellPending {
 					break
 				}
-				if item.Input != "" && rs.tIdx >= 0 && si == rs.tIdx {
+				if item.MergedAt == "" && rs.tIdx >= 0 && si == rs.tIdx {
 					if rs.merged() {
 						l.skipLate(rs, ii)
 						changed = true
@@ -149,7 +149,7 @@ func (l *loop) tryMerge(rs *runState) bool {
 	}
 	var cands []int
 	for ii, it := range rs.r.Items {
-		if it.Input == "" {
+		if it.MergedAt != "" {
 			continue
 		}
 		good := true
@@ -207,7 +207,7 @@ func (l *loop) sourceFiles(rs *runState, ii, si int) []core.RunFile {
 	step := rs.r.Steps[si]
 	switch step.From {
 	case FromInput:
-		if item.Input == "" {
+		if item.MergedAt != "" {
 			var out []core.RunFile
 			for _, m := range item.Merged {
 				out = append(out, inputRunFile(rs.r.Items[m].Input))
@@ -222,7 +222,7 @@ func (l *loop) sourceFiles(rs *runState, ii, si int) []core.RunFile {
 	if j < 0 || j >= si {
 		return nil
 	}
-	if item.Input == "" && j < rs.tIdx {
+	if item.MergedAt != "" && j < rs.tIdx {
 		var out []core.RunFile
 		for _, m := range item.Merged {
 			out = append(out, rs.r.Items[m].Cells[j].Files...)
@@ -355,7 +355,7 @@ func (l *loop) failCell(rs *runState, ii, si int, err error) {
 		slog.Warn("pipelines: cell failed", "run", rs.r.ID, "step", si, "err", ae)
 	}
 	c := &rs.r.Items[ii].Cells[si]
-	c.Status, c.Wait = core.CellFailed, ""
+	c.Status, c.Wait, c.Until = core.CellFailed, "", 0
 	c.ErrorCode, c.Error, c.ErrorHint = ae.Code, ae.Message, ae.Hint
 	c.FinishedAt = l.r.nowMs()
 	l.blockAfter(rs, ii, si)
@@ -423,7 +423,13 @@ func (l *loop) buildRequest(rs *runState, ii, si int) (core.StepRequest, error) 
 		RunID: rs.r.ID, StepID: step.ID, Pipeline: rs.r.Name, Options: append(json.RawMessage{}, opts...),
 		Item: l.itemView(rs, ii, item.Cells[si].Inputs), Secrets: secrets, Started: rs.r.CreatedAt,
 	}
-	if rs.steps[si].info.Together && item.Input == "" {
+	if c := item.Cells[si]; c.Wait == core.WaitTime {
+		req.Until = c.Until
+	}
+	if rt := rs.rt[[2]int{ii, si}]; rt != nil && rt.skip {
+		req.SkipWait, rt.skip = true, false
+	}
+	if rs.steps[si].info.Together && item.MergedAt != "" {
 		for _, m := range item.Merged {
 			files, _ := l.inputsFor(rs, m, si)
 			req.Items = append(req.Items, l.itemView(rs, m, files))
@@ -474,7 +480,7 @@ func (l *loop) startCell(rs *runState, c cand) bool {
 	cell := &rs.r.Items[c.item].Cells[c.step]
 	cell.Status, cell.Inputs, cell.Message = core.CellPreparing, cloneFiles(c.files), c.note
 	cell.Error, cell.ErrorCode, cell.ErrorHint = "", "", ""
-	cell.StartedAt, cell.FinishedAt = l.r.nowMs(), 0
+	cell.StartedAt, cell.FinishedAt, cell.Until = l.r.nowMs(), 0, 0
 	l.spawnPrepare(rs, c.item, c.step)
 	l.touch(rs)
 	return cell.Status != core.CellFailed
@@ -515,10 +521,10 @@ func (l *loop) spawnPrepare(rs *runState, ii, si int) {
 	}()
 }
 
-// reprepare retries a condition wait.
+// reprepare retries a condition or time wait.
 func (l *loop) reprepare(rs *runState, ii, si int) {
 	c := &rs.r.Items[ii].Cells[si]
-	if c.Status != core.CellWaiting || c.Wait != core.WaitCondition {
+	if c.Status != core.CellWaiting || (c.Wait != core.WaitCondition && c.Wait != core.WaitTime) {
 		return
 	}
 	l.spawnPrepare(rs, ii, si)
@@ -554,14 +560,19 @@ func (l *loop) onPrepared(runID string, ii, si, gen int, jobs []core.StepJob, er
 		rt.cancel = nil
 	}
 	c := &rs.r.Items[ii].Cells[si]
-	if c.Status != core.CellPreparing && !(c.Status == core.CellWaiting && c.Wait == core.WaitCondition) {
+	if c.Status != core.CellPreparing && !(c.Status == core.CellWaiting && (c.Wait == core.WaitCondition || c.Wait == core.WaitTime)) {
 		return
 	}
 	if err != nil {
 		if core.IsCode(err, core.CodeWaiting) {
 			ae := core.AsAppError(err)
 			c.Status, c.Wait, c.Message, c.ErrorHint = core.CellWaiting, core.WaitCondition, ae.Message, ae.Hint
+			c.Until = 0
 			rt.retryAt = time.Now().Add(l.r.waitRetry)
+			if until, ok := core.WaitingUntil(err); ok {
+				c.Wait, c.Until = core.WaitTime, until.UnixMilli()
+				rt.retryAt = l.retryAtFor(c.Until)
+			}
 			l.touch(rs)
 			return
 		}
@@ -579,7 +590,7 @@ func (l *loop) submit(rs *runState, ii, si int, sjobs []core.StepJob) {
 	if c.Status == core.CellWaiting { // a cleared condition: drop its text
 		c.Message = ""
 	}
-	c.Wait, c.Error, c.ErrorCode, c.ErrorHint = "", "", "", ""
+	c.Wait, c.Until, c.Error, c.ErrorCode, c.ErrorHint = "", 0, "", "", ""
 	if len(sjobs) == 0 {
 		files := cloneFiles(c.Inputs)
 		for i := range files {

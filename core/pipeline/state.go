@@ -22,7 +22,8 @@ type cellRT struct {
 	gen       int // bumped whenever a prepare is started or invalidated
 	cancel    context.CancelFunc
 	preparing bool      // a PrepareStep goroutine is in flight
-	retryAt   time.Time // condition waits: when to prepare again
+	retryAt   time.Time // condition and time waits: when to prepare again
+	skip      bool      // Continue now: the next prepare gets SkipWait
 }
 
 // stepRT is the resolved type of a run's step.
@@ -79,7 +80,7 @@ func (rs *runState) merged() bool {
 	}
 	id := rs.r.Steps[rs.tIdx].ID
 	for _, it := range rs.r.Items {
-		if it.Input == "" && it.MergedAt == id {
+		if it.MergedAt == id {
 			return true
 		}
 	}
@@ -92,7 +93,7 @@ func (rs *runState) mergedItem() int {
 	}
 	id := rs.r.Steps[rs.tIdx].ID
 	for i, it := range rs.r.Items {
-		if it.Input == "" && it.MergedAt == id {
+		if it.MergedAt == id {
 			return i
 		}
 	}
@@ -276,6 +277,7 @@ func builtinVars(label string, link bool, n int, pipeline string, created time.T
 		"n":        itoa(n),
 		"date":     t.Format("2006-01-02"),
 		"time":     t.Format("15-04"),
+		"weekday":  t.Format("Mon"),
 		"pipeline": pipeline,
 	}
 }
