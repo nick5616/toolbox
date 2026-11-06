@@ -396,10 +396,12 @@ func run() error {
 		Store: db, ProjectsDir: projectsDir, SupportDir: paths.SupportDir, TmpDir: paths.TmpDir,
 		Engine: engine, Jobs: jobs, Outputs: db, Emitter: emitter, LibraryDir: libraryDir, Resolve: depSvc.Resolve,
 		SaveDialog: paintSaveDialog, SavedMask: eraserMod.SavedMaskPNG,
+		Models: newPaintModels(paths.ModelsDir, eraserMod, editMod),
 	})
 	if err := paint.Register(reg, paintMod); err != nil {
 		return err
 	}
+	paintMod.PruneTmp() // start-up cleanup of tmp/paint (Lab crops and results)
 	// --- end Phase 19 ---
 
 	settings.OnChange(func(old, new core.Settings) {
