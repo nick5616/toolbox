@@ -16,7 +16,7 @@ Agreed on 2026-10-28; the Visualizer was cut in line as Phase 7 on 2026-10-29 an
 | 13 | **Built 2026-11-04.** Local File Transfer: LocalSend v2 (HTTPS) compatible, pairing with a 6-digit code, auto-accept from paired Toolboxes, receive Off / While open / Always, "Send to a device" step. The listener rule was amended for it. |
 | 16 | **Built 2026-11-04.** Parameters as inputs: every step option is a coloured port that variables and run parameters wire into; the value colour system. |
 | 17 | **Built 2026-11-05.** Compress to Size: any file under a byte limit, with frozen targets (Discord, Gmail, …). `docs/specs/phase-17.md`. |
-| 18 | **2026-11-05.** Focus Lock (stop everything but the chosen apps for a set time, Windows and macOS) and pipeline timing (wait-until, Wait step, schedules, runs without files, Open in app). See `SPEC.md`. |
+| 18 | **Built 2026-11-05.** Focus Lock (stop everything but the chosen apps for a set time, Windows and macOS) and pipeline timing (wait-until, Wait step, schedules, runs without files, Open in app). See `SPEC.md`. |
 
 ## Pipelines (Phase 8) — intended model
 

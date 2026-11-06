@@ -550,3 +550,29 @@ Newest last. Format: date — decision — why.
     - the span band covers every step from the start to its wait;
     - the pipeline list refetches once a minute while a schedule is on, because the runner doesn't emit when "next" simply passes.
   - **The resume toast has no State field.** The shell infers it: on the first state after launch, an active session that started before the app did.
+- **2026-11-05: Phase 18 Wave 2 merged (S1 shell/tray/hotkey/quit, P1 templates).**
+  - **Quit gate:**
+    - `ShouldQuit` ignores the `RequestWeaken("quit")` error, so at Strict the quit is still refused and Focus opens for Emergency unlock;
+    - once the engine sets `QuitReleased` after a refused quit, the shell quits;
+    - tray and hotkey starts use `LastProfileID`, `LastMinutes` (50 if unset) and `DefaultStrength`, because Settings keeps no last strength.
+  - **macOS gap (open issue):** Wails exposes no shutdown or log-out signal on macOS, so a log-out during a real session meets the quit friction. Windows uses `GetSystemMetrics(SM_SHUTTINGDOWN)` and is never blocked.
+  - **Resume toast:** shown once per page when the first loaded state has an active session that started before the page did.
+  - **Templates:**
+    - Morning deep work ships with its schedule off, its times filled in, and no profile;
+    - 29–31 need no packs;
+    - the template shape test allows a Focus start first step and an Open in app last step.
+  - **Open in app:** a step with a problem still says it takes no files, so the runner doesn't add a "needs files" problem next to "Pick an app".
+- **2026-11-05: Phase 18 sandbox QA (dry run).**
+  - **Engine and pipelines:**
+    - The engine reported `dryRun: true` before any session was started.
+    - A firm session ran with its friction dialog, phrase check and 30 s countdown; Confirm ended it.
+    - Pomodoro ×4 ran end to end with 1-minute rounds and a test profile: start → session → wait ends with the session → Wait 1 min → next start, on time.
+  - **Shell:**
+    - The top-bar pill, the sidebar dot and the "Would stop …" toasts appeared.
+    - Layouts checked at 1180×720 and 960×600.
+  - **CPU (acceptance 6):** the Go process used 31 ms of CPU in 60 s with a session on (0.05% of a core).
+  - **Fixed from QA:**
+    - a band whose length is bound to a run parameter is unlabelled (it showed the default);
+    - a dry run's ended line says "would have stopped";
+    - a run without files counts steps in the runs list.
+  - **Not run here, against the safety rule:** acceptance 2–4 need a real (non-dry-run) session, which CLAUDE.md forbids while developing. Their logic is covered by the engine's tests, the scoped real-platform E2E test and the dry-run QA. They are listed for the user with 1 and 5.
