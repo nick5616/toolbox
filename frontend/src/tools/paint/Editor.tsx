@@ -12,18 +12,24 @@ import { useMediaQuery } from "@/lib/media";
 import { openLibrary } from "@/lib/openLibrary";
 import { useBeforePopOut } from "@/lib/popout";
 import { matches, useShortcut } from "@/lib/shortcuts";
-import { PaintGLError, type PaintEngine, type PaintDoc, type TileSource } from "@/paint/engine/types";
+import { PaintGLError, type PaintEngine, type PaintDoc, type TileSource, type ToolState } from "@/paint/engine/types";
 import type { BrushPreset } from "@/paint/brushes/schema";
 import type { PaintEngineExt } from "@/paint/engine/engine";
+import type { ObjectSelector } from "@/paint/ai/ops";
+import { shapeInputPoints, type Shape } from "@/paint/guides/quickshape";
 import type { PerceptionToolInfo } from "@/paint/lab/types";
 import { actionCombos, buildActions } from "./actions";
+import { AdjustPanel, type AdjustRun } from "./adjustUI";
 import type { InputController, OverlayShape } from "./canvasInput";
 import { HeaderContent, LabStrip, LeftEdge, TopLeftIsland, TopRightIsland, TransformBar, type ChromeActions } from "./chrome";
 import { EditorContext, useEngineEvents, type EditorDialog } from "./context";
 import { EditorDialogs } from "./dialogs";
-import { DEFAULT_GUIDES, runtime } from "./engine-adapter";
+import { DEFAULT_GUIDES, runtime, useAIStatus, type LiquifyMode } from "./engine-adapter";
+import { QuickShapeHandles, TransformHandles } from "./handles";
+import { applyTransformDrag } from "./transformDrag";
+import { takePaper } from "./paper";
 import { copyImage, ExportResult } from "./exportFlow";
-import { BrushHud, PendingRegions, ShapeOverlay } from "./overlays";
+import { BrushHud, MaskPreview, PendingRegions, ShapeOverlay } from "./overlays";
 import { BrushLibrary } from "./panels/BrushLibrary";
 import { BrushStudio } from "./panels/BrushStudio";
 import { ColorPanel } from "./panels/ColorPanel";
@@ -67,6 +73,17 @@ function tileSource(projectId: string, onFail: (layerId: string, keys: string[])
   };
 }
 
+/** A new canvas that asked for paper texture gets its grain baked into a locked bottom layer, once. */
+async function applyPaper(engine: PaintEngine, projectId: string): Promise<void> {
+  const job = takePaper(projectId);
+  if (!job) return;
+  try {
+    await job(engine);
+  } catch (e) {
+    toast({ title: "Couldn't add the paper texture", description: toAppError(e).message, tone: "warn" });
+  }
+}
+
 /** What the real engine offers beyond the frozen contract (absent on the stand-in engine). */
 type Ext = PaintEngine & Partial<PaintEngineExt>;
 
@@ -89,7 +106,21 @@ export interface EditorProps {
 
 export default function Editor({ projectId, initialName, studio, onToggleStudio, onBack, onOpen, imports, onImportsDone }: EditorProps) {
   const [engine] = useState<PaintEngine>(() => runtime.createEngine());
-  const [queue] = useState(() => runtime.createQueue(engine));
+  const [queue] = useState(() => runtime.createQueue(engine, () => projectId));
+  const tips = useMemo(() => runtime.createStampTips({ engine, queue }), [engine, queue]);
+  const stampSrc = useRef("");
+  const selectorRef = useRef<ObjectSelector | null>(null);
+  const [, bump] = useState(0);
+  const [qshape, setQshape] = useState<{ shape: Shape; tool: ToolState; pressure: number } | null>(null);
+  const [adjustRun, setAdjustRun] = useState<AdjustRun | null>(null);
+  const adjustRef = useRef<AdjustRun | null>(null);
+  adjustRef.current = adjustRun;
+  const liquifyCfg = useRef<{ mode: LiquifyMode; strength: number }>({ mode: "push", strength: 0.5 });
+  const liquifyRaf = useRef(0);
+  const ai = useAIStatus();
+  const aiRef = useRef(ai);
+  aiRef.current = ai;
+  
   const [name, setName] = useState(initialName);
   const nameRef = useRef(name);
   nameRef.current = name;
@@ -107,7 +138,7 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
   const [points, setPoints] = useState<Array<{ x: number; y: number; positive: boolean }>>([]);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
   const hudTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const txy = useRef({ x: 0, y: 0 });
+
   const strokes = useRef(0);
   const lockedToast = useRef(0);
 
@@ -147,6 +178,8 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
       }
       if (!(engine as Ext).setGuides) runtime.applyGuides(engine, usePaintUI.getState().guides);
       (engine as Ext).setViewport?.(areaRef.current?.clientWidth ?? 0, areaRef.current?.clientHeight ?? 0);
+      runtime.warm();
+      await applyPaper(engine, projectId);
       saver.start();
       engine.view.fit();
       setReady(true);
@@ -238,7 +271,10 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
           case "smudge":
           case "eraser":
           case "history":
+          case "pencil":
             return "stroke";
+          case "liquify":
+            return "liquify";
           case "lab": {
             const info = labById(s.labToolId);
             if (!info) return "none";
@@ -260,14 +296,25 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
           }
           return null;
         }
+        setQshape(null);
         const info = s.tool === "lab" ? labById(s.labToolId) : undefined;
         const seed = s.tool === "lab" ? strokeSeed(s.labToolId) : ++strokes.current;
+        if (s.tool === "lab" && s.labToolId === "subject-stamp") return stampTool(s, seed);
         return buildToolState(s, seed, info?.kind === "perception");
       },
       simulatePressure: () => usePaintUI.getState().settings.simulatePressure,
       palmRejection: () => usePaintUI.getState().settings.palmRejection,
       onStrokeEnd(result, tool) {
         strokes.current++;
+        const run = adjustRef.current;
+        if (run && usePaintUI.getState().tool === "pencil") {
+          // Pencil: the adjustment lands only where the brush went.
+          if (run.effect && result.mask) {
+            run.handle.render(run.effect);
+            run.handle.applyThroughMask(result.mask, { x: result.bounds.x, y: result.bounds.y });
+          }
+          return;
+        }
         if (tool.kind !== "mask") return;
         const s = usePaintUI.getState();
         const info = labById(s.labToolId) as PerceptionToolInfo | undefined;
@@ -292,28 +339,153 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
       },
       onWand: (at) => engine.selection.wand(at, usePaintUI.getState().wand),
       onTransformDrag(dx, dy) {
-        if (!engine.transform.active) {
-          engine.transform.begin("free");
-          txy.current = { x: 0, y: 0 };
-        }
-        txy.current = { x: txy.current.x + dx, y: txy.current.y + dy };
-        engine.transform.set({ matrix: [1, 0, 0, 1, txy.current.x, txy.current.y] });
+        if (!engine.transform.active) engine.transform.begin("free");
+        applyTransformDrag(engine, dx, dy);
       },
       onPoint(at, positive) {
-        setPoints((p) => [...p, { x: at.x, y: at.y, positive }].slice(-64));
+        const info = labById("select-object");
+        if (!info) return;
+        if (!selectorRef.current) {
+          const sel = runtime.createObjectSelector({ engine, queue, params: usePaintUI.getState().labParams["select-object"] ?? defaultParams(info) });
+          if (!sel) {
+            toast({ title: "Select object needs the AI engine", tone: "warn" });
+            return;
+          }
+          sel.on(() => bump((n) => n + 1));
+          selectorRef.current = sel;
+        }
+        selectorRef.current.add({ x: at.x, y: at.y, positive });
+        setPoints(selectorRef.current.points());
+      },
+      onLiquify(phase, at, delta) {
+        const run = adjustRef.current;
+        if (!run?.field || phase !== "move") return;
+        const c = liquifyCfg.current;
+        run.field.dab(c.mode, at.x, at.y, usePaintUI.getState().size, c.strength, delta.x, delta.y);
+        if (liquifyRaf.current) return;
+        liquifyRaf.current = requestAnimationFrame(() => {
+          liquifyRaf.current = 0;
+          const r = adjustRef.current;
+          if (r?.field) r.handle.preview(r.field.effect());
+        });
+      },
+      quickShape: (tool) => tool.kind === "brush" || tool.kind === "eraser",
+      onQuickShape(shape, tool, pressure) {
+        (engine as Ext).restroke?.(tool, shapeInputPoints(shape, Math.max(0.5, pressure)));
+        setQshape({ shape, tool, pressure });
       },
       onOverlay: setShape,
       onTwoFingerTap: () => void engine.undo(),
       onThreeFingerTap: () => void engine.redo(),
       onHover: setHover,
     }),
-    [engine, queue, labById],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [engine, queue, labById, tips],
   );
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!ready || !canvas) return;
     return runtime.attachInput(canvas, engine, ctl);
   }, [ready, engine, ctl]);
+
+  // Subject stamp: the first stroke cuts the active layer's subject out; later strokes scatter it as a brush tip.
+  function stampTool(s: ReturnType<typeof usePaintUI.getState>, seed: number): ToolState | null {
+    if (!tips) {
+      toast({ title: "Subject stamp needs the AI engine", tone: "warn" });
+      return null;
+    }
+    const info = labById("subject-stamp");
+    if (!stampSrc.current || !tips.tip(stampSrc.current)) {
+      const layer = engine.doc.active;
+      const gate = aiRef.current.reasonFor("cutout");
+      if (gate) {
+        toast({ title: "Subject stamp can't run", description: gate, tone: "warn" });
+        return null;
+      }
+      toast({ title: "Cutting out the subject…", description: "Paint again when it is ready" });
+      tips
+        .cut(layer, s.labParams["subject-stamp"] ?? (info ? defaultParams(info) : {}))
+        .then(async () => {
+          stampSrc.current = layer;
+          (engine as Ext).invalidateAsset?.(`stamp:${layer}`);
+          const t = buildToolState({ ...usePaintUI.getState(), tool: "brush" }, 1, false);
+          if (t && t.kind === "brush") await (engine as Ext).prepareBrush?.({ ...t.brush, tip: { ...t.brush.tip, shape: `stamp:${layer}` } });
+          toast({ title: "Subject ready", description: "Paint with it on any layer", tone: "success" });
+        })
+        .catch((e) => toast({ title: toAppError(e).message, tone: "danger" }));
+      return null;
+    }
+    const t = buildToolState({ ...s, tool: "brush" }, seed, false);
+    if (!t || t.kind !== "brush") return null;
+    return { ...t, brush: { ...t.brush, tip: { ...t.brush.tip, shape: `stamp:${stampSrc.current}`, hardness: 1, roundness: 1, angle: 0 }, spacing: Math.max(t.brush.spacing, 0.9), scatter: Math.max(t.brush.scatter, 0.3) } };
+  }
+  useEffect(
+    () =>
+      usePaintUI.subscribe((st, prev) => {
+        if (st.labToolId !== prev.labToolId || st.tool !== prev.tool) {
+          if (st.labToolId !== "subject-stamp" || st.tool !== "lab") {
+            stampSrc.current = "";
+            tips?.clear();
+          }
+          if (!(st.tool === "lab" && st.labToolId === "select-object") && selectorRef.current) {
+            selectorRef.current.cancel();
+            selectorRef.current = null;
+            setPoints([]);
+          }
+          if (st.tool !== "brush" && st.tool !== "eraser") setQshape(null);
+        }
+      }),
+    [tips],
+  );
+
+  const endAdjust = useCallback(
+    (apply: boolean) => {
+      const run = adjustRef.current;
+      if (!run) return;
+      if (apply) run.handle.commit();
+      else run.handle.cancel();
+      cancelAnimationFrame(liquifyRaf.current);
+      liquifyRaf.current = 0;
+      setAdjustRun(null);
+      const t = usePaintUI.getState().tool;
+      if (t === "pencil" || t === "liquify") usePaintUI.getState().setTool("brush");
+    },
+    [],
+  );
+  const startAdjust = (id: string) => {
+    endAdjust(false);
+    const info = runtime.adjustments().find((a) => a.id === id);
+    if (!info?.available) return;
+    if (info.liquify) {
+      const l = runtime.beginLiquify(engine, "Liquify");
+      if (!l) return void toast({ title: "Nothing to liquify", description: "The active layer has no area to work on", tone: "warn" });
+      setAdjustRun({ info, handle: l.adjust, field: l.field, effect: null });
+      usePaintUI.getState().setTool("liquify");
+      return;
+    }
+    const h = runtime.beginAdjust(engine, info.label);
+    if (!h) return void toast({ title: "Nothing to adjust", description: "The active layer has no area to work on", tone: "warn" });
+    setAdjustRun({ info, handle: h, effect: null });
+  };
+  // Changing the active layer ends a running adjustment (it was taken from the old one).
+  useEffect(() => {
+    let layer = engine.doc.active;
+    return engine.on("layers", () => {
+      if (engine.doc.active !== layer) {
+        layer = engine.doc.active;
+        endAdjust(false);
+      }
+    });
+  }, [engine, endAdjust]);
+  const runSubject = (action: "select-subject" | "cut-subject") => {
+    const gate = ai.reasonFor("cutout");
+    if (gate) return void toast({ title: "That needs the AI engine", description: gate, tone: "warn" });
+    const info = labById("select-subject");
+    toast({ title: "Finding the subject…" });
+    runtime
+      .runLabAction(action, { engine, queue, params: usePaintUI.getState().labParams["select-subject"] ?? (info ? defaultParams(info) : {}) })
+      .catch((e) => toast({ title: toAppError(e).message, tone: "danger" }));
+  };
 
   // ---- shortcuts ----
   const flashHud = useCallback(() => {
@@ -331,13 +503,26 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
     flashHud,
   });
   useShortcut(actionCombos(actions), (e) => actions.find((a) => matches(e, a.combo))?.run(), { when: ready });
-  useShortcut("Enter", () => {
-    const pts = points;
-    setPoints([]);
-    runtime.runLabAction("select-object", { engine, queue, points: pts }).catch((e) => toast({ title: toAppError(e).message, tone: "danger" }));
-  }, { when: ready && points.length > 0 });
+  useShortcut(
+    "Enter",
+    () => {
+      const sel = selectorRef.current;
+      if (sel && points.length > 0) {
+        selectorRef.current = null;
+        setPoints([]);
+        void sel.commit().then((ok) => !ok && toast({ title: "Nothing was selected", tone: "warn" }), (e) => toast({ title: toAppError(e).message, tone: "danger" }));
+      } else if (engine.transform.active) engine.transform.commit("bicubic");
+      else if (qshape) setQshape(null);
+    },
+    { when: ready },
+  );
   useShortcut("Escape", () => {
-    if (points.length) setPoints([]);
+    if (points.length) {
+      selectorRef.current?.cancel();
+      selectorRef.current = null;
+      setPoints([]);
+    } else if (qshape) setQshape(null);
+    else if (adjustRef.current) endAdjust(false);
     else if (engine.transform.active) engine.transform.cancel();
     else if (usePaintUI.getState().uiHidden) usePaintUI.getState().setUIHidden(false);
   }, { when: ready });
@@ -351,6 +536,9 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
   const chromeActions: ChromeActions = {
     onBack: () => void saver.flush().catch(() => undefined).finally(onBack),
     onClose: () => void saver.flush().catch(() => undefined).finally(onBack),
+    onAdjust: startAdjust,
+    onSelectSubject: () => runSubject("select-subject"),
+    onCutSubject: () => runSubject("cut-subject"),
     onImportImage: () =>
       void FilesService.PickWith("Add a picture as a layer", [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".heif"], true).then((p) => {
         if (p && p.length) setPending((q) => [...q, ...p]);
@@ -375,7 +563,7 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
     PaintService.Rename(projectId, n).catch((e) => toast({ title: "Couldn't rename", description: toAppError(e).message, tone: "danger" }));
   };
 
-  const ctxValue = useMemo(() => ({ engine, queue, projectId, saver, docked, compact, openDialog: setDialog }), [engine, queue, projectId, saver, docked, compact]);
+  const ctxValue = useMemo(() => ({ engine, queue, projectId, saver, docked, compact, openDialog: setDialog, openProject: onOpen }), [engine, queue, projectId, saver, docked, compact, onOpen]);
 
   const panelNode = (id: PanelId) => {
     switch (id) {
@@ -433,6 +621,19 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
             {ready ? (
               <>
                 <ShapeOverlay shape={points.length ? { kind: "points", points } : shape} />
+                <MaskPreview mask={selectorRef.current?.preview() ?? null} />
+                <TransformHandles engine={engine} />
+                {qshape ? (
+                  <QuickShapeHandles
+                    engine={engine}
+                    shape={qshape.shape}
+                    onChange={(sh) => {
+                      (engine as Ext).restroke?.(qshape.tool, shapeInputPoints(sh, Math.max(0.5, qshape.pressure)));
+                      setQshape({ ...qshape, shape: sh });
+                    }}
+                    onDone={() => undefined}
+                  />
+                ) : null}
                 <PendingRegions />
                 <BrushHud at={hover} />
                 <div className={ed.floats}>
@@ -441,6 +642,7 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
                   <LeftEdge compact={compact} />
                   <LabStrip compact={compact} />
                   <div className={ed.bottomBar}>
+                    {adjustRun ? <AdjustPanel run={adjustRun} onApply={() => endAdjust(true)} onCancel={() => endAdjust(false)} liquify={liquifyCfg} /> : null}
                     <TransformBar />
                     <GenerationsStrip />
                     {exportJob ? <ExportResult jobId={exportJob} onDismiss={() => setExportJob(null)} /> : null}

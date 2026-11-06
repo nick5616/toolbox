@@ -10,7 +10,7 @@ import type { HistoryId, ToolState } from "@/paint/engine/types";
 import { hexToHsv, hexToRGBA, hsvToHex, type Hsv } from "./color";
 import { DEFAULT_GUIDES, type GuidesState } from "./engine-adapter";
 
-export type ToolId = "brush" | "smudge" | "eraser" | "fill" | "eyedropper" | "transform" | "lasso" | "rect" | "ellipse" | "wand" | "lab" | "history";
+export type ToolId = "brush" | "smudge" | "eraser" | "fill" | "eyedropper" | "transform" | "lasso" | "rect" | "ellipse" | "wand" | "lab" | "history" | "liquify" | "pencil";
 export type BrushToolId = "brush" | "smudge" | "eraser";
 export type PanelId = "brushes" | "brushstudio" | "color" | "layers" | "history" | "lab" | "guides";
 export type DockMode = "auto" | "dock" | "pop";
@@ -190,6 +190,9 @@ export function buildToolState(s: PaintUIState, seed: number, perception: boolea
       return s.brushes.smudge ? { kind: "smudge", brush: withSize(s.brushes.smudge), seed } : null;
     case "eraser":
       return s.brushes.eraser ? { kind: "eraser", brush: withSize(s.brushes.eraser), seed } : null;
+    case "pencil":
+      // Adjustment Pencil: the stroke only records a mask (nothing is drawn).
+      return s.brushes.brush ? { kind: "mask", brush: withSize(s.brushes.brush), seed } : null;
     case "history":
       return s.brushes.brush && s.historySource !== null ? { kind: "history", brush: withSize(s.brushes.brush), source: s.historySource, seed } : null;
     case "lab": {

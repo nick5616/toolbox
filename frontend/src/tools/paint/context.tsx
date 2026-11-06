@@ -13,6 +13,8 @@ export interface EditorContextValue {
   compact: boolean;
   /** Opens the export dialog / other editor-level dialogs. */
   openDialog(d: EditorDialog): void;
+  /** Opens another painting (Upscale canvas into a new project). */
+  openProject(id: string): void;
 }
 
 export type EditorDialog = "export" | "canvasSize" | "imageSize" | "extend" | "upscale" | "newBrush";

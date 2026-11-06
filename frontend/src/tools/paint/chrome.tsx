@@ -14,6 +14,9 @@ export interface ChromeActions {
   onShowLibrary(): void;
   onDuplicate(): void;
   onClose(): void;
+  onAdjust(id: string): void;
+  onSelectSubject(): void;
+  onCutSubject(): void;
 }
 
 function useAnchor() {
@@ -132,7 +135,7 @@ export function TopLeftIsland({ actions, compact }: { actions: ChromeActions; co
       item("dock-dock", "Always dock panels", () => setDock("dock"), { checked: dockMode === "dock" }),
       item("dock-pop", "Panels always float", () => setDock("pop"), { checked: dockMode === "pop" }),
     ],
-    adjust: adj.map((a) => item(a.id, a.label, () => undefined, { icon: a.icon, disabled: !a.available, ...(a.reason ? { reason: a.reason } : {}) })),
+    adjust: adj.map((a) => item(a.id, a.label, () => (close(), actions.onAdjust(a.id)), { icon: a.icon, disabled: !a.available, ...(a.reason ? { reason: a.reason } : {}) })),
     select: [
       item("rect", "Rectangle", () => setTool("rect"), { icon: "rect", kbd: "M" }),
       item("ellipse", "Ellipse", () => setTool("ellipse"), { icon: "ellipse" }),
@@ -142,6 +145,10 @@ export function TopLeftIsland({ actions, compact }: { actions: ChromeActions; co
       item("all", "Select all", () => engine.selection.rect({ x: 0, y: 0, w: engine.doc.width, h: engine.doc.height }), { kbd: "Ctrl+A" }),
       item("none", "Deselect", () => engine.selection.clear(), { kbd: "Ctrl+D", disabled: !engine.selection.active, reason: "Nothing is selected" }),
       item("inv", "Invert", () => engine.selection.invert(), { kbd: "Ctrl+Shift+I", disabled: !engine.selection.active, reason: "Nothing is selected" }),
+      sep(),
+      item("subj", "Select subject", actions.onSelectSubject, { icon: "subject" }),
+      item("cut", "Cut subject to new layer", actions.onCutSubject, { icon: "subject" }),
+      sep(),
       item("grow", "Grow by 4 px", () => engine.selection.grow(4), { disabled: !engine.selection.active, reason: "Nothing is selected" }),
       item("shrink", "Shrink by 4 px", () => engine.selection.grow(-4), { disabled: !engine.selection.active, reason: "Nothing is selected" }),
       item("feather", "Feather 8 px", () => engine.selection.feather(8), { disabled: !engine.selection.active, reason: "Nothing is selected" }),

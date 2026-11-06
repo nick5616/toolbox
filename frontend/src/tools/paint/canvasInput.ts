@@ -8,7 +8,9 @@
  * It drives the PaintEngine contract only, so P1's own input helper can
  * replace it by changing `runtime.attachInput` (engine-adapter.ts).
  */
+import type { PaintEngineExt } from "@/paint/engine/engine";
 import type { InputPoint, PaintEngine, Point, PointerKind, Rect, StrokeResult, ToolState } from "@/paint/engine/types";
+import { detectShape, type Shape } from "@/paint/guides/quickshape";
 import { isEditableTarget } from "@/lib/shortcuts";
 
 export type OverlayShape = { kind: "rect" | "ellipse"; rect: Rect } | { kind: "lasso"; points: Point[] } | { kind: "points"; points: Array<Point & { positive: boolean }> };
@@ -16,7 +18,7 @@ export type OverlayShape = { kind: "rect" | "ellipse"; rect: Rect } | { kind: "l
 /** What the editor tells the input layer, and what the input layer reports back. */
 export interface InputController {
   /** The tool as the editor has it right now. */
-  mode(): "stroke" | "eyedropper" | "fill" | "rect" | "ellipse" | "lasso" | "wand" | "transform" | "points" | "none";
+  mode(): "stroke" | "liquify" | "eyedropper" | "fill" | "rect" | "ellipse" | "lasso" | "wand" | "transform" | "points" | "none";
   /** Brush-like tool state to start a stroke with (null = can't paint, e.g. a locked layer). */
   strokeTool(): ToolState | null;
   simulatePressure(): boolean;
@@ -28,6 +30,12 @@ export interface InputController {
   onTransformDrag(dx: number, dy: number): void;
   /** Select object: a click, positive unless Alt was held. */
   onPoint(at: Point, positive: boolean): void;
+  /** Liquify: a brush drag. `delta` is the move since the last call (canvas px). */
+  onLiquify?(phase: "start" | "move" | "end", at: Point, delta: Point): void;
+  /** Can a hold at the end of this stroke snap it to a shape (brush and eraser strokes)? */
+  quickShape?(tool: ToolState): boolean;
+  /** A hold snapped the stroke to `shape`; the stroke has already ended. */
+  onQuickShape?(shape: Shape, tool: ToolState, pressure: number): void;
   onOverlay(shape: OverlayShape | null): void;
   onTwoFingerTap(): void;
   onThreeFingerTap(): void;
@@ -37,6 +45,19 @@ export interface InputController {
 
 const TAP_MS = 260;
 const TAP_SLOP = 12;
+/** A brush held still this long before moving picks a colour. */
+export const EYEDROP_HOLD_MS = 400;
+/** A stroke held still this long at its end snaps to a shape. */
+export const QUICKSHAPE_HOLD_MS = 500;
+const HOLD_SLOP = 3;
+
+type Ext = PaintEngine & Partial<PaintEngineExt>;
+
+/** Ends the running stroke; the real engine finishes Lab strokes asynchronously, so this waits for it. */
+export async function finishStroke(engine: PaintEngine): Promise<StrokeResult> {
+  const e = engine as Ext;
+  return e.endStrokeAsync ? e.endStrokeAsync() : engine.endStroke();
+}
 
 export function attachCanvasInput(canvas: HTMLCanvasElement, engine: PaintEngine, ctl: InputController): () => void {
   canvas.style.touchAction = "none";
@@ -48,7 +69,9 @@ export function attachCanvasInput(canvas: HTMLCanvasElement, engine: PaintEngine
 
   // Active gesture on the primary pointer.
   type Drag =
-    | { kind: "stroke"; id: number; t0: number; last: Point; lastT: number; pressure: number; tool: ToolState; pointer: PointerKind }
+    | { kind: "stroke"; id: number; t0: number; last: Point; lastT: number; pressure: number; tool: ToolState; pointer: PointerKind; moved: boolean; anchor: Point; timer: ReturnType<typeof setTimeout> | undefined }
+    | { kind: "liquify"; id: number; last: Point }
+    | { kind: "held"; id: number }
     | { kind: "pan"; id: number; x: number; y: number }
     | { kind: "rotate"; id: number; cx: number; cy: number; a0: number; r0: number }
     | { kind: "shape"; id: number; mode: "rect" | "ellipse" | "lasso"; start: Point; points: Point[] }
@@ -148,14 +171,20 @@ export function attachCanvasInput(canvas: HTMLCanvasElement, engine: PaintEngine
           const from = lastEnd;
           engine.beginStroke(tool, from);
           engine.extendStroke([{ ...from, t: 1 }, inputPoint(e, st)], []);
-          const result = engine.endStroke();
-          ctl.onStrokeEnd(result, tool);
           lastEnd = inputPoint(e, st);
+          void finishStroke(engine).then((result) => ctl.onStrokeEnd(result, tool));
           return;
         }
         const p = inputPoint(e, st);
         engine.beginStroke(tool, p);
-        drag = { kind: "stroke", id: e.pointerId, ...st, tool, pointer: p.pointer };
+        const d: Drag = { kind: "stroke", id: e.pointerId, ...st, tool, pointer: p.pointer, moved: false, anchor: { x: e.clientX, y: e.clientY }, timer: undefined };
+        drag = d;
+        arm(d, e.pointerId);
+        return;
+      }
+      case "liquify": {
+        drag = { kind: "liquify", id: e.pointerId, last: at };
+        ctl.onLiquify?.("start", at, { x: 0, y: 0 });
         return;
       }
       case "fill":
@@ -204,7 +233,16 @@ export function attachCanvasInput(canvas: HTMLCanvasElement, engine: PaintEngine
     } else if (d.kind === "rotate") {
       const a = Math.atan2(e.clientY - d.cy, e.clientX - d.cx);
       engine.view.set({ rotation: d.r0 + ((a - d.a0) * 180) / Math.PI });
+    } else if (d.kind === "liquify") {
+      const at = toCanvas(e);
+      ctl.onLiquify?.("move", at, { x: at.x - d.last.x, y: at.y - d.last.y });
+      d.last = at;
     } else if (d.kind === "stroke") {
+      if (Math.hypot(e.clientX - d.anchor.x, e.clientY - d.anchor.y) > HOLD_SLOP) {
+        d.moved = true;
+        d.anchor = { x: e.clientX, y: e.clientY };
+        arm(d, e.pointerId);
+      }
       const co = (e.getCoalescedEvents?.() ?? []).filter((x) => x.pointerId === e.pointerId);
       const list = co.length ? co : [e];
       const pts = list.map((ev) => inputPoint(ev, d));
@@ -247,9 +285,11 @@ export function attachCanvasInput(canvas: HTMLCanvasElement, engine: PaintEngine
     if (!d || d.id !== e.pointerId) return;
     drag = null;
     if (d.kind === "stroke") {
-      const result = engine.endStroke();
+      clearTimeout(d.timer);
       lastEnd = { x: d.last.x, y: d.last.y, pressure: d.pressure, tiltX: 0, tiltY: 0, twist: 0, t: 0, pointer: d.pointer };
-      ctl.onStrokeEnd(result, d.tool);
+      void finishStroke(engine).then((result) => ctl.onStrokeEnd(result, d.tool));
+    } else if (d.kind === "liquify") {
+      ctl.onLiquify?.("end", d.last, { x: 0, y: 0 });
     } else if (d.kind === "shape") {
       ctl.onOverlay(null);
       const at = toCanvas(e);
@@ -267,11 +307,42 @@ export function attachCanvasInput(canvas: HTMLCanvasElement, engine: PaintEngine
     touches.delete(e.pointerId);
     if (touches.size < 2) gesture = null;
     if (drag?.id === e.pointerId) {
-      if (drag.kind === "stroke") engine.cancelStroke();
+      if (drag.kind === "stroke") {
+        clearTimeout(drag.timer);
+        engine.cancelStroke();
+      }
       drag = null;
       ctl.onOverlay(null);
     }
   };
+
+  /** (Re)starts the stillness timer: a long press picks a colour, a hold after drawing snaps to a shape. */
+  function arm(d: Extract<Drag, { kind: "stroke" }>, id: number) {
+    clearTimeout(d.timer);
+    const tool = d.tool;
+    const eyedrop = !d.moved && tool.kind === "brush";
+    const quick = d.moved && (ctl.quickShape?.(tool) ?? false);
+    if (!eyedrop && !quick) return;
+    d.timer = setTimeout(() => {
+      if (drag !== d || d.id !== id) return;
+      if (eyedrop) {
+        const at = d.last;
+        engine.cancelStroke();
+        drag = { kind: "held", id };
+        ctl.onEyedrop(at);
+        return;
+      }
+      const pts = (engine as Ext).strokePoints?.() ?? [];
+      const shape = pts.length >= 8 ? detectShape(pts) : null;
+      if (!shape) return;
+      drag = { kind: "held", id };
+      lastEnd = { x: d.last.x, y: d.last.y, pressure: d.pressure, tiltX: 0, tiltY: 0, twist: 0, t: 0, pointer: d.pointer };
+      void finishStroke(engine).then((result) => {
+        ctl.onStrokeEnd(result, tool);
+        ctl.onQuickShape?.(shape, tool, d.pressure);
+      });
+    }, eyedrop ? EYEDROP_HOLD_MS : QUICKSHAPE_HOLD_MS);
+  }
 
   function startGesture(t0: number) {
     const pts = [...touches.values()];
