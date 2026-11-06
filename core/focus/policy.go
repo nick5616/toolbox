@@ -38,3 +38,9 @@ func CheckRule(r AllowRule) error { return core.NotImplemented("Focus rules") }
 // WindowsExtras is the frozen list of allowed, non-conferring folders outside
 // the system folder for this OS (SPEC.md §1.3 rule 3b, §1.7).
 func WindowsExtras() []string { return []string{} }
+
+// BroadFolder reports whether a folder rule at path would be refused as too
+// broad (SPEC.md §1.3: drive roots, %SystemRoot%, %ProgramFiles%, …; on macOS
+// §1.7). %VARS% are expanded first. modules/focus uses it to fall back to an
+// exe rule when guessing an install root. Wave 0 stub; WP-F1 implements it.
+func BroadFolder(path string) bool { return false }
