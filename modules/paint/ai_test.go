@@ -304,7 +304,7 @@ func TestRunOtherOpsParams(t *testing.T) {
 }
 
 func TestRunMissingModelIsDependencyError(t *testing.T) {
-	cases := map[AIOp]string{OpFill: "inpaint", OpCutout: "bg-default", OpSegment: "matte-select", OpEnhance: "upscaler"}
+	cases := map[AIOp]string{OpFill: "inpaint", OpCutout: "bg-default", OpSegment: "matte-select", OpEnhance: "upscale-photo"}
 	for op, component := range cases {
 		eng := &fakeEngine{result: `{}`}
 		m, a := newAI(t, eng, &aiFakeModels{})
@@ -383,7 +383,7 @@ func TestStatus(t *testing.T) {
 		t.Fatalf("cutout = %+v", cut)
 	}
 	enh := by["enhance"]
-	if enh.Ready || enh.Needs[0] != "upscaler" || enh.ModelSize != 67_040_989 {
+	if enh.Ready || enh.Needs[0] != "upscale-photo" || enh.ModelSize != 67_040_989 {
 		t.Fatalf("enhance = %+v", enh)
 	}
 

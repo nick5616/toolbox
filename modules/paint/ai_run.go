@@ -44,7 +44,7 @@ func needsFor(op AIOp) (component, label string) {
 	case OpSegment:
 		return "matte-select", "the SAM 2.1 object model"
 	default:
-		return "upscaler", "the Real-ESRGAN photo model"
+		return "upscale-photo", "the Real-ESRGAN photo model"
 	}
 }
 

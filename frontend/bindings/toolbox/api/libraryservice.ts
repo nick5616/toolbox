@@ -60,7 +60,8 @@ export function Places(): $CancellablePromise<core$0.LibraryPlaces> {
 
 /**
  * Query pages through outputs with server-side filters (supersedes Recent
- * for the Library view).
+ * for the Library view). The cursor is opaque and only valid with the same
+ * sort.
  */
 export function Query(q: core$0.LibraryQuery): $CancellablePromise<core$0.OutputPage> {
     return $Call.ByID(975713127, q);
@@ -82,7 +83,8 @@ export function Remove(outputID: string): $CancellablePromise<void> {
 
 /**
  * Rename renames an output's file in its folder (sanitised, never
- * overwriting) and moves the output row.
+ * overwriting) and moves the output row. It emits library:added with the
+ * updated output (same ID).
  */
 export function Rename(outputID: string, newName: string): $CancellablePromise<core$0.Output> {
     return $Call.ByID(1077493647, outputID, newName);
@@ -105,7 +107,7 @@ export function RevealPath(path: string): $CancellablePromise<void> {
 
 /**
  * SaveCopies asks for a folder and copies every output there (non-overwriting
- * names). Cancelling returns "".
+ * names). Cancelling returns "". Originals are never moved or changed.
  */
 export function SaveCopies(outputIDs: string[] | null): $CancellablePromise<string> {
     return $Call.ByID(1611107749, outputIDs);
@@ -122,7 +124,8 @@ export function SaveCopy(outputID: string, path: string): $CancellablePromise<st
 
 /**
  * Trash moves library files (by output ID or by path) to the Recycle Bin /
- * Trash and forgets their outputs.
+ * Trash and forgets their outputs. Per-path problems are in Failed; library:
+ * removed is emitted for the forgotten outputs.
  */
 export function Trash(outputIDs: string[] | null, paths: string[] | null): $CancellablePromise<core$0.TrashResult> {
     return $Call.ByID(4163034897, outputIDs, paths);
