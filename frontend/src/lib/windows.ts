@@ -12,7 +12,7 @@
 import { DesktopService, type PopOutRequest } from "@/lib/api";
 import { on } from "@/lib/events";
 
-export type WindowKind = "main" | "tool" | "part" | "popup" | "vizlab";
+export type WindowKind = "main" | "tool" | "part" | "popup" | "vizlab" | "paintlab";
 
 export interface WindowIdentity {
   kind: WindowKind;
@@ -30,7 +30,7 @@ export interface WindowIdentity {
 export function parseWindow(search: string): WindowIdentity {
   const q = new URLSearchParams(search);
   const w = q.get("window");
-  const kind: WindowKind = w === "tool" || w === "part" || w === "popup" || w === "vizlab" ? w : "main";
+  const kind: WindowKind = w === "tool" || w === "part" || w === "popup" || w === "vizlab" || w === "paintlab" ? w : "main";
   const key = kind === "main" ? "main" : kind === "tool" || kind === "part" ? (q.get("key") ?? "") : "";
   return { kind, key, view: q.get("view") ?? "", part: q.get("part") ?? "", params: q };
 }
