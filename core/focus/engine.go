@@ -1318,7 +1318,17 @@ func (e *Engine) SaveProfile(p Profile) (Profile, error) {
 	if err := e.o.Store.PutProfile(ctx, p); err != nil {
 		return Profile{}, err
 	}
+	e.refreshLearnRules()
 	return p, nil
+}
+
+// refreshLearnRules rebuilds learn mode's rules after a profile changed.
+func (e *Engine) refreshLearnRules() {
+	e.mu.Lock()
+	if e.w != nil && e.w.learn {
+		e.w.rules = e.learnRulesLocked()
+	}
+	e.mu.Unlock()
 }
 
 func labelOr(r AllowRule, i int) string {
@@ -1333,6 +1343,7 @@ func (e *Engine) DeleteProfile(id string) error {
 	if err := e.o.Store.DeleteProfile(context.Background(), id); err != nil {
 		return err
 	}
+	defer e.refreshLearnRules()
 	e.mu.Lock()
 	if e.settings.LastProfileID == id {
 		e.settings.LastProfileID = ""
