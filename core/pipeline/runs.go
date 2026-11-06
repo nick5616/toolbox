@@ -30,7 +30,12 @@ func (r *Runner) StartRun(req core.RunRequest, trigger string) (core.PipelineRun
 		seen[in] = true
 		inputs = append(inputs, in)
 	}
-	if len(inputs) == 0 {
+	noFiles := !takesFiles(p.Steps)
+	if noFiles && len(inputs) > 0 {
+		return core.PipelineRun{}, core.ValidationError("This pipeline doesn't take files", nil).
+			WithHint("Press Run to start it")
+	}
+	if len(inputs) == 0 && !noFiles {
 		return core.PipelineRun{}, core.ValidationError("Add at least one file", nil)
 	}
 	if len(inputs) > MaxItems {
@@ -71,6 +76,9 @@ func (r *Runner) StartRun(req core.RunRequest, trigger string) (core.PipelineRun
 	steps := resolveStepsFor(r, p.Steps)
 	var accepted, left []string
 	for _, in := range inputs {
+		if noFiles {
+			break
+		}
 		f := inputRunFile(in)
 		ok := false
 		for i, s := range p.Steps {
@@ -84,7 +92,7 @@ func (r *Runner) StartRun(req core.RunRequest, trigger string) (core.PipelineRun
 			left = append(left, in)
 		}
 	}
-	if len(accepted) == 0 {
+	if len(accepted) == 0 && !noFiles {
 		return core.PipelineRun{}, core.ValidationError("This pipeline can't use these files", nil).
 			WithHint("Drop files of a kind its first steps read")
 	}
@@ -123,13 +131,24 @@ func (l *loop) newRun(p core.Pipeline, inputs []string, trigger, note string, se
 		Status: core.RunRunning, Trigger: trigger, Inputs: append([]string{}, inputs...),
 		Items: make([]core.RunItem, 0, len(inputs)), Error: note, CreatedAt: created.UnixMilli(),
 	}
+	// A pipeline that takes no files runs one item with no input (SPEC.md
+	// §3.5): its label and {item}/{name} are the pipeline's name.
+	if len(inputs) == 0 {
+		inputs = []string{""}
+	}
 	for i, in := range inputs {
 		label := inputLabel(in)
+		if in == "" {
+			label = p.Name
+		}
 		cells := make([]core.RunCell, len(p.Steps))
 		for si, s := range p.Steps {
 			cells[si] = core.RunCell{StepID: s.ID, Status: core.CellPending, JobIDs: []string{}, Inputs: []core.RunFile{}, Files: []core.RunFile{}}
 		}
 		vars := builtinVars(label, isURL(in), i+1, p.Name, created)
+		if in == "" {
+			vars["item"], vars["name"] = p.Name, p.Name
+		}
 		for k, v := range params { // run parameters (Phase 16); names never collide with built-ins
 			vars[k] = v
 		}

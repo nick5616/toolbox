@@ -324,6 +324,12 @@ func (l *loop) doContinue(req core.ContinueRequest) error {
 		return err
 	}
 	c := &rs.r.Items[req.Item].Cells[si]
+	if c.Status == core.CellWaiting && c.Wait == core.WaitTime {
+		// Continue now (R21): the step decides what skipping its wait means.
+		rs.cellRT(req.Item, si).skip = true
+		l.spawnPrepare(rs, req.Item, si)
+		return nil
+	}
 	if c.Status != core.CellWaiting || (c.Wait != core.WaitManual && c.Wait != core.WaitCheck) {
 		return core.Errorf(core.CodeConflict, "That step isn't waiting for you")
 	}
@@ -496,7 +502,7 @@ func (l *loop) doRetry(runID string) (core.PipelineRun, error) {
 			case core.CellBlocked:
 				c.Status, c.Message = core.CellPending, ""
 			case core.CellWaiting:
-				if c.Wait == core.WaitCondition {
+				if c.Wait == core.WaitCondition || c.Wait == core.WaitTime {
 					rt := rs.cellRT(ii, si)
 					if !rt.preparing {
 						l.reprepare(rs, ii, si)
@@ -531,7 +537,7 @@ func (l *loop) retryCell(rs *runState, ii, si int) {
 		}
 	}
 	c.Error, c.ErrorCode, c.ErrorHint, c.Message, c.Wait = "", "", "", "", ""
-	c.FinishedAt = 0
+	c.FinishedAt, c.Until = 0, 0
 	if retried > 0 {
 		c.Status = core.CellRunning
 		l.unblockAfter(rs, ii, si)

@@ -301,8 +301,9 @@ func runBuiltins(req core.StepRequest, vars map[string]string) map[string]string
 		"pipeline": req.Pipeline,
 		"date":     started.Format("2006-01-02"),
 		"time":     started.Format("15-04"),
+		"weekday":  started.Format("Mon"),
 	}
-	for _, k := range []string{"pipeline", "date", "time"} {
+	for _, k := range []string{"pipeline", "date", "time", "weekday"} {
 		if v, ok := vars[k]; ok && v != "" {
 			m[k] = v
 		}

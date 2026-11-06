@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -83,7 +84,7 @@ func (r *Runner) List() []core.PipelineEntry {
 func (r *Runner) entry(p core.Pipeline) core.PipelineEntry {
 	p = r.canonSteps(clonePipeline(p))
 	check := r.Describe(p)
-	e := core.PipelineEntry{Pipeline: p, Check: check, Watch: r.watchState(p, check), Clip: r.clipState(p, check)}
+	e := core.PipelineEntry{Pipeline: p, Check: check, Watch: r.watchState(p, check), Clip: r.clipState(p, check), Schedule: r.scheduleState(p, check)}
 	r.pmu.RLock()
 	if b, ok := r.lastRun[p.ID]; ok {
 		b := b
@@ -194,6 +195,9 @@ func (r *Runner) normalize(p *core.Pipeline, others []core.Pipeline) error {
 	for i := range p.Params {
 		p.Params[i].Label = strings.TrimSpace(p.Params[i].Label)
 	}
+	if err := normalizeSchedule(&p.Schedule); err != nil {
+		return err
+	}
 	if err := normalizeClip(&p.Clip); err != nil {
 		return err
 	}
@@ -256,6 +260,19 @@ func (r *Runner) Save(p core.Pipeline) (core.PipelineEntry, error) {
 	if p.Watch.Enabled && (idx < 0 || !old.Watch.Enabled || old.Watch.Folder != p.Watch.Folder) {
 		r.baseline(p)
 	}
+	r.pmu.Lock()
+	delete(r.schedMsg, p.ID)
+	r.pmu.Unlock()
+	if p.Schedule.Enabled {
+		if idx < 0 || !old.Schedule.Enabled || !slices.Equal(old.Schedule.Days, p.Schedule.Days) || !slices.Equal(old.Schedule.Times, p.Schedule.Times) {
+			// Count from now, so a freshly set schedule never fires a slot that
+			// already passed.
+			r.schedMu.Lock()
+			r.setScheduleLast(p.ID, now)
+			r.schedMu.Unlock()
+		}
+		r.kickSchedule(false)
+	}
 	r.watchMu.Lock()
 	delete(r.watch, p.ID)
 	r.watchMu.Unlock()
@@ -289,6 +306,7 @@ func (r *Runner) Delete(id string) error {
 	r.pipes = append(r.pipes[:idx], r.pipes[idx+1:]...)
 	delete(r.lastRun, id)
 	delete(r.watchMsg, id)
+	delete(r.schedMsg, id)
 	r.pmu.Unlock()
 	r.watchMu.Lock()
 	delete(r.watch, id)
@@ -317,6 +335,7 @@ func (r *Runner) Duplicate(id string) (core.PipelineEntry, error) {
 	}
 	src.ID, src.Name = "", name
 	src.Watch.Enabled = false
+	src.Schedule.Enabled = false
 	return r.Save(src)
 }
 

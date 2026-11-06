@@ -29,6 +29,7 @@ var builtinVarList = []core.StepVar{
 	{Name: "n", Label: "Item number", Type: core.ValueNumber},
 	{Name: "date", Label: "Run date", Type: core.ValueText},
 	{Name: "time", Label: "Run time", Type: core.ValueText},
+	{Name: "weekday", Label: "Run weekday", Type: core.ValueText},
 	{Name: "pipeline", Label: "Pipeline name", Type: core.ValueText},
 }
 
@@ -198,9 +199,12 @@ func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck {
 			}
 			seen := map[string]bool{}
 			for _, ptr := range info.Templates {
+				// {file} and {files} are per-file values a step fills in itself,
+				// accepted only in an argument list (Open in app's /args).
+				perFile := ptr == "/args" || strings.HasPrefix(ptr, "/args/")
 				for _, str := range pointerStrings(opts, ptr) {
 					for _, v := range core.TemplateVars(str) {
-						if !allowed[v] && !seen[v] {
+						if !allowed[v] && !seen[v] && !(perFile && (v == "file" || v == "files")) {
 							seen[v] = true
 							sc.Problems = append(sc.Problems, "{"+v+"} isn't made by an earlier step")
 						}
@@ -289,20 +293,35 @@ func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck {
 	if optionsBytes > MaxOptionsBytes {
 		check.Problems = append(check.Problems, "The steps' options are too big (1 MiB at most)")
 	}
+	check.TakesFiles = takesFiles(p.Steps)
 	if p.Watch.Enabled {
+		if !check.TakesFiles {
+			check.Problems = append(check.Problems, "This pipeline takes no files, so it can't watch a folder")
+		}
 		check.Problems = append(check.Problems, r.watchFolderProblems(p.Watch.Folder)...)
 		if len(check.Secrets) > 0 {
 			check.Problems = append(check.Problems, "A watched pipeline can't ask for passwords")
 		}
 	}
 	if p.Clip.Enabled {
-		check.Problems = append(check.Problems, clipProblems(p.Clip, check.Accepts)...)
+		if !check.TakesFiles {
+			check.Problems = append(check.Problems, "This pipeline takes no files, so it can't start from a copy")
+		} else {
+			check.Problems = append(check.Problems, clipProblems(p.Clip, check.Accepts)...)
+		}
 		if len(check.Secrets) > 0 {
 			check.Problems = append(check.Problems, "A pipeline that runs when you copy can't ask for passwords")
 		}
 	}
+	check.Problems = append(check.Problems, scheduleProblems(p)...)
 	check.Ready = len(check.Problems) == 0 && !stepProblems && len(check.Missing) == 0 && n > 0
 	return check
+}
+
+// takesFiles reports whether some step reads the run's files (From "input").
+// A pipeline where none does starts with one item and no inputs (SPEC.md §3.5).
+func takesFiles(steps []core.PipelineStep) bool {
+	return slices.ContainsFunc(steps, func(s core.PipelineStep) bool { return s.From == FromInput })
 }
 
 // watchFolderProblems applies the folder rules of SPEC.md §8.9.
