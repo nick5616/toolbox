@@ -92,7 +92,21 @@ void main() {
   vec2 fp = wp - f0.xy;
   vec2 l = vec2(fp.x * c + fp.y * s, -fp.x * s + fp.y * c);
   vec2 aaw = vec2(1.0 / hw, 1.0 / hh);
-  float cov = tipCov(u_tipShape, u_tip, vec2(l.x / hw, l.y / hh), u_hard.x, u_invert.x, aaw);
+  float cov;
+  vec3 tipRGB = vec3(0.0);
+  if (u_tipShape == 3) {
+    // A colour tip (premultiplied RGBA texture): its own alpha and colour.
+    vec2 tn = vec2(l.x / hw, l.y / hh);
+    if (abs(tn.x) > 1.0 || abs(tn.y) > 1.0) {
+      cov = 0.0;
+    } else {
+      vec4 tc = textureLod(u_tip, tn * 0.5 + 0.5, 0.0);
+      cov = u_invert.x == 1 ? 1.0 - tc.a : tc.a;
+      tipRGB = tc.rgb / max(tc.a, 0.0001);
+    }
+  } else {
+    cov = tipCov(u_tipShape, u_tip, vec2(l.x / hw, l.y / hh), u_hard.x, u_invert.x, aaw);
+  }
   if (u_hasDual == 1) {
     float dc = cos(f2.w);
     float ds = sin(f2.w);
@@ -111,6 +125,7 @@ void main() {
   if (u_rendering == 2) a = 1.0 - (1.0 - a) * (1.0 - a);
   if (a <= 0.0) discard;
   vec3 col = vec3(f1.z, f1.w, f2.x);
+  if (u_tipShape == 3) col = mix(tipRGB, col, u_hard.x); // hardness is the tint toward the current colour
   if (u_coverageOnly == 1) {
     col = vec3(0.0);
   } else if (u_hasSrc == 1 && f3.y > 0.0) {

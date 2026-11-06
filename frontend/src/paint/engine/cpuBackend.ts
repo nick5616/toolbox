@@ -2,7 +2,7 @@
 // by vitest (no WebGL in jsdom) and as the spec for the shaders.
 
 import { blendInto } from "./blend";
-import { dabAlpha, loadDab, newGeo, type MaskData } from "./dabmath";
+import { colorTipAt, dabAlpha, loadDab, newGeo, type ColorMaskData, type MaskData } from "./dabmath";
 import { D, DAB_STRIDE, type BlendParams, type DabBatch, type DabStyle, type GLBackend, type MaskTex, type MergeParams, type PresentArgs, type Surface } from "./gl";
 import { clamp } from "./pixels";
 
@@ -57,6 +57,17 @@ export function createCpuBackend(tile = 512): GLBackend & { surfaceData(s: Surfa
       for (let i = 0; i < f.length; i++) f[i] = (data[i] as number) / 255;
       return { w, h, data: f } as MaskData;
     },
+    createColorMask(rgba: Uint8ClampedArray, w: number, h: number): MaskTex {
+      const alpha = new Float32Array(w * h);
+      const rgb = new Float32Array(w * h * 3);
+      for (let i = 0; i < w * h; i++) {
+        alpha[i] = (rgba[i * 4 + 3] as number) / 255;
+        rgb[i * 3] = (rgba[i * 4] as number) / 255;
+        rgb[i * 3 + 1] = (rgba[i * 4 + 1] as number) / 255;
+        rgb[i * 3 + 2] = (rgba[i * 4 + 2] as number) / 255;
+      }
+      return { w, h, data: alpha, rgb } as ColorMaskData;
+    },
     destroyMask(): void {},
 
     drawDabs(dst: Surface, ox: number, oy: number, batch: DabBatch, style: DabStyle, source: Surface | null, clip: { x: number; y: number; w: number; h: number }) {
@@ -68,6 +79,8 @@ export function createCpuBackend(tile = 512): GLBackend & { surfaceData(s: Surfa
       const cy1 = Math.min(size, clip.y + clip.h - oy);
       const f = batch.data;
       const g = newGeo();
+      const dabRGB: [number, number, number] = [0, 0, 0];
+      const tipRGB = [0, 0, 0];
       for (let n = batch.start; n < batch.end; n++) {
         const o = n * DAB_STRIDE;
         if (!loadDab(g, f, o)) continue;
@@ -79,6 +92,9 @@ export function createCpuBackend(tile = 512): GLBackend & { surfaceData(s: Surfa
         const cr = f[o + D.R] as number;
         const cg = f[o + D.G] as number;
         const cb = f[o + D.B] as number;
+        dabRGB[0] = cr;
+        dabRGB[1] = cg;
+        dabRGB[2] = cb;
         const wet = f[o + D.WET] as number;
         const pullX = f[o + D.PULLX] as number;
         const pullY = f[o + D.PULLY] as number;
@@ -89,6 +105,11 @@ export function createCpuBackend(tile = 512): GLBackend & { surfaceData(s: Surfa
             let r = cr;
             let gg = cg;
             let b = cb;
+            if (!style.coverageOnly && colorTipAt(style, g, px + ox + 0.5, py + oy + 0.5, dabRGB, tipRGB)) {
+              r = tipRGB[0] as number;
+              gg = tipRGB[1] as number;
+              b = tipRGB[2] as number;
+            }
             if (style.coverageOnly) {
               r = gg = b = 0;
             } else if (src && wet > 0) {

@@ -72,7 +72,12 @@ export interface DabBatch {
 }
 
 export interface TipStyle {
-  shape: "round" | "square" | "image";
+  /**
+   * "image" is a grayscale coverage mask; "color" is a full-colour (RGBA) tip such as a
+   * subject stamp: it paints its own colours, and `hardness` is then the tint: 0 keeps the
+   * tip's colours, 1 paints its silhouette in the current colour.
+   */
+  shape: "round" | "square" | "image" | "color";
   tex: MaskTex | null;
   hardness: number;
   invert: boolean;
@@ -144,6 +149,8 @@ export interface GLBackend {
   download(s: Surface, x: number, y: number, w: number, h: number): Uint8ClampedArray;
 
   createMask(data: Uint8Array | Uint8ClampedArray, w: number, h: number): MaskTex;
+  /** A colour tip: straight (non-premultiplied) RGBA8, w×h. Freed with destroyMask. */
+  createColorMask(rgba: Uint8ClampedArray, w: number, h: number): MaskTex;
   destroyMask(m: MaskTex): void;
 
   /**
