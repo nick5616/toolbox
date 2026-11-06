@@ -7,7 +7,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 import { Banner, Button, Select, Spinner, toast } from "@/components";
 import { EditStudioService, type EditMatteRequest } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
-import { isActive, useJobs } from "@/state/jobs";
+import { announceWhenDone, isActive, useJobs } from "@/state/jobs";
 import { editLength } from "@/viz/edit/types";
 import { flushEdit } from "@/editor/useEditAutosave";
 import { refreshMattes, refreshSources } from "@/editor/useEditData";
@@ -131,6 +131,7 @@ function Panel({ onClose }: { onClose(): void }) {
       if (!after.projectId) return;
       const job = await EditStudioService.Render(after.projectId);
       useJobs.getState().upsert(job);
+      announceWhenDone(job.id); // leaving the project list wipes jobs.render; the toast still says where it went
       useEditStudio.getState().setJob("render", job.id);
       onClose();
     } catch (e) {
