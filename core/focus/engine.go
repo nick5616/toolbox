@@ -90,7 +90,10 @@ type Engine struct {
 	loopCancel context.CancelFunc
 	wg         sync.WaitGroup
 	tickMu     sync.Mutex
-	manual     bool // tests drive ticks themselves
+	manual     bool           // tests drive ticks themselves
+	asks       sync.WaitGroup // polite closes in flight
+	askMu      sync.Mutex
+	askSem     chan struct{}
 
 	notifyMu sync.Mutex
 	subs     map[int]func(State)
@@ -178,6 +181,7 @@ func (e *Engine) Stop() {
 	e.w = nil
 	e.mu.Unlock()
 	e.wg.Wait()
+	e.asks.Wait()
 }
 
 func (e *Engine) dryLocked() bool {
@@ -385,6 +389,7 @@ func (e *Engine) tickNow() {
 	e.mu.Unlock()
 	if w != nil {
 		e.tick(context.Background(), w)
+		e.asks.Wait()
 	}
 }
 
@@ -644,13 +649,44 @@ func (e *Engine) tick(ctx context.Context, w *watcher) {
 	for _, a := range terminate {
 		events = append(events, e.doTerminate(w, a, sessionID, now))
 	}
-	for _, a := range ask {
-		if ev, ok := e.doAsk(w, a, sessionID, now); ok {
-			events = append(events, ev)
-		}
-	}
+	// Polite closes can take seconds (a Mac app's own quit): they run beside
+	// the loop, never inside the tick.
+	e.askAsync(w, ask, sessionID, now)
 	events = compactEvents(events)
 	e.record(w, sessionID, events, changed || len(ask) > 0)
+}
+
+// maxConcurrentAsks bounds the polite closes in flight at once.
+const maxConcurrentAsks = 4
+
+// askAsync asks each program to close on worker goroutines (at most
+// maxConcurrentAsks at a time). Stop waits for them.
+func (e *Engine) askAsync(w *watcher, ask []stopAction, sessionID string, now int64) {
+	if len(ask) == 0 {
+		return
+	}
+	e.askMu.Lock()
+	if e.askSem == nil {
+		e.askSem = make(chan struct{}, maxConcurrentAsks)
+	}
+	sem := e.askSem
+	e.askMu.Unlock()
+	for _, a := range ask {
+		e.asks.Add(1)
+		go func(a stopAction) {
+			defer e.asks.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			if e.root.Err() != nil {
+				return
+			}
+			ev, ok := e.doAsk(w, a, sessionID, now)
+			if !ok {
+				return
+			}
+			e.record(w, sessionID, []BlockEvent{ev}, true)
+		}(a)
+	}
 }
 
 func compactEvents(evs []BlockEvent) []BlockEvent {
@@ -701,6 +737,7 @@ func (e *Engine) doAsk(w *watcher, a stopAction, sessionID string, now int64) (B
 		ev.Result, ev.Error = ResultFailed, denyMessage(err)
 		e.mu.Lock()
 		w.pending[a.key] = true // still listed after the wait, so the user can Force close
+		e.armPendingLocked(w)
 		e.mu.Unlock()
 		return ev, true
 	case !asked:
@@ -709,8 +746,17 @@ func (e *Engine) doAsk(w *watcher, a stopAction, sessionID string, now int64) (B
 	ev.Result = ResultClosed
 	e.mu.Lock()
 	w.pending[a.key] = true
+	e.armPendingLocked(w)
 	e.mu.Unlock()
 	return ev, true
+}
+
+// armPendingLocked makes sure the still-open check will run for a close that
+// finished after the tick that asked for it.
+func (e *Engine) armPendingLocked(w *watcher) {
+	if w.pendingAt == 0 {
+		w.pendingAt = e.nowMs() + StillOpenAfter.Milliseconds()
+	}
 }
 
 // record stores events, bumps the session's count and notifies.
