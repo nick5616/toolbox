@@ -1,17 +1,10 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { Button, IconButton, Markdown, TextArea, toast, cx } from "@/components";
+import { Button, IconButton, Markdown, TextArea, cx } from "@/components";
+import { copyText } from "@/lib/copy";
+import { TextActions } from "@/tools/_kit";
 import { ChatMessageStatus, ChatRole, type ChatMessage } from "@/lib/api";
 import { isStreaming } from "./useThread";
 import styles from "./Chat.module.css";
-
-async function copy(text: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast({ title: "Copied", tone: "success", duration: 1800 });
-  } catch {
-    toast({ title: "Couldn't copy to the clipboard", tone: "danger" });
-  }
-}
 
 interface BubbleProps {
   message: ChatMessage;
@@ -64,7 +57,7 @@ function Bubble({ message: m, isLast, busy, backendLabel, onRetry, onEdit }: Bub
           <>
             <div className={cx(styles.bubble, styles.userBubble)}>{m.content}</div>
             <div className={styles.actions}>
-              <IconButton size="sm" icon="copy" label="Copy message" data-tip="Copy what you wrote to the clipboard" onClick={() => void copy(m.content)} />
+              <IconButton size="sm" icon="copy" label="Copy message" data-tip="Copy what you wrote to the clipboard" onClick={() => void copyText(m.content)} />
               <Button
                 size="sm"
                 variant="ghost"
@@ -101,7 +94,7 @@ function Bubble({ message: m, isLast, busy, backendLabel, onRetry, onEdit }: Bub
       </div>
       {!streaming && (
         <div className={styles.actions}>
-          {m.content && <IconButton size="sm" icon="copy" label="Copy answer" data-tip="Copy the assistant's answer to the clipboard" onClick={() => void copy(m.content)} />}
+          {m.content && <TextActions text={m.content} filename="answer.md" what="answer" />}
           {(stopped || failed) && isLast && (
             <Button size="sm" variant="secondary" icon="rotate-ccw" disabled={busy} data-tip={busy ? "Wait for the current answer to finish" : "Ask again and replace this answer"} onClick={onRetry}>
               Retry
