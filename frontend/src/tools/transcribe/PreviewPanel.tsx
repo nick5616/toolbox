@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { IconButton, Spinner } from "@/components";
 import { FilesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { TranscriptActions } from "./TranscriptActions";
 import { PREVIEW_BYTES, PREVIEW_LINES, basename } from "./options";
 import styles from "./TranscribeView.module.css";
 
@@ -41,6 +42,7 @@ export function PreviewPanel({ path, title, onClose }: PreviewPanelProps) {
             {basename(path)}
           </span>
         </div>
+        <TranscriptActions path={path} />
         <IconButton icon="x" label="Close preview" size="sm" data-tip="Close the transcript preview" onClick={onClose} />
       </header>
       <div className={styles.panelBody}>

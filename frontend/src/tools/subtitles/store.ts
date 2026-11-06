@@ -32,7 +32,7 @@ import {
 import { loadSpeechLanguages } from "@/blocks/speech";
 import { toAppError, type AppErrorShape } from "@/lib/errors";
 import { openTool } from "@/lib/openTool";
-import { isActive, useJobs, type JobView } from "@/state/jobs";
+import { announceWhenDone, isActive, useJobs, type JobView } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
 import { EMPTY_EDITOR, activeTab, anyDirty, editorReducer, makeTab, type EditorState } from "./editor";
@@ -290,6 +290,8 @@ export const useSubtitles = create<SubtitlesState>()((set, get) => {
     try {
       const jobs = await SubtitlesService.Enqueue(inputs, opts);
       const first = jobs?.[0];
+      // The result of save, embed and burn shows only inside the Export drawer.
+      if (first && (key === "save" || key === "embed" || key === "burn")) announceWhenDone(first.id);
       setRun(key, { submitting: false, ...(first ? { jobId: first.id } : {}) });
     } catch (e) {
       setRun(key, { submitting: false, error: toAppError(e) });

@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { JobsService, LyricVideoService, type LyricVideoOptions } from "@/lib/api";
 import { toAppError, type AppErrorShape } from "@/lib/errors";
-import { isActive, useJob, type JobView } from "@/state/jobs";
+import { announceWhenDone, isActive, useJob, type JobView } from "@/state/jobs";
 import { useLyricVideo, type JobSlot } from "./store";
 
 export interface JobRun {
@@ -34,7 +34,10 @@ export function useJobRun(slot: JobSlot): JobRun {
       try {
         const jobs = await LyricVideoService.Enqueue(inputs, opts);
         const first = jobs?.[0];
-        if (first) useLyricVideo.getState().setJob(slot, first.id);
+        if (first) {
+          if (slot === "render") announceWhenDone(first.id);
+          useLyricVideo.getState().setJob(slot, first.id);
+        }
       } catch (e) {
         useLyricVideo.getState().setJobError(slot, toAppError(e));
       } finally {

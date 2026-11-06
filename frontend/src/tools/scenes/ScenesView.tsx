@@ -6,6 +6,7 @@ import { useToolJobs } from "@/tools/_kit/session";
 import { EmptyLine, FileToolLayout, ResultRow, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import { basename, useThumb } from "@/tools/_kit/image/common";
+import { FileActions } from "@/tools/_kit/FileActions";
 import { useResultBehaviour } from "@/tools/_kit/ResultRow";
 import type { ToolViewProps } from "../index";
 import {
@@ -47,7 +48,7 @@ function SceneCell({ scene, item }: { scene: SceneItem; item: ScenesResultItem }
   const thumb = useThumb(scene.still, 288);
   const label = `Scene ${scene.n}, ${range(scene)}`;
   return (
-    <div {...behaviour} className={styles.cell} aria-label={label} data-tip="Double-click to open; drag it into another app">
+    <div {...behaviour} className={styles.cell} aria-label={label} data-tip={`${path} · double-click to open; drag it into another app`}>
       {scene.still !== "" && thumb.status === "ok" ? (
         <img className={styles.thumb} src={thumb.src} alt="" draggable={false} />
       ) : (
@@ -57,6 +58,12 @@ function SceneCell({ scene, item }: { scene: SceneItem; item: ScenesResultItem }
       )}
       <span className={styles.cellLabel}>
         #{scene.n} · {range(scene)}
+      </span>
+      <span className={styles.cellName} data-tip={path}>
+        {basename(path)}
+      </span>
+      <span className={styles.cellActions}>
+        <FileActions outputId={file?.id || undefined} path={path} disabled={file?.missing} />
       </span>
     </div>
   );

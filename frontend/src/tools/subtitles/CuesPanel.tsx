@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Banner, Button, ClickIn, EmptyState, Stepper, Switch, TextField, cx } from "@/components";
+import { TextActions } from "@/tools/_kit";
 import { CueList } from "./CueList";
 import { isDirty } from "./editor";
 import { useBlocker, useRows } from "./hooks";
@@ -50,6 +51,10 @@ export function CuesPanel() {
   const shift = useSubtitles((s) => s.shift);
   const replaceAll = useSubtitles((s) => s.replaceAll);
 
+  const mediaPath = useSubtitles((s) => s.mediaPath);
+  const tabLabel = useSubtitles((s) => s.editor.tabs.find((t) => t.id === s.editor.activeId)?.label ?? "");
+  const stem = (mediaPath ?? "").split(/[\\/]/).pop()?.replace(/\.[^.]+$/, "") || tabLabel || "Subtitles";
+  const textName = `${stem}.txt`;
   const [lateBy, setLateBy] = useState(0);
   const [find, setFind] = useState("");
   const [repl, setRepl] = useState("");
@@ -106,6 +111,8 @@ export function CuesPanel() {
             </div>
           </div>
         </ClickIn>
+        <span className={styles.grow} />
+        <TextActions text={() => rows.map((r) => r.text).join("\n")} filename={textName} what="subtitle text" disabled={rows.length === 0} />
       </div>
       {blocker && (
         <div className={styles.cuesNote}>

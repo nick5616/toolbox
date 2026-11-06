@@ -148,4 +148,22 @@ describe("SilenceView", () => {
     render(<SilenceView moduleId="silence" />);
     expect(await screen.findByText("a (cut).wav")).toBeTruthy();
   });
+
+  it("shows the cut list as its own result row", async () => {
+    analyse.mockResolvedValue({ durationMs: 5000, silences: [], removed: [], kept: [], removedMs: 0, keptMs: 5000 });
+    useJobs.getState().upsert({
+      id: "j10",
+      moduleId: "silence",
+      status: JobStatus.JobDone,
+      inputs: ["/a.wav"],
+      outputs: [
+        { id: "o2", path: "/out/b (cut).wav", name: "b (cut).wav" },
+        { id: "o3", path: "/out/b (cut).csv", name: "b (cut).csv" },
+      ],
+      resultJson: '{"output":"/out/b (cut).wav","cutList":"/out/b (cut).csv","durationMs":10000,"removedMs":4000,"keptMs":6000}',
+      message: "",
+    } as unknown as Job);
+    render(<SilenceView moduleId="silence" />);
+    expect(await screen.findByText("b (cut).csv")).toBeTruthy();
+  });
 });

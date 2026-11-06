@@ -3,7 +3,7 @@ import { Section, Select, Stepper, Switch } from "@/components";
 import { Timeline } from "@/components/media";
 import { JobStatus, MediaService, SilenceService, type SilenceAnalysis } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
-import { FileToolLayout, ResultTable, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { FileToolLayout, ResultRow, ResultTable, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ResultColumn } from "@/tools/_kit";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { submitJobs } from "@/tools/_kit/enqueue";
@@ -87,13 +87,14 @@ export default function SilenceView({ moduleId }: ToolViewProps) {
   };
 
   const rows = useMemo(() => {
-    const out: Array<CutOutcome & { id: string; outputId?: string; missing?: boolean }> = [];
+    const out: Array<CutOutcome & { id: string; outputId?: string; missing?: boolean; listId?: string; listMissing?: boolean }> = [];
     for (const j of jobs) {
       if (j.status !== JobStatus.JobDone) continue;
       const c = parseCut(j.resultJson);
       if (!c) continue;
       const o = j.outputs.find((x) => x.path === c.output);
-      out.push({ ...c, id: j.id, outputId: o?.id, missing: o?.missing });
+      const l = c.cutList ? j.outputs.find((x) => x.path === c.cutList) : undefined;
+      out.push({ ...c, id: j.id, outputId: o?.id, missing: o?.missing, listId: l?.id, listMissing: l?.missing });
     }
     return out.slice(0, MAX_ROWS);
   }, [jobs]);
@@ -231,6 +232,15 @@ export default function SilenceView({ moduleId }: ToolViewProps) {
             rowFile={(r) => ({ path: r.output, outputId: r.outputId, missing: r.missing })}
             empty="No cuts yet. Cut files appear here with how much silence was removed."
           />
+          {rows.some((r) => r.cutList) && (
+            <div aria-label="Cut lists">
+              {rows
+                .filter((r) => r.cutList)
+                .map((r) => (
+                  <ResultRow key={`${r.id}-list`} path={r.cutList} outputId={r.listId || undefined} missing={r.listMissing} icon="file-text" meta="Cut list" />
+                ))}
+            </div>
+          )}
         </Section>
       }
     />
