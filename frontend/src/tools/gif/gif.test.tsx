@@ -3,6 +3,24 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const enqueue = vi.hoisted(() => vi.fn());
+const playhead = vi.hoisted(() => ({ ms: 0 }));
+
+vi.mock("@/components/media", async (orig) => {
+  const actual = await orig<typeof import("@/components/media")>();
+  const React = await import("react");
+  return {
+    ...actual,
+    useMediaSource: () => ({
+      retry: () => undefined,
+      status: "ready",
+      source: { url: "/media/t/a.mp4", info: { durationMs: 83_000 } },
+    }),
+    MediaPlayer: React.forwardRef(function MediaPlayerStub(_p: object, ref: React.Ref<unknown>) {
+      React.useImperativeHandle(ref, () => ({ currentMs: () => playhead.ms }));
+      return <div data-testid="player" />;
+    }),
+  };
+});
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -23,7 +41,7 @@ vi.mock("@/lib/api", async (orig) => {
 import { ErrorCode, GifMode, JobStatus } from "@/lib/api";
 import { useJobs } from "@/state/jobs";
 import GifView from "./GifView";
-import { DEFAULT_GIF_OPTIONS, sanitizeGifOptions, toGifResult } from "./options";
+import { DEFAULT_GIF_OPTIONS, lengthFromEnd, sanitizeGifOptions, tenthsOfSecond, toGifResult } from "./options";
 
 function job(id: string, outPath: string, result: Record<string, unknown>) {
   return {
@@ -94,6 +112,37 @@ describe("GifView", () => {
     await waitFor(() => expect((run as HTMLButtonElement).disabled).toBe(false));
     await user.click(run);
     await waitFor(() => expect(enqueue).toHaveBeenCalledWith(["/a.mp4"], expect.objectContaining({ mode: "sheet", columns: 4, rows: 4, labels: true })));
+  });
+
+  it("shows the video with its duration and sets start and end from the playhead", async () => {
+    enqueue.mockResolvedValue([{}]);
+    const user = userEvent.setup();
+    render(<GifView moduleId="gif" />);
+    await user.click(await screen.findByRole("button", { name: "Add files…" }));
+    expect(await screen.findByTestId("player")).toBeTruthy();
+    expect(screen.getByText("1:23")).toBeTruthy();
+    playhead.ms = 12_340;
+    await user.click(screen.getByRole("button", { name: "Set start here" }));
+    expect((screen.getByLabelText("Start") as HTMLInputElement).value).toContain("12.3");
+    playhead.ms = 17_340;
+    await user.click(screen.getByRole("button", { name: "Set end here" }));
+    expect((screen.getByLabelText("Length") as HTMLInputElement).value).toContain("5");
+    const run = await screen.findByRole("button", { name: /Make a GIF from/ });
+    await waitFor(() => expect((run as HTMLButtonElement).disabled).toBe(false));
+    await user.click(run);
+    await waitFor(() => expect(enqueue).toHaveBeenCalledWith(["/a.mp4"], expect.objectContaining({ startSec: 12.3, lengthSec: 5 })));
+    // The video stays queued after the run, so a tweak can run again.
+    expect(screen.getByRole("list", { name: "Input files" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Clear" })).toBeTruthy();
+  });
+
+  it("converts a playhead into start and length", () => {
+    expect(tenthsOfSecond(12.34)).toBe(12.3);
+    expect(lengthFromEnd(12.3, 17.34)).toBe(5);
+    expect(lengthFromEnd(12.3, 12.3)).toBeNull();
+    expect(lengthFromEnd(2, 1)).toBeNull();
+    expect(lengthFromEnd(0, 120)).toBe(30);
+    expect(lengthFromEnd(1, 1.2)).toBe(0.5);
   });
 
   it("previews a GIF inline and a sheet as an image card", async () => {

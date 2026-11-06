@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ToolHeader } from "@/components/ToolHeader";
 import { Banner, Button, ClickInHost, DropZone, Icon, IconButton, Meter, Section, cx, toast } from "@/components";
 import { useMediaSource } from "@/components/media";
-import { JobStatus, JobsService, PackComponentState, PacksService, RedactAction, RedactService, type RedactOptions, type RedactTrack } from "@/lib/api";
+import { JobStatus, JobsService, OutputKind, PackComponentState, PacksService, RedactAction, RedactService, type RedactOptions, type RedactTrack } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { useShortcut } from "@/lib/shortcuts";
 import { isOk, useDeps } from "@/state/deps";
 import { isActive, useJob, useJobs } from "@/state/jobs";
 import { usePacks } from "@/state/packs";
-import { DepsGate, useDepsGate, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { DepsGate, RecentResults, useDepsGate, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "../index";
 import { Thumb } from "./bits";
 import { onRedactAction } from "./commands";
@@ -34,7 +34,7 @@ import {
   type VideoState,
 } from "./logic";
 import { CompactOptions } from "./CompactOptions";
-import { Results } from "./Results";
+import { ResultCards, Results } from "./Results";
 import { VideoReview } from "./VideoReview";
 import styles from "./RedactView.module.css";
 
@@ -76,16 +76,15 @@ export default function RedactView({ moduleId }: ToolViewProps) {
   const kinds = useMemo(() => classify(paths), [paths]);
   const mixed = kinds.images.length > 0 && kinds.videos.length > 0;
   const isVideo = kinds.videos.length > 0 && !mixed;
-  const video = isVideo ? kinds.videos[kinds.videos.length - 1] : undefined;
+  // Review works on one video; several videos can only be redacted automatically (one job each).
+  const video = isVideo && kinds.videos.length === 1 ? kinds.videos[0] : undefined;
+  const manyVideos = isVideo && kinds.videos.length > 1;
   const hasHeic = kinds.images.some(isHeicPath);
-
-  // Only one video at a time: the newest replaces the older ones.
-  useEffect(() => {
-    if (kinds.videos.length > 1 && kinds.images.length === 0) for (const p of kinds.videos.slice(0, -1)) remove(p);
-  }, [kinds, remove]);
 
   // ---- session state ----
   const [run, setRun] = useState<Run | null>(null);
+  // Several videos redacted without review: one job each, followed together.
+  const [batch, setBatch] = useState<string[] | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<{ message: string; hint?: string } | null>(null);
   const [entries, setEntries] = useState<ImageEntry[]>([]);
@@ -100,6 +99,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
   const filesKey = paths.join("\n");
   useEffect(() => {
     setRun(null);
+    setBatch(null);
     setEntries([]);
     setEdits({});
     setReviewed(new Set());
@@ -176,13 +176,39 @@ export default function RedactView({ moduleId }: ToolViewProps) {
     }
   }, []);
 
-  const canStart = paths.length > 0 && !blocked && !nothingToFind && !running && !submitting && !reviewing && !applied;
-  const canDetect = canStart && !hasHeic;
+  const submitEach = useCallback(async (opts: RedactOptions, each: string[]) => {
+    setSubmitting(true);
+    setSubmitError(null);
+    const ids: string[] = [];
+    let failure: { message: string; hint?: string } | null = null;
+    for (const p of each) {
+      try {
+        const jobs = await RedactService.Enqueue([p], opts);
+        const j = jobs?.[0];
+        if (j) {
+          useJobs.getState().upsert(j);
+          ids.push(j.id);
+        }
+      } catch (e) {
+        const a = toAppError(e);
+        failure ??= { message: `${baseName(p)}: ${a.message}`, hint: a.hint };
+      }
+    }
+    if (ids.length > 0) setBatch(ids);
+    setSubmitError(failure);
+    setSubmitting(false);
+  }, []);
+
+  const canStart = paths.length > 0 && !blocked && !nothingToFind && !running && !submitting && !reviewing && !applied && !batch;
+  const canDetect = canStart && !hasHeic && !manyVideos;
   const detect = () => {
     if (canDetect) void submit("detect", baseOptions(settings, RedactAction.ActionDetect), isVideo && video ? [video] : paths);
   };
   const auto = () => {
-    if (canStart) void submit("auto", baseOptions(settings, RedactAction.ActionAuto), isVideo && video ? [video] : paths);
+    if (!canStart) return;
+    const opts = baseOptions(settings, RedactAction.ActionAuto);
+    if (manyVideos) void submitEach(opts, kinds.videos);
+    else void submit("auto", opts, isVideo && video ? [video] : paths);
   };
 
   const imagePaths = useMemo(() => entries.map((e) => e.path), [entries]);
@@ -199,6 +225,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
   };
   const startOver = () => {
     setRun(null);
+    setBatch(null);
     setEntries([]);
     setEdits({});
     setVdet(null);
@@ -246,6 +273,15 @@ export default function RedactView({ moduleId }: ToolViewProps) {
     </Banner>
   );
 
+  const recent = (
+    <RecentResults
+      moduleId={moduleId}
+      kinds={[OutputKind.KindImage, OutputKind.KindVideo]}
+      label="Recent"
+      tip="Files this tool redacted before; Show in folder, Open and Save a copy are on each row"
+    />
+  );
+
   if (files.length === 0) {
     return (
       <ClickInHost>
@@ -258,6 +294,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
                 Choose files
               </Button>
             </DropZone>
+            {recent}
           </div>
         </section>
       </ClickInHost>
@@ -319,6 +356,8 @@ export default function RedactView({ moduleId }: ToolViewProps) {
             Cancel
           </Button>
         </div>
+      ) : batch ? (
+        <BatchStage ids={batch} onMore={more} />
       ) : applied ? (
         <Results job={applied} onEdit={entries.length > 0 || vdet ? () => setRun(null) : undefined} onMore={more} />
       ) : reviewing && vdet ? (
@@ -362,10 +401,14 @@ export default function RedactView({ moduleId }: ToolViewProps) {
           {hasHeic && (
             <p className={styles.hint}>HEIC photos can't be previewed here, so they can only be redacted automatically, with no review step.</p>
           )}
+          {manyVideos && (
+            <p className={styles.hint}>Reviewing works on one video at a time. “Redact without review” makes one redacted copy per video.</p>
+          )}
+          {recent}
         </div>
       )}
 
-      {!running && !applied && (
+      {!running && !applied && !batch && (
         <div className={styles.footer}>
           {reviewing ? (
             <>
@@ -409,7 +452,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
                 icon="scan-search"
                 loading={submitting}
                 disabled={!canDetect}
-                data-tip={canDetect ? "Search for faces and plates, then review the boxes before anything is hidden" : hasHeic ? "HEIC photos cannot be reviewed; use Redact without review" : blocked || (nothingToFind ? "Turn on faces or number plates first" : "Add files first")}
+                data-tip={canDetect ? "Search for faces and plates, then review the boxes before anything is hidden" : manyVideos ? "Review works on one video at a time; use Redact without review, or remove the other videos" : hasHeic ? "HEIC photos cannot be reviewed; use Redact without review" : blocked || (nothingToFind ? "Turn on faces or number plates first" : "Add files first")}
                 onClick={detect}
               >
                 {isVideo ? "Find faces and plates" : paths.length > 1 ? `Find in ${paths.length} images` : "Find faces and plates"}
@@ -420,6 +463,49 @@ export default function RedactView({ moduleId }: ToolViewProps) {
       )}
     </section>
     </ClickInHost>
+  );
+}
+
+function BatchJob({ id }: { id: string }) {
+  const job = useJob(id);
+  if (!job) return <span className={styles.hint}>Starting…</span>;
+  if (isActive(job)) {
+    return (
+      <div className={styles.progress} role="status">
+        <span>{job.title || baseName(job.inputs[0] ?? "")}</span>
+        <Meter value={job.progress} label={`Progress of ${job.title || "video"}`} />
+        <span className={styles.hint}>{job.message || "Waiting…"}</span>
+        <Button size="sm" variant="secondary" data-tip="Stop this video's redaction" onClick={() => void JobsService.Cancel(id).catch(() => undefined)}>
+          Cancel
+        </Button>
+      </div>
+    );
+  }
+  if (job.status === JobStatus.JobDone) return <ResultCards outputs={job.outputs} />;
+  return (
+    <Banner tone={job.status === JobStatus.JobFailed ? "danger" : "warn"} title={`${job.title || baseName(job.inputs[0] ?? "")}: ${job.status === JobStatus.JobFailed ? job.error || "That didn't work" : "Cancelled"}`}>
+      {job.status === JobStatus.JobFailed ? job.errorHint : undefined}
+    </Banner>
+  );
+}
+
+/** One automatic job per video, followed together; the originals are untouched. */
+function BatchStage({ ids, onMore }: { ids: string[]; onMore: () => void }) {
+  return (
+    <div className={styles.results} aria-label="Redacted videos">
+      <Banner tone="info" title={`Redacting ${ids.length} videos, one copy each`}>
+        The originals are untouched. Look over each result before sharing it.
+      </Banner>
+      {ids.map((id) => (
+        <BatchJob key={id} id={id} />
+      ))}
+      <div className={styles.footer}>
+        <span className={styles.spacer} />
+        <Button variant="primary" icon="scan-face" data-tip="Clear this session and pick new files to redact" onClick={onMore}>
+          Redact more
+        </Button>
+      </div>
+    </div>
   );
 }
 

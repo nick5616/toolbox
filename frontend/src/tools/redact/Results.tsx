@@ -54,6 +54,17 @@ export interface ResultsProps {
   onMore: () => void;
 }
 
+/** The cards alone (no banner, no footer): one per redacted file. */
+export function ResultCards({ outputs }: { outputs: JobView["outputs"] }) {
+  return (
+    <ul className={styles.cards}>
+      {outputs.map((o) => (
+        <ResultCard key={o.id || o.path} o={o} />
+      ))}
+    </ul>
+  );
+}
+
 /** Cards for the redacted files with Reveal/Open and a reminder to check them. */
 export function Results({ job, onEdit, onMore }: ResultsProps) {
   const outputs = job.outputs;
@@ -62,11 +73,7 @@ export function Results({ job, onEdit, onMore }: ResultsProps) {
       <Banner tone="info" title={`${outputs.length === 1 ? "Redacted copy saved" : `${outputs.length} redacted copies saved`}`}>
         The originals are untouched. Look over each result before sharing it.
       </Banner>
-      <ul className={styles.cards}>
-        {outputs.map((o) => (
-          <ResultCard key={o.id || o.path} o={o} />
-        ))}
-      </ul>
+      <ResultCards outputs={outputs} />
       <div className={styles.footer}>
         <span className={styles.spacer} />
         {onEdit && (

@@ -94,3 +94,15 @@ export function gifSummary(o: GifOptions): string {
   if (o.mode === GifMode.ModeSheet) return `${o.cellWidth} px frames${o.labels ? " · timecodes" : ""}`;
   return `${o.fps} fps · ${o.width} px${o.loop ? "" : " · plays once"}`;
 }
+
+/** Seconds rounded to a tenth (what the Start field shows). */
+export function tenthsOfSecond(sec: number): number {
+  return Math.max(0, Math.round(sec * 10) / 10);
+}
+
+/** The loop length that ends at `endSec`, clamped to 0.5..30 s; null when the end is not after the start. */
+export function lengthFromEnd(startSec: number, endSec: number): number | null {
+  const len = tenthsOfSecond(endSec) - startSec;
+  if (!(len > 0)) return null;
+  return Math.min(30, Math.max(0.5, Math.round(len * 10) / 10));
+}

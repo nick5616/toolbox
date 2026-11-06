@@ -49,9 +49,10 @@ vi.mock("@/components/media", async (orig) => {
   };
 });
 
-import { JobStatus, PackComponentState, PackState } from "@/lib/api";
+import { JobStatus, OutputKind, PackComponentState, PackState } from "@/lib/api";
 import { useToastStore } from "@/components/toast";
 import { useJobs, type JobView } from "@/state/jobs";
+import { useLibrary } from "@/state/library";
 import { usePacks } from "@/state/packs";
 import { redactCommands } from "./commands";
 import RedactView from "./RedactView";
@@ -253,6 +254,34 @@ describe("RedactView", () => {
     await load(["/a.jpg", "/b.mp4"]);
     expect(await screen.findByText("Redact images and videos separately")).toBeTruthy();
     expect((screen.getByRole("button", { name: /^Find/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("queues one automatic job per video when several are chosen", async () => {
+    h.enqueue.mockImplementation(async (inputs: string[]) => [{ id: `job-${inputs[0]}`, moduleId: "redact", status: "queued", progress: 0, inputs, outputs: [] }]);
+    const user = await load(["/a.mp4", "/b.mov"]);
+    // Both videos stay in the list, and review is off for more than one.
+    expect(screen.getByText("a.mp4")).toBeTruthy();
+    expect(screen.getByText("b.mov")).toBeTruthy();
+    expect((screen.getByRole("button", { name: /^Find/ }) as HTMLButtonElement).getAttribute("aria-disabled")).toBe("true");
+    await user.click(screen.getByRole("button", { name: "Redact without review" }));
+    await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(2));
+    expect(h.enqueue.mock.calls.map((c) => c[0])).toEqual([["/a.mp4"], ["/b.mov"]]);
+    expect(h.enqueue.mock.calls.every((c) => (c[1] as { action: string }).action === "auto")).toBe(true);
+    expect(await screen.findByText("Redacting 2 videos, one copy each")).toBeTruthy();
+    finish(job({ id: "job-/a.mp4", status: JobStatus.JobDone, progress: 1, title: "a.mp4", outputs: [{ id: "o1", path: "/out/a (redacted).mp4", name: "a (redacted).mp4", sizeBytes: 5 }] as never }));
+    expect(await screen.findByText("a (redacted).mp4")).toBeTruthy();
+  });
+
+  it("lists past results in the empty and setup states", async () => {
+    useLibrary.setState({
+      items: [{ id: "o9", jobId: "j", moduleId: "redact", path: "/out/old (redacted).jpg", name: "old (redacted).jpg", kind: OutputKind.KindImage, sizeBytes: 10, createdAt: Date.now(), tags: [], missing: false }],
+    });
+    render(<RedactView moduleId="redact" />);
+    expect(screen.getByText("old (redacted).jpg")).toBeTruthy();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Choose files" }));
+    expect(await screen.findByRole("switch", { name: "Find faces" })).toBeTruthy();
+    expect(screen.getByText("old (redacted).jpg")).toBeTruthy();
+    useLibrary.setState({ items: [] });
   });
 
   it("reviews a video: tracks, false positives off, manual box, and sends the detections path back", async () => {

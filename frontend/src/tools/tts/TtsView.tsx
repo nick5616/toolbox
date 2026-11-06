@@ -173,8 +173,8 @@ export default function TtsView({ moduleId }: ToolViewProps) {
     setRunning(true);
     const res = await submitJobs(() => TtsService.Enqueue(paths, { ...opts, preview: false }), paths, ["text", "texts"]);
     setRunning(false);
+    // Keep the file list so a tweak and another run needs no re-pick; Clear empties it.
     setInputErrors(res.inputErrors);
-    if (res.ok) inputs.clear();
   };
 
   const speakText = async () => {
@@ -184,7 +184,6 @@ export default function TtsView({ moduleId }: ToolViewProps) {
       recordSubmitted((started ?? []).map((j) => j.id));
       for (const j of started ?? []) useJobs.getState().upsert(j);
       toast({ title: "Reading your text aloud", tone: "success" });
-      setText("");
     } catch (e) {
       const err = toAppError(e);
       toast({ title: err.message, description: err.hint, tone: "danger" });
@@ -294,6 +293,9 @@ export default function TtsView({ moduleId }: ToolViewProps) {
                   onClick={() => void speakText()}
                 >
                   Read text aloud
+                </Button>
+                <Button variant="ghost" icon="x" disabled={text === ""} data-tip="Empty the text box" onClick={() => setText("")}>
+                  Clear text
                 </Button>
               </div>
             </div>
