@@ -46,7 +46,8 @@ export function useVizJob(slot: VizSlot): VizJob {
         const jobs = await VisualizerService.Enqueue(inputs, opts);
         const first = jobs?.[0];
         if (first) {
-          announceWhenDone(first.id);
+          // Previews are throwaway cache files shown in the drawer; only a render is announced.
+          if (slot === "render") announceWhenDone(first.id);
           patch("ids", slot, first.id);
         }
       } catch (e) {
