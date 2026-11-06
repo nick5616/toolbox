@@ -576,3 +576,7 @@ Newest last. Format: date — decision — why.
     - a dry run's ended line says "would have stopped";
     - a run without files counts steps in the runs list.
   - **Not run here, against the safety rule:** acceptance 2–4 need a real (non-dry-run) session, which CLAUDE.md forbids while developing. Their logic is covered by the engine's tests, the scoped real-platform E2E test and the dry-run QA. They are listed for the user with 1 and 5.
+- **2026-11-05: The macOS log-out gap is closed (unverified on a Mac).** Wails calls `ShouldQuit` synchronously from `applicationShouldTerminate:`. While that runs, AppKit's current Apple event is the `quit` event, and its `kAEQuitReason` attribute says log-out, restart or shut down. A Cmd+Q or tray Quit carries no reason. `desktop/shutdown_darwin.go` (cgo, Objective-C) reads it, so a log-out is never refused. A cgo-less build falls back to the old behaviour. It couldn't be compiled here (no macOS C toolchain on the Windows PC), so the first Mac build must check it.
+- **2026-11-05: Step parameters follow the options.** `StepUI.relevant(options, pointer)` leaves options off the node and panel when they don't matter, unless they're wired:
+  - a Focus wait or end shows none;
+  - a start or Wait shows minutes or a time, depending on the mode.
