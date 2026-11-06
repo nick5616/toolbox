@@ -42,7 +42,9 @@ export interface Point {
 
 export type Stroke =
   | { kind: "brush" | "unpaint"; size: number; points: Point[] }
-  | { kind: "clear" };
+  | { kind: "clear" }
+  /** A saved mask drawn over the whole canvas (alpha = where to erase); one undo step. */
+  | { kind: "stamp"; image: CanvasImageSource; w: number; h: number };
 
 /** Undo/redo over strokes (50 undo steps). Replaying `applied` rebuilds the mask. */
 export class MaskHistory {
@@ -96,7 +98,7 @@ export class MaskHistory {
 
   /** True when a brush stroke exists after the last clear (a heuristic: unpaint may have emptied it). */
   get hasPaint(): boolean {
-    return this.strokes().some((s) => s.kind === "brush");
+    return this.strokes().some((s) => s.kind === "brush" || s.kind === "stamp");
   }
 
   reset(): void {
@@ -189,11 +191,17 @@ export interface StrokeCtx {
   stroke(): void;
   fill(): void;
   clearRect(x: number, y: number, w: number, h: number): void;
+  drawImage?(image: CanvasImageSource, x: number, y: number, w: number, h: number): void;
 }
 
 /** Draws points[from..] of a brush/unpaint stroke (continuing from points[from-1] when from > 0). */
 export function drawStroke(ctx: StrokeCtx, s: Stroke, color: string, from = 0): void {
   if (s.kind === "clear") return;
+  if (s.kind === "stamp") {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.drawImage?.(s.image, 0, 0, s.w, s.h);
+    return;
+  }
   ctx.globalCompositeOperation = s.kind === "unpaint" ? "destination-out" : "source-over";
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
@@ -226,6 +234,20 @@ export function replay(ctx: StrokeCtx, h: MaskHistory, size: Size, color: string
   ctx.globalCompositeOperation = "source-over";
   ctx.clearRect(0, 0, size.w, size.h);
   for (const s of h.strokes()) drawStroke(ctx, s, color);
+}
+
+/**
+ * Turns a saved mask (white = erase, black = keep, opaque) into a paint layer
+ * in place: every pixel gets `rgb` and an alpha equal to its brightness.
+ */
+export function maskToPaint(data: Uint8ClampedArray, rgb: [number, number, number]): void {
+  for (let i = 0; i + 3 < data.length; i += 4) {
+    const a = Math.round(((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0)) / 3);
+    data[i] = rgb[0];
+    data[i + 1] = rgb[1];
+    data[i + 2] = rgb[2];
+    data[i + 3] = Math.round((a * (data[i + 3] ?? 255)) / 255);
+  }
 }
 
 /** Normalises a PNG data URL / base64 for display purposes (the backend accepts both forms). */

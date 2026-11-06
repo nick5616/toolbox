@@ -12,7 +12,13 @@ const h = vi.hoisted(() => ({
   thumb: vi.fn(async (_p: string, _max: number) => "data:image/jpeg;base64,AAAA"),
   pick: { paths: ["/photo.jpg"] as string[] },
   setState: vi.fn(async (..._a: unknown[]) => undefined),
+  maskImage: vi.fn(async (_id: string) => "data:image/png;base64,QUJD"),
 }));
+
+vi.mock("./stamp", async (orig) => {
+  const actual = await orig<typeof import("./stamp")>();
+  return { ...actual, loadMaskStamp: async () => document.createElement("canvas") };
+});
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -28,6 +34,7 @@ vi.mock("@/lib/api", async (orig) => {
       SavedMasks: async () => h.masks,
       SaveMask: (...a: unknown[]) => h.saveMask(...a),
       DeleteMask: (id: string) => h.deleteMask(id),
+      SavedMaskImage: (id: string) => h.maskImage(id),
     },
     MediaService: { URLFor: (p: string) => h.urlFor(p) },
     JobsService: { Cancel: (id: string) => h.cancel(id) },
@@ -42,8 +49,9 @@ vi.mock("@/lib/api", async (orig) => {
 });
 
 import { useToastStore } from "@/components/toast";
-import { JobStatus } from "@/lib/api";
+import { JobStatus, OutputKind } from "@/lib/api";
 import { useJobs, type JobView } from "@/state/jobs";
+import { useLibrary } from "@/state/library";
 import { eraserCommands } from "./commands";
 import ObjectEraserView from "./ObjectEraserView";
 
@@ -239,16 +247,16 @@ describe("ObjectEraserView", () => {
     expect(h.urlFor).not.toHaveBeenCalled();
   });
 
-  it("saves the painted mask for pipelines under a name", async () => {
+  it("saves the painted mask under a name", async () => {
     h.saveMask.mockResolvedValue({ id: "m1", name: "photo mask", width: 2000, height: 1000, createdAt: 1 });
     const user = await loaded();
     await user.click(await screen.findByRole("button", { name: /^Saved masks/ }));
-    const save = screen.getByRole("button", { name: "Save mask for pipelines…" }) as HTMLButtonElement;
+    const save = screen.getByRole("button", { name: "Save mask…" }) as HTMLButtonElement;
     expect(save.disabled).toBe(true); // nothing painted yet
     await user.click(screen.getByRole("button", { name: "Close" }));
     paint();
     await user.click(screen.getByRole("button", { name: /^Saved masks/ }));
-    await user.click(screen.getByRole("button", { name: "Save mask for pipelines…" }));
+    await user.click(screen.getByRole("button", { name: "Save mask…" }));
     const field = screen.getByLabelText("Mask name") as HTMLInputElement;
     expect(field.value).toBe("photo mask");
     await user.clear(field);
@@ -268,6 +276,37 @@ describe("ObjectEraserView", () => {
     await user.click(screen.getByRole("button", { name: "Delete Watermark" }));
     await waitFor(() => expect(h.deleteMask).toHaveBeenCalledWith("m1"));
     expect(await screen.findByText("No saved masks yet.")).toBeTruthy();
+  });
+
+  it("loads a saved mask as an undoable starting mask", async () => {
+    h.masks = [{ id: "m1", name: "Watermark", width: 800, height: 600, createdAt: 1 }];
+    const user = await loaded();
+    const erase = screen.getByRole("button", { name: /^Erase/ }) as HTMLButtonElement;
+    expect(erase.disabled).toBe(true);
+    await user.click(await screen.findByRole("button", { name: /^Saved masks/ }));
+    await user.click(await screen.findByRole("button", { name: "Load Watermark" }));
+    await waitFor(() => expect(h.maskImage).toHaveBeenCalledWith("m1"));
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect((screen.getByRole("button", { name: /^Erase/ }) as HTMLButtonElement).disabled).toBe(false));
+    const undo = screen.getByRole("button", { name: "Undo" }) as HTMLButtonElement;
+    expect(undo.disabled).toBe(false);
+    await user.click(undo);
+    await waitFor(() => expect((screen.getByRole("button", { name: /^Erase/ }) as HTMLButtonElement).disabled).toBe(true));
+  });
+
+  it("lists past results in the empty state and opens one as the photo", async () => {
+    useLibrary.setState({
+      items: [
+        { id: "o1", jobId: "j", moduleId: "object-eraser", path: "/out/erased.png", name: "erased.png", kind: OutputKind.KindImage, sizeBytes: 10, createdAt: Date.now(), tags: [], missing: false },
+        { id: "o2", jobId: "j", moduleId: "converter", path: "/out/other.png", name: "other.png", kind: OutputKind.KindImage, sizeBytes: 10, createdAt: Date.now(), tags: [], missing: false },
+      ],
+    });
+    render(<ObjectEraserView moduleId="object-eraser" />);
+    expect(screen.getByText("erased.png")).toBeTruthy();
+    expect(screen.queryByText("other.png")).toBeNull();
+    fireEvent.doubleClick(screen.getByRole("group", { name: "erased.png" }));
+    expect(await screen.findByAltText("Photo to edit")).toBeTruthy();
+    useLibrary.setState({ items: [] });
   });
 
   it("registers palette entries", () => {

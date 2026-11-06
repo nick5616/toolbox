@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ToolHeader } from "@/components/ToolHeader";
 import { Banner, Button, ClickIn, ClickInHost, CompareSlider, DropZone, IconButton, MenuButton, Meter, SegmentedControl, Slider, cx, toast } from "@/components";
-import { EraserModel, EraserService, FilesService, JobsService, type EraserModelInfo } from "@/lib/api";
+import { EraserModel, EraserService, FilesService, JobsService, OutputKind, type EraserModelInfo, type EraserSavedMask } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { releaseImageUrl, wholeImageUrl } from "@/lib/wholeImage";
 import { formatBytes } from "@/lib/format";
 import { useShortcut } from "@/lib/shortcuts";
 import { isActive, useJob } from "@/state/jobs";
-import { DepsGate, useDepsGate, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { DepsGate, RecentResults, useDepsGate, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { useEmbedFocus } from "@/tools/_kit/useEmbedFocus";
 import type { ToolViewProps } from "../index";
@@ -33,6 +33,7 @@ import {
   type View,
 } from "./mask";
 import { SavedMasks } from "./SavedMasks";
+import { loadMaskStamp, parseColor } from "./stamp";
 import { DEFAULT_SETTINGS, canPaintOn, modelHint, needsThumb, sanitizeSettings, summarizeModel } from "./options";
 import styles from "./ObjectEraserView.module.css";
 
@@ -254,7 +255,7 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
     }
     const s = stroke.current;
     const rect = canvasRect();
-    if (!s || s.kind === "clear" || !rect || rect.width <= 0) return;
+    if (!s || s.kind === "clear" || s.kind === "stamp" || !rect || rect.width <= 0) return;
     s.points.push(clientToMask(e.clientX, e.clientY, rect, mask));
     const ctx = ctx2d();
     if (ctx) drawStroke(ctx as StrokeCtx, s, accentColor(), s.points.length - 1);
@@ -281,6 +282,25 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
       setRev((n) => n + 1);
     }
   }, [repaint]);
+  // A saved mask becomes the starting mask: drawn scaled to this photo, one undo step.
+  const loadSavedMask = useCallback(
+    async (m: EraserSavedMask): Promise<boolean> => {
+      if (mask.w === 0) return false;
+      try {
+        const url = await EraserService.SavedMaskImage(m.id);
+        const stampCanvas = await loadMaskStamp(url, mask, parseColor(accentColor()));
+        if (!stampCanvas) throw new Error("decode");
+        history.current.push({ kind: "stamp", image: stampCanvas, w: mask.w, h: mask.h });
+        repaint();
+        setRev((n) => n + 1);
+        return true;
+      } catch {
+        toast({ title: `Couldn't load “${m.name}”`, tone: "danger" });
+        return false;
+      }
+    },
+    [mask, repaint],
+  );
   const clearMask = useCallback(() => {
     if (!history.current.hasPaint) return;
     history.current.push({ kind: "clear" });
@@ -430,6 +450,14 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
                 Choose photo
               </Button>
             </DropZone>
+            <RecentResults
+              moduleId={moduleId}
+              kinds={[OutputKind.KindImage]}
+              icon="image"
+              label="Recent"
+              tip="Photos this tool made before. Double-click one to keep editing it; Show in folder, Open and Save a copy are on each row"
+              onPick={(p) => void inputs.add([p])}
+            />
           </div>
         </section>
       </ClickInHost>
@@ -627,6 +655,8 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
             <SavedMasks
               canSave={editing && hasPaint}
               getMaskPNG={() => (maskRef.current && img ? exportMaskPNG(maskRef.current, img.w, img.h) : "")}
+              onLoad={loadSavedMask}
+              canLoad={editing && mask.w > 0}
               suggestName={baseName(path ?? file.path).replace(/.[^.]+$/, "")}
             />
             <span className={styles.spacer} />

@@ -13,10 +13,13 @@ import {
   clientToMask,
   exportSize,
   fitScale,
+  drawStroke,
   maskIsEmpty,
+  maskToPaint,
   maskSize,
   zoomAround,
   type Stroke,
+  type StrokeCtx,
 } from "./mask";
 import { modelHint, sanitizeSettings, DEFAULT_SETTINGS, canPaintOn, needsThumb, summarizeModel } from "./options";
 
@@ -128,6 +131,28 @@ describe("MaskHistory", () => {
     h.undo(); // undo the clear
     expect(h.strokes()).toHaveLength(1);
     expect(h.hasPaint).toBe(true);
+  });
+
+  it("treats a stamped saved mask as paint and one undo step", () => {
+    const h = new MaskHistory();
+    h.push({ kind: "stamp", image: {} as CanvasImageSource, w: 10, h: 10 });
+    expect(h.hasPaint).toBe(true);
+    expect(h.strokes()).toHaveLength(1);
+    h.undo();
+    expect(h.hasPaint).toBe(false);
+    h.redo();
+    expect(h.hasPaint).toBe(true);
+  });
+
+  it("draws a stamp over the whole canvas and a mask becomes paint by brightness", () => {
+    const calls: unknown[][] = [];
+    const ctx = { globalCompositeOperation: "source-over", drawImage: (...a: unknown[]) => calls.push(a) } as unknown as StrokeCtx;
+    const img = {} as CanvasImageSource;
+    drawStroke(ctx, { kind: "stamp", image: img, w: 40, h: 20 }, "#fff");
+    expect(calls).toEqual([[img, 0, 0, 40, 20]]);
+    const px = new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 255, 128, 128, 128, 255]);
+    maskToPaint(px, [10, 20, 30]);
+    expect(Array.from(px)).toEqual([10, 20, 30, 255, 10, 20, 30, 0, 10, 20, 30, 128]);
   });
 
   it("reports paint only for brush strokes", () => {

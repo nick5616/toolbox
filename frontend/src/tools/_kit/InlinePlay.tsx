@@ -56,7 +56,7 @@ export function InlinePlay({ path, disabled }: { path: string; disabled?: boolea
       try {
         const source = await MediaService.Open(path);
         if (!source.url) {
-          toast({ title: "This audio is being prepared for playback; try again in a moment", tone: "info" });
+          toast({ title: "This audio is being prepared for playback; try again in a moment", tone: "neutral" });
           if (stopCurrent === mine) stopCurrent = null;
           return;
         }

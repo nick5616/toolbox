@@ -11,6 +11,10 @@ export interface SavedMasksProps {
   getMaskPNG: () => string;
   /** The photo's name, offered as the mask's name. */
   suggestName?: string;
+  /** Draws a saved mask onto the canvas as the starting mask (resolves false when it couldn't). */
+  onLoad?: (m: EraserSavedMask) => Promise<boolean>;
+  /** True when there is a photo to load a mask onto. */
+  canLoad?: boolean;
 }
 
 export function summarizeMasks(n: number): string {
@@ -18,15 +22,16 @@ export function summarizeMasks(n: number): string {
 }
 
 /**
- * Saved masks for pipelines (Phase 14): paint once, save the mask under a
+ * Saved masks (Phase 14): paint once, save the mask under a
  * name, then a pipeline's Object Eraser step erases that same area from every
  * photo of the same shape. Lists the saved masks, with Delete.
  */
-export function SavedMasks({ canSave, getMaskPNG, suggestName = "" }: SavedMasksProps) {
+export function SavedMasks({ canSave, getMaskPNG, suggestName = "", onLoad, canLoad = true }: SavedMasksProps) {
   const [masks, setMasks] = useState<EraserSavedMask[]>([]);
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loadingId, setLoadingId] = useState("");
 
   const reload = useCallback(async () => {
     try {
@@ -57,11 +62,21 @@ export function SavedMasks({ canSave, getMaskPNG, suggestName = "" }: SavedMasks
       const saved = await EraserService.SaveMask(clean, png);
       setMasks((m) => [saved, ...m.filter((x) => x.id !== saved.id)]);
       setNaming(false);
-      toast({ title: `Saved “${saved.name}” for pipelines`, tone: "success" });
+      toast({ title: `Saved “${saved.name}”`, tone: "success" });
     } catch (e) {
       toast({ title: "Couldn't save the mask", description: toAppError(e).message, tone: "danger" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const load = async (m: EraserSavedMask) => {
+    if (!onLoad || loadingId) return;
+    setLoadingId(m.id);
+    try {
+      await onLoad(m);
+    } finally {
+      setLoadingId("");
     }
   };
 
@@ -79,7 +94,7 @@ export function SavedMasks({ canSave, getMaskPNG, suggestName = "" }: SavedMasks
       icon="workflow"
       title="Saved masks"
       summary={summarizeMasks(masks.length)}
-      tip="Masks kept for pipelines: an Object Eraser step erases the same area from every photo of the same shape"
+      tip="Masks you kept: load one onto this photo as a starting point, or let a pipeline erase the same area from every photo of the same shape"
       width={340}
     >
       <div className={styles.stack}>
@@ -108,10 +123,10 @@ export function SavedMasks({ canSave, getMaskPNG, suggestName = "" }: SavedMasks
             size="sm"
             variant="secondary"
             disabled={!canSave}
-            data-tip={canSave ? "Keep the mask you painted so a pipeline can erase the same area from other photos" : "Paint over what to erase first"}
+            data-tip={canSave ? "Keep the mask you painted so you can load it onto other photos later (pipelines can use it too)" : "Paint over what to erase first"}
             onClick={startNaming}
           >
-            Save mask for pipelines…
+            Save mask…
           </Button>
         )}
         {masks.length === 0 ? (
@@ -126,6 +141,19 @@ export function SavedMasks({ canSave, getMaskPNG, suggestName = "" }: SavedMasks
                 <span className={styles.size}>
                   {m.width}×{m.height}
                 </span>
+                {onLoad && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={loadingId === m.id}
+                    disabled={!canLoad || (loadingId !== "" && loadingId !== m.id)}
+                    data-tip={canLoad ? "Draw this mask on the photo as your starting mask; you can still paint, unpaint and undo" : "Open a photo first"}
+                    aria-label={`Load ${m.name}`}
+                    onClick={() => void load(m)}
+                  >
+                    Load
+                  </Button>
+                )}
                 <IconButton size="sm" icon="trash-2" label={`Delete ${m.name}`} data-tip="Delete this saved mask. Pipelines that use it stop working" onClick={() => void remove(m)} />
               </li>
             ))}
