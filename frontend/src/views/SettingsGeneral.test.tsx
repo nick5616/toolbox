@@ -90,7 +90,7 @@ describe("Settings → General / Clipboard / ExifTool", () => {
     useSettings.setState({ settings: { ...defaultSettings(), hotkeys: { clipboard: "", quickOpen: "CmdOrCtrl+Alt+Q" } } });
     render(<SettingsView />);
     fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }));
-    expect(update).toHaveBeenCalledWith({ hotkeys: { ...DEFAULT_HOTKEYS, focusStart: "" } });
+    expect(update).toHaveBeenCalledWith({ hotkeys: { ...DEFAULT_HOTKEYS } });
   });
 
   it("installs ExifTool from the dependencies table", async () => {

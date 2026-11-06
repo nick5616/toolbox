@@ -7,7 +7,7 @@ import { DEFAULT_HOTKEYS, useSettings } from "@/state/settings";
 import styles from "./SettingsGeneral.module.css";
 
 /** Defaults including the actions that ship unbound. */
-const RESET_HOTKEYS: Record<string, string> = { ...DEFAULT_HOTKEYS, focusStart: "" };
+const RESET_HOTKEYS: Record<string, string> = DEFAULT_HOTKEYS;
 
 const HOTKEY_ROWS: Array<{ action: string; label: string }> = [
   { action: "clipboard", label: "Open clipboard history" },

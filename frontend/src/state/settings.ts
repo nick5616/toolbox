@@ -5,6 +5,7 @@ import { SettingsService, Theme, type AppInfo, type Settings, type SettingsPatch
 export const DEFAULT_HOTKEYS: Record<string, string> = {
   clipboard: "CmdOrCtrl+Alt+V",
   quickOpen: "CmdOrCtrl+Alt+Space",
+  focusStart: "",
 };
 
 /** Default settings (mirrors Go; used before load and as a test fixture base). */
