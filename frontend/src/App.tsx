@@ -15,6 +15,7 @@ import RenderHost from "@/viz/RenderHost";
 import { TooltipLayer } from "@/components/TooltipLayer";
 
 const VizLab = lazy(() => import("@/viz/lab/VizLab"));
+const PaintLab = lazy(() => import("@/paint/paintlab/PaintLab"));
 
 type BootState = { kind: "loading" } | { kind: "ready" } | { kind: "error"; error: AppErrorShape };
 
@@ -66,6 +67,12 @@ export function App() {
       return (
         <Suspense fallback={null}>
           <VizLab />
+        </Suspense>
+      );
+    case "paintlab":
+      return (
+        <Suspense fallback={null}>
+          <PaintLab />
         </Suspense>
       );
     case "popup":

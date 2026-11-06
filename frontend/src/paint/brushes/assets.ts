@@ -29,7 +29,8 @@ export function toMask(img: AssetImage): Uint8Array {
   return out;
 }
 
-const isImageRef = (s: string) => s.startsWith("lib:") || s.startsWith("set:");
+/** "stamp:<layerId>" is a cut-out from P6's subject stamp, resolved by the host's resolver like the others. */
+const isImageRef = (s: string) => s.startsWith("lib:") || s.startsWith("set:") || s.startsWith("stamp:");
 
 export class BrushAssets {
   private readonly cache = new Map<string, MaskTex | null>();
@@ -71,6 +72,13 @@ export class BrushAssets {
       this.pending.set(ref, pr);
     }
     return pr;
+  }
+
+  /** Forget a loaded image (a stamp was cut again); the next draw reloads it. */
+  invalidate(ref: string): void {
+    const t = this.cache.get(ref);
+    if (t) this.backend().destroyMask(t);
+    this.cache.delete(ref);
   }
 
   /** Register a texture directly (tests, procedurally made tips). */

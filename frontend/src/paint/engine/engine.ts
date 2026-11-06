@@ -72,6 +72,8 @@ export interface PaintEngineExt {
   /** The element's CSS size; the view maths use it. */
   setViewport(cssW: number, cssH: number): void;
   setResolver(r: AssetResolver | null): void;
+  /** Forget a cached tip/grain (e.g. "stamp:<layer>" after a new cut-out). */
+  invalidateAsset(ref: string): void;
   /** Load a preset's tip and grain images; call when a brush is picked. */
   prepareBrush(p: BrushPreset): Promise<void>;
   getGuides(): GuidesConfig;
@@ -87,7 +89,7 @@ export interface PaintEngineExt {
   restroke(tool: ToolState, points: InputPoint[]): StrokeResult;
   beginPreview(layerId?: string): PreviewSession;
   /** Premultiplied pixels of r, synchronously (adjustments, tests). */
-  readPixels(r: Rect, src: "layer" | "merged"): PixelBuf;
+  readPixels(r: Rect, src: "layer" | "merged", layerId?: string): PixelBuf;
   /** The id of the last applied history step (0 = none). */
   historyCursor(): number;
   /** Is a stroke running? */
@@ -341,6 +343,10 @@ class Engine implements PaintEngine, PaintEngineExt {
 
   setResolver(r: AssetResolver | null): void {
     this.assets.setResolver(r);
+  }
+
+  invalidateAsset(ref: string): void {
+    this.assets.invalidate(ref);
   }
 
   prepareBrush(p: BrushPreset): Promise<void> {
@@ -1358,9 +1364,9 @@ class Engine implements PaintEngine, PaintEngineExt {
 
   // ---- pixels in and out ----
 
-  readPixels(r: Rect, src: "layer" | "merged"): PixelBuf {
+  readPixels(r: Rect, src: "layer" | "merged", layerId?: string): PixelBuf {
     if (src === "merged") return this.composeRegion(r, true);
-    const l = this.activeLayer();
+    const l = layerId ? this.layers.find((x) => x.id === layerId) : this.activeLayer();
     if (!l) return newBuf(r.w, r.h);
     return new TilePixels(this.backend(), l.tiles, null, this.canvasRect()).read(r);
   }

@@ -198,7 +198,7 @@ describe("layers and compositing", () => {
     expect(e.doc.layers).toHaveLength(1);
     expect((await px(e, 30, 20))[0]).toBe(255);
     e.undo();
-    expect(e.doc.layers.length).toBeGreaterThan(1);
+    expect(e.doc.layers!.length).toBeGreaterThan(1);
   });
 
   it("merged readRegion includes the background and is transparent off-canvas", async () => {

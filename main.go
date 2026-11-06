@@ -248,6 +248,7 @@ func run() error {
 	}
 	vizAnalyzer := viz.NewAnalyzer(filepath.Join(paths.CacheDir, "visualizer"), paths.ModelsDir, engine, chatSvc)
 	vizBroker := viz.NewRenderBroker(emitter, mediaAPI.URLFor, vizLabDir)
+	paintLab := newPaintLabSink(filepath.Join(paths.TmpDir, "paintlab"), appOrigins()) // dev-only (TOOLBOX_PAINTLAB=1)
 	vizBroker.SetAppOrigins(appOrigins()...)
 	visualizerMod, err := visualizer.Register(reg, vizAnalyzer, vizBroker, engine, chatSvc, depSvc.Resolve,
 		paths.ModelsDir, filepath.Join(paths.CacheDir, "visualizer"))
@@ -516,6 +517,9 @@ func run() error {
 		// (SPEC.md §4.4). The broker checks the token and the origin.
 		RawMessageHandler: func(_ application.Window, msg string, origin *application.OriginInfo) {
 			if origin != nil {
+				if paintLab.handle(msg, origin.Origin) {
+					return
+				}
 				vizBroker.HandleRawMessage(msg, origin.Origin, origin.TopOrigin)
 			}
 		},
@@ -690,6 +694,9 @@ func devtoolsArgs() []string {
 }
 
 func startURL() string {
+	if u := paintLabURL(); u != "" { // dev-only PaintLab (Phase 19)
+		return u
+	}
 	if os.Getenv("TOOLBOX_VIZLAB") == "1" && os.Getenv("TOOLBOX_VIEW") == "vizlab" { // dev-only lab (SPEC.md §11.4)
 		q := "/?window=vizlab"
 		if k := os.Getenv("TOOLBOX_VIZLAB_KEY"); k != "" {
