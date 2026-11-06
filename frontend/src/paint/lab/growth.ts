@@ -20,7 +20,8 @@ export const LEAF_TIPS = [
   { value: "lib:tips/pine-needle.png", label: "Needle" },
 ];
 
-const hex = (r: number, g: number, b: number): RGBA => ({ r: (r / 255) ** 2.2, g: (g / 255) ** 2.2, b: (b / 255) ** 2.2, a: 1 });
+// The engine takes sRGB 0..1 values (no gamma expansion).
+const hex = (r: number, g: number, b: number): RGBA => ({ r: r / 255, g: g / 255, b: b / 255, a: 1 });
 
 export const SEASONS: Record<string, RGBA[]> = {
   spring: [hex(150, 205, 90), hex(190, 230, 120), hex(240, 170, 190), hex(120, 190, 100)],
@@ -47,7 +48,8 @@ const PARAMS: LabParam[] = [
     default: "summer",
     tip: "Leaf colours. Winter leaves are sparse and grey.",
   },
-  { id: "tip", label: "Leaf shape", type: "choice", choices: LEAF_TIPS, default: "brush", tip: "The brush tip used for leaves. The current brush works with any tip." },
+  { id: "tip", label: "Leaf shape", type: "choice", choices: LEAF_TIPS, default: "lib:tips/leaf-oak.png", tip: "The brush tip used for leaves. The current brush works with any tip." },
+  { id: "leafSize", label: "Leaf size", type: "number", min: 4, max: 120, step: 1, default: 22, unit: "px", tip: "How big each leaf is, whatever the brush size." },
 ];
 
 const D2R = Math.PI / 180;
@@ -62,7 +64,9 @@ export function createGrowth(): AsyncLabTool {
     const angle = num(p, "angle", 35) * D2R;
     const density = num(p, "leafDensity", 0.6);
     const season = str(p, "season", "summer");
-    const tip = str(p, "tip", "brush");
+    const tip = str(p, "tip", "lib:tips/leaf-oak.png");
+    const leafPx = num(p, "leafSize", 22);
+    const brushPx = Math.max(1, ext(ctx).brushSize ?? 32);
     const palette = SEASONS[season] ?? (SEASONS.summer as RGBA[]);
     const segs = 6;
     const seg = len / segs;
@@ -82,7 +86,7 @@ export function createGrowth(): AsyncLabTool {
       const winterScale = season === "winter" ? 0.08 : 1;
       if (r() > density * winterScale) return;
       const color = palette[Math.floor(r() * palette.length) % palette.length] as RGBA;
-      const style = { tip: tip === "brush" ? undefined : tip, color, sizeScale: 0.7 + 0.8 * r(), angle: (lh / D2R + 90) % 360 };
+      const style = { tip: tip === "brush" ? undefined : tip, color, sizeScale: (leafPx / brushPx) * (0.7 + 0.8 * r()), angle: (lh / D2R + 90) % 360 };
       const pts1 = [pt(lx, ly, 0.7 + 0.3 * r(), t)];
       const x2 = ext(ctx);
       if (x2.dabAs) x2.dabAs(pts1, style);

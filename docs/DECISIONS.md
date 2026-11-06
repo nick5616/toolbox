@@ -644,3 +644,18 @@ Newest last. Format: date — decision — why.
     - `Rename` keeps the extension unless one with a letter is typed, and refuses Windows device names.
     - `Trash` only takes regular files inside the library, refuses paths over 259 characters on Windows, and uses `FOF_WANTNUKEWARNING` (a file too big for the bin prompts instead of being deleted).
     - `core/trash`'s macOS cgo code has not been compiled yet (first Mac build).
+- **2026-11-06: Phase 19 integration.**
+  - **Lab devices (user request mid-build):** each Lab tool is an Ableton-style device: knobs/switches, Seed (lock/re-roll) and Rand with back/forward and per-control locks. Saved variants live in the user brush set `lab-devices`. `LabParam` gained the optional fields `rand`/`unit`/`curve` (SPEC §1.4.0).
+  - **Bugs found in the real app and fixed:**
+    - The editor canvas kept the default 300×150 drawing buffer, so every stroke was a blocky staircase. The engine now sizes it in `setViewport`.
+    - Zoomed-out views now use a mipmapped composite.
+    - Growth's leaves defaulted to the current (thin) brush and used gamma-expanded colours. They now default to the oak leaf tip with a "Leaf size" control, in sRGB.
+    - Device choice groups overlapped the knobs; each choice now takes its own row.
+    - The gallery's preset shapes spilled over their labels.
+  - **Brush quality:** after the I2 pass (PaintLab over every preset on the real GPU), MyPaint `opaque` maps to flow, not an opacity cap, and fine MyPaint brushes are raised to ≥ 6 px (noted in `fidelity`).
+  - **Known weak spots:** Watercolour has no real wet-edge pooling; Wash and Glaze are pale.
+  - **Paper texture:** an undoable grain fill on a locked "Paper" layer.
+  - **Not verified on this PC:**
+    - real pen pressure/tilt and touch gestures (CDP only sends synthetic events);
+    - the perception tools end to end (no engine models in the sandbox);
+    - PNG/ORA export from the UI and Studio mode at 4K. These are covered by unit tests only.

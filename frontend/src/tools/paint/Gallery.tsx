@@ -101,6 +101,13 @@ export interface GalleryProps {
   compact: boolean;
 }
 
+/** The preset's shape fitted inside a 112 × 64 box (never spills over the label). */
+function presetBox(w: number, h: number): { width: string; height: string } {
+  const ar = w / h;
+  const bw = Math.min(112, 64 * ar);
+  return { width: `${Math.round(bw)}px`, height: `${Math.round(bw / ar)}px` };
+}
+
 export default function Gallery({ openImages, onOpen, studio, onToggleStudio, compact }: GalleryProps) {
   const [projects, setProjects] = useState<ProjectInfo[] | null>(null);
   const [bg, setBg] = useState<Bg>("paper");
@@ -166,7 +173,7 @@ export default function Gallery({ openImages, onOpen, studio, onToggleStudio, co
               <div role="listitem" key={p.id} style={{ display: "contents" }}>
                 <button type="button" className={`${styles.tile} ${i === 0 ? styles.tileFirst : ""}`} data-tip={`Start a ${p.w} × ${p.h} px canvas`} onClick={() => void create(p)}>
                   <span className={styles.shape} aria-hidden="true">
-                    <span style={{ aspectRatio: `${p.w} / ${p.h}`, height: p.h > p.w ? "100%" : undefined, width: p.h > p.w ? undefined : "70%" }} />
+                    <span style={presetBox(p.w, p.h)} />
                   </span>
                   <span className={styles.tileName}>
                     {p.label} {p.note ? `· ${p.note}` : ""}

@@ -174,8 +174,17 @@
   position: static;
 }
 
+/* A choice takes its own row (a long set of options never overlaps the knobs). */
+.choiceCell {
+  flex: 1 1 100%;
+  max-width: none;
+  align-items: flex-start;
+}
+
 .mini {
   display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   padding: 2px;
   gap: 1px;
   border-radius: 6px;
@@ -183,6 +192,7 @@
 }
 
 .mini button {
+  white-space: nowrap;
   min-height: 22px;
   padding: 0 8px;
   border: 0;

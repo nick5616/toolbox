@@ -73,11 +73,15 @@ export function createGLBackend(canvas: HTMLCanvasElement): GLBackend {
     return s;
   };
   const samplers = { lc: mkSampler(true, false), nc: mkSampler(false, false), lr: mkSampler(true, true), nr: mkSampler(false, true) };
+  // Trilinear sampler for presenting the composite zoomed out (no shimmering staircases).
+  const mipSampler = mkSampler(true, false);
+  gl.samplerParameteri(mipSampler, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  let compMipDirty = true;
 
-  const mkTex = (w: number, h: number, fmt: number) => {
+  const mkTex = (w: number, h: number, fmt: number, levels = 1) => {
     const t = gl.createTexture() as WebGLTexture;
     gl.bindTexture(gl.TEXTURE_2D, t);
-    gl.texStorage2D(gl.TEXTURE_2D, 1, fmt, w, h);
+    gl.texStorage2D(gl.TEXTURE_2D, levels, fmt, w, h);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -284,8 +288,10 @@ export function createGLBackend(canvas: HTMLCanvasElement): GLBackend {
       }
       const max = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
       if (w > max || h > max) throw new PaintGLError(`This canvas is larger than the graphics card supports (${max} px)`);
-      const tex = mkTex(w, h, gl.RGBA8);
+      const levels = Math.floor(Math.log2(Math.max(w, h))) + 1;
+      const tex = mkTex(w, h, gl.RGBA8, levels);
       comp = { tex, fbo: mkFbo(tex), w, h };
+      compMipDirty = true;
       const lin = samplers.lc;
       void lin;
     },
@@ -294,6 +300,7 @@ export function createGLBackend(canvas: HTMLCanvasElement): GLBackend {
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, g(tile).fbo);
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, comp.fbo);
       gl.blitFramebuffer(0, 0, w, h, x, y, x + w, y + h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+      compMipDirty = true;
     },
     readComposite(): Uint8ClampedArray {
       if (!comp) return new Uint8ClampedArray(0);
@@ -323,7 +330,15 @@ export function createGLBackend(canvas: HTMLCanvasElement): GLBackend {
       gl.uniform3f(u.u_m0 ?? null, m[0], m[2], m[4]);
       gl.uniform3f(u.u_m1 ?? null, m[1], m[3], m[5]);
       gl.uniform1f(u.u_cell ?? null, 8 / Math.max(0.01, Math.hypot(m[0], m[1])));
-      bindTex(0, comp.tex, a.nearest ? samplers.nc : samplers.lc);
+      const scale = Math.hypot(m[0], m[1]) * (c.clientWidth > 0 ? c.width / c.clientWidth : 1);
+      if (!a.nearest && scale < 1) {
+        if (compMipDirty) {
+          gl.bindTexture(gl.TEXTURE_2D, comp.tex);
+          gl.generateMipmap(gl.TEXTURE_2D);
+          compMipDirty = false;
+        }
+        bindTex(0, comp.tex, mipSampler);
+      } else bindTex(0, comp.tex, a.nearest ? samplers.nc : samplers.lc);
       gl.uniform1i(u.u_tex ?? null, 0);
       gl.bindVertexArray(emptyVao);
       if (a.checker) {

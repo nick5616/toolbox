@@ -96,7 +96,7 @@ export function Device({ info, params, onParam, onParams, seed, onToggleSeedLock
     }
     if (p.type === "choice") {
       return (
-        <div key={p.id} className={styles.cell} onContextMenu={lockMenu(p)}>
+        <div key={p.id} className={`${styles.cell} ${styles.choiceCell}`} onContextMenu={lockMenu(p)}>
           <div className={styles.mini} role="radiogroup" aria-label={p.label} data-tip={p.tip}>
             {p.choices.map((c) => (
               <button key={c.value} type="button" role="radio" aria-checked={value === c.value} aria-label={`${p.label}: ${c.label}`} data-tip={`${p.label}: ${c.label}`} onClick={() => onParam(p.id, c.value)} onDoubleClick={() => onParam(p.id, p.default)}>

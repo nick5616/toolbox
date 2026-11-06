@@ -332,7 +332,7 @@ class Engine implements PaintEngine, PaintEngineExt {
   attach(canvas: HTMLCanvasElement): void {
     this.canvasEl = canvas;
     if (!this.be) this.setBackend(createGLBackend(canvas));
-    this.view.setViewport(canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height);
+    this.setViewport(canvas.clientWidth || canvas.width, canvas.clientHeight || canvas.height);
     this.markAllComp();
     this.render();
   }
@@ -343,6 +343,19 @@ class Engine implements PaintEngine, PaintEngineExt {
 
   setViewport(w: number, h: number): void {
     this.view.setViewport(w, h);
+    // The drawing buffer follows the element's size × devicePixelRatio; left at
+    // the default 300 × 150 the browser upscales it into a blocky staircase.
+    const c = this.canvasEl;
+    if (c && w > 0 && h > 0) {
+      const dpr = typeof window !== "undefined" && window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
+      const bw = Math.max(1, Math.round(w * dpr));
+      const bh = Math.max(1, Math.round(h * dpr));
+      if (c.width !== bw || c.height !== bh) {
+        c.width = bw;
+        c.height = bh;
+      }
+    }
+    this.presentDirty = true;
   }
 
   setResolver(r: AssetResolver | null): void {
