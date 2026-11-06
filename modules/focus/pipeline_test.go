@@ -132,8 +132,7 @@ func TestStartUntilPicksNextOccurrence(t *testing.T) {
 		want time.Time
 	}{
 		{"17:30", time.Date(2026, 11, 5, 17, 30, 0, 0, time.Local)},
-		{"09:00", time.Date(2026, 11, 6, 9, 0, 0, 0, time.Local)},  // passed today: tomorrow
-		{"16:00", time.Date(2026, 11, 6, 16, 0, 0, 0, time.Local)}, // exactly now: tomorrow
+		{"03:00", time.Date(2026, 11, 6, 3, 0, 0, 0, time.Local)}, // passed today, 11 h away tomorrow
 	} {
 		eng.begun = nil
 		raw := opts(t, func(o *StepOptions) { o.Mode = ModeUntil; o.At = tc.at })

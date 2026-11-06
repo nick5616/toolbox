@@ -261,7 +261,23 @@ func (m *Module) PrepareStep(ctx context.Context, req core.StepRequest) ([]core.
 			sr.Extra = []focus.AllowRule{}
 		}
 		if o.Mode == ModeUntil {
-			t, _ := nextAt(m.clock(), o.At)
+			now := m.clock()
+			t, _ := nextAt(now, o.At)
+			if active != nil && t.Day() != now.Day() {
+				// A session is on and today's time has passed: that time is
+				// reached. Don't roll to tomorrow (it would stretch the session).
+				note := fmt.Sprintf("%s has passed today and a session is already on: nothing to extend", o.At)
+				return []core.StepJob{{
+					Inputs:  filePaths(files),
+					Options: JobOptions{Action: ActionStart, Start: &sr, IfActive: o.IfActive, RunID: req.RunID, Carry: passFiles(files), Reached: true, Note: note},
+				}}, nil
+			}
+			if t.Sub(now) > time.Duration(focus.MaxMinutes)*time.Minute {
+				if t.Day() != now.Day() {
+					return nil, field("at", fmt.Sprintf("%s has passed today and tomorrow's is more than 12 h away", o.At))
+				}
+				return nil, field("at", fmt.Sprintf("%s is more than 12 h away", o.At))
+			}
 			sr.Until = t.UnixMilli()
 		} else {
 			sr.Minutes = o.Minutes
@@ -322,6 +338,16 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 		job.SetTitle("Start focus")
 		if o.Start == nil {
 			return core.ValidationError("Missing session settings", nil)
+		}
+		if o.Reached {
+			res.Session = m.eng.State().Session
+			res.Vars = map[string]string{"focus_ends": "", "focus_minutes": "", "focus_profile": ""}
+			if res.Session != nil {
+				res.Vars = sessionVars(*res.Session, m.clock())
+			}
+			job.Logf("%s", o.Note)
+			job.Progress(1, "Done")
+			return job.SetResult(res)
 		}
 		sess, err := m.startOrExtend(o)
 		if err != nil {

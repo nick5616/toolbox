@@ -25,6 +25,7 @@ import (
 var (
 	user32                        = windows.NewLazySystemDLL("user32.dll")
 	procPostMessageW              = user32.NewProc("PostMessageW")
+	procGetWindow                 = user32.NewProc("GetWindow")
 	procPostThreadMessageW        = user32.NewProc("PostThreadMessageW")
 	procGetMessageW               = user32.NewProc("GetMessageW")
 	procPeekMessageW              = user32.NewProc("PeekMessageW")
@@ -226,12 +227,21 @@ var (
 	enumCB    uintptr
 )
 
-// visibleWindows calls fn for every visible top-level window.
+// isOwned reports whether h has an owner (dialogs, tool palettes): only
+// unowned top-level windows count as a program's windows (SPEC §1.2).
+func isOwned(h windows.HWND) bool {
+	owner, _, _ := procGetWindow.Call(uintptr(h), gwOwner)
+	return owner != 0
+}
+
+const gwOwner = 4
+
+// visibleWindows calls fn for every visible, unowned top-level window.
 func visibleWindows(fn func(hwnd windows.HWND, pid uint32)) {
 	enumCBOne.Do(func() {
 		enumCB = windows.NewCallback(func(hwnd, _ uintptr) uintptr {
 			h := windows.HWND(hwnd)
-			if windows.IsWindowVisible(h) {
+			if windows.IsWindowVisible(h) && !isOwned(h) {
 				var pid uint32
 				if _, err := windows.GetWindowThreadProcessId(h, &pid); err == nil && pid != 0 {
 					enumFn(h, pid)

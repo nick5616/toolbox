@@ -90,7 +90,10 @@ type Engine struct {
 	loopCancel context.CancelFunc
 	wg         sync.WaitGroup
 	tickMu     sync.Mutex
-	manual     bool // tests drive ticks themselves
+	manual     bool           // tests drive ticks themselves
+	asks       sync.WaitGroup // polite closes in flight
+	askMu      sync.Mutex
+	askSem     chan struct{}
 
 	notifyMu sync.Mutex
 	subs     map[int]func(State)
@@ -178,6 +181,7 @@ func (e *Engine) Stop() {
 	e.w = nil
 	e.mu.Unlock()
 	e.wg.Wait()
+	e.asks.Wait()
 }
 
 func (e *Engine) dryLocked() bool {
@@ -385,6 +389,7 @@ func (e *Engine) tickNow() {
 	e.mu.Unlock()
 	if w != nil {
 		e.tick(context.Background(), w)
+		e.asks.Wait()
 	}
 }
 
@@ -444,7 +449,7 @@ func (e *Engine) safeToStopLocked(p ProcInfo, w *watcher) bool {
 	if p.PID == 0 || p.Session != e.interactive || p.PID == e.self.PID {
 		return false
 	}
-	if _, ok := w.toolbox[p.PID]; ok {
+	if c, ok := w.toolbox[p.PID]; ok && c == p.Created {
 		return false
 	}
 	if e.o.Scope != nil && !e.o.Scope(p) {
@@ -548,6 +553,9 @@ func (e *Engine) tick(ctx context.Context, w *watcher) {
 	for k, ent := range w.seen {
 		if ent.goneAt == 0 && !alive[k] {
 			ent.goneAt = now
+			if c, ok := w.toolbox[k.pid]; ok && c == k.created && k.pid != e.self.PID {
+				delete(w.toolbox, k.pid) // a reused PID is a new program
+			}
 		}
 	}
 	dry := e.dryLocked()
@@ -641,13 +649,44 @@ func (e *Engine) tick(ctx context.Context, w *watcher) {
 	for _, a := range terminate {
 		events = append(events, e.doTerminate(w, a, sessionID, now))
 	}
-	for _, a := range ask {
-		if ev, ok := e.doAsk(w, a, sessionID, now); ok {
-			events = append(events, ev)
-		}
-	}
+	// Polite closes can take seconds (a Mac app's own quit): they run beside
+	// the loop, never inside the tick.
+	e.askAsync(w, ask, sessionID, now)
 	events = compactEvents(events)
 	e.record(w, sessionID, events, changed || len(ask) > 0)
+}
+
+// maxConcurrentAsks bounds the polite closes in flight at once.
+const maxConcurrentAsks = 4
+
+// askAsync asks each program to close on worker goroutines (at most
+// maxConcurrentAsks at a time). Stop waits for them.
+func (e *Engine) askAsync(w *watcher, ask []stopAction, sessionID string, now int64) {
+	if len(ask) == 0 {
+		return
+	}
+	e.askMu.Lock()
+	if e.askSem == nil {
+		e.askSem = make(chan struct{}, maxConcurrentAsks)
+	}
+	sem := e.askSem
+	e.askMu.Unlock()
+	for _, a := range ask {
+		e.asks.Add(1)
+		go func(a stopAction) {
+			defer e.asks.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			if e.root.Err() != nil {
+				return
+			}
+			ev, ok := e.doAsk(w, a, sessionID, now)
+			if !ok {
+				return
+			}
+			e.record(w, sessionID, []BlockEvent{ev}, true)
+		}(a)
+	}
 }
 
 func compactEvents(evs []BlockEvent) []BlockEvent {
@@ -698,6 +737,7 @@ func (e *Engine) doAsk(w *watcher, a stopAction, sessionID string, now int64) (B
 		ev.Result, ev.Error = ResultFailed, denyMessage(err)
 		e.mu.Lock()
 		w.pending[a.key] = true // still listed after the wait, so the user can Force close
+		e.armPendingLocked(w)
 		e.mu.Unlock()
 		return ev, true
 	case !asked:
@@ -706,8 +746,17 @@ func (e *Engine) doAsk(w *watcher, a stopAction, sessionID string, now int64) (B
 	ev.Result = ResultClosed
 	e.mu.Lock()
 	w.pending[a.key] = true
+	e.armPendingLocked(w)
 	e.mu.Unlock()
 	return ev, true
+}
+
+// armPendingLocked makes sure the still-open check will run for a close that
+// finished after the tick that asked for it.
+func (e *Engine) armPendingLocked(w *watcher) {
+	if w.pendingAt == 0 {
+		w.pendingAt = e.nowMs() + StillOpenAfter.Milliseconds()
+	}
 }
 
 // record stores events, bumps the session's count and notifies.
@@ -952,6 +1001,10 @@ func (e *Engine) RequestWeaken(a Weaken, rule *AllowRule) (Friction, error) {
 			e.mu.Unlock()
 			return Friction{}, core.ValidationError("Pick an app to allow", map[string]string{"rule": "Pick an app to allow"})
 		}
+		if len(s.Extra) >= MaxExtra {
+			e.mu.Unlock()
+			return Friction{}, errExtraCap()
+		}
 		c := *rule
 		if c.ID == "" {
 			c.ID = core.NewID()
@@ -983,6 +1036,12 @@ func (e *Engine) RequestWeaken(a Weaken, rule *AllowRule) (Friction, error) {
 	return out, nil
 }
 
+// errExtraCap is the refusal when a session already allows MaxExtra extra apps.
+func errExtraCap() error {
+	return core.ValidationError("This session already allows 20 extra apps", map[string]string{"extra": "At most 20 extra apps per session"}).
+		WithHint("End the session to start one with a different list.")
+}
+
 var spaceRe = strings.NewReplacer("’", "'", "‘", "'", "ʼ", "'")
 
 func normPhrase(s string) string {
@@ -1008,6 +1067,10 @@ func (e *Engine) ConfirmWeaken(a Weaken, phrase string) error {
 	if f.Phrase != "" && normPhrase(phrase) != normPhrase(f.Phrase) {
 		e.mu.Unlock()
 		return core.Errorf(CodePhrase, "That doesn't match the phrase").WithHint(`Type: ` + f.Phrase)
+	}
+	if a == WeakenAllow && f.Rule != nil && len(e.session.Extra) >= MaxExtra {
+		e.mu.Unlock()
+		return errExtraCap()
 	}
 	e.friction = nil
 	switch a {
@@ -1315,7 +1378,17 @@ func (e *Engine) SaveProfile(p Profile) (Profile, error) {
 	if err := e.o.Store.PutProfile(ctx, p); err != nil {
 		return Profile{}, err
 	}
+	e.refreshLearnRules()
 	return p, nil
+}
+
+// refreshLearnRules rebuilds learn mode's rules after a profile changed.
+func (e *Engine) refreshLearnRules() {
+	e.mu.Lock()
+	if e.w != nil && e.w.learn {
+		e.w.rules = e.learnRulesLocked()
+	}
+	e.mu.Unlock()
 }
 
 func labelOr(r AllowRule, i int) string {
@@ -1330,6 +1403,7 @@ func (e *Engine) DeleteProfile(id string) error {
 	if err := e.o.Store.DeleteProfile(context.Background(), id); err != nil {
 		return err
 	}
+	defer e.refreshLearnRules()
 	e.mu.Lock()
 	if e.settings.LastProfileID == id {
 		e.settings.LastProfileID = ""

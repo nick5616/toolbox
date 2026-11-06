@@ -4,6 +4,7 @@ package proc
 
 import (
 	"context"
+	"debug/pe"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,6 +18,37 @@ const (
 	swShowMinNoActive = 7 // SW_SHOWMINNOACTIVE
 	exitStillActive   = 259
 )
+
+// subsystemWindowsCUI is IMAGE_SUBSYSTEM_WINDOWS_CUI: a console program.
+const subsystemWindowsCUI = 3
+
+// isConsoleExe reads the PE header's Subsystem. Anything unreadable counts as
+// a window program (no console is forced on it).
+func isConsoleExe(path string) bool {
+	f, err := pe.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	switch oh := f.OptionalHeader.(type) {
+	case *pe.OptionalHeader32:
+		return oh.Subsystem == subsystemWindowsCUI
+	case *pe.OptionalHeader64:
+		return oh.Subsystem == subsystemWindowsCUI
+	}
+	return false
+}
+
+// launchFlags are the CreateProcess flags for path: its own process group,
+// and for console programs a console of their own (a GUI parent has none to
+// share, so the program would run without a visible window).
+func launchFlags(path string) uint32 {
+	flags := uint32(windows.CREATE_NEW_PROCESS_GROUP | windows.CREATE_UNICODE_ENVIRONMENT)
+	if isConsoleExe(path) {
+		flags |= windows.CREATE_NEW_CONSOLE
+	}
+	return flags
+}
 
 // launch starts the program with CreateProcess: no CREATE_NO_WINDOW, a new
 // process group, no job object (so nothing kills it with Toolbox's calls), and
@@ -52,7 +84,7 @@ func launch(ctx context.Context, s LaunchSpec) (Launched, error) {
 	}
 	var pi windows.ProcessInformation
 	if err := windows.CreateProcess(app, cmdline, nil, nil, false,
-		windows.CREATE_NEW_PROCESS_GROUP|windows.CREATE_UNICODE_ENVIRONMENT, nil, dirp, si, &pi); err != nil {
+		launchFlags(s.Path), nil, dirp, si, &pi); err != nil {
 		return Launched{}, fmt.Errorf("starting %s: %w", filepath.Base(s.Path), err)
 	}
 	defer windows.CloseHandle(pi.Thread)

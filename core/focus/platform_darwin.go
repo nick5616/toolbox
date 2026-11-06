@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -129,18 +128,8 @@ func (p *macPlatform) Paths(ps []ProcInfo) {
 	}
 }
 
-// bundleOf returns the .app bundle containing path ("" if none).
-func bundleOf(path string) string {
-	for i := 0; i+4 <= len(path); i++ {
-		if strings.EqualFold(path[i:i+4], ".app") && (i+4 == len(path) || path[i+4] == '/') {
-			return path[:i+4]
-		}
-	}
-	return ""
-}
-
 // Windows guesses windowed apps from the bundle layout: the main executable
-// of an .app is windowed.
+// of an .app is windowed (helper bundles nested inside it are not).
 func (p *macPlatform) Windows() map[uint32]bool {
 	p.mu.Lock()
 	procs := append([]ProcInfo(nil), p.last...)
@@ -148,7 +137,7 @@ func (p *macPlatform) Windows() map[uint32]bool {
 	p.Paths(procs)
 	out := map[uint32]bool{}
 	for _, pi := range procs {
-		if strings.Contains(pi.Path, ".app/Contents/MacOS/") {
+		if isBundleMain(pi.Path) {
 			out[pi.PID] = true
 		}
 	}
@@ -186,13 +175,19 @@ func (p *macPlatform) Terminate(pi ProcInfo) error {
 	return nil
 }
 
+var quits = newQuitFlight()
+
 func quitApp(bundle string) error {
+	return quits.do(bundle, func() error { return quitBundle(bundle) })
+}
+
+func quitBundle(bundle string) error {
 	esc := strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(bundle)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), quitTimeout)
 	defer cancel()
-	_, err := proc.Output(ctx, 30*time.Second, "/usr/bin/osascript", "-e", `tell application "`+esc+`" to quit`)
+	_, err := proc.Output(ctx, quitTimeout, "/usr/bin/osascript", "-e", `tell application "`+esc+`" to quit`)
 	if err != nil {
-		return fmt.Errorf("Toolbox isn't allowed to quit %s: %w", filepath.Base(bundle), err)
+		return quitError(bundle, err)
 	}
 	return nil
 }

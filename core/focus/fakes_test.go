@@ -55,6 +55,7 @@ type fakePlatform struct {
 	termErr     map[uint32]error
 	staysOpen   map[uint32]bool // AskToClose doesn't make it quit
 	unsupported error
+	askGate     chan struct{} // when set, AskToClose blocks until it is closed
 }
 
 func newFake() *fakePlatform {
@@ -150,7 +151,11 @@ func (f *fakePlatform) AskToClose(p ProcInfo) (bool, error) {
 	f.asked = append(f.asked, p)
 	has := f.windows[p.PID]
 	stays := f.staysOpen[p.PID]
+	gate := f.askGate
 	f.mu.Unlock()
+	if gate != nil {
+		<-gate // a slow quit
+	}
 	if has && !stays {
 		f.remove(p.PID)
 	}
@@ -182,6 +187,7 @@ func (f *fakePlatform) askedPIDs() []uint32 {
 	for _, p := range f.asked {
 		out = append(out, p.PID)
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] }) // asks run concurrently
 	return out
 }
 

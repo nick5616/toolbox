@@ -392,14 +392,49 @@ func (s *Service) StudioSuggestion() (focus.Profile, error) {
 	return studioProfile(append(apps, running...)), nil
 }
 
+// squash lowercases s and drops spaces, so "Windows Terminal" and the exe name
+// "WindowsTerminal" compare equal.
+func squash(s string) string {
+	return strings.ReplaceAll(strings.ToLower(s), " ", "")
+}
+
+// exeBase is the file name of an app's program without its extension.
+func exeBase(path string) string {
+	p := strings.ReplaceAll(path, `\`, "/")
+	p = p[strings.LastIndexByte(p, '/')+1:]
+	return strings.TrimSuffix(p, filepath.Ext(p))
+}
+
+// matchesPick reports whether an app is the pick: by its label, or by the
+// name of its program (Running() labels an app by its exe).
+func matchesPick(a App, want string) bool {
+	w := squash(want)
+	if strings.Contains(squash(a.Label), w) {
+		return true
+	}
+	for _, path := range []string{a.Path, a.Rule.Path} {
+		if path != "" && strings.Contains(squash(exeBase(path)), w) {
+			return true
+		}
+	}
+	return false
+}
+
 func studioProfile(apps []App) focus.Profile {
 	p := focus.Profile{Name: "Studio", Rules: []focus.AllowRule{}}
+	have := map[string]bool{}
 	for _, want := range studioPicks {
 		for _, a := range apps {
-			if strings.Contains(strings.ToLower(a.Label), want) {
-				p.Rules = append(p.Rules, a.Rule)
-				break
+			key := strings.ToLower(a.Path)
+			if key == "" {
+				key = strings.ToLower(a.Rule.Path)
 			}
+			if have[key] || !matchesPick(a, want) {
+				continue
+			}
+			have[key] = true
+			p.Rules = append(p.Rules, a.Rule)
+			break
 		}
 	}
 	return p
