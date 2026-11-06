@@ -14,6 +14,7 @@ import { StudioLayout, WorkspacePreviewFrame, WorkspaceRail } from "@/workspace"
 import type { ToolViewProps } from "../index";
 import { ProjectPickerDialog } from "./dialogs";
 import { PostHeader } from "./Header";
+import { PostExportRow } from "./lastExport";
 import { usePostHost } from "./host";
 import { altSummary, checksSummary, formatSummary, issuesBySlide, roomLeft, sourcesSummary } from "./logic";
 import { PhonePreviewPart } from "./preview";
@@ -77,6 +78,7 @@ function Workspace() {
   const st = usePostBuilder.getState;
   const doc = useDoc();
   const selectedId = usePostBuilder((s) => s.selectedId);
+  const postId = usePostBuilder((s) => s.postId);
   const limits = usePostBuilder((s) => s.limits);
   const issues = usePostBuilder((s) => s.issues);
   const still = usePostBuilder((s) => s.still);
@@ -137,6 +139,8 @@ function Workspace() {
         aspect={doc.aspect}
         project={projects.get(selected.projectId)}
         onChange={(patch) => st().patchSlide(selected.id, patch)}
+        onFramingLive={(patch) => st().setLiveFraming({ id: selected.id, patch })}
+        onFramingEnd={(patch) => st().commitFraming(selected.id, patch)}
         onEdit={(where) => void st().editSlide(selected.id, where)}
         stillMs={still && still.id === selected.id ? still.ms : selected.inMs}
       />
@@ -191,7 +195,14 @@ function Workspace() {
         stage={stage}
         side={side}
         sideWidth={wide ? STRIP_PX + PHONE_PX + 40 : STRIP_PX + 28}
-        bottom={doc ? <SelectionBar /> : undefined}
+        bottom={
+          doc ? (
+            <>
+              <PostExportRow postId={postId} />
+              <SelectionBar />
+            </>
+          ) : undefined
+        }
       />
       {pick && (
         <ProjectPickerDialog

@@ -6,9 +6,11 @@
 import { System } from "@wailsio/runtime";
 import { useEffect } from "react";
 import { on } from "@/lib/events";
+import { defaultSingleDeps, runSingle, type SingleDeps, type SingleRun } from "./edit/headless";
+import { announceHost } from "./edit/hostReply";
 import { Sender, type HostMessage, type WorkerMessage } from "./worker/transport";
 
-interface Active {
+export interface Active {
   token: string;
   worker: Worker;
   sender: Sender;
@@ -59,18 +61,58 @@ export function startRender(token: string, planUrl: string, invoke: (msg: string
   worker.postMessage(msg);
 }
 
+/** Headless requests in flight (compositions and recipes), by token. */
+export type Singles = Map<string, SingleRun>;
+
+/**
+ * Routes a `viz:render` event: pipeline requests answered by the host itself
+ * (kind "composition" or "recipe", Phase 14 A2) or a video render in a worker.
+ * `kind` is absent from the generated event type until bindings are regenerated.
+ */
+export function routeRender(
+  d: { token: string; planUrl: string; kind?: string },
+  invoke: (msg: string) => void,
+  active: Map<string, Active>,
+  singles: Singles,
+  forceJpeg = false,
+  deps: SingleDeps = defaultSingleDeps,
+): void {
+  if (d.kind === "composition" || d.kind === "recipe") {
+    const run: SingleRun = { token: d.token, abort: new AbortController() };
+    singles.set(d.token, run);
+    void runSingle(run, d.planUrl, invoke, deps).finally(() => singles.delete(d.token));
+    return;
+  }
+  startRender(d.token, d.planUrl, invoke, active, forceJpeg);
+}
+
+/** Cancels whichever kind of request has this token. */
+export function cancelRender(token: string, active: Map<string, Active>, singles: Singles): void {
+  singles.get(token)?.abort.abort();
+  active.get(token)?.worker.postMessage({ type: "cancel" } satisfies HostMessage);
+}
+
 export default function RenderHost() {
   useEffect(() => {
     const active = new Map<string, Active>();
+    const singles: Singles = new Map();
     const invoke = (msg: string) => System.invoke(msg);
+    const forceJpeg = new URLSearchParams(location.search).get("vizjpeg") === "1";
     const offs = [
-      on("viz:render", (d) => startRender(d.token, d.planUrl, invoke, active, new URLSearchParams(location.search).get("vizjpeg") === "1")),
-      on("viz:render-cancel", (d) => active.get(d.token)?.worker.postMessage({ type: "cancel" } satisfies HostMessage)),
+      on("viz:render", (d) => routeRender(d as typeof d & { kind?: string }, invoke, active, singles, forceJpeg)),
+      on("viz:render-cancel", (d) => cancelRender(d.token, active, singles)),
       on("viz:render-ack", (d) => active.get(d.token)?.worker.postMessage({ type: "ack", bytes: d.bytes } satisfies HostMessage)),
     ];
+    // Tell Go a window can draw: pipeline steps that render headless wait for it.
+    announceHost(invoke, true);
+    const down = () => announceHost(invoke, false);
+    window.addEventListener("pagehide", down);
     return () => {
+      window.removeEventListener("pagehide", down);
+      down();
       for (const off of offs) off();
       for (const a of active.values()) a.worker.terminate();
+      for (const s of singles.values()) s.abort.abort();
     };
   }, []);
   return null;

@@ -29,6 +29,17 @@ export const toolViews: Record<string, LazyExoticComponent<ComponentType<ToolVie
   redact: lazy(() => import("./redact/RedactView")),
   "object-eraser": lazy(() => import("./eraser/ObjectEraserView")),
   "dev-utils": lazy(() => import("./devutils/DevUtilsView")),
+  documents: lazy(() => import("./documents/DocumentsView")),
+  archiver: lazy(() => import("./archiver/ArchiverView")),
+  scenes: lazy(() => import("./scenes/ScenesView")),
+  gif: lazy(() => import("./gif/GifView")),
+  organize: lazy(() => import("./organize/OrganizeView")),
+  "lan-share": lazy(() => import("./lan-share/LanShareView")),
+  silence: lazy(() => import("./silence/SilenceView")),
+  compress: lazy(() => import("./compress/CompressView")),
+  focus: lazy(() => import("./focus/FocusView")),
+  imagebatch: lazy(() => import("./imagebatch/ImageBatchView")),
+  tts: lazy(() => import("./tts/TtsView")),
   visualizer: lazy(() => import("./visualizer/VisualizerView")),
   pipelines: lazy(() => import("./pipelines/PipelinesView")),
   "photo-composer": lazy(() => import("./photo-composer/PhotoComposerView")),
@@ -49,6 +60,12 @@ registerToolActions({
  * Views a popup window can show (`/?window=popup&view=<id>`), rendered by
  * PopupShell without the sidebar or job tray.
  */
+/**
+ * Components the main window's shell renders over every view (Phase 13):
+ * Local File Transfer's incoming-transfer and pairing prompts.
+ */
+export const shellOverlays: LazyExoticComponent<ComponentType>[] = [lazy(() => import("./lan-share/LanSharePrompt"))];
+
 export const popupViews: Record<string, LazyExoticComponent<ComponentType>> = {
   clipboard: lazy(() => import("./clipboard/ClipboardPopup")),
 };

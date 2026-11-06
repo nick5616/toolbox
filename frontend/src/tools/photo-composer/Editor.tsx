@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent as RKeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent } from "react";
 import { Button, IconButton, MenuButton, Spinner, TextField, toast, useClickIn } from "@/components";
-import { ComposerService, LibraryService, PostsService, type ComposerLayer, type Composition, type ProjectInfo } from "@/lib/api";
+import { ComposerService, PostsService, type ComposerLayer, type Composition, type ProjectInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { useBeforePopOut } from "@/lib/popout";
-import { revealLabel } from "@/lib/platform";
 import { applyLayout } from "@/composer/layouts";
 import { loadImage } from "@/composer/loadImages";
 import { addLayer, findLayer, layerList, MAX_LAYERS, newImageLayer, setLayerSource } from "@/composer/model";
@@ -11,11 +10,12 @@ import { imageSize, layerSize } from "@/composer/render";
 import { useCompositionInputs } from "@/state/composition";
 import { useJobs } from "@/state/jobs";
 import type { PostSlideSeed } from "@/state/ui";
+import { LastExport } from "@/editor/export/LastExport";
 import { StudioLayout, Spacer, WorkspacePreviewFrame, WorkspaceRail } from "@/workspace";
 import { ComposerStage } from "./canvas";
 import { CropDialog } from "./CropDialog";
 import { composerImages, imageFailed, useComposerImages, useLoadComposerImages } from "./images";
-import { backgroundSummary, layersSummary, nudge } from "./logic";
+import { backgroundSummary, layersSummary, nudge, slotsLine } from "./logic";
 import { SelectionBar } from "./SelectionBar";
 import { MODULE_ID, resetFailureToasts, toastError, toastFailureOnce, useComposer, useDoc, useSelectedLayers, type Pending } from "./store";
 import { useAutosave, type SaveState } from "./useAutosave";
@@ -273,6 +273,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   }, [build, phase, imagesReady, pending, buildLayout, st]);
 
   // ---- export ----
+  const [lastExport, setLastExport] = useState<{ id: string; path: string; missing: boolean } | null>(null);
   const exportAs = useCallback(
     async (format: "jpg" | "png") => {
       if (st().exporting) return;
@@ -284,12 +285,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
         if (changed) await new Promise((r) => setTimeout(r, 0));
         await autosave.flush(true);
         const out = await ComposerService.Export(project.id);
-        toast({
-          title: "Exported",
-          description: out.name,
-          tone: "success",
-          action: { label: revealLabel, onClick: () => void LibraryService.Reveal(out.id).catch((e) => toastError("Couldn't reveal the file", e)) },
-        });
+        setLastExport({ id: out.id, path: out.path, missing: out.missing });
       } catch (e) {
         toastError("Couldn't export", e);
       } finally {
@@ -363,7 +359,9 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
 
   const header = (
     <div className={styles.headerBar} role="toolbar" aria-label="Composer tools">
-      <IconButton icon="arrow-left" label="Back to projects" data-tip="Save and go back to your list of compositions" onClick={() => void closeEditor()} />
+      <Button size="sm" variant="ghost" icon="chevron-left" data-tip="Save and go back to your list of compositions" onClick={() => void closeEditor()}>
+        Projects
+      </Button>
       <TextField
         size="sm"
         aria-label="Project name"
@@ -387,23 +385,15 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
       <IconButton icon="redo-2" label="Redo" data-tip="Redo the change you just undid" kbd="Ctrl+Shift+Z" disabled={!redoable} onClick={() => st().redo()} />
       <MenuButton
         size="sm"
-        label="Add"
-        icon="plus"
-        collapsible
-        data-tip="Add a photo or a text layer to the canvas"
-        items={() => [
-          { id: "photo", label: "Add photo", icon: "image", tip: "Add photos from your computer as new layers", onSelect: () => void st().pickPhotos() },
-          { id: "text", label: "Add text", icon: "type", tip: "Add a text layer you can type into, style and move", onSelect: () => st().addText() },
-        ]}
-      />
-      <MenuButton
-        size="sm"
         variant="ghost"
         label="More actions"
         icon="ellipsis"
-        data-tip="Zoom and layer shortcuts"
+        data-tip="Add photos or text, zoom, duplicate"
         items={() => [
+          { id: "photo", label: "Add photo", icon: "image", tip: "Add photos from your computer as new layers", onSelect: () => void st().pickPhotos() },
+          { id: "text", label: "Add text", icon: "type", tip: "Add a text layer you can type into, style and move", onSelect: () => st().addText() },
           { id: "fit", label: "Zoom to fit", icon: "maximize-2", tip: "Reset the canvas zoom so the whole picture fits", onSelect: () => st().setZoom(1) },
+          { id: "slots", label: slotsLine(layerList(doc)), icon: "layers", tip: "How many photos a pipeline's Fill a template step puts into this composition. Mark photo layers as Template slot in the Layer panel", disabled: true, onSelect: () => undefined },
           { id: "duplicate", label: "Duplicate layer", icon: "copy", tip: "Copy the selected layer", disabled: !single, onSelect: () => single && st().duplicateLayer(single.id) },
         ]}
       />
@@ -431,7 +421,20 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
             <ComposerStage />
           </WorkspacePreviewFrame>
         }
-        bottom={<SelectionBar />}
+        bottom={
+          <>
+            {lastExport && (
+              <LastExport
+                path={lastExport.path}
+                outputId={lastExport.id}
+                missing={lastExport.missing}
+                moduleId={MODULE_ID}
+                onDismiss={() => setLastExport(null)}
+              />
+            )}
+            <SelectionBar />
+          </>
+        }
       />
       {cropLayer?.image && (
         <CropDialog

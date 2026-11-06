@@ -5,7 +5,7 @@
  * screen, click-ins carry a summary, bars never wrap, rails never scroll.
  */
 import { Children, isValidElement, useState, type ReactElement, type ReactNode } from "react";
-import { ClickIn, ErrorBoundary, MenuButton, useClickIn } from "@/components";
+import { ClickIn, ErrorBoundary, MenuButton, ToolHeader, useClickIn } from "@/components";
 import { useElementSize } from "@/lib/useElementSize";
 import { PartFrame } from "@/parts/PartFrame";
 import type { Workspace } from "./types";
@@ -57,7 +57,7 @@ export function WorkspacePanel({ ws, panel, variant = "row", summary, showSummar
 }
 
 const ITEM_PX = 44;
-const PAD_PX = 16;
+const PAD_PX = 8;
 
 /** How many of `count` items show in `height` px (all when unknown); one slot is the "More" item when some must go. */
 export function railFit(count: number, height: number): number {
@@ -174,7 +174,11 @@ export function OneLineBar({ children, widths = {}, overflow, className, "aria-l
 }
 
 export interface StudioLayoutProps {
-  /** Header, left to right: back/title/state … then `headerEnd` (undo, More, the primary action). One line. */
+  /**
+   * Header, left to right: back/title/state … then `headerEnd` (undo, More, the
+   * primary action). One line. It renders in the shell's top bar (SPEC §13 rule 1),
+   * inline above the layout only when embedded or without a shell slot.
+   */
   header: ReactNode;
   rail?: ReactNode;
   /** The preview/canvas: gets the room. */
@@ -192,7 +196,7 @@ export interface StudioLayoutProps {
 export function StudioLayout({ header, rail, stage, side, sideWidth = 360, bottom, className }: StudioLayoutProps) {
   return (
     <div className={[styles.studio, className].filter(Boolean).join(" ")}>
-      <header className={styles.studioHeader}>{header}</header>
+      <ToolHeader className={styles.studioHeader}>{header}</ToolHeader>
       {rail ? <div className={styles.studioRail}>{rail}</div> : null}
       <section className={styles.studioStage} aria-label="Preview">
         {stage}
@@ -216,7 +220,7 @@ export function Spacer() {
 export function WorkspacePreviewFrame({ ws, children }: { ws: Workspace; children: ReactNode }) {
   if (!ws.previewPart) return <>{children}</>;
   return (
-    <PartFrame part={ws.previewPart} chrome="overlay">
+    <PartFrame part={ws.previewPart} chrome="overlay" keepWhileOut={!!ws.previewMirror}>
       {children}
     </PartFrame>
   );

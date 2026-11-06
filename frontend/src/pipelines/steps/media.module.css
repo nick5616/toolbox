@@ -7,10 +7,18 @@
 
 .row {
   display: grid;
-  grid-template-columns: 8rem 1fr;
+  grid-template-columns: 8rem minmax(0, 1fr);
   gap: var(--space-3);
   align-items: center;
   width: 100%;
+}
+
+/* A narrow Step panel: the label sits above its control, which gets the full width. */
+@container step-editor (max-width: 460px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
 }
 
 .label {

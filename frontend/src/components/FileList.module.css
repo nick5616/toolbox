@@ -2,9 +2,8 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg-panel);
+  background: var(--bg-inset);
   overflow: hidden;
 }
 
@@ -32,6 +31,9 @@
 .path {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .size {

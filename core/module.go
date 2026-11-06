@@ -60,6 +60,9 @@ type Descriptor struct {
 	SplitInputs bool `json:"-"`
 	// MaxConcurrent caps running jobs of this module; 0 = global limit only.
 	MaxConcurrent int `json:"-"`
+	// Immediate jobs start at once, outside the global parallel-job limit
+	// (Local File Transfer's receive jobs: a sender is waiting on the other end).
+	Immediate bool `json:"-"`
 	// MaxInputs caps inputs per submission; 0 = no limit.
 	MaxInputs int `json:"maxInputs"`
 	// NotAStep keeps a module out of the pipeline step catalogue (creator

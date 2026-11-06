@@ -15,6 +15,8 @@ interface State {
   past: Show[];
   present: Show;
   future: Show[];
+  seq: number;
+  epoch: number;
 }
 
 export interface ShowHistory {
@@ -29,6 +31,10 @@ export interface ShowHistory {
   redo(): void;
   canUndo: boolean;
   canRedo: boolean;
+  /** Counts the undo steps recorded (merged edits don't count), so a host can mirror them in a wider history. */
+  seq: number;
+  /** Counts `reset` calls (the history was forgotten). */
+  epoch: number;
 }
 
 export interface ShowHistoryOptions {
@@ -38,7 +44,7 @@ export interface ShowHistoryOptions {
 
 export function useShowHistory(initial: Show, opts: ShowHistoryOptions = {}): ShowHistory {
   const coalesceMs = opts.coalesceMs ?? COALESCE_MS;
-  const [state, setState] = useState<State>({ past: [], present: initial, future: [] });
+  const [state, setState] = useState<State>({ past: [], present: initial, future: [], seq: 0, epoch: 0 });
   const lastEdit = useRef(0);
 
   const set = useCallback(
@@ -48,9 +54,9 @@ export function useShowHistory(initial: Show, opts: ShowHistoryOptions = {}): Sh
       lastEdit.current = now;
       setState((s) => {
         if (next === s.present) return s;
-        if (merge && s.past.length > 0) return { past: s.past, present: next, future: [] };
+        if (merge && s.past.length > 0) return { ...s, present: next, future: [] };
         const past = [...s.past, s.present];
-        return { past: past.length > HISTORY_LIMIT ? past.slice(past.length - HISTORY_LIMIT) : past, present: next, future: [] };
+        return { ...s, past: past.length > HISTORY_LIMIT ? past.slice(past.length - HISTORY_LIMIT) : past, present: next, future: [], seq: s.seq + 1 };
       });
     },
     [coalesceMs],
@@ -58,7 +64,7 @@ export function useShowHistory(initial: Show, opts: ShowHistoryOptions = {}): Sh
 
   const reset = useCallback((next: Show) => {
     lastEdit.current = 0;
-    setState({ past: [], present: next, future: [] });
+    setState((s) => ({ past: [], present: next, future: [], seq: s.seq, epoch: s.epoch + 1 }));
   }, []);
 
   const checkpoint = useCallback(() => {
@@ -69,7 +75,7 @@ export function useShowHistory(initial: Show, opts: ShowHistoryOptions = {}): Sh
     lastEdit.current = 0;
     setState((s) => {
       const prev = s.past[s.past.length - 1];
-      return prev ? { past: s.past.slice(0, -1), present: prev, future: [s.present, ...s.future] } : s;
+      return prev ? { ...s, past: s.past.slice(0, -1), present: prev, future: [s.present, ...s.future] } : s;
     });
   }, []);
 
@@ -77,11 +83,11 @@ export function useShowHistory(initial: Show, opts: ShowHistoryOptions = {}): Sh
     lastEdit.current = 0;
     setState((s) => {
       const next = s.future[0];
-      return next ? { past: [...s.past, s.present], present: next, future: s.future.slice(1) } : s;
+      return next ? { ...s, past: [...s.past, s.present], present: next, future: s.future.slice(1) } : s;
     });
   }, []);
 
-  return { show: state.present, set, reset, checkpoint, undo, redo, canUndo: state.past.length > 0, canRedo: state.future.length > 0 };
+  return { show: state.present, set, reset, checkpoint, undo, redo, canUndo: state.past.length > 0, canRedo: state.future.length > 0, seq: state.seq, epoch: state.epoch };
 }
 
 /**

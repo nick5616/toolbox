@@ -49,6 +49,17 @@ export enum Action {
      * markers CSV/JSON or captions SRT into <library>/Edits
      */
     ActionText = "text",
+
+    /**
+     * Pipeline steps (Phase 14 A2): both build an edit in memory and export it.
+     * "Assemble a video" (Video Editor): the inputs laid end to end, or into a template
+     */
+    ActionAssemble = "assemble",
+
+    /**
+     * "Cut to the beat" (Edit Studio): a song plus clips, filled by a recipe
+     */
+    ActionBeat = "beat",
 };
 
 /**
@@ -71,6 +82,132 @@ export interface AnalyzeRequest {
      * "" = auto
      */
     "language": string;
+}
+
+/**
+ * AssembleRequest is both the step's options and the assemble job's request.
+ */
+export interface AssembleRequest {
+    /**
+     * a saved edit whose clips are replaced in order; "" = a new edit
+     */
+    "templateId": string;
+
+    /**
+     * a label only
+     */
+    "templateName": string;
+
+    /**
+     * "cut" | "crossfade" (a template keeps its own transitions unless this is crossfade)
+     */
+    "transition": string;
+
+    /**
+     * crossfade length, 100..2000; 0 = 500
+     */
+    "transitionMs": number;
+
+    /**
+     * text over the start of the video; "" = none; takes {vars}
+     */
+    "title": string;
+
+    /**
+     * 500..10000; 0 = 3000
+     */
+    "titleMs": number;
+
+    /**
+     * a music bed's path (takes {vars}); "" = the template's, or an audio input, or none
+     */
+    "music": string;
+
+    /**
+     * new edits: "9:16" | "4:5" | "1:1" | "16:9"
+     */
+    "aspect": string;
+
+    /**
+     * new edits: 30 | 60
+     */
+    "fps": number;
+
+    /**
+     * export short side: 720 | 1080 | 1440
+     */
+    "height": number;
+
+    /**
+     * how long a photo shows; 0 = 3000
+     */
+    "stillMs": number;
+
+    /**
+     * new edits: "fill" | "fit" | "fit-blur"
+     */
+    "fit": string;
+
+    /**
+     * output file name; takes {vars}; "" = the template's name, or the first clip's
+     */
+    "name": string;
+}
+
+/**
+ * BeatRequest is both the step's options and the beat job's request. The
+ * job's inputs are the clips; the song is Song.
+ */
+export interface BeatRequest {
+    /**
+     * one of BeatRecipes
+     */
+    "recipeId": string;
+
+    /**
+     * 0 = 1; the same inputs and seed give the same cut
+     */
+    "seed": number;
+
+    /**
+     * "recipe" | "sequential" | "shuffleNoRepeat" | "byTag"
+     */
+    "order": string;
+
+    /**
+     * the song's path (takes {vars}); "" = the first audio input
+     */
+    "song": string;
+
+    /**
+     * where in the song the edit starts
+     */
+    "startMs": number;
+
+    /**
+     * 0 = 30 s (shorter if the song ends)
+     */
+    "lengthMs": number;
+
+    /**
+     * "9:16" | "4:5" | "1:1" | "16:9"
+     */
+    "aspect": string;
+
+    /**
+     * 30 | 60
+     */
+    "fps": number;
+
+    /**
+     * export short side: 720 | 1080 | 1440
+     */
+    "height": number;
+
+    /**
+     * output file name; takes {vars}; "" = the song's name
+     */
+    "name": string;
 }
 
 export interface Captions {

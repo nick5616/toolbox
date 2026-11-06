@@ -23,6 +23,7 @@ type Module struct {
 	sc        sidecar.Caller
 	modelsDir string // <modelsDir>/eraser/
 	maskDir   string // <support>/tmp/eraser
+	savedDir  string // saved masks; "" = <support>/eraser/masks
 }
 
 var _ core.ModelProvider = (*Module)(nil)

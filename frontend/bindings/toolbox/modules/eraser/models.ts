@@ -41,6 +41,12 @@ export interface Options {
      * set by Service.Erase; never from the UI
      */
     "maskPath": string;
+
+    /**
+     * Note is set by the pipeline step: photos it left out and why. It is
+     * added to the job's warning.
+     */
+    "note": string;
 }
 
 /**
@@ -54,4 +60,31 @@ export interface Result {
      */
     "warning": string;
     "outputs": string[] | null;
+}
+
+/**
+ * SavedMask describes one saved mask.
+ */
+export interface SavedMask {
+    "id": string;
+    "name": string;
+    "width": number;
+    "height": number;
+
+    /**
+     * Unix ms
+     */
+    "createdAt": number;
+}
+
+/**
+ * StepOptions are what the user edits on an Object Eraser step.
+ */
+export interface StepOptions {
+    "model": Model;
+
+    /**
+     * a saved mask (Service.SavedMasks)
+     */
+    "maskId": string;
 }

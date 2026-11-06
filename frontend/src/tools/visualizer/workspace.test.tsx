@@ -109,7 +109,7 @@ describe("Visualizer workspace", () => {
     analysed();
     render(<VisualizerView moduleId="visualizer" />);
     expect(await screen.findByRole("button", { name: "Source: night-drive.mp3" })).toBeTruthy();
-    const header = screen.getByRole("banner");
+    const header = screen.getByRole("toolbar", { name: "Tool" });
     expect(within(header).getByRole("button", { name: "Undo" })).toBeTruthy();
     expect(within(header).getByRole("button", { name: "Redo" })).toBeTruthy();
     expect(within(header).getByRole("button", { name: "More" })).toBeTruthy();
@@ -147,7 +147,7 @@ describe("Visualizer workspace", () => {
     expect(await within(dialog).findByRole("radiogroup", { name: "Aspect" })).toBeTruthy();
     expect(within(dialog).getByRole("radiogroup", { name: "Quality" })).toBeTruthy();
     expect(within(dialog).getByRole("radiogroup", { name: "Range" })).toBeTruthy();
-    expect(within(dialog).getByRole("button", { name: "Render video" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Export video" })).toBeTruthy();
     await userEvent.click(within(dialog).getByRole("radio", { name: "720p" }));
     expect(useVisualizer.getState().exportPrefs.height).toBe(720);
   });
@@ -164,7 +164,7 @@ describe("Visualizer workspace", () => {
   it("a design edit enables Undo, and Undo takes it back", async () => {
     analysed();
     render(<VisualizerView moduleId="visualizer" />);
-    const header = (await screen.findByRole("banner")) as HTMLElement;
+    const header = (await screen.findByRole("toolbar", { name: "Tool" })) as HTMLElement;
     const undo = within(header).getByRole("button", { name: "Undo" }) as HTMLButtonElement;
     const redo = within(header).getByRole("button", { name: "Redo" }) as HTMLButtonElement;
     expect(undo.disabled).toBe(true);

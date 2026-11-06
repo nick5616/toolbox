@@ -129,7 +129,43 @@ describe("OcrView", () => {
     await user.keyboard("{Escape}");
     await user.click(screen.getByRole("button", { name: "Copy text" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("Hello\nToolbox OCR"));
-    await user.click(screen.getByRole("button", { name: "Save as…" }));
+    await user.click(screen.getByRole("button", { name: "Show file" }));
     expect(reveal).toHaveBeenCalledWith("o1");
+  });
+
+  it("offers Save as document… with the text file as the Document Converter's input", async () => {
+    const user = userEvent.setup();
+    useJobs.getState().upsert({
+      id: "j2",
+      moduleId: "ocr",
+      title: "b.png",
+      status: JobStatus.JobDone,
+      progress: 1,
+      message: "",
+      inputs: ["/b.png"],
+      optionsJson: "{}",
+      errorCode: ErrorCode.$zero,
+      error: "",
+      errorHint: "",
+      pipelineRunId: "",
+      pipelineStepId: "",
+      attempt: 1,
+      cancelRequested: false,
+      createdAt: 1,
+      startedAt: 1,
+      finishedAt: 2,
+      outputs: [{ id: "o2", path: "/o/b (text).txt" } as never],
+      resultJson: JSON.stringify({ kind: "image", lines: 1, characters: 5, meanConfidence: 0.9, preview: "Hello", outputs: ["/o/b (text).txt"] }),
+    });
+    function FakeDocs() {
+      const h = useEmbed()?.handoff;
+      return <p>docs: {h?.inputs.join(",")}</p>;
+    }
+    registerToolViews({ documents: FakeDocs });
+    const d = (id: string, name: string) => ({ id, name, icon: "box", status: ModuleStatus.StatusReady, accepts: { extensions: [], urls: false, any: false } }) as unknown as Descriptor;
+    useModules.getState().setAll([d("documents", "Document Converter"), d("ocr", "OCR")]);
+    render(<OcrView moduleId="ocr" />);
+    await user.click(await screen.findByRole("button", { name: /Save as document/ }));
+    expect((await screen.findByText(/^docs:/)).textContent).toBe("docs: /o/b (text).txt");
   });
 });

@@ -21,14 +21,58 @@ const (
 	TplLecture       = "lecture"
 	TplBeforeSharing = "before-sharing"
 	TplMusicVideo    = "music-video"
+	TplReadingList   = "reading-list"
+	TplPaperToWord   = "paper-to-word"
+
+	// Phase 15: one template for each workflow in SPEC.md §1.
+	TplReadItToMe        = "read-it-to-me"
+	TplAudiobook         = "audiobook"
+	TplTightLecture      = "tight-lecture"
+	TplPodcastPolish     = "podcast-polish"
+	TplCameraRoll        = "camera-roll"
+	TplShopShots         = "shop-shots"
+	TplStoryboard        = "storyboard"
+	TplMeetingMinutes    = "meeting-minutes"
+	TplLinkToNotes       = "link-to-notes"
+	TplHighlightReel     = "highlight-reel"
+	TplReactionGIF       = "reaction-gif"
+	TplNarratedSlideshow = "narrated-slideshow"
+	TplSongEverything    = "song-everything"
+	TplVerticalCut       = "vertical-cut"
+
+	// Phase 13: Local File Transfer.
+	TplSendToMyComputer = "send-to-my-computer"
 )
 
 // Templates returns the built-in templates in gallery order (SPEC.md §10).
 func Templates() []core.PipelineTemplate {
-	return []core.PipelineTemplate{
-		socialClip(), podcast(), sampling(), karaoke(), productPhotos(), paperArchive(),
-		foreignVideo(), receipts(), lecture(), beforeSharing(), musicVideo(),
+	all := []core.PipelineTemplate{
+		socialClip(), podcast(), sampling(), karaoke(), productPhotos(), paperArchive(), paperToWord(),
+		foreignVideo(), receipts(), lecture(), beforeSharing(), musicVideo(), readingList(),
+		readItToMe(), audiobook(), tightLecture(), podcastPolish(), cameraRoll(), shopShots(), storyboard(),
+		meetingMinutes(), linkToNotes(), highlightReel(), reactionGIF(), narratedSlideshow(), songEverything(), verticalCut(),
+		sendToMyComputer(),
 	}
+	for i := range all {
+		all[i].Group = templateGroups[all[i].ID]
+	}
+	return all
+}
+
+// templateGroups puts every template in the gallery's "Practical" or "Just
+// cool" section (Phase 15). A template missing here fails the tests.
+var templateGroups = map[string]string{
+	TplSocialClip: core.TemplateGroupCool, TplSampling: core.TemplateGroupCool, TplKaraoke: core.TemplateGroupCool,
+	TplMusicVideo: core.TemplateGroupCool, TplHighlightReel: core.TemplateGroupCool, TplReactionGIF: core.TemplateGroupCool,
+	TplNarratedSlideshow: core.TemplateGroupCool, TplSongEverything: core.TemplateGroupCool, TplVerticalCut: core.TemplateGroupCool,
+
+	TplPodcast: core.TemplateGroupPractical, TplProductPhotos: core.TemplateGroupPractical, TplPaperArchive: core.TemplateGroupPractical,
+	TplPaperToWord: core.TemplateGroupPractical, TplForeignVideo: core.TemplateGroupPractical, TplReceipts: core.TemplateGroupPractical,
+	TplLecture: core.TemplateGroupPractical, TplBeforeSharing: core.TemplateGroupPractical, TplReadingList: core.TemplateGroupPractical,
+	TplReadItToMe: core.TemplateGroupPractical, TplAudiobook: core.TemplateGroupPractical, TplTightLecture: core.TemplateGroupPractical,
+	TplPodcastPolish: core.TemplateGroupPractical, TplCameraRoll: core.TemplateGroupPractical, TplShopShots: core.TemplateGroupPractical,
+	TplStoryboard: core.TemplateGroupPractical, TplMeetingMinutes: core.TemplateGroupPractical, TplLinkToNotes: core.TemplateGroupPractical,
+	TplSendToMyComputer: core.TemplateGroupPractical,
 }
 
 // NewStepID returns 8 random characters from [a-z0-9].

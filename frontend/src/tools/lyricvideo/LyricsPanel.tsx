@@ -74,7 +74,7 @@ export default function LyricsPanel() {
       }),
     );
   };
-  const onGet = () => (st().canUndo ? setConfirm(true) : run());
+  const onGet = () => (st().history.past.length > 0 ? setConfirm(true) : run());
   if (!songPath) return null;
 
   return (

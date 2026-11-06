@@ -65,7 +65,7 @@ describe("MidiView", () => {
     await user.click(screen.getByRole("button", { name: /Advanced/ }));
     await user.click(await screen.findByRole("switch", { name: "Melodia trick" }));
     await user.click(screen.getByRole("button", { name: "Add files…" }));
-    const btn = await screen.findByRole("button", { name: /Transcribe 1 file/ });
+    const btn = await screen.findByRole("button", { name: /Make MIDI/ });
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
     await user.click(btn);
     await waitFor(() => expect(enqueue).toHaveBeenCalledWith(["/a.wav"], { ...DEFAULT_MIDI_OPTIONS, range: "bass", melodiaTrick: false }));
@@ -85,7 +85,7 @@ describe("MidiView", () => {
     const user = userEvent.setup();
     render(<MidiView moduleId="audio-to-midi" />);
     await user.click(await screen.findByRole("button", { name: "Add files…" }));
-    const btn = await screen.findByRole("button", { name: /Transcribe 1 file/ });
+    const btn = await screen.findByRole("button", { name: /Make MIDI/ });
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
     await user.click(btn);
     expect(await screen.findByText("Too long")).toBeTruthy();
@@ -108,11 +108,11 @@ describe("MidiView", () => {
     const user = userEvent.setup();
     render(<MidiView moduleId="audio-to-midi" />);
     await user.click(await screen.findByRole("button", { name: "Add files…" }));
-    await screen.findByRole("button", { name: /Transcribe 1 file/ });
+    await screen.findByRole("button", { name: /Make MIDI/ });
     await user.click(screen.getByRole("button", { name: /Split into stems first/ }));
     expect(await screen.findByText("stems of /a.wav")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Use this stem" }));
-    const btn = await screen.findByRole("button", { name: /Transcribe 1 file/ });
+    const btn = await screen.findByRole("button", { name: /Make MIDI/ });
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
     await user.click(btn);
     await waitFor(() => expect(enqueue).toHaveBeenCalledWith(["/vocals.flac"], expect.anything()));

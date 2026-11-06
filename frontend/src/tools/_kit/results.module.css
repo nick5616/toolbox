@@ -34,6 +34,8 @@
 
 .meta {
   flex: none;
+  min-width: 56px;
+  text-align: right;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--fg-subtle);
@@ -54,4 +56,101 @@
 .missing .name,
 .missing .icon {
   opacity: 0.5;
+}
+
+/* Result rows (Phase 14): Reveal and Open show on hover or focus; Send to is always visible. */
+.hoverActions {
+  display: inline-flex;
+  opacity: 0;
+  transition: opacity var(--dur-fast, 120ms);
+}
+
+:global([data-result-row]):hover .hoverActions,
+:global([data-result-row]):focus-within .hoverActions,
+.hoverActions:focus-within {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .hoverActions {
+    opacity: 1;
+  }
+}
+
+.resultRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--row-h);
+  padding: 0 var(--space-2);
+  border-radius: var(--r-md);
+  cursor: default;
+}
+
+.resultRow:hover,
+.resultRow:focus-visible,
+.resultRow:focus-within {
+  background: var(--bg-hover);
+}
+
+.resultRow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.resultRow .rowActions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.nameCol {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-md);
+}
+
+.failed {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+}
+
+.failedBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.failedTitle {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.failedMsg {
+  font-size: var(--text-xs);
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+
+.failedHint {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.failedList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
 }

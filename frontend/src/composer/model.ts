@@ -80,7 +80,7 @@ export function newImageLayer(path: string, natW: number, natH: number, doc: Pic
   const w = Math.min(0.6 * doc.width, (0.6 * doc.height * nw) / nh);
   return {
     id: newLayerId(), kind: "image", name: baseName(path) || "Photo", hidden: false, locked: false,
-    x: 0.5, y: 0.5, size: w / doc.width, rotation: 0, flipX: false, opacity: 1,
+    x: 0.5, y: 0.5, size: w / doc.width, rotation: 0, flipX: false, opacity: 1, slot: false,
     image: { ref: { path, original: "" }, crop: { x: 0, y: 0, w: 1, h: 1 }, radius: 0 },
     text: null, shadow: defaultShadow(), outline: defaultOutline(), look: { ...NO_LOOK },
   };
@@ -90,7 +90,7 @@ export function newTextLayer(doc: Pick<Composition, "width" | "height">): Compos
   void doc;
   return {
     id: newLayerId(), kind: "text", name: "Text", hidden: false, locked: false,
-    x: 0.5, y: 0.5, size: 0.08, rotation: 0, flipX: false, opacity: 1,
+    x: 0.5, y: 0.5, size: 0.08, rotation: 0, flipX: false, opacity: 1, slot: false,
     image: null,
     text: { text: "Text", font: "Arial", bold: true, italic: false, color: "#111111", align: "center", lineHeight: 1.2, pill: "" },
     shadow: defaultShadow(), outline: defaultOutline(), look: { ...NO_LOOK },
@@ -136,7 +136,7 @@ function cleanLayer(v: unknown): ComposerLayer | null {
     hidden: bool(v.hidden, false), locked: bool(v.locked, false),
     x: num(v.x, 0.5, -2, 3), y: num(v.y, 0.5, -2, 3),
     size: num(v.size, kind === "text" ? 0.08 : 0.4, 0.005, kind === "text" ? 1 : 5),
-    rotation: num(v.rotation, 0, -3600, 3600), flipX: bool(v.flipX, false), opacity: num(v.opacity, 1, 0, 1),
+    rotation: num(v.rotation, 0, -3600, 3600), flipX: bool(v.flipX, false), opacity: num(v.opacity, 1, 0, 1), slot: bool(v.slot, false),
     shadow: {
       on: bool(sh.on, false), blur: num(sh.blur, 0.02, 0, 0.5), offsetX: num(sh.offsetX, 0, -0.5, 0.5),
       offsetY: num(sh.offsetY, 0.008, -0.5, 0.5), opacity: num(sh.opacity, 0.35, 0, 1), color: hex(sh.color, "#000000"),

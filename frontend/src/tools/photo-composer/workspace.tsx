@@ -20,6 +20,8 @@ export type ComposerBridgeValues = {
   projectId: string | null;
   name: string;
   doc: Composition | null;
+  /** The drag in progress (about 30 fps), so popped-out windows follow it. */
+  live: Composition | null;
   undoDepth: number;
   redoDepth: number;
   saveState: SaveState;
@@ -70,6 +72,7 @@ export function pickComposerValues(s: ComposerState): ComposerBridgeValues {
     projectId: s.projectId,
     name: s.name,
     doc: s.history?.present ?? null,
+    live: s.liveOut,
     undoDepth: s.history?.past.length ?? 0,
     redoDepth: s.history?.future.length ?? 0,
     saveState: s.saveState,
@@ -128,6 +131,6 @@ export const composerWorkspace = defineWorkspace<ComposerState, ComposerBridgeVa
     { id: "background", title: "Background", icon: "paint-bucket", tip: "What shows behind all the layers", component: BackgroundPanelView, drawerWidth: 380, width: 380, height: 640 },
     { id: "canvas", title: "Canvas", icon: "frame", tip: "The shape, size and file type of the finished picture", component: CanvasPanelView, drawerWidth: 360, width: 360, height: 360 },
   ],
-  preview: { title: "Canvas", icon: "image", tip: "The live canvas in its own window", component: ComposerPreview, width: 900, height: 900 },
+  preview: { title: "Canvas", icon: "image", tip: "The live canvas in its own window", component: ComposerPreview, width: 900, height: 900, mirror: true },
   useReplica,
 });

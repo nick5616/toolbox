@@ -90,3 +90,15 @@ describe("drops in pop-out windows", () => {
     }
   });
 });
+
+describe("custom drop targets (Phase 13)", () => {
+  it("hands a drop on a claimed target to its handler and nothing else", async () => {
+    const { registerDropTarget } = await import("@/lib/dropTargets");
+    const got: Array<[string, string[]]> = [];
+    const off = registerDropTarget("lan-device:", (fp, paths) => got.push([fp, paths]));
+    routeFilesDropped({ paths: ["/a.jpg"], targetId: "lan-device:abc", window: "", result: { matches: null, unmatched: null } });
+    off();
+    routeFilesDropped({ paths: ["/b.jpg"], targetId: "lan-device:abc", window: "", result: { matches: null, unmatched: null } });
+    expect(got).toEqual([["abc", ["/a.jpg"]]]);
+  });
+});

@@ -90,6 +90,41 @@ type RenderPlan struct {
 	ImagePath string      `json:"imagePath"` // optional still background texture
 	Seed      int64       `json:"seed"`
 	Edit      *EditPlan   `json:"edit"` // non-nil: an Edit Studio render (ShowJSON is "") (Phase 9 §12.2)
+
+	// Headless requests for pipeline steps (Phase 14 A2). At most one of Edit,
+	// Composition and Recipe is set. The main window's RenderHost answers
+	// Composition and Recipe itself with a single file, not a video stream.
+	Composition *CompositionPlan `json:"composition"` // render a Photo Composer document to a still
+	Recipe      *RecipePlan      `json:"recipe"`      // build an edit from an auto-fill recipe (JSON result)
+}
+
+// CompositionPlan asks the host to render a Photo Composer document
+// (frontend/src/composer/render.ts on an OffscreenCanvas). The RenderPlan's
+// Width and Height are the output size in pixels.
+type CompositionPlan struct {
+	DocumentJSON string  `json:"documentJson"` // composer.Composition
+	Format       string  `json:"format"`       // "png" | "jpg"
+	Scale        float64 `json:"scale"`        // output pixels per document pixel
+}
+
+// RecipePlan asks the host to run an auto-fill recipe on an edit and return
+// the filled project as JSON. The plan's Analysis points at the song's
+// analysis.
+type RecipePlan struct {
+	ProjectJSON string         `json:"projectJson"` // editstudio.EditProject with the song, analysis key and an empty video track
+	RecipeID    string         `json:"recipeId"`
+	Seed        int64          `json:"seed"`
+	Order       string         `json:"order"` // "recipe" | "sequential" | "shuffleNoRepeat" | "byTag"
+	Sources     []RecipeSource `json:"sources"`
+}
+
+// RecipeSource is one clip or photo the recipe may use.
+type RecipeSource struct {
+	Path       string   `json:"path"`
+	Kind       string   `json:"kind"` // "video" | "image"
+	DurationMs int64    `json:"durationMs"`
+	Tags       []string `json:"tags"`
+	Shots      []int64  `json:"shots"` // null = not made
 }
 
 // EditPlan is everything an Edit Studio render needs besides the analysis
@@ -111,7 +146,7 @@ type EditPlanStream struct {
 // RenderOutput is the elementary stream the renderer produced in TempDir.
 type RenderOutput struct {
 	Path    string `json:"path"`
-	Codec   string `json:"codec"` // "h264" | "mjpeg"
+	Codec   string `json:"codec"` // "h264" | "mjpeg"; single files: "png" | "jpeg" | "json"
 	Frames  int    `json:"frames"`
 	Encoder string `json:"encoder"` // "h264-hw" | "h264-sw" | "jpeg"
 }
@@ -128,6 +163,7 @@ type RenderStart struct {
 	Token   string `json:"token"`
 	PlanURL string `json:"planUrl"`
 	JobID   string `json:"jobId"`
+	Kind    string `json:"kind"` // "" (a video stream), "composition" or "recipe": the host answers those itself
 }
 
 // RenderAck is the payload of the viz:render-ack event.

@@ -14,8 +14,11 @@ export type {
     ImageRef,
     Layer,
     Look,
+    Options,
     Outline,
     Rect,
     Shadow,
+    SlotInfo,
+    StepOptions,
     TextLayer
 } from "./models.js";

@@ -7,13 +7,14 @@ const installEngine = vi.fn();
 const updateExiftool = vi.fn();
 const writeText = vi.fn().mockResolvedValue(undefined);
 const installUpscaler = vi.hoisted(() => vi.fn());
+const installFfmpeg = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
   return {
     ...actual,
     FilesService: { Stat: (p: string[]) => stat(p), Pick: (m: string) => pick(m) },
-    DepsService: { InstallAudioEngine: () => installEngine(), UpdateExiftool: () => updateExiftool(), InstallUpscaler: () => installUpscaler() },
+    DepsService: { InstallAudioEngine: () => installEngine(), UpdateExiftool: () => updateExiftool(), InstallUpscaler: () => installUpscaler(), InstallFFmpeg: () => installFfmpeg() },
     SettingsService: { ModuleState: vi.fn().mockResolvedValue(""), SetModuleState: vi.fn().mockResolvedValue(undefined) },
   };
 });
@@ -26,6 +27,7 @@ import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
 import { DepsGate, useDepsGate } from "./DepsGate";
 import { ResultTable, toCsv, type ResultColumn } from "./ResultTable";
+import { useFileInputsStore } from "./fileInputsStore";
 import { useFileInputs } from "./useFileInputs";
 
 function mod(over: Partial<Descriptor> = {}): Descriptor {
@@ -58,6 +60,7 @@ beforeEach(() => {
   installEngine.mockReset();
   useModules.getState().setAll([mod()]);
   useUI.setState({ handoff: null });
+  useFileInputsStore.getState().reset();
   useDeps.getState().setAll([]);
   useJobs.getState().setAll([]);
   Object.assign(navigator, { clipboard: { writeText } });
@@ -162,12 +165,15 @@ describe("DepsGate", () => {
     expect(result.current.blocked).toBe(false);
   });
 
-  it("shows an ffmpeg hint", () => {
+  it("offers a real FFmpeg install button", async () => {
     useModules.getState().setAll([mod({ requires: ["ffmpeg", "ffprobe"] })]);
     useDeps.getState().setAll([dep("ffmpeg", DepState.DepMissing), dep("ffprobe", DepState.DepMissing)]);
     render(<DepsGate moduleId="stems" />);
     expect(screen.getByText("ffmpeg is required")).toBeTruthy();
-    expect(screen.getByText("brew install x")).toBeTruthy();
+    expect(screen.queryByText("brew install x")).toBeNull();
+    installFfmpeg.mockResolvedValue({ id: "j-ff", moduleId: "system-ffmpeg-install", status: "queued", inputs: null, outputs: null });
+    fireEvent.click(screen.getByRole("button", { name: "Install FFmpeg" }));
+    await waitFor(() => expect(installFfmpeg).toHaveBeenCalledTimes(1));
   });
 });
 

@@ -52,6 +52,21 @@ func (r *Runner) snapshotPipes() []core.Pipeline {
 
 func clonePipeline(p core.Pipeline) core.Pipeline {
 	p.Steps = cloneSteps(p.Steps)
+	params := make([]core.PipelineParam, len(p.Params))
+	for i, pp := range p.Params {
+		pp.Choices = append([]string{}, pp.Choices...)
+		params[i] = pp
+	}
+	p.Params = params
+	return p
+}
+
+// canonSteps rewrites aliased step types (the old "pipelines.chat") to their
+// canonical IDs, so the UI only ever sees one.
+func (r *Runner) canonSteps(p core.Pipeline) core.Pipeline {
+	for i := range p.Steps {
+		p.Steps[i].Type = r.canonicalType(p.Steps[i].Type)
+	}
 	return p
 }
 
@@ -66,9 +81,9 @@ func (r *Runner) List() []core.PipelineEntry {
 }
 
 func (r *Runner) entry(p core.Pipeline) core.PipelineEntry {
-	p = clonePipeline(p)
+	p = r.canonSteps(clonePipeline(p))
 	check := r.Describe(p)
-	e := core.PipelineEntry{Pipeline: p, Check: check, Watch: r.watchState(p, check)}
+	e := core.PipelineEntry{Pipeline: p, Check: check, Watch: r.watchState(p, check), Clip: r.clipState(p, check)}
 	r.pmu.RLock()
 	if b, ok := r.lastRun[p.ID]; ok {
 		b := b
@@ -86,7 +101,7 @@ func (r *Runner) emitPipelines() {
 func (r *Runner) Get(id string) (core.Pipeline, error) {
 	for _, p := range r.snapshotPipes() {
 		if p.ID == id {
-			return clonePipeline(p), nil
+			return r.canonSteps(clonePipeline(p)), nil
 		}
 	}
 	return core.Pipeline{}, core.Errorf(core.CodeNotFound, "Pipeline not found")
@@ -145,6 +160,7 @@ func (r *Runner) normalize(p *core.Pipeline, others []core.Pipeline) error {
 		if s.Type == "" {
 			return fieldErr("steps", fmt.Sprintf("Step %d has no type", i+1))
 		}
+		s.Type = r.canonicalType(s.Type)
 		if utf8.RuneCountInString(s.Label) > 60 {
 			return fieldErr("steps", fmt.Sprintf("Step %d: the title is too long (60 characters at most)", i+1))
 		}
@@ -157,6 +173,9 @@ func (r *Runner) normalize(p *core.Pipeline, others []core.Pipeline) error {
 		if !json.Valid([]byte(s.OptionsJSON)) {
 			return fieldErr("steps", fmt.Sprintf("Step %d: the options aren't valid JSON", i+1))
 		}
+		if msg := bindsProblem(s.Binds); msg != "" {
+			return fieldErr("steps", fmt.Sprintf("Step %d: %s", i+1, msg))
+		}
 		total += len(s.OptionsJSON)
 		if s.From != FromInput && s.From != FromNone && !earlier[s.From] {
 			return fieldErr("steps", fmt.Sprintf("Step %d must read from the input, nothing, or an earlier step", i+1))
@@ -168,6 +187,18 @@ func (r *Runner) normalize(p *core.Pipeline, others []core.Pipeline) error {
 	}
 	if total > MaxOptionsBytes {
 		return fieldErr("steps", "The steps' options are too big (1 MiB at most)")
+	}
+	if msg := paramsProblem(p.Params); msg != "" {
+		return fieldErr("params", msg)
+	}
+	for i := range p.Params {
+		p.Params[i].Label = strings.TrimSpace(p.Params[i].Label)
+	}
+	if err := normalizeClip(&p.Clip); err != nil {
+		return err
+	}
+	if cyc := cycleThrough(*p, others); len(cyc) > 0 {
+		return fieldErr("steps", "A pipeline can't run itself: "+strings.Join(cyc, " → "))
 	}
 	return nil
 }

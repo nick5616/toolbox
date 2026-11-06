@@ -145,6 +145,12 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 	if sink.err != nil {
 		return sink.err
 	}
+	if o.Note != "" {
+		if res.Warning != "" {
+			res.Warning += " · "
+		}
+		res.Warning += o.Note
+	}
 	result := Result{Regions: res.Regions, Warning: res.Warning, Outputs: []string{}}
 	if res.Output != "" {
 		result.Outputs = append(result.Outputs, res.Output)

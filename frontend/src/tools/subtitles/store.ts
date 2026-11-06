@@ -662,6 +662,67 @@ function initialDataKeepingStatic(s: SubtitlesState): SubtitlesData {
   };
 }
 
+/** What a replica needs of a track: the cues and how many undo/redo steps the host holds (never the steps). */
+export interface EditorViewTab {
+  id: string;
+  label: string;
+  language: string;
+  rows: CueRow[];
+  savedKey: string;
+  savedPath?: string;
+  undoCount: number;
+  redoCount: number;
+}
+
+export interface EditorView {
+  tabs: EditorViewTab[];
+  activeId: string;
+}
+
+const viewCache = new WeakMap<EditorState, EditorView>();
+
+/** The editor without its undo history (same object for the same editor state, so the bridge's reference check holds). */
+export function editorView(e: EditorState): EditorView {
+  let v = viewCache.get(e);
+  if (!v) {
+    v = {
+      activeId: e.activeId,
+      tabs: e.tabs.map((t) => ({
+        id: t.id,
+        label: t.label,
+        language: t.language,
+        rows: t.history.present,
+        savedKey: t.savedKey,
+        savedPath: t.savedPath,
+        undoCount: t.history.past.length,
+        redoCount: t.history.future.length,
+      })),
+    };
+    viewCache.set(e, v);
+  }
+  return v;
+}
+
+/** A replica's editor from the host's view: undo/redo only count (actions run on the host). */
+export function editorFromView(v: EditorView): EditorState {
+  return {
+    activeId: v.activeId,
+    tabs: v.tabs.map((t) => ({
+      id: t.id,
+      label: t.label,
+      language: t.language,
+      savedKey: t.savedKey,
+      savedPath: t.savedPath,
+      history: {
+        past: new Array<CueRow[]>(t.undoCount).fill(t.rows),
+        present: t.rows,
+        future: new Array<CueRow[]>(t.redoCount).fill(t.rows),
+        lastAt: 0,
+      },
+    })),
+  };
+}
+
 /** The values mirrored into part windows (each key compared by reference). */
 export function bridgedValues(s: SubtitlesState) {
   return {
@@ -669,7 +730,7 @@ export function bridgedValues(s: SubtitlesState) {
     mediaPath: s.mediaPath,
     subPath: s.subPath,
     loadError: s.loadError,
-    editor: s.editor,
+    editorView: editorView(s.editor),
     selectedId: s.selectedId,
     focusId: s.focusId,
     playheadMs: s.playheadMs,

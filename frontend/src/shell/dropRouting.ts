@@ -1,9 +1,12 @@
+import { isCustomDropTarget, routeCustomDrop } from "@/lib/dropTargets";
 import { toast } from "@/components";
 import type { FilesDropped } from "@/lib/api";
 import { acceptsPath } from "@/tools/_kit/accepts";
 import { isReady, useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
 import { currentWindow } from "@/lib/windows";
+import { ModulesService } from "@/lib/api";
+import { hasPaths, readPaths } from "@/lib/fileDrag";
 // --- pipelines ---
 import { PipelinesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -42,7 +45,7 @@ function routePipelineDrop(id: string, paths: string[]): void {
   }
   const name = entry.pipeline.name;
   const skipped = paths.length - accepted.length;
-  PipelinesService.Start({ pipelineId: id, inputs: accepted, secrets: {} })
+  PipelinesService.Start({ pipelineId: id, inputs: accepted, secrets: {}, params: {} })
     .then((run) => {
       usePipelines.getState().upsertRun(run);
       toast({
@@ -133,6 +136,7 @@ export function routeFilesDropped(d: FilesDropped): void {
   if (!ownsDrop(d)) return;
   const ui = useUI.getState();
   const target = d.targetId ?? "";
+  if (target && routeCustomDrop(target, d.paths ?? [])) return;
   // --- pipelines ---
   if (target.startsWith(PIPELINE_DROP_PREFIX)) {
     routePipelineDrop(target.slice(PIPELINE_DROP_PREFIX.length), d.paths ?? []);
@@ -159,3 +163,119 @@ export function routeFilesDropped(d: FilesDropped): void {
   if (handToTool(ui.view, paths)) return;
   ui.setDrop(d);
 }
+
+// --- in-app drags (Phase 14 §1.B) ---
+const ACTIVE_CLASS = "file-drop-target-active";
+/** Set on <html> while an in-app file drag is over the window: "target" over a drop target, "free" elsewhere. */
+export const IN_APP_DRAG_ATTR = "data-inapp-drag";
+
+/** The nearest `[data-file-drop-target]` element around an event target, or null. */
+export function dropTargetOf(t: EventTarget | null): HTMLElement | null {
+  return t instanceof Element ? t.closest<HTMLElement>("[data-file-drop-target]") : null;
+}
+
+/** Routes files from an in-app drag exactly like an OS drop on the element with this id ("" = none). */
+export function routeInAppDrop(targetId: string, paths: string[]): void {
+  const key = currentWindow().key;
+  const base = { paths, targetId, window: key === "main" ? "" : key };
+  const direct = [TOOL_DROP_PREFIX, PIPELINE_DROP_PREFIX, PIPELINE_RUN_PREFIX].some((p) => targetId.startsWith(p)) || isCustomDropTarget(targetId);
+  if (direct) {
+    routeFilesDropped({ ...base, result: { matches: null, unmatched: null } });
+    return;
+  }
+  // The chooser needs the match list the OS-drop path gets from Go.
+  ModulesService.Match(paths).then(
+    (result) => routeFilesDropped({ ...base, result }),
+    () => routeFilesDropped({ ...base, result: { matches: null, unmatched: null } }),
+  );
+}
+
+/** True inside a WebView2 (Windows) window. */
+function isWebView2(): boolean {
+  const w = window as Window & { chrome?: { webview?: unknown } };
+  return w.chrome?.webview !== undefined;
+}
+
+/**
+ * Document-level handling of in-app drags (`hasPaths`). OS drags (type
+ * "Files") are never touched, so Wails keeps routing those natively. A drag
+ * between windows carries no data (HTML5 drag stays inside one webview), so
+ * it simply does nothing. Returns the uninstall function.
+ */
+export function installInAppDrops(doc: Document = document): () => void {
+  let active: HTMLElement | null = null;
+  const setActive = (el: HTMLElement | null) => {
+    if (active === el) return;
+    active?.classList.remove(ACTIVE_CLASS);
+    el?.classList.add(ACTIVE_CLASS);
+    active = el;
+  };
+  const clear = () => {
+    setActive(null);
+    doc.documentElement.removeAttribute(IN_APP_DRAG_ATTR);
+  };
+  const over = (e: DragEvent) => {
+    if (!hasPaths(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    const t = dropTargetOf(e.target);
+    setActive(t);
+    doc.documentElement.setAttribute(IN_APP_DRAG_ATTR, t ? "target" : "free");
+  };
+  const leave = (e: DragEvent) => {
+    if (e.relatedTarget === null && hasPaths(e)) clear();
+  };
+  const drop = (e: DragEvent) => {
+    if (!hasPaths(e)) return;
+    e.preventDefault();
+    const t = dropTargetOf(e.target);
+    clear();
+    const paths = readPaths(e);
+    if (!paths || paths.length === 0) return;
+    routeInAppDrop(t?.id ?? "", paths);
+  };
+  const key = (e: KeyboardEvent) => {
+    if (e.key === "Escape") clearAll();
+  };
+  // Leftover highlights: on Windows the Wails runtime ignores the dragleave of
+  // an OS drag that leaves the window (relatedTarget is null), so the
+  // highlight (and the full-window "Drop files" hint on #app-root) stayed
+  // until the next drop. Pointer events never fire during a drag, so the next
+  // mouse move or click after a drag clears anything still marked.
+  const marked = doc.getElementsByClassName(ACTIVE_CLASS);
+  const clearAll = () => {
+    for (const el of Array.from(marked)) el.classList.remove(ACTIVE_CLASS);
+    active = null;
+    doc.documentElement.removeAttribute(IN_APP_DRAG_ATTR);
+  };
+  const stale = () => {
+    if (marked.length > 0 || doc.documentElement.hasAttribute(IN_APP_DRAG_ATTR)) clearAll();
+  };
+  const leaveWindow = (e: DragEvent) => {
+    // An OS file drag leaving a WebView2 window (Windows only: on macOS/Linux
+    // this event is spurious and the native side reports leaves itself).
+    if (!e.relatedTarget && isWebView2() && e.dataTransfer?.types.includes("Files")) clearAll();
+  };
+  doc.addEventListener("dragenter", over);
+  doc.addEventListener("dragover", over);
+  doc.addEventListener("dragleave", leave);
+  doc.addEventListener("drop", drop);
+  doc.addEventListener("dragend", clear);
+  doc.addEventListener("keydown", key);
+  doc.addEventListener("dragleave", leaveWindow);
+  doc.addEventListener("pointermove", stale);
+  doc.addEventListener("pointerdown", stale);
+  return () => {
+    doc.removeEventListener("dragenter", over);
+    doc.removeEventListener("dragover", over);
+    doc.removeEventListener("dragleave", leave);
+    doc.removeEventListener("drop", drop);
+    doc.removeEventListener("dragend", clear);
+    doc.removeEventListener("keydown", key);
+    doc.removeEventListener("dragleave", leaveWindow);
+    doc.removeEventListener("pointermove", stale);
+    doc.removeEventListener("pointerdown", stale);
+    clear();
+  };
+}
+// --- end in-app drags ---

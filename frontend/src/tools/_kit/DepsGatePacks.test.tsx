@@ -3,10 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ InstallFor: vi.fn(), Install: vi.fn(), Relaunch: vi.fn() }));
+const chat = vi.hoisted(() => ({ Catalog: vi.fn(), DownloadModel: vi.fn() }));
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
-  return { ...actual, PacksService: api };
+  return { ...actual, PacksService: api, ChatService: chat };
 });
 
 import { DepSource, DepState, PackState, type DepStatus } from "@/lib/api";
@@ -66,8 +67,35 @@ describe("DepsGate pack buttons", () => {
     await waitFor(() => expect(api.InstallFor).toHaveBeenCalledWith("bgremove"));
     await user.click(whole);
     await waitFor(() => expect(api.Install).toHaveBeenCalledWith(["image"], ""));
-    // The existing per-dependency banner is still there.
-    expect(screen.getByText("The AI engine isn't installed")).toBeTruthy();
+    // One banner names what is missing and carries the pack buttons (polish rule 3).
+    expect(screen.getByText(/isn.t installed$/)).toBeTruthy();
+  });
+
+  it("shows one button when the pack is exactly what the tool needs", async () => {
+    const M = PackComponentState.ComponentMissing;
+    const same = [pack("image", "Image", PackState.PackMissing, [comp("engine", M, 1600e6, ["image"]), comp("bg-default", M, 220e6, ["image"], PackComponentKind.ComponentModel)], ["bgremove"])];
+    usePacks.setState({ list: same, byId: { image: same[0]! }, loaded: true });
+    const user = userEvent.setup();
+    render(<DepsGate moduleId="bgremove" />);
+    expect(screen.getAllByRole("button", { name: /Install/ })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /Install the Image pack/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Install what this tool needs (1.8 GB)" }));
+    await waitFor(() => expect(api.InstallFor).toHaveBeenCalledWith("bgremove"));
+  });
+
+  it("downloads the default chat model along with Local Chat's engine", async () => {
+    chat.Catalog.mockReset().mockResolvedValue([{ id: "m1", isDefault: true, installed: false, ollama: false, jobId: "" }]);
+    chat.DownloadModel.mockReset().mockResolvedValue({ id: "jm", moduleId: "system-chat-model", status: "queued", inputs: null, outputs: null });
+    useModules.setState({ byId: { "llm-chat": { id: "llm-chat", requires: ["llama-server"] } } } as unknown as Parameters<typeof useModules.setState>[0]);
+    useDeps.getState().setAll([dep("llama-server", DepState.DepMissing)]);
+    const M = PackComponentState.ComponentMissing;
+    const packs = [pack("chat", "Chat", PackState.PackMissing, [comp("llama-server", M, 100e6, ["chat"])], ["llm-chat"])];
+    usePacks.setState({ list: packs, byId: { chat: packs[0]! }, loaded: true });
+    const user = userEvent.setup();
+    render(<DepsGate moduleId="llm-chat" />);
+    await user.click(screen.getByRole("button", { name: /Install what this tool needs/ }));
+    await waitFor(() => expect(api.InstallFor).toHaveBeenCalledWith("llm-chat"));
+    await waitFor(() => expect(chat.DownloadModel).toHaveBeenCalledWith("m1"));
   });
 
   it("hides the buttons when the pack is unsupported", () => {

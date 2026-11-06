@@ -16,8 +16,17 @@ export interface FramedMediaProps {
   framing: Framing;
   /** When set the picture can be dragged (pan) and wheeled (zoom). */
   onFraming?: (next: Partial<Pick<Framing, "zoom" | "panX" | "panY">>) => void;
+  /**
+   * A pan drag reports here while it moves (not recorded) and then once on release
+   * with the final framing. Without these a drag calls `onFraming` on every move.
+   */
+  onFramingLive?: (next: Partial<Pick<Framing, "zoom" | "panX" | "panY">>) => void;
+  onFramingEnd?: (next: Partial<Pick<Framing, "zoom" | "panX" | "panY">>) => void;
   /** Shown when there is no picture. */
   placeholderIcon?: string;
+  /** A line under the placeholder icon (the "missing media" state). */
+  placeholderLabel?: string;
+  placeholderTone?: "warn";
   loading?: boolean;
   alt?: string;
   /** Size to fit the parent box (which must be a size container) instead of its width. */
@@ -30,10 +39,10 @@ export interface FramedMediaProps {
  * A picture cover-fitted into a frame of the post's shape with the slide's pan,
  * zoom and rotation, using the same window maths as the Go exporter.
  */
-export function FramedMedia({ url, aspect, framing, onFraming, placeholderIcon = "image", loading, alt = "", fit, className, children }: FramedMediaProps) {
+export function FramedMedia({ url, aspect, framing, onFraming, onFramingLive, onFramingEnd, placeholderIcon = "image", placeholderLabel, placeholderTone, loading, alt = "", fit, className, children }: FramedMediaProps) {
   const frame = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
-  const drag = useRef<{ id: number; x: number; y: number; panX: number; panY: number } | null>(null);
+  const drag = useRef<{ id: number; x: number; y: number; panX: number; panY: number; last: Partial<Pick<Framing, "panX" | "panY">> | null } | null>(null);
   const live = useRef({ framing, onFraming });
   live.current = { framing, onFraming };
 
@@ -61,16 +70,23 @@ export function FramedMedia({ url, aspect, framing, onFraming, placeholderIcon =
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!interactive || e.button !== 0) return;
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, panX: framing.panX, panY: framing.panY };
+    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, panX: framing.panX, panY: framing.panY, last: null };
   };
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d || d.id !== e.pointerId || !layout || !onFraming) return;
     const w = frame.current?.clientWidth ?? 0;
-    onFraming(panFromDrag(d, layout, e.clientX - d.x, e.clientY - d.y, w));
+    const next = panFromDrag(d, layout, e.clientX - d.x, e.clientY - d.y, w);
+    if (onFramingLive) {
+      d.last = next;
+      onFramingLive(next);
+    } else onFraming(next);
   };
   const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (drag.current?.id === e.pointerId) drag.current = null;
+    const d = drag.current;
+    if (d?.id !== e.pointerId) return;
+    drag.current = null;
+    if (onFramingLive && d.last) onFramingEnd?.(d.last);
   };
 
   return (
@@ -108,8 +124,9 @@ export function FramedMedia({ url, aspect, framing, onFraming, placeholderIcon =
           />
         </div>
       ) : (
-        <div className={styles.placeholder}>
+        <div className={cx(styles.placeholder, placeholderTone === "warn" && styles.warn)} role={placeholderLabel ? "img" : undefined} aria-label={placeholderLabel}>
           <Icon name={loading ? "loader" : placeholderIcon} size={20} />
+          {placeholderLabel && !loading && <span className={styles.placeholderLabel}>{placeholderLabel}</span>}
         </div>
       )}
       {children}

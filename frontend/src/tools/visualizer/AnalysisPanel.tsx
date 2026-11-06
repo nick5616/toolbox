@@ -258,6 +258,7 @@ export default function AnalysisPanel() {
             disabled={!!block.reason}
             data-tip={block.reason || "Analyse the song again with these options; finished stages are reused from the cache"}
             onClick={() => {
+              useVisualizer.setState({ restored: false }); // asked for: the stage runs by itself
               useVisualizer.getState().setAnalysis(null, null);
               close();
             }}

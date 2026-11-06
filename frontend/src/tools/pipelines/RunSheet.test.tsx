@@ -12,13 +12,14 @@ vi.mock("@/lib/api", async (orig) => {
   };
 });
 
+import { ValueType, type PipelineParam } from "@/lib/api";
 import { usePipelines } from "@/state/pipelines";
 import { RunSheet } from "./RunSheet";
 import { acc, check, entry, pipeline, step, stepCheck } from "./testFixtures";
 import { run } from "./RunGridFixtures";
 
-function setup(opts: { accepts?: ReturnType<typeof acc>; secrets?: { stepId: string; key: string; label: string }[]; inputs?: string[]; ready?: boolean } = {}) {
-  const p = pipeline("p1", [step("s1", "stems")], { name: "Stems" });
+function setup(opts: { accepts?: ReturnType<typeof acc>; secrets?: { stepId: string; key: string; label: string }[]; inputs?: string[]; ready?: boolean; params?: PipelineParam[] } = {}) {
+  const p = pipeline("p1", [step("s1", "stems")], { name: "Stems", params: opts.params ?? [] });
   const c = check([stepCheck("s1")], { accepts: opts.accepts ?? acc([".mp3", ".wav"], { urls: true }), secrets: opts.secrets ?? [], ready: opts.ready ?? true });
   usePipelines.setState({ entries: [entry(p, c)], runs: {}, runSheet: { pipelineId: "p1", inputs: opts.inputs ?? [] }, loaded: true });
   return render(<RunSheet pipelineId="p1" />);
@@ -44,7 +45,7 @@ describe("RunSheet", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Start" }));
     await waitFor(() => expect(h.start).toHaveBeenCalled());
-    expect(h.start).toHaveBeenCalledWith({ pipelineId: "p1", inputs: ["/a/song.mp3"], secrets: {} });
+    expect(h.start).toHaveBeenCalledWith({ pipelineId: "p1", inputs: ["/a/song.mp3"], secrets: {}, params: {} });
     await waitFor(() => expect(usePipelines.getState().runSheet).toBeNull());
     expect(usePipelines.getState().tab).toBe("runs");
     expect(usePipelines.getState().selectedRunId).toBe("r1");
@@ -80,7 +81,7 @@ describe("RunSheet", () => {
     expect(start.disabled).toBe(false);
     fireEvent.click(start);
     await waitFor(() => expect(h.start).toHaveBeenCalled());
-    expect(h.start).toHaveBeenCalledWith({ pipelineId: "p1", inputs: ["/a/song.mp3"], secrets: { "s1.password": "hunter2" } });
+    expect(h.start).toHaveBeenCalledWith({ pipelineId: "p1", inputs: ["/a/song.mp3"], secrets: { "s1.password": "hunter2" }, params: {} });
   });
 
   it("shows a Start error inline and keeps the sheet open", async () => {
@@ -109,5 +110,52 @@ describe("RunSheet", () => {
   it("blocks Start for a pipeline that isn't ready", () => {
     setup({ inputs: ["/a/song.mp3"], ready: false });
     expect((screen.getByRole("button", { name: "Start" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  describe("run parameters", () => {
+    const params: PipelineParam[] = [
+      { name: "title", label: "Title", type: ValueType.ValueText, default: "Hello", choices: [] },
+      { name: "speed", label: "Speed", type: ValueType.ValueNumber, default: "1.1", choices: [] },
+      { name: "loud", label: "Loud", type: ValueType.ValueToggle, default: "false", choices: [] },
+      { name: "voice", label: "Voice", type: ValueType.ValueChoice, default: "am_adam", choices: ["am_adam", "af_bella"] },
+      { name: "tint", label: "Tint", type: ValueType.ValueColor, default: "#112233", choices: [] },
+    ];
+
+    it("shows a field per parameter, fitting its type and pre-filled with the default", () => {
+      setup({ inputs: ["/a/song.mp3"], params });
+      const group = screen.getByRole("group", { name: "Run parameters" });
+      expect((within(group).getByRole("textbox", { name: "Title" }) as HTMLInputElement).value).toBe("Hello");
+      const speed = within(group).getByRole("spinbutton", { name: "Speed" }) as HTMLInputElement;
+      expect(speed.type).toBe("number");
+      expect(speed.value).toBe("1.1");
+      expect(within(group).getByRole("switch", { name: "Loud" }).getAttribute("aria-checked")).toBe("false");
+      expect((within(group).getByRole("combobox", { name: "Voice" }) as HTMLSelectElement).value).toBe("am_adam");
+      expect((within(group).getByRole("textbox", { name: "Tint" }) as HTMLInputElement).value).toBe("#112233");
+    });
+
+    it("sends every parameter with the edited values and the defaults of the rest", async () => {
+      setup({ inputs: ["/a/song.mp3"], params });
+      const group = screen.getByRole("group", { name: "Run parameters" });
+      fireEvent.change(within(group).getByRole("spinbutton", { name: "Speed" }), { target: { value: "1.5" } });
+      fireEvent.click(within(group).getByRole("switch", { name: "Loud" }));
+      fireEvent.change(within(group).getByRole("combobox", { name: "Voice" }), { target: { value: "af_bella" } });
+      fireEvent.click(screen.getByRole("button", { name: "Start" }));
+      await waitFor(() => expect(h.start).toHaveBeenCalled());
+      expect(h.start).toHaveBeenCalledWith({
+        pipelineId: "p1",
+        inputs: ["/a/song.mp3"],
+        secrets: {},
+        params: { title: "Hello", speed: "1.5", loud: "true", voice: "af_bella", tint: "#112233" },
+      });
+    });
+
+    it("disables Start while a colour isn't a colour", () => {
+      setup({ inputs: ["/a/song.mp3"], params });
+      const group = screen.getByRole("group", { name: "Run parameters" });
+      fireEvent.change(within(group).getByRole("textbox", { name: "Tint" }), { target: { value: "red" } });
+      expect(screen.getByRole("button", { name: "Start" }).getAttribute("aria-disabled")).toBe("true");
+      fireEvent.change(within(group).getByRole("textbox", { name: "Tint" }), { target: { value: "#abcdef" } });
+      expect(screen.getByRole("button", { name: "Start" }).getAttribute("aria-disabled")).toBeNull();
+    });
   });
 });

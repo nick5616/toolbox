@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"toolbox/core"
+	"toolbox/core/lan"
 	"toolbox/desktop/paste"
 )
 
@@ -17,6 +18,12 @@ type Clipboard interface {
 	State() core.ClipboardState
 	Pause() error
 	Resume() error
+}
+
+// LanReceiver is the slice of Local File Transfer the tray needs (*lan.Runtime fits).
+type LanReceiver interface {
+	State() lan.State
+	SetReceive(mode lan.ReceiveMode) error
 }
 
 // --- vault (VA1) ---
@@ -42,6 +49,11 @@ type Options struct {
 	// --- vault (VA1) ---
 	// Vault is optional; the tray shows "Lock vault" while it is unlocked.
 	Vault VaultLocker
+	// Lan is optional; the tray shows the receiving status with Stop/Start (Phase 13).
+	// main.go sets it to the lan runtime: `Lan: lanRT`.
+	Lan LanReceiver
+	// Focus is optional; the tray shows the session and the quit gate asks for friction (Phase 18).
+	Focus FocusEngine
 	// --- end vault ---
 	// DarkMode reports whether the effective UI theme is dark (popup background).
 	DarkMode func() bool

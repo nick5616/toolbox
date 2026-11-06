@@ -109,7 +109,7 @@ func TestVersionRegexes(t *testing.T) {
 
 func TestCatalogShape(t *testing.T) {
 	c := Catalog()
-	if len(c) != 9 {
+	if len(c) != 12 {
 		t.Fatalf("len=%d", len(c))
 	}
 	for _, sp := range c {
@@ -226,13 +226,13 @@ func TestDetectStates(t *testing.T) {
 	s.knownDirs = func() []string { return []string{sys} }
 
 	pre := s.List()
-	if len(pre) != 9 || pre[0].State != core.DepMissing || pre[0].InstallHint == "" || pre[0].RequiredBy == nil {
+	if len(pre) != 12 || pre[0].State != core.DepMissing || pre[0].InstallHint == "" || pre[0].RequiredBy == nil {
 		t.Fatalf("pre-detect list: %+v", pre[0])
 	}
 
 	// deno hang: shrink nothing; real 5s timeout applies.
 	got := s.Detect(context.Background())
-	if len(got) != 9 {
+	if len(got) != 12 {
 		t.Fatalf("len=%d", len(got))
 	}
 	if d := find(t, got, FFmpeg); d.State != core.DepOK || d.Version != "8.0" || d.Source != core.SourceKnownDir || d.CheckedAt == 0 {
@@ -251,7 +251,7 @@ func TestDetectStates(t *testing.T) {
 		t.Errorf("exiftool: %+v", d)
 	}
 	mu.Lock()
-	if len(events) != 1 || len(events[0].Deps) != 9 {
+	if len(events) != 1 || len(events[0].Deps) != 12 {
 		t.Errorf("events: %d", len(events))
 	}
 	mu.Unlock()

@@ -240,7 +240,7 @@ async function openPanel(user: User, name: string, launcher?: string) {
   return dialog;
 }
 
-const header = () => screen.getByRole("button", { name: /^Song: / }).closest("header") as HTMLElement;
+const header = () => screen.getByRole("button", { name: /^Song: / }).closest('[role="toolbar"][aria-label="Tool"]') as HTMLElement;
 const side = () => screen.getByRole("complementary");
 
 /** Runs "Paste lyrics" in the Lyrics panel and finishes the job with LINES. */
@@ -255,6 +255,9 @@ async function withLines(user: User, matched = 0.9) {
   await within(side()).findByLabelText("Line 3 text");
   return dialog;
 }
+
+/** The look/options saves (the session is saved under its own key). */
+const prefsCalls = () => (h.setState.mock.calls as Array<[string, string]>).filter(([k]) => k === "lyric-video");
 
 const startOf = (n: number) => (within(side()).getByLabelText(`Line ${n} start`) as HTMLInputElement).value;
 
@@ -298,10 +301,10 @@ describe("Lyric Video workspace", () => {
     expect(useLyricVideo.getState().songPath).toBe("/in/song.mp3");
   });
 
-  it("header: song chip, undo, redo, more, Render; rail: Song, Lyrics, Visuals, Look; stage and lines side", async () => {
+  it("header: song chip, undo, redo, more, Export; rail: Song, Lyrics, Visuals, Look; stage and lines side", async () => {
     await toWorkspace();
     const hd = within(header());
-    for (const name of ["Undo", "Redo", "More", "Render"]) expect(hd.getByRole("button", { name })).toBeTruthy();
+    for (const name of ["Undo", "Redo", "More", "Export"]) expect(hd.getByRole("button", { name })).toBeTruthy();
     const rail = within(screen.getByRole("navigation", { name: "Panels" }));
     for (const name of ["Song", "Lyrics", "Visuals", "Look"]) expect(rail.getByRole("button", { name })).toBeTruthy();
     expect(await screen.findByTestId("lyric-preview")).toBeTruthy();
@@ -467,8 +470,8 @@ describe("Lyric Video workspace", () => {
       expect(startOf(2)).toBe("0:04.000");
       await user.click(within(header()).getByRole("button", { name: "Redo" }));
       expect(startOf(2)).toBe("0:03.900");
-      await user.click(within(side()).getByRole("button", { name: "Undo" }));
-      expect(startOf(2)).toBe("0:04.000");
+      // The lines panel has no undo pair of its own: the header's is the document's one history.
+      expect(within(side()).queryByRole("button", { name: "Undo" })).toBeNull();
     });
 
     it("edits a start time and flags a line that goes out of order", async () => {
@@ -576,7 +579,7 @@ describe("Lyric Video workspace", () => {
     }
     const lastCall = () => h.analysisCalls.at(-1);
     const lastSaved = () =>
-      JSON.parse((h.setState.mock.calls.at(-1) as [string, string])[1]) as {
+      JSON.parse(prefsCalls().at(-1)![1]) as {
         visualsMode: string;
         look: { background: string; visuals: { showJson: string; stems: boolean } };
       };
@@ -716,8 +719,8 @@ describe("Lyric Video workspace", () => {
       expect(within(dialog).getByLabelText("Text colour")).toBeTruthy();
       expect(within(dialog).getByLabelText("Highlight colour")).toBeTruthy();
 
-      await waitFor(() => expect(h.setState).toHaveBeenCalled());
-      const [id, json] = h.setState.mock.calls.at(-1) as [string, string];
+      await waitFor(() => expect(prefsCalls().length).toBeGreaterThan(0));
+      const [id, json] = prefsCalls().at(-1)!;
       expect(id).toBe("lyric-video");
       const saved = JSON.parse(json) as { aspect: string; height: number; look: { showNext: boolean; visualizer: string; position: string; karaoke: boolean; title?: string } };
       expect(saved).toMatchObject({ aspect: "9:16", height: 720, look: { showNext: false, visualizer: "wave", position: "lower", karaoke: false } });
@@ -763,9 +766,9 @@ describe("Lyric Video workspace", () => {
       const user = userEvent.setup();
       await withLines(user);
       act(() => useLyricVideo.getState().setPreviewStartMs(2000));
-      const dialog = await openPanel(user, "Render", "Render");
+      const dialog = await openPanel(user, "Export", "Export");
       h.enqueue.mockResolvedValue([job({ id: "p1" })]);
-      await user.click(within(dialog).getByRole("button", { name: "Render 10 s preview" }));
+      await user.click(within(dialog).getByRole("button", { name: "Preview 10 s" }));
       await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(2));
       const popts = h.enqueue.mock.calls[1]?.[1] as { action: string; previewStartMs: number; lines: unknown[]; aspect: string; height: number };
       expect(popts).toMatchObject({ action: "preview", previewStartMs: 2000, aspect: "16:9", height: 1080 });
@@ -776,7 +779,7 @@ describe("Lyric Video workspace", () => {
       await waitFor(() => expect(h.open).toHaveBeenCalledWith("/cache/preview-p1.mp4"));
 
       h.enqueue.mockResolvedValue([job({ id: "r1" })]);
-      await user.click(within(dialog).getByRole("button", { name: "Render video" }));
+      await user.click(within(dialog).getByRole("button", { name: "Export video" }));
       await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(3));
       expect(h.enqueue.mock.calls[2]?.[1]).toMatchObject({ action: "render" });
       finish(
@@ -792,13 +795,13 @@ describe("Lyric Video workspace", () => {
     it("keeps its job when the panel is closed and opened again", async () => {
       const user = userEvent.setup();
       await withLines(user);
-      let dialog = await openPanel(user, "Render");
+      let dialog = await openPanel(user, "Export");
       h.enqueue.mockResolvedValue([job({ id: "r1" })]);
-      await user.click(within(dialog).getByRole("button", { name: "Render video" }));
+      await user.click(within(dialog).getByRole("button", { name: "Export video" }));
       await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(2));
       act(() => useJobs.getState().upsert(job({ id: "r1", status: JobStatus.JobRunning, progress: 0.2, message: "Rendering frames" }) as never));
       await user.click(within(dialog).getByRole("button", { name: "Close" }));
-      dialog = await openPanel(user, "Render");
+      dialog = await openPanel(user, "Export");
       expect(await within(dialog).findByText("Rendering frames")).toBeTruthy();
     });
 
@@ -806,17 +809,17 @@ describe("Lyric Video workspace", () => {
       const user = userEvent.setup();
       await withLines(user);
       act(() => useLyricVideo.getState().setPrefs((o) => ({ ...o, look: { ...o.look, background: "video" } })));
-      const dialog = await openPanel(user, "Render");
+      const dialog = await openPanel(user, "Export");
       expect(await within(dialog).findByText(/Choose a background file/)).toBeTruthy();
-      expect((within(dialog).getByRole("button", { name: "Render video" }) as HTMLButtonElement).disabled).toBe(true);
+      expect((within(dialog).getByRole("button", { name: "Export video" }) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it("shows a failed render", async () => {
       const user = userEvent.setup();
       await withLines(user);
-      const dialog = await openPanel(user, "Render");
+      const dialog = await openPanel(user, "Export");
       h.enqueue.mockResolvedValue([job({ id: "r1" })]);
-      await user.click(within(dialog).getByRole("button", { name: "Render video" }));
+      await user.click(within(dialog).getByRole("button", { name: "Export video" }));
       await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(2));
       act(() => useJobs.getState().upsert(job({ id: "r1", status: JobStatus.JobFailed, error: "FFmpeg failed" }) as never));
       expect(await within(dialog).findByText("FFmpeg failed")).toBeTruthy();
@@ -827,13 +830,13 @@ describe("Lyric Video workspace", () => {
       useDeps.getState().setAll([dep("ffmpeg", DepState.DepOK), dep("ffprobe", DepState.DepOK), dep("audio-engine", DepState.DepMissing)]);
       await toWorkspace();
       act(() => useLyricVideo.getState().resetSheet(toRows(LINES)));
-      let dialog = await openPanel(user, "Render");
+      let dialog = await openPanel(user, "Export");
       expect(within(dialog).queryByText("The AI engine isn't installed")).toBeNull();
-      expect((within(dialog).getByRole("button", { name: "Render video" }) as HTMLButtonElement).disabled).toBe(false);
+      expect((within(dialog).getByRole("button", { name: "Export video" }) as HTMLButtonElement).disabled).toBe(false);
       act(() => useLyricVideo.getState().setPrefs((o) => ({ ...o, audio: "instrumental" })));
-      dialog = await screen.findByRole("dialog", { name: "Render" });
+      dialog = await screen.findByRole("dialog", { name: "Export" });
       expect(await within(dialog).findByText("The AI engine isn't installed")).toBeTruthy();
-      expect((within(dialog).getByRole("button", { name: "Render video" }) as HTMLButtonElement).disabled).toBe(true);
+      expect((within(dialog).getByRole("button", { name: "Export video" }) as HTMLButtonElement).disabled).toBe(true);
     });
   });
 

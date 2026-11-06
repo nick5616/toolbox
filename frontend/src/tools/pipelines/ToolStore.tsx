@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Icon, TextField, cx } from "@/components";
 import type { StepType } from "@/lib/api";
+import { startToolDrag } from "@/lib/fileDrag";
 import type { ModuleView } from "@/state/modules";
 import { storeContents } from "./toolStoreModel";
 import styles from "./GraphEditor.module.css";
@@ -46,6 +47,7 @@ export function ToolStore({ catalog, modules, onAdd }: ToolStoreProps) {
                 data-tool-id={t.id}
                 data-tip={`${t.description} Drag it onto the canvas, or click to add.`}
                 onDragStart={(e) => {
+                  startToolDrag(e, t.id);
                   e.dataTransfer.setData(DRAG_TYPE, t.id);
                   e.dataTransfer.effectAllowed = "copy";
                   dragGhost(e.dataTransfer, t.name);

@@ -8,8 +8,10 @@ package posts
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"time"
+	"unicode/utf8"
 
 	"toolbox/core"
 	"toolbox/core/media"
@@ -25,19 +27,32 @@ const ModuleID = "post-builder"
 // Action is what one Post Builder job does.
 type Action string
 
-// ActionExport writes the post's folder.
-const ActionExport Action = "export"
+const (
+	// ActionExport writes the post's folder.
+	ActionExport Action = "export"
+	// ActionMake (the pipeline step, Phase 14) turns the job's input files
+	// into a new post, saves it as a project and exports it.
+	ActionMake Action = "make"
+)
 
 // Options are the job options.
 type Options struct {
 	Action    Action `json:"action"`
-	ProjectID string `json:"projectId"`
+	ProjectID string `json:"projectId"` // export
+
+	// make: the new post. The inputs are its photos and clips, in order.
+	Name         string `json:"name"`         // "" = the first file's name
+	Format       string `json:"format"`       // "carousel" | "reel" | "story"
+	Aspect       string `json:"aspect"`       // carousel; reels and stories are 9:16
+	Caption      string `json:"caption"`      // ≤ 2,200 chars
+	KeepLocation bool   `json:"keepLocation"` // keep location and metadata
 }
 
 // ExportResult is an export job's result.
 type ExportResult struct {
-	Folder string   `json:"folder"`
-	Files  []string `json:"files"`
+	Folder    string   `json:"folder"`
+	Files     []string `json:"files"`
+	ProjectID string   `json:"projectId"` // the post that was exported
 }
 
 // SlideSource describes a file before it becomes a slide.
@@ -98,7 +113,7 @@ func (m *Module) Descriptor() core.Descriptor {
 		Accepts:      core.Accepts{Extensions: slices.Concat(media.ImageExtensions(), media.VideoExtensions())},
 		Requires:     []string{"ffmpeg", "ffprobe"},
 		Recommends:   []string{sidecar.DepID},
-		OutputSubdir: "Posts", Order: 11, MaxConcurrent: 1, NotAStep: true,
+		OutputSubdir: "Posts", Order: 11, MaxConcurrent: 1,
 		Parts: []string{"photo-composer", "video-editor", "bg-remover", "upscaler"},
 	}
 }
@@ -109,11 +124,35 @@ func (m *Module) Validate(inputs []string, options json.RawMessage) error {
 	if err != nil {
 		return err
 	}
-	if o.Action != ActionExport {
-		return core.ValidationError("Unknown Post Builder action", map[string]string{"action": "must be export"})
+	switch o.Action {
+	case ActionExport:
+		if o.ProjectID == "" {
+			return core.ValidationError("Choose a post to export", map[string]string{"projectId": "required"})
+		}
+	case ActionMake:
+		return validateMake(o, inputs)
+	default:
+		return core.ValidationError("Unknown Post Builder action", map[string]string{"action": "must be export or make"})
 	}
-	if o.ProjectID == "" {
-		return core.ValidationError("Choose a post to export", map[string]string{"projectId": "required"})
+	return nil
+}
+
+// validateMake checks a make job: its files and the shape of the new post.
+func validateMake(o Options, inputs []string) error {
+	if len(inputs) == 0 {
+		return core.ValidationError("Add photos or clips for the post", map[string]string{"inputs": "Add at least one file"})
+	}
+	if len(inputs) > DefaultLimits().MaxSlides {
+		return core.ValidationError(fmt.Sprintf("A post has at most %d slides", DefaultLimits().MaxSlides), nil)
+	}
+	if _, err := normalizeFormat(o.Format, o.Aspect); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(o.Caption) > DefaultLimits().MaxCaptionChars {
+		return core.ValidationError("The caption is too long", map[string]string{"caption": "At most 2,200 characters"})
+	}
+	if o.Format == "reel" && len(inputs) != 1 {
+		return core.ValidationError("A reel is exactly one video", map[string]string{"inputs": "Use one video"})
 	}
 	return nil
 }

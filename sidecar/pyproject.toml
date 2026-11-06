@@ -1,7 +1,7 @@
 [project]
 name = "toolbox-sidecar"
 version = "0.7.0"
-description = "Toolbox AI engine: stems, BPM & key, audio-to-MIDI, transcription, background removal, CPU upscaling, OCR, redaction, object removal, voice denoising and music visualisation analysis over stdio JSON lines"
+description = "Toolbox AI engine: stems, BPM & key, audio-to-MIDI, transcription, background removal, CPU upscaling, OCR, redaction, object removal, voice denoising, text to speech and music visualisation analysis over stdio JSON lines"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "audio-separator[cpu]==0.47.1",
@@ -23,6 +23,7 @@ dependencies = [
   "python-bidi>=0.6.12",   # Arabic text order for RapidOCR
   "pypdf>=6",              # searchable-PDF text overlay
   "opencv-python-headless>=5.0.0.93",  # face detection (YuNet decode), image ops; already pulled in by rapidocr
+  "kokoro-onnx>=0.6.1,<0.7",  # Text to Speech (Kokoro ONNX; espeakng-loader bundles espeak-ng)
   "sam-2",                # SAM 2.1 (facebookresearch/sam2, pinned in [tool.uv.sources])
 ]
 

@@ -127,7 +127,7 @@ describe("Export panel", () => {
     expect(screen.getByRole("radiogroup", { name: "Range" })).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "Audio" })).toBeTruthy();
     expect(screen.getByLabelText("Background")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Render 10 s preview" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Preview 10 s" })).toBeTruthy();
   });
 
   it("edits the quality and shape in the store (the view keeps them)", async () => {
@@ -150,7 +150,7 @@ describe("Export panel", () => {
 
   it("renders the video with the design, size and the Song Map selection", async () => {
     setup({ ...DEFAULT_EXPORT, aspect: "9:16", height: 720, fps: 60 }, { selection: { startMs: 4000, endMs: 20000 } });
-    await userEvent.click(screen.getByRole("button", { name: "Render video" }));
+    await userEvent.click(screen.getByRole("button", { name: "Export video" }));
     await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(1));
     const [paths, opts] = h.enqueue.mock.calls[0] as [string[], Record<string, unknown>];
     expect(paths).toEqual(["C:/song.mp3"]);
@@ -160,7 +160,7 @@ describe("Export panel", () => {
 
   it("renders a 10 s preview from the playhead", async () => {
     setup();
-    await userEvent.click(screen.getByRole("button", { name: "Render 10 s preview" }));
+    await userEvent.click(screen.getByRole("button", { name: "Preview 10 s" }));
     await waitFor(() => expect(h.enqueue).toHaveBeenCalledTimes(1));
     const opts = (h.enqueue.mock.calls[0] as [string[], Record<string, unknown>])[1];
     expect(opts).toMatchObject({ action: VisualizerAction.ActionPreview, previewStartMs: 5000, startMs: 0, endMs: 0 });
@@ -168,7 +168,7 @@ describe("Export panel", () => {
 
   it("shows progress and the result card", async () => {
     setup();
-    await userEvent.click(screen.getByRole("button", { name: "Render video" }));
+    await userEvent.click(screen.getByRole("button", { name: "Export video" }));
     await waitFor(() => expect(h.enqueue).toHaveBeenCalled());
     useJobs.getState().upsert(job({ progress: 0.4, message: "frame 300" }));
     expect(await screen.findByRole("progressbar", { name: "Rendering the video…" })).toBeTruthy();
@@ -184,6 +184,6 @@ describe("Export panel", () => {
     bad.reactivity = 9;
     setup(DEFAULT_EXPORT, { show: bad });
     expect(screen.getByText(/couldn't be read: Reactivity must be 0–2/)).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Render video" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Export video" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

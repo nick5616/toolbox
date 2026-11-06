@@ -34,6 +34,13 @@ export function Create(name: string, aspect: string, backgroundPath: string): $C
 }
 
 /**
+ * Defaults are the options of a fill.
+ */
+export function Defaults(): $CancellablePromise<$models.Options> {
+    return $Call.ByID(693605072);
+}
+
+/**
  * Delete removes a composition and its renders.
  */
 export function Delete(id: string): $CancellablePromise<void> {
@@ -45,6 +52,14 @@ export function Delete(id: string): $CancellablePromise<void> {
  */
 export function Duplicate(id: string): $CancellablePromise<core$0.ProjectInfo> {
     return $Call.ByID(733677967, id);
+}
+
+/**
+ * Enqueue fills a template (opts.ProjectID) with inputs, in order, and
+ * renders it: one job.
+ */
+export function Enqueue(inputs: string[] | null, opts: $models.Options): $CancellablePromise<core$0.Job[] | null> {
+    return $Call.ByID(2125748864, inputs, opts);
 }
 
 /**
@@ -97,4 +112,18 @@ export function Save(id: string, name: string, doc: $models.Composition): $Cance
  */
 export function SaveRender(id: string, format: string, base64Data: string): $CancellablePromise<void> {
     return $Call.ByID(3768657071, id, format, base64Data);
+}
+
+/**
+ * Slots lists the photo slots of a composition (the step editor).
+ */
+export function Slots(id: string): $CancellablePromise<$models.SlotInfo> {
+    return $Call.ByID(360389739, id);
+}
+
+/**
+ * StepShape carries the Fill a template step's option type into the bindings.
+ */
+export function StepShape(): $CancellablePromise<$models.StepOptions> {
+    return $Call.ByID(2000406433);
 }

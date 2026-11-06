@@ -21,6 +21,7 @@ import {
 } from "@/lib/api";
 import { BUILTIN_VARS } from "../vars";
 import { parseObject, registerSteps, type StepEditorProps, type StepUI } from "./registry";
+import { PARAMS } from "./paramDefs";
 import styles from "./builtin.module.css";
 
 // Step editors of the built-in steps (SPEC.md §7, §11.4): rename, chat,
@@ -437,5 +438,6 @@ const check: StepUI<Record<string, never>> = { type: "pipelines.check", parse: (
 
 // Step editors owned by WP-BI1 (pipelines.rename, .chat, .table, .zip, .copy, .check).
 // The registry is typed StepUI<never>; each editor is typed to its own options.
-const erase = <T,>(ui: StepUI<T>): StepUI<never> => ui as unknown as StepUI<never>;
-registerSteps([erase(rename), erase(chat), erase(table), erase(zip), erase(copy), erase(check)]);
+const erase = <T,>(ui: StepUI<T>): StepUI<never> => ({ ...ui, params: PARAMS[ui.type] }) as unknown as StepUI<never>;
+// Local Chat's step is the tool's own (llm-chat); "pipelines.chat" is its saved-pipeline alias.
+registerSteps([erase(rename), erase(chat), erase({ ...chat, type: "llm-chat" }), erase(table), erase(zip), erase(copy), erase(check)]);

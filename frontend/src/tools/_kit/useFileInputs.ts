@@ -1,10 +1,13 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback } from "react";
 import { toast } from "@/components";
 import { FilesService, type FileInfo } from "@/lib/api";
-import { useToolHandoff } from "@/lib/embed";
+import { useEmbed, useToolHandoff } from "@/lib/embed";
 import { toAppError } from "@/lib/errors";
 import { useModules } from "@/state/modules";
 import { acceptsPath } from "./accepts";
+import { fileInputsKey, useFileInputsStore } from "./fileInputsStore";
+
+const NONE: FileInfo[] = [];
 
 export interface FileInputs {
   /** Current inputs (deduped, in add order). */
@@ -19,13 +22,12 @@ export interface FileInputs {
 
 /** Manages a file tool's inputs, including handoffs (drop/paste/Send to). */
 export function useFileInputs(moduleId: string): FileInputs {
-  const [files, setFiles] = useState<FileInfo[]>([]);
-  const ref = useRef<FileInfo[]>([]);
+  const embed = useEmbed();
+  const key = fileInputsKey(moduleId, embed ? { host: embed.host, placement: embed.placement, token: embed.handoff.embed?.token } : null);
+  const files = useFileInputsStore((s) => s.lists[key]) ?? NONE;
 
-  const commit = useCallback((next: FileInfo[]) => {
-    ref.current = next;
-    setFiles(next);
-  }, []);
+  const commit = useCallback((next: FileInfo[]) => useFileInputsStore.getState().set(key, next), [key]);
+  const latest = useCallback(() => useFileInputsStore.getState().lists[key] ?? NONE, [key]);
 
   const add = useCallback(
     async (paths: string[]) => {
@@ -35,7 +37,7 @@ export function useFileInputs(moduleId: string): FileInputs {
 
       const supported = paths.filter((p) => acceptsPath(exts, p));
       const unsupported = paths.length - supported.length;
-      const have = new Set(ref.current.map((f) => f.path));
+      const have = new Set(latest().map((f) => f.path));
       const fresh: string[] = [];
       for (const p of supported) {
         if (!have.has(p)) {
@@ -56,7 +58,7 @@ export function useFileInputs(moduleId: string): FileInputs {
         return;
       }
       // Re-check against the latest list: another add may have landed meanwhile.
-      const current = ref.current;
+      const current = latest();
       const seen = new Set(current.map((f) => f.path));
       let accepted = infos.filter((i) => i.exists && !i.isDir && !seen.has(i.path));
       if (maxInputs > 0 && current.length + accepted.length > maxInputs) {
@@ -65,10 +67,10 @@ export function useFileInputs(moduleId: string): FileInputs {
       }
       if (accepted.length > 0) commit([...current, ...accepted]);
     },
-    [moduleId, commit],
+    [moduleId, commit, latest],
   );
 
-  const remove = useCallback((path: string) => commit(ref.current.filter((f) => f.path !== path)), [commit]);
+  const remove = useCallback((path: string) => commit(latest().filter((f) => f.path !== path)), [commit, latest]);
   const clear = useCallback(() => commit([]), [commit]);
 
   const pick = useCallback(async () => {

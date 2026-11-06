@@ -4,8 +4,9 @@
  * PipelineList and PipelineEditor, UI2 owns RunsPanel and RunSheet.
  */
 import { useEffect } from "react";
-import { Button } from "@/components";
+import { Button, ToolHeader } from "@/components";
 import { usePipelines } from "@/state/pipelines";
+import { seedWorkflowPipelines } from "./seedWorkflows";
 import type { ToolViewProps } from "../index";
 import { PipelineEditor } from "./PipelineEditor";
 import { useEditorMode } from "./editorMode";
@@ -31,18 +32,25 @@ export default function PipelinesView(_props: ToolViewProps) {
   useEffect(() => {
     void usePipelines.getState().ensureCatalog();
   }, []);
+  // The workflow pipelines arrive once, after the list has loaded (Phase 15).
+  const loaded = usePipelines((s) => s.loaded);
+  useEffect(() => {
+    if (loaded) void seedWorkflowPipelines();
+  }, [loaded]);
+
+  // The editor carries the header (tabs included) whenever it is on screen; otherwise this does.
+  const editorOnScreen = tab === "pipelines" && hasPipelines;
 
   return (
     <div className={styles.root}>
-      {/* One row in Graph mode: the editor header carries the tabs. */}
-      {!(tab === "pipelines" && fullWidth) && (
-        <header className={styles.header}>
+      {!editorOnScreen && (
+        <ToolHeader aria-label="Pipelines">
           <PipelinesTabs />
           <span className={styles.spacer} />
-          <Button icon="plus" data-tip="Create a pipeline from a ready-made template or from scratch" onClick={newPipeline.open}>
+          <Button size="sm" icon="plus" data-tip="Create a pipeline from a ready-made template or from scratch" onClick={newPipeline.open}>
             New
           </Button>
-        </header>
+        </ToolHeader>
       )}
       <div className={styles.body}>
         {tab === "pipelines" ? (
@@ -53,7 +61,7 @@ export default function PipelinesView(_props: ToolViewProps) {
           ) : (
             <div className={styles.split}>
               <PipelineList onNew={newPipeline.open} />
-              <PipelineEditor />
+              <PipelineEditor onNew={newPipeline.open} />
             </div>
           )
         ) : (

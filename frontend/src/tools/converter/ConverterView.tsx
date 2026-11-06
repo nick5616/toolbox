@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState, Field, Icon, Section, Select, Switch, cx } from "@/components";
+import { Field, Section, Select, Switch } from "@/components";
 import { ConverterService, MaxHeight, OutputKind, type PresetInfo } from "@/lib/api";
-import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { useRecentOutputs } from "@/state/library";
-import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { EmptyLine, FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
-import { FileActions } from "@/tools/_kit/FileActions";
+import { ResultRow } from "@/tools/_kit/ResultRow";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import shared from "@/tools/_kit/results.module.css";
 import {
@@ -114,26 +113,14 @@ export default function ConverterView({ moduleId }: ToolViewProps) {
         </div>
       }
       results={
-        <Section label="Recent conversions" tip="Files this tool converted lately">
+        <Section label="Results" tip="Files this tool converted lately">
           {recent.length === 0 ? (
-            <EmptyState icon="repeat" title="Nothing converted yet." body="Converted files appear here." />
+            <EmptyLine title="Nothing converted yet." body="Converted files appear here." />
           ) : (
             <ul className={shared.list}>
               {recent.map((o) => (
-                <li key={o.id} className={cx(shared.row, o.missing && shared.missing)}>
-                  <Icon name={KIND_ICON[o.kind] ?? "file"} size={14} className={shared.icon} />
-                  <span className={shared.name} data-tip={o.path}>
-                    {o.name}
-                  </span>
-                  <span className={shared.meta} data-tip="File size on disk">
-                    {formatBytes(o.sizeBytes)}
-                  </span>
-                  <span className={shared.meta} data-tip={new Date(o.createdAt).toLocaleString()}>
-                    {formatRelativeTime(o.createdAt)}
-                  </span>
-                  <span className={shared.actions}>
-                    <FileActions outputId={o.id} path={o.path} disabled={o.missing} />
-                  </span>
+                <li key={o.id}>
+                  <ResultRow path={o.path} outputId={o.id} missing={o.missing} name={o.name} sizeBytes={o.sizeBytes} at={o.createdAt} icon={KIND_ICON[o.kind] ?? "file"} />
                 </li>
               ))}
             </ul>

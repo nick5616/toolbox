@@ -91,7 +91,7 @@ describe("drop routing", () => {
   it("starts at once when the pipeline is ready, needs no secrets and takes a path", async () => {
     usePipelines.setState({ entries: entries() });
     routeFilesDropped(drop("pipeline-drop:p1", ["/a.mp3", "/b.mp3", "/c.txt"]));
-    await waitFor(() => expect(h.start).toHaveBeenCalledWith({ pipelineId: "p1", inputs: ["/a.mp3", "/b.mp3"], secrets: {} }));
+    await waitFor(() => expect(h.start).toHaveBeenCalledWith({ pipelineId: "p1", inputs: ["/a.mp3", "/b.mp3"], secrets: {}, params: {} }));
     await waitFor(() => expect(toastTitles()).toContain("Started Stems with 2 files"));
     expect(usePipelines.getState().runSheet).toBeNull();
     expect(usePipelines.getState().runs.new1).toBeDefined();

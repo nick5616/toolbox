@@ -89,6 +89,14 @@ export function LayerSections({ layer, docWidth, docHeight, busy, onPatch, onArr
               onChange={(v) => onPatch({ image: { ...im, radius: v } })}
             />
           </Row>
+          <Row label="Template">
+            <Switch
+              checked={layer.slot}
+              label="Template slot"
+              tip="A pipeline's Fill a template step puts one photo here. If no photo is marked, every visible photo is a slot"
+              onChange={(slot) => onPatch({ slot })}
+            />
+          </Row>
           {cutOut && (
             <Row label="Original">
               <Button size="sm" variant="ghost" data-tip="Put the original photo back, with its background" disabled={busy} onClick={onRestoreOriginal}>

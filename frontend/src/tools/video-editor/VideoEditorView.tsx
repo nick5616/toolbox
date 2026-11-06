@@ -824,7 +824,9 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
     <ClickInHost className={styles.root}>
       <DepsGate moduleId={moduleId} />
       <div className={styles.header}>
-        <IconButton icon="arrow-left" label="All videos" data-tip="Save and go back to the list of your video projects" onClick={() => void closeProject()} />
+        <Button size="sm" variant="ghost" icon="chevron-left" data-tip="Save and go back to the list of your video projects" onClick={() => void closeProject()}>
+          Projects
+        </Button>
         <TextField
           aria-label="Project name"
           data-tip="Rename this project (shown in the list; the exported file uses it too)"

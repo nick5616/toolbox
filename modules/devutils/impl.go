@@ -84,7 +84,7 @@ func (m *Module) validate(inputs []string, options json.RawMessage) error {
 	if len(fields) > 0 {
 		return core.ValidationError("Some files can't be hashed", fields)
 	}
-	return checkAlgorithms(opts.Algorithms)
+	return checkActionOptions(opts, inputs)
 }
 
 func (m *Module) run(ctx context.Context, job *core.JobContext) error {
@@ -92,14 +92,30 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 	if err != nil {
 		return err
 	}
-	if err := checkAlgorithms(opts.Algorithms); err != nil {
+	if err := checkActionOptions(opts, job.Inputs); err != nil {
 		return err
 	}
+	switch opts.Action {
+	case ActionEncode:
+		return runEncode(ctx, job, opts)
+	case ActionChecksums:
+		return runChecksums(ctx, job, opts)
+	}
+	res, err := hashAll(ctx, job, opts.Algorithms, 1)
+	if err != nil {
+		return err
+	}
+	job.Progress(1, "Done")
+	return job.SetResult(res)
+}
+
+// hashAll hashes the job's inputs, reporting progress scaled to share.
+func hashAll(ctx context.Context, job *core.JobContext, algos []string, share float64) (Result, error) {
 	var total int64
 	for _, p := range job.Inputs {
 		st, err := os.Stat(p)
 		if err != nil {
-			return core.Errorf(core.CodeNotFound, "Can't read %s", p).WithCause(err)
+			return Result{}, core.Errorf(core.CodeNotFound, "Can't read %s", p).WithCause(err)
 		}
 		total += st.Size()
 	}
@@ -109,19 +125,18 @@ func (m *Module) run(ctx context.Context, job *core.JobContext) error {
 	buf := make([]byte, readChunk)
 	res := Result{Files: make([]FileHashes, 0, len(job.Inputs))}
 	for _, p := range job.Inputs {
-		fh, err := hashFile(ctx, p, opts.Algorithms, buf, func(n int64) {
+		fh, err := hashFile(ctx, p, algos, buf, func(n int64) {
 			done += n
 			if total > 0 {
-				job.Progress(float64(done)/float64(total), fmt.Sprintf("%d of %d bytes", done, total))
+				job.Progress(share*float64(done)/float64(total), fmt.Sprintf("%d of %d bytes", done, total))
 			}
 		})
 		if err != nil {
-			return err
+			return Result{}, err
 		}
 		res.Files = append(res.Files, fh)
 	}
-	job.Progress(1, "Done")
-	return job.SetResult(res)
+	return res, nil
 }
 
 func hashFile(ctx context.Context, path string, algos []string, buf []byte, onBytes func(int64)) (FileHashes, error) {

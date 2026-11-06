@@ -13,5 +13,7 @@ export {
 export type {
     ModelInfo,
     Options,
-    Result
+    Result,
+    SavedMask,
+    StepOptions
 } from "./models.js";

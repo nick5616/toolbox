@@ -3,10 +3,13 @@ import { Button, Field, SegmentedControl, Select, Switch, TextField, cx } from "
 import type { PipelineStep, StepCheck, StepType } from "@/lib/api";
 import { FROM_INPUT, FROM_NONE } from "@/pipelines/compat";
 import { stepUI } from "@/pipelines/steps";
+import { CurrentPipelineContext } from "@/pipelines/steps/context";
 import { BUILTIN_VARS } from "@/pipelines/vars";
+import { useDraft } from "./draftStore";
 import { autoContinueFor, CHECK_TYPE, filterOf, isFilterEmpty, NO_FILES_TYPES } from "./editorModel";
 import { FiltersPopover } from "./FiltersPopover";
 import { roleProducts, stepName } from "./stepHelpers";
+import { WiredSection } from "./WiredSection";
 import styles from "./StepCard.module.css";
 
 export interface StepOptionsProps {
@@ -30,6 +33,7 @@ export function StepOptions({ step, steps, index, catalog, checkById, onChange, 
   const type = useMemo(() => catalog.find((t) => t.id === step.type), [catalog, step.type]);
   const filter = useMemo(() => filterOf(step.filter), [step.filter]);
   const check = checkById.get(step.id);
+  const pipelineId = useDraft((s) => s.pipelineId) ?? "";
   const toolName = type?.name ?? step.type;
   const isCheck = step.type === CHECK_TYPE;
   const noFiles = NO_FILES_TYPES.has(step.type) || check?.info.noFiles === true;
@@ -64,6 +68,8 @@ export function StepOptions({ step, steps, index, catalog, checkById, onChange, 
 
   return (
     <div id={id} className={styles.body}>
+      <WiredSection step={step} steps={steps} index={index} type={type} catalog={catalog} always={graph} onBinds={(binds) => onChange({ binds })} />
+
       {!graph && (
         <div className={styles.row}>
           <Field label="Files from" className={styles.grow}>
@@ -161,12 +167,14 @@ export function StepOptions({ step, steps, index, catalog, checkById, onChange, 
             </>
           ) : ui && value !== undefined ? (
             <div className={styles.editor}>
-              <ui.Editor
+              <CurrentPipelineContext.Provider value={pipelineId}>
+                <ui.Editor
                 value={value}
                 onChange={(next) => onChange({ optionsJson: JSON.stringify(next) })}
                 check={check}
                 vars={check?.vars ?? [...BUILTIN_VARS]}
               />
+              </CurrentPipelineContext.Provider>
             </div>
           ) : (
             <div className={styles.unknown}>

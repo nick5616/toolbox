@@ -66,7 +66,7 @@ func (m *Module) DescribeStep(options json.RawMessage) (core.StepInfo, error) {
 	return core.StepInfo{
 		Accepts:  m.Descriptor().Accepts,
 		Produces: []core.StepProduct{{Role: "midi", Label: "MIDI", Kind: core.KindOther, Exts: []string{".mid"}}},
-		Vars:     []core.StepVar{{Name: "notes", Label: "Number of notes"}},
+		Vars:     []core.StepVar{{Name: "notes", Label: "Number of notes", Type: core.ValueNumber}},
 		Summary:  summary,
 	}, nil
 }

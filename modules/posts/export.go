@@ -10,6 +10,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,9 +39,26 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) (retErr error) {
 	if err != nil {
 		return err
 	}
-	stored, err := m.docs.Load(ctx, o.ProjectID)
-	if err != nil {
-		return err
+	var stored core.StoredProject
+	if o.Action == ActionMake {
+		made, err := m.makePost(ctx, job, o)
+		if err != nil {
+			return err
+		}
+		stored = made
+		// A post that couldn't be exported is not left behind: the step runs again.
+		defer func() {
+			if retErr != nil {
+				if err := m.docs.Delete(context.Background(), made.ID); err != nil {
+					slog.Warn("posts: removing an unfinished post", "err", err)
+				}
+			}
+		}()
+	} else {
+		stored, err = m.docs.Load(ctx, o.ProjectID)
+		if err != nil {
+			return err
+		}
 	}
 	var doc Post
 	if err := json.Unmarshal([]byte(stored.Data), &doc); err != nil {
@@ -108,7 +126,33 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) (retErr error) {
 		}
 	}
 	job.Progress(1, "Done")
-	return job.SetResult(ExportResult{Folder: folder, Files: append(files, extra.reference...)})
+	return job.SetResult(ExportResult{Folder: folder, Files: append(files, extra.reference...), ProjectID: stored.ID})
+}
+
+// makePost creates the post of a make job from its input files.
+func (m *Module) makePost(ctx context.Context, job *core.JobContext, o Options) (core.StoredProject, error) {
+	job.Progress(core.IndeterminateProgress, "Making the post…")
+	doc, err := m.newPost(ctx, o.Format, o.Aspect, job.Inputs)
+	if err != nil {
+		return core.StoredProject{}, err
+	}
+	if len(doc.Slides) == 0 {
+		return core.StoredProject{}, core.ValidationError("None of these files can go in a post", nil).
+			WithHint("Posts take photos and videos")
+	}
+	doc.Caption, doc.KeepLocation = o.Caption, o.KeepLocation
+	if err := validateShape(doc); err != nil {
+		return core.StoredProject{}, err
+	}
+	name := strings.TrimSpace(o.Name)
+	if name == "" {
+		name = core.StemName(job.Inputs[0])
+	}
+	info, err := m.docs.Create(ctx, name, doc)
+	if err != nil {
+		return core.StoredProject{}, err
+	}
+	return m.docs.Load(ctx, info.ID)
 }
 
 type textFiles struct {

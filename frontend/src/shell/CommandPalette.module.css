@@ -83,8 +83,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  height: 32px;
-  padding: 0 var(--space-2);
+  min-height: 32px;
+  padding: 3px var(--space-2);
   border-radius: var(--r-md);
   color: var(--fg-muted);
 }
@@ -110,5 +110,15 @@
 .empty {
   padding: var(--space-6);
   text-align: center;
+  color: var(--fg-subtle);
+}
+
+.subtitle {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
   color: var(--fg-subtle);
 }

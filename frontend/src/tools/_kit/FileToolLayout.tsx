@@ -1,5 +1,6 @@
 import { useRef, type ReactNode } from "react";
-import { Button, ClickIn, ClickInHost, DropZone, FileList, Section, cx } from "@/components";
+import { Button, ClickIn, ClickInHost, DropZone, Icon, IconButton, Section, cx, splitPath } from "@/components";
+import { useCommands } from "@/lib/commands";
 import { useEmbed } from "@/lib/embed";
 import { formatBytes } from "@/lib/format";
 import { useShortcut } from "@/lib/shortcuts";
@@ -7,6 +8,7 @@ import { JobRow } from "@/shell/JobRow";
 import { isActive, useOrderedJobs } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { DepsGate, useDepsGate } from "./DepsGate";
+import { FailedJobs } from "./FailedJobs";
 import { useSessionJobIds } from "./session";
 import { KitToolContext } from "./toolContext";
 import type { FileInputs } from "./useFileInputs";
@@ -62,6 +64,8 @@ export function FileToolLayout({
   const jobs = useOrderedJobs(moduleId);
   const embed = useEmbed();
   const embedded = embed !== null;
+  // Mod+O (the shell's "tool.addFiles" convention): add files to this tool. Not when embedded (the host owns its shortcuts).
+  useCommands(embedded ? [] : [{ id: "tool.addFiles", title: "Add files…", section: "Actions", shortcut: "Mod+O", run: () => void inputs.pick() }], [embedded]);
   const session = useSessionJobIds();
   // Embedded: only the jobs this embed session submitted are "Active" here.
   const active = jobs.filter((j) => isActive(j) && (!session || session.has(j.id)));
@@ -98,11 +102,7 @@ export function FileToolLayout({
       <div className={styles.scroll} ref={rootRef}>
     <section className={cx(styles.root, embedded && styles.embedded)} aria-label={mod?.name ?? moduleId}>
       {/* The shell's top bar already shows the tool's name (SPEC §13.1: no duplicate headers); only the tagline stays (not when embedded: the drawer's title says it). */}
-      {mod?.tagline && !embedded && (
-        <header className={styles.header}>
-          <p className={styles.tagline}>{mod.tagline}</p>
-        </header>
-      )}
+      {mod?.tagline && !embedded && empty && <p className={styles.tagline}>{mod.tagline}</p>}
 
       <DepsGate moduleId={moduleId} />
 
@@ -134,29 +134,40 @@ export function FileToolLayout({
           </p>
         ) : empty ? (
           <div data-tip="Drag files here from your file manager, or use Add files">
-            <DropZone id={`tool-drop:${moduleId}`} label="Drop files here or Add files…">
+            <DropZone id={`tool-drop:${moduleId}`} className={styles.drop} label="Drop files here">
               <Button size="sm" variant="secondary" icon="plus" data-tip="Open a file picker" onClick={() => void inputs.pick()}>
                 Add files…
               </Button>
             </DropZone>
           </div>
         ) : (
-          <FileList
-            aria-label="Input files"
-            files={inputs.files.map((f) => {
+          <ul className={styles.files} aria-label="Input files">
+            {inputs.files.map((f) => {
               const err = inputErrors?.[f.path];
-              return {
-                path: f.path,
-                size: f.sizeBytes,
-                trailing: err ? (
-                  <span className={styles.error} role="alert" data-tip="This file was rejected when queuing; remove it or fix it and try again">
-                    {err}
+              return (
+                <li key={f.path} className={styles.file}>
+                  <Icon name="file" size={14} className={styles.fileIcon} />
+                  <span className={styles.fileName} data-tip={f.path}>
+                    {splitPath(f.path)[1]}
                   </span>
-                ) : undefined,
-              };
+                  {err && (
+                    <span className={styles.error} role="alert" data-tip="This file was rejected when queuing; remove it or fix it and try again">
+                      {err}
+                    </span>
+                  )}
+                  <span className={styles.fileSize}>{formatBytes(f.sizeBytes)}</span>
+                  <IconButton
+                    size="sm"
+                    icon="x"
+                    label="Remove"
+                    className={styles.remove}
+                    data-tip="Remove this file from the list (the file itself is not deleted)"
+                    onClick={() => inputs.remove(f.path)}
+                  />
+                </li>
+              );
             })}
-            onRemove={inputs.remove}
-          />
+          </ul>
         )}
       </Section>
 
@@ -198,6 +209,8 @@ export function FileToolLayout({
           </div>
         </Section>
       )}
+
+      <FailedJobs moduleId={moduleId} />
 
       {results}
     </section>

@@ -35,6 +35,7 @@ type Layer struct {
 	Kind     string      `json:"kind"` // "image" | "text"
 	Name     string      `json:"name"`
 	Hidden   bool        `json:"hidden"`
+	Slot     bool        `json:"slot"` // image layers: a photo slot the "Fill a template" step fills; if no layer is marked, every visible image layer is a slot
 	Locked   bool        `json:"locked"`
 	X        float64     `json:"x"`        // centre, fraction of canvas width
 	Y        float64     `json:"y"`        // centre, fraction of canvas height

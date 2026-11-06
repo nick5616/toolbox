@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode, Ref } from "react";
+import { useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { Browser } from "@wailsio/runtime";
 import { Badge, Button, IconButton, Meter, Tooltip, cx } from "@/components";
 import { PackState } from "@/lib/api";
@@ -44,13 +44,21 @@ function openLink(e: React.MouseEvent, href: string) {
   void Browser.OpenURL(href).catch(() => undefined);
 }
 
-function StateBadge({ pack }: { pack: PackView }) {
+/** Short hints that tell similarly named packs apart (names and ids come from the catalog). */
+const PACK_KICKER: Record<string, string> = {
+  music: "Audio tools",
+  edit: "For Edit Studio",
+};
+
+function StateBadge({ pack, mode = "select" }: { pack: PackView; mode?: "select" | "manage" }) {
   switch (pack.state) {
     case PackState.PackInstalled:
       return <Badge tone="ok" tip="Everything in this pack is installed">Installed</Badge>;
     case PackState.PackOutdated:
       return <Badge tone="warn" tip="A newer version of something in this pack is available">Update available</Badge>;
     case PackState.PackPartial:
+      // In Settings the "Install the rest (size)" button says it all.
+      if (mode === "manage") return null;
       return <Badge tone="neutral" tip="Some parts are installed; install again to add the rest">Partly installed</Badge>;
     case PackState.PackUnsupported: {
       const badge = <Badge tone="neutral" tip="This pack does not run on your system">Not available on this computer</Badge>;
@@ -129,19 +137,85 @@ function Progress({ progress, packName }: { progress: PackProgress; packName: st
 
 /** One tool pack: icon, state, live size, what it unlocks and downloads. */
 export function PackCard({ pack, size, mode, selected = false, locked = false, onToggle, progress, actions, hitRef, onHitKeyDown }: PackCardProps) {
-  const selectable = mode === "select" && isSelectable(pack) && !locked;
+  const selectable = isSelectable(pack) && !locked;
   const present = pack.state === PackState.PackInstalled || pack.state === PackState.PackUnsupported;
   const showSize = pack.state !== PackState.PackInstalled && pack.state !== PackState.PackUnsupported;
-  const on = mode === "select" && selected && isSelectable(pack);
+  const on = selected && isSelectable(pack);
+  const [open, setOpen] = useState(false);
+
+  if (mode === "manage") {
+    const detailsId = `pack-details-${pack.id}`;
+    return (
+      <article className={styles.row} data-pack={pack.id} data-state={pack.state} aria-label={`${pack.name} pack`}>
+        <div className={styles.rowHead}>
+          <button
+            type="button"
+            className={styles.rowToggle}
+            aria-expanded={open}
+            aria-controls={detailsId}
+            data-tip={open ? "Hide what this pack unlocks and downloads" : "Show what this pack unlocks and downloads"}
+            onClick={() => setOpen((v) => !v)}
+          >
+            <span className={cx(styles.chev, open && styles.chevOpen)} aria-hidden="true">
+              <PackIcon name="chevron-right" size={12} />
+            </span>
+            <span className={styles.rowTile}>
+              <PackIcon name={pack.icon} size={14} strokeWidth={1.75} />
+            </span>
+            <span className={styles.rowName} data-tip="A pack is a group of related tools">
+              {pack.name}
+              {PACK_KICKER[pack.id] ? <small className={styles.kicker}> · {PACK_KICKER[pack.id]}</small> : null}
+            </span>
+            {showSize ? (
+              <span className={styles.rowSize} data-tip="Disk space once installed, and how much to download">
+                {formatSize(size.disk)}
+                <small> · {formatSize(size.download)} download</small>
+              </span>
+            ) : null}
+          </button>
+          <span className={styles.rowState}>
+            <StateBadge pack={pack} mode="manage" />
+          </span>
+          {progress ? null : actions ? <div className={styles.rowActions}>{actions}</div> : null}
+        </div>
+        {progress ? <Progress progress={progress} packName={pack.name} /> : null}
+        {open ? (
+          <div id={detailsId} className={styles.rowDetails}>
+            <p className={styles.desc}>{pack.description}</p>
+            {pack.unlocks.length > 0 ? (
+              <div>
+                <div className={styles.label} data-tip="Tools that start working once this pack is installed">Unlocks</div>
+                <ul className={styles.unlocksInline}>
+                  {pack.unlocks.map((u) => (
+                    <li key={u.moduleId}>
+                      <PackIcon name={u.icon} size={13} />
+                      {u.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <div>
+              <div className={styles.label} data-tip="Engines and models this pack installs, each with its licence and size">Downloads</div>
+              <ul className={styles.parts}>
+                {pack.components.map((c) => (
+                  <ComponentRow key={c.id} pack={pack} size={size} id={c.id} />
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : null}
+      </article>
+    );
+  }
 
   return (
     <article
-      className={cx(styles.card, on && styles.selected, (present || (mode === "select" && !selectable && !locked)) && styles.muted, mode === "manage" && styles.manage)}
+      className={cx(styles.card, on && styles.selected, (present || (!selectable && !locked)) && styles.muted)}
       data-pack={pack.id}
       data-state={pack.state}
-      aria-label={mode === "manage" ? `${pack.name} pack` : undefined}
-    >
-      {mode === "select" ? (
+          >
+      {(
         <button
           ref={hitRef}
           type="button"
@@ -156,7 +230,7 @@ export function PackCard({ pack, size, mode, selected = false, locked = false, o
           }}
           onKeyDown={onHitKeyDown}
         />
-      ) : null}
+      )}
       <div className={styles.content}>
         <div className={styles.head}>
           <span className={styles.tile}>
@@ -164,7 +238,7 @@ export function PackCard({ pack, size, mode, selected = false, locked = false, o
           </span>
           <span className={styles.headRight}>
             <StateBadge pack={pack} />
-            {mode === "select" && isSelectable(pack) ? (
+            {isSelectable(pack) ? (
               <span className={styles.check} aria-hidden="true">
                 <PackIcon name="check" size={12} strokeWidth={3} />
               </span>
@@ -172,7 +246,10 @@ export function PackCard({ pack, size, mode, selected = false, locked = false, o
           </span>
         </div>
         <div>
-          <div className={styles.name} data-tip="A pack is a group of related tools">{pack.name}</div>
+          <div className={styles.name} data-tip="A pack is a group of related tools">
+            {pack.name}
+            {PACK_KICKER[pack.id] ? <small className={styles.kicker}> · {PACK_KICKER[pack.id]}</small> : null}
+          </div>
           {showSize ? (
             <div className={styles.size} data-tip="Disk space once installed, and how much to download">
               {formatSize(size.disk)}
@@ -205,8 +282,7 @@ export function PackCard({ pack, size, mode, selected = false, locked = false, o
         </div>
         <div className={styles.foot}>
           {progress ? <Progress progress={progress} packName={pack.name} /> : <p className={styles.desc}>{pack.description}</p>}
-          {mode === "manage" && actions ? <div className={styles.actions}>{actions}</div> : null}
-        </div>
+                  </div>
       </div>
     </article>
   );

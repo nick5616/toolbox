@@ -1,6 +1,7 @@
 import { Banner, Button, Icon, IconButton, Meter } from "@/components";
 import { JobStatus } from "@/lib/api";
 import { copyText } from "@/lib/copy";
+import { startPathsDrag } from "@/lib/fileDrag";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { basename } from "./logic";
 import { parseResult } from "./options";
@@ -66,12 +67,12 @@ export function RunStatus({ run, runningLabel, showResult = true, doneLabel = "D
           {outputs.map((path) => {
             const out = job.outputs.find((o) => o.path === path);
             return (
-              <li key={path} className={styles.resultRow}>
+              <li key={path} className={styles.resultRow} draggable={!out?.missing} onDragStart={(e) => startPathsDrag(e, [path])}>
                 <Icon name={/\.lrc$/i.test(path) ? "file-text" : "film"} size={14} />
                 <span className={styles.resultName} data-tip={path}>
                   {basename(path)}
                 </span>
-                <FileActions outputId={out?.id} path={path} disabled={out?.missing} />
+                <FileActions outputId={out?.id} path={path} disabled={out?.missing} moduleId="lyric-video" />
                 <IconButton size="sm" icon="copy" label="Copy path" data-tip="Copy the full path of this file" onClick={() => void copyText(path, { what: "path" })} />
               </li>
             );

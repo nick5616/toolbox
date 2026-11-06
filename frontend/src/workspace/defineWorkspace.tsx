@@ -4,22 +4,32 @@
  * `tools/<id>/workspace.ts(x)` and import that file from `parts/index.ts`, so
  * part windows (which never mount the tool view) know the parts too.
  */
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useStore } from "zustand";
 import { EmptyState, ErrorBoundary } from "@/components";
 import { currentWindow } from "@/lib/windows";
 import { definePart } from "@/parts/registry";
 import type { PartProps } from "@/parts/types";
-import { hostBridge, replicaBridge, useBridgeStatus, type BridgeSpec, type BridgeTransport } from "@/state/bridge";
-import type { ToolPanel, Workspace, WorkspaceSpec } from "./types";
+import { hostBridge, replicaBridge, useBridgesStatus, useBridgeStatus, type BridgeSpec, type BridgeTransport } from "@/state/bridge";
+import type { StoreApi } from "zustand";
+import type { ExtraBridge, ToolPanel, Workspace, WorkspaceSpec } from "./types";
 import styles from "./workspace.module.css";
 
 const workspaces = new Map<string, Workspace>();
 
 /** Test hook: bridge transports per side ("host" | "replica") instead of the window relay. */
-let testTransport: ((side: "host" | "replica") => BridgeTransport) | null = null;
-export function setWorkspaceTransportForTest(t: ((side: "host" | "replica") => BridgeTransport) | null): void {
+let testTransport: ((side: "host" | "replica", name: string) => BridgeTransport) | null = null;
+export function setWorkspaceTransportForTest(t: ((side: "host" | "replica", name: string) => BridgeTransport) | null): void {
   testTransport = t;
+}
+
+/** A store and its bridge spec as an extra channel of a workspace. */
+export function bridgeOf<S, V extends Record<string, unknown>>(store: StoreApi<S>, spec: BridgeSpec<S, V>): ExtraBridge {
+  return {
+    name: spec.name,
+    host: (transport) => hostBridge(store, spec, transport),
+    replica: (transport) => replicaBridge(store, spec, transport ? { transport } : {}),
+  };
 }
 
 /** The workspace a tool defined, if any. */
@@ -35,18 +45,26 @@ export function defineWorkspace<S, V extends Record<string, unknown>>(spec: Work
   const byId = new Map<string, ToolPanel>(spec.panels.map((p) => [p.id, p]));
   let replica = false;
 
+  const extras = spec.extraBridges ?? [];
+
   const connect = (): Promise<() => void> => {
     replica = true;
-    const dispose = replicaBridge(spec.store, bridge, testTransport ? { transport: testTransport("replica") } : {});
+    const disposeAll = [
+      replicaBridge(spec.store, bridge, testTransport ? { transport: testTransport("replica", bridgeName) } : {}),
+      ...extras.map((x) => x.replica(testTransport?.("replica", x.name))),
+      ...(spec.onConnect ? [spec.onConnect()] : []),
+    ];
     return Promise.resolve(() => {
-      dispose();
+      for (const d of disposeAll) d();
       replica = false;
     });
   };
 
-  /** A part window renders once its replica is live and has an open document. */
+  /** A part window renders once its replicas are live and it has an open document. */
   function useReady(): boolean {
-    const status = useBridgeStatus(bridgeName);
+    const one = useBridgeStatus(bridgeName);
+    const all = useBridgesStatus();
+    const status = extras.length > 0 ? all : one;
     const open = useStore(spec.store, spec.isOpen);
     return status === "live" && open;
   }
@@ -54,6 +72,11 @@ export function defineWorkspace<S, V extends Record<string, unknown>>(spec: Work
   function ReplicaHooks() {
     spec.useReplica?.();
     return null;
+  }
+
+  function Wrap({ children }: { children: ReactNode }) {
+    const W = spec.wrap;
+    return W ? <W>{children}</W> : <>{children}</>;
   }
 
   function PanelWindow(_p: PartProps) {
@@ -64,12 +87,14 @@ export function defineWorkspace<S, V extends Record<string, unknown>>(spec: Work
     if (!ready) return <div className={styles.waiting}>Connecting…</div>;
     const Panel = panel.component;
     return (
-      <div className={styles.panelWindow}>
-        <ReplicaHooks />
-        <ErrorBoundary label={panel.title} resetKey={id}>
-          <Panel />
-        </ErrorBoundary>
-      </div>
+      <Wrap>
+        <div className={styles.panelWindow}>
+          <ReplicaHooks />
+          <ErrorBoundary label={panel.title} resetKey={id}>
+            <Panel />
+          </ErrorBoundary>
+        </div>
+      </Wrap>
     );
   }
 
@@ -79,12 +104,14 @@ export function defineWorkspace<S, V extends Record<string, unknown>>(spec: Work
     if (!ready) return <div className={styles.waiting}>Connecting…</div>;
     const Preview = spec.preview.component;
     return (
-      <div className={styles.previewWindow}>
-        <ReplicaHooks />
-        <ErrorBoundary label={spec.preview.title ?? "Preview"}>
-          <Preview />
-        </ErrorBoundary>
-      </div>
+      <Wrap>
+        <div className={styles.previewWindow}>
+          <ReplicaHooks />
+          <ErrorBoundary label={spec.preview.title ?? "Preview"}>
+            <Preview />
+          </ErrorBoundary>
+        </div>
+      </Wrap>
     );
   }
 
@@ -93,7 +120,7 @@ export function defineWorkspace<S, V extends Record<string, unknown>>(spec: Work
     host: spec.moduleId,
     title: "Panel",
     icon: "panel-right",
-    tip: "A panel of this tool in its own window",
+    tip: spec.panelTip ?? "A panel of this tool in its own window",
     width: 380,
     height: 720,
     headingFor: (params) => {
@@ -120,10 +147,13 @@ export function defineWorkspace<S, V extends Record<string, unknown>>(spec: Work
   const isReplica = (): boolean => replica || (currentWindow().kind === "part" && currentWindow().part.startsWith(`${spec.moduleId}.`));
 
   function useHost(): void {
-    const open = useStore(spec.store, spec.isOpen);
+    const open = useStore(spec.store, spec.isHosting ?? spec.isOpen);
     useEffect(() => {
       if (!open || isReplica()) return;
-      return hostBridge(spec.store, bridge, testTransport?.("host"));
+      const stops = [hostBridge(spec.store, bridge, testTransport?.("host", bridgeName)), ...extras.map((x) => x.host(testTransport?.("host", x.name)))];
+      return () => {
+        for (const stop of stops) stop();
+      };
     }, [open]);
   }
 
@@ -131,6 +161,7 @@ export function defineWorkspace<S, V extends Record<string, unknown>>(spec: Work
     moduleId: spec.moduleId,
     panelPart,
     previewPart,
+    previewMirror: !!spec.preview?.mirror,
     bridgeName,
     panels: spec.panels,
     getPanel: (id) => byId.get(id),

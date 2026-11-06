@@ -41,6 +41,13 @@ describe("openTool", () => {
     expect(w.popOutTool).toHaveBeenCalledTimes(1);
   });
 
+  it("carries an action through the handoff and the pop-out", async () => {
+    await openTool("pdf", ["/a.pdf"], { action: "compress" });
+    expect(useUI.getState().handoff).toEqual({ moduleId: "pdf", inputs: ["/a.pdf"], action: "compress" });
+    await openTool("pdf", ["/a.pdf"], { action: "compress" }, { window: true });
+    expect(w.popOutTool).toHaveBeenCalledWith("pdf", expect.objectContaining({ handoff: { moduleId: "pdf", inputs: ["/a.pdf"], action: "compress" } }));
+  });
+
   it("builds a pair of menu items", () => {
     const items = openToolItems("trimmer", ["/v.mp4"]);
     expect(items.map((i) => i.id)).toEqual(["open-trimmer", "open-trimmer-window"]);

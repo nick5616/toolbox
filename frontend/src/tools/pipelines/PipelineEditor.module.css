@@ -3,34 +3,28 @@
   align-items: center;
   justify-content: center;
   min-height: 0;
-  border: 1px dashed var(--line);
-  border-radius: var(--r-md);
+  height: 100%;
 }
 
 .root {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
   min-width: 0;
   min-height: 0;
-  background: var(--bg-panel);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  height: 100%;
 }
 
+/* The header lives in the shell's top bar (ToolHeader): one line, never wraps. */
 .header {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-4) 0;
+  gap: var(--space-2);
+  container-type: inline-size;
+  overflow: hidden;
 }
 
 .titles {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 120px;
+  min-width: 60px;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
 }
 
 .name,
@@ -48,8 +42,8 @@
 }
 
 .name {
-  font-size: var(--text-lg);
-  line-height: var(--text-lg-lh);
+  height: 28px;
+  font-size: var(--text-md);
   font-weight: 600;
 }
 
@@ -57,6 +51,11 @@
   font-size: var(--text-sm);
   line-height: var(--text-sm-lh);
   color: var(--fg-muted);
+}
+
+.nameFlush,
+.description {
+  margin-left: 0;
 }
 
 .name:hover,
@@ -74,8 +73,15 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   flex-shrink: 0;
+}
+
+@container (max-width: 620px) {
+  .takes,
+  .saveState {
+    display: none;
+  }
 }
 
 .saveState {
@@ -95,15 +101,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: 0 var(--space-4) var(--space-4);
-}
-
-.status {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  color: var(--fg-muted);
-  font-size: var(--text-sm);
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .statusDot.ok {
@@ -209,13 +207,28 @@
 /* Graph mode: the canvas takes all the height that is left. */
 .scrollGraph {
   overflow: hidden;
+  gap: 0;
+  padding: 0;
+}
+
+.banners {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
 }
 
+.scrollGraph .banners {
+  padding: var(--space-2) var(--space-3);
+}
+
+/* One line of click-ins under the canvas, separated by a single divider. */
 .footer {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-1);
   flex-shrink: 0;
+  padding: var(--space-1) var(--space-2);
+  border-top: 1px solid var(--line);
+  overflow: hidden;
 }
 
 .footerItem {
@@ -230,17 +243,6 @@
   padding: var(--space-3);
 }
 
-/* Graph mode: one compact header row. */
-.headerGraph {
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-3) 0;
-}
-
-.headerGraph .titles {
-  flex: 1 1 120px;
-  min-width: 80px;
-}
 
 .statusInline {
   flex: 0 1 auto;
@@ -250,4 +252,8 @@
   white-space: nowrap;
   color: var(--fg-muted);
   font-size: var(--text-sm);
+}
+
+.tabs {
+  flex-shrink: 0;
 }

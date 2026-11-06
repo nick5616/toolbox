@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -212,18 +212,22 @@ describe("ExportBanner", () => {
     expect(h.cancel).toHaveBeenCalledWith("j1");
   });
 
-  it("offers Open, Reveal and Add to post when done", async () => {
+  it("ends in a draggable result row with Open, Reveal and Send to when done", async () => {
     const user = userEvent.setup();
     const out = { id: "o1", jobId: "j1", path: "/lib/Edits/My edit.mp4", missing: false } as unknown as Job["outputs"] extends (infer O)[] | null ? O : never;
     showBanner(job({ status: JobStatus.JobDone, progress: 1, outputs: [out], resultJson: JSON.stringify({ action: "render", outputs: ["/lib/Edits/My edit.mp4"], encoder: "h264-hw", speed: 3.2 }) }));
-    expect(screen.getByText("Exported My edit.mp4")).toBeTruthy();
-    expect(screen.getByText("Rendered ×3.2 real time")).toBeTruthy();
+    expect(screen.getByText("My edit.mp4")).toBeTruthy();
+    expect(screen.getByText("×3.2 real time")).toBeTruthy();
+    const row = screen.getByTestId("last-export");
+    expect(row.getAttribute("draggable")).toBe("true");
+    const data: Record<string, string> = {};
+    fireEvent.dragStart(row, { dataTransfer: { setData: (k: string, v: string) => (data[k] = v), types: [] } });
+    expect(JSON.parse(data["application/x-toolbox-paths"] ?? "[]")).toEqual(["/lib/Edits/My edit.mp4"]);
+    expect(screen.getByRole("button", { name: "Send to…" })).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Open" }));
     expect(h.open).toHaveBeenCalledWith("o1");
     await user.click(screen.getByRole("button", { name: /Show in Explorer|Reveal in Finder/ }));
     expect(h.reveal).toHaveBeenCalledWith("o1");
-    await user.click(screen.getByRole("button", { name: "Add to post…" }));
-    expect(h.addToPost).toHaveBeenCalledWith("/lib/Edits/My edit.mp4");
     await user.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(useEditStudio.getState().jobs.render).toBeUndefined();
   });

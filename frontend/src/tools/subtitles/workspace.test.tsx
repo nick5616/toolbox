@@ -20,7 +20,7 @@ import { hostBridge, resetBridgeStatusesForTest, type BridgeTransport } from "@/
 import { setWorkspaceTransportForTest } from "@/workspace/defineWorkspace";
 import { editorReducer, makeTab } from "./editor";
 import { toRows, updateCue } from "./logic";
-import { BRIDGED_ACTIONS, bridgedValues, initialData, useSubtitles, type SubtitlesState } from "./store";
+import { BRIDGED_ACTIONS, bridgedValues, editorFromView, initialData, useSubtitles, type SubtitlesState } from "./store";
 import { subtitlesWorkspace as ws } from "./workspace";
 
 class Hub {
@@ -74,6 +74,26 @@ describe("Subtitles workspace parts", () => {
   it("only mirrors what survives JSON, and forwards the editing actions", () => {
     expect(() => JSON.stringify(bridgedValues(useSubtitles.getState()))).not.toThrow();
     for (const a of ["patchCue", "rowAction", "undo", "seek", "save", "generate", "useCut"]) expect(BRIDGED_ACTIONS).toContain(a);
+  });
+
+  it("mirrors the cues and undo counts, never the undo history", () => {
+    const tab = makeTab("original", "Original", "en", toRows([{ startMs: 0, endMs: 1000, text: "Hello" }]));
+    useSubtitles.setState({ editor: { tabs: [tab], activeId: "original" } });
+    const id = tab.history.present[0]!.id;
+    useSubtitles.getState().patchCue(id, { text: "One" });
+    useSubtitles.getState().patchCue(id, { text: "Two" });
+    useSubtitles.getState().undo();
+    const values = bridgedValues(useSubtitles.getState());
+    const json = JSON.stringify(values);
+    expect(json).not.toContain('"past"');
+    expect(json).not.toContain('"future"');
+    expect(Object.keys(values)).not.toContain("editor");
+    expect(values.editorView.tabs[0]).toMatchObject({ undoCount: 1, redoCount: 1 });
+    expect(bridgedValues(useSubtitles.getState()).editorView).toBe(values.editorView); // stable until the editor changes
+    const back = editorFromView(values.editorView);
+    expect(back.tabs[0]?.history.present[0]?.text).toBe("One");
+    expect(back.tabs[0]?.history.past).toHaveLength(1);
+    expect(back.tabs[0]?.history.future).toHaveLength(1);
   });
 
   it("renders the cue list in a part window and an edit there reaches the host", async () => {

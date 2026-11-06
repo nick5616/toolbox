@@ -7,6 +7,7 @@ import { revealLabel } from "@/lib/platform";
 import { useModules } from "@/state/modules";
 import { sendToMenuItems } from "./sendTo";
 import { useKitTool } from "./toolContext";
+import styles from "./results.module.css";
 
 async function run(p: Promise<unknown>) {
   try {
@@ -27,8 +28,10 @@ export interface FileActionsProps {
 
 /**
  * Result-row actions for a file: **Use** (only inside another tool that wants
- * results back, Phase 11), Reveal, Open and **Send to** (every ready tool that
- * accepts the file, plus "Add to post…").
+ * results back, Phase 11), **Send to** (always visible: every ready tool that
+ * accepts the file, "Add to post…" and the saved pipelines that take it), and
+ * Reveal and Open, which show on row hover and keyboard focus (they stay in the
+ * tab order).
  */
 export function FileActions({ outputId, path, disabled, moduleId }: FileActionsProps) {
   const embed = useEmbed();
@@ -62,24 +65,6 @@ export function FileActions({ outputId, path, disabled, moduleId }: FileActionsP
           {embed.useLabel}
         </Button>
       ) : null}
-      <IconButton
-        size="sm"
-        icon="folder-open"
-        label={revealLabel}
-        data-tip={disabled ? "The file is missing" : outputId ? "Show this file in its folder" : "Show the folder that holds this file"}
-        disabled={disabled}
-        onClick={() => void run(outputId ? LibraryService.Reveal(outputId) : LibraryService.RevealPath(path))}
-      />
-      <IconButton
-        size="sm"
-        icon="external-link"
-        label="Open"
-        data-tip={disabled ? "The file is missing" : outputId ? "Open this file in its default app" : "Not yet registered in the library, so it can only be revealed"}
-        disabled={disabled || !outputId}
-        onClick={() => {
-          if (outputId) void run(LibraryService.Open(outputId));
-        }}
-      />
       {disabled ? null : (
         <MenuButton
           size="sm"
@@ -91,6 +76,26 @@ export function FileActions({ outputId, path, disabled, moduleId }: FileActionsP
           items={() => sendToMenuItems(path, current, modules)}
         />
       )}
+      <span className={styles.hoverActions}>
+        <IconButton
+          size="sm"
+          icon="folder-open"
+          label={revealLabel}
+          data-tip={disabled ? "The file is missing" : outputId ? "Show this file in its folder" : "Show the folder that holds this file"}
+          disabled={disabled}
+          onClick={() => void run(outputId ? LibraryService.Reveal(outputId) : LibraryService.RevealPath(path))}
+        />
+        <IconButton
+          size="sm"
+          icon="external-link"
+          label="Open"
+          data-tip={disabled ? "The file is missing" : outputId ? "Open this file in its default app" : "Not yet registered in the library, so it can only be revealed"}
+          disabled={disabled || !outputId}
+          onClick={() => {
+            if (outputId) void run(LibraryService.Open(outputId));
+          }}
+        />
+      </span>
     </>
   );
 }

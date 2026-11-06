@@ -72,6 +72,32 @@ export function useToolHandoff(moduleId: string, onHandoff: (h: Handoff) => void
   }, [global, moduleId, isEmbedded]);
 }
 
+/**
+ * Delivers the handoff's `action` preset without consuming the handoff, so it
+ * works next to `useToolHandoff`/`useFileInputs`. Embedded: the embed's
+ * handoff; standalone: the pending global handoff. `cb` runs once per handoff
+ * once `ready` is true; the tool validates the value.
+ */
+export function useHandoffAction(moduleId: string, ready: boolean, cb: (action: string) => void): void {
+  const embed = useContext(EmbedContext);
+  const global = useUI((s) => s.handoff);
+  const h = embed ? embed.handoff : global;
+  const pending = useRef<string | null>(null);
+  const seen = useRef<Handoff | null>(null);
+  if (h && h !== seen.current && h.moduleId === moduleId) {
+    seen.current = h;
+    if (h.action) pending.current = h.action;
+  }
+  const f = useRef(cb);
+  f.current = cb;
+  useEffect(() => {
+    if (!ready || pending.current === null) return;
+    const a = pending.current;
+    pending.current = null;
+    f.current(a);
+  }, [ready, h]);
+}
+
 /** The relay channel results travel on from a popped-out embed to its host. */
 export const EMBED_CHANNEL = "embed";
 

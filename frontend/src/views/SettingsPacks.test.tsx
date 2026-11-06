@@ -81,6 +81,29 @@ describe("SettingsPacks", () => {
     expect(api.Install).toHaveBeenCalledWith(["media"], "");
   });
 
+  it("offers 'Install the rest' with its size for a partly installed pack, with no badge", async () => {
+    const packs = samplePacks();
+    packs[0] = pack("media", "Media", PackState.PackPartial, [comp("ffmpeg", I, 200e6, ["media"]), comp("yt-dlp", PackComponentState.ComponentMissing, 20e6, ["media"]), comp("deno", PackComponentState.ComponentMissing, 100e6, ["media"])], ["downloader"]);
+    usePacks.setState({ list: packs });
+    const user = userEvent.setup();
+    render(<SettingsPacks />);
+    const media = screen.getByRole("article", { name: "Media pack" });
+    expect(within(media).queryByText("Partly installed")).toBeNull();
+    expect(within(media).queryByRole("button", { name: "Install" })).toBeNull();
+    await user.click(within(media).getByRole("button", { name: "Install the rest (60 MB)" }));
+    expect(api.Install).toHaveBeenCalledWith(["media"], "");
+  });
+
+  it("tells the Music and Music edits packs apart", () => {
+    const packs = samplePacks();
+    packs[1] = pack("music", "Music", PackState.PackMissing, [comp("engine", PackComponentState.ComponentMissing, 1e6, ["music"])], ["stems"]);
+    packs[2] = pack("edit", "Music edits", PackState.PackMissing, [comp("engine", PackComponentState.ComponentMissing, 1e6, ["edit"])], ["edit-studio"]);
+    usePacks.setState({ list: packs });
+    render(<SettingsPacks />);
+    expect(within(screen.getByRole("article", { name: "Music pack" })).getByText(/Audio tools/)).toBeTruthy();
+    expect(within(screen.getByRole("article", { name: "Music edits pack" })).getByText(/For Edit Studio/)).toBeTruthy();
+  });
+
   it("shows the tools folder with free space, and the setup link", async () => {
     const user = userEvent.setup();
     render(<SettingsPacks />);

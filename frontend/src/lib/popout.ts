@@ -7,6 +7,7 @@
 import { useEffect, useRef } from "react";
 import { toast } from "@/components/toast";
 import { toAppError } from "@/lib/errors";
+import { parkForPopOut } from "@/lib/parkedHistory";
 import { popOutTool } from "@/lib/windows";
 
 type Flusher = () => Promise<void> | void;
@@ -39,6 +40,11 @@ export function useBeforePopOut(moduleId: string, fn: Flusher): void {
 
 /** Runs every flusher registered for the module; resolves when all finish or after 3 s. Errors are swallowed. */
 export async function runBeforePopOut(moduleId: string): Promise<void> {
+  await flushAll(moduleId);
+  await parkForPopOut(moduleId).catch(() => undefined);
+}
+
+async function flushAll(moduleId: string): Promise<void> {
   const set = flushers.get(moduleId);
   if (!set || set.size === 0) return;
   const all = Promise.all(

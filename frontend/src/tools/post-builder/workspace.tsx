@@ -12,7 +12,7 @@ import { defineWorkspace } from "@/workspace";
 import type { PostDoc } from "./logic";
 import { AltPanelView, CaptionPanelView, ChecksPanelView, FormatPanelView, FramingPanelView, PostsPanelView, SourcesPanelView, TrimPanelView } from "./panels";
 import { PhonePreviewPart } from "./preview";
-import { MODULE_ID, usePostBuilder, type PostState, type SaveState, type Still } from "./postStore";
+import { MODULE_ID, usePostBuilder, type LiveFraming, type PostState, type SaveState, type Still } from "./postStore";
 
 export type PostBridgeValues = {
   posts: ProjectInfo[];
@@ -20,6 +20,8 @@ export type PostBridgeValues = {
   loadedId: string;
   name: string;
   doc: PostDoc | null;
+  /** A framing drag in progress (about 30 fps), so popped-out windows follow it. */
+  liveFraming: LiveFraming | null;
   undoDepth: number;
   redoDepth: number;
   saveState: SaveState;
@@ -61,6 +63,7 @@ export function pickPostValues(s: PostState): PostBridgeValues {
     loadedId: s.loadedId,
     name: s.name,
     doc: s.history?.present ?? null,
+    liveFraming: s.liveFramingOut,
     undoDepth: s.history?.past.length ?? 0,
     redoDepth: s.history?.future.length ?? 0,
     saveState: s.saveState,

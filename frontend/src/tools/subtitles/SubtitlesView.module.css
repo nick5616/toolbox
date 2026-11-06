@@ -7,7 +7,7 @@
 /* The empty state before a source is chosen: the drop zone. */
 .sourceEmpty {
   max-width: 640px;
-  margin: var(--space-8) auto;
+  margin: var(--space-6) auto;
   padding: 0 var(--space-6);
   width: 100%;
   box-sizing: border-box;
@@ -19,9 +19,9 @@
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
-  max-width: 280px;
+  max-width: 200px;
   height: var(--control-h-compact, 28px);
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-2);
   font-size: var(--text-sm);
   color: var(--fg);
   background: var(--bg-raised);
@@ -72,17 +72,21 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
-  gap: var(--space-2);
-  padding: var(--space-3);
   box-sizing: border-box;
 }
 
+/* Edge to edge: the player and the timeline run flush with the stage, one divider between them. */
 .previewMain {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  gap: var(--space-2);
+  gap: 0;
+}
+
+.previewMain .player {
+  border: 0;
+  border-radius: 0;
 }
 
 .player {
@@ -109,27 +113,20 @@
   color: var(--fg-muted);
 }
 
-/* Before any cues: the primary action, in the room the cue list will take (never over the picture or timeline). */
+/* Before any cues: the primary action on one line under the timeline. */
 .cta {
-  flex: 1 1 auto;
-  min-height: 140px;
-  display: grid;
-  place-items: center;
+  flex: none;
+  padding: var(--space-3);
+  border-top: 1px solid var(--line);
 }
 
 .ctaCard {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
-  max-width: 340px;
+  justify-content: center;
+  gap: var(--space-2) var(--space-3);
   text-align: center;
-  pointer-events: auto;
-  background: var(--bg-raised);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.3));
 }
 
 .ctaSummary {
@@ -144,8 +141,14 @@
   flex: 1;
   min-height: 0;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3) var(--space-3);
+  padding: var(--space-2) 0 0;
   box-sizing: border-box;
+}
+
+.toolbar,
+.tabs,
+.cuesNote {
+  margin-inline: var(--space-2);
 }
 
 .toolbar {

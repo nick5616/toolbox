@@ -17,10 +17,16 @@ export interface PartFrameProps {
   chrome?: "overlay" | "header";
   children: ReactNode;
   className?: string;
+  /**
+   * Keep the inline content while the part's window is open (a read-only
+   * mirror on a second screen, e.g. Photo Composer's canvas): the window gets a
+   * small "also in its own window" chip instead of a placeholder.
+   */
+  keepWhileOut?: boolean;
 }
 
 /** Wraps a part rendered inline: adds the pop-out button and, while the part's window is open, a placeholder. */
-export function PartFrame({ part, instance, params, chrome = "overlay", children, className }: PartFrameProps) {
+export function PartFrame({ part, instance, params, chrome = "overlay", children, className, keepWhileOut = false }: PartFrameProps) {
   const spec = getPart(part);
   const key = partWindowKey(part, instance);
   const out = useWindowOpen(key);
@@ -38,6 +44,23 @@ export function PartFrame({ part, instance, params, chrome = "overlay", children
     }).catch(fail);
   };
 
+  if (out && keepWhileOut) {
+    return (
+      <div className={cx(styles.frame, className)} data-part={part}>
+        <div className={styles.outChip} role="status">
+          <Icon name={spec?.icon ?? "app-window"} size={12} className={styles.placeholderIcon} />
+          <span>Also in its own window</span>
+          <Button size="sm" variant="ghost" onClick={() => focusWindow(key).catch(fail)} data-tip={`Show the ${title} window`}>
+            Show
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => closeWindow(key).catch(fail)} data-tip={`Close the ${title} window`}>
+            Close
+          </Button>
+        </div>
+        <div className={styles.content}>{children}</div>
+      </div>
+    );
+  }
   if (out) {
     return (
       <div className={cx(styles.placeholder, className)} role="status">

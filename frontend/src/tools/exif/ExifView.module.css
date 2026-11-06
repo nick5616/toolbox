@@ -74,7 +74,6 @@
   object-fit: cover;
   color: var(--fg-subtle);
   background: var(--bg-inset);
-  border: 1px solid var(--line);
   border-radius: var(--r-md);
 }
 
@@ -105,8 +104,7 @@
   padding: var(--space-3);
   color: var(--warn);
   background: var(--warn-soft);
-  border: 1px solid var(--warn);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-md);
 }
 
 .locationText {

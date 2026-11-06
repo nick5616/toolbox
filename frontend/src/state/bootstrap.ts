@@ -14,6 +14,7 @@ import { notifyHiddenToTray } from "@/shell/hiddenToTray";
 import { useDesktop } from "./desktop";
 import { useDeps } from "./deps";
 import { useJobs } from "./jobs";
+import { subscribeLanShare } from "./lanshare";
 import { useLibrary } from "./library";
 import { useModules } from "./modules";
 import { usePipelines } from "./pipelines";
@@ -56,6 +57,8 @@ export function subscribeAll(): void {
     on("pipelines:run", (r) => usePipelines.getState().upsertRun(r)),
     on("pipelines:runs-removed", (p) => usePipelines.getState().removeRuns(p.ids ?? [])),
     ...subscribeDesktop(),
+    // Local File Transfer (Phase 13): main and tool windows, not popups.
+    subscribeLanShare({ main: isMain }),
   ];
 }
 

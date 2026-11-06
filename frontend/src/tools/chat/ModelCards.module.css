@@ -1,20 +1,22 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* Dense rows separated by one divider, not boxed cards. */
 .card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--bg-raised);
+  gap: 2px;
+  padding: var(--space-2) var(--space-2);
+}
+
+.card + .card {
+  border-top: 1px solid var(--line);
 }
 
 .head {
@@ -49,7 +51,6 @@
 .actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: var(--space-1);
 }
 
 .progress {

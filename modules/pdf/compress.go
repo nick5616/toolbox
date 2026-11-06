@@ -496,3 +496,16 @@ func moveFile(src, dst string) error {
 	_ = os.Remove(src)
 	return nil
 }
+
+// CompressImages recompresses the pictures of in at dpi/quality (JPEG
+// 1..100) and writes the optimised file to out (Compress to Size, Phase 17).
+// progress(done,total) counts images and may be nil. It returns how many
+// images were recompressed. Errors are *core.AppError where the user can act
+// (password needed, restricted, not found).
+func CompressImages(ctx context.Context, in, out, password string, dpi, quality int, progress func(done, total int)) (int, error) {
+	if progress == nil {
+		progress = func(int, int) {}
+	}
+	res, err := compressPDF(ctx, in, out, password, compressLevel{dpi: dpi, quality: quality}, progress)
+	return res.recompressed, err
+}

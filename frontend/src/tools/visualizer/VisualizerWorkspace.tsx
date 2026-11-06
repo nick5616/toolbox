@@ -123,9 +123,6 @@ export default function VisualizerWorkspace({ lastShow }: { lastShow: Show | nul
             <Icon name={isVideo ? "film" : "music"} size={14} />
             <span className={styles.chipName}>{basename(input)}</span>
           </button>
-          <span className={styles.name} data-tip="The name of this design">
-            {history.show.name}
-          </span>
           <Spacer />
           <IconButton icon="undo-2" label="Undo" data-tip="Undo the last design change" kbd="Mod+Z" disabled={!history.canUndo} onClick={history.undo} />
           <IconButton icon="redo-2" label="Redo" data-tip="Redo the change you just undid" kbd="Mod+Shift+Z" disabled={!history.canRedo} onClick={history.redo} />

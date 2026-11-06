@@ -32,7 +32,7 @@ export const stepType = (id: string, name: string, o: Partial<StepType> = {}): S
 
 export const CATALOG: StepType[] = [
   stepType("pipelines.check", "Check", { builtin: true, auto: false, manual: false, accepts: acc([], { any: true }), icon: "eye" }),
-  stepType("pipelines.chat", "Ask Local Chat", { builtin: true, accepts: acc([]), icon: "sparkles" }),
+  stepType("llm-chat", "Local Chat", { moduleId: "pipelines", builtin: true, accepts: acc([]), icon: "message-square" }),
   stepType("downloader", "Downloader", { accepts: acc([], { urls: true }), defaultsJson: '{"format":"video"}', icon: "arrow-down-to-line" }),
   stepType("trimmer", "Video Trimmer", { manual: true, accepts: acc([".mp4"]), icon: "scissors", defaultsJson: '{"whole":true}' }),
   stepType("stems", "Stem Splitter", { category: Category.CategoryAudio, accepts: acc([".mp3", ".flac"]), icon: "layers" }),
@@ -57,6 +57,7 @@ export const step = (id: string, type: string, o: Partial<PipelineStep> = {}): P
   autoContinue: true,
   keep: false,
   note: "",
+  binds: [],
   ...o,
 });
 
@@ -66,8 +67,11 @@ export const pipeline = (id: string, steps: PipelineStep[], o: Partial<Pipeline>
   description: "",
   layout: "",
   templateId: "",
+  params: [],
   steps,
   watch: { enabled: false, folder: "" },
+  clip: { enabled: false, kinds: [], pattern: "" },
+  schedule: { enabled: false, days: [], times: [], catchUpMin: 30 },
   createdAt: 1,
   updatedAt: 1,
   ...o,
@@ -100,6 +104,7 @@ export const check = (steps: StepCheck[], o: Partial<PipelineCheck> = {}): Pipel
   secrets: [],
   missing: [],
   ready: true,
+  takesFiles: true,
   ...o,
 });
 
@@ -107,6 +112,8 @@ export const entry = (p: Pipeline, c: PipelineCheck = check((p.steps ?? []).map(
   pipeline: p,
   check: c,
   watch: { active: false, message: "" },
+  schedule: { active: false, message: "", next: 0 },
+  clip: { active: false, message: "" },
   lastRun: null,
   ...o,
 });

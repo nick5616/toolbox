@@ -1,14 +1,20 @@
 package api
 
 import (
+	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode/utf8"
+
+	sysclip "golang.design/x/clipboard"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -201,4 +207,92 @@ func (s *FilesService) ImageThumb(path string, maxDim int) (string, error) {
 // ImageSize returns an image's pixel dimensions (header only).
 func (s *FilesService) ImageSize(path string) (core.Size, error) {
 	return imaging.Size(path)
+}
+
+// maxClipboardImage caps a pasted image (same limit as clipboard history).
+const maxClipboardImage = 20 << 20
+
+// clipboardReader is the read side of the OS clipboard (swapped in tests).
+// It never writes.
+type clipboardReader interface {
+	Files(ctx context.Context) ([]string, error)
+	Image(ctx context.Context) ([]byte, error)
+}
+
+type systemClipboardReader struct{}
+
+func (systemClipboardReader) Files(ctx context.Context) ([]string, error) {
+	if err := sysclip.Init(); err != nil {
+		return nil, err
+	}
+	return sysclip.ReadFiles(ctx)
+}
+
+func (systemClipboardReader) Image(ctx context.Context) ([]byte, error) {
+	if err := sysclip.Init(); err != nil {
+		return nil, err
+	}
+	return sysclip.Read(ctx, sysclip.FmtImage)
+}
+
+var clipReader clipboardReader = systemClipboardReader{}
+
+// ClipboardFiles returns the files copied in Explorer/Finder (existing
+// absolute paths only) or, when the clipboard holds an image instead, saves it
+// as a PNG in the app's tmp folder and returns that path. Anything else, or a
+// platform that can't read file lists, returns an empty list. It never writes
+// to the clipboard.
+func (s *FilesService) ClipboardFiles() ([]string, error) {
+	return s.clipboardFiles(context.Background(), clipReader)
+}
+
+func (s *FilesService) clipboardFiles(ctx context.Context, r clipboardReader) ([]string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	if paths, err := r.Files(ctx); err == nil {
+		out := make([]string, 0, len(paths))
+		for _, p := range paths {
+			if !filepath.IsAbs(p) {
+				continue
+			}
+			if _, err := os.Stat(p); err == nil {
+				out = append(out, p)
+			}
+		}
+		if len(out) > 0 {
+			return out, nil
+		}
+	}
+
+	img, err := r.Image(ctx)
+	if err != nil || len(img) == 0 || len(img) > maxClipboardImage {
+		// Nothing usable, or no clipboard to reach: not an error for a paste.
+		return []string{}, nil
+	}
+	dir := filepath.Join(s.Paths.TmpDir, "paste")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("create paste folder: %w", err)
+	}
+	pruneOld(dir, 24*time.Hour)
+	var b [4]byte
+	_, _ = rand.Read(b[:])
+	p := filepath.Join(dir, "Pasted image "+time.Now().Format("2006-01-02 150405")+"-"+hex.EncodeToString(b[:])+".png")
+	if err := os.WriteFile(p, img, 0o600); err != nil {
+		return nil, fmt.Errorf("save pasted image: %w", err)
+	}
+	return []string{p}, nil
+}
+
+// pruneOld deletes files in dir older than age (best effort).
+func pruneOld(dir string, age time.Duration) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if info, err := e.Info(); err == nil && !e.IsDir() && time.Since(info.ModTime()) > age {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
+		}
+	}
 }

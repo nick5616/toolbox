@@ -14,8 +14,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-6);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--line);
 }
 
@@ -26,7 +26,7 @@
 
 .filters {
   flex: 0 0 auto;
-  width: clamp(150px, 26vw, 240px);
+  width: clamp(140px, 22vw, 200px);
 }
 
 .drawerBody {
@@ -39,7 +39,7 @@
 .list {
   list-style: none;
   margin: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-2);
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -47,7 +47,8 @@
 
 .row {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) minmax(72px, 160px) 76px 72px auto;
+  grid-template-columns: 20px minmax(0, 1fr) minmax(72px, 160px) 76px 72px;
+  position: relative;
   align-items: center;
   column-gap: var(--space-3);
   height: var(--row-h);
@@ -102,9 +103,17 @@
 }
 
 .actions {
+  position: absolute;
+  right: var(--space-1);
+  top: 50%;
+  translate: 0 -50%;
+  padding-left: var(--space-2);
+  background: var(--bg-hover);
+  border-radius: var(--r-md);
   display: inline-flex;
   gap: 2px;
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease-out);
 }
 
@@ -112,10 +121,38 @@
 .row:focus-within .actions,
 .selected .actions {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .more {
   display: flex;
   justify-content: center;
   padding: var(--space-3);
+}
+
+.typeBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.bulk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.bulkCount {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.row[draggable="true"] {
+  cursor: grab;
 }

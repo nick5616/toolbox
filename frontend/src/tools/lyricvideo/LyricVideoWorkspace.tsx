@@ -2,7 +2,7 @@
  * Lyric Video once a song is chosen (SPEC Phase 11 §5.4): one screen instead of
  * five steps.
  *
- * Header: song chip (opens Song) | undo · redo · ⋯ · Render (opens Render).
+ * Header: song chip (opens Song) | undo · redo · ⋯ · Export (opens Export).
  * Rail: Song, Lyrics, Visuals, Look. Stage: the preview (a part that pops
  * out) with the song's player and timeline under it, or the full designer when
  * it is open. Side: the lyric lines (a panel that pops out).
@@ -22,7 +22,7 @@ import { useJob } from "@/state/jobs";
 import { usePacks } from "@/state/packs";
 import { PartFrame } from "@/parts/PartFrame";
 import { withoutText } from "@/blocks/visuals/designer/model";
-import { useShowHistory, useUndoKeys } from "@/blocks/visuals/designer/useShowHistory";
+import { useShowHistory } from "@/blocks/visuals/designer/useShowHistory";
 import { VisualDesigner } from "@/blocks/visuals/designer/VisualDesigner";
 import type { Show } from "@/viz/types";
 import { JobStatus } from "@/lib/api";
@@ -33,7 +33,7 @@ import { basename, stem, tagValue, toLines, toRows } from "./logic";
 import { parseResult, textSummary } from "./options";
 import { LyricOverlay } from "./Preview";
 import { PreviewStage } from "./PreviewPart";
-import { playerHandle, useLyricVideo } from "./store";
+import { designHandle, playerHandle, useLyricVideo } from "./store";
 import { STEMS_MODEL, aspectNumber, componentInstalled, designLabel, initialDesign, showOf, stepAnalyzeOptions } from "./visuals";
 import { lyricVideoWorkspace as ws } from "./workspace";
 import styles from "./panels.module.css";
@@ -162,8 +162,6 @@ function DesignerStage({ songPath, history }: { songPath: string; history: Retur
   return (
     <div className={styles.designer}>
       <div className={styles.designerBar}>
-        <IconButton icon="undo-2" label="Undo design" data-tip="Undo the last design change" disabled={!history.canUndo} onClick={history.undo} />
-        <IconButton icon="redo-2" label="Redo design" data-tip="Redo the change you just undid" disabled={!history.canRedo} onClick={history.redo} />
         <span className={styles.designerName} data-tip="The name of this design">
           {history.show.name}
         </span>
@@ -190,7 +188,12 @@ function DesignerStage({ songPath, history }: { songPath: string; history: Retur
   );
 }
 
-/** The design's undo history, kept in step with the options (the picker and the designer both choose the design). */
+/**
+ * The design's history, kept in step with the options (the picker and the
+ * designer both choose the design). Its steps are mirrored into the store's
+ * single undo journal, so the header's Undo takes back the last change
+ * whether it was to the lines or the design.
+ */
 function useDesign() {
   const showJson = useLyricVideo((s) => s.prefs.look.visuals.showJson);
   const designerOpen = useLyricVideo((s) => s.designerOpen);
@@ -202,7 +205,28 @@ function useDesign() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
-  useUndoKeys(history, designerOpen);
+  const live = useRef(history);
+  live.current = history;
+  useEffect(() => {
+    // A design history from an earlier mount is gone; its steps can't be taken back.
+    useLyricVideo.getState().dropDomain("design");
+    designHandle.current = { undo: () => live.current.undo(), redo: () => live.current.redo() };
+    return () => {
+      designHandle.current = null;
+    };
+  }, []);
+  const seq = useRef(history.seq);
+  useEffect(() => {
+    if (history.seq === seq.current) return;
+    seq.current = history.seq;
+    useLyricVideo.getState().noteStep("design");
+  }, [history.seq]);
+  const epoch = useRef(history.epoch);
+  useEffect(() => {
+    if (history.epoch === epoch.current) return;
+    epoch.current = history.epoch;
+    useLyricVideo.getState().dropDomain("design");
+  }, [history.epoch]);
   const emitted = useRef(showJson);
   // The designer's edits become the chosen design.
   useEffect(() => {
@@ -260,9 +284,9 @@ function Workspace({ songPath }: { songPath: string }) {
     useLyricVideo.getState().requestPanel(null);
   }, [panelRequest, open]);
 
-  // Undo/redo of the lines (the designer has its own history while it is open).
-  useShortcut("Mod+Z", () => st().undo(), { when: !tapping && !designerOpen, allowInInputs: true });
-  useShortcut(["Mod+Shift+Z", "Mod+Y"], () => st().redo(), { when: !tapping && !designerOpen, allowInInputs: true });
+  // One undo history for the lines and the design. While the designer is open its own text fields keep their native undo.
+  useShortcut("Mod+Z", () => st().undo(), { when: !tapping, allowInInputs: !designerOpen });
+  useShortcut(["Mod+Shift+Z", "Mod+Y"], () => st().redo(), { when: !tapping, allowInInputs: !designerOpen });
   // Tap to sync.
   useShortcut(" ", () => st().stamp(), { when: tapping });
   useShortcut("Backspace", () => st().tapBackOne(), { when: tapping });
@@ -285,8 +309,8 @@ function Workspace({ songPath }: { songPath: string }) {
               <span className={styles.chipName}>{label}</span>
             </button>
             <Spacer />
-            <IconButton icon="undo-2" label="Undo" data-tip={designerOpen ? "Undo the last design change" : "Undo the last lyric edit"} kbd="Mod+Z" disabled={designerOpen ? !design.canUndo : !canUndo} onClick={designerOpen ? design.undo : () => st().undo()} />
-            <IconButton icon="redo-2" label="Redo" data-tip={designerOpen ? "Redo the change you just undid" : "Redo the edit you just undid"} kbd="Mod+Shift+Z" disabled={designerOpen ? !design.canRedo : !canRedo} onClick={designerOpen ? design.redo : () => st().redo()} />
+            <IconButton icon="undo-2" label="Undo" data-tip="Undo the last change to the lyrics or the design" kbd="Mod+Z" disabled={!canUndo} onClick={() => st().undo()} />
+            <IconButton icon="redo-2" label="Redo" data-tip="Redo the change you just undid" kbd="Mod+Shift+Z" disabled={!canRedo} onClick={() => st().redo()} />
             <MenuButton
               label="More"
               icon="ellipsis"
@@ -299,8 +323,8 @@ function Workspace({ songPath }: { songPath: string }) {
                 { id: "lv-visualizer-window", label: "Make the whole video in Visualizer (new window)", tip: "Open Visualizer with this song and these lyrics in its own window", onSelect: () => makeInVisualizer(true) },
               ]}
             />
-            <Button variant="primary" icon="film" collapsible data-tip="Render a short exact preview or the whole video" onClick={() => open(panelDrawerId("render"))}>
-              Render
+            <Button variant="primary" icon="film" collapsible data-tip="Export a short exact preview or the whole video" onClick={() => open(panelDrawerId("render"))}>
+              Export
             </Button>
           </>
         }
@@ -316,7 +340,7 @@ function Workspace({ songPath }: { songPath: string }) {
                 look: textSummary(prefs.look),
               }}
             />
-            {/* Opened by the Render button; its drawer stays mounted. */}
+            {/* Opened by the Export button; its drawer stays mounted. */}
             <span hidden>
               <WorkspacePanel ws={ws} panel="render" />
             </span>

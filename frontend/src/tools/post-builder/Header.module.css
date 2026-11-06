@@ -1,6 +1,5 @@
 /* The header line: Posts chip, save state | spacer | undo redo ⋯ Export. Never wraps. */
 .bar {
-  container: toolbar-compact / inline-size;
   display: flex;
   flex: 1;
   flex-wrap: nowrap;

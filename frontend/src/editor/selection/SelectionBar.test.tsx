@@ -7,13 +7,14 @@ import { fixtureProject } from "@/viz/edit/fixture";
 import { defaultTextClip, serializeTextClip } from "@/viz/edit/schema";
 import { findClip } from "../doc";
 import { Rail } from "../Rail";
-import { registerEditorPanel } from "../panels";
-import "../panelDefs";
+import { defineEditorWorkspace } from "../workspace";
 import { EditorProfileProvider, PLAIN_PROFILE } from "../profileContext";
 import type { EditorProfile } from "../profile";
 import { useEditStudio, type Selection } from "../store";
 import { placeGenerated } from "../timeline/placeGenerated";
 import { fitChips, SelectionBar } from "./SelectionBar";
+
+const titleOf = (panel: string) => defineEditorWorkspace(PLAIN_PROFILE).getPanel(panel)?.title;
 
 const size = vi.hoisted(() => ({ width: 0 }));
 vi.mock("@/lib/useElementSize", () => ({ useElementSize: () => ({ width: size.width, height: 0 }) }));
@@ -32,6 +33,7 @@ function open(selection: Selection) {
 }
 
 function bar(profile: EditorProfile = PLAIN_PROFILE) {
+  defineEditorWorkspace(profile);
   return render(
     <EditorProfileProvider profile={profile}>
       <ClickInHost>
@@ -114,8 +116,7 @@ describe("selection bar", () => {
 
   it("the profile adds its own chips", () => {
     open({ kind: "clips", ids: ["c1"] });
-    registerEditorPanel({ id: "own-chip", title: "Own chip", icon: "music", tip: "", component: () => <div /> });
-    bar({ ...PLAIN_PROFILE, clipChips: [{ panel: "own-chip", summary: () => "hello" }, { panel: "own-chip", kinds: ["image"] }] });
+    bar({ ...PLAIN_PROFILE, moduleId: "own-chip-tool", panels: [{ id: "own-chip", title: "Own chip", icon: "music", tip: "", component: () => <div /> }], clipChips: [{ panel: "own-chip", summary: () => "hello" }, { panel: "own-chip", kinds: ["image"] }] });
     expect(chips().filter((c) => c.startsWith("Own chip"))).toEqual(["Own chiphello"]);
   });
 
@@ -193,13 +194,13 @@ describe("fitChips", () => {
     { panel: "clip-effects", summary: "2 effects" },
     { panel: "clip-masks", summary: "None" },
   ];
-  it("shows everything for an unknown width", () => expect(fitChips(list, 0)).toEqual({ shown: 3, summaries: true }));
+  it("shows everything for an unknown width", () => expect(fitChips(list, 0, titleOf)).toEqual({ shown: 3, summaries: true }));
   it("shows summaries while there is room, then only labels, then fewer chips", () => {
-    expect(fitChips(list, 800)).toEqual({ shown: 3, summaries: true });
-    expect(fitChips(list, 270)).toEqual({ shown: 3, summaries: false });
-    const small = fitChips(list, 200);
+    expect(fitChips(list, 800, titleOf)).toEqual({ shown: 3, summaries: true });
+    expect(fitChips(list, 270, titleOf)).toEqual({ shown: 3, summaries: false });
+    const small = fitChips(list, 200, titleOf);
     expect(small.summaries).toBe(false);
     expect(small.shown).toBeLessThan(3);
-    expect(fitChips(list, 10).shown).toBe(0);
+    expect(fitChips(list, 10, titleOf).shown).toBe(0);
   });
 });

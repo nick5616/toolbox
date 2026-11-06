@@ -10,11 +10,10 @@ const h = vi.hoisted(() => ({
   drag: vi.fn(),
 }));
 
-vi.mock("@/blocks/sources/sourceDrag", () => ({
-  startSourceDrag: (...a: unknown[]) => h.drag(...a),
-  useSourceDropTarget: () => undefined,
-  useSourceDrag: () => undefined,
-}));
+vi.mock("@/blocks/sources/sourceDrag", async (orig) => {
+  const actual = await orig<typeof import("@/blocks/sources/sourceDrag")>();
+  return { ...actual, startSourceDrag: (...a: unknown[]) => h.drag(...a) };
+});
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -32,6 +31,7 @@ vi.mock("@/lib/api", async (orig) => {
 });
 
 import { JobStatus, type EditSourceState, type Job } from "@/lib/api";
+import { PATHS_MIME } from "@/lib/fileDrag";
 import { useJobs } from "@/state/jobs";
 import { emptyEditProject, type NormalProject } from "@/viz/edit/defaults";
 import { useEditStudio } from "@/editor/store";
@@ -81,6 +81,23 @@ describe("SourcesPanel", () => {
     open([]);
     render(<SourcesPanel />);
     expect(screen.getByText("Drop clips and photos here")).toBeTruthy();
+  });
+
+  it("takes files dragged in from another tool (PATHS_MIME) as new sources", async () => {
+    open(["/c/a.mp4"], [st("/c/a.mp4")]);
+    h.probe.mockResolvedValue([{ path: "/c/b.mp4", kind: "video", durationMs: 4000, error: "" }]);
+    const { container } = render(<SourcesPanel />);
+    const data: Record<string, string> = { [PATHS_MIME]: JSON.stringify(["/c/a.mp4", "/c/b.mp4"]) };
+    fireEvent.drop(container.firstElementChild!, { dataTransfer: { types: [PATHS_MIME], getData: (k: string) => data[k] ?? "" } });
+    await waitFor(() => expect(h.prepare).toHaveBeenCalledWith("p1", ["/c/b.mp4"], 30));
+    expect(project().sources.map((s) => s.path)).toEqual(["/c/a.mp4", "/c/b.mp4"]);
+  });
+
+  it("ignores a drag that carries no in-app files", () => {
+    open(["/c/a.mp4"], [st("/c/a.mp4")]);
+    const { container } = render(<SourcesPanel />);
+    fireEvent.drop(container.firstElementChild!, { dataTransfer: { types: ["Files"], getData: () => "" } });
+    expect(h.probe).not.toHaveBeenCalled();
   });
 
   it("shows each source's status", () => {

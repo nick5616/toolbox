@@ -11,6 +11,8 @@ export interface ConversationListProps {
   onSearch: (q: string) => void;
   onSelect: (id: string) => void;
   onNew: () => void;
+  /** No model is installed yet: New chat waits for one. */
+  newDisabled?: boolean;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
   onExport: (id: string) => void;
@@ -33,7 +35,7 @@ export function ConversationList(p: ConversationListProps) {
   return (
     <nav className={styles.sidebar} aria-label="Conversations">
       <div className={styles.sideTop}>
-        <Button variant="primary" icon="message-square" onClick={p.onNew} className={styles.newBtn} data-tip="Start a fresh conversation with an empty history">
+        <Button variant="primary" icon="message-square" onClick={p.onNew} disabled={p.newDisabled} className={styles.newBtn} data-tip={p.newDisabled ? "Download a model first; then you can start a chat" : "Start a fresh conversation with an empty history"}>
           New chat
         </Button>
         <TextField

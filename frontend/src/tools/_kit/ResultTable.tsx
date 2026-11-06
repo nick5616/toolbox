@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Button, IconButton, toast, cx } from "@/components";
+import { useResultBehaviour } from "./ResultRow";
 import styles from "./ResultTable.module.css";
 
 export interface ResultColumn<Row> {
@@ -14,6 +15,12 @@ export interface ResultColumn<Row> {
   width?: string;
 }
 
+export interface ResultFile {
+  path: string;
+  outputId?: string;
+  missing?: boolean;
+}
+
 export interface ResultTableProps<Row> {
   rows: Row[];
   columns: ResultColumn<Row>[];
@@ -22,6 +29,8 @@ export interface ResultTableProps<Row> {
   label: string;
   empty?: ReactNode;
   actions?: ReactNode;
+  /** The file a row stands for: makes the row draggable, and double-click or Enter open it. */
+  rowFile?: (row: Row) => ResultFile | undefined;
 }
 
 function csvField(v: string): string {
@@ -44,10 +53,18 @@ async function copyText(text: string, title: string): Promise<void> {
   }
 }
 
+/** A table row that behaves like a result row when it stands for a file. */
+function FileTr({ file, children }: { file: ResultFile | undefined; children: ReactNode }) {
+  const behaviour = useResultBehaviour({ path: file?.path ?? "", outputId: file?.outputId, missing: file?.missing || !file });
+  if (!file) return <tr>{children}</tr>;
+  return <tr {...behaviour}>{children}</tr>;
+}
+
 /** Dense results table with copy-row and copy-all-as-CSV. */
-export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions }: ResultTableProps<Row>) {
+export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions, rowFile }: ResultTableProps<Row>) {
   return (
     <div className={styles.root}>
+      {rows.length > 0 && (
       <div className={styles.bar}>
         <span className={styles.count} data-tip="Number of finished results listed below">
           {rows.length} {rows.length === 1 ? "result" : "results"}
@@ -66,6 +83,7 @@ export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions 
           </Button>
         </span>
       </div>
+      )}
       {rows.length === 0 ? (
         <div className={styles.empty}>{empty}</div>
       ) : (
@@ -85,7 +103,7 @@ export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions 
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={rowKey(r)}>
+                <FileTr key={rowKey(r)} file={rowFile?.(r)}>
                   {columns.map((c) => (
                     <td key={c.key} className={cx(c.align === "right" && styles.right, c.mono && styles.mono)}>
                       {c.render(r)}
@@ -101,7 +119,7 @@ export function ResultTable<Row>({ rows, columns, rowKey, label, empty, actions 
                       onClick={() => void copyText(columns.map((c) => c.text(r)).join("\t"), "Row copied")}
                     />
                   </td>
-                </tr>
+                </FileTr>
               ))}
             </tbody>
           </table>

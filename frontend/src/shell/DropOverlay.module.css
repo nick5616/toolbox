@@ -8,7 +8,8 @@
   transition: opacity var(--dur-fast) var(--ease-out);
 }
 
-:global(.file-drop-target-active) .hint {
+:global(.file-drop-target-active) .hint,
+:global([data-inapp-drag="free"]) .hint {
   opacity: 1;
 }
 

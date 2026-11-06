@@ -5,20 +5,20 @@
  * the controls of several panels at once render them together here.
  */
 import { findClip } from "../doc";
-import { getEditorPanel } from "../panels";
 import { useEditorProfile } from "../profileContext";
+import { defineEditorWorkspace } from "../workspace";
 import { ClipQuickControls } from "../selection/SelectionBar";
 import { CLIP_CHIPS } from "../selection/summaries";
 import { useEditStudio } from "../store";
-import "../panelDefs";
 
 export function InspectorHarness() {
   const profile = useEditorProfile();
+  const ws = defineEditorWorkspace(profile);
   const selection = useEditStudio((s) => s.selection);
   const project = useEditStudio((s) => s.history?.present ?? null);
   if (!project) return null;
   const panel = (id: string) => {
-    const Body = getEditorPanel(id)?.component;
+    const Body = ws.getPanel(id)?.component;
     return Body ? <Body key={id} /> : null;
   };
   if (selection?.kind === "clips" && selection.ids.length === 1) {

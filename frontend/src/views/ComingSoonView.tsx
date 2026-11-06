@@ -32,7 +32,7 @@ export function ComingSoonView({ moduleId }: ComingSoonViewProps) {
           </div>
         </div>
       ) : null}
-      <p className={styles.planned}>Planned for a future phase.</p>
+      <p className={styles.planned}>Not available yet.</p>
     </section>
   );
 }

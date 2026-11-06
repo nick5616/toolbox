@@ -11,6 +11,7 @@ import { MediaPlayer, formatMs, useMediaSource } from "@/components/media";
 import { FilesService, JobStatus, VisualizerAction, VisualizerMode, type VisualizerOptions } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { copyText } from "@/lib/copy";
+import { startPathsDrag } from "@/lib/fileDrag";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { chooseEncoder } from "@/viz/worker/encoder";
 import { validateShow } from "@/viz/validate";
@@ -147,12 +148,12 @@ function ResultCard({ job }: { job: NonNullable<VizJob["job"]> }) {
         {outputs.map((path) => {
           const out = job.outputs.find((o) => o.path === path);
           return (
-            <li key={path} className={styles.resultRow}>
+            <li key={path} className={styles.resultRow} draggable={!out?.missing} onDragStart={(e) => startPathsDrag(e, [path])}>
               <Icon name="film" size={14} />
               <span className={styles.resultName} data-tip={path}>
                 {base(path)}
               </span>
-              <FileActions outputId={out?.id} path={path} disabled={out?.missing} />
+              <FileActions outputId={out?.id} path={path} disabled={out?.missing} moduleId="visualizer" />
               <IconButton size="sm" icon="copy" label="Copy path" data-tip="Copy the full path of this file" onClick={() => void copyText(path, { what: "path" })} />
             </li>
           );
@@ -348,7 +349,7 @@ export default function ExportPanel() {
           </label>
           <div className={styles.row}>
             <Button icon="play" variant="secondary" loading={preview.busy} disabled={!!blocker || busy} data-tip={blocker || (busy ? "Wait for the current render to finish" : "Render 10 seconds from the chosen start so you can check it")} onClick={() => go(preview, VisualizerAction.ActionPreview)}>
-              Render 10 s preview
+              Preview 10 s
             </Button>
           </div>
           <Progress run={preview} label="Rendering the preview…" rangeSec={10} outFps={prefs.fps} />
@@ -360,7 +361,7 @@ export default function ExportPanel() {
         <div className={styles.form}>
           <div className={styles.row}>
             <Button icon="film" variant="primary" loading={render.busy} disabled={!!blocker || busy} data-tip={blocker || (busy ? "Wait for the current render to finish" : "Render the full video with these settings and save it to your Library")} onClick={() => go(render, VisualizerAction.ActionRender)}>
-              Render video
+              Export video
             </Button>
           </div>
           <Progress run={render} label="Rendering the video…" rangeSec={rangeSec} outFps={prefs.fps} />

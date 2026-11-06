@@ -1,6 +1,9 @@
 package pipelines
 
-import "toolbox/core/pipeline"
+import (
+	"toolbox/core"
+	"toolbox/core/pipeline"
+)
 
 // Built-in step and job options (SPEC.md §7).
 
@@ -12,6 +15,7 @@ const (
 	ActionTable  Action = "table"
 	ActionZip    Action = "zip"
 	ActionCopy   Action = "copy"
+	ActionRun    Action = "run"
 )
 
 // Options are the job options (made by PrepareStep; everything expanded).
@@ -23,6 +27,8 @@ type Options struct {
 	Table    *TableJob  `json:"table"`
 	Zip      *ZipJob    `json:"zip"`
 	Copy     *CopyJob   `json:"copy"`
+	Run      *RunJob    `json:"run"`
+	Open     *OpenJob   `json:"open"` // Phase 18
 }
 
 type RenameOp struct {
@@ -120,12 +126,32 @@ type CopyStep struct {
 // Step type IDs of the built-ins.
 const (
 	TypeRename = "pipelines.rename"
-	TypeChat   = "pipelines.chat"
+	TypeChat   = pipeline.LocalChatType // Local Chat's own step; "pipelines.chat" is its alias
+	TypeRun    = pipeline.RunPipelineType
 	TypeTable  = "pipelines.table"
 	TypeZip    = "pipelines.zip"
 	TypeCopy   = "pipelines.copy"
 	TypeCheck  = pipeline.CheckType
 )
+
+// RunStep is "Run another pipeline" (Phase 14): the saved pipeline to run as
+// a sub-run on the step's files. Its kept outputs (or, when it keeps none,
+// the files of its last step) become this step's files.
+type RunStep struct {
+	PipelineID string `json:"pipelineId"`
+}
+
+// RunJob is the job side of a sub-run: the finished sub-run's files, which
+// the job only reports (the waiting happens while the step is prepared, so a
+// sub-run never holds a job slot its own steps need).
+type RunJob struct {
+	Name  string         `json:"name"` // the sub-pipeline's name
+	Files []core.RunFile `json:"files"`
+}
+
+// TypeChatLegacy is the old ID of Local Chat's step; saved pipelines keep
+// working through an alias.
+const TypeChatLegacy = pipeline.LegacyChatType
 
 // Chat modes and formats.
 const (
@@ -149,3 +175,4 @@ func DefaultTable() TableStep {
 func DefaultZip() ZipStep { return ZipStep{Together: true, Name: "{pipeline} {date}"} }
 
 func DefaultCopy() CopyStep { return CopyStep{Folder: "", Subfolder: ""} }
+func DefaultRun() RunStep   { return RunStep{} }

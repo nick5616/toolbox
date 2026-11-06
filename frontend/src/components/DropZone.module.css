@@ -4,10 +4,10 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  min-height: 96px;
-  padding: var(--space-4);
+  min-height: 64px;
+  padding: var(--space-3);
   border: 1px dashed var(--line-strong);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-md);
   background: var(--bg-inset);
   color: var(--fg-muted);
   text-align: center;

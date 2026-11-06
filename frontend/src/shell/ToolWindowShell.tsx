@@ -1,5 +1,6 @@
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { Button, ClickInHost, ErrorBoundary, Icon, Toaster, toast } from "@/components";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { HeaderPresenceContext } from "@/components/ToolHeader";
+import { Button, ClickInHost, HeaderSlotProvider, ErrorBoundary, Icon, Toaster, toast } from "@/components";
 import { TooltipLayer } from "@/components/TooltipLayer";
 import { DesktopService } from "@/lib/api";
 import { EmbedContext, sendEmbedUseAcked, type EmbedContextValue } from "@/lib/embed";
@@ -48,6 +49,9 @@ export function ToolWindowShell({ view }: ToolWindowShellProps) {
   // A handoff that carries an embed link: this window was popped out of another tool's click-in.
   const [embedded, setEmbedded] = useState<Handoff | null>(null);
   const key = currentWindow().key || toolWindowKey(view);
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const [headers, setHeaders] = useState(0);
+  const reportHeader = useCallback((present: boolean) => setHeaders((n) => Math.max(0, n + (present ? 1 : -1))), []);
 
   // The window's one-time handoff, then any later one sent to this window.
   useEffect(() => {
@@ -132,16 +136,20 @@ export function ToolWindowShell({ view }: ToolWindowShellProps) {
             for {embed.hostName}
           </span>
         ) : null}
-        <CompositionBar view={view} />
-        <span className={styles.spacer} />
+        <CompositionBar view={view} condensed={headers > 0} />
+        <div ref={setSlot} className={styles.slot} data-testid="header-slot" />
         <Button size="sm" icon="app-window" data-tip="Close this window and show the tool in the main window again" onClick={() => void bringBack()}>
           Bring back
         </Button>
       </header>
-      <ClickInHost className={styles.host}>
-        <main className={styles.view}>{embed ? <EmbedContext.Provider value={embed}>{body}</EmbedContext.Provider> : body}</main>
-        <ConstituentDrawer view={view} />
-      </ClickInHost>
+      <HeaderPresenceContext.Provider value={reportHeader}>
+        <HeaderSlotProvider value={slot}>
+          <ClickInHost className={styles.host}>
+            <main className={styles.view}>{embed ? <EmbedContext.Provider value={embed}>{body}</EmbedContext.Provider> : body}</main>
+            <ConstituentDrawer view={view} />
+          </ClickInHost>
+        </HeaderSlotProvider>
+      </HeaderPresenceContext.Provider>
       <JobTray />
       <DropOverlay />
       <Toaster />

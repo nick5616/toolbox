@@ -98,7 +98,7 @@ describe("Edit Studio", () => {
     expect((screen.getByRole("button", { name: /auto-fill/i }) as HTMLButtonElement).disabled).toBe(false);
     fireEvent.doubleClick(screen.getByRole("button", { name: "clip a" }));
     expect(screen.getByTestId("lanes").getAttribute("data-compact")).toBe("true");
-    expect(screen.getByTestId("breadcrumb").textContent).toBe("Edit Studio›Video");
+    expect(screen.getByTestId("breadcrumb").textContent).toBe("Edit Studio›Clip view");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.getByTestId("lanes").getAttribute("data-compact")).toBe("false");
   });

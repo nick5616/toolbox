@@ -29,7 +29,7 @@ describe("storeContents", () => {
   it("lists the glue first, then tools by category", () => {
     const { groups } = storeContents(CATALOG, [], "");
     expect(groups[0]?.id).toBe("glue");
-    expect(groups[0]?.tools.map((t) => t.id)).toEqual(["pipelines.check", "pipelines.chat"]);
+    expect(groups[0]?.tools.map((t) => t.id)).toEqual(["pipelines.check", "llm-chat"]);
     expect(groups.map((g) => g.id)).toEqual(["glue", Category.CategoryMedia, Category.CategoryAudio, Category.CategoryImage, Category.CategoryDocument]);
   });
 
@@ -79,6 +79,6 @@ describe("wire style", () => {
   it("reads a palette with fallbacks", () => {
     const el = document.createElement("div");
     const p = readPalette(el);
-    expect(p.kinds.audio).toHaveLength(3);
+    expect(p.types.files).toHaveLength(3);
   });
 });

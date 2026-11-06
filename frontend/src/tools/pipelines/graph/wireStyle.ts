@@ -1,8 +1,9 @@
-import type { WireKind } from "../graphModel";
+import type { CSSProperties } from "react";
+import type { ValueType } from "@/pipelines/params";
 
 // Pure look of the glowing wires: how bright, how wide, whether light flows.
 
-export type WireVisualState = "idle" | "flow" | "done" | "failed" | "selected" | "drag";
+export type WireVisualState = "idle" | "flow" | "done" | "failed" | "selected" | "drag" | "dim";
 
 export type RGB = readonly [number, number, number];
 
@@ -33,6 +34,9 @@ export function wireLook(state: WireVisualState, reduced: boolean): WireLook {
       break;
     case "done":
       look = { ...base, bright: 1, halo: 0.95, shimmer: 0 };
+      break;
+    case "dim":
+      look = { ...base, bright: 0.4, glow: 4, halo: 0.2, shimmer: 0 };
       break;
     case "failed":
       look = { ...base, bright: 0.6, halo: 0.4, shimmer: 0, danger: true };
@@ -68,17 +72,45 @@ export function parseColor(css: string): RGB | null {
   return null;
 }
 
+/** A wire's colour is its value type's token: files are orange, values take their source's type. */
+export type WireType = ValueType | "any";
+
 export interface WirePalette {
-  kinds: Record<WireKind, RGB>;
+  types: Record<WireType, RGB>;
   danger: RGB;
   /** Dark theme: the glow adds light; light theme: it is a subtler tint. */
   dark: boolean;
 }
 
 const FALLBACK: RGB = [0.6, 0.62, 0.68];
-const KINDS: WireKind[] = ["audio", "video", "image", "document", "text", "other", "any"];
+const TYPES: WireType[] = ["files", "file", "text", "number", "toggle", "choice", "color", "any"];
 
-/** Colours from the CSS tokens (custom properties `--wire-<kind>` on `el`). */
+/** A value wire is thinner, calm (no flow, no shimmer) and tighter. */
+export function valueWireLook(look: WireLook): WireLook {
+  return { ...look, core: look.core >= 3 ? 2.2 : 1.6, glow: look.glow * 0.7, flow: false, shimmer: 0 };
+}
+
+/** Sets `--c` (the port or swatch colour) to a type's token. */
+export function typeStyle(t: WireType): CSSProperties {
+  return { ["--c"]: `var(--type-${t})` } as CSSProperties;
+}
+
+/** Inline style of a wire's SVG stroke (the fallback when WebGL isn't there, and what tests can read). */
+export function svgWireStyle(type: WireType, value: boolean, dashed: boolean, failed: boolean): CSSProperties {
+  const s: CSSProperties = {};
+  if (!failed) s.stroke = `var(--type-${type})`;
+  if (value) s.strokeWidth = 1.6;
+  if (dashed) s.strokeDasharray = "5 4";
+  return s;
+}
+
+/** The look of a wire of the given channel. */
+export function lookFor(state: WireVisualState, reduced: boolean, value: boolean): WireLook {
+  const look = wireLook(state, reduced);
+  return value ? valueWireLook(look) : look;
+}
+
+/** Colours from the CSS tokens (`--type-<type>`, `--wire-failed`, `--wire-bg` on `el`). */
 /** Pushes a colour away from grey so glows read as colour, not white. */
 export function saturate(c: RGB, k: number): RGB {
   const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
@@ -93,6 +125,6 @@ export function readPalette(el: Element): WirePalette {
   const luma = 0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2];
   const dark = luma < 0.5;
   const k = dark ? 1.5 : 1.15;
-  const kinds = Object.fromEntries(KINDS.map((n) => [n, saturate(get(`--wire-${n}`), k)])) as Record<WireKind, RGB>;
-  return { kinds, danger: saturate(get("--wire-failed"), k), dark };
+  const types = Object.fromEntries(TYPES.map((n) => [n, saturate(get(`--type-${n}`), k)])) as Record<WireType, RGB>;
+  return { types, danger: saturate(get("--wire-failed"), k), dark };
 }

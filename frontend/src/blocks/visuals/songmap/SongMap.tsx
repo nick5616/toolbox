@@ -268,7 +268,7 @@ export function SongMap({ analysis, timeline, playheadMs, onSeek, selection, onS
         )}
         <IconButton size="sm" icon="zoom-out" label="Zoom out" data-tip="Show more of the song at once" disabled={!zoomed} onClick={() => zoomTo(pps / ZOOM_STEP, width / 2)} />
         <IconButton size="sm" icon="zoom-in" label="Zoom in" data-tip="Show less of the song in more detail" onClick={() => zoomTo(pps * ZOOM_STEP, width / 2)} />
-        <IconButton size="sm" icon="maximize" label="Fit the whole song" data-tip="Zoom out so the whole song fits the width" disabled={!zoomed} onClick={() => zoomTo(fit, width / 2)} />
+        <IconButton size="sm" icon="arrow-left-right" label="Fit the whole song" data-tip="Zoom out so the whole song fits the width" disabled={!zoomed} onClick={() => zoomTo(fit, width / 2)} />
       </div>
       <div className={styles.body}>
         <div className={styles.labels} style={{ width: LABEL_WIDTH }}>

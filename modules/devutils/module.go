@@ -27,9 +27,29 @@ const (
 // AllAlgorithms lists the algorithms in UI order.
 func AllAlgorithms() []string { return []string{AlgoMD5, AlgoSHA1, AlgoSHA256, AlgoSHA512, AlgoCRC32} }
 
-// Options are the file-hash job's options.
+// Job actions. "" and ActionHash are the Hash utility (a result, no files);
+// the others are the pipeline steps (Phase 14) and write files.
+const (
+	ActionHash      = "hash"
+	ActionChecksums = "checksums"
+	ActionEncode    = "encode"
+)
+
+// Checksum file formats and encodings.
+const (
+	FormatSidecar  = "sidecar" // <name>.sha256 (sha256sum format), one file per algorithm
+	FormatCSV      = "csv"     // one CSV: file, size, one column per algorithm
+	EncodingBase64 = "base64"
+	EncodingHex    = "hex"
+)
+
+// Options are the job's options.
 type Options struct {
-	Algorithms []string `json:"algorithms"` // ≥ 1 of AllAlgorithms()
+	Algorithms []string `json:"algorithms"` // ≥ 1 of AllAlgorithms() (hash, checksums)
+	Action     string   `json:"action"`     // "" | ActionHash | ActionChecksums | ActionEncode
+	Format     string   `json:"format"`     // checksums: FormatSidecar | FormatCSV
+	Encoding   string   `json:"encoding"`   // encode: EncodingBase64 | EncodingHex
+	Name       string   `json:"name"`       // checksums: base name of the written file(s); "" = automatic
 }
 
 // DefaultOptions: SHA-256 only.
@@ -67,7 +87,7 @@ func (m *Module) Descriptor() core.Descriptor {
 		Tagline:     "JSON, Base64, hashes, UUIDs, JWTs and more",
 		Description: "Offline developer helpers: JSON and YAML, Base64, URLs, hashes, UUIDs, JWTs, timestamps, colours, regex and diffs.",
 		Status:      core.StatusReady,
-		Order:       220, MaxInputs: 100,
+		Order:       220, MaxInputs: 100, OutputSubdir: "Dev Utilities",
 	}
 }
 

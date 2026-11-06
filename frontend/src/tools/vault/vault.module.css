@@ -1,12 +1,10 @@
 .root {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
   height: 100%;
   overflow-y: auto;
-  padding: var(--space-6);
-  max-width: 960px;
-  margin: 0 auto;
+  padding: var(--space-4);
   width: 100%;
 }
 
@@ -17,14 +15,31 @@
   max-width: 460px;
 }
 
+/* The reassurance notes sit quietly under the form, without bullets. */
 .list {
   margin: 0;
-  padding-left: var(--space-5);
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  font-size: var(--text-md);
-  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+}
+
+.main > .dropLine {
+  flex-direction: row;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-2) var(--space-3);
+}
+
+.main > .dropLine > :global(svg) {
+  display: none;
+}
+
+.table tr:not(:hover):not(:focus-within) .colActions > :not(:first-child) {
+  opacity: 0;
 }
 
 .strength {
@@ -86,9 +101,16 @@
   flex-wrap: nowrap;
 }
 
-.foldersRow {
+.header .foldersRow {
   flex: 0 1 220px;
   min-width: 140px;
+  min-height: 28px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.header .foldersRow:hover {
+  background: var(--bg-hover);
 }
 
 .status {
@@ -168,7 +190,6 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: nowrap;
-  container: toolbar-compact / inline-size;
 }
 
 .toolbar > * {

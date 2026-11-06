@@ -2,12 +2,12 @@ import type { ReactNode } from "react";
 import { formatBytes } from "@/lib/format";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
-import { PathText } from "./PathText";
+import { splitPath } from "./PathText";
 import { cx } from "./cx";
 import styles from "./FileList.module.css";
 
 export interface FileListItem {
-  /** Absolute path; also the React key. */
+  /** Absolute path; also the React key. Rows show the file name; the path is the tooltip (CLAUDE.md: names, not paths). */
   path: string;
   /** Size in bytes, shown in mono if given. */
   size?: number;
@@ -36,7 +36,9 @@ export function FileList({ files, onRemove, empty, className, ...aria }: FileLis
       {files.map((f) => (
         <li key={f.path} className={styles.row}>
           <Icon name={f.icon ?? "file"} size={14} className={styles.icon} />
-          <PathText path={f.path} className={styles.path} />
+          <span className={styles.path} data-tip={f.path}>
+            {splitPath(f.path)[1]}
+          </span>
           {f.size != null && <span className={styles.size}>{formatBytes(f.size)}</span>}
           {f.trailing}
           {onRemove && <IconButton size="sm" icon="x" label="Remove" data-tip="Remove this file from the list (the file itself is not deleted)" onClick={() => onRemove(f.path)} />}

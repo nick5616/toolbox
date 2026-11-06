@@ -18,6 +18,7 @@ import type { MenuItem } from "@/components";
 import type { NormalProject } from "@/viz/edit/defaults";
 import type { EditClip as Clip } from "@/lib/api";
 import type { EditPost, Marker } from "@/viz/edit/types";
+import type { ToolPanel } from "@/workspace";
 
 /** One launcher chip in the selection bar for a clip's constituent panel. */
 export interface ClipChip {
@@ -62,8 +63,10 @@ export interface EditorProfile {
   /** @deprecated Phase 10 §5.5: constituents are panels now (see `rail`); the shell no longer shows right-panel tabs. */
   rightTabs?: { id: string; label: string; tip: string; render: () => ReactNode }[];
 
+  /** Panels the tool adds to the editor's own (Phase 11): they join the editor workspace of this tool (rail, drawers, pop-outs). */
+  panels?: readonly ToolPanel[];
   /**
-   * Phase 10 §5.5. Panel ids (see `panels.ts`) of the left rail's click-in
+   * Phase 10 §5.5. Panel ids (see `panelDefs.tsx` and `panels`) of the left rail's click-in
    * launchers, top to bottom. Default: `DEFAULT_RAIL` (media, text, music, project).
    */
   rail?: string[];

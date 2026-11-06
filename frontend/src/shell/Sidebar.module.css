@@ -57,18 +57,18 @@
 .scroll {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-2);
+  padding: 0 var(--space-2) var(--space-2);
 }
 
 .section {
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .sectionLabel {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-2) 2px;
   font-size: var(--text-xs);
   line-height: var(--text-xs-lh);
   font-weight: 500;
@@ -184,6 +184,20 @@
   right: 10px;
 }
 
+.receiving {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex: none;
+}
+
+.collapsed .receiving {
+  position: absolute;
+  top: 5px;
+  right: 10px;
+}
+
 .footer {
   flex: none;
   padding: var(--space-2);
@@ -245,4 +259,85 @@
   border: 1px solid var(--fg-subtle);
   background: var(--bg-sidebar);
   pointer-events: none;
+}
+
+/* --- Phase 14: tool rows (drop target + pin), group separators, context menu --- */
+.row {
+  position: relative;
+}
+
+.row:hover .pin,
+.pin:focus-visible,
+.pinned {
+  opacity: 1;
+}
+
+.pin {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--bg-sidebar);
+  border: 0;
+  border-radius: var(--r-sm);
+  color: var(--fg-muted);
+  opacity: 0;
+}
+
+.pin:hover {
+  color: var(--fg);
+}
+
+.pinned {
+  color: var(--accent);
+}
+
+.sep {
+  display: none;
+  margin: var(--space-1) var(--space-2);
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.collapsed .sep {
+  display: block;
+}
+
+.collapsed .section:first-child .sep {
+  display: none;
+}
+
+.menu {
+  position: fixed;
+  z-index: 90;
+  min-width: 180px;
+  padding: var(--space-1);
+  background: var(--bg-raised);
+  border: 1px solid var(--pop-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 28px;
+  padding: 0 var(--space-2);
+  background: none;
+  border: 0;
+  border-radius: var(--r-sm);
+  color: var(--fg);
+  text-align: left;
+}
+
+.menuItem:hover {
+  background: var(--bg-hover);
 }

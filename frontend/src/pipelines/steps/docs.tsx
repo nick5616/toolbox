@@ -23,6 +23,7 @@ import { DEFAULT_BG_OPTIONS, sanitizeBgOptions } from "@/tools/bgremove/options"
 import { FIELD_HINTS, FIELD_LABELS, DEFAULT_EDITABLE_FIELDS } from "@/tools/exif/options";
 import { DEFAULT_UPSCALE_OPTIONS, sanitizeUpscaleOptions } from "@/tools/upscale/options";
 import { parseObject, registerSteps, type StepEditorProps, type StepUI } from "./registry";
+import { PARAMS } from "./paramDefs";
 import styles from "./docs.module.css";
 
 // Step editors owned by WP-AD3 (pdf, vault, bg-remover, upscaler, exif).
@@ -406,7 +407,7 @@ function ExifEditor({ value, onChange, vars }: StepEditorProps<ExifOptions>) {
 }
 
 const ui = <T,>(type: string, parse: (json: string) => T, Editor: StepUI<T>["Editor"]): StepUI<never> =>
-  ({ type, parse, Editor }) as unknown as StepUI<never>;
+  ({ type, parse, Editor, params: PARAMS[type] }) as unknown as StepUI<never>;
 
 registerSteps([
   ui("pdf", parsePdfStep, PdfEditor),

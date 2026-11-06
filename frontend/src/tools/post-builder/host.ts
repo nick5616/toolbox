@@ -13,7 +13,7 @@ import type { Handoff } from "@/state/ui";
 import { addExtras, folderBaseName } from "./pool";
 import { MEDIA_EXTS as SOURCE_EXTS } from "./SourcesPanel";
 import { defaultPostName, docForSave, editWindowClosed } from "./logic";
-import { CHECK_MS, isEditingElsewhere, setEditingElsewhere, useDoc, usePostBuilder } from "./postStore";
+import { CHECK_MS, isEditingElsewhere, setEditingElsewhere, usePostBuilder, useRecordedDoc } from "./postStore";
 import { NEW_POST, useAddToPost, usePostDrop } from "./store";
 
 export function usePostHost(): void {
@@ -22,15 +22,16 @@ export function usePostHost(): void {
   const postId = usePostBuilder((s) => s.postId);
   const selectedId = usePostBuilder((s) => s.selectedId);
   const lastPostId = usePostBuilder((s) => s.pstate.lastPostId);
-  const doc = useDoc();
+  const doc = useRecordedDoc();
 
-  // Load on mount; leaving the tool saves and clears.
+  // Load on mount; leaving the tool saves but keeps the open post and its undo history, so coming
+  // back (from an editing tool, a pop-out) reloads the post from disk and undo still works.
   useEffect(() => {
-    st().reset();
+    if (st().history) usePostBuilder.setState({ ready: false });
+    else st().reset();
     void st().init();
     return () => {
       void st().save().catch(() => undefined);
-      st().reset();
     };
   }, [st]);
 

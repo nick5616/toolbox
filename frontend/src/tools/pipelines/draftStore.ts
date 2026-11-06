@@ -9,12 +9,15 @@
  */
 import { create } from "zustand";
 import { toast } from "@/components";
-import { FilesService, PipelinesService, type Pipeline, type PipelineCheck, type PipelineEntry, type PipelineStep, type StepType } from "@/lib/api";
+import { FilesService, PipelinesService, type ClipTrigger, type Pipeline, type PipelineCheck, type PipelineEntry, type PipelineStep, type StepType } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { adoptParkedHistory, registerHistory } from "@/lib/parkedHistory";
 import { newHistory, pushHistory, redo as redoHistory, undo as undoHistory, type History } from "@/lib/history";
 import { normalizeEntry, usePipelines } from "@/state/pipelines";
+import { useUI } from "@/state/ui";
 import { newStepId, stepsOf, withEntry } from "./editorModel";
 import { deleteSteps, duplicateSteps, INPUT_NODE, MAX_STEPS, parseLayout, serializeLayout, withSteps } from "./graphModel";
+import { unbindVar } from "./wiring";
 
 export const SAVE_DELAY_MS = 600;
 export const DESCRIBE_DELAY_MS = 250;
@@ -31,6 +34,8 @@ export interface DraftState {
   /** The node whose options the Step panel shows. */
   stepId: string | null;
   watchMessage: string;
+  /** Whether the "When I copy…" trigger is working, and why not (PipelineEntry.clip). */
+  clipStatus: { active: boolean; message: string };
   runText: string;
   runCount: number;
   canUndo: boolean;
@@ -53,12 +58,19 @@ export interface DraftState {
   keepTouched: (id: string) => void;
   removeStep: (id: string) => void;
   duplicateStep: (id: string) => void;
+  /** Edits a run parameter: its label or its default (the name never changes). */
+  updateParam: (name: string, patch: { label?: string; default?: string }) => void;
+  /** Removes a run parameter and every wire that uses it. */
+  removeParam: (name: string) => void;
   setName: (name: string) => void;
   setDescription: (description: string) => void;
   setWatchEnabled: (enabled: boolean) => void;
   chooseFolder: () => Promise<void>;
+  /** Edits the "When I copy…" trigger. */
+  setClip: (patch: Partial<ClipTrigger>) => void;
+  openClipboardSettings: () => void;
   openRuns: () => void;
-  setLive: (v: Partial<Pick<DraftState, "watchMessage" | "runText" | "runCount" | "catalog">>) => void;
+  setLive: (v: Partial<Pick<DraftState, "watchMessage" | "clipStatus" | "runText" | "runCount" | "catalog">>) => void;
   /** Saves now if dirty. */
   flush: () => Promise<void>;
 }
@@ -81,7 +93,7 @@ export function stashDraft(p: Pipeline | null): void {
 }
 
 function normalizeCheck(pipeline: Pipeline, check: PipelineCheck): PipelineCheck {
-  return normalizeEntry({ pipeline, check, watch: { active: false, message: "" }, lastRun: null }).check;
+  return normalizeEntry({ pipeline, check, watch: { active: false, message: "" }, clip: { active: false, message: "" }, schedule: { active: false, message: "", next: 0 }, lastRun: null }).check;
 }
 
 /** Saves a pipeline and tells the list about it. */
@@ -151,7 +163,8 @@ export const useDraft = create<DraftState>()((set, get) => {
       canUndo: hist.past.length > 0,
       canRedo: hist.future.length > 0,
       dirty: true,
-      stepId: s.stepId && stepsOf(p).some((x) => x.id === s.stepId) ? s.stepId : null,
+      // The Input node (run parameters) stays selectable; a step that's gone is deselected.
+      stepId: s.stepId && (s.stepId === INPUT_NODE || stepsOf(p).some((x) => x.id === s.stepId)) ? s.stepId : null,
     }));
     schedule(describe);
   };
@@ -181,6 +194,7 @@ export const useDraft = create<DraftState>()((set, get) => {
     catalog: [],
     stepId: null,
     watchMessage: "",
+    clipStatus: { active: false, message: "" },
     runText: "",
     runCount: 0,
     canUndo: false,
@@ -211,6 +225,7 @@ export const useDraft = create<DraftState>()((set, get) => {
         saveState: { kind: "idle" },
       });
       if (restored) schedule(true);
+      void adoptParkedHistory("pipelines", entry.pipeline.id);
     },
 
     close: () => {
@@ -291,6 +306,19 @@ export const useDraft = create<DraftState>()((set, get) => {
       if (nid) set({ stepId: nid });
     },
 
+    updateParam: (name, patch) =>
+      edit(
+        (p) => ({
+          ...p,
+          params: (p.params ?? []).map((q) =>
+            q.name === name ? { ...q, label: patch.label !== undefined && patch.label.trim() !== "" ? patch.label.slice(0, 60) : q.label, default: patch.default ?? q.default } : q,
+          ),
+        }),
+        `param:${name}`,
+      ),
+
+    removeParam: (name) => edit((p) => ({ ...p, params: (p.params ?? []).filter((q) => q.name !== name), steps: unbindVar(stepsOf(p), name) })),
+
     setName: (name) => edit((p) => ({ ...p, name }), "name"),
     setDescription: (description) => edit((p) => ({ ...p, description }), "description"),
 
@@ -300,6 +328,16 @@ export const useDraft = create<DraftState>()((set, get) => {
     },
 
     chooseFolder,
+
+    setClip: (patch) =>
+      edit((p) => {
+        const next = { ...p.clip, ...patch, kinds: patch.kinds ?? p.clip.kinds ?? [] };
+        // Switching it on with nothing chosen starts with links, the common case.
+        if (patch.enabled && next.kinds.length === 0) next.kinds = ["link"];
+        return { ...p, clip: next };
+      }),
+
+    openClipboardSettings: () => useUI.getState().navigate("settings"),
 
     openRuns: () => {
       const id = get().pipelineId;
@@ -316,4 +354,21 @@ export const useDraft = create<DraftState>()((set, get) => {
       await save();
     },
   };
+});
+
+// Undo history survives popping the whole tool out and bringing it back (lib/parkedHistory.ts).
+registerHistory("pipelines", ["pipelines"], {
+  docId: () => useDraft.getState().pipelineId,
+  read: () => {
+    const h = useDraft.getState().hist;
+    return h ? { past: h.past, future: h.future } : null;
+  },
+  write: ({ past, future }) => {
+    const h = useDraft.getState().hist;
+    if (h) useDraft.setState({ hist: { ...h, past: past as Pipeline[], future: future as Pipeline[] }, canUndo: past.length > 0, canRedo: future.length > 0 });
+  },
+  subscribe: (cb) =>
+    useDraft.subscribe((s, prev) => {
+      if (s.hist !== prev.hist) cb();
+    }),
 });

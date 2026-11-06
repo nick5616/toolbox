@@ -1,6 +1,6 @@
 # Toolbox — repo rules and architecture
 
-Personal, local-only desktop app (Wails v3 + Go + React/TS) that wraps open-source media/AI/utility tools behind one UI. Never distributed or hosted. Primary machine: macOS on Apple Silicon; secondary: Windows.
+Personal, local-only desktop app (Wails v3 + Go + React/TS) that wraps open-source media/AI/utility tools behind one UI. Never distributed or hosted. Primary machine: Windows; also used on macOS (Apple Silicon). Tools are cross-platform: when something can't be done on one OS, the UI says so and the other OS still gets it.
 
 `SPEC.md` is the source of truth for the current phase. `docs/DECISIONS.md` records every deviation and every ambiguity resolved.
 
@@ -33,12 +33,22 @@ Personal, local-only desktop app (Wails v3 + Go + React/TS) that wraps open-sour
 - Never `git push`, never change git remotes, never rewrite main's history (no force, no rebase of main).
 - No `sudo`. No `rm -rf` on any path outside the repo. Never touch ~/.ssh, keychains, shell profiles, or other projects.
 - Never commit secrets, tokens, or personal files.
+- **Never start a real Focus session while developing.** The Focus engine is in dry run (it decides and logs but never closes or terminates anything) whenever `TOOLBOX_FOCUS_DRYRUN=1`, or `TOOLBOX_SUPPORT_DIR` is set and `TOOLBOX_FOCUS_DRYRUN` isn't `0`. `wails3 task dev:sandbox` and `.dev/p10-qa/dev.sh` set it. Tests use a fake platform; the one real-platform test (`TOOLBOX_FOCUS_E2E=1`) is scoped to processes it spawned.
 
 ### App rules
-- No network listeners. Open no ports. If a local server ever becomes unavoidable, bind 127.0.0.1 only with a random per-launch token. **Never build with the Wails `server` or `mcp` build tags** (they are the only code paths in Wails that listen).
+- **No network listeners, with one exception: Local File Transfer** (`core/lan`, `modules/lanshare`; amended 2026-11-04 with the user's approval). It may listen on the local network (TCP and UDP multicast, port 53317 by default) **only while receiving is on**, which only the user turns on. It accepts connections only from private, link-local and Tailscale-range (100.64.0.0/10) addresses, speaks only HTTPS (TLS, self-signed per-install certificate), and writes received files only into `<library>/Received/`. Nothing else in the app listens on a non-loopback address. Any other local server binds 127.0.0.1 only with a random per-launch token.
+- **Never build with the Wails `server` or `mcp` build tags** (they are the only code paths in Wails that listen).
 - No telemetry or analytics. No outbound calls except what the tools themselves need and dependency updates the user triggers.
 - User files live in a configurable library folder (default ~/Toolbox). Never modify input files in place.
 - Long operations are cancellable and never block the UI.
+- **Toolbox stops other programs only during a Focus session** (`core/focus`, `modules/focus`; approved 2026-11-05). A session is started by the user, directly or by a pipeline they made, and always has an end time (≤ 12 h). During it, Toolbox may close or terminate programs only:
+  - in the user's own session (Windows session ID; the user's uid on macOS);
+  - never anything in the OS's own folders (`%SystemRoot%`, `/System`, `/usr`, …) or on the frozen Windows extras list;
+  - never Toolbox or its descendants;
+  - never in a dry run.
+
+  Programs already open when a session starts are only asked to close (WM_CLOSE / the app's own quit); force-closing them needs a click. If the focus engine errors, it stops enforcing (fail-open) and says so.
+- **Every program Toolbox launches for the user goes through `core/proc.Launch`** (detached, visible, not tree-killed on cancel). It is the only exception to `core/proc`'s tree-kill rule.
 
 ---
 
@@ -60,6 +70,7 @@ wails3 task dev:sandbox     # wails3 dev with support/library dirs under .dev/ (
 TOOLBOX_VIEW=settings ...   # optional: open on a view (library, settings, or a module id)
 TOOLBOX_SHOW_POPUP=1 ...    # optional: open the clipboard popup 2 s after start (visual QA)
 TOOLBOX_DEVTOOLS_PORT=9222 ...  # sandbox only: WebView2 DevTools on 127.0.0.1 for automated UI checks (CDP)
+TOOLBOX_FOCUS_DRYRUN=1 ...      # Focus Lock decides but never stops programs (set by dev:sandbox; forced by a sandbox support dir)
 wails3 dev                  # dev against the real support dir and ~/Toolbox
 wails3 build                # production binary in bin/
 wails3 generate bindings -clean=true -ts -i   # regenerate frontend/bindings (architect only)
@@ -271,7 +282,7 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Store bridge** (`state/bridge.ts`): a host window mirrors picked store values to replica windows and runs the actions they forward. Bridged values must be JSON-serialisable; load heavy data (analyses) locally in the replica.
 - Tools register `useBeforePopOut(moduleId, flush)` (`lib/popout.ts`) so a pop-out never loses unsaved work. Tools of one family (base + variants) are popped out together because they share a store.
 - **Minimal surfaces (SPEC §7b, §13):** a tool's top level is its input, one or two primary settings, the preview/result and the primary action. Everything else is a `ClickIn` (`components/ClickIn.tsx`; the tool root is a `ClickInHost`) with a one-line summary of its state. Bars never wrap (measure with `useElementSize`, overflow to "More…"), rails never scroll, show file names not paths, never repeat the shell's title. File tools put secondary options in the kit's `advanced` slot.
-- **Editor layout:** `editor/EditorShell.tsx` (header, `Rail`, preview in a `PartFrame`, one-line `selection/` bar, tracks). Constituent surfaces are `EditorPanel`s (`editor/panels.ts`, registered in `editor/panelDefs.tsx` and `tools/edit-studio/panels.tsx`) and take no props. Pop-out parts come from `editor/editorParts.tsx` (`<moduleId>.preview`, `<moduleId>.panel`), registered via `tools/*/parts.ts` in `parts/index.ts`.
+- **Editor layout:** `editor/EditorShell.tsx` (header, `Rail`, preview in a `WorkspacePreviewFrame`, one-line `selection/` bar, tracks). The editor is a workspace: `defineEditorWorkspace(profile)` (`editor/workspace.tsx`, called from `tools/video-studio/workspace.ts` and `tools/edit-studio/workspace.ts`) gives each module its `<moduleId>.panel`/`<moduleId>.preview` parts over the family bridge channels (`editor`, `editor-focus`). Panels are `ToolPanel`s that take no props: `EDITOR_PANELS` (`editor/panelDefs.tsx`) plus the profile's `panels` (Edit Studio's `MUSIC_PANELS` in `tools/edit-studio/panels.tsx`).
 - **Opening another tool with inputs:** `openTool(moduleId, inputs, extra, { window })` / `openToolItems(...)` in `lib/openTool.ts` — never call `handOff` directly for a new hand-off.
 - **Icons:** add any new lucide icon to `components/Icon.tsx`; `components/iconNames.test.ts` fails on unregistered names.
 - **Dev handles for QA:** `window.__ui` and `window.__edit` (dev builds only).
@@ -285,6 +296,65 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 - **Click-ins inside a drawer stack over it** (their own width); `useClickIn()` inside a drawer addresses the drawer's own host. Panels that pick files or submit jobs are `poppable: false`.
 - **Big local images in an `<img>`**: use `wholeImageUrl(path)` (`lib/wholeImage.ts`), never a bare media URL (media responses stop at 4 MiB and `<img>` never asks for the rest); `FilesService.ImageThumb` for previews.
 - **One-time window state** (a tool window's start-up handoff, a parked session) must survive React StrictMode's double effects in dev: take it once per page, not once per effect run.
+
+## Documents (Phase 12)
+
+- **Document Converter** (`modules/documents`, `tools/documents/`) runs **Pandoc** with **Typst** as the PDF engine (`--pdf-engine=<managed typst>`); **Web Archiver** (`modules/archiver`, `tools/archiver/`) runs **monolith**. All three are pinned managed archives in `core/deps` (`pandoc.go`, `typst.go`, `monolith.go`; monolith is a `Raw` single-file part) in the **Documents** pack (`docs`; the OCR pack is "Text recognition").
+- **Pandoc always runs with cwd = the job's TempDir** (it writes Typst's temp `.typ` and media into the cwd), with an empty `--data-dir`, `--resource-path=<input dir>` and `+RTS -M1024M -RTS`. Never `pandoc server`, never user Lua filters. Typst gets `TYPST_PACKAGE_CACHE_PATH` under the tools dir; never `typst watch`/`update`. A system Typst older than 0.12 doesn't count (`Spec.MinVersion`).
+- **Render JavaScript / Also PDF** use the installed Edge/Chrome headless with a temporary `--user-data-dir` in the job's TempDir and **never a `--remote-debugging-*` flag** (tests assert it). Local/private addresses are refused unless `AllowLocal`.
+- Outputs: `<library>/Documents/`, `<library>/Web Archive/<host>/<title> <date>.html`.
+
+## Every tool composes (Phase 14)
+
+- **Every tool is a pipeline step.** `TestEveryToolIsAPipelineStep` (root) and `pipelines/everyTool.test.tsx` fail if a sidebar tool has no automatic step type or no `StepUI`. **There is no exemption list**: a new tool ships with its `core.Chainable` and step editor. Job-less tools become steps through `core.StepProvider` (a hidden companion module; Clipboard's "Copy to clipboard"); Local Chat's step id is `llm-chat` (`pipelines.chat` is an alias); "Run another pipeline" is the built-in `pipelines` (cycles refused at save).
+- **Steps that render in the webview** (Photo Composer "Fill a template", Video Editor "Assemble", Edit Studio "Cut to the beat") go through `core/viz.RenderBroker` → the main window's `RenderHost` (`vz1|host|up/down`); without a window they wait with `ErrWaiting("Open Toolbox to render")`. Pure auto-fill code lives in `editor/autofill/` so `viz/` may use it.
+- **Clipboard trigger** (`Pipeline.Clip`): only after the recorder stored a copy (recording on, never sensitive); a text trigger needs a pattern; the pipeline's own copies never re-trigger.
+- **Drag and drop:** `lib/fileDrag.ts` is the contract. Every file row is a drag source (`startPathsDrag`; `ResultRow`, Library rows, export rows); any in-app drop on a `[data-file-drop-target]` routes exactly like an OS drop (`installInAppDrops`); sidebar tools are drop targets and tool drag sources; the pipeline graph adds a step for a dropped tool. Drags don't cross windows.
+- **Results:** use the kit's `ResultRow` (draggable, double-click opens, Send to incl. **Pipeline: …**, Reveal/Open on hover); exports of workspace tools end in `editor/export/LastExport`. A job module that writes files needs an `OutputSubdir` (or `job.OutputDir` is empty).
+- **Shell:** sidebar grouped by category with Pinned/Recent and Mod+1…9; palette matches `shell/keywords.ts` + taglines; tools register `tool.addFiles` for Mod+O (the kit does); "?" opens the shortcuts overlay; completion toasts are batched and skipped when the tool is on screen; disabled buttons use `aria-disabled` so their tooltip explains why.
+
+## New tools (Phase 15)
+
+- **Text to Speech** (`modules/tts`, engine `tts.speak`, Kokoro int8 ONNX + `voices-v1.0.bin`, pinned sha in `modules/tts/models.go`, `<models>/tts/`, component `kokoro-voices` in the Speech pack). The handler never downloads; previews go to `cache/tts-preview` (1 day), pasted text to `tmp/tts-text` (7 days).
+- **Scene Splitter** (`scenes`), **GIF & Contact Sheet** (`gif`), **Silence Cutter** (`silence`): FFmpeg jobs run with TempDir as the working directory (no Windows paths in filters; long graphs via `-/filter_complex <file>`). Contact-sheet timecodes and Image Batch text go through ASS/libass like subtitles.
+- **Image Batch** (`imagebatch`): pure Go for resize/crop/pad/JPEG/PNG/logo; FFmpeg only for WebP and text watermarks. **Organizer** (`organize`, built in): **copies only**, never into or above an input; exact duplicates by SHA-256, look-alikes by 64-bit dHash; `report.csv`.
+- **Local File Transfer** (`lan-share`) became a real tool in Phase 13 (see "Local File Transfer (Phase 13)").
+
+## Focus Lock and pipeline timing (Phase 18)
+
+- **`core/focus`** is the engine: a polling loop over `Platform` (Windows: one `NtQuerySystemInformation` snapshot per tick, ~4.5 ms, every 1 s plus an immediate tick on a window-shown kick; macOS: `kern.proc.all` sysctl, no cgo) and a pure `Decide` policy (other sessions ignored → Toolbox and descendants → OS folders, which don't confer → Windows extras → allow rules → nearest conferring seen ancestor → unknown path allowed → block). Each (PID, created) is decided once. Persistence goes through `focus.Store` (`core/store/focus.go`, migration 0008); settings key `focus`.
+- **Sessions are snapshots** (profile + Always allowed at start); only one at a time; they resume after a restart and end on wake when their time passed. Weakening (end early, allow mid-session, quit) costs the strength's friction, and countdowns live in the engine. Quitting Toolbox during a real session goes through `desktop.Shell.ShouldQuit` (never during OS shutdown).
+- **Pipelines learn time:** `core.ErrWaitingUntil` makes a cell wait with `Wait = time` and a persisted `RunCell.Until`, retried at that moment and on a 30 s wall-clock check (Go's timers don't count sleep on Windows), on `Runner.Resumed()` and on `Runner.WakeTimeWaits()` (called on every focus change). `StepRequest.Until` keeps a deadline fixed; `SkipWait` is Continue now. The Wait step (`pipelines.wait`) and Focus wait return zero jobs when done (files pass through).
+- **Runs without files:** a pipeline where no step reads `From: "input"` (`PipelineCheck.TakesFiles` false) starts with one item and no inputs; merged items are `MergedAt != ""`, never `Input == ""`. **Schedules** (`Pipeline.Schedule`) fire only such pipelines, with catch-up, overlap skip and DST rules; last fires in `pipeline_schedule_state`.
+- **Open in app** (`pipelines.open`) launches through `proc.Launch`, records the app in the focus session (`Engine.NoteLaunch`) and only ever closes politely (`focus.AskToClose`). `App` is never a template or a bind.
+
+## Compress to Size (Phase 17)
+
+- **`compress`** (`modules/compress`, `tools/compress/`): any file in, the same thing out under a byte limit. Kinds by extension (`KindOf`): video/audio (FFmpeg, two-pass H.264/H.265, MP3/Opus, optional split into parts), photos (pure Go JPEG/PNG, WebP via FFmpeg), animated GIF (FFmpeg palette), PDF (`pdf.CompressImages` ladder), Office (`.docx/.pptx/.xlsx` pictures recompressed, other zip entries byte-identical), anything else zipped.
+- **Estimate = run.** Each kind has a pure planner shared by `estimate<Kind>` (probe only, `CompressService.Estimate`) and `run<Kind>`, so the preview is what the job does. Runs aim at `Budget(limit)` (97%), measure, retry ≤ `MaxAttempts`, and fail with `overLimit` rather than output a file over the limit. Files that already fit are copied unchanged.
+- **Targets** (Discord, Gmail, …) are frozen data in `modules/compress/targets.go`, decimal MB, with `TargetsAsOf`; update the date when you change a limit. The frontend's step choices mirror the IDs.
+
+## Parameters as inputs (Phase 16)
+
+- **Every scalar option of a step is a parameter** (`pipelines/params.ts`: `deriveParams` walks the defaults; `StepUI.params` overrides in `pipelines/steps/paramDefs.ts` give labels, types, choices, primaries, hidden). A new option shows up by itself; `steps/params.test.ts` makes every visible one carry a deliberate label.
+- **A wire into a parameter is a bind** (`PipelineStep.Binds`: option pointer → variable). The runner writes the variable into a copy of the options before `PrepareStep`, converting to the option's JSON type; an empty variable keeps the option's value. Step variables declare a `Type` (`pipeline_vars_test.go` lists them all). **Run parameters** (`Pipeline.Params`) are asked at start and become variables.
+- **Value colours** are tokens `--type-files|file|text|number|toggle|choice|color|any` (files are orange; every file wire is orange). Use `valueTypeVar()`; never colour a value type any other way.
+
+## Local File Transfer (Phase 13)
+
+- **`core/lan`** is the protocol (LocalSend v2 in HTTPS mode + Toolbox pairing at `/api/toolbox/v1/pair`): identity (`<support>/lanshare/identity.pem`, fingerprint = lowercase hex SHA-256 of the cert DER), settings and known devices (`settings.json`, `devices.json`), discovery (multicast 224.0.0.167/ff12::167:53317 + an outbound subnet scan), the HTTPS server and the pinned client. It never imports Wails or modules; accepted sessions go to a `SessionSink`.
+- **Listening** happens only while receiving is on: mode `always`, or `open` with a live window hold (`LanShareService.Hold`, renewed every 10 s, 30 s TTL). Sending and scanning never need a listener. Turning receiving off closes every socket.
+- **Trust:** Toolbox peers present their identity cert as a TLS client cert, so a paired device is verified and may auto-accept; LocalSend senders are never verified and always ask. Never auto-accept on a claimed fingerprint.
+- **Received files** go to `<library>/Received/<device>/` through `lan-receive` jobs (hidden module), names sanitised in `core/lan/names.go`, never overwriting, never opened. No download API (browser share), no plain-HTTP peers.
+
+## Polish rules (every screen)
+
+Full list in docs/specs/phase-12.md §13.1. In short:
+- **One header row.** A tool's header (name, save state, undo/redo, More, primary action) goes through `<ToolHeader>` (`components/ToolHeader.tsx`), which portals into the shell's top bar (or a tool window's title bar) and renders inline when embedded. `StudioLayout` and `EditorShell` already do. With a tool header present the shell shows Search and the composition chips as icons. Don't give a header class its own `container: toolbar-compact` (ToolHeader sets it when the window is narrow).
+- **No frames around a page, never a border inside a border**; one `--line` divider between regions. Canvases run edge to edge with floating toolbars. Bottom click-in bars are one line.
+- **Never repeat a title**; taglines only in empty states; dense lists (≈ 32 px rows, secondary actions on hover/focus); form pages use their width with `--space-4` padding.
+- One `DepsGate` banner names what's missing and carries the pack buttons. Check every change at 1180×720 and 960×600 (baseline shots in `.dev/polish/`).
+- Source files are UTF-8 (a builder once wrote a cp1252 `§`, which broke the production build but not the tests).
 
 ## Conventions
 

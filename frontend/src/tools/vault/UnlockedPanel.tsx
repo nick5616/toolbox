@@ -19,6 +19,7 @@ import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { isActive, useOrderedJobs } from "@/state/jobs";
 import { useClickIn } from "@/components/ClickIn";
+import { ToolHeader } from "@/components/ToolHeader";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import { formatLockIn, useNow } from "./useVaultState";
 import styles from "./vault.module.css";
@@ -217,7 +218,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
 
   return (
     <>
-      <div className={styles.header}>
+      <ToolHeader className={styles.header} aria-label="Vault">
         <div className={styles.status} data-tip="The vault is open. It locks by itself after the time set in Settings">
           <Icon name="lock" size={16} className={styles.statusIcon} />
           <span aria-live="off">{lockIn ? `Unlocked · locks in ${lockIn}` : "Unlocked"}</span>
@@ -256,7 +257,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
         <Button variant="primary" icon="plus" data-tip="Choose files to copy into the vault, encrypted; your originals stay where they are" onClick={() => void pick()}>
           Add files
         </Button>
-      </div>
+      </ToolHeader>
 
       <div className={styles.body}>
         <div className={styles.main}>
@@ -375,7 +376,7 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
             </table>
           )}
           {sorted.length > 0 && (
-            <DropZone id="tool-drop:vault" label="Drop files here to encrypt them">
+            <DropZone id="tool-drop:vault" className={styles.dropLine} label="Drop files here to encrypt them">
               <Button size="sm" variant="secondary" icon="plus" data-tip="Choose files to encrypt into the vault" onClick={() => void pick()}>
                 Add files…
               </Button>

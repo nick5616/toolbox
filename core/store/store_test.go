@@ -42,7 +42,7 @@ func TestMigrationsIdempotent(t *testing.T) {
 	}
 	defer db.Close()
 	var n int
-	if err := db.sql.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 7 {
+	if err := db.sql.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 8 {
 		t.Fatalf("migrations = %d, %v", n, err)
 	}
 	if v, ok, _ := db.GetSetting(context.Background(), "k"); !ok || v != `"v"` {
@@ -369,7 +369,7 @@ func TestMigrationUpgradesPhase1DB(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Simulate a Phase 1 database: only migration 0001 applied.
-	for _, q := range []string{`DROP TABLE projects`, `DROP INDEX jobs_pipeline_idx`, `ALTER TABLE jobs DROP COLUMN pipeline_run_id`, `ALTER TABLE jobs DROP COLUMN pipeline_step_id`, `DROP TABLE pipelines`, `DROP TABLE pipeline_runs`, `DROP TABLE pipeline_watch_seen`, `ALTER TABLE jobs DROP COLUMN result`, `DROP TABLE clip_items`, `DROP TABLE chat_messages`, `DROP TABLE chat_conversations`, `DELETE FROM schema_migrations WHERE version >= 2`} {
+	for _, q := range []string{`DROP TABLE focus_profiles`, `DROP TABLE focus_sessions`, `DROP TABLE focus_events`, `DROP TABLE pipeline_schedule_state`, `DROP TABLE projects`, `DROP INDEX jobs_pipeline_idx`, `ALTER TABLE jobs DROP COLUMN pipeline_run_id`, `ALTER TABLE jobs DROP COLUMN pipeline_step_id`, `DROP TABLE pipelines`, `DROP TABLE pipeline_runs`, `DROP TABLE pipeline_watch_seen`, `ALTER TABLE jobs DROP COLUMN result`, `DROP TABLE clip_items`, `DROP TABLE chat_messages`, `DROP TABLE chat_conversations`, `DELETE FROM schema_migrations WHERE version >= 2`} {
 		if _, err := db.sql.Exec(q); err != nil {
 			t.Fatal(err)
 		}
@@ -399,7 +399,7 @@ func TestMigrationUpgradesPhase2DB(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Simulate a Phase 2 database: migrations 0001–0002 applied.
-	for _, q := range []string{`DROP TABLE projects`, `DROP INDEX jobs_pipeline_idx`, `ALTER TABLE jobs DROP COLUMN pipeline_run_id`, `ALTER TABLE jobs DROP COLUMN pipeline_step_id`, `DROP TABLE pipelines`, `DROP TABLE pipeline_runs`, `DROP TABLE pipeline_watch_seen`, `DROP TABLE clip_items`, `DROP TABLE chat_messages`, `DROP TABLE chat_conversations`, `DELETE FROM schema_migrations WHERE version >= 3`} {
+	for _, q := range []string{`DROP TABLE focus_profiles`, `DROP TABLE focus_sessions`, `DROP TABLE focus_events`, `DROP TABLE pipeline_schedule_state`, `DROP TABLE projects`, `DROP INDEX jobs_pipeline_idx`, `ALTER TABLE jobs DROP COLUMN pipeline_run_id`, `ALTER TABLE jobs DROP COLUMN pipeline_step_id`, `DROP TABLE pipelines`, `DROP TABLE pipeline_runs`, `DROP TABLE pipeline_watch_seen`, `DROP TABLE clip_items`, `DROP TABLE chat_messages`, `DROP TABLE chat_conversations`, `DELETE FROM schema_migrations WHERE version >= 3`} {
 		if _, err := db.sql.Exec(q); err != nil {
 			t.Fatal(err)
 		}

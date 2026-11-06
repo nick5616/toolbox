@@ -15,10 +15,7 @@
   gap: var(--space-3);
   width: 100%;
   max-width: 560px;
-  padding: var(--space-4);
-  background: var(--bg-raised);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
+  padding: var(--space-3);
 }
 
 .head {

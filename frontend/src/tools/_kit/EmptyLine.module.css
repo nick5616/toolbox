@@ -1,0 +1,10 @@
+.line {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+}
+
+.title {
+  color: var(--fg-muted);
+}

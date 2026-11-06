@@ -30,13 +30,20 @@ export interface ExportOptions {
   signal?: AbortSignal;
 }
 
+export interface RenderedComposition {
+  format: "jpg" | "png";
+  bytes: Uint8Array;
+  width: number;
+  height: number;
+}
+
 /**
- * Renders doc at scale (1 = Width×Height) on an OffscreenCanvas, encodes it
- * (JPEG q0.92 or PNG per doc.format) and stores it with
- * ComposerService.SaveRender(projectId, …).
+ * Renders doc at scale (1 = Width×Height) on an OffscreenCanvas and encodes it
+ * (JPEG q0.92 or PNG; `format` defaults to doc.format). The editor's export and
+ * the render host's headless requests (pipeline steps) both use it.
  */
-export async function exportComposition(projectId: string, doc: Composition, scale = 1, opts: ExportOptions = {}): Promise<ExportResult> {
-  const format: "jpg" | "png" = doc.format === "png" ? "png" : "jpg";
+export async function renderCompositionBytes(doc: Composition, scale = 1, opts: ExportOptions & { format?: "jpg" | "png" } = {}): Promise<RenderedComposition> {
+  const format: "jpg" | "png" = (opts.format ?? doc.format) === "png" ? "png" : "jpg";
   const width = Math.round(doc.width * scale);
   const height = Math.round(doc.height * scale);
   const canvas = new OffscreenCanvas(width, height);
@@ -69,7 +76,15 @@ export async function exportComposition(projectId: string, doc: Composition, sca
   clearRenderCache(); // 4096 px sprites would otherwise crowd the editor's cache
 
   const blob = await canvas.convertToBlob(format === "png" ? { type: "image/png" } : { type: "image/jpeg", quality: 0.92 });
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  await ComposerService.SaveRender(projectId, format, bytesToBase64(bytes));
-  return { format, bytes: bytes.length, width, height };
+  return { format, bytes: new Uint8Array(await blob.arrayBuffer()), width, height };
+}
+
+/**
+ * Renders doc at scale (1 = Width×Height), encodes it per doc.format and
+ * stores it with ComposerService.SaveRender(projectId, …).
+ */
+export async function exportComposition(projectId: string, doc: Composition, scale = 1, opts: ExportOptions = {}): Promise<ExportResult> {
+  const r = await renderCompositionBytes(doc, scale, opts);
+  await ComposerService.SaveRender(projectId, r.format, bytesToBase64(r.bytes));
+  return { format: r.format, bytes: r.bytes.length, width: r.width, height: r.height };
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import { wireBezier, type Pt, type View, type WireKind } from "../graphModel";
+import { wireBezier, type Pt, type View } from "../graphModel";
 import { glSupported, WireGL, type WireDraw } from "./wireGL";
-import { isAnimated, readPalette, wireLook, type WireLook, type WirePalette, type WireVisualState } from "./wireStyle";
+import { isAnimated, lookFor, readPalette, type WireLook, type WirePalette, type WireType, type WireVisualState } from "./wireStyle";
 import styles from "./WireCanvas.module.css";
 
 export interface WireSpec {
@@ -9,7 +9,12 @@ export interface WireSpec {
   /** World coordinates of the output port and the input port. */
   a: Pt;
   b: Pt;
-  kind: WireKind;
+  /** Colour: the source's value type (file wires are "files", orange). */
+  type: WireType;
+  /** A value wire: thinner, no flow. */
+  value?: boolean;
+  /** A wire that may fail at run time (a warning wire): drawn dashed. */
+  dashed?: boolean;
   state: WireVisualState;
 }
 
@@ -67,12 +72,12 @@ export function WireCanvas({ wires, view, width, height, onGL }: WireCanvasProps
       const zf = Math.max(0.6, Math.min(1.5, v.zoom));
       const looks: WireLook[] = [];
       const draws: WireDraw[] = ws.map((s) => {
-        const look = wireLook(s.state, reduced);
+        const look = lookFor(s.state, reduced, s.value === true);
         looks.push(look);
         const c = wireBezier(s.a, s.b).map((q) => ({ x: q.x * v.zoom + v.x, y: q.y * v.zoom + v.y })) as [Pt, Pt, Pt, Pt];
         return {
           p: c,
-          color: look.danger ? pal.danger : pal.kinds[s.kind],
+          color: look.danger ? pal.danger : pal.types[s.type],
           bright: look.bright * (pal.dark ? 1 : 0.9),
           glow: look.glow * zf,
           halo: look.halo * (pal.dark ? 1 : 0.45),
@@ -80,6 +85,7 @@ export function WireCanvas({ wires, view, width, height, onGL }: WireCanvasProps
           shimmer: look.shimmer,
           flow: look.flow,
           seed: seedOf(s.id),
+          dash: s.dashed === true,
         };
       });
       gl.resize(w, h, dpr);

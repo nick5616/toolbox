@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ToolHeader } from "@/components/ToolHeader";
 import { Banner, Button, ClickIn, ClickInHost, DropZone, Field, IconButton, Meter, Section, SegmentedControl, Select, Switch, TextField, TimecodeInput, cx, toast } from "@/components";
 import { CropOverlay, MediaPlayer, Timeline, formatMs, parseTimecodeMs, useMediaSource, type MediaPlayerHandle, type Range } from "@/components/media";
 import { JobsService, MediaService, TrimAspect, TrimJoin, TrimMode, TrimmerService, type Job } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
-import { formatBytes } from "@/lib/format";
 import { useShortcut, isEditableTarget } from "@/lib/shortcuts";
 import { isActive, useJob } from "@/state/jobs";
 import { useFileInputs, useModuleOptions } from "@/tools/_kit";
-import { FileActions } from "@/tools/_kit/FileActions";
+import { ResultRow } from "@/tools/_kit/ResultRow";
 import { recordSubmitted } from "@/tools/_kit/session";
 import { useEmbedFocus } from "@/tools/_kit/useEmbedFocus";
 import type { ToolViewProps } from "@/tools";
@@ -304,7 +304,7 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
   // ---- render ----
 
   const title = file ? (
-    <header className={styles.header}>
+    <ToolHeader aria-label="Video Trimmer">
       <span className={styles.fileName} data-tip={file.path}>
         <span>{file.name}</span>
         <Button
@@ -319,15 +319,15 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
           Choose another
         </Button>
       </span>
-    </header>
+    </ToolHeader>
   ) : null;
 
   if (!file) {
     return (
       <ClickInHost className={styles.host}>
-      <section ref={embedFocus.ref} className={styles.root} aria-label="Video Trimmer">
+      <section ref={embedFocus.ref} className={cx(styles.root, styles.rootEmpty)} aria-label="Video Trimmer">
         <div className={styles.empty}>
-          <DropZone id="trimmer-drop" label="Drop a video or audio file" hint="Cut one or more ranges, losslessly or frame-accurately." icon="scissors">
+          <DropZone id="trimmer-drop" className={styles.fullDrop} label="Drop a video or audio file" hint="Cut one or more ranges, losslessly or frame-accurately." icon="scissors">
             <Button variant="secondary" icon="folder-open" data-tip="Choose a video or audio file to trim" onClick={() => void inputs.pick()}>
               Choose file
             </Button>
@@ -562,16 +562,12 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
       )}
 
       {result && (
-        <div className={styles.result} aria-label="Result">
-          {result.outputs.map((o) => (
-            <div key={o.id} className={styles.resultRow}>
-              <span className={styles.resultName} data-tip={o.path}>
-                {o.name}
-              </span>
-              <span className={styles.resultMeta} data-tip="Size of the exported file">{formatBytes(o.sizeBytes)}</span>
-              <FileActions outputId={o.id} path={o.path} />
-            </div>
-          ))}
+        <div className={styles.result} aria-label="Results">
+          <Section label="Results" tip="The exported file">
+            {result.outputs.map((o) => (
+              <ResultRow key={o.id} path={o.path} outputId={o.id} name={o.name} sizeBytes={o.sizeBytes} icon="scissors" />
+            ))}
+          </Section>
           {shift > 500 && <p className={styles.hint}>Fast mode moved a cut up to {(shift / 1000).toFixed(1)} s earlier to land on a keyframe.</p>}
         </div>
       )}

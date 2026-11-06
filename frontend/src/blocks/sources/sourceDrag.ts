@@ -1,5 +1,6 @@
 import { useEffect, type RefObject } from "react";
 import { create } from "zustand";
+import { hasPaths, readPaths } from "@/lib/fileDrag";
 
 // Dragging post sources onto slides, a composition or a timeline (SPEC.md
 // §B13.4–B13.5). Pointer events, not HTML5 drag-and-drop: Wails' file-drop
@@ -21,6 +22,8 @@ export interface SourceDropInfo {
   /** Pointer position (client px) at the drop. */
   x: number;
   y: number;
+  /** Whether Shift was held at an in-app (HTML5) drop. */
+  shiftKey?: boolean;
 }
 
 /** Pixels the pointer must move before a press becomes a drag. */
@@ -171,13 +174,47 @@ export function startSourceDrag(paths: string[], e: { clientX: number; clientY: 
  * Makes ref's element a drop target for source drags; onDrop runs when a drag
  * is released over it. While a drag hovers it, the element gets
  * `data-source-over` (style it with CSS).
+ *
+ * It also takes in-app file drags from anywhere else (Phase 14: a result row,
+ * an image card, a Library row dragged with `startPathsDrag`): the dropped
+ * paths arrive in `onDrop` with the pointer position, like a source drag. A
+ * drop inside a `[data-file-drop-target]` descendant is left to the shell's
+ * drop routing.
  */
 export function useSourceDropTarget(ref: RefObject<HTMLElement | null>, onDrop: (info: SourceDropInfo) => void): void {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     targets.set(el, { onDrop });
+    const routed = (e: DragEvent) => e.target instanceof Element && !!e.target.closest("[data-file-drop-target]");
+    const over = (e: DragEvent) => {
+      if (!hasPaths(e) || routed(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      el.setAttribute(OVER_ATTR, "");
+    };
+    const leave = (e: DragEvent) => {
+      if (e.relatedTarget instanceof Node && el.contains(e.relatedTarget)) return;
+      el.removeAttribute(OVER_ATTR);
+    };
+    const drop = (e: DragEvent) => {
+      el.removeAttribute(OVER_ATTR);
+      if (!hasPaths(e) || routed(e)) return;
+      const paths = readPaths(e);
+      if (!paths || paths.length === 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onDrop({ paths, x: e.clientX, y: e.clientY, shiftKey: e.shiftKey });
+    };
+    el.addEventListener("dragenter", over);
+    el.addEventListener("dragover", over);
+    el.addEventListener("dragleave", leave);
+    el.addEventListener("drop", drop);
     return () => {
+      el.removeEventListener("dragenter", over);
+      el.removeEventListener("dragover", over);
+      el.removeEventListener("dragleave", leave);
+      el.removeEventListener("drop", drop);
       if (targets.get(el)?.onDrop === onDrop) targets.delete(el);
       el.removeAttribute(OVER_ATTR);
     };

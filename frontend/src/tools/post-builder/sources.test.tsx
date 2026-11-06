@@ -121,6 +121,7 @@ import { routeFilesDropped } from "@/shell/dropRouting";
 import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
 import { cancelSourceDrag } from "@/blocks/sources/sourceDrag";
+import { PATHS_MIME } from "@/lib/fileDrag";
 import { CollageDialog, StitchDialog } from "./buildDialogs";
 import { DEFAULT_SOURCE_VIEW, clickSelection, hideFromPool, stripDrop, viewSources } from "./pool";
 import PostBuilderView from "./PostBuilderView";
@@ -472,6 +473,37 @@ describe("allocation", () => {
     }
 
     afterEach(() => vi.restoreAllMocks());
+
+    /** An in-app file drag (a result row, the Library) released on the strip at y. */
+    function dropPaths(paths: string[], y: number) {
+      const strip = screen.getByRole("region", { name: "Slides" });
+      const data: Record<string, string> = { [PATHS_MIME]: JSON.stringify(paths) };
+      // jsdom has no DragEvent: a MouseEvent carries the pointer, `dataTransfer` is attached.
+      const e = new MouseEvent("drop", { bubbles: true, cancelable: true, clientX: 50, clientY: y });
+      Object.defineProperty(e, "dataTransfer", { value: { types: [PATHS_MIME], getData: (k: string) => data[k] ?? "" } });
+      fireEvent(strip, e);
+    }
+
+    it("takes files dragged in from another tool: adds slides at that point", async () => {
+      h.doc.current = h.post([h.slide("s1"), h.slide("s2"), h.slide("s3")]);
+      await open();
+      await waitFor(() => expect(options()).toHaveLength(4));
+      layoutTiles();
+      dropPaths(["/trip/c.jpg"], 108);
+      await waitFor(() => expect(slideCount()).toBe(4));
+      await waitFor(() => expect(h.save).toHaveBeenCalled(), { timeout: 3000 });
+      expect(lastSaved().slides.map((s) => s.path)).toEqual(["/p/s1.jpg", "/trip/c.jpg", "/p/s2.jpg", "/p/s3.jpg"]);
+    });
+
+    it("takes files dragged in from another tool: replaces the slide under the drop", async () => {
+      h.doc.current = h.post([h.slide("s1"), h.slide("s2")]);
+      await open();
+      await waitFor(() => expect(options()).toHaveLength(4));
+      layoutTiles();
+      dropPaths(["/trip/d.mp4"], 160);
+      await waitFor(() => expect(h.save).toHaveBeenCalled(), { timeout: 3000 });
+      expect(lastSaved().slides[1]).toMatchObject({ id: "s2", kind: "clip", path: "/trip/d.mp4" });
+    });
 
     it("inserts at the position between slides", async () => {
       h.doc.current = h.post([h.slide("s1"), h.slide("s2"), h.slide("s3")]);

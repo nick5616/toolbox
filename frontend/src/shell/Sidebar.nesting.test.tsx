@@ -36,7 +36,7 @@ describe("Sidebar composition", () => {
     render(<Sidebar />);
     expect(labels()).toEqual(["Video Editor", "Edit Studio", "Other"]);
     const { result } = renderHook(() => useNavGroups());
-    expect(result.current.ordered.map((i) => i.id)).toEqual(["library", "pipelines", "editor", "studio", "other"]);
+    expect(result.current.ordered.map((i) => i.id)).toEqual(["editor", "studio", "other"]);
     expect(result.current.tools.find((t) => t.id === "studio")?.variantOf).toBe("editor");
   });
 

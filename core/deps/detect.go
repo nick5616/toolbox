@@ -2,6 +2,7 @@ package deps
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -154,6 +155,14 @@ func (s *Service) detectOne(ctx context.Context, sp Spec) core.DepStatus {
 		st.Error = "Couldn't read the version from: " + firstLine(out)
 		return st
 	}
+	if sp.MinVersion != "" && versionLess(v, sp.MinVersion) {
+		// Too old to use: report it as missing so the managed copy gets
+		// installed (or the hint shown).
+		st.State = core.DepMissing
+		st.Path, st.Source = "", core.SourceNone
+		st.Error = fmt.Sprintf("%s %s is too old (%s or newer is needed)", sp.Name, v, sp.MinVersion)
+		return st
+	}
 	st.State = core.DepOK
 	st.Version = v
 	// A system copy of an AllowSystem tool is never "outdated": the pin only
@@ -184,4 +193,38 @@ func firstLine(s string) string {
 		s = s[:200]
 	}
 	return s
+}
+
+// versionLess reports whether dotted numeric version a is older than b.
+// Non-numeric suffixes ("1-rc1") are ignored; missing parts count as 0.
+func versionLess(a, b string) bool {
+	pa, pb := versionParts(a), versionParts(b)
+	for i := 0; i < len(pa) || i < len(pb); i++ {
+		var x, y int
+		if i < len(pa) {
+			x = pa[i]
+		}
+		if i < len(pb) {
+			y = pb[i]
+		}
+		if x != y {
+			return x < y
+		}
+	}
+	return false
+}
+
+func versionParts(v string) []int {
+	var out []int
+	for _, f := range strings.Split(strings.TrimPrefix(strings.TrimSpace(v), "v"), ".") {
+		n := 0
+		for _, c := range f {
+			if c < '0' || c > '9' {
+				break
+			}
+			n = n*10 + int(c-'0')
+		}
+		out = append(out, n)
+	}
+	return out
 }

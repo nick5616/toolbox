@@ -55,6 +55,10 @@ type PipelineStore interface {
 	SeenFiles(ctx context.Context, pipelineID string) (map[string]SeenFile, error)
 	MarkSeen(ctx context.Context, pipelineID string, files []SeenFile) error
 	ForgetSeen(ctx context.Context, pipelineID string, paths []string) error
+	// ScheduleFired is the last slot (Unix ms) the pipeline's schedule fired
+	// for, 0 if never (Phase 18).
+	ScheduleFired(ctx context.Context, pipelineID string) (int64, error)
+	SetScheduleFired(ctx context.Context, pipelineID string, at int64) error
 }
 
 // SeenFile is a watch-folder file already handled (or baselined).

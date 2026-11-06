@@ -47,5 +47,6 @@ tasks:
     env:
       TOOLBOX_SUPPORT_DIR: '{{.ROOT_DIR}}/.dev/support'
       TOOLBOX_LIBRARY_DIR: '{{.ROOT_DIR}}/.dev/library'
+      TOOLBOX_FOCUS_DRYRUN: '1' # never stop real programs while developing (CLAUDE.md)
     cmds:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}

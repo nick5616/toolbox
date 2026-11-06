@@ -11,9 +11,9 @@
  * 3. **A store bridge**: while a document is open, the tool's window hosts
  *    its store; part windows hold replicas whose listed actions run on the host.
  */
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { StoreApi } from "zustand";
-import type { BridgeSpec } from "@/state/bridge";
+import type { BridgeSpec, BridgeTransport } from "@/state/bridge";
 
 export interface ToolPanel {
   /** [a-z0-9-], unique within the tool ("layers", "cues"). */
@@ -45,6 +45,21 @@ export interface WorkspacePreview {
   height?: number;
   /** Renders the preview from the (replica) store. Takes no props. */
   component: ComponentType;
+  /**
+   * The popped-out preview is a read-only mirror and the tool's own stage is
+   * where you edit: keep the stage in the main window while it's open.
+   */
+  mirror?: boolean;
+}
+
+/**
+ * A second store mirrored on its own channel next to the main one (the
+ * editor's focus store). Make one with `bridgeOf(store, spec)`.
+ */
+export interface ExtraBridge {
+  name: string;
+  host(transport?: BridgeTransport): () => void;
+  replica(transport?: BridgeTransport): () => void;
 }
 
 export interface WorkspaceSpec<S, V extends Record<string, unknown>> {
@@ -57,6 +72,16 @@ export interface WorkspaceSpec<S, V extends Record<string, unknown>> {
   bridgeName?: string;
   /** Whether a document is open: the host bridges only then, and a part window renders only then. */
   isOpen(state: S): boolean;
+  /** Whether the host bridges (default `isOpen`): a window may host slightly before a replica can render. */
+  isHosting?(state: S): boolean;
+  /** More channels that are hosted and replicated together with the main one. */
+  extraBridges?: readonly ExtraBridge[];
+  /** Wraps what a part window renders (context providers the panels read). */
+  wrap?: ComponentType<{ children: ReactNode }>;
+  /** Called when a part window of this tool connects; returns its cleanup. */
+  onConnect?(): () => void;
+  /** The panel part's tooltip (default: "A panel of this tool in its own window"). */
+  panelTip?: string;
   panels: readonly ToolPanel[];
   preview?: WorkspacePreview;
   /**
@@ -73,6 +98,8 @@ export interface Workspace {
   panelPart: string;
   /** "<moduleId>.preview", or "" without a preview. */
   previewPart: string;
+  /** The preview window is a read-only mirror: the tool keeps its own stage while it's open. */
+  previewMirror: boolean;
   bridgeName: string;
   panels: readonly ToolPanel[];
   getPanel(id: string): ToolPanel | undefined;

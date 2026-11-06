@@ -40,10 +40,10 @@ export async function openTool(moduleId: string, inputs: string[] = [], extra: O
  * Menu items for "Open in <tool>" plus "…in its own window", for any tool
  * that hands files to another (Library, editors, composites).
  */
-export function openToolItems(moduleId: string, inputs: string[], idPrefix = "open"): { id: string; label: string; tip: string; onSelect: () => void }[] {
+export function openToolItems(moduleId: string, inputs: string[], idPrefix = "open", action?: string): { id: string; label: string; tip: string; onSelect: () => void }[] {
   const name = useModules.getState().byId[moduleId]?.name ?? moduleId;
   return [
-    { id: `${idPrefix}-${moduleId}`, label: `Open in ${name}`, tip: `Send to ${name}`, onSelect: () => void openTool(moduleId, inputs) },
-    { id: `${idPrefix}-${moduleId}-window`, label: `Open in ${name} (new window)`, tip: `Open ${name} in its own window with this`, onSelect: () => void openTool(moduleId, inputs, {}, { window: true }) },
+    { id: `${idPrefix}-${moduleId}`, label: `Open in ${name}`, tip: `Send to ${name}`, onSelect: () => void openTool(moduleId, inputs, action ? { action } : {}) },
+    { id: `${idPrefix}-${moduleId}-window`, label: `Open in ${name} (new window)`, tip: `Open ${name} in its own window with this`, onSelect: () => void openTool(moduleId, inputs, action ? { action } : {}, { window: true }) },
   ];
 }

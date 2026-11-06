@@ -65,6 +65,41 @@ export interface CopyStep {
 }
 
 /**
+ * OpenStep are Open in app's step options.
+ */
+export interface OpenStep {
+    /**
+     * absolute .exe (or macOS .app); never a template, never bound
+     */
+    "app": string;
+
+    /**
+     * "Ableton Live 12"
+     */
+    "label": string;
+
+    /**
+     * ≤ 20; templates ({vars}, {file}); an arg of exactly "{files}" = every file as its own argument
+     */
+    "args": string[] | null;
+
+    /**
+     * OpenFilesNone | OpenFilesEach | OpenFilesAll
+     */
+    "files": string;
+
+    /**
+     * OpenWindowNormal | OpenWindowMinimized
+     */
+    "window": string;
+
+    /**
+     * CloseNever | CloseFocusEnds | CloseRunEnds
+     */
+    "closeWhen": string;
+}
+
+/**
  * StepOptions are what the user edits, one struct per built-in type.
  */
 export interface RenameStep {
@@ -72,6 +107,15 @@ export interface RenameStep {
      * default "{name}"; takes {vars}
      */
     "template": string;
+}
+
+/**
+ * RunStep is "Run another pipeline" (Phase 14): the saved pipeline to run as
+ * a sub-run on the step's files. Its kept outputs (or, when it keeps none,
+ * the files of its last step) become this step's files.
+ */
+export interface RunStep {
+    "pipelineId": string;
 }
 
 export interface TableColumn {
@@ -93,6 +137,31 @@ export interface TableStep {
      * 1–30
      */
     "columns": TableColumn[] | null;
+}
+
+/**
+ * WaitStep are the Wait step's options.
+ */
+export interface WaitStep {
+    /**
+     * WaitFor | WaitUntil
+     */
+    "mode": string;
+
+    /**
+     * for: 1–1440
+     */
+    "minutes": number;
+
+    /**
+     * until: "HH:MM" 24 h local
+     */
+    "at": string;
+
+    /**
+     * ≤ 200, shown on the waiting card
+     */
+    "note": string;
 }
 
 export interface ZipStep {

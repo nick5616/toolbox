@@ -387,12 +387,30 @@ func (l *loop) itemView(rs *runState, ii int, files []core.RunFile) core.StepIte
 	return core.StepItem{Index: it.Index, Label: it.Label, Files: cloneFiles(files), Vars: copyVars(it.Vars)}
 }
 
-func (l *loop) buildRequest(rs *runState, ii, si int) core.StepRequest {
+func (l *loop) buildRequest(rs *runState, ii, si int) (core.StepRequest, error) {
 	step := rs.r.Steps[si]
 	item := &rs.r.Items[ii]
 	opts := json.RawMessage(step.OptionsJSON)
 	if len(opts) == 0 {
 		opts = json.RawMessage("{}")
+	}
+	if len(step.Binds) > 0 {
+		var first map[string]string
+		if in := item.Cells[si].Inputs; len(in) > 0 {
+			first = core.FileVars(in[0])
+		}
+		lookup := func(name string) (string, bool) {
+			if v, ok := item.Vars[name]; ok {
+				return v, true
+			}
+			v, ok := first[name]
+			return v, ok
+		}
+		bound, err := applyBinds(opts, step.Binds, lookup)
+		if err != nil {
+			return core.StepRequest{}, l.bindFailure(rs, si, err)
+		}
+		opts = bound
 	}
 	secrets := map[string]string{}
 	prefix := step.ID + "."
@@ -411,7 +429,31 @@ func (l *loop) buildRequest(rs *runState, ii, si int) core.StepRequest {
 			req.Items = append(req.Items, l.itemView(rs, m, files))
 		}
 	}
-	return req
+	return req, nil
+}
+
+// bindFailure words a value that doesn't fit its option as a validation error
+// naming the step and where to look.
+func (l *loop) bindFailure(rs *runState, si int, err error) error {
+	be, ok := err.(*bindError)
+	if !ok {
+		return err
+	}
+	label := rs.r.Steps[si].Label
+	if label == "" {
+		label = rs.steps[si].typ.Name
+	}
+	if label == "" {
+		label = fmt.Sprintf("Step %d", si+1)
+	}
+	hint := "Check the value of {" + be.varName + "}"
+	for j := si - 1; j >= 0; j-- {
+		if slices.ContainsFunc(rs.steps[j].info.Vars, func(v core.StepVar) bool { return v.Name == be.varName }) {
+			hint = fmt.Sprintf("Check what step %d makes", j+1)
+			break
+		}
+	}
+	return core.ValidationError(label+": "+be.Error(), nil).WithHint(hint)
 }
 
 // startCell begins preparing a cell. It reports false if the cell failed at
@@ -435,7 +477,7 @@ func (l *loop) startCell(rs *runState, c cand) bool {
 	cell.StartedAt, cell.FinishedAt = l.r.nowMs(), 0
 	l.spawnPrepare(rs, c.item, c.step)
 	l.touch(rs)
-	return true
+	return cell.Status != core.CellFailed
 }
 
 func safePrepare(ctx context.Context, ad core.Chainable, req core.StepRequest) (jobs []core.StepJob, err error) {
@@ -449,6 +491,12 @@ func safePrepare(ctx context.Context, ad core.Chainable, req core.StepRequest) (
 
 func (l *loop) spawnPrepare(rs *runState, ii, si int) {
 	r := l.r
+	req, err := l.buildRequest(rs, ii, si)
+	if err != nil {
+		l.invalidatePrepare(rs, ii, si)
+		l.failCell(rs, ii, si, err)
+		return
+	}
 	rt := rs.cellRT(ii, si)
 	if rt.cancel != nil {
 		rt.cancel()
@@ -457,7 +505,6 @@ func (l *loop) spawnPrepare(rs *runState, ii, si int) {
 	gen := rt.gen
 	ctx, cancel := context.WithCancel(l.ctx)
 	rt.cancel, rt.preparing, rt.retryAt = cancel, true, time.Time{}
-	req := l.buildRequest(rs, ii, si)
 	ad := rs.steps[si].ad
 	runID := rs.r.ID
 	r.wg.Add(1)

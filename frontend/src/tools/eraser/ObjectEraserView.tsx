@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { ToolHeader } from "@/components/ToolHeader";
 import { Banner, Button, ClickIn, ClickInHost, CompareSlider, DropZone, IconButton, MenuButton, Meter, SegmentedControl, Slider, cx, toast } from "@/components";
 import { EraserModel, EraserService, FilesService, JobsService, type EraserModelInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -31,6 +32,7 @@ import {
   type StrokeCtx,
   type View,
 } from "./mask";
+import { SavedMasks } from "./SavedMasks";
 import { DEFAULT_SETTINGS, canPaintOn, modelHint, needsThumb, sanitizeSettings, summarizeModel } from "./options";
 import styles from "./ObjectEraserView.module.css";
 
@@ -318,7 +320,7 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const j = await EraserService.Erase(path, data, { model: settings.model, maskPath: "" });
+      const j = await EraserService.Erase(path, data, { model: settings.model, maskPath: "", note: "" });
       setJobId(j.id);
     } catch (e) {
       const a = toAppError(e);
@@ -394,7 +396,7 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
   // ---- render ----
 
   const header = file ? (
-    <header className={styles.header}>
+    <ToolHeader aria-label="Object Eraser">
       <span className={styles.fileName} data-tip={path ?? file.path}>
         <span>{baseName(path ?? file.path)}</span>
         <Button
@@ -409,16 +411,16 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
           Choose another
         </Button>
       </span>
-    </header>
+    </ToolHeader>
   ) : null;
 
   if (!file) {
     return (
       <ClickInHost>
-        <section ref={embedFocus.ref} className={styles.root} aria-label="Object Eraser">
+        <section ref={embedFocus.ref} className={cx(styles.root, styles.rootEmpty)} aria-label="Object Eraser">
           <DepsGate moduleId={moduleId} />
           <div className={styles.empty}>
-            <DropZone id="eraser-drop" label="Drop a photo" hint="Paint over what you want gone, then erase it." icon="eraser">
+            <DropZone id="eraser-drop" className={styles.fullDrop} label="Drop a photo" hint="Paint over what you want gone, then erase it." icon="eraser">
               <Button variant="secondary" icon="folder-open" data-tip="Pick the photo you want to remove things from" onClick={() => void inputs.pick()}>
                 Choose photo
               </Button>
@@ -617,6 +619,11 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
                 </span>
               </div>
             </ClickIn>
+            <SavedMasks
+              canSave={editing && hasPaint}
+              getMaskPNG={() => (maskRef.current && img ? exportMaskPNG(maskRef.current, img.w, img.h) : "")}
+              suggestName={baseName(path ?? file.path).replace(/.[^.]+$/, "")}
+            />
             <span className={styles.spacer} />
             {gate.blocked && <span className={styles.hint}>{gate.reason}</span>}
             <Button

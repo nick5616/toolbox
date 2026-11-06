@@ -1,8 +1,8 @@
 import { Suspense, useEffect, useState } from "react";
-import { ClickIn, ClickInHost, EmptyState, Icon, IconButton, Spinner, TextField } from "@/components";
+import { ClickIn, ClickInHost, EmptyState, Icon, Spinner, TextField } from "@/components";
 import { useClickIn } from "@/components/ClickIn";
+import { ToolHeader } from "@/components/ToolHeader";
 import { useToolHandoff } from "@/lib/embed";
-import { popOutPart } from "@/lib/windows";
 import { useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "../index";
 import { detectUtil } from "./detect";
@@ -92,7 +92,7 @@ export default function DevUtilsView({ moduleId }: ToolViewProps) {
   return (
     <ClickInHost>
       <section className={styles.root} aria-label="Dev Utilities">
-        <header className={styles.bar}>
+        <ToolHeader className={styles.bar} aria-label="Dev Utilities">
           <ClickIn
             icon={current.icon}
             title="Utilities"
@@ -103,13 +103,7 @@ export default function DevUtilsView({ moduleId }: ToolViewProps) {
           >
             <PickerList currentId={current.id} onChoose={choose} />
           </ClickIn>
-          <IconButton
-            icon="picture-in-picture-2"
-            label={"Pop out " + current.name}
-            data-tip={"Open " + current.name + " in its own small window; it stays live"}
-            onClick={() => void popOutPart(ws.panelPart, { instance: current.id, params: { panel: current.id }, title: current.name + " — Toolbox", width: 520, height: 560 })}
-          />
-        </header>
+        </ToolHeader>
         <div className={styles.main}>
           <Suspense fallback={<Spinner />}>
             <Active key={current.id} />

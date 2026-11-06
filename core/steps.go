@@ -18,7 +18,8 @@ type Chainable interface {
 	DescribeStep(options json.RawMessage) (StepInfo, error)
 	// PrepareStep turns one item's files (or, when Together, every merged
 	// item's) into job submissions for this module. It may probe the files.
-	// ErrWaiting(...) means "not yet": the runner retries every 5 s.
+	// ErrWaiting(...) means "not yet": the runner retries every 5 s;
+	// ErrWaitingUntil(...) retries at its deadline (Phase 18).
 	PrepareStep(ctx context.Context, req StepRequest) ([]StepJob, error)
 	// StepOutputs reads a finished (done) job back: its files with roles,
 	// and its variables. It may read the output files (≤ 1 MiB of text).
@@ -35,6 +36,13 @@ type StepRequest struct {
 	Items    []StepItem        // together steps: every merged item, in order (SPEC.md §4.2 rule 5)
 	Secrets  map[string]string // this step's secrets by key
 	Started  int64             // the run's start (for {date}/{time})
+	// Until is the cell's stored deadline from an earlier ErrWaitingUntil
+	// (Unix ms), 0 the first time; a step uses it to keep a deadline fixed
+	// across retries and restarts (Phase 18).
+	Until int64
+	// SkipWait is set when the user pressed Continue now on a time wait; the
+	// step decides what that means (Phase 18).
+	SkipWait bool
 }
 
 // StepItem is one item's view for PrepareStep.

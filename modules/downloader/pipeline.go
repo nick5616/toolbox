@@ -99,7 +99,7 @@ func (m *Module) DescribeStep(options json.RawMessage) (core.StepInfo, error) {
 	return core.StepInfo{
 		Accepts:  m.Descriptor().Accepts,
 		Produces: []core.StepProduct{prod},
-		Vars:     []core.StepVar{{Name: "title", Label: "Title"}, {Name: "url", Label: "Link"}},
+		Vars:     []core.StepVar{{Name: "title", Label: "Title", Type: core.ValueText}, {Name: "url", Label: "Link", Type: core.ValueText}},
 		Summary:  stepSummary(o),
 	}, nil
 }

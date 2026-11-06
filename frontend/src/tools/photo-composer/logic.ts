@@ -218,3 +218,38 @@ export function backgroundSummary(b: Composition["background"]): string {
   if (b.kind === "image") return b.image?.path ? `Photo · ${fileBase(b.image.path)}` : "Photo";
   return `Colour ${b.color}`;
 }
+
+/** The name a photo layer gets from its file: the file name without its extension (as `newImageLayer`). */
+export function layerNameFromPath(path: string): string {
+  const base = path.split(/[\\/]/).pop() ?? path;
+  const dot = base.lastIndexOf(".");
+  return (dot > 0 ? base.slice(0, dot) : base) || "Photo";
+}
+
+/**
+ * The name a layer has after "Use as this layer" swaps its file. It follows the
+ * new file unless the user renamed the layer (its name isn't what the old file,
+ * or the original it was cut out from, would have produced).
+ */
+export function nameAfterSourceChange(name: string, oldPath: string, oldOriginal: string, newPath: string): string {
+  const derived = [oldPath, oldOriginal].filter(Boolean).map(layerNameFromPath);
+  const auto = derived.some((n) => n === name || n.slice(0, 120) === name);
+  return auto ? layerNameFromPath(newPath).slice(0, 120) : name;
+}
+
+/**
+ * How many photos fill this composition as a pipeline template (Phase 14): the
+ * image layers marked as slots, or, when none is marked, every visible image
+ * layer (the same rule as the Go step).
+ */
+export function templateSlotCount(layers: readonly ComposerLayer[]): number {
+  const images = layers.filter((l) => l.kind === "image");
+  const marked = images.filter((l) => l.slot);
+  return marked.length > 0 ? marked.length : images.filter((l) => !l.hidden).length;
+}
+
+/** The line in the More menu about the template slots. */
+export function slotsLine(layers: readonly ComposerLayer[]): string {
+  const n = templateSlotCount(layers);
+  return n === 0 ? "Template: no photo slots" : `Template: ${n} photo ${n === 1 ? "slot" : "slots"}`;
+}

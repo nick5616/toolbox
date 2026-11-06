@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, EmptyState, Section, SegmentedControl, Select, Switch, ToolClickIn, toast } from "@/components";
+import { Button, Section, SegmentedControl, Select, Switch, ToolClickIn, toast } from "@/components";
 import {
   FilesService,
   JobStatus,
@@ -14,7 +14,7 @@ import { copyText } from "@/lib/copy";
 import { toAppError } from "@/lib/errors";
 import { useCompositionInputs } from "@/state/composition";
 import { useToolJobs } from "@/tools/_kit/session";
-import { FileActions, FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { EmptyLine, FileToolLayout, ResultRow, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import type { ToolViewProps } from "../index";
 import { DEFAULT_OCR_OPTIONS, FALLBACK_LANGUAGES, downloadNote, sanitizeOcrOptions, toOcrResult, type OcrResultItem } from "./options";
@@ -56,8 +56,29 @@ function AskChat({ item, textPath }: { item: OcrResultItem; textPath: string }) 
   );
 }
 
+/** "Save as document…": the recognised text file goes to the Document Converter (the backend reads .txt as Markdown). */
+function SaveAsDocument({ textPath }: { textPath: string }) {
+  return (
+    <ToolClickIn
+      host="ocr"
+      module="documents"
+      title="Save as document…"
+      icon="file-text"
+      inputs={textPath === "" ? [] : [textPath]}
+      useLabel="Done"
+      tip="Turn the recognised text into a Word, PDF, EPUB or other document (opens Document Converter here)"
+      disabledReason={textPath === "" ? "No saved text file to convert" : undefined}
+      onUse={(paths) => {
+        const first = paths[0]?.split(/[\\/]/).pop() ?? "document";
+        toast({ title: paths.length > 1 ? `Saved ${paths.length} documents` : `Saved ${first}`, tone: "success" });
+      }}
+    />
+  );
+}
+
 function ResultCard({ item }: { item: OcrResultItem }) {
   const textFile = item.files.find((f) => f.path.toLowerCase().endsWith(".txt")) ?? item.files[0];
+  const textPath = textFile && textFile.path.toLowerCase().endsWith(".txt") && !textFile.missing ? textFile.path : "";
 
   // copyText goes through Go (self-copy marker) and shows its own toast.
   const copy = () => void copyText(item.preview);
@@ -74,16 +95,12 @@ function ResultCard({ item }: { item: OcrResultItem }) {
         {item.meta}
       </p>
       {item.files.map((f) => (
-        <div key={f.path} className={styles.file}>
-          <span className={f.missing ? `${styles.fileName} ${styles.missing}` : styles.fileName} data-tip={f.path}>
-            {f.name}
-          </span>
-          <FileActions outputId={f.id || undefined} path={f.path} disabled={f.missing} />
-        </div>
+        <ResultRow key={f.path} path={f.path} outputId={f.id || undefined} missing={f.missing} name={f.name} />
       ))}
       {item.preview !== "" && (
         <>
-          <AskChat item={item} textPath={textFile && textFile.path.toLowerCase().endsWith(".txt") && !textFile.missing ? textFile.path : ""} />
+          <AskChat item={item} textPath={textPath} />
+          <SaveAsDocument textPath={textPath} />
           <pre className={styles.preview} aria-label="Text preview" data-tip="The text that was read, as it will be copied">
             {item.preview}
           </pre>
@@ -92,7 +109,7 @@ function ResultCard({ item }: { item: OcrResultItem }) {
               Copy text
             </Button>
             <Button size="sm" variant="ghost" icon="folder-open" data-tip="Show the saved text file so you can copy or move it" onClick={saveAs}>
-              Save as…
+              Show file
             </Button>
           </div>
         </>
@@ -108,7 +125,7 @@ export default function OcrView({ moduleId }: ToolViewProps) {
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
   const jobs = useToolJobs(moduleId);
-  useCompositionInputs(moduleId, { "llm-chat": [] });
+  useCompositionInputs(moduleId, { "llm-chat": [], documents: [] });
 
   useEffect(() => {
     let cancelled = false;
@@ -219,7 +236,7 @@ export default function OcrView({ moduleId }: ToolViewProps) {
       results={
         <Section label="Results" tip="Recognised text with its files; copy it or open the saved file">
           {items.length === 0 ? (
-            <EmptyState icon="file-text" title="No results yet." body="Read some scans or photos and the text appears here." />
+            <EmptyLine title="No results yet." body="Read some scans or photos and the text appears here." />
           ) : (
             <div className={styles.cards}>
               {items.map((item) => (

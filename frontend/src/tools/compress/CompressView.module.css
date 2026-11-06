@@ -1,0 +1,136 @@
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.label {
+  flex: none;
+  width: 130px;
+  font-size: var(--text-md);
+  color: var(--fg-muted);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+}
+
+.estimates {
+  display: flex;
+  flex-direction: column;
+}
+
+.total {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.est {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 32px;
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  font-size: var(--text-md);
+}
+
+.name {
+  flex: 1 1 140px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+}
+
+.size {
+  flex: none;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.plan {
+  flex: 2 1 120px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--fg-subtle);
+}
+
+
+.warn {
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--warn);
+  white-space: nowrap;
+}
+
+.problem {
+  flex: none;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
+.chip {
+  flex: none;
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  background: var(--bg-hover);
+  color: var(--fg-muted);
+}
+
+.great,
+.good {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.fair {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.poor {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.bar {
+  display: inline-block;
+  width: 72px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-active);
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.barOver {
+  background: var(--danger);
+}

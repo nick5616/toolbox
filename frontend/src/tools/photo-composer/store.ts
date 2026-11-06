@@ -35,12 +35,13 @@ import {
 import { imageSize, layerSize } from "@/composer/render";
 import { ComposerService, FilesService, type ComposerBackground, type ComposerLayer, type Composition } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { adoptParkedHistory, registerHistory } from "@/lib/parkedHistory";
 import { newHistory, pushHistory, redo as redoH, undo as undoH, type History } from "@/lib/history";
 import { useJobs } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import type { PostSlideSeed } from "@/state/ui";
 import { composerImages } from "./images";
-import { geometryChanged, idRange } from "./logic";
+import { geometryChanged, idRange, nameAfterSourceChange } from "./logic";
 import type { SaveState } from "./useAutosave";
 
 export const MODULE_ID = "photo-composer";
@@ -73,8 +74,10 @@ export interface ComposerState {
   projectId: string | null;
   name: string;
   history: History<Composition> | null;
-  /** The document being dragged on the stage (not recorded yet; never bridged). */
+  /** The document being dragged on the stage (not recorded yet). */
   live: Composition | null;
+  /** `live`, throttled to about 30 fps: what the bridge mirrors so pop-outs follow a drag. */
+  liveOut: Composition | null;
   saveState: SaveState;
   /** Set when opened from a post. */
   postSlide: PostSlideSeed | null;
@@ -171,6 +174,35 @@ function imageExts(): string[] {
 
 const present = (s: ComposerState): Composition | null => s.history?.present ?? null;
 
+export const LIVE_INTERVAL_MS = 33;
+
+const liveClock = new WeakMap<object, { timer: ReturnType<typeof setTimeout> | undefined; last: number }>();
+
+/** Mirrors `live` into `liveOut` at most every 33 ms (trailing); clearing is immediate. */
+function scheduleLiveOut(
+  live: Composition | null,
+  set: (p: Partial<ComposerState>) => void,
+  get: () => ComposerState,
+): void {
+  const clock = liveClock.get(set) ?? { timer: undefined, last: 0 };
+  liveClock.set(set, clock);
+  if (live === null) {
+    if (clock.timer !== undefined) clearTimeout(clock.timer);
+    clock.timer = undefined;
+    set({ liveOut: null });
+    return;
+  }
+  if (clock.timer !== undefined) return;
+  const wait = Math.max(0, clock.last + LIVE_INTERVAL_MS - Date.now());
+  const fire = (): void => {
+    clock.timer = undefined;
+    clock.last = Date.now();
+    set({ liveOut: get().live });
+  };
+  if (wait === 0) fire();
+  else clock.timer = setTimeout(fire, wait);
+}
+
 export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
   const edit: ComposerState["edit"] = (fn, opts = {}) => {
     const h = get().history;
@@ -186,6 +218,7 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
     name: "",
     history: null,
     live: null,
+    liveOut: null,
     saveState: "idle",
     postSlide: null,
     selectedId: null,
@@ -208,6 +241,7 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
         name,
         history: newHistory(doc),
         live: null,
+        liveOut: null,
         saveState: "idle",
         postSlide,
         selectedId: null,
@@ -222,6 +256,7 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
         exporting: false,
         touched: false,
       });
+      void adoptParkedHistory("photo-composer", id);
     },
     close: () =>
       set({
@@ -229,6 +264,7 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
         name: "",
         history: null,
         live: null,
+        liveOut: null,
         saveState: "idle",
         postSlide: null,
         selectedId: null,
@@ -244,9 +280,13 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
     setName: (name) => set({ name }),
     setSaveState: (saveState) => set({ saveState }),
     edit,
-    setLive: (live) => set({ live }),
+    setLive: (live) => {
+      set({ live });
+      scheduleLiveOut(live, set, get);
+    },
     commit: (doc, key) => {
-      set({ live: null });
+      scheduleLiveOut(null, set, get);
+      set({ live: null, liveOut: null });
       edit(() => doc, { key });
     },
     undo: () => {
@@ -422,7 +462,9 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
         const l = findLayer(d, layerId);
         if (!l?.image) return d;
         // Keep a way back: the photo it had becomes the "original" unless it already had one.
-        return setLayerSource(d, layerId, path, l.image.ref.original || l.image.ref.path);
+        const next = setLayerSource(d, layerId, path, l.image.ref.original || l.image.ref.path);
+        const name = nameAfterSourceChange(l.name, l.image.ref.path, l.image.ref.original, path);
+        return name === l.name ? next : updateLayer(next, layerId, { name });
       });
     },
 
@@ -438,6 +480,23 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
 
 /** The window's store. Tests build their own with `createStore(composerInitializer)`. */
 export const useComposer = create<ComposerState>(composerInitializer);
+
+// Undo history survives popping the whole tool out and bringing it back (lib/parkedHistory.ts).
+registerHistory("photo-composer", ["photo-composer"], {
+  docId: () => useComposer.getState().projectId,
+  read: () => {
+    const h = useComposer.getState().history;
+    return h ? { past: h.past, future: h.future } : null;
+  },
+  write: ({ past, future }) => {
+    const h = useComposer.getState().history;
+    if (h) useComposer.setState({ history: { ...h, past: past as Composition[], future: future as Composition[] } });
+  },
+  subscribe: (cb) =>
+    useComposer.subscribe((s, prev) => {
+      if (s.history !== prev.history) cb();
+    }),
+});
 
 
 // ---- hooks (stable references) ----

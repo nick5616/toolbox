@@ -112,7 +112,7 @@ describe("FileToolLayout embedded", () => {
   it("shows the tagline and drop zone standalone", () => {
     render(<FileToolLayout moduleId="converter" inputs={inputs([])} runLabel="Go" onRun={() => undefined} />);
     expect(screen.getByText("Converter tagline")).toBeTruthy();
-    expect(screen.getByText("Drop files here or Add files…")).toBeTruthy();
+    expect(screen.getByText("Drop files here")).toBeTruthy();
   });
 
   it("drops the tagline and the drop zone when files were handed over", () => {
@@ -122,9 +122,17 @@ describe("FileToolLayout embedded", () => {
     expect(screen.getByRole("button", { name: /Add files/ })).toBeTruthy();
   });
 
+  it("shows file names, with the full path as the tooltip", () => {
+    const deep = [{ path: "/lots/of/folders/shot.png", name: "shot.png", sizeBytes: 10, exists: true, isDir: false }];
+    render(wrap(embedValue(), <FileToolLayout moduleId="converter" inputs={inputs(deep)} runLabel="Go" onRun={() => undefined} />));
+    const name = screen.getByText("shot.png");
+    expect(name.getAttribute("data-tip")).toBe("/lots/of/folders/shot.png");
+    expect(screen.queryByText("/lots/of/folders/shot.png")).toBeNull();
+  });
+
   it("shows a compact add row when handed-over files were all removed", () => {
     render(wrap(embedValue(), <FileToolLayout moduleId="converter" inputs={inputs([])} runLabel="Go" onRun={() => undefined} />));
-    expect(screen.queryByText("Drop files here or Add files…")).toBeNull();
+    expect(screen.queryByText("Drop files here")).toBeNull();
     expect(screen.getByText(/No files yet/)).toBeTruthy();
   });
 

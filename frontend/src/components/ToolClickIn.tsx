@@ -29,6 +29,8 @@ export interface ToolClickInProps {
   inputs?: string[];
   /** Extra handoff fields (`text`, `seed`, …). */
   extra?: Omit<Handoff, "moduleId" | "inputs" | "embed">;
+  /** A preset for the constituent (its own action id, e.g. "compress"); unknown values are ignored by the tool. */
+  action?: string;
   /** Returns result files; omit for a constituent whose results stay in the Library. */
   onUse?: (paths: string[]) => void;
   /** The Use button's label (default "Use in <host>"). */
@@ -55,6 +57,7 @@ export function ToolClickIn({
   module,
   inputs = [],
   extra,
+  action,
   onUse,
   useLabel,
   title,
@@ -74,8 +77,8 @@ export function ToolClickIn({
   const label = useLabel ?? `Use in ${hostName}`;
 
   // A new handoff object only when the inputs or extras change.
-  const key = JSON.stringify([inputs, extra ?? null]);
-  const handoff = useMemo<Handoff>(() => ({ moduleId: module, inputs: [...inputs], ...(extra ?? {}) }), [module, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const key = JSON.stringify([inputs, extra ?? null, action ?? null]);
+  const handoff = useMemo<Handoff>(() => ({ moduleId: module, inputs: [...inputs], ...(extra ?? {}), ...(action ? { action } : {}) }), [module, key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const useRefCb = useRef(onUse);
   useRefCb.current = onUse;

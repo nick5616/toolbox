@@ -36,6 +36,23 @@ export * as RedactService from "@bindings/modules/redact/service";
 export * as EraserService from "@bindings/modules/eraser/service";
 export * as VisualizerService from "@bindings/modules/visualizer/service";
 export * as DevUtilsService from "@bindings/modules/devutils/service";
+export * as DocumentsService from "@bindings/modules/documents/service";
+export * as OrganizeService from "@bindings/modules/organize/service";
+// --- Phase 13: Local File Transfer ---
+export * as LanShareService from "@bindings/modules/lanshare/service";
+export { FromMode as LanFromMode, PromptKind as LanPromptKind, ReceiveMode as LanReceiveMode } from "@bindings/core/lan/models";
+export type {
+  Activity as LanActivity,
+  Device as LanDevice,
+  DevicesChanged as LanDevicesChanged,
+  Message as LanMessage,
+  Prompt as LanPrompt,
+  PromptClosed as LanPromptClosed,
+  PromptFile as LanPromptFile,
+  State as LanState,
+} from "@bindings/core/lan/models";
+export type { LanSettings, LanSettingsInput, SendInput as LanSendInput, StepOptions as LanShareStepOptions } from "@bindings/modules/lanshare/models";
+export * as ArchiverService from "@bindings/modules/archiver/service";
 
 export {
   Category,
@@ -239,6 +256,11 @@ export type {
   Options as DevUtilsOptions,
   Result as DevUtilsResult,
 } from "@bindings/modules/devutils/models";
+export { Format as DocumentFormat } from "@bindings/modules/documents/models";
+export type { Options as DocumentsOptions } from "@bindings/modules/documents/models";
+export { DupAction as OrganizeDupAction, DupMode as OrganizeDupMode, GroupBy as OrganizeGroupBy } from "@bindings/modules/organize/models";
+export type { DuplicateGroup as OrganizeDuplicateGroup, Options as OrganizeOptions, Preview as OrganizePreview, PreviewFile as OrganizePreviewFile, PreviewFolder as OrganizePreviewFolder } from "@bindings/modules/organize/models";
+export type { BrowserInfo as ArchiverBrowserInfo, Options as ArchiverOptions } from "@bindings/modules/archiver/models";
 export { Action as VisualizerAction, Mode as VisualizerMode } from "@bindings/modules/visualizer/models";
 export type {
   ChatStatus as VisualizerChatStatus,
@@ -260,12 +282,13 @@ export type { CueWord } from "@bindings/modules/subtitles/models";
 
 // --- Phase 8: Pipelines ---
 export * as PipelinesService from "@bindings/modules/pipelines/service";
-export { CellStatus, RunStatus, WaitKind } from "@bindings/core/models";
+export { CellStatus, RunStatus, ValueType, WaitKind } from "@bindings/core/models";
 export type {
   ContinueRequest,
   Pipeline,
   PipelineCheck,
   PipelineEntry,
+  PipelineParam,
   PipelineRun,
   PipelineStep,
   PipelineTemplate,
@@ -278,6 +301,7 @@ export type {
   RunRequest,
   RunsRemoved,
   SecretAsk,
+  StepBind,
   StepCheck,
   StepFilter,
   StepInfo,
@@ -287,11 +311,15 @@ export type {
   StepVar,
   WatchConfig,
   WatchState,
+  ScheduleTrigger,
+  ScheduleState,
 } from "@bindings/core/models";
 export type {
   ChatField as PipelineChatField,
   ChatStep as PipelineChatStep,
   CopyStep as PipelineCopyStep,
+  OpenStep as PipelineOpenStep,
+  WaitStep as PipelineWaitStep,
   RenameStep as PipelineRenameStep,
   TableColumn as PipelineTableColumn,
   TableStep as PipelineTableStep,
@@ -377,3 +405,88 @@ export type {
   TextRequest as EditTextRequest,
   Track as EditTrack,
 } from "@bindings/modules/editstudio/models";
+
+// --- Phase 14: step options of the tools that became pipeline steps ---
+export type { SavedMask as EraserSavedMask, StepOptions as EraserStepOptions } from "@bindings/modules/eraser/models";
+export type { SlotInfo as ComposerSlotInfo, StepOptions as ComposerStepOptions } from "@bindings/modules/composer/models";
+export type { RunStep as PipelineRunStep } from "@bindings/modules/pipelines/models";
+export type { AssembleRequest as EditAssembleRequest, BeatRequest as EditBeatRequest } from "@bindings/modules/editstudio/models";
+export type { ClipTrigger } from "@bindings/core/models";
+
+// Scene Splitter and GIF & Contact Sheet (Phase 15, T2)
+export * as ScenesService from "@bindings/modules/scenes/service";
+export * as GifService from "@bindings/modules/gif/service";
+export { Output as SceneOutput, Keep as SceneKeep } from "@bindings/modules/scenes/models";
+export type { Options as ScenesOptions, Result as ScenesResult, Scene as SceneInfo, StepOptions as ScenesStepOptions } from "@bindings/modules/scenes/models";
+export { Mode as GifMode } from "@bindings/modules/gif/models";
+export type { Options as GifOptions, Result as GifResult, StepOptions as GifStepOptions } from "@bindings/modules/gif/models";
+
+// Silence Cutter and Image Batch (Phase 15, T3).
+export * as SilenceService from "@bindings/modules/silence/service";
+export * as ImageBatchService from "@bindings/modules/imagebatch/service";
+export type {
+  Analysis as SilenceAnalysis,
+  Options as SilenceOptions,
+  Range as SilenceRange,
+  Result as SilenceResult,
+  StepOptions as SilenceStepOptions,
+} from "@bindings/modules/silence/models";
+export {
+  Corner as BatchCorner,
+  Fit as BatchFit,
+  Format as BatchFormat,
+  ResizeMode as BatchResize,
+  WatermarkKind as BatchWatermarkKind,
+} from "@bindings/modules/imagebatch/models";
+export type {
+  FileResult as ImageBatchFile,
+  Options as ImageBatchOptions,
+  Result as ImageBatchResult,
+  StepOptions as ImageBatchStepOptions,
+  Watermark as ImageBatchWatermark,
+} from "@bindings/modules/imagebatch/models";
+
+// Compress to Size (Phase 17).
+export * as CompressService from "@bindings/modules/compress/service";
+export {
+  Grade as CompressGrade,
+  ImageFormat as CompressImageFormat,
+  Kind as CompressKind,
+  TooSmall as CompressTooSmall,
+  VideoCodec as CompressVideoCodec,
+} from "@bindings/modules/compress/models";
+export type {
+  Estimate as CompressEstimate,
+  Options as CompressOptions,
+  Result as CompressResult,
+  Target as CompressTarget,
+} from "@bindings/modules/compress/models";
+
+// Focus Lock (Phase 18).
+export * as FocusService from "@bindings/modules/focus/service";
+export { Strength as FocusStrength, Weaken as FocusWeaken } from "@bindings/core/focus/models";
+export type {
+  AllowRule as FocusAllowRule,
+  BlockEvent as FocusBlockEvent,
+  BlockedApp as FocusBlockedApp,
+  Friction as FocusFriction,
+  LearnEntry as FocusLearnEntry,
+  OpenApp as FocusOpenApp,
+  Profile as FocusProfile,
+  Session as FocusSession,
+  Settings as FocusSettings,
+  StartRequest as FocusStartRequest,
+  State as FocusState,
+} from "@bindings/core/focus/models";
+export type { App as FocusApp, StepOptions as FocusStepOptions } from "@bindings/modules/focus/models";
+
+// Text to Speech (Phase 15, T1).
+export * as TtsService from "@bindings/modules/tts/service";
+export { Format as TtsFormat, Split as TtsSplit } from "@bindings/modules/tts/models";
+export type {
+  FileResult as TtsFileResult,
+  Options as TtsOptions,
+  Result as TtsResult,
+  StepOptions as TtsStepOptions,
+  VoiceInfo as TtsVoiceInfo,
+} from "@bindings/modules/tts/models";

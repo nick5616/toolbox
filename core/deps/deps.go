@@ -24,20 +24,30 @@ const (
 	ExifTool = "exiftool"
 	Upscayl  = "upscayl"
 	Llama    = "llama-runtime"
+	// Phase 12 (Documents).
+	Pandoc   = "pandoc"
+	Typst    = "typst"
+	Monolith = "monolith"
 )
 
 // Pinned managed versions (SPEC.md §0.4, §3.3, §7.6).
 const (
-	FFmpegVersion = "9.0.2"
-	DenoVersion   = "2.9.8"
-	LlamaVersion  = "b11938"
+	FFmpegVersion   = "9.0.2"
+	DenoVersion     = "2.9.8"
+	LlamaVersion    = "b11938"
+	PandocVersion   = "3.13"
+	TypstVersion    = "0.15.1"
+	MonolithVersion = "2.12.0"
 )
 
 // Hidden installer module IDs (Phase 5).
 const (
-	FFmpegInstallModuleID = "system-ffmpeg-install"
-	DenoInstallModuleID   = "system-deno-install"
-	LlamaInstallModuleID  = "system-llama-install"
+	FFmpegInstallModuleID   = "system-ffmpeg-install"
+	DenoInstallModuleID     = "system-deno-install"
+	LlamaInstallModuleID    = "system-llama-install"
+	PandocInstallModuleID   = "system-pandoc-install"
+	TypstInstallModuleID    = "system-typst-install"
+	MonolithInstallModuleID = "system-monolith-install"
 )
 
 // UpdateModuleID is the hidden system module that installs/updates yt-dlp.
@@ -53,6 +63,7 @@ type Spec struct {
 	ArchiveDir        string            // managed archive install folder under bin ("" = single binary)
 	VersionFile       string            // relative to ArchiveDir: read the version from this file instead of running the binary
 	PinnedVersion     string            // installed VERSION differing from this → outdated (pinned managed archives)
+	MinVersion        string            // a system copy older than this does not count (managed copies are exempt)
 	AllowSystem       bool              // pinned archive tools: a copy on PATH / in known dirs also counts (managed first)
 	InstallHint       map[string]string // GOOS → hint
 }

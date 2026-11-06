@@ -1,4 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
+import { guardClick } from "./Button";
 import { Icon } from "./Icon";
 import { cx } from "./cx";
 import styles from "./IconButton.module.css";
@@ -18,7 +19,7 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { label, icon, size = "md", variant = "ghost", kbd, pressed, tooltipSide, className, type = "button", ...rest },
+  { label, icon, size = "md", variant = "ghost", kbd, pressed, tooltipSide, className, type = "button", disabled, onClick, ...rest },
   ref,
 ) {
   return (
@@ -31,7 +32,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       data-tip-kbd={kbd}
       data-tip-side={tooltipSide}
       className={cx(styles.button, styles[size], styles[variant], pressed && styles.pressed, className)}
+      aria-disabled={disabled || undefined}
       {...rest}
+      onClick={guardClick(disabled, onClick)}
     >
       <Icon name={icon} size={size === "sm" ? 14 : 16} />
     </button>

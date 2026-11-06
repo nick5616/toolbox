@@ -108,9 +108,11 @@ export function CuesPanel() {
         </ClickIn>
       </div>
       {blocker && (
-        <Banner tone="warn" title="Fix this before saving">
-          {blocker}
-        </Banner>
+        <div className={styles.cuesNote}>
+          <Banner tone="warn" title="Fix this before saving">
+            {blocker}
+          </Banner>
+        </div>
       )}
       {rows.length === 0 ? (
         <EmptyState

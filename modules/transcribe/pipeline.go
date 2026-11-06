@@ -83,11 +83,11 @@ func (m *Module) DescribeStep(options json.RawMessage) (core.StepInfo, error) {
 	if has(FormatJSON) {
 		products = append(products, core.StepProduct{Role: "json", Label: "JSON", Kind: core.KindDocument, Exts: []string{".json"}})
 	}
-	vars := []core.StepVar{{Name: "transcript", Label: "Transcript"}}
+	vars := []core.StepVar{{Name: "transcript", Label: "Transcript", Type: core.ValueText}}
 	if has(FormatSRT) || has(FormatVTT) || has(FormatJSON) {
-		vars = append(vars, core.StepVar{Name: "transcript_timed", Label: "Transcript with times"})
+		vars = append(vars, core.StepVar{Name: "transcript_timed", Label: "Transcript with times", Type: core.ValueText})
 	}
-	vars = append(vars, core.StepVar{Name: "language", Label: "Language"})
+	vars = append(vars, core.StepVar{Name: "language", Label: "Language", Type: core.ValueText})
 
 	var formats []string
 	for _, f := range AllFormats() {

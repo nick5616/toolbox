@@ -23,6 +23,7 @@ import { devutilsCommands } from "@/tools/devutils/commands";
 // --- Visualizer (Phase 7) ---
 import { visualizerCommands } from "@/tools/visualizer/commands";
 // --- end Visualizer ---
+import { lanshareCommands } from "@/tools/lan-share/commands";
 // --- pipelines ---
 import { usePipelines } from "@/state/pipelines";
 import { pipelinesCommands } from "./pipelinesCommands";
@@ -94,6 +95,15 @@ export function useBuiltinCommands(): void {
       icon: "panel-left",
       shortcut: "Mod+Backslash",
       run: () => useUI.getState().toggleSidebar(),
+    },
+    {
+      id: "shell.shortcuts",
+      title: "Keyboard shortcuts",
+      section: "Actions",
+      icon: "command",
+      shortcut: "?",
+      keywords: ["keys", "hotkeys", "help", "cheat sheet"],
+      run: () => useUI.getState().setShortcutsOpen(true),
     },
     {
       id: "jobs.cancel-all",
@@ -295,6 +305,7 @@ export function useBuiltinCommands(): void {
     ...redactCommands(),
     ...eraserCommands(),
     ...devutilsCommands(),
+    ...lanshareCommands(),
     // --- Visualizer (Phase 7) ---
     ...visualizerCommands(),
     // --- end Visualizer ---

@@ -14,7 +14,7 @@ export function PipelinesTabs() {
       value={tab}
       onChange={(v) => setTab(v)}
       options={[
-        { value: "pipelines", label: "Pipelines", tip: "Your saved recipes and the editor for the selected one" },
+        { value: "pipelines", label: "Edit", tip: "Your saved recipes and the editor for the selected one" },
         {
           value: "runs",
           label: active > 0 ? `Runs (${active})` : "Runs",

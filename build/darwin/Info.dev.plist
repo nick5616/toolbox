@@ -21,6 +21,8 @@
             <string>appicon</string>
         <key>LSMinimumSystemVersion</key>
             <string>12.0.0</string>
+        <key>NSLocalNetworkUsageDescription</key>
+        <string>Toolbox finds your other devices on this network and sends files to them when you use Local File Transfer.</string>
         <key>NSHighResolutionCapable</key>
             <string>true</string>
         <key>NSHumanReadableCopyright</key>

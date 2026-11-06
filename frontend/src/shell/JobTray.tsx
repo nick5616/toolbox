@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toAppError } from "@/lib/errors";
 import { Button, Icon, IconButton, Kbd, Meter, toast, cx, type MeterStatus } from "@/components";
 import { JobStatus } from "@/lib/api";
@@ -7,7 +7,7 @@ import { useUI } from "@/state/ui";
 import { JobRow } from "./JobRow";
 import styles from "./JobTray.module.css";
 
-export const STRIP_HEIGHT = 36;
+export const STRIP_HEIGHT = 28;
 const MIN_HEIGHT = 200;
 
 function clampHeight(px: number): number {
@@ -33,6 +33,14 @@ export function JobTray() {
     const mean = running.reduce((a, j) => a + j.progress, 0) / running.length;
     return { value: mean, status: "running" as MeterStatus };
   }, [byId]);
+
+  // Failures count as "new" until the tray has been open with them in the list.
+  const seenFailed = useUI((s) => s.seenFailed);
+  const failedIds = useMemo(() => Object.values(byId).filter((j) => j.status === JobStatus.JobFailed).map((j) => j.id), [byId]);
+  const newFailures = failedIds.filter((id) => !seenFailed.includes(id)).length;
+  useEffect(() => {
+    if (open && failedIds.length > 0) useUI.getState().markFailedSeen(failedIds);
+  }, [open, failedIds]);
 
   const idle = counts.running === 0 && counts.queued === 0;
   const parts: string[] = [];
@@ -93,7 +101,15 @@ export function JobTray() {
       >
         <Meter tip="Average progress of all running jobs" className={styles.meter} value={aggregate.value} status={aggregate.status} size="sm" label="Overall progress" />
         <span className={styles.summary}>{summary}</span>
-        {counts.failed > 0 && <span data-tip="Jobs that stopped with an error; open the tray to see why or retry" className={cx(styles.summary, styles.failed)}>{counts.failed} failed</span>}
+        {newFailures > 0 ? (
+          <span data-tip="Jobs that stopped with an error since you last opened the tray; open it to see why or retry" className={cx(styles.summary, styles.failed)}>
+            {newFailures} new {newFailures === 1 ? "failure" : "failures"}
+          </span>
+        ) : counts.failed > 0 ? (
+          <span data-tip="Jobs that stopped with an error (already seen); open the tray to retry or clear them" className={styles.summary}>
+            {counts.failed} failed
+          </span>
+        ) : null}
         <span className={styles.spacer} />
         <Kbd combo="Mod+J" />
         <span className={styles.chev}>

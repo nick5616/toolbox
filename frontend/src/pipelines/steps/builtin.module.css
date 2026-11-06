@@ -12,6 +12,12 @@
   align-items: start;
 }
 
+@container step-editor (max-width: 460px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .hint {
   margin: 0;
   font-size: var(--text-sm);
@@ -73,4 +79,12 @@
 .none {
   font-size: var(--text-sm);
   color: var(--fg-subtle);
+}
+
+/* Narrow Step panel: field and column rows wrap onto two lines instead of overflowing. */
+@container step-editor (max-width: 460px) {
+  .fieldRow,
+  .colRow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
 }

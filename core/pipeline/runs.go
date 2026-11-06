@@ -36,6 +36,10 @@ func (r *Runner) StartRun(req core.RunRequest, trigger string) (core.PipelineRun
 	if len(inputs) > MaxItems {
 		return core.PipelineRun{}, core.ValidationError(fmt.Sprintf("At most %d files per run", MaxItems), nil)
 	}
+	params, err := resolveParams(p, req.Params)
+	if err != nil {
+		return core.PipelineRun{}, err
+	}
 	check := r.Describe(p)
 	if len(check.Missing) > 0 {
 		return core.PipelineRun{}, core.Errorf(core.CodeDependencyMissing, "Needs %s", strings.Join(check.Missing, ", ")).
@@ -100,7 +104,7 @@ func (r *Runner) StartRun(req core.RunRequest, trigger string) (core.PipelineRun
 	var out core.PipelineRun
 	var startErr error
 	if err := r.exec(func() {
-		out, startErr = r.l.newRun(p, accepted, trigger, note, secrets)
+		out, startErr = r.l.newRun(p, accepted, trigger, note, secrets, params)
 	}); err != nil {
 		return core.PipelineRun{}, err
 	}
@@ -112,7 +116,7 @@ func resolveStepsFor(r *Runner, steps []core.PipelineStep) []stepRT {
 	return l.resolveSteps(steps)
 }
 
-func (l *loop) newRun(p core.Pipeline, inputs []string, trigger, note string, secrets map[string]string) (core.PipelineRun, error) {
+func (l *loop) newRun(p core.Pipeline, inputs []string, trigger, note string, secrets, params map[string]string) (core.PipelineRun, error) {
 	created := l.r.now()
 	pr := core.PipelineRun{
 		ID: core.NewID(), PipelineID: p.ID, Name: p.Name, Steps: cloneSteps(p.Steps),
@@ -125,9 +129,12 @@ func (l *loop) newRun(p core.Pipeline, inputs []string, trigger, note string, se
 		for si, s := range p.Steps {
 			cells[si] = core.RunCell{StepID: s.ID, Status: core.CellPending, JobIDs: []string{}, Inputs: []core.RunFile{}, Files: []core.RunFile{}}
 		}
+		vars := builtinVars(label, isURL(in), i+1, p.Name, created)
+		for k, v := range params { // run parameters (Phase 16); names never collide with built-ins
+			vars[k] = v
+		}
 		pr.Items = append(pr.Items, core.RunItem{
-			Index: i, Label: label, Input: in, Merged: []int{}, Cells: cells,
-			Vars: builtinVars(label, isURL(in), i+1, p.Name, created),
+			Index: i, Label: label, Input: in, Merged: []int{}, Cells: cells, Vars: vars,
 		})
 	}
 	rs := &runState{r: pr, tIdx: -1, rt: map[[2]int]*cellRT{}, secrets: secrets}

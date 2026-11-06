@@ -15,6 +15,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/ulikunitz/xz"
+
 	"toolbox/core"
 	"toolbox/core/proc"
 )
@@ -31,6 +33,10 @@ type ArchivePart struct {
 	URL    func(asset string) string                          // download URL (may redirect)
 	SHA256 func(asset string) string                          // pinned hex; nil or "" → look up in ArchiveSpec.ChecksumsURL
 	Size   int64                                              // approximate bytes; weights the progress (0 = unknown, even split)
+	// Raw: the asset is the executable itself (no archive). It is downloaded
+	// and verified, then stored mode 0755 as <extract>/<part>/<asset>, which
+	// Layout moves into place. No extraction.
+	Raw bool
 }
 
 // ArchiveSpec describes an app-managed tool installed from one or more
@@ -380,6 +386,16 @@ func (i *archiveInstaller) install(ctx context.Context, job *core.JobContext, a 
 	roots := map[string]string{}
 	for n, p := range a.Parts {
 		dest := filepath.Join(extractDir, p.Name)
+		if p.Raw {
+			if err := os.MkdirAll(dest, 0o755); err != nil {
+				return core.Errorf(core.CodeInternal, "Couldn't create a temporary folder").WithCause(err)
+			}
+			if err := moveFile(archives[n], filepath.Join(dest, assets[n]), 0o755); err != nil {
+				return core.Errorf(core.CodeToolFailed, "Couldn't set up %s", label).WithCause(err)
+			}
+			roots[p.Name] = dest
+			continue
+		}
 		if err := extractArchive(ctx, archives[n], assets[n], dest, limit); err != nil {
 			return err
 		}
@@ -529,7 +545,8 @@ func copyFileMode(src, dst string, mode os.FileMode) error {
 	return out.Close()
 }
 
-// extractArchive unpacks a .zip or .tar.gz into dest, rejecting path
+// extractArchive unpacks a .zip, .tar.gz or .tar.xz into dest (zip symlinks and
+// other special entries are skipped), rejecting path
 // traversal and capping the total unpacked size at limit.
 func extractArchive(ctx context.Context, archive, assetName, dest string, limit int64) error {
 	bad := func(err error) error {
@@ -599,18 +616,27 @@ func extractArchive(ctx context.Context, archive, assetName, dest string, limit 
 			}
 		}
 		return nil
-	case strings.HasSuffix(assetName, ".tar.gz"), strings.HasSuffix(assetName, ".tgz"):
+	case strings.HasSuffix(assetName, ".tar.gz"), strings.HasSuffix(assetName, ".tgz"), strings.HasSuffix(assetName, ".tar.xz"):
 		f, err := os.Open(archive)
 		if err != nil {
 			return bad(err)
 		}
 		defer f.Close()
-		gz, err := gzip.NewReader(f)
-		if err != nil {
-			return bad(err)
+		var tr *tar.Reader
+		if strings.HasSuffix(assetName, ".tar.xz") {
+			xr, err := xz.NewReader(f)
+			if err != nil {
+				return bad(err)
+			}
+			tr = tar.NewReader(xr)
+		} else {
+			gz, err := gzip.NewReader(f)
+			if err != nil {
+				return bad(err)
+			}
+			defer gz.Close()
+			tr = tar.NewReader(gz)
 		}
-		defer gz.Close()
-		tr := tar.NewReader(gz)
 		var links []pendingLink
 		for {
 			if err := cancelled(ctx); err != nil {

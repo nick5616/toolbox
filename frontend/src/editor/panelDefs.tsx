@@ -1,14 +1,14 @@
 /**
- * The editor's own panels (Phase 10 SPEC §5.5), registered at import. Both
- * tool profiles import this module (so do the part windows through them);
- * the music layer registers its panels in `tools/edit-studio/panels.tsx`.
+ * The editor's own panels (Phase 10 SPEC §5.5; Phase 11: ToolPanels of the
+ * editor workspace, see `workspace.tsx`). The music layer supplies its own
+ * through `EditorProfile.panels` (`tools/edit-studio/panels.tsx`).
  *
  * Every panel reads only the editor store and the profile context, so it
  * renders the same in a click-in drawer and in its own window.
  */
 import { useMemo } from "react";
 import { Button } from "@/components";
-import { registerEditorPanel } from "./panels";
+import type { ToolPanel } from "@/workspace";
 import {
   ClipCutoutPanel,
   ClipEffectsPanel,
@@ -81,19 +81,22 @@ function TrackPanel() {
   return <TrackInspector key={track.id} track={track} />;
 }
 
-registerEditorPanel({ id: "media", title: "Media", icon: "images", tip: "Your photos and videos for this edit: add, tag, drag onto tracks", component: MediaPanel, width: 420, height: 720 });
-registerEditorPanel({ id: "text", title: "Text", icon: "type", tip: "Add a title or caption clip", component: TextPanel });
-registerEditorPanel({ id: "music", title: "Music", icon: "music", tip: "Music under the video: add, trim, volume and fades", component: MusicInspector });
-registerEditorPanel({ id: "project", title: "Project", icon: "sliders-horizontal", tip: "Aspect, frame rate, background, Look and export size", component: ProjectInspector });
-registerEditorPanel({ id: "track", title: "Track", icon: "film", tip: "The selected track's name, mute, lock and matte", component: TrackPanel });
-registerEditorPanel({ id: "clip-transform", title: "Transform", icon: "maximize-2", tip: "Move, scale, rotate and fade the selected clip; flip and blend", component: ClipTransformPanel });
-registerEditorPanel({ id: "clip-effects", title: "Effects", icon: "sparkles", tip: "Effects on the selected clip", component: ClipEffectsPanel });
-registerEditorPanel({ id: "clip-masks", title: "Masks", icon: "square-dashed", tip: "Shapes that limit where the selected clip shows", component: ClipMasksPanel });
-registerEditorPanel({ id: "clip-cutout", title: "Cut-out", icon: "scan-face", tip: "Separate the subject of the selected clip from its background", component: ClipCutoutPanel });
-registerEditorPanel({ id: "clip-speed", title: "Speed", icon: "gauge", tip: "In point, speed ramps and slow motion of the selected video", component: ClipSpeedPanel });
-registerEditorPanel({ id: "clip-transition", title: "Transition", icon: "layers", tip: "How the selected clip comes in", component: ClipTransitionPanel });
-registerEditorPanel({ id: "clip-text-style", title: "Text style", icon: "type", tip: "The words, reveal and look of the selected text clip", component: ClipTextPanel });
-registerEditorPanel({ id: "clip-visual", title: "Visual", icon: "sparkles", tip: "The layer, palette and settings of the selected visual clip", component: ClipVisualPanel });
+/** The editor's own panels, in the order the rail and menus list them. A tool's profile appends its own (`EditorProfile.panels`). */
+export const EDITOR_PANELS: readonly ToolPanel[] = [
+  { id: "media", title: "Media", icon: "images", tip: "Your photos and videos for this edit: add, tag, drag onto tracks", component: MediaPanel, drawerWidth: 420, width: 420, height: 720 },
+  { id: "text", title: "Text", icon: "type", tip: "Add a title or caption clip", component: TextPanel },
+  { id: "music", title: "Music", icon: "music", tip: "Music under the video: add, trim, volume and fades", component: MusicInspector },
+  { id: "project", title: "Project", icon: "sliders-horizontal", tip: "Aspect, frame rate, background, Look and export size", component: ProjectInspector },
+  { id: "track", title: "Track", icon: "film", tip: "The selected track's name, mute, lock and matte", component: TrackPanel },
+  { id: "clip-transform", title: "Transform", icon: "maximize-2", tip: "Move, scale, rotate and fade the selected clip; flip and blend", component: ClipTransformPanel },
+  { id: "clip-effects", title: "Effects", icon: "sparkles", tip: "Effects on the selected clip", component: ClipEffectsPanel, drawerWidth: 400 },
+  { id: "clip-masks", title: "Masks", icon: "square-dashed", tip: "Shapes that limit where the selected clip shows", component: ClipMasksPanel },
+  { id: "clip-cutout", title: "Cut-out", icon: "scan-face", tip: "Separate the subject of the selected clip from its background", component: ClipCutoutPanel },
+  { id: "clip-speed", title: "Speed", icon: "gauge", tip: "In point, speed ramps and slow motion of the selected video", component: ClipSpeedPanel },
+  { id: "clip-transition", title: "Transition", icon: "layers", tip: "How the selected clip comes in", component: ClipTransitionPanel },
+  { id: "clip-text-style", title: "Text style", icon: "type", tip: "The words, reveal and look of the selected text clip", component: ClipTextPanel, drawerWidth: 400 },
+  { id: "clip-visual", title: "Visual", icon: "sparkles", tip: "The layer, palette and settings of the selected visual clip", component: ClipVisualPanel },
+];
 
-/** The ids this module registers. */
+/** The ids of the editor's own panels. */
 export const EDITOR_PANEL_IDS = ["media", "text", "music", "project", "track", "clip-transform", "clip-effects", "clip-masks", "clip-cutout", "clip-speed", "clip-transition", "clip-text-style", "clip-visual"] as const;

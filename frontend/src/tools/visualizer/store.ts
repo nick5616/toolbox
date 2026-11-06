@@ -49,6 +49,8 @@ export interface VisualizerState {
   exportPrefs: ExportPrefs;
   /** A panel something outside the workspace wants opened (palette commands); the view consumes it. */
   panelRequest: { id: string; n: number } | null;
+  /** The source came back from the last session: nothing is analysed by itself until the user asks. */
+  restored: boolean;
 
   setInput(input: string | null, isVideo: boolean): void;
   setMode(mode: "full" | "overlay"): void;
@@ -95,11 +97,13 @@ const initial = {
   seedLook: null,
   exportPrefs: DEFAULT_EXPORT,
   panelRequest: null,
+  restored: false,
 };
 
 export const useVisualizer = create<VisualizerState>((set) => ({
   ...initial,
-  setInput: (input, isVideo) => set({ input, isVideo, mode: isVideo ? "overlay" : "full", ref: null, analysis: null, selection: null, analyze: { ...DEFAULT_ANALYZE, stems: !isVideo } }),
+  setInput: (input, isVideo) =>
+    set((s) => ({ input, isVideo, mode: isVideo ? "overlay" : "full", ref: null, analysis: null, selection: null, analyze: { ...DEFAULT_ANALYZE, stems: !isVideo }, restored: s.input === input ? s.restored : false })),
   setMode: (mode) => set({ mode }),
   setAnalyze: (patch) => set((s) => ({ analyze: { ...s.analyze, ...patch } })),
   setSeed: (seedFrom, seedLines) => set({ seedFrom, seedLines }),

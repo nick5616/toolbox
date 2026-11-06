@@ -12,6 +12,9 @@ const (
 type Options struct {
 	Model    Model  `json:"model"`
 	MaskPath string `json:"maskPath"` // set by Service.Erase; never from the UI
+	// Note is set by the pipeline step: photos it left out and why. It is
+	// added to the job's warning.
+	Note string `json:"note"`
 }
 
 // DefaultOptions: the best model.

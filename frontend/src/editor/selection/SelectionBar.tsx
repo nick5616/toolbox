@@ -13,9 +13,8 @@ import { findClip } from "../doc";
 import { FIT_OPTIONS, FIT_TIPS } from "../inspector/SourceSection";
 import { patchClip } from "../inspector/inspectorState";
 import { isKeyed, paramBase } from "../inspector/paramOps";
-import { getEditorPanel } from "../panels";
 import { PanelClickIn, panelDrawerId } from "../PanelClickIn";
-import { useEditorProfile } from "../profileContext";
+import { useEditorProfile, useEditorWorkspace } from "../profileContext";
 import { useEditStudio } from "../store";
 import { clipLabel } from "../timeline/clipInfo";
 import { deleteSelection, duplicateSelection } from "../timeline/actions";
@@ -87,12 +86,13 @@ export function ClipQuickControls({ clip }: { clip: EditClip }) {
 /** The selected clip's constituent chips for the profile (own panels, then the profile's extras), each with its summary. */
 export function useClipChips(clip: EditClip): { panel: string; summary: string }[] {
   const profile = useEditorProfile();
+  const ws = useEditorWorkspace();
   const mattes = useEditStudio((s) => s.mattes);
   return useMemo(() => {
     const own = CLIP_CHIPS.filter((c) => c.kinds.includes(clip.kind)).map((c) => ({ panel: c.panel, summary: clipSummary(c.panel, clip, { mattes }) }));
     const extra = (profile.clipChips ?? []).filter((c) => !c.kinds || c.kinds.includes(clip.kind)).map((c) => ({ panel: c.panel, summary: c.summary?.(clip) ?? "" }));
-    return [...own, ...extra].filter((c) => !!getEditorPanel(c.panel));
-  }, [clip, mattes, profile.clipChips]);
+    return [...own, ...extra].filter((c) => !!ws?.getPanel(c.panel));
+  }, [clip, mattes, profile.clipChips, ws]);
 }
 
 export function SelectionBar() {
@@ -140,7 +140,7 @@ function profileTrackName(id: string): string {
 /** A label and a button that opens a panel whose launcher lives elsewhere (the rail). */
 function OpenPanel({ label, panel }: { label: string; panel: string }) {
   const { open } = useClickIn();
-  const def = getEditorPanel(panel);
+  const def = useEditorWorkspace()?.getPanel(panel);
   return (
     <>
       <span className={styles.name}>{label}</span>
@@ -159,9 +159,9 @@ const SUMMARY_PX = (summary: string) => (summary ? 8 + 6 * summary.length : 0);
 const MORE_PX = 72;
 
 /** Which chips fit in `width` px: all with summaries, else all without, else as many as fit plus "More…". Unknown width (0) shows everything. */
-export function fitChips(chips: { panel: string; summary: string; title?: string }[], width: number): { shown: number; summaries: boolean } {
+export function fitChips(chips: { panel: string; summary: string; title?: string }[], width: number, titleOf: (panel: string) => string | undefined = () => undefined): { shown: number; summaries: boolean } {
   if (width <= 0) return { shown: chips.length, summaries: true };
-  const label = (c: { panel: string; title?: string }) => CHIP_PX(c.title ?? getEditorPanel(c.panel)?.title ?? c.panel);
+  const label = (c: { panel: string; title?: string }) => CHIP_PX(c.title ?? titleOf(c.panel) ?? c.panel);
   const withSummary = chips.reduce((n, c) => n + label(c) + SUMMARY_PX(c.summary) + 4, 0);
   if (withSummary <= width) return { shown: chips.length, summaries: true };
   let used = 0;
@@ -181,6 +181,8 @@ type BarChip = { panel: string; summary: string; title?: string; tool?: ToolChip
 
 function SingleClip({ clip }: { clip: EditClip }) {
   const profile = useEditorProfile();
+  const ws = useEditorWorkspace();
+  const titleOf = (panel: string): string | undefined => ws?.getPanel(panel)?.title;
   const panelChips = useClipChips(clip);
   const known = useModules((s) => s.byId);
   const { onUse, dialog } = useReplaceClipSource(clip.id);
@@ -193,7 +195,7 @@ function SingleClip({ clip }: { clip: EditClip }) {
       .map((t): BarChip => ({ panel: toolDrawerId(t.module), summary: "", title: t.title, tool: t }));
     return [...panelChips, ...tools];
   }, [panelChips, clip, known]);
-  const { shown: n, summaries } = fitChips(chips, width);
+  const { shown: n, summaries } = fitChips(chips, width, titleOf);
   const shown = chips.slice(0, n);
   const overflow = chips.slice(n);
   const chipView = (c: BarChip, compact: boolean) =>
@@ -231,7 +233,7 @@ function SingleClip({ clip }: { clip: EditClip }) {
               items={() =>
                 overflow.map((c) => ({
                   id: c.panel,
-                  label: `${c.title ?? getEditorPanel(c.panel)?.title ?? c.panel}${c.summary ? ` · ${c.summary}` : ""}`,
+                  label: `${c.title ?? titleOf(c.panel) ?? c.panel}${c.summary ? ` · ${c.summary}` : ""}`,
                   onSelect: () => open(c.tool ? toolDrawerId(c.tool.module) : panelDrawerId(c.panel)),
                 }))
               }

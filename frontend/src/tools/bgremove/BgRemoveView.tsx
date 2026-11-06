@@ -3,7 +3,7 @@ import { ColorSwatchPicker, Section, SegmentedControl, Stepper, Switch } from "@
 import { BgOutput, BgRemoveService, JobStatus, type PresetInfo } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 import { useToolJobs } from "@/tools/_kit/session";
-import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { FileToolLayout, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import type { ToolViewProps } from "../index";
 import { RadioCards } from "@/tools/_kit/image/RadioCards";
@@ -85,7 +85,7 @@ export default function BgRemoveView({ moduleId }: ToolViewProps) {
     <FileToolLayout
       moduleId={moduleId}
       inputs={inputs}
-      runLabel={runLabel("Remove background", n, "image", "images")}
+      runLabel={n > 1 ? `Remove backgrounds (${n})` : "Remove backgrounds"}
       onRun={onRun}
       running={running}
       inputErrors={inputErrors}

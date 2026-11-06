@@ -79,7 +79,7 @@ export const lyricVideoWorkspace = defineWorkspace({
     { id: "lyrics", title: "Lyrics", icon: "mic-vocal", tip: "Detect the words from the vocals, paste them or load a file, then get the timings", component: lazyBody(() => import("./LyricsPanel")), drawerWidth: 440, poppable: false },
     { id: "visuals", title: "Visuals", icon: "sparkles", tip: "Animated visuals that react to the song, or a classic background", component: lazyBody(() => import("./VisualsPanel")), drawerWidth: 460, poppable: false },
     { id: "look", title: "Look", icon: "palette", tip: "Shape, background, font, colours, karaoke and position", component: lazyBody(() => import("./LookPanel")), drawerWidth: 420, poppable: false },
-    { id: "render", title: "Render", icon: "film", tip: "A short exact preview, then the whole video", component: lazyBody(() => import("./RenderPanel")), drawerWidth: 460, poppable: false },
+    { id: "render", title: "Export", icon: "film", tip: "A short exact preview, then the whole video", component: lazyBody(() => import("./RenderPanel")), drawerWidth: 460, poppable: false },
     { id: "lines", title: "Lyric lines", icon: "captions", tip: "The timed lines: edit words and times, tap to sync", component: lazyBody(() => import("./LinesPanel")), drawerWidth: 420, width: 420, height: 720 },
   ],
   preview: {

@@ -2,9 +2,8 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeProject } from "@/viz/edit/defaults";
 import { fixtureProject } from "@/viz/edit/fixture";
-import { getEditorPanel, listEditorPanels, panelPartId, previewPartId } from "./panels";
-import "./panelDefs";
 import { EDITOR_PANEL_IDS } from "./panelDefs";
+import { defineEditorWorkspace } from "./workspace";
 import { EditorProfileProvider, PLAIN_PROFILE } from "./profileContext";
 import { useEditStudio, type Selection } from "./store";
 
@@ -17,6 +16,10 @@ vi.mock("@/lib/api", async (orig) => {
   };
 });
 vi.mock("@/editor/useEditAutosave", () => ({ flushEdit: async () => undefined }));
+
+const ws = defineEditorWorkspace(PLAIN_PROFILE);
+const listEditorPanels = () => [...ws.panels];
+const getEditorPanel = (id: string) => ws.getPanel(id);
 
 const st = () => useEditStudio.getState();
 
@@ -35,14 +38,16 @@ describe("editor panels", () => {
     for (const id of EDITOR_PANEL_IDS) expect(ids, id).toContain(id);
     expect(EDITOR_PANEL_IDS).toEqual(["media", "text", "music", "project", "track", "clip-transform", "clip-effects", "clip-masks", "clip-cutout", "clip-speed", "clip-transition", "clip-text-style", "clip-visual"]);
     for (const p of listEditorPanels()) {
+      expect(p.component).toBeTruthy();
       expect(p.id).toMatch(/^[a-z0-9-]+$/);
       expect(p.title && p.icon && p.tip).toBeTruthy();
     }
   });
 
   it("part ids follow the contract", () => {
-    expect(panelPartId("video-studio")).toBe("video-studio.panel");
-    expect(previewPartId("edit-studio")).toBe("edit-studio.preview");
+    expect(ws.panelPart).toBe("video-studio.panel");
+    expect(ws.previewPart).toBe("video-studio.preview");
+    expect(ws.bridgeName).toBe("editor");
   });
 
   const selections: Array<[string, Selection]> = [

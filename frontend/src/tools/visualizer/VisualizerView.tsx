@@ -12,7 +12,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { ClickInHost, Spinner } from "@/components";
 import { SettingsService, type AnalysisRef } from "@/lib/api";
-import { useToolHandoff } from "@/lib/embed";
+import { useIsEmbedded, useToolHandoff } from "@/lib/embed";
 import { useCompositionInputs } from "@/state/composition";
 import { buildFixture } from "@/viz/fixture";
 import { validateShow } from "@/viz/validate";
@@ -22,6 +22,7 @@ import { MAX_STATE_BYTES, patchVizState, readVizState } from "./vizState";
 import { DEFAULT_EXPORT, sanitizeExport, type ExportPrefs } from "./exportPrefs";
 import { EmptySource } from "./SourcePanel";
 import { applyHandoff } from "./useSeed";
+import { buildLastSource, LAST_SOURCE_KEY, restoreLastSource, takeRestore } from "./restore";
 import { useVisualizer } from "./store";
 import { visualizerWorkspace as ws } from "./workspace";
 import styles from "./VisualizerView.module.css";
@@ -120,6 +121,36 @@ function Loading() {
   );
 }
 
+/**
+ * Reopens the last source (once per page, StrictMode-safe) and keeps it saved.
+ * A handoff wins; part windows (replicas) and embedded views neither restore
+ * nor save. The restore never starts an analysis.
+ */
+function useLastSource(): void {
+  const embedded = useIsEmbedded();
+  const off = embedded || ws.isReplica();
+  useEffect(() => {
+    if (off || fixtureRequested() || !takeRestore()) return;
+    void restoreLastSource().catch(() => undefined);
+  }, [off]);
+
+  const input = useVisualizer((s) => s.input);
+  const isVideo = useVisualizer((s) => s.isVideo);
+  const mode = useVisualizer((s) => s.mode);
+  const analyze = useVisualizer((s) => s.analyze);
+  useEffect(() => {
+    if (off || !input || input === FIXTURE_INPUT) return;
+    const rec = buildLastSource({ input, isVideo, mode, analyze });
+    if (!rec) return;
+    const t = setTimeout(() => void patchVizState({ [LAST_SOURCE_KEY]: rec }), 600);
+    return () => clearTimeout(t);
+  }, [off, input, isVideo, mode, analyze]);
+}
+
+function fixtureRequested(): boolean {
+  return new URLSearchParams(window.location.search).get("vizfixture") === "1";
+}
+
 export default function VisualizerView({ moduleId }: ToolViewProps) {
   const input = useVisualizer((s) => s.input);
   const [lastShow, setLastShow] = useState<Show | null>(null);
@@ -129,6 +160,7 @@ export default function VisualizerView({ moduleId }: ToolViewProps) {
   usePrefs();
   ws.useHost();
   useToolHandoff(moduleId, applyHandoff);
+  useLastSource();
   useCompositionInputs(moduleId, input ? { stems: [input], "bpm-key": [input] } : {});
 
   // ---- the design survives a restart ----
@@ -160,7 +192,7 @@ export default function VisualizerView({ moduleId }: ToolViewProps) {
   // ---- dev: the synthetic analysis ----
   useEffect(() => {
     if (fixtureDone.current || !lastLoaded) return;
-    if (new URLSearchParams(window.location.search).get("vizfixture") !== "1") return;
+    if (!fixtureRequested()) return;
     fixtureDone.current = true;
     const a = buildFixture();
     const s = useVisualizer.getState();

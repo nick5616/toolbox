@@ -62,7 +62,7 @@ func PlatformKey(goos, goarch string) string {
 }
 
 // BuiltIn are module IDs that need no download (shown, never packed).
-var BuiltIn = []string{"clipboard", "pdf", "vault", "dev-utils"}
+var BuiltIn = []string{"clipboard", "pdf", "vault", "dev-utils", "organize", "lan-share", "focus"}
 
 const mb = 1_000_000
 
@@ -97,6 +97,32 @@ func Components() []ComponentSpec {
 			},
 		},
 		{
+			ID: "pandoc", Name: "Pandoc", Href: "https://pandoc.org", License: "GPL-2.0-or-later",
+			Kind: core.ComponentDep, DepID: deps.Pandoc, Version: deps.PandocVersion,
+			// Disk is the executable alone (the layout drops pandoc-lua/-server and docs).
+			Sizes: map[string]Size{
+				Windows: {Download: 42_983_200, Disk: 239_168_264},
+				MacARM:  {Download: 43_148_194, Disk: 195_370_176},
+			},
+		},
+		{
+			ID: "typst", Name: "Typst", Href: "https://typst.app", License: "Apache-2.0",
+			Kind: core.ComponentDep, DepID: deps.Typst, Version: deps.TypstVersion,
+			// Mac disk is an estimate (the tar.xz can't be sized without unpacking it).
+			Sizes: map[string]Size{
+				Windows: {Download: 22_463_684, Disk: 52_487_680},
+				MacARM:  {Download: 14_438_168, Disk: 48 * mb},
+			},
+		},
+		{
+			ID: "monolith", Name: "Monolith", Href: "https://github.com/Y2Z/monolith", License: "CC0-1.0",
+			Kind: core.ComponentDep, DepID: deps.Monolith, Version: deps.MonolithVersion,
+			Sizes: map[string]Size{
+				Windows: {Download: 5_539_328, Disk: 5_539_328},
+				MacARM:  {Download: 6_227_984, Disk: 6_227_984},
+			},
+		},
+		{
 			ID: "engine", Name: "AI engine", Href: "https://github.com/astral-sh/uv", License: "BSD/MIT/Apache",
 			Kind: core.ComponentDep, DepID: sidecar.DepID,
 			// uv (31.8 MB) + CPython 3.12 (65.4 MB) + the 0.5.0 venv (1,310 MB),
@@ -122,6 +148,11 @@ func Components() []ComponentSpec {
 			ID: "mood-reader", Name: "Mood reader", Href: "https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", License: "Apache-2.0",
 			Kind: core.ComponentModel, Module: "visualizer", Preset: "mood",
 			Sizes: map[string]Size{Windows: {Download: 127_535_388, Disk: 127_535_388}, MacARM: {Download: 127_493_916, Disk: 127_493_916}},
+		},
+		{
+			ID: "kokoro-voices", Name: "Kokoro voices", Href: "https://huggingface.co/hexgrad/Kokoro-82M", License: "Apache-2.0",
+			Kind: core.ComponentModel, Module: "tts", Preset: "kokoro",
+			Sizes: same(Size{Download: 120_575_669, Disk: 120_575_669}),
 		},
 		{
 			ID: "whisper-default", Name: "Whisper small", Href: "https://huggingface.co/Systran/faster-whisper-small", License: "MIT",
@@ -210,6 +241,10 @@ func Catalog() []PackSpec {
 				{Module: "downloader", Needs: []string{"ffmpeg", "yt-dlp", "deno"}},
 				{Module: "converter", Needs: []string{"ffmpeg"}},
 				{Module: "trimmer", Needs: []string{"ffmpeg"}},
+				{Module: "scenes", Needs: []string{"ffmpeg"}},
+				{Module: "gif", Needs: []string{"ffmpeg"}},
+				{Module: "silence", Needs: []string{"ffmpeg"}},
+				{Module: "compress", Needs: []string{"ffmpeg"}},
 				{Module: "video-studio", Needs: []string{"ffmpeg"}},
 			},
 		},
@@ -232,6 +267,7 @@ func Catalog() []PackSpec {
 			Unlocks: []Unlock{
 				{Module: "bg-remover", Needs: []string{"engine", "bg-default"}},
 				{Module: "upscaler", Needs: []string{"upscaler"}},
+				{Module: "imagebatch", Needs: []string{}},
 				{Module: "exif", Needs: []string{"exiftool"}},
 				{Module: "redact", Needs: []string{"engine", "ffmpeg", "face-detect", "plate-detect"}},
 				{Module: "object-eraser", Needs: []string{"engine", "inpaint"}},
@@ -248,18 +284,28 @@ func Catalog() []PackSpec {
 		{
 			ID: "speech", Name: "Speech", Icon: "captions",
 			Description: "Transcribe and subtitle recordings, clean up voices, fully offline",
-			Components:  []string{"engine", "ffmpeg", "whisper-default", "voice-denoise", "mood-reader"},
+			Components:  []string{"engine", "ffmpeg", "whisper-default", "voice-denoise", "mood-reader", "kokoro-voices"},
 			Unlocks: []Unlock{
 				{Module: "transcribe", Needs: []string{"engine", "whisper-default"}},
 				{Module: "subtitles", Needs: []string{"engine", "ffmpeg", "whisper-default"}},
 				{Module: "audio-cleanup", Needs: []string{"ffmpeg", "engine", "voice-denoise"}},
+				{Module: "tts", Needs: []string{"engine", "ffmpeg", "kokoro-voices"}},
 			},
 		},
 		{
-			ID: "documents", Name: "Documents", Icon: "scan-text",
+			ID: "documents", Name: "Text recognition", Icon: "scan-text",
 			Description: "Read text from scans and photos; other scripts download ≈13 MB on first use",
 			Components:  []string{"engine"},
 			Unlocks:     []Unlock{{Module: "ocr", Needs: []string{"engine"}}},
+		},
+		{
+			ID: "docs", Name: "Documents", Icon: "file-text",
+			Description: "Convert documents between Markdown, Word, HTML, EPUB and PDF, and save web pages as one file",
+			Components:  []string{"pandoc", "typst", "monolith"},
+			Unlocks: []Unlock{
+				{Module: "documents", Needs: []string{"pandoc", "typst"}},
+				{Module: "archiver", Needs: []string{"monolith"}},
+			},
 		},
 		{
 			ID: "chat", Name: "Local Chat", Icon: "message-square",

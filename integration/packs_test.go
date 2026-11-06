@@ -71,6 +71,7 @@ func TestPackInstall(t *testing.T) {
 		deps.RegisterUpdater(reg, depSvc), deps.RegisterExifToolUpdater(reg, depSvc),
 		deps.RegisterUpscalerInstaller(reg, depSvc), deps.RegisterFFmpegInstaller(reg, depSvc),
 		deps.RegisterDenoInstaller(reg, depSvc), deps.RegisterUVUpdater(reg, depSvc),
+		deps.RegisterPandocInstaller(reg, depSvc), deps.RegisterTypstInstaller(reg, depSvc), deps.RegisterMonolithInstaller(reg, depSvc),
 		sidecar.RegisterSetup(reg, paths, engine,
 			func() (string, error) { return depSvc.Resolve(deps.UV) },
 			func(ctx context.Context, job *core.JobContext) error {

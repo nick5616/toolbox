@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { toRows } from "./logic";
-import { playerHandle, resetLyricVideo, useLyricVideo } from "./store";
+import { designHandle, playerHandle, resetLyricVideo, useLyricVideo } from "./store";
 
 const rows = () =>
   toRows([
@@ -24,6 +24,37 @@ describe("Lyric Video store", () => {
     expect(st().canRedo).toBe(true);
     st().redo();
     expect(st().rows[1]?.startMs).toBe(4100);
+  });
+
+  it("keeps one undo history for the lines and the design, oldest step last to go", () => {
+    let designUndos = 0;
+    let designRedos = 0;
+    designHandle.current = { undo: () => void designUndos++, redo: () => void designRedos++ };
+    st().resetSheet(rows());
+    const id = st().rows[1]!.id;
+    st().nudge(id, 100); // lines step 1
+    st().noteStep("design"); // design step
+    st().nudge(st().rows[0]!.id, 200); // lines step 2
+    expect(st().journal).toEqual(["lines", "design", "lines"]);
+    st().undo();
+    expect(st().rows[0]?.startMs).toBe(1000);
+    expect(designUndos).toBe(0);
+    st().undo(); // the design change
+    expect(designUndos).toBe(1);
+    expect(st().canRedo).toBe(true);
+    st().undo(); // the first lines step
+    expect(st().rows[1]?.startMs).toBe(4000);
+    expect(st().canUndo).toBe(false);
+    st().redo();
+    st().redo();
+    expect(designRedos).toBe(1);
+    expect(st().journal).toEqual(["lines", "design"]);
+    // A new edit forgets what could have been redone; resetting the design forgets its steps.
+    st().nudge(st().rows[0]!.id, 50);
+    expect(st().canRedo).toBe(false);
+    st().dropDomain("design");
+    expect(st().journal).toEqual(["lines", "lines"]);
+    designHandle.current = null;
   });
 
   it("inserts after the selection, deletes it and selects the neighbour", () => {

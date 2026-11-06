@@ -50,6 +50,7 @@ import { CellStatus, ErrorCode, JobStatus, OutputKind, RunStatus, WaitKind } fro
 import { normalizeJob, useJobs } from "@/state/jobs";
 import { usePipelines } from "@/state/pipelines";
 import { useUI } from "@/state/ui";
+import { useRunModeStore } from "./RunGraphMode";
 import { RunsPanel } from "./RunsPanel";
 import { CATALOG, entry, pipeline, step } from "./testFixtures";
 import { cell, file, item, run } from "./RunGridFixtures";
@@ -68,6 +69,9 @@ function setRuns(...runs: ReturnType<typeof run>[]) {
 }
 
 beforeEach(() => {
+  // These tests are about the List view; the graph has its own tests (RunGraph.test.tsx).
+  localStorage.setItem("toolbox.pipelines.runViewMode", "list");
+  useRunModeStore.setState({ mode: null });
   h.retry.mockImplementation(async (id: string) => run(id));
   for (const m of [h.cancel, h.clean, h.remove, h.cont, h.skip, h.stop, h.openFolder, h.open, h.reveal, h.revealPath]) m.mockResolvedValue(undefined);
   h.clean.mockResolvedValue(2);

@@ -37,6 +37,7 @@ uniform float u_flow;
 uniform float u_time;
 uniform float u_additive;
 uniform float u_seed;
+uniform float u_dash;
 ${GLSL_COMMON}
 vec2 bez(float t) {
   float u = 1.0 - t;
@@ -55,7 +56,9 @@ void main() {
     prev = cur;
   }
   float edge = best - u_core * 0.5;
-  float core = aaFill(edge);
+  // dashed wires (a value that may not fit): the core and halo break up along the curve
+  float dm = mix(1.0, step(0.5, fract(bt * 24.0)), u_dash);
+  float core = aaFill(edge) * dm;
   float e0 = max(edge, 0.0);
   // two falloffs: a tight bright one and a wide dim one
   float halo = (exp(-e0 / max(u_glow, 0.001)) * 0.62 + exp(-e0 / max(u_glow * 2.6, 0.001)) * 0.4) * u_halo;
@@ -67,7 +70,7 @@ void main() {
   float k = sh * (1.0 + pulse * 1.4);
   vec3 hot = mix(u_col, vec3(1.0), 0.18 * core + 0.4 * pulse);
   float a = clamp(core * u_bright * k, 0.0, 1.0);
-  float g = halo * (0.7 + pulse * 1.3) * sh;
+  float g = halo * (0.7 + pulse * 1.3) * sh * mix(1.0, 0.25 + 0.75 * dm, u_dash);
   if (u_additive > 0.5) {
     // dark theme: light adds up where wires and halos overlap (kept a valid premultiplied colour)
     float al = clamp(max(a, g * 0.8), 0.0, 1.0);
@@ -91,6 +94,8 @@ export interface WireDraw {
   flow: boolean;
   /** 0..1, differs per wire so shimmers don't line up. */
   seed: number;
+  /** Drawn dashed. */
+  dash?: boolean;
 }
 
 export interface WireFrame {
@@ -179,7 +184,8 @@ export class WireGL {
         .f1("u_bright", wire.bright)
         .f1("u_shimmer", wire.shimmer)
         .f1("u_flow", wire.flow ? 1 : 0)
-        .f1("u_seed", wire.seed);
+        .f1("u_seed", wire.seed)
+        .f1("u_dash", wire.dash ? 1 : 0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
     gl.bindVertexArray(null);

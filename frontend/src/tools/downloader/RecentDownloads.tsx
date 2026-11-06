@@ -1,8 +1,7 @@
-import { Badge, EmptyState, Icon, IconButton, Section, cx, toast } from "@/components";
-import { LibraryService, OutputKind } from "@/lib/api";
-import { toAppError } from "@/lib/errors";
-import { formatBytes, formatRelativeTime } from "@/lib/format";
-import { revealLabel } from "@/lib/platform";
+import { EmptyState, IconButton, Section, toast } from "@/components";
+import { OutputKind } from "@/lib/api";
+import { FailedJobs } from "@/tools/_kit/FailedJobs";
+import { ResultRow } from "@/tools/_kit/ResultRow";
 import { MODULE_ID } from "./options";
 import { isActive, useOrderedJobs } from "@/state/jobs";
 import { useRecentOutputs, type OutputView } from "@/state/library";
@@ -17,14 +16,6 @@ const KIND_ICON: Record<string, string> = {
   [OutputKind.KindDocument]: "file-text",
 };
 
-async function run(p: Promise<unknown>) {
-  try {
-    await p;
-  } catch (e) {
-    toast({ title: toAppError(e).message, tone: "danger" });
-  }
-}
-
 async function copyPath(path: string) {
   try {
     await navigator.clipboard.writeText(path);
@@ -36,25 +27,18 @@ async function copyPath(path: string) {
 
 function OutputRow({ o }: { o: OutputView }) {
   return (
-    <li className={cx(styles.row, o.missing && styles.missing)}>
-      <Icon name={KIND_ICON[o.kind] ?? "file"} size={14} className={styles.kind} />
-      <span className={styles.name} data-tip={o.path}>
-        {o.name}
-      </span>
-      {o.missing && <Badge tone="warn" tip="The file was moved or deleted outside Toolbox">
-          MISSING
-        </Badge>}
-      <span className={styles.meta} data-tip="File size on disk">
-        {formatBytes(o.sizeBytes)}
-      </span>
-      <span className={styles.meta} data-tip={new Date(o.createdAt).toLocaleString()}>
-        {formatRelativeTime(o.createdAt)}
-      </span>
-      <span className={styles.actions}>
-        <IconButton size="sm" icon="folder-open" label={revealLabel} data-tip={o.missing ? "The file is missing" : "Show this file in its folder"} disabled={o.missing} onClick={() => void run(LibraryService.Reveal(o.id))} />
-        <IconButton size="sm" icon="external-link" label="Open" data-tip={o.missing ? "The file is missing" : "Open this file in its default app"} disabled={o.missing} onClick={() => void run(LibraryService.Open(o.id))} />
-        <IconButton size="sm" icon="copy" label="Copy path" data-tip="Copy the full path of this file" onClick={() => void copyPath(o.path)} />
-      </span>
+    <li>
+      <ResultRow
+        path={o.path}
+        outputId={o.id}
+        missing={o.missing}
+        name={o.name}
+        sizeBytes={o.sizeBytes}
+        at={o.createdAt}
+        icon={KIND_ICON[o.kind] ?? "file"}
+        moduleId={MODULE_ID}
+        extra={<IconButton size="sm" icon="copy" label="Copy path" data-tip="Copy the full path of this file" onClick={() => void copyPath(o.path)} />}
+      />
     </li>
   );
 }
@@ -74,7 +58,8 @@ export function RecentDownloads() {
           </div>
         </Section>
       )}
-      <Section label="Recent downloads" tip="The latest files this tool saved to your library">
+      <FailedJobs moduleId={MODULE_ID} />
+      <Section label="Results" tip="The latest files this tool saved to your library">
         {recent.length === 0 ? (
           <EmptyState icon="download" title="Nothing downloaded yet." body="Paste a link above, or anywhere in the app." />
         ) : (

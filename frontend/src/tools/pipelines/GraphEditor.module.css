@@ -2,9 +2,7 @@
   position: relative;
   display: flex;
   flex: 1 1 auto;
-  min-height: 360px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  min-height: 200px;
   background: var(--bg-inset);
   overflow: hidden;
 }
@@ -47,18 +45,10 @@
   pointer-events: none;
 }
 
-/* File kinds map to existing tokens (the GL layer reads the same names). */
-.k_audio { --kind: var(--lane-bass); }
-.k_video { --kind: var(--lane-kick); }
-.k_image { --kind: var(--lane-hats); }
-.k_document { --kind: var(--lane-break); }
-.k_text { --kind: var(--lane-phrase); }
-.k_other { --kind: var(--lane-other); }
-.k_any { --kind: var(--accent); }
-
+/* Wire colours are the value-type tokens (--type-*); the stroke is set inline per wire. */
 .wire {
   fill: none;
-  stroke: var(--kind, var(--fg-muted));
+  stroke: var(--type-files);
   stroke-width: 2;
   stroke-linecap: round;
   opacity: 0.8;
@@ -179,49 +169,312 @@
   color: var(--danger);
 }
 
+.body {
+  flex: none;
+}
+
 .portRow {
   position: relative;
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding-right: var(--space-3);
 }
 
-.portLabel {
+.cellL,
+.cellR,
+.cellEmpty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.cellL {
+  flex: 1 1 0;
+  padding-left: var(--space-3);
+  padding-right: var(--space-1);
+}
+
+.cellEmpty {
+  flex: 1 1 0;
+}
+
+.cellR {
+  flex: 0 1 auto;
+  max-width: 48%;
+  justify-content: flex-end;
+  padding-right: var(--space-3);
+  padding-left: var(--space-1);
+}
+
+.pLabel {
+  flex: none;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--fg-muted);
   font-size: var(--text-xs);
 }
 
-.inPort,
-.outDot {
+.pValue {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--fg);
+  font-size: var(--text-xs);
+}
+
+.pWired {
+  color: var(--c, var(--fg));
+}
+
+.portLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+}
+
+.paramRow {
+  position: relative;
+  cursor: pointer;
+}
+
+.paramRow:hover {
+  background: var(--bg-hover);
+}
+
+.rowBad .pValue {
+  color: var(--danger);
+}
+
+/* While a wire is dragged: legal targets glow, the rest step back. */
+.portOk {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.portDim {
+  opacity: 0.35;
+}
+
+/* Files ports are circles (12px), value ports rounded squares (10px); a wired one is filled, an unwired one a hollow ring. */
+.dotFiles,
+.dotValue {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  box-sizing: border-box;
-  border: 2px solid var(--bg-raised);
-  border-radius: 50%;
-}
-
-.inPort {
+  top: 50%;
   left: -7px;
-  background: var(--kind, var(--fg-muted));
-  box-shadow: 0 0 6px var(--kind, transparent);
-}
-
-.outDot {
-  right: -7px;
-  top: 4px;
-  background: var(--kind, var(--fg-muted));
-  box-shadow: 0 0 7px var(--kind, transparent);
+  box-sizing: border-box;
+  border: 2px solid var(--c, var(--fg-muted));
+  background: var(--bg-raised);
   cursor: crosshair;
   transition: transform var(--dur-fast), box-shadow var(--dur-fast);
 }
 
-.outDot:hover,
-.inPort:hover {
-  transform: scale(1.45);
-  box-shadow: 0 0 14px 2px var(--kind, transparent);
+.dotFiles {
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border-radius: 50%;
+}
+
+.dotValue {
+  left: -6px;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 3px;
+}
+
+.dotOut {
+  left: auto;
+  right: -7px;
+}
+
+.dotValue.dotOut {
+  right: -6px;
+}
+
+.dotOn {
+  background: var(--c, var(--fg-muted));
+  box-shadow: 0 0 6px var(--c, transparent);
+}
+
+.dotFiles:hover,
+.dotValue:hover {
+  transform: scale(1.4);
+  box-shadow: 0 0 10px 1px var(--c, transparent);
+}
+
+.dotFiles:focus-visible,
+.dotValue:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.rowMenu {
+  display: none;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.paramRow:hover .rowMenu,
+.paramRow:focus-within .rowMenu {
+  display: inline-flex;
+}
+
+.rowMenu:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.moreBtn {
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-subtle);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.moreBtn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.moreBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* The legend (bottom left) */
+.legend {
+  position: absolute;
+  left: var(--space-2);
+  bottom: var(--space-2);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.legendHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.legendChip {
+  composes: legend;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.legendDot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--c);
+}
+
+.legendDot.legendFiles {
+  width: 12px;
+  height: 12px;
+  margin: -1px;
+  border-radius: 50%;
+}
+
+.legendNote {
+  color: var(--fg-subtle);
+  white-space: nowrap;
+}
+
+/* The port menu */
+.portMenu {
+  position: absolute;
+  z-index: 8;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+  border: 1px solid var(--pop-border);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+}
+
+.portMenuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.portMenuItem:hover:not([aria-disabled="true"]),
+.portMenuItem:focus-visible {
+  outline: none;
+  background: var(--bg-hover);
+}
+
+.portMenuItem[aria-disabled="true"] {
+  color: var(--fg-subtle);
+  cursor: not-allowed;
+}
+
+.portMenuNote {
+  padding: 0 var(--space-2) var(--space-1);
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
 }
 
 .srOnly {
@@ -260,10 +513,11 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
+  padding: 1px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
   background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
 }
 
 .toolbarSep {
@@ -322,11 +576,11 @@
 
 .store {
   flex: none;
-  width: 200px;
+  width: 216px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-2);
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-1) 0 var(--space-2);
   border-right: 1px solid var(--line);
   background: var(--bg-panel);
   min-height: 0;
@@ -349,7 +603,7 @@
   top: 0;
   z-index: 1;
   background: var(--bg-panel);
-  padding: var(--space-3) var(--space-1) var(--space-1);
+  padding: var(--space-2) var(--space-1) 2px;
   color: var(--fg-subtle);
   font-size: var(--text-xs);
   font-weight: 500;
@@ -363,11 +617,11 @@
   gap: var(--space-2);
   width: 100%;
   box-sizing: border-box;
-  margin-bottom: 2px;
-  padding: 5px var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--bg-raised);
+  min-height: 40px;
+  padding: 2px var(--space-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
   color: var(--fg);
   font: inherit;
   text-align: left;
@@ -376,7 +630,6 @@
 
 .tool:hover {
   background: var(--bg-hover);
-  border-color: var(--line-strong);
 }
 
 .ghost {
@@ -406,8 +659,7 @@
 }
 
 .toolOff:hover {
-  background: var(--bg-raised);
-  border-color: var(--line);
+  background: transparent;
 }
 
 .toolIcon {
@@ -423,6 +675,7 @@
 
 .toolName {
   font-size: var(--text-md);
+  line-height: 18px;
 }
 
 .toolDesc {
@@ -431,6 +684,7 @@
   white-space: nowrap;
   color: var(--fg-subtle);
   font-size: var(--text-xs);
+  line-height: 16px;
 }
 
 .quick {
@@ -455,8 +709,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .outDot:hover,
-  .inPort:hover {
+  .dotFiles:hover,
+  .dotValue:hover {
     transform: none;
   }
 }

@@ -11,7 +11,7 @@
 .stage {
   position: relative;
   flex: none;
-  margin: var(--space-4);
+  margin: var(--space-3);
   box-shadow: var(--shadow-pop);
   outline: none;
   touch-action: none;

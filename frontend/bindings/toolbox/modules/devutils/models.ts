@@ -23,13 +23,33 @@ export interface HashResult {
 }
 
 /**
- * Options are the file-hash job's options.
+ * Options are the job's options.
  */
 export interface Options {
     /**
-     * ≥ 1 of AllAlgorithms()
+     * ≥ 1 of AllAlgorithms() (hash, checksums)
      */
     "algorithms": string[] | null;
+
+    /**
+     * "" | ActionHash | ActionChecksums | ActionEncode
+     */
+    "action": string;
+
+    /**
+     * checksums: FormatSidecar | FormatCSV
+     */
+    "format": string;
+
+    /**
+     * encode: EncodingBase64 | EncodingHex
+     */
+    "encoding": string;
+
+    /**
+     * checksums: base name of the written file(s); "" = automatic
+     */
+    "name": string;
 }
 
 /**

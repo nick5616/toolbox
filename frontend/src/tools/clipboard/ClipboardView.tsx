@@ -14,6 +14,7 @@ import {
   toast,
   type BadgeTone,
 } from "@/components";
+import { ToolHeader } from "@/components/ToolHeader";
 import { ClipKind, ClipboardService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { acceleratorToCombo, isMac } from "@/lib/platform";
@@ -180,7 +181,7 @@ export default function ClipboardView({ moduleId }: ToolViewProps) {
   return (
     <ClickInHost>
     <div className={styles.root} onKeyDown={onKeyDown}>
-      <header className={styles.header}>
+      <ToolHeader className={styles.header} aria-label="Clipboard">
         {enabled && (
           <span className={styles.status} role="status">
             <Badge tone={statusTone} tip={state.error ? "Recording hit a problem; see the message" : state.paused ? "Copies are being ignored until you resume" : state.recording ? "Everything you copy is being saved to the history" : "Recording is getting ready"}>{statusLabel}</Badge>
@@ -234,13 +235,13 @@ export default function ClipboardView({ moduleId }: ToolViewProps) {
             </section>
           </ClickIn>
         )}
-      </header>
+      </ToolHeader>
 
       {!enabled && (
         <EmptyState
           className={hasHistory ? styles.offCompact : styles.off}
           icon="clipboard"
-          size={hasHistory ? "md" : "lg"}
+          size="md"
           title="Clipboard history is off"
           body={
             <>

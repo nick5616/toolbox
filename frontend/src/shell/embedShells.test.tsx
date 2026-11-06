@@ -32,6 +32,7 @@ vi.mock("@/lib/windows", async (orig) => {
   };
 });
 vi.mock("@/tools", () => ({
+  shellOverlays: [],
   toolViews: {
     stems: () => {
       return <FakeStems />;

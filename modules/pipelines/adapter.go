@@ -26,6 +26,8 @@ func (s *step) StepDefaults() any {
 		return DefaultRename()
 	case ActionChat:
 		return DefaultChat()
+	case ActionRun:
+		return DefaultRun()
 	case ActionTable:
 		return DefaultTable()
 	case ActionZip:
@@ -72,6 +74,8 @@ func (s *step) DescribeStep(options json.RawMessage) (core.StepInfo, error) {
 			Templates: []string{"/template"}, Warnings: []string{}, Summary: "Rename to " + ellipsize(o.Template, 60)}, nil
 	case ActionChat:
 		return s.describeChat(options)
+	case ActionRun:
+		return s.describeRun(options)
 	case ActionTable:
 		return s.describeTable(options)
 	case ActionZip:
@@ -200,6 +204,8 @@ func (s *step) PrepareStep(ctx context.Context, req core.StepRequest) ([]core.St
 	case ActionChat:
 		o, _ := decodeStep(req.Options, DefaultChat())
 		return s.prepareChat(req, o)
+	case ActionRun:
+		return s.prepareRun(ctx, req)
 	case ActionTable:
 		o, _ := decodeStep(req.Options, DefaultTable())
 		return s.prepareTable(req, o)

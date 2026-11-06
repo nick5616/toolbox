@@ -103,6 +103,24 @@ describe("ToolClickIn", () => {
     expect(opts.handoff.embed).toMatchObject({ host: "photo-composer", hostName: "Photo Composer", useLabel: "Use in Photo Composer" });
   });
 
+  it("hands the action to the view and keeps it on pop-out", async () => {
+    function ActionView() {
+      return <p>action: {useEmbed()?.handoff.action}</p>;
+    }
+    registerToolViews({ stems: ActionView });
+    useModules.getState().setAll([desc("stems", ModuleStatus.StatusReady), desc("photo-composer", ModuleStatus.StatusReady)]);
+    render(
+      <ClickInHost>
+        <ToolClickIn host="photo-composer" module="stems" inputs={["song.mp3"]} action="compress" onUse={() => undefined} />
+      </ClickInHost>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Stem Splitter/ }));
+    expect(await screen.findByText("action: compress")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Pop out" }));
+    const [, opts] = popOutTool.mock.calls[0] as [string, { handoff: Handoff }];
+    expect(opts.handoff.action).toBe("compress");
+  });
+
   it("is disabled when the constituent isn't ready", () => {
     registerToolViews({ stems: FakeStems });
     useModules.getState().setAll([desc("stems", ModuleStatus.StatusComingSoon), desc("photo-composer", ModuleStatus.StatusReady)]);

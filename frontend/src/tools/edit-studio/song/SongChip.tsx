@@ -1,6 +1,6 @@
 /** The song's name in the header (Phase 10 SPEC §5.5): a chip that opens the Song panel. */
 import { Icon, useClickIn } from "@/components";
-import { panelDrawerId } from "@/editor/PanelClickIn";
+import { panelDrawerId } from "@/workspace";
 import { useProject } from "@/editor/store";
 import styles from "./SongChip.module.css";
 

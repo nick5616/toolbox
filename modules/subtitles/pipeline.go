@@ -170,7 +170,7 @@ func (m *Module) DescribeStep(options json.RawMessage) (core.StepInfo, error) {
 	s := raw.withDefaults()
 	info := core.StepInfo{
 		Accepts:   stepAccepts(),
-		Vars:      []core.StepVar{{Name: "subtitles", Label: "Subtitle text"}, {Name: "language", Label: "Language"}},
+		Vars:      []core.StepVar{{Name: "subtitles", Label: "Subtitle text", Type: core.ValueText}, {Name: "language", Label: "Language", Type: core.ValueText}},
 		Templates: []string{}, Warnings: []string{}, Secrets: []core.StepSecret{},
 		Summary: stepSummary(s),
 	}

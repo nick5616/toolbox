@@ -74,6 +74,9 @@ func (d *DB) DeletePipeline(ctx context.Context, id string) error {
 	if _, err := tx.ExecContext(ctx, `DELETE FROM pipeline_watch_seen WHERE pipeline_id = ?`, id); err != nil {
 		return fmt.Errorf("delete watch state of %s: %w", id, err)
 	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM pipeline_schedule_state WHERE pipeline_id = ?`, id); err != nil {
+		return fmt.Errorf("delete schedule state of %s: %w", id, err)
+	}
 	return tx.Commit()
 }
 
@@ -244,4 +247,28 @@ func (d *DB) ForgetSeen(ctx context.Context, pipelineID string, paths []string) 
 		}
 	}
 	return tx.Commit()
+}
+
+// ScheduleFired implements core.PipelineStore: the last slot the pipeline's
+// schedule fired for (Unix ms), 0 if never.
+func (d *DB) ScheduleFired(ctx context.Context, pipelineID string) (int64, error) {
+	var at int64
+	err := d.sql.QueryRowContext(ctx, `SELECT last_fire_at FROM pipeline_schedule_state WHERE pipeline_id = ?`, pipelineID).Scan(&at)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("schedule state %s: %w", pipelineID, err)
+	}
+	return at, nil
+}
+
+// SetScheduleFired implements core.PipelineStore.
+func (d *DB) SetScheduleFired(ctx context.Context, pipelineID string, at int64) error {
+	_, err := d.sql.ExecContext(ctx, `INSERT INTO pipeline_schedule_state(pipeline_id, last_fire_at) VALUES (?, ?)
+		ON CONFLICT(pipeline_id) DO UPDATE SET last_fire_at = excluded.last_fire_at`, pipelineID, at)
+	if err != nil {
+		return fmt.Errorf("set schedule state %s: %w", pipelineID, err)
+	}
+	return nil
 }

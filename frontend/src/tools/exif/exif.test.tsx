@@ -101,8 +101,7 @@ describe("ExifView", () => {
     read.mockResolvedValue(view({ editable: false, hasLocation: false, location: null }));
     await load();
     expect(screen.getAllByText(/RAW files are read-only here/).length).toBeGreaterThan(0);
-    expect((screen.getByRole("button", { name: "Remove all metadata" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Edit…" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Remove location from/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("shows a read error", async () => {
@@ -128,7 +127,8 @@ describe("ExifView", () => {
     expect(screen.getByRole("button", { name: /Advanced/ }).textContent).toContain("keeps orientation");
     await user.click(screen.getByRole("button", { name: /Advanced/ }));
     await user.click(await screen.findByRole("switch", { name: "Keep orientation & colour profile" }));
-    await user.click(screen.getByRole("button", { name: "Remove all metadata" }));
+    await user.click(screen.getByRole("radio", { name: "Remove all" }));
+    await user.click(screen.getByRole("button", { name: /Remove all metadata from 1 file/ }));
     await waitFor(() =>
       expect(enqueue).toHaveBeenCalledWith(["/a.jpg"], { action: "strip-all", keepOrientation: false, fields: {} }),
     );
@@ -137,7 +137,8 @@ describe("ExifView", () => {
   it("edit dialog prefills, validates and sends only changed fields", async () => {
     enqueue.mockResolvedValue([{}]);
     const user = await load();
-    await user.click(screen.getByRole("button", { name: "Edit…" }));
+    await user.click(screen.getByRole("radio", { name: "Edit fields" }));
+    await user.click(screen.getByRole("button", { name: /Edit fields…/ }));
     const dialog = await screen.findByRole("dialog");
     const title = within(dialog).getByLabelText("Title") as HTMLInputElement;
     expect(title.value).toBe("Old title");

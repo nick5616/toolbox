@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 
 	"toolbox/core"
+	"toolbox/modules/archiver"
 	"toolbox/modules/audiocleanup"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/converter"
+	"toolbox/modules/documents"
 	"toolbox/modules/downloader"
 	"toolbox/modules/lyricvideo"
 	"toolbox/modules/midi"
@@ -41,6 +43,8 @@ const (
 	stVault        = vault.ModuleID
 	stRedact       = redact.ModuleID
 	stVisualizer   = visualizer.ModuleID
+	stDocuments    = documents.ModuleID
+	stArchiver     = archiver.ModuleID
 )
 
 // tstep is one template step. Its From is "" for "the previous step"
@@ -53,6 +57,7 @@ type tstep struct {
 	autoContinue  bool
 	keep          bool
 	note          string
+	binds         []core.StepBind
 }
 
 func buildTemplate(id, name, icon, blurb string, packs []string, steps ...tstep) core.PipelineTemplate {
@@ -84,12 +89,13 @@ func buildTemplate(id, name, icon, blurb string, packs []string, steps ...tstep)
 		out[i] = core.PipelineStep{
 			ID: t.id, Type: t.typ, OptionsJSON: optionsJSON, From: from, Filter: f,
 			Manual: t.manual, AutoContinue: t.autoContinue, Keep: t.keep, Note: t.note,
+			Binds: append([]core.StepBind{}, t.binds...),
 		}
 		prev = t.id
 	}
 	return core.PipelineTemplate{
 		ID: id, Blurb: blurb, Icon: icon, Packs: packs,
-		Pipeline: core.Pipeline{Name: name, Description: blurb, TemplateID: id, Steps: out, Watch: core.WatchConfig{}},
+		Pipeline: core.Pipeline{Name: name, Description: blurb, TemplateID: id, Steps: out, Params: []core.PipelineParam{}, Watch: core.WatchConfig{}},
 	}
 }
 
@@ -197,6 +203,34 @@ func paperArchive() core.PipelineTemplate {
 		tstep{id: "ocr", typ: stOCR, opts: scan},
 		tstep{id: "compress", typ: stPDF, opts: small},
 		tstep{id: "vault", typ: stVault, opts: vault.StepOptions{Folder: "Documents"}},
+	)
+}
+
+// paperToWord is "Paper to archive"'s Word branch as its own template (the
+// template model has no optional steps): photos of paper → OCR text → .docx.
+func paperToWord() core.PipelineTemplate {
+	scan := ocr.DefaultOptions()
+	scan.PDFOutput = ocr.PDFText
+	word := documents.DefaultOptions()
+	word.To = documents.FormatDOCX
+	return buildTemplate(TplPaperToWord, "Paper to Word", "file-text",
+		"Read the text from photos or scans of paper and save it as an editable Word document.",
+		[]string{"documents", "docs"},
+		tstep{id: "ocr", typ: stOCR, opts: scan},
+		tstep{id: "word", typ: stDocuments, opts: word, filter: roles("text"), keep: true},
+	)
+}
+
+func readingList() core.PipelineTemplate {
+	page := archiver.DefaultOptions()
+	page.AlsoPDF = false
+	book := documents.DefaultOptions()
+	book.To = documents.FormatEPUB
+	return buildTemplate(TplReadingList, "Archive a reading list", "book-open",
+		"Save every link in a text file as one self-contained page, and make an EPUB of each to read offline.",
+		[]string{"docs"},
+		tstep{id: "archive", typ: stArchiver, opts: page, keep: true},
+		tstep{id: "epub", typ: stDocuments, opts: book, filter: roles("page"), keep: true},
 	)
 }
 

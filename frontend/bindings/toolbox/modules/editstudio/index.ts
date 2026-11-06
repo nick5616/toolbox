@@ -12,6 +12,8 @@ export {
 
 export type {
     AnalyzeRequest,
+    AssembleRequest,
+    BeatRequest,
     Captions,
     Clip,
     CustomMarker,

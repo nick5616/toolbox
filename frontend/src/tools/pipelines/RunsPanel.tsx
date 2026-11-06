@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, ConfirmDialog, EmptyState, Select, StatusChip, cx, toast } from "@/components";
+import { Badge, Button, ConfirmDialog, EmptyState, SegmentedControl, Select, StatusChip, cx, toast } from "@/components";
 import { PipelinesService, RunStatus } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatRelativeTime } from "@/lib/format";
 import { isRunActive, usePipelines, useRunList, waitingCells, type RunView } from "@/state/pipelines";
 import { NeedsYouCard } from "./NeedsYouCard";
+import { RunGraph } from "./RunGraph";
+import { useRunMode } from "./RunGraphMode";
 import { RunGrid } from "./RunGrid";
 import { hasTemporaryFiles, runChip, runProgress, sortRuns } from "./RunGridModel";
 import { RunResults } from "./RunResults";
+import { runParamsText } from "./RunSheetModel";
 import styles from "./RunsPanel.module.css";
 
 function report(e: unknown): void {
@@ -43,6 +46,10 @@ function RunDetail({ run }: { run: RunView }) {
   const runs = usePipelines((s) => s.runs);
   const [confirm, setConfirm] = useState(false);
   const [alsoClean, setAlsoClean] = useState(true);
+  const [mode, setMode] = useRunMode();
+  const entries = usePipelines((s) => s.entries);
+  const valuesUsed = useMemo(() => runParamsText(entries.find((e) => e.pipeline.id === run.pipelineId)?.pipeline.params ?? [], run.items), [entries, run.pipelineId, run.items]);
+  const graph = mode === "graph";
   const active = isRunActive(run);
   const chip = runChip(run.status);
   const waiting = useMemo(() => waitingCells(runs).filter((w) => w.run.id === run.id), [runs, run.id]);
@@ -50,15 +57,31 @@ function RunDetail({ run }: { run: RunView }) {
   const cleanable = !active && hasTemporaryFiles(run);
 
   return (
-    <div className={styles.detail}>
+    <div className={cx(styles.detail, graph && styles.detailFill)}>
       <header className={styles.header}>
         <div className={styles.headTitle}>
           <h2 className={styles.name}>{run.name}</h2>
           <StatusChip status={chip.status} label={chip.label} />
+          <SegmentedControl
+            className={styles.modeSwitch}
+            size="sm"
+            aria-label="Run view"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "graph", label: "Graph", tip: "Show the run as the pipeline's steps, with each step's progress" },
+              { value: "list", label: "List", tip: "Show the run as a table of files and steps" },
+            ]}
+          />
         </div>
         <div className={styles.headMeta} data-tip="When it started and what started it">
           Started {formatRelativeTime(run.createdAt)} · {TRIGGER[run.trigger] ?? run.trigger}
         </div>
+        {valuesUsed && (
+          <div className={styles.headMeta} data-tip="The run parameters this run was started with" data-testid="run-params">
+            {valuesUsed}
+          </div>
+        )}
         <div className={styles.headActions}>
           {active && (
             <Button size="sm" icon="square" data-tip="Stop this run; steps that already finished keep their files" onClick={() => PipelinesService.Cancel(run.id).catch(report)}>
@@ -95,12 +118,18 @@ function RunDetail({ run }: { run: RunView }) {
 
       {run.error && <div className={styles.runError}>{run.error}</div>}
 
-      {waiting.map((w) => (
-        <NeedsYouCard key={`${w.item.index}:${w.step.id}`} w={w} />
-      ))}
+      {graph ? (
+        <RunGraph run={run} />
+      ) : (
+        <>
+          {waiting.map((w) => (
+            <NeedsYouCard key={`${w.item.index}:${w.step.id}`} w={w} />
+          ))}
 
-      <RunGrid run={run} />
-      <RunResults run={run} />
+          <RunGrid run={run} />
+          <RunResults run={run} />
+        </>
+      )}
 
       <ConfirmDialog
         open={confirm}

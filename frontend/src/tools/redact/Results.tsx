@@ -2,6 +2,7 @@ import { Banner, Button } from "@/components";
 import { MediaPlayer, useMediaSource } from "@/components/media";
 import type { JobView } from "@/state/jobs";
 import { FileActions } from "@/tools/_kit/FileActions";
+import { useResultBehaviour } from "@/tools/_kit/ResultRow";
 import { formatBytes } from "@/lib/format";
 import { Thumb } from "./bits";
 import { baseName, isVideoPath } from "./logic";
@@ -26,6 +27,26 @@ function VideoResult({ path }: { path: string }) {
   );
 }
 
+function ResultCard({ o }: { o: JobView["outputs"][number] }) {
+  const { draggable, onDragStart, onDoubleClick, ...behaviour } = useResultBehaviour({ path: o.path, outputId: o.id || undefined, missing: o.missing });
+  // Only the footer starts a drag or opens the file: the player keeps its own drags.
+  const grip = { draggable, onDragStart, onDoubleClick };
+  return (
+    <li {...behaviour} className={styles.card} data-testid="result-card">
+    {isVideoPath(o.path) ? <VideoResult path={o.path} /> : <Thumb path={o.path} size={480} className={styles.cardThumb} />}
+    <div className={styles.cardFoot} {...grip}>
+      <span className={styles.cardName} data-tip={o.path}>
+        {o.name || baseName(o.path)}
+      </span>
+      <span className={styles.hint} data-tip="File size on disk">
+        {formatBytes(o.sizeBytes)}
+      </span>
+      <FileActions outputId={o.id} path={o.path} disabled={o.missing} />
+    </div>
+</li>
+  );
+}
+
 export interface ResultsProps {
   job: JobView;
   /** Back to the boxes (only when there are detections to edit). */
@@ -43,18 +64,7 @@ export function Results({ job, onEdit, onMore }: ResultsProps) {
       </Banner>
       <ul className={styles.cards}>
         {outputs.map((o) => (
-          <li key={o.id || o.path} className={styles.card} data-testid="result-card">
-            {isVideoPath(o.path) ? <VideoResult path={o.path} /> : <Thumb path={o.path} size={480} className={styles.cardThumb} />}
-            <div className={styles.cardFoot}>
-              <span className={styles.cardName} data-tip={o.path}>
-                {o.name || baseName(o.path)}
-              </span>
-              <span className={styles.hint} data-tip="File size on disk">
-                {formatBytes(o.sizeBytes)}
-              </span>
-              <FileActions outputId={o.id} path={o.path} disabled={o.missing} />
-            </div>
-          </li>
+          <ResultCard key={o.id || o.path} o={o} />
         ))}
       </ul>
       <div className={styles.footer}>

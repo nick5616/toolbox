@@ -194,6 +194,18 @@ describe("PdfView", () => {
     await waitFor(() => expect(checked().textContent).toMatch(/Compress PDF/));
   });
 
+  it("selects the action from a handoff and ignores unknown ones", async () => {
+    moduleState.value = "";
+    useUI.getState().handOff({ moduleId: "pdf", inputs: ["/a.pdf"], action: "compress" });
+    const first = render(<PdfView moduleId="pdf" />);
+    await waitFor(() => expect(checked().textContent).toMatch(/Compress PDF/));
+    first.unmount();
+    moduleState.value = JSON.stringify({ action: PdfAction.ActionSplit });
+    useUI.getState().handOff({ moduleId: "pdf", inputs: ["/a.pdf"], action: "bogus" });
+    render(<PdfView moduleId="pdf" />);
+    await waitFor(() => expect(checked().textContent).toMatch(/Split PDF/));
+  });
+
   it("Make searchable opens OCR with the PDFs in the list", async () => {
     function FakeOcr() {
       return <p>ocr gets: {useEmbed()?.handoff.inputs.join(",")}</p>;

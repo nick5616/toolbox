@@ -1,9 +1,10 @@
+import { useEffect } from "react";
 import { isReady } from "@/state/modules";
 import { useUI } from "@/state/ui";
 // --- pipelines ---
 import { usePipelines } from "@/state/pipelines";
 import { inputAccepted } from "@/tools/pipelines/RunSheetModel";
-import { openPipelineRunSheet } from "./dropRouting";
+import { installInAppDrops, openPipelineRunSheet } from "./dropRouting";
 // --- end pipelines ---
 import { Badge, Button, Icon } from "@/components";
 import styles from "./DropOverlay.module.css";
@@ -18,6 +19,8 @@ export function DropOverlay() {
   const drop = useUI((s) => s.drop);
   const setDrop = useUI((s) => s.setDrop);
   const handOff = useUI((s) => s.handOff);
+  // In-app drags (file rows, Phase 14) route like OS drops; the hint below shows for them too.
+  useEffect(() => installInAppDrops(), []);
 
   return (
     <>

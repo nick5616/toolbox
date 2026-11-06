@@ -45,11 +45,11 @@
   white-space: nowrap;
 }
 
-.item:disabled {
+.item[aria-disabled="true"] {
   opacity: 0.45;
 }
 
-.active:not(:disabled) {
+.active:not([aria-disabled="true"]) {
   background: var(--bg-hover);
 }
 

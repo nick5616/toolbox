@@ -1,12 +1,11 @@
 import { useMemo, useState } from "react";
-import { Badge, Button, EmptyState, Field, Icon, SegmentedControl, Section, Slider, Stepper, Switch, ToolClickIn, cx } from "@/components";
+import { Badge, Button, Field, SegmentedControl, Section, Slider, Stepper, Switch, ToolClickIn } from "@/components";
 import { JobStatus, MidiRange, MidiService } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/format";
 import { useCompositionInputs } from "@/state/composition";
 import { useToolJobs } from "@/tools/_kit/session";
-import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { EmptyLine, FileToolLayout, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
-import { FileActions } from "@/tools/_kit/FileActions";
+import { ResultRow } from "@/tools/_kit/ResultRow";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import shared from "@/tools/_kit/results.module.css";
 import { DEFAULT_MIDI_OPTIONS, formatPitchRange, parseMidiResult, sanitizeMidiOptions } from "./options";
@@ -48,7 +47,7 @@ export default function MidiView({ moduleId }: ToolViewProps) {
     <FileToolLayout
       moduleId={moduleId}
       inputs={inputs}
-      runLabel={runLabel("Transcribe", n, "file", "files")}
+      runLabel={n > 1 ? `Make MIDI (${n} files)` : "Make MIDI"}
       onRun={onRun}
       running={running}
       inputErrors={inputErrors}
@@ -117,7 +116,7 @@ export default function MidiView({ moduleId }: ToolViewProps) {
       results={
         <Section label="Results" tip="Finished MIDI files with note counts">
           {done.length === 0 ? (
-            <EmptyState icon="piano" title="No transcriptions yet." body="Transcribed MIDI files appear here." />
+            <EmptyLine title="No transcriptions yet." body="Transcribed MIDI files appear here." />
           ) : (
             <ul className={shared.list}>
               {done.map((j) => {
@@ -125,27 +124,27 @@ export default function MidiView({ moduleId }: ToolViewProps) {
                 const r = parseMidiResult(j.resultJson);
                 const range = r ? formatPitchRange(r.pitchRange) : "";
                 return (
-                  <li key={j.id} className={cx(shared.row, out?.missing && shared.missing)}>
-                    <Icon name="piano" size={14} className={shared.icon} />
-                    <span className={shared.name} data-tip={out?.path ?? j.title}>
-                      {out?.name ?? j.title}
-                    </span>
-                    {r && (
-                      <Badge mono tip="Number of notes found in the track">
-                        {r.notes} notes
-                      </Badge>
-                    )}
-                    {range && (
-                      <span className={shared.meta} data-tip="Lowest to highest note found">
-                        {range}
-                      </span>
-                    )}
-                    <span className={shared.meta} data-tip={new Date(j.finishedAt || j.createdAt).toLocaleString()}>
-                      {formatRelativeTime(j.finishedAt || j.createdAt)}
-                    </span>
-                    <span className={shared.actions}>
-                      {out && <FileActions outputId={out.id} path={out.path} disabled={out.missing} />}
-                    </span>
+                  <li key={j.id}>
+                    {out ? (
+                      <ResultRow
+                        path={out.path}
+                        outputId={out.id}
+                        missing={out.missing}
+                        name={out.name}
+                        icon="piano"
+                        at={j.finishedAt || j.createdAt}
+                        meta={
+                          <>
+                            {r && (
+                              <Badge mono tip="Number of notes found in the track">
+                                {r.notes} notes
+                              </Badge>
+                            )}
+                            {range && <span data-tip="Lowest to highest note found"> {range}</span>}
+                          </>
+                        }
+                      />
+                    ) : null}
                   </li>
                 );
               })}

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, EmptyState, Icon, Section, Switch, cx } from "@/components";
+import { Badge, Icon, Section, SegmentedControl, Switch, cx } from "@/components";
 import { ExifAction, ExifService, JobStatus, type ExifOptions } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 import { useToolJobs } from "@/tools/_kit/session";
-import { FileToolLayout, runLabel, summarize, useDepsGate, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { EmptyLine, FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
-import { FileActions } from "@/tools/_kit/FileActions";
+import { ResultRow } from "@/tools/_kit/ResultRow";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import shared from "@/tools/_kit/results.module.css";
 import { EditDialog } from "./EditDialog";
@@ -30,11 +30,11 @@ function sanitize(raw: unknown, defaults: SavedOptions): SavedOptions {
 export default function ExifView({ moduleId }: ToolViewProps) {
   const inputs = useFileInputs(moduleId);
   const [saved, setSaved] = useModuleOptions(moduleId, DEFAULT_SAVED, sanitize);
-  const gate = useDepsGate(moduleId);
   const [running, setRunning] = useState(false);
   const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState("");
   const [editOpen, setEditOpen] = useState(false);
+  const [mode, setMode] = useState<"location" | "all" | "edit">("location");
   const [fieldNames, setFieldNames] = useState<string[]>(DEFAULT_EDITABLE_FIELDS);
   const jobs = useToolJobs(moduleId);
   const done = useMemo(
@@ -78,22 +78,20 @@ export default function ExifView({ moduleId }: ToolViewProps) {
   const initial = only?.status === "ok" ? editableValues(only.view) : {};
 
   const noActionable = paths.length > 0 && actionable.length === 0;
-  const barDisabled = paths.length === 0 || noActionable || gate.blocked || running;
-  const barReason = paths.length === 0
-    ? "Add photos first"
-    : noActionable
-      ? "RAW files are read-only here"
-      : gate.blocked
-        ? gate.reason
-        : "Working on the current files";
-
   return (
     <>
       <FileToolLayout
         moduleId={moduleId}
         inputs={inputs}
-        runLabel={runLabel("Remove location from", actionable.length, "file", "files")}
-        onRun={() => void submit(base(ExifAction.ActionStripLocation))}
+        runLabel={
+          mode === "edit"
+            ? "Edit fields…"
+            : runLabel(mode === "all" ? "Remove all metadata from" : "Remove location from", actionable.length, "file", "files")
+        }
+        onRun={() => {
+          if (mode === "edit") setEditOpen(true);
+          else void submit(base(mode === "all" ? ExifAction.ActionStripAll : ExifAction.ActionStripLocation));
+        }}
         runDisabledReason={noActionable ? "RAW files are read-only here" : undefined}
         running={running}
         inputErrors={inputErrors}
@@ -145,25 +143,16 @@ export default function ExifView({ moduleId }: ToolViewProps) {
               </Section>
             )}
             <div className={styles.actions} data-tip="Changes are saved to new copies; the originals are never modified">
-              <div className={styles.actionBtns}>
-                <Button
-                  variant="secondary"
-                  disabled={barDisabled}
-                  data-tip={barDisabled ? barReason : "Strip location, camera, dates and every other tag from new copies"}
-                  onClick={() => void submit(base(ExifAction.ActionStripAll))}
-                >
-                  Remove all metadata
-                </Button>
-                <Button
-                  variant="secondary"
-                  icon="wand-sparkles"
-                  disabled={barDisabled}
-                  data-tip={barDisabled ? barReason : "Set title, author, copyright, keywords or date on new copies"}
-                  onClick={() => setEditOpen(true)}
-                >
-                  Edit…
-                </Button>
-              </div>
+              <SegmentedControl
+                aria-label="What to do"
+                value={mode}
+                onChange={setMode}
+                options={[
+                  { value: "location", label: "Remove location", tip: "Strip only the GPS position; keep camera and date info" },
+                  { value: "all", label: "Remove all", tip: "Strip location, camera, dates and every other tag from new copies" },
+                  { value: "edit", label: "Edit fields", tip: "Set title, author, copyright, keywords or date on new copies" },
+                ]}
+              />
               {readOnly.length > 0 && (
                 <p className={styles.note} data-tip="RAW files cannot be edited here, so they are left out of the actions">
                   RAW files are read-only here ({readOnly.length} {readOnly.length === 1 ? "file" : "files"} skipped).
@@ -195,7 +184,7 @@ export default function ExifView({ moduleId }: ToolViewProps) {
         results={
           <Section label="Results" tip="Cleaned copies; the originals are never changed">
             {done.length === 0 ? (
-              <EmptyState icon="scan-search" title="No cleaned files yet." body="Cleaned copies appear here. Originals are never changed." />
+              <EmptyLine title="No cleaned files yet." body="Cleaned copies appear here. Originals are never changed." />
             ) : (
               <ul className={shared.list}>
                 {done.map((j) => {
@@ -203,19 +192,8 @@ export default function ExifView({ moduleId }: ToolViewProps) {
                   if (!r) return null;
                   const out = j.outputs.find((o) => o.path === r.output);
                   return (
-                    <li key={j.id} className={cx(shared.row, out?.missing && shared.missing)}>
-                      <Icon name="image" size={14} className={shared.icon} />
-                      <span className={shared.name} data-tip={r.output}>
-                        {basename(r.output)}
-                      </span>
-                      {j.message && (
-                        <span className={shared.meta} data-tip="What was changed in this copy">
-                          {j.message}
-                        </span>
-                      )}
-                      <span className={shared.actions}>
-                        <FileActions outputId={out?.id} path={r.output} disabled={out?.missing} />
-                      </span>
+                    <li key={j.id}>
+                      <ResultRow path={r.output} outputId={out?.id} missing={out?.missing} name={basename(r.output)} meta={j.message || undefined} at={j.finishedAt || undefined} icon="image" />
                     </li>
                   );
                 })}

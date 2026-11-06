@@ -25,19 +25,20 @@ import { PackState, type Pipeline, type PipelineTemplate } from "@/lib/api";
 import { usePacks } from "@/state/packs";
 import { usePipelines } from "@/state/pipelines";
 import { PipelineList } from "./PipelineList";
+import { groupTemplates } from "./TemplateGallery";
 import { useNewPipeline } from "./useNewPipeline";
 import { CATALOG, check, entry, pipeline, step, stepCheck } from "./testFixtures";
 
-function template(id: string, name: string, steps: NonNullable<Pipeline["steps"]>, packs: string[] = []): PipelineTemplate {
-  return { id, blurb: `${name} blurb`, icon: "workflow", packs, pipeline: pipeline("", steps, { name, templateId: id }) };
+function template(id: string, name: string, steps: NonNullable<Pipeline["steps"]>, packs: string[] = [], group = "Practical"): PipelineTemplate {
+  return { id, group, blurb: `${name} blurb`, icon: "workflow", packs, pipeline: pipeline("", steps, { name, templateId: id }) };
 }
 
 const TEMPLATES = [
-  template("social-clip", "Clip for social", [step("aaaaaaaa", "downloader")]),
+  template("social-clip", "Clip for social", [step("aaaaaaaa", "downloader")], [], "Just cool"),
   template("podcast", "Podcast", [step("aaaaaaaa", "stems")], ["music"]),
-  template("sampling", "Sampling", [step("aaaaaaaa", "stems")]),
+  template("sampling", "Sampling", [step("aaaaaaaa", "stems")], [], "Just cool"),
   template("product-photos", "Product photos", [step("aaaaaaaa", "object-eraser")]),
-  template("music-video", "Music video", [step("aaaaaaaa", "visualizer", { optionsJson: '{"presetId":"golden-hour","showJson":""}' })]),
+  template("music-video", "Music video", [step("aaaaaaaa", "visualizer", { optionsJson: '{"presetId":"golden-hour","showJson":""}' })], [], "Just cool"),
 ];
 
 function Gallery() {
@@ -134,6 +135,27 @@ describe("template gallery", () => {
     for (const t of TEMPLATES) expect(within(dialog).getByText(t.pipeline.name)).toBeTruthy();
     expect(within(dialog).getByText("Needs: Music pack")).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: "Install" })).toBeTruthy();
+  });
+
+  it("shows the templates in a Practical and a Just cool section, keeping their order", () => {
+    render(<Gallery />);
+    fireEvent.click(screen.getByText("open gallery"));
+    const dialog = screen.getByRole("dialog", { name: "New pipeline" });
+    const names = (section: string) =>
+      within(within(dialog).getByRole("region", { name: section }))
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label"))
+        .filter((n) => n !== null);
+    expect(names("Practical")).toEqual(["Podcast", "Product photos"]);
+    expect(names("Just cool")).toEqual(["Clip for social", "Sampling", "Music video"]);
+    const headings = within(dialog).getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(["Practical", "Just cool"]);
+  });
+
+  it("groupTemplates puts a template without a known group under Practical and drops empty sections", () => {
+    const odd = template("x", "Odd", [step("aaaaaaaa", "stems")], [], "");
+    expect(groupTemplates([odd]).map((g) => [g.group, g.templates.length])).toEqual([["Practical", 1]]);
+    expect(groupTemplates([])).toEqual([]);
   });
 
   it("fills the visualizer design before the first Save, selects the pipeline and closes", async () => {

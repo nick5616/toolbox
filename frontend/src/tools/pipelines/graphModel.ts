@@ -1,7 +1,9 @@
-import { CellStatus, WaitKind, type OutputKind, type Pipeline, type PipelineCheck, type PipelineStep, type StepCheck, type StepProduct, type StepType } from "@/lib/api";
+import { CellStatus, WaitKind, type OutputKind, type Pipeline, type PipelineCheck, type PipelineParam, type PipelineStep, type StepCheck, type StepProduct, type StepType } from "@/lib/api";
 import { canRead, filterProducts, FROM_INPUT, FROM_NONE, kindOfPath } from "@/pipelines/compat";
+import { canWire, displayValue, type ValueType } from "@/pipelines/params";
 import type { RunView } from "@/state/pipelines";
 import { acceptsNoun, CHECK_TYPE, emptyFilter, newStep, NO_FILES_TYPES, stepsOf } from "./editorModel";
+import { bindValue, builtinSources, nodeName, resolveSource, runParamSources, stepParams, stepVarSources, valueWireVerdict, type StepParam } from "./wiring";
 
 // Pure logic of the node-graph pipeline builder (SPEC.md §12): pipeline ⇄ graph,
 // connect rules, topological order, layout. The steps stay the source of truth;
@@ -41,12 +43,35 @@ export interface Layout {
   v: 1;
   nodes: Record<string, Pt>;
   view: View;
+  /** Nodes whose "+ N more" is open (Phase 16). Absent in older layouts. */
+  expanded?: string[];
 }
 
 export interface GraphPort {
   id: string;
   label: string;
   kind: WireKind;
+}
+
+/** A parameter row on the left of a step node. */
+export interface ParamRow {
+  pointer: string;
+  label: string;
+  type: Exclude<ValueType, "files">;
+  /** The current value as shown ("1.1", "On", "← BPM & Key · BPM" when wired). */
+  display: string;
+  /** The step's own value (shown as the fallback when wired). */
+  own: string;
+  primary: boolean;
+  wired?: { name: string; from: string; label: string; type: ValueType; loose: boolean; resolved: boolean; reason: string };
+  def: StepParam;
+}
+
+/** A value output on the right of a node. */
+export interface ValueOut {
+  id: string;
+  label: string;
+  type: ValueType;
 }
 
 export interface GraphNode {
@@ -56,18 +81,40 @@ export interface GraphNode {
   y: number;
   w: number;
   h: number;
+  /** File output ports. */
   ports: GraphPort[];
+  /** Parameter rows (steps), the visible ones. */
+  params: ParamRow[];
+  /** Value outputs (variables) shown. */
+  values: ValueOut[];
+  /** The "+ N more" / "Fewer" row, when there is something to expand. */
+  more: { side: "left" | "right"; count: number; expanded: boolean } | null;
 }
 
 export interface GraphWire {
-  /** "<from>|<port>|<to>" */
+  /** "<from>|<port>|<to>" for files, "<from>|v:<var>|<to>|<pointer>" for a value. */
   id: string;
   from: string;
+  /** The file port, or (for a value wire) the variable name. */
   port: string;
   to: string;
   /** The step's role filter (the wire shows one port, but a List-view filter may name several). */
   roles: string[];
+  /** The media kind of the files (a label only: file wires are all orange). */
   kind: WireKind;
+  channel: "files" | "value";
+  /** Value wires: the source's type (the wire's colour), the target parameter and whether it's a ⚠ wire. */
+  valueType?: ValueType;
+  param?: string;
+  loose?: boolean;
+}
+
+export interface BuildOptions {
+  catalog?: readonly StepType[];
+  /** The pipeline's run parameters. */
+  params?: readonly PipelineParam[];
+  /** The Runs graph: wired parameters only, no value outputs that nothing uses, no expanders. */
+  compact?: boolean;
 }
 
 export interface Graph {
@@ -86,12 +133,13 @@ export function defaultView(): View {
 
 /** Reads Pipeline.layout; anything missing or malformed gives an empty layout. */
 export function parseLayout(json: string): Layout {
-  const out: Layout = { v: 1, nodes: {}, view: defaultView() };
+  const out: Layout = { v: 1, nodes: {}, view: defaultView(), expanded: [] };
   if (!json.trim()) return out;
   try {
     const raw: unknown = JSON.parse(json);
     if (!raw || typeof raw !== "object") return out;
-    const r = raw as { nodes?: unknown; view?: unknown };
+    const r = raw as { nodes?: unknown; view?: unknown; expanded?: unknown };
+    if (Array.isArray(r.expanded)) out.expanded = r.expanded.filter((x): x is string => typeof x === "string").slice(0, 100);
     if (r.nodes && typeof r.nodes === "object" && !Array.isArray(r.nodes)) {
       for (const [id, p] of Object.entries(r.nodes as Record<string, unknown>)) {
         const q = p as { x?: unknown; y?: unknown } | null;
@@ -101,7 +149,7 @@ export function parseLayout(json: string): Layout {
     const v = r.view as { x?: unknown; y?: unknown; zoom?: unknown } | null | undefined;
     if (v && num(v.x) && num(v.y) && num(v.zoom)) out.view = { x: v.x, y: v.y, zoom: clamp(v.zoom, MIN_ZOOM, MAX_ZOOM) };
   } catch {
-    return { v: 1, nodes: {}, view: defaultView() };
+    return { v: 1, nodes: {}, view: defaultView(), expanded: [] };
   }
   return out;
 }
@@ -113,7 +161,10 @@ export function serializeLayout(layout: Layout, liveIds: Iterable<string>): stri
   const live = new Set(liveIds);
   const nodes: Record<string, Pt> = {};
   for (const [id, p] of Object.entries(layout.nodes)) if (live.has(id)) nodes[id] = { x: round(p.x), y: round(p.y) };
-  return JSON.stringify({ v: 1, nodes, view: { x: round(layout.view.x), y: round(layout.view.y), zoom: Math.round(layout.view.zoom * 100) / 100 } });
+  const view = { x: round(layout.view.x), y: round(layout.view.y), zoom: Math.round(layout.view.zoom * 100) / 100 };
+  const expanded = (layout.expanded ?? []).filter((id) => live.has(id));
+  // `expanded` is left out when empty, so older pipelines serialise exactly as before.
+  return JSON.stringify(expanded.length > 0 ? { v: 1, nodes, view, expanded } : { v: 1, nodes, view });
 }
 
 // ── kinds ─────────────────────────────────────────────────────
@@ -162,13 +213,47 @@ export function nodeHeight(portCount: number): number {
   return HEAD_H + SUMMARY_H + Math.max(1, portCount) * PORT_H + NODE_PAD;
 }
 
-export function outPortPos(n: GraphNode, portId: string): Pt {
-  const i = Math.max(0, n.ports.findIndex((p) => p.id === portId));
-  return { x: n.x + n.w, y: n.y + HEAD_H + SUMMARY_H + i * PORT_H + PORT_H / 2 };
+/** Top of the port rows inside a node. */
+export const BODY_TOP = HEAD_H + SUMMARY_H;
+export const NODE_W_WIDE = 240;
+
+/** Width of a node: wide while its "+ N more" is open. */
+export function nodeWidth(expanded: boolean): number {
+  return expanded ? NODE_W_WIDE : NODE_W;
 }
 
+/** Rows of a node's body: the taller of its two columns. */
+export function bodyRows(leftRows: number, rightRows: number): number {
+  return Math.max(1, leftRows, rightRows);
+}
+
+const rowY = (n: GraphNode, i: number) => n.y + BODY_TOP + i * PORT_H + PORT_H / 2;
+
+export function outPortPos(n: GraphNode, portId: string): Pt {
+  const i = Math.max(0, n.ports.findIndex((p) => p.id === portId));
+  return { x: n.x + n.w, y: rowY(n, i) };
+}
+
+/** A value output (variable) of a node: below its file ports. */
+export function valueOutPos(n: GraphNode, name: string): Pt {
+  const i = Math.max(0, n.values.findIndex((v) => v.id === name));
+  return { x: n.x + n.w, y: rowY(n, n.ports.length + i) };
+}
+
+/** The files input of a step: the first row of the left column. */
 export function inPortPos(n: GraphNode): Pt {
-  return { x: n.x, y: n.y + HEAD_H / 2 };
+  return { x: n.x, y: rowY(n, 0) };
+}
+
+/** A parameter's port: the rows after the files input. */
+export function paramPortPos(n: GraphNode, pointer: string): Pt {
+  const i = Math.max(0, n.params.findIndex((p) => p.pointer === pointer));
+  return { x: n.x, y: rowY(n, 1 + i) };
+}
+
+/** Row index (0-based, within the left column) of the "+ N more" row. */
+export function moreRowIndex(n: GraphNode): number {
+  return n.more?.side === "left" ? (n.type === "step" ? 1 : 0) + n.params.length : n.ports.length + n.values.length;
 }
 
 /** Control points of a wire's cubic bezier from an output port to an input port. */
@@ -190,15 +275,20 @@ export function bezierAt(c: readonly [Pt, Pt, Pt, Pt], t: number): Pt {
 }
 
 /** Depth of each step (the input is 0); steps with no source are in column 1 too. */
-function depths(steps: readonly PipelineStep[]): Map<string, number> {
+function depths(steps: readonly PipelineStep[], valueDeps?: ReadonlyMap<string, readonly string[]>): Map<string, number> {
   const d = new Map<string, number>([[INPUT_NODE, 0]]);
-  for (const s of steps) d.set(s.id, s.from === FROM_INPUT || s.from === FROM_NONE || !d.has(s.from) ? 1 : (d.get(s.from) ?? 0) + 1);
+  for (const s of steps) {
+    let col = s.from === FROM_INPUT || s.from === FROM_NONE || !d.has(s.from) ? 1 : (d.get(s.from) ?? 0) + 1;
+    // A step whose parameters are wired to another step's values sits to the right of it.
+    for (const src of valueDeps?.get(s.id) ?? []) if (d.has(src)) col = Math.max(col, (d.get(src) ?? 0) + 1);
+    d.set(s.id, col);
+  }
   return d;
 }
 
 /** Layered left-to-right layout for nodes that have no saved position. */
-export function autoLayout(steps: readonly PipelineStep[], heights: ReadonlyMap<string, number>): Record<string, Pt> {
-  const d = depths(steps);
+export function autoLayout(steps: readonly PipelineStep[], heights: ReadonlyMap<string, number>, valueDeps?: ReadonlyMap<string, readonly string[]>): Record<string, Pt> {
+  const d = depths(steps, valueDeps);
   const colY = new Map<number, number>();
   const out: Record<string, Pt> = {};
   const place = (id: string) => {
@@ -213,21 +303,103 @@ export function autoLayout(steps: readonly PipelineStep[], heights: ReadonlyMap<
 }
 
 /** Builds the graph of a pipeline; saved positions win, the rest is laid out. */
-export function buildGraph(steps: readonly PipelineStep[], check: PipelineCheck | undefined, layout: Layout): Graph {
-  const heights = new Map<string, number>();
+export function buildGraph(steps: readonly PipelineStep[], check: PipelineCheck | undefined, layout: Layout, opts: BuildOptions = {}): Graph {
+  const catalog = opts.catalog ?? [];
+  const runParams = opts.params ?? [];
+  const compact = opts.compact === true;
+  const expandedIds = new Set(layout.expanded ?? []);
+
+  // Value wires first: they decide which rows must show even when collapsed.
+  interface Bound {
+    stepId: string;
+    pointer: string;
+    name: string;
+    src: ReturnType<typeof resolveSource>;
+  }
+  const bound: Bound[] = [];
+  steps.forEach((s, i) => {
+    for (const b of s.binds ?? []) bound.push({ stepId: s.id, pointer: b.option, name: b.var, src: resolveSource(steps, i, check, runParams, b.var) });
+  });
+  const wiredOut = new Set(bound.filter((b) => b.src).map((b) => `${b.src?.node}|${b.src?.name}`));
+
   const portsBy = new Map<string, GraphPort[]>();
-  const inputPorts: GraphPort[] = [{ id: ALL_PORT, label: "Files you run it on", kind: "any" }];
+  const valuesBy = new Map<string, ValueOut[]>();
+  const paramsBy = new Map<string, ParamRow[]>();
+  const moreBy = new Map<string, GraphNode["more"]>();
+  const heights = new Map<string, number>();
+  const widths = new Map<string, number>();
+
+  // The input node: Files, the built-ins (all when open, else the wired ones), the run parameters, then "+ N more".
+  const inputPorts: GraphPort[] = [{ id: ALL_PORT, label: "Files", kind: "any" }];
   portsBy.set(INPUT_NODE, inputPorts);
-  heights.set(INPUT_NODE, nodeHeight(1));
+  {
+    const open = expandedIds.has(INPUT_NODE) && !compact;
+    const builtins = builtinSources();
+    const shown = builtins.filter((b) => open || wiredOut.has(`${INPUT_NODE}|${b.name}`));
+    const params = runParamSources(runParams).filter((p) => !compact || wiredOut.has(`${INPUT_NODE}|${p.name}`));
+    const values = [...shown, ...params].map((v) => ({ id: v.name, label: v.label, type: v.type }));
+    const hidden = compact ? 0 : builtins.length - shown.length;
+    const more = !compact && (hidden > 0 || open) ? { side: "right" as const, count: open ? builtins.length : hidden, expanded: open } : null;
+    valuesBy.set(INPUT_NODE, values);
+    paramsBy.set(INPUT_NODE, []);
+    moreBy.set(INPUT_NODE, more);
+    heights.set(INPUT_NODE, nodeHeight(bodyRows(0, inputPorts.length + values.length + (more ? 1 : 0))));
+    widths.set(INPUT_NODE, nodeWidth(open && more !== null));
+  }
+
   for (const s of steps) {
     const ports = stepPorts(s.id, check, steps);
     portsBy.set(s.id, ports);
-    heights.set(s.id, nodeHeight(ports.length));
+    const type = catalog.find((t) => t.id === s.type);
+    const defs = stepParams(s, type);
+    const rows: ParamRow[] = defs.map((d) => {
+      const b = bound.find((x) => x.stepId === s.id && x.pointer === d.pointer);
+      const row: ParamRow = { pointer: d.pointer, label: d.label, type: d.type, display: displayValue(d, d.value), own: displayValue(d, d.value), primary: d.primary, def: d };
+      if (b) {
+        const src = b.src;
+        const verdict = src ? canWire(src.type, d.type) : { ok: false, loose: false, reason: "" };
+        row.display = src ? `← ${src.origin === "step" ? `${nodeName(steps, catalog, src.node)} · ${src.label}` : src.label}` : `← {${b.name}}`;
+        row.wired = {
+          name: b.name,
+          from: src?.node ?? "",
+          label: src?.label ?? b.name,
+          type: src?.type ?? "text",
+          loose: verdict.ok && verdict.loose === true,
+          resolved: !!src,
+          reason: src ? (verdict.reason ?? "") : `Nothing before this step makes {${b.name}}`,
+        };
+      }
+      return row;
+    });
+    const collapsed = rows.filter((r) => r.wired || (!compact && r.primary));
+    const hidden = compact ? 0 : rows.length - collapsed.length;
+    const open = expandedIds.has(s.id) && hidden > 0;
+    const shown = compact ? rows.filter((r) => r.wired) : open ? rows : collapsed;
+    const values = stepVarSources(check, s.id)
+      .filter((v) => !compact || wiredOut.has(`${s.id}|${v.name}`))
+      .map((v) => ({ id: v.name, label: v.label, type: v.type }));
+    const more = hidden > 0 ? { side: "left" as const, count: hidden, expanded: open } : null;
+    paramsBy.set(s.id, shown);
+    valuesBy.set(s.id, values);
+    moreBy.set(s.id, more);
+    heights.set(s.id, nodeHeight(bodyRows(1 + shown.length + (more ? 1 : 0), ports.length + values.length)));
+    widths.set(s.id, nodeWidth(open));
   }
-  const auto = autoLayout(steps, heights);
+  const auto = autoLayout(steps, heights, valueDepsOf(steps, check, runParams));
   const mk = (id: string, type: "input" | "step"): GraphNode => {
     const p = layout.nodes[id] ?? auto[id] ?? { x: 0, y: 0 };
-    return { id, type, x: p.x, y: p.y, w: NODE_W, h: heights.get(id) ?? nodeHeight(1), ports: portsBy.get(id) ?? [] };
+    return {
+      id,
+      type,
+      x: p.x,
+      y: p.y,
+      w: widths.get(id) ?? NODE_W,
+      h: heights.get(id) ?? nodeHeight(1),
+      ports: portsBy.get(id) ?? [],
+      params: paramsBy.get(id) ?? [],
+      values: valuesBy.get(id) ?? [],
+      more: moreBy.get(id) ?? null,
+    };
   };
   const nodes = [mk(INPUT_NODE, "input"), ...steps.map((s) => mk(s.id, "step"))];
   const wires: GraphWire[] = [];
@@ -238,9 +410,71 @@ export function buildGraph(steps: readonly PipelineStep[], check: PipelineCheck 
     const port = roles.length === 1 ? (roles[0] ?? ALL_PORT) : ALL_PORT;
     const src = portsBy.get(s.from);
     const kind = src?.find((p) => p.id === port)?.kind ?? "any";
-    wires.push({ id: `${s.from}|${port}|${s.id}`, from: s.from, port, to: s.id, roles: [...roles], kind });
+    wires.push({ id: `${s.from}|${port}|${s.id}`, from: s.from, port, to: s.id, roles: [...roles], kind, channel: "files" });
+  }
+  for (const n of nodes) {
+    for (const row of n.params) {
+      const w = row.wired;
+      if (!w || !w.resolved) continue;
+      if (!nodes.find((x) => x.id === w.from)?.values.some((v) => v.id === w.name)) continue;
+      wires.push({ id: `${w.from}|v:${w.name}|${n.id}|${row.pointer}`, from: w.from, port: w.name, to: n.id, roles: [], kind: "any", channel: "value", valueType: w.type, param: row.pointer, loose: w.loose });
+    }
   }
   return { nodes, wires };
+}
+
+/** Per node, which ports have a wire: "in", "out:<port>", "val:<name>", "param:<pointer>". Wired ports draw filled. */
+export function wiredPortsByNode(g: Graph): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>(g.nodes.map((n) => [n.id, new Set<string>()] as const));
+  for (const w of g.wires) {
+    if (w.channel === "files") {
+      out.get(w.from)?.add(`out:${w.port}`);
+      out.get(w.to)?.add("in");
+    } else {
+      out.get(w.from)?.add(`val:${w.port}`);
+      out.get(w.to)?.add(`param:${w.param ?? ""}`);
+    }
+  }
+  return out;
+}
+
+/** For each step, the steps whose values its parameters are wired to (autoLayout input). */
+export function valueDepsOf(steps: readonly PipelineStep[], check: PipelineCheck | undefined, runParams: readonly PipelineParam[]): Map<string, string[]> {
+  const deps = new Map<string, string[]>();
+  steps.forEach((s, i) => {
+    const srcs = (s.binds ?? []).map((b) => resolveSource(steps, i, check, runParams, b.var)?.node).filter((n): n is string => !!n && n !== INPUT_NODE);
+    if (srcs.length > 0) deps.set(s.id, srcs);
+  });
+  return deps;
+}
+
+/** The graph's heights by node (autoLayout input), for tidy. */
+export function nodeHeights(g: Graph): Map<string, number> {
+  return new Map(g.nodes.map((n) => [n.id, n.h] as const));
+}
+
+// ── value wiring on the graph ─────────────────────────────────
+
+/** Whether the value output `name` of node `fromId` may feed `pointer` of step `toId`. */
+export function valueConnectReason(
+  steps: readonly PipelineStep[],
+  check: PipelineCheck | undefined,
+  catalog: readonly StepType[],
+  runParams: readonly PipelineParam[],
+  fromId: string,
+  name: string,
+  toId: string,
+  pointer: string,
+): { ok: boolean; loose: boolean; reason: string } {
+  const target = steps.find((s) => s.id === toId);
+  if (!target) return { ok: false, loose: false, reason: "That isn't a step" };
+  const def = stepParams(target, catalog.find((t) => t.id === target.type)).find((p) => p.pointer === pointer);
+  if (!def) return { ok: false, loose: false, reason: "That setting doesn't exist" };
+  const all = fromId === INPUT_NODE ? [...builtinSources(), ...runParamSources(runParams)] : stepVarSources(check, fromId);
+  const src = all.find((v) => v.name === name);
+  if (!src) return { ok: false, loose: false, reason: "That value doesn't exist" };
+  const v = valueWireVerdict(steps, catalog, src, toId, def);
+  return { ok: v.ok, loose: v.ok && v.loose === true, reason: v.reason ?? "" };
 }
 
 // ── editing ───────────────────────────────────────────────────
@@ -333,6 +567,24 @@ export function connect(
     return s;
   });
   return { ok: true, steps: topoSort(next) };
+}
+
+export type ValueConnectResult = { ok: true; steps: PipelineStep[]; loose: boolean } | { ok: false; reason: string };
+
+/** Wires a value output into a parameter (replacing that parameter's old wire). */
+export function connectValue(
+  steps: readonly PipelineStep[],
+  check: PipelineCheck | undefined,
+  catalog: readonly StepType[],
+  runParams: readonly PipelineParam[],
+  fromId: string,
+  name: string,
+  toId: string,
+  pointer: string,
+): ValueConnectResult {
+  const v = valueConnectReason(steps, check, catalog, runParams, fromId, name, toId, pointer);
+  if (!v.ok) return { ok: false, reason: v.reason };
+  return { ok: true, steps: bindValue(steps, toId, pointer, name), loose: v.loose };
 }
 
 /** Removes the incoming wire of a step (it then reads nothing until wired again). */

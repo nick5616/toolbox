@@ -1,9 +1,9 @@
 import { Icon, IconButton, MenuButton, cx, toast, type MenuItem } from "@/components";
 import { LibraryService, ModulesService, OutputKind, type RunFile } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { openToolItems } from "@/lib/openTool";
 import { revealLabel } from "@/lib/platform";
 import { isReady } from "@/state/modules";
-import { useUI } from "@/state/ui";
 import styles from "./RunResults.module.css";
 
 export const KIND_ICON: Record<string, string> = {
@@ -24,12 +24,14 @@ export async function toolSendToItems(path: string): Promise<MenuItem[]> {
   const res = await ModulesService.Match([path]);
   return (res.matches ?? [])
     .filter((m) => isReady(m.module))
-    .map((m) => ({
-      id: m.module.id,
-      label: m.module.name,
-      icon: m.module.icon,
-      onSelect: () => useUI.getState().handOff({ moduleId: m.module.id, inputs: [path] }),
-    }));
+    .flatMap((m) =>
+      // The tool, then "(new window)", as the kit's Send to offers.
+      openToolItems(m.module.id, [path], "send").map((it, i) => ({
+        ...it,
+        label: i === 0 ? m.module.name : `${m.module.name} (new window)`,
+        icon: i === 0 ? m.module.icon : "app-window",
+      })),
+    );
 }
 
 export function openRunFile(f: RunFile): void {

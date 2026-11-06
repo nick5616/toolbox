@@ -18,14 +18,6 @@
     color var(--dur-fast) var(--ease-out);
 }
 
-.button:disabled {
-  opacity: 0.45;
-  pointer-events: none;
-}
-
-.loading:disabled {
-  opacity: 0.8;
-}
 
 .sm {
   height: var(--control-h-compact);
@@ -97,6 +89,43 @@
 }
 .danger:active {
   background: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+/* Disabled: aria-disabled keeps the button hoverable so its tooltip can say why.
+   A disabled primary button is neutral grey, never dim orange. */
+.button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.primary[aria-disabled="true"]:not(.loading),
+.primary[aria-disabled="true"]:not(.loading):hover,
+.primary[aria-disabled="true"]:not(.loading):active {
+  background: var(--bg-active);
+  border-color: var(--line-strong);
+  color: var(--fg-subtle);
+  opacity: 1;
+}
+.secondary[aria-disabled="true"]:hover,
+.secondary[aria-disabled="true"]:active {
+  background: var(--bg-raised);
+}
+.ghost[aria-disabled="true"]:hover,
+.ghost[aria-disabled="true"]:active {
+  background: transparent;
+  color: var(--fg-muted);
+}
+.danger[aria-disabled="true"]:hover,
+.danger[aria-disabled="true"]:active {
+  background: var(--danger-soft);
+}
+.loading[aria-disabled="true"] {
+  opacity: 0.8;
+}
+.primary.loading[aria-disabled="true"] {
+  opacity: 1;
+}
+.primary[aria-disabled="true"] .kbd {
+  opacity: 0.6;
 }
 
 /* Toolbars that shrink: give the toolbar `container: toolbar-compact / inline-size`

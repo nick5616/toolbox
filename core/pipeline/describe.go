@@ -22,14 +22,14 @@ type prod struct {
 var passThrough = []core.StepProduct{{Many: true}}
 
 var builtinVarList = []core.StepVar{
-	{Name: "item", Label: "Item name"},
-	{Name: "name", Label: "File name"},
-	{Name: "ext", Label: "File extension"},
-	{Name: "role", Label: "File role"},
-	{Name: "n", Label: "Item number"},
-	{Name: "date", Label: "Run date"},
-	{Name: "time", Label: "Run time"},
-	{Name: "pipeline", Label: "Pipeline name"},
+	{Name: "item", Label: "Item name", Type: core.ValueText},
+	{Name: "name", Label: "File name", Type: core.ValueText},
+	{Name: "ext", Label: "File extension", Type: core.ValueText},
+	{Name: "role", Label: "File role", Type: core.ValueText},
+	{Name: "n", Label: "Item number", Type: core.ValueNumber},
+	{Name: "date", Label: "Run date", Type: core.ValueText},
+	{Name: "time", Label: "Run time", Type: core.ValueText},
+	{Name: "pipeline", Label: "Pipeline name", Type: core.ValueText},
 }
 
 // Describe checks a pipeline (SPEC.md §8.8).
@@ -42,6 +42,7 @@ func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck {
 		Missing:  []string{},
 	}
 	n := len(p.Steps)
+	allPipes := r.snapshotPipes()
 	prods := make([][]prod, n)
 	infos := make([]core.StepInfo, n)
 	ids := map[string]int{}
@@ -108,8 +109,13 @@ func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck {
 
 		// Variables this step may use: built-ins + earlier steps'.
 		vars := append([]core.StepVar{}, builtinVarList...)
-		if s.Type == "pipelines.chat" {
-			vars = append(vars, core.StepVar{Name: "file", Label: "Text of the files"})
+		if r.canonicalType(s.Type) == LocalChatType {
+			vars = append(vars, core.StepVar{Name: "file", Label: "Text of the files", Type: core.ValueText})
+		}
+		for _, pp := range p.Params {
+			if core.VarName.MatchString(pp.Name) && !slices.ContainsFunc(vars, func(x core.StepVar) bool { return x.Name == pp.Name }) {
+				vars = append(vars, core.StepVar{Name: pp.Name, Label: "Run parameter · " + pp.Label, Type: pp.Type})
+			}
 		}
 		for j := 0; j < i; j++ {
 			for _, v := range infos[j].Vars {
@@ -175,6 +181,15 @@ func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck {
 			}
 		}
 
+		// A pipeline can't run itself, directly or through others.
+		if s.Type == RunPipelineType && p.ID != "" {
+			one := p
+			one.Steps = []core.PipelineStep{s}
+			if cyc := cycleThrough(one, allPipes); len(cyc) > 0 {
+				sc.Problems = append(sc.Problems, "This would run the pipeline again: "+strings.Join(cyc, " → "))
+			}
+		}
+
 		// {vars} in option strings.
 		if auto && validOpts {
 			allowed := map[string]bool{}
@@ -191,6 +206,15 @@ func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck {
 						}
 					}
 				}
+			}
+		}
+
+		// Wired settings (Phase 16).
+		if auto && validOpts && len(s.Binds) > 0 {
+			probs, warns := bindDescribe(opts, s.Binds, sc.Vars, humanizePtr)
+			sc.Problems = append(sc.Problems, probs...)
+			if len(warns) > 0 {
+				info.Warnings = append(append([]string{}, info.Warnings...), warns...)
 			}
 		}
 
@@ -253,6 +277,9 @@ func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck {
 			}
 		}
 	}
+	if msg := paramsProblem(p.Params); msg != "" {
+		check.Problems = append(check.Problems, msg)
+	}
 	if n == 0 {
 		check.Problems = append(check.Problems, "Add at least one step")
 	}
@@ -266,6 +293,12 @@ func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck {
 		check.Problems = append(check.Problems, r.watchFolderProblems(p.Watch.Folder)...)
 		if len(check.Secrets) > 0 {
 			check.Problems = append(check.Problems, "A watched pipeline can't ask for passwords")
+		}
+	}
+	if p.Clip.Enabled {
+		check.Problems = append(check.Problems, clipProblems(p.Clip, check.Accepts)...)
+		if len(check.Secrets) > 0 {
+			check.Problems = append(check.Problems, "A pipeline that runs when you copy can't ask for passwords")
 		}
 	}
 	check.Ready = len(check.Problems) == 0 && !stepProblems && len(check.Missing) == 0 && n > 0

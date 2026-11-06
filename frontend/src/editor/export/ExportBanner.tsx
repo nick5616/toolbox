@@ -5,13 +5,11 @@
  * Mounted by ExportDialog, so it stays visible after the dialog closes.
  */
 import { Banner, Button, IconButton, Meter, Tooltip, toast } from "@/components";
-import { JobStatus, JobsService, LibraryService, type EditResult } from "@/lib/api";
+import { JobStatus, JobsService, type EditResult } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
-import { revealLabel } from "@/lib/platform";
 import { useJob, type JobView } from "@/state/jobs";
-import { toolAction } from "@/lib/toolActions";
 import { useEditStudio } from "@/editor/store";
-import { baseName } from "./checks";
+import { LastExport } from "./LastExport";
 import styles from "./ExportBanner.module.css";
 
 function parseResult(json: string): Partial<EditResult> | null {
@@ -36,27 +34,17 @@ function Done({ job, onDismiss }: { job: JobView; onDismiss(): void }) {
   const path = result?.outputs?.[0] ?? job.outputs[0]?.path ?? "";
   const out = job.outputs.find((o) => o.path === path) ?? job.outputs[0];
   const speed = result?.speed ?? 0;
+  if (!path) return <Banner tone="info" title="Export finished" action={<IconButton size="sm" icon="x" label="Dismiss" data-tip="Hide this message" onClick={onDismiss} />} />;
   return (
-    <Banner
-      tone="info"
-      title={path ? `Exported ${baseName(path)}` : "Export finished"}
-      action={
-        <div className={styles.actions}>
-          <Button size="sm" data-tip="Open the exported video in your default player" disabled={!out || out.missing} onClick={() => out && void run(LibraryService.Open(out.id))}>
-            Open
-          </Button>
-          <Button size="sm" data-tip="Show the exported file in your file manager" disabled={!path} onClick={() => void run(out ? LibraryService.Reveal(out.id) : LibraryService.RevealPath(path))}>
-            {revealLabel}
-          </Button>
-          <Button size="sm" data-tip="Use this video as a slide in an Instagram post" disabled={!path || !!out?.missing} onClick={() => void toolAction("addToPost")(path)}>
-            Add to post…
-          </Button>
-          <IconButton size="sm" icon="x" label="Dismiss" data-tip="Hide this message; the exported file stays in your library" onClick={onDismiss} />
-        </div>
-      }
-    >
-      {speed > 0 ? `Rendered ×${speed.toFixed(1)} real time` : undefined}
-    </Banner>
+    <LastExport
+      label="Exported"
+      path={path}
+      outputId={out?.id}
+      missing={out?.missing}
+      moduleId="video-studio"
+      note={speed > 0 ? `×${speed.toFixed(1)} real time` : undefined}
+      onDismiss={onDismiss}
+    />
   );
 }
 

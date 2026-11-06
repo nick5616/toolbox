@@ -10,8 +10,11 @@ export type {
     ChatField,
     ChatStep,
     CopyStep,
+    OpenStep,
     RenameStep,
+    RunStep,
     TableColumn,
     TableStep,
+    WaitStep,
     ZipStep
 } from "./models.js";

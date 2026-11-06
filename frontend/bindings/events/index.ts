@@ -59,6 +59,16 @@ export const ClipboardState = "clipboard:state";
 export const DepsChanged = "deps:changed";
 
 /**
+ * Name of the custom event "focus:blocked".
+ */
+export const FocusBlocked = "focus:blocked";
+
+/**
+ * Name of the custom event "focus:changed".
+ */
+export const FocusChanged = "focus:changed";
+
+/**
  * Name of the custom event "hotkeys:status".
  */
 export const HotkeysStatus = "hotkeys:status";
@@ -82,6 +92,36 @@ export const JobsProgress = "jobs:progress";
  * Name of the custom event "jobs:removed".
  */
 export const JobsRemoved = "jobs:removed";
+
+/**
+ * Name of the custom event "lanshare:activity".
+ */
+export const LanshareActivity = "lanshare:activity";
+
+/**
+ * Name of the custom event "lanshare:devices".
+ */
+export const LanshareDevices = "lanshare:devices";
+
+/**
+ * Name of the custom event "lanshare:message".
+ */
+export const LanshareMessage = "lanshare:message";
+
+/**
+ * Name of the custom event "lanshare:prompt".
+ */
+export const LansharePrompt = "lanshare:prompt";
+
+/**
+ * Name of the custom event "lanshare:prompt-closed".
+ */
+export const LansharePromptClosed = "lanshare:prompt-closed";
+
+/**
+ * Name of the custom event "lanshare:state".
+ */
+export const LanshareState = "lanshare:state";
 
 /**
  * Name of the custom event "library:added".

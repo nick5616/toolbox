@@ -1,0 +1,72 @@
+.who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.verified {
+  color: var(--ok);
+}
+
+.unverified {
+  color: var(--warn);
+}
+
+.claimed {
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+
+.summary {
+  margin: 0;
+  color: var(--fg);
+}
+
+.names {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-sm);
+}
+
+.names li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more {
+  color: var(--fg-muted);
+}
+
+.text {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg);
+}
+
+.code {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--fg);
+}
+
+.countdown {
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}

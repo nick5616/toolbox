@@ -176,7 +176,7 @@ export function MenuButton({ label, icon, items, emptyLabel = "Nothing available
                 type="button"
                 role="menuitem"
                 tabIndex={-1}
-                disabled={item.disabled}
+                aria-disabled={item.disabled || undefined}
                 data-active={i === active || undefined}
                 data-tip={item.tip}
                 data-tip-side="left"

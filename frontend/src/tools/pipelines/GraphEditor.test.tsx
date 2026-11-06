@@ -92,6 +92,16 @@ describe("GraphEditor", () => {
     expect(Number.isFinite(pos.x) && Number.isFinite(pos.y)).toBe(true);
   });
 
+  it("adds a step for a sidebar tool dragged onto the graph", () => {
+    render(<Harness initial={base()} />);
+    const data: Record<string, string> = { "application/x-toolbox-tool": "stems" };
+    const dt = { types: Object.keys(data), getData: (k: string) => data[k] ?? "", dropEffect: "", effectAllowed: "" };
+    const vp = screen.getByRole("application");
+    fireEvent.drop(vp, { dataTransfer: dt, clientX: 300, clientY: 200 });
+    expect(stepsOf(current)).toHaveLength(4);
+    expect(stepsOf(current)[3]?.type).toBe("stems");
+  });
+
   it("lists tools that can't be steps, disabled with the reason", () => {
     render(<Harness initial={base()} />);
     // Only catalogue tools here (no modules were passed), so the group is absent.

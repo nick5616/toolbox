@@ -252,7 +252,7 @@ export function SettingsPacks() {
                       <>
                         {canInstall ? (
                           <Button size="sm" variant="secondary" icon="download" loading={queuing === p.id} data-tip={`Download and set up the ${p.name} pack`} onClick={() => void install(p)}>
-                            Install
+                            {p.state === PackState.PackPartial ? `Install the rest (${formatSize((alone[p.id] ?? { download: 0 }).download)})` : "Install"}
                           </Button>
                         ) : null}
                         {p.state === PackState.PackOutdated ? (

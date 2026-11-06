@@ -48,10 +48,12 @@
 
 .tile {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   padding: var(--space-1);
-  border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg-panel);
+  background: transparent;
   touch-action: none;
   user-select: none;
 }
@@ -61,8 +63,8 @@
 }
 
 .selected {
-  border-color: var(--accent);
   background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .dragging {
@@ -76,7 +78,8 @@
 .select {
   position: relative;
   display: block;
-  width: 100%;
+  flex: none;
+  max-width: 100%;
   padding: 0;
   background: none;
   border: 0;
@@ -86,8 +89,8 @@
 
 .thumbWrap {
   display: flex;
-  justify-content: center;
-  height: 110px;
+  justify-content: flex-start;
+  height: 72px;
 }
 
 .thumbWrap .thumb {
@@ -98,8 +101,8 @@
 
 .badge {
   position: absolute;
-  top: var(--space-1);
-  left: var(--space-1);
+  top: 2px;
+  left: 2px;
   min-width: 18px;
   padding: 0 5px;
   border-radius: 9px;
@@ -113,8 +116,8 @@
 
 .kind {
   position: absolute;
-  right: var(--space-1);
-  bottom: var(--space-1);
+  right: 2px;
+  bottom: 2px;
   display: flex;
   padding: 3px;
   border-radius: var(--r-sm);
@@ -124,8 +127,8 @@
 
 .warn {
   position: absolute;
-  right: var(--space-1);
-  top: var(--space-1);
+  right: 2px;
+  top: 2px;
   display: flex;
   padding: 3px;
   border-radius: var(--r-sm);
@@ -140,7 +143,7 @@
 
 .pending {
   position: absolute;
-  inset: auto 0 var(--space-1) 0;
+  inset: auto auto 2px 2px;
   margin: 0 auto;
   width: max-content;
   padding: 1px 6px;
@@ -150,11 +153,19 @@
   font-size: var(--text-xs);
 }
 
+/* Secondary actions: a 2x2 block that shows on the selected, hovered or focused tile. */
 .actions {
-  display: flex;
-  justify-content: center;
+  display: none;
+  flex: none;
+  margin-left: auto;
+  grid-template-columns: repeat(2, auto);
   gap: 2px;
-  padding-top: var(--space-1);
+}
+
+.selected .actions,
+.tile:hover .actions,
+.tile:focus-within .actions {
+  display: grid;
 }
 
 .root[data-source-over] {

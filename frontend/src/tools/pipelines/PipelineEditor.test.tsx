@@ -170,7 +170,7 @@ describe("PipelineEditor", () => {
       .getAllByRole("menuitem")
       .map((i) => i.querySelectorAll("span")[1]?.textContent);
     expect(within(menu).getByText("Pipeline steps")).toBeTruthy();
-    expect(names.slice(0, 2)).toEqual(["Check", "Ask Local Chat"]);
+    expect(names.slice(0, 2)).toEqual(["Check", "Local Chat"]);
     const eraser = within(menu).getByRole("menuitem", { name: /Object Eraser/ });
     expect(eraser.textContent).toMatch(/nothing earlier makes/);
     // Within the media group Video Trimmer (reads .mp4) comes before Downloader (reads links only).

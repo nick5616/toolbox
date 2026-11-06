@@ -6,9 +6,15 @@
 
 .rows {
   display: flex;
-  flex-direction: column;
+  flex-flow: row wrap;
   gap: var(--space-2);
-  max-width: 520px;
+}
+
+/* One line of compact launchers, each sized to its summary (SPEC §13 rule 6). */
+.rows > button {
+  width: auto;
+  flex: 0 1 auto;
+  min-height: 28px;
 }
 
 .stack {

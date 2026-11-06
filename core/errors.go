@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 // ErrorCode classifies an AppError. It crosses the Wails boundary as JSON and
@@ -30,6 +31,9 @@ type AppError struct {
 	Hint    string            `json:"hint,omitempty"`
 	Fields  map[string]string `json:"fields,omitempty"`
 	Err     error             `json:"-"`
+	// Until is set only by ErrWaitingUntil: the moment (Unix ms) a waiting
+	// pipeline step should be prepared again (Phase 18).
+	Until int64 `json:"-"`
 }
 
 func (e *AppError) Error() string {
@@ -81,6 +85,22 @@ func NotImplemented(what string) *AppError {
 // clear first (e.g. the Vault is locked). The pipeline runner retries it.
 func ErrWaiting(message, hint string) *AppError {
 	return &AppError{Code: CodeWaiting, Message: message, Hint: hint}
+}
+
+// ErrWaitingUntil is ErrWaiting with a deadline: "not yet, and nothing
+// changes before until" (Phase 18). The runner prepares the step again at
+// until (wall clock), not every 5 s.
+func ErrWaitingUntil(message, hint string, until time.Time) *AppError {
+	return &AppError{Code: CodeWaiting, Message: message, Hint: hint, Until: until.UnixMilli()}
+}
+
+// WaitingUntil reports the deadline of an ErrWaitingUntil error.
+func WaitingUntil(err error) (time.Time, bool) {
+	var ae *AppError
+	if !errors.As(err, &ae) || ae.Code != CodeWaiting || ae.Until <= 0 {
+		return time.Time{}, false
+	}
+	return time.UnixMilli(ae.Until), true
 }
 
 // AsAppError returns err as an *AppError, wrapping unknown errors as

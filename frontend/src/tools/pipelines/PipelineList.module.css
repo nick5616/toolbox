@@ -1,15 +1,17 @@
 .root {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   min-height: 0;
   overflow-y: auto;
+  padding: var(--space-2);
+  border-right: 1px solid var(--line);
 }
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -19,17 +21,15 @@
   position: relative;
   display: flex;
   align-items: flex-start;
-  background: var(--bg-panel);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
 }
 
 .card:hover {
-  border-color: var(--line-strong);
+  background: var(--bg-hover);
 }
 
-.selected {
-  border-color: var(--accent);
+.selected,
+.selected:hover {
   background: var(--accent-soft);
 }
 
@@ -44,10 +44,10 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3);
+  gap: 2px;
+  padding: var(--space-2);
   border: 0;
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--fg);
   font: inherit;
@@ -117,13 +117,13 @@
 }
 
 .run {
-  margin: var(--space-2) var(--space-2) 0 0;
+  margin: 2px 2px 0 0;
   flex-shrink: 0;
 }
 
 .hint {
   margin: 0;
-  text-align: center;
+  padding: 0 var(--space-1);
   color: var(--fg-subtle);
   font-size: var(--text-sm);
 }
@@ -138,10 +138,10 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--bg-panel);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
   color: var(--fg);
   font: inherit;
   text-align: left;
@@ -149,7 +149,6 @@
 }
 
 .quickCard:hover {
-  border-color: var(--line-strong);
   background: var(--bg-hover);
 }
 

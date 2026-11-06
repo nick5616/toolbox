@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-6) var(--space-4);
   text-align: center;
 }
 
@@ -12,12 +12,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin-bottom: var(--space-1);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--bg-raised);
+  width: 32px;
+  height: 32px;
+  margin-bottom: 0;
+  border-radius: var(--r-md);
+  background: var(--bg-inset);
   color: var(--fg-muted);
 }
 
@@ -36,7 +35,7 @@
 }
 
 .action {
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
 }
 
 .lg {

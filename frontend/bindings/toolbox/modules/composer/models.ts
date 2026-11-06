@@ -119,6 +119,11 @@ export interface Layer {
     "kind": string;
     "name": string;
     "hidden": boolean;
+
+    /**
+     * image layers: a photo slot the "Fill a template" step fills; if no layer is marked, every visible image layer is a slot
+     */
+    "slot": boolean;
     "locked": boolean;
 
     /**
@@ -172,6 +177,31 @@ export interface Look {
     "warmth": number;
 }
 
+/**
+ * Options are the job options of a fill.
+ */
+export interface Options {
+    /**
+     * the template
+     */
+    "projectId": string;
+
+    /**
+     * "jpg" | "png"; "" = the template's
+     */
+    "format": string;
+
+    /**
+     * output pixels per document pixel; 0 = 1
+     */
+    "scale": number;
+
+    /**
+     * file name without extension; "" = "<template> - <first photo>"
+     */
+    "name": string;
+}
+
 export interface Outline {
     "on": boolean;
 
@@ -196,6 +226,51 @@ export interface Shadow {
     "offsetY": number;
     "opacity": number;
     "color": string;
+}
+
+/**
+ * SlotInfo describes a template for the step editor.
+ */
+export interface SlotInfo {
+    "name": string;
+
+    /**
+     * layer names in fill order
+     */
+    "slots": string[] | null;
+    "width": number;
+    "height": number;
+    "format": string;
+}
+
+/**
+ * StepOptions are the Fill a template step's options.
+ */
+export interface StepOptions {
+    /**
+     * the saved composition
+     */
+    "templateId": string;
+
+    /**
+     * a label only
+     */
+    "templateName": string;
+
+    /**
+     * "" = the template's | "jpg" | "png"
+     */
+    "format": string;
+
+    /**
+     * 0 = 1
+     */
+    "scale": number;
+
+    /**
+     * output file name; takes {vars}; "" = "<template> - <photo>"
+     */
+    "name": string;
 }
 
 export interface TextLayer {

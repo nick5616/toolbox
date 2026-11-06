@@ -4,9 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClickInHost } from "@/components";
 import { normalizeProject } from "@/viz/edit/defaults";
 import { fixtureProject } from "@/viz/edit/fixture";
-import "./panelDefs";
+import { defineEditorWorkspace } from "./workspace";
 import { EditorProfileProvider, PLAIN_PROFILE } from "./profileContext";
-import { Rail, railFit } from "./Rail";
+import { railFit } from "@/workspace";
+import { Rail } from "./Rail";
 import { useEditStudio } from "./store";
 
 const size = vi.hoisted(() => ({ height: 0 }));
@@ -19,14 +20,17 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-const mount = () =>
-  render(
-    <EditorProfileProvider profile={{ ...PLAIN_PROFILE, rail: ["media", "text", "music", "project", "track", "clip-effects"] }}>
+const mount = () => {
+  const profile = { ...PLAIN_PROFILE, rail: ["media", "text", "music", "project", "track", "clip-effects"] };
+  defineEditorWorkspace(profile);
+  return render(
+    <EditorProfileProvider profile={profile}>
       <ClickInHost>
         <Rail />
       </ClickInHost>
     </EditorProfileProvider>,
   );
+};
 
 describe("railFit", () => {
   it("shows everything when it fits or the height is unknown, else leaves a slot for the more item", () => {

@@ -1,3 +1,4 @@
+import type { ParamOverrides } from "../params";
 import type { ComponentType } from "react";
 import type { StepCheck, StepVar } from "@/lib/api";
 
@@ -19,6 +20,12 @@ export interface StepUI<T = unknown> {
   /** Parses OptionsJSON, sanitising over the defaults. Never throws. */
   parse: (optionsJson: string) => T;
   Editor: ComponentType<StepEditorProps<T>>;
+  /**
+   * Phase 16: labels, types and choices of this step's parameters (its scalar
+   * options), keyed by JSON pointer. Options not listed are derived from the
+   * defaults; mark internal ones `hidden`.
+   */
+  params?: ParamOverrides;
 }
 
 const registry = new Map<string, StepUI>();

@@ -11,8 +11,12 @@ Agreed on 2026-10-28; the Visualizer was cut in line as Phase 7 on 2026-10-29 an
 | 9 | **Edit Studio**: beat-synced music edits. A song's beats, kicks, drops and words as snap markers, a multitrack timeline on the Visualizer's GPU engine, auto-fill recipes, marker-driven effects, people/subject cut-outs and captions. Cut in on 2026-11-03. See `SPEC.md`. |
 | 10 | **Composable tools** (2026-11-04): baselines and variants (Edit Studio composed on a new multitrack Video Editor), parts and pop-out windows for every tool and panel, minimal surfaces with click-ins across the app, and a node-graph pipeline builder. See `SPEC.md`. |
 | 11 | **Composable everything** (2026-11-04): every constituent opens inside its host (and pops out), results come back with Use; every workspace tool gets store-backed poppable panels and previews; the step wizards become workspaces; shared building blocks in `blocks/`; Send to on every result. See `SPEC.md`. |
-| 12 | Documents: Pandoc conversion (+ Typst for PDF), maybe Calibre ebook conversion; the Web Archiver placeholder. |
-| 13 (last) | LAN file transfer, LocalSend-protocol compatible. Opt-in, listens only while the Share panel is open, pairing + accept prompt. Needs an explicit amendment to the "no network listeners" app rule. |
+| 12 | **Documents** (2026-11-04): Document Converter (Pandoc + Typst for PDF) and Web Archiver (monolith, optional headless Edge/Chrome render). Calibre left out. See `SPEC.md`. |
+| 14 | **Every tool composes** (2026-11-04): every tool is a pipeline step (proved by tests, no exemptions), in-app drag and drop everywhere, one result row with Send to incl. pipelines, and the usability audit's fixes. See `SPEC.md`. |
+| 13 | **Built 2026-11-04.** Local File Transfer: LocalSend v2 (HTTPS) compatible, pairing with a 6-digit code, auto-accept from paired Toolboxes, receive Off / While open / Always, "Send to a device" step. The listener rule was amended for it. |
+| 16 | **Built 2026-11-04.** Parameters as inputs: every step option is a coloured port that variables and run parameters wire into; the value colour system. |
+| 17 | **Built 2026-11-05.** Compress to Size: any file under a byte limit, with frozen targets (Discord, Gmail, …). `docs/specs/phase-17.md`. |
+| 18 | **2026-11-05.** Focus Lock (stop everything but the chosen apps for a set time, Windows and macOS) and pipeline timing (wait-until, Wait step, schedules, runs without files, Open in app). See `SPEC.md`. |
 
 ## Pipelines (Phase 8) — intended model
 
@@ -38,6 +42,30 @@ Agreed on 2026-10-28; the Visualizer was cut in line as Phase 7 on 2026-10-29 an
 9. Lecture: recording → transcript → chat study notes and flashcards → PDF.
 10. Before sharing: strip location and metadata → blur faces and plates → zip.
 11. Music video: song → Visualizer analysis → preset render at 9:16 (added with Phase 7).
+12. Archive a reading list: a .txt of links → Web Archiver (one page each) → Document Converter to EPUB (Phase 12).
+13. Paper to Word: photos or scans of paper → OCR text → an editable .docx (Phase 12).
+
+Phase 15 adds one template for each workflow in its SPEC §1. The gallery shows the templates in two sections, **Practical** and **Just cool** (the older templates are sorted into them too). Where a template needs a choice only the user can make, that step is left empty and the step editor flags it.
+
+Practical:
+
+14. Read it to me: a .txt of links → Web Archiver → Document Converter (text) → Text to Speech → Audio Cleanup (loudness) = one MP3 per article. (New, because it adds speech to "Archive a reading list".)
+15. Audiobook from a document: EPUB/DOCX → Markdown → Text to Speech (one file per chapter) → zip.
+16. Tight lecture: recorded talk → Silence Cutter → Subtitles (burned in) → Converter (720p MP4).
+17. Podcast polish: episode → Audio Cleanup → Silence Cutter → Transcribe → Local Chat show notes. (Extends "Podcast" with the Silence Cutter.)
+18. Camera-roll tidy: photos → Organizer (folders by date, look-alikes aside) → Image Batch (2048 px, no location) → Vault.
+19. Shop-ready product shots: photos → Background Remover → Image Batch (square on white) → Photo Composer template (you pick it).
+20. Storyboard a video: video → Scene Splitter (a still per shot) → PDF, plus a GIF & Contact Sheet.
+21. Meeting recording to minutes: recording → Transcribe → Local Chat (decisions and actions) → Word document.
+22. Clipboard link to notes: copy a link (clipboard trigger on) → Downloader (audio) → Transcribe → Local Chat summary → Copy to clipboard.
+
+Just cool:
+
+23. Highlight reel to the beat: footage → Scene Splitter (the 12 most active shots) → Edit Studio "Cut to the beat" (you pick the song).
+24. Reaction GIF: clip → Subtitles (burned in) → looping GIF.
+25. Narrated slideshow: script → Text to Speech (voice-over), photos → Video Editor "Assemble a video" (a dropped audio file is the voice bed; see DECISIONS).
+26. Song to everything: song → stems, tempo and key in the names, melody MIDI, a music video → zip of the stems.
+27. Vertical cut for social: landscape video → Silence Cutter → Video Editor "Assemble" (9:16, title) → Post Builder reel.
 
 ## Not planned
 

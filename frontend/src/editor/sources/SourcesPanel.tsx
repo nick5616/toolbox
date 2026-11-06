@@ -11,7 +11,7 @@ import { useEditStudio, useMarkers, useProject } from "@/editor/store";
 import { useEditorProfile } from "../profileContext";
 import { commit, insertAtPlayhead } from "../timeline/actions";
 import { addSourcePaths, pickAndAddSources, pickFolderAndAddSources, prepare, relinkSource, watchPrepareJobs } from "./actions";
-import { startSourcesDrag } from "./dragSource";
+import { startSourcesDrag, useSourceDropTarget } from "./dragSource";
 import { useSourceSelection } from "./selection";
 import { SourceTile } from "./SourceTile";
 import { allTags, filterSources, MAX_SOURCES, normalizeTag, setSourceTags, toggleTag, usedCounts } from "./tags";
@@ -36,6 +36,11 @@ function Sources({ project }: { project: NormalProject }) {
 
   const live = useRef({ project, markers });
   live.current = { project, markers };
+
+  // Files dragged in from another tool (a result row, the Library) join the sources.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const onFilesDropped = useCallback((info: { paths: string[] }) => void addSourcePaths(info.paths), []);
+  useSourceDropTarget(panelRef, onFilesDropped);
 
   useEffect(() => watchPrepareJobs(), []);
   useEffect(() => {
@@ -96,7 +101,7 @@ function Sources({ project }: { project: NormalProject }) {
   };
 
   return (
-    <div className={styles.panel}>
+    <div ref={panelRef} className={styles.panel}>
       <div className={styles.bar}>
         <span className={styles.title} data-tip="Your photos and videos for this edit. Drag them onto a video track, or double-click to drop them at the playhead">Sources</span>
         <span className={styles.count} data-tip={`${project.sources.length} of at most ${MAX_SOURCES} sources in this edit`}>

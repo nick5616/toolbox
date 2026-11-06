@@ -1,24 +1,25 @@
 /**
- * The editor's store bridge (Phase 10, SPEC §5.5 WP-E4). The window that has a
- * project open (main or a tool window) is the host; part windows (the preview,
- * a popped-out panel) hold replicas of the editor store and the focus store.
+ * The editor's store bridge specs (Phase 10, SPEC §5.5 WP-E4). The window that
+ * has a project open (main or a tool window) is the host; part windows (the
+ * preview, a popped-out panel) hold replicas of the editor store and the focus
+ * store. Hosting and replicating run through the editor workspace
+ * (`workspace.tsx`, Phase 11).
  *
  * Replicated: the document (as `project`), undo/redo depths, selection,
  * playhead, view state, the analysis ref, source/matte/interp states and
  * their /media URLs. Not replicated: the analysis itself (a replica loads it
  * from the ref), job IDs and setup flags. Replica actions run on the host.
  */
-import { useEffect } from "react";
 import type { StoreApi } from "zustand";
 import type { AnalysisRef, EditMatteState, EditSourceState, EditStream } from "@/lib/api";
 import { currentWindow } from "@/lib/windows";
-import { hostBridge, replicaBridge, type BridgeSpec, type BridgeTransport } from "@/state/bridge";
+import type { BridgeSpec } from "@/state/bridge";
 import type { NormalProject } from "@/viz/edit/defaults";
 import type { MarkerLane } from "@/viz/edit/types";
 import { newHistory } from "@/lib/history";
-import { useEditorFocus, type FocusState } from "./focus";
+import type { FocusState } from "./focus";
 import type { EditorFocus } from "./profile";
-import { useEditStudio, type AnalysisState, type EditStudioState, type SaveState, type Selection } from "./store";
+import { type AnalysisState, type EditStudioState, type SaveState, type Selection } from "./store";
 
 export type EditorBridgeValues = {
   projectId: string | null;
@@ -130,38 +131,10 @@ export function setReplicaModeForTest(on: boolean): void {
   replicaMode = on;
 }
 
-export interface BridgeOverrides {
-  editor?: BridgeTransport;
-  focus?: BridgeTransport;
-}
-
-/** Part windows: replicate the editor and focus stores from the host. Returns dispose. */
-export function startEditorReplica(moduleId: string, transports: BridgeOverrides = {}): () => void {
+/** Part windows call this when their replica connects (the workspace's `onConnect`); the returned function undoes it. */
+export function enterReplicaMode(): () => void {
   replicaMode = true;
-  const a = replicaBridge(useEditStudio, editorBridgeSpec(moduleId), transports.editor ? { transport: transports.editor } : {});
-  const b = replicaBridge(useEditorFocus, focusBridgeSpec(moduleId), transports.focus ? { transport: transports.focus } : {});
   return () => {
-    a();
-    b();
     replicaMode = false;
   };
-}
-
-/** Starts the host while a project is open in this window (not in part windows); stops when it closes. */
-export function startEditorBridgeHost(moduleId: string, transports: BridgeOverrides = {}): () => void {
-  const a = hostBridge(useEditStudio, editorBridgeSpec(moduleId), transports.editor);
-  const b = hostBridge(useEditorFocus, focusBridgeSpec(moduleId), transports.focus);
-  return () => {
-    a();
-    b();
-  };
-}
-
-/** Mount in the editor: hosts the store bridge for pop-out parts while a project is open. */
-export function useEditorBridgeHost(moduleId: string): void {
-  const open = useEditStudio((s) => s.projectId !== null);
-  useEffect(() => {
-    if (!open || isReplicaWindow()) return;
-    return startEditorBridgeHost(moduleId);
-  }, [open, moduleId]);
 }

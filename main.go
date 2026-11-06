@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
@@ -22,8 +23,11 @@ import (
 	"toolbox/api"
 	"toolbox/core"
 	"toolbox/core/deps"
+	"toolbox/core/disk"
+	"toolbox/core/focus"
 	"toolbox/core/heic"
 	"toolbox/core/imaging"
+	"toolbox/core/lan"
 	"toolbox/core/media"
 	"toolbox/core/packs"
 	"toolbox/core/pdfium"
@@ -32,30 +36,41 @@ import (
 	"toolbox/core/store"
 	"toolbox/core/viz"
 	"toolbox/desktop"
+	"toolbox/modules/archiver"
 	"toolbox/modules/audiocleanup"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
 	"toolbox/modules/chat"
 	"toolbox/modules/clipboard"
 	"toolbox/modules/composer"
+	"toolbox/modules/compress"
 	"toolbox/modules/converter"
 	"toolbox/modules/devutils"
+	"toolbox/modules/documents"
 	"toolbox/modules/downloader"
 	"toolbox/modules/editstudio"
 	"toolbox/modules/eraser"
 	"toolbox/modules/exif"
+	focusmod "toolbox/modules/focus"
+	"toolbox/modules/gif"
+	"toolbox/modules/imagebatch"
+	"toolbox/modules/lanshare"
 	"toolbox/modules/lyricvideo"
 	"toolbox/modules/midi"
 	"toolbox/modules/ocr"
+	"toolbox/modules/organize"
 	"toolbox/modules/pdf"
 	"toolbox/modules/pipelines"
 	"toolbox/modules/placeholders"
 	"toolbox/modules/posts"
 	"toolbox/modules/redact"
+	"toolbox/modules/scenes"
+	"toolbox/modules/silence"
 	"toolbox/modules/stems"
 	"toolbox/modules/subtitles"
 	"toolbox/modules/transcribe"
 	"toolbox/modules/trimmer"
+	"toolbox/modules/tts"
 	"toolbox/modules/upscale"
 	"toolbox/modules/vault"
 	"toolbox/modules/videoeditor"
@@ -120,6 +135,26 @@ func run() error {
 	}, func(ctx context.Context) core.DepStatus { return sidecar.Detect(ctx, paths) })
 
 	exifMod := exif.New(depSvc.Resolve)
+	organizeMod := organize.New(depSvc.Resolve)
+	// Local File Transfer (Phase 13): the only code that may listen on the
+	// local network, and only while receiving is on.
+	lanRT, err := lan.New(lan.Config{
+		Dir:        filepath.Join(paths.SupportDir, "lanshare"),
+		Emit:       func(name string, data any) { emitter.Emit(name, data) }, // not emitter.Emit: that copies the Emitter before App is set
+		ReceiveDir: func() string { return filepath.Join(settings.Current().LibraryDir, "Received") },
+		FreeSpace: func(dir string) (uint64, error) {
+			free, _, err := disk.Free(dir)
+			return free, err
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("local file transfer: %w", err)
+	}
+	defer lanRT.Close()
+	lanMod, lanRecv := lanshare.New(lanRT)
+	lanRT.SetSink(lanshare.NewSink(jobs, lanRT))
+	lanSvc := lanshare.NewService(jobs, lanRT)
+	lanshare.SetReceiveDir(lanSvc, func() string { return filepath.Join(settings.Current().LibraryDir, "Received") })
 	defer exifMod.Close()
 	pdfRenderer := pdfium.New(filepath.Join(paths.CacheDir, "pdfium"))
 	defer pdfRenderer.Close()
@@ -181,6 +216,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	ttsMod, err := tts.Register(reg, engine, paths.ModelsDir, filepath.Join(paths.CacheDir, "tts-preview"), filepath.Join(paths.TmpDir, "tts-text"))
+	if err != nil {
+		return err
+	}
 	redactMod, err := redact.Register(reg, engine, depSvc.Resolve, paths.ModelsDir, filepath.Join(paths.CacheDir, "redact"))
 	if err != nil {
 		return err
@@ -213,6 +252,7 @@ func run() error {
 		eraserMod.ClearMasks()
 		cleanupMod.PrunePreviews()
 		lyricMod.PruneCache()
+		ttsMod.PruneCache()
 		redactMod.PruneCache()
 		media.PruneCache(media.CacheDir(paths), media.CacheLimitBytes)
 		vizAnalyzer.Prune()
@@ -228,7 +268,7 @@ func run() error {
 		func() error { return converter.Register(reg) },
 		func() error { return transcribe.Register(reg, engine, paths.ModelsDir) },
 		func() error { return exif.Register(reg, exifMod) },
-		func() error { return clipboard.Register(reg) },
+		func() error { return clipboard.Register(reg, clipHistory) },
 		func() error { return bgremove.Register(reg, engine, paths.ModelsDir) },
 		func() error { return upscale.Register(reg, engine, paths.ModelsDir) },
 		func() error { return pdf.Register(reg, pdfMod) },
@@ -237,13 +277,25 @@ func run() error {
 		func() error { return ocr.Register(reg, engine, pdfRenderer, paths.ModelsDir) },
 		func() error { return packs.Register(reg, packSvc) },
 		func() error { return trimmer.Register(reg, depSvc.Resolve) },
+		func() error { return scenes.Register(reg) },
+		func() error { return gif.Register(reg) },
+		func() error { return organize.Register(reg, organizeMod) },
+		func() error { return silence.Register(reg, depSvc.Resolve) },
+		func() error { return compress.Register(reg, depSvc.Resolve) },
+		func() error { return imagebatch.Register(reg) },
 		func() error { return devutils.Register(reg) },
+		func() error { return documents.Register(reg, paths.ToolsDir) },
+		func() error { return archiver.Register(reg) },
 		func() error { return placeholders.Register(reg) },
+		func() error { return lanshare.Register(reg, lanMod, lanRecv) },
 		func() error { return deps.RegisterExifToolUpdater(reg, depSvc) },
 		func() error { return deps.RegisterUpscalerInstaller(reg, depSvc) },
 		func() error { return deps.RegisterLlamaInstaller(reg, depSvc) },
 		func() error { return deps.RegisterFFmpegInstaller(reg, depSvc) },
 		func() error { return deps.RegisterDenoInstaller(reg, depSvc) },
+		func() error { return deps.RegisterPandocInstaller(reg, depSvc) },
+		func() error { return deps.RegisterTypstInstaller(reg, depSvc) },
+		func() error { return deps.RegisterMonolithInstaller(reg, depSvc) },
 		func() error { return deps.RegisterUpdater(reg, depSvc) },
 		func() error { return deps.RegisterUVUpdater(reg, depSvc) },
 		func() error {
@@ -260,18 +312,34 @@ func run() error {
 		}
 	}
 
+	// --- Phase 18: Focus Lock engine (architect) ---
+	focusEng := focus.New(focus.Options{
+		Platform: focus.NewPlatform(), Store: db.FocusStore(), DryRun: focus.DryRunFromEnv(),
+		Emit: func(name string, data any) { emitter.Emit(name, data) },
+	})
+	defer focusEng.Stop()
+	// --- end Phase 18 ---
+
 	// --- Phase 8 Pipelines (architect) ---
 	runner := pipeline.New(pipeline.Config{
 		Store: db, Outputs: db, Jobs: jobs, Reg: reg, Em: emitter,
 		Tools: depSvc.Resolve, Settings: settings.Current,
 		ProtectedDirs: []string{paths.SupportDir, paths.ToolsDir},
+		TmpDir:        paths.TmpDir,
+		ClipboardOn:   func() bool { return clipHistory.Recording() },
 	})
 	defer runner.Stop()
+	clipHistory.OnRecorded(runner.ClipboardCopied)
 	if _, err := pipelines.Register(reg, pipelines.Config{
 		Runner: runner, Chat: chatSvc, Outputs: db, Emitter: emitter, LibraryDir: libraryDir,
+		Launcher: pipelines.Launcher{NoteLaunch: focusEng.NoteLaunch, Subscribe: focusEng.Subscribe},
 	}); err != nil {
 		return err
 	}
+	if _, err := focusmod.Register(reg, focusEng, runner.WakeTimeWaits); err != nil {
+		return err
+	}
+	focusEng.Subscribe(func(focus.State) { runner.WakeTimeWaits() })
 	// --- end Phase 8 ---
 
 	// HEIC photos: FFmpeg stitches iPhone tile grids, the AI engine is the
@@ -284,7 +352,7 @@ func run() error {
 	projectsDir := filepath.Join(paths.SupportDir, "projects")
 	composerMod := composer.New(composer.Config{
 		Store: db, ProjectsDir: projectsDir, CacheDir: filepath.Join(paths.CacheDir, "composer"),
-		Engine: engine, Jobs: jobs, Outputs: db, Emitter: emitter, LibraryDir: libraryDir,
+		Engine: engine, Jobs: jobs, Outputs: db, Emitter: emitter, LibraryDir: libraryDir, Broker: vizBroker,
 	})
 	videoMod := videoeditor.New(videoeditor.Config{
 		Store: db, ProjectsDir: projectsDir, Engine: engine, Analyzer: vizAnalyzer, Resolve: depSvc.Resolve, Jobs: jobs,
@@ -331,6 +399,9 @@ func run() error {
 	if err := runner.Start(ctx); err != nil {
 		return err
 	}
+	if err := focusEng.Start(ctx); err != nil {
+		slog.Warn("focus lock", "err", err) // fail-open: the app works without it
+	}
 	go depSvc.Detect(ctx)
 	clipHistory.Start(ctx)
 	vaultSvc.Start(ctx)
@@ -341,6 +412,7 @@ func run() error {
 	}
 
 	desktopSvc := &api.DesktopService{} // Shell is set once the app exists
+	var quitGate func() bool            // the desktop shell's ShouldQuit, once it exists
 	packsAPI := &api.PacksService{Packs: packSvc}
 	opts := api.Options()
 	app := application.New(application.Options{
@@ -371,12 +443,23 @@ func run() error {
 			application.NewServiceWithOptions(packsAPI, opts),
 			application.NewServiceWithOptions(mediaAPI, opts),
 			application.NewServiceWithOptions(trimmer.NewService(jobs), opts),
+			application.NewServiceWithOptions(scenes.NewService(jobs), opts),
+			application.NewServiceWithOptions(gif.NewService(jobs), opts),
+			application.NewServiceWithOptions(organize.NewService(jobs, organizeMod), opts),
+			application.NewServiceWithOptions(lanSvc, opts),
+			application.NewServiceWithOptions(silence.NewService(jobs, depSvc.Resolve), opts),
+			application.NewServiceWithOptions(compress.NewService(jobs, depSvc.Resolve), opts),
+			application.NewServiceWithOptions(focusmod.NewService(focusEng), opts),
+			application.NewServiceWithOptions(tts.NewService(jobs, ttsMod), opts),
+			application.NewServiceWithOptions(imagebatch.NewService(jobs, depSvc.Resolve, paths.TmpDir), opts),
 			application.NewServiceWithOptions(subtitles.NewService(jobs, subtitlesMod), opts),
 			application.NewServiceWithOptions(audiocleanup.NewService(jobs, cleanupMod), opts),
 			application.NewServiceWithOptions(lyricvideo.NewService(jobs), opts),
 			application.NewServiceWithOptions(redact.NewService(jobs), opts),
 			application.NewServiceWithOptions(eraser.NewService(jobs, eraserMod), opts),
 			application.NewServiceWithOptions(devutils.NewService(jobs), opts),
+			application.NewServiceWithOptions(documents.NewService(jobs), opts),
+			application.NewServiceWithOptions(archiver.NewService(jobs), opts),
 			application.NewServiceWithOptions(visualizer.NewService(jobs, visualizerMod), opts),
 			application.NewServiceWithOptions(pipelines.NewService(runner), opts),
 			application.NewServiceWithOptions(composer.NewService(composerMod), opts),
@@ -403,6 +486,13 @@ func run() error {
 			}
 		},
 		Linux: application.LinuxOptions{DisableQuitOnLastWindowClosed: true},
+		// A real focus session makes quitting cost its friction (SPEC.md §2.4).
+		ShouldQuit: func() bool {
+			if quitGate == nil {
+				return true
+			}
+			return quitGate()
+		},
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID: instanceID(paths),
 			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
@@ -453,7 +543,7 @@ func run() error {
 	// --- desktop shell (WP-D1): tray, close-to-tray, login item, hotkeys, popup ---
 	shell := desktop.New(desktop.Options{
 		App: app, Main: win, Settings: settings, Jobs: jobs, Outputs: db, Emitter: emitter,
-		Clipboard: clipHistory, Vault: vaultAPI,
+		Clipboard: clipHistory, Vault: vaultAPI, Lan: lanRT, Focus: focusEng,
 		DarkMode: func() bool {
 			t := settings.Current().Theme
 			return t == core.ThemeDark || (t == core.ThemeSystem && app.Env.IsDarkMode())
@@ -476,6 +566,13 @@ func run() error {
 		return err
 	}
 	desktopSvc.Shell = shell
+	quitGate = shell.ShouldQuit
+	// Timers don't count sleep on Windows: re-check focus and pipeline
+	// deadlines against the wall clock on wake (SPEC.md R10).
+	app.Event.OnApplicationEvent(events.Common.SystemDidWake, func(*application.ApplicationEvent) {
+		focusEng.Resumed()
+		runner.Resumed()
+	})
 	runner.OnNeedsYou(shell.SetPipelinesNeedYou)
 	clipHistory.SetPopupOpener(shell.TogglePopup)
 	if os.Getenv("TOOLBOX_SHOW_POPUP") != "" { // dev aid for visual QA (no hotkey needed)

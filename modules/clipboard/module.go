@@ -18,11 +18,25 @@ import (
 const ModuleID = "clipboard"
 
 // Module implements core.Module. It is job-less: it only exists so the tool
-// shows up in the sidebar and palette.
-type Module struct{}
+// shows up in the sidebar and palette. As a pipeline step ("Copy to
+// clipboard", core.StepProvider) its work runs as jobs of the hidden
+// CopyModule.
+type Module struct{ h *History }
 
-// Register adds the module to the registry.
-func Register(reg *core.Registry) error { return reg.Register(Module{}) }
+// Register adds the module and its hidden step module to the registry. Pass
+// the History whose clipboard the "Copy to clipboard" step writes to (main.go
+// passes clipHistory); without one the step's jobs fail with "Clipboard
+// unavailable". It is variadic only so callers that predate the step compile.
+func Register(reg *core.Registry, history ...*History) error {
+	var h *History
+	if len(history) > 0 {
+		h = history[0]
+	}
+	if err := reg.Register(Module{h: h}); err != nil {
+		return err
+	}
+	return reg.Register(&CopyModule{h: h})
+}
 
 // Descriptor implements core.Module.
 func (Module) Descriptor() core.Descriptor {

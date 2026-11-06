@@ -41,6 +41,7 @@ vi.mock("@/lib/events", () => ({
   },
 }));
 vi.mock("@/tools", () => ({
+  shellOverlays: [],
   toolViews: {
     stems: () => {
       const handoff = useUI((s) => s.handoff);
@@ -170,6 +171,20 @@ describe("PartFrame", () => {
     expect(screen.queryByText("inline content")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Bring back" }));
     expect(h.closeWindow).toHaveBeenCalledWith("part:t.view@1");
+  });
+
+  it("keeps the inline content while out when keepWhileOut (a read-only mirror window)", async () => {
+    const user = userEvent.setup();
+    render(
+      <PartFrame part="t.view" keepWhileOut>
+        <div>editable stage</div>
+      </PartFrame>,
+    );
+    act(() => useWindows.getState().setOpen(["part:t.view"]));
+    expect(screen.getByText("editable stage")).toBeTruthy();
+    expect(screen.getByText("Also in its own window")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(h.closeWindow).toHaveBeenCalledWith("part:t.view");
   });
 });
 

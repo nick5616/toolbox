@@ -35,7 +35,7 @@
 
 .shortcut {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 170px;
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 170px);
   align-items: center;
   gap: var(--space-3);
   font-size: var(--text-md);
@@ -43,6 +43,7 @@
 
 .shortcutLabel {
   min-width: 0;
+  white-space: nowrap;
 }
 
 .note {

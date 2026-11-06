@@ -1,9 +1,12 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from "react";
 import { Banner, Button, DropZone, Icon, IconButton, TextArea, TextField, cx } from "@/components";
-import { FilesService, PipelinesService } from "@/lib/api";
+import { FilesService, PipelinesService, type PipelineParam } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { describeAccepts } from "@/pipelines/compat";
+import { fromWireType, validParamValue } from "@/pipelines/params";
 import { usePipelineEntry, usePipelines } from "@/state/pipelines";
+import { typeStyle } from "./graph/wireStyle";
+import { ParamField, type ParamFieldType } from "./ParamField";
 import { baseName } from "./RunGridModel";
 import { inputAccepted, isLink, mergeInputs } from "./RunSheetModel";
 import styles from "./RunSheet.module.css";
@@ -32,6 +35,8 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
   const close = usePipelines((s) => s.closeRunSheet);
   const [linksText, setLinksText] = useState("");
   const [secrets, setSecrets] = useState<Record<string, string>>({});
+  // Run parameter values the user changed; the rest show (and send) their defaults.
+  const [edited, setEdited] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; hint: string } | null>(null);
 
@@ -52,7 +57,13 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
   const missingSecret = needs.some((s) => !(secrets[secretKey(s.stepId, s.key)] ?? "").length);
   const tooMany = accepted.length > MAX_INPUTS;
   const ready = entry.check.ready;
-  const canStart = ready && !busy && accepted.length > 0 && !tooMany && !missingSecret;
+  const runParams = entry.pipeline.params ?? [];
+  const valueOf = (p: PipelineParam) => edited[p.name] ?? p.default;
+  const badParam = runParams.find((p) => {
+    const t = fromWireType(p.type);
+    return t !== "file" && t !== "files" && !validParamValue(t, valueOf(p), p.choices ?? []);
+  });
+  const canStart = ready && !busy && accepted.length > 0 && !tooMany && !missingSecret && !badParam;
 
   const choose = async () => {
     try {
@@ -70,7 +81,9 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
     try {
       const sec: Record<string, string> = {};
       for (const s of needs) sec[secretKey(s.stepId, s.key)] = secrets[secretKey(s.stepId, s.key)] ?? "";
-      const run = await PipelinesService.Start({ pipelineId, inputs: accepted, secrets: sec });
+      const params: Record<string, string> = {};
+      for (const p of runParams) params[p.name] = valueOf(p);
+      const run = await PipelinesService.Start({ pipelineId, inputs: accepted, secrets: sec, params });
       usePipelines.getState().upsertRun(run);
       close();
       usePipelines.getState().showRun(run.id);
@@ -182,6 +195,24 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
           </div>
         )}
 
+        {runParams.length > 0 && (
+          <div className={styles.secrets} role="group" aria-label="Run parameters">
+            {runParams.map((p) => {
+              const t = fromWireType(p.type);
+              const ft: ParamFieldType = t === "file" || t === "files" ? "text" : t;
+              return (
+                <div key={p.name} className={styles.field}>
+                  <span className={styles.fieldLabel}>
+                    <span className={styles.typeDot} style={typeStyle(t)} aria-hidden="true" />
+                    {p.label}
+                  </span>
+                  <ParamField type={ft} value={valueOf(p)} choices={p.choices ?? []} label={p.label} onChange={(v) => setEdited((cur) => ({ ...cur, [p.name]: v }))} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {error && (
           <Banner tone="danger" title={error.message}>
             {error.hint}
@@ -192,7 +223,7 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
           <Button variant="secondary" data-tip="Close without starting" data-tip-kbd="Esc" onClick={close}>
             Cancel
           </Button>
-          <Button variant="primary" icon="play" disabled={!canStart} data-tip={!ready ? "The pipeline cannot run yet; see the message above" : accepted.length === 0 ? "Add at least one file or link this pipeline accepts" : tooMany ? `Remove some inputs; a run takes at most ${MAX_INPUTS}` : missingSecret ? "Enter the passwords the steps need" : "Start the run on the listed inputs"} onClick={() => void start()}>
+          <Button variant="primary" icon="play" disabled={!canStart} data-tip={!ready ? "The pipeline cannot run yet; see the message above" : accepted.length === 0 ? "Add at least one file or link this pipeline accepts" : tooMany ? `Remove some inputs; a run takes at most ${MAX_INPUTS}` : missingSecret ? "Enter the passwords the steps need" : badParam ? `Check “${badParam.label}”: that value doesn't fit` : "Start the run on the listed inputs"} onClick={() => void start()}>
             {accepted.length > 1 ? `Start with ${accepted.length} files` : "Start"}
           </Button>
         </div>

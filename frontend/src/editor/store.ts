@@ -6,6 +6,7 @@
 import { useEffect, useMemo } from "react";
 import { create } from "zustand";
 import { MediaService, type AnalysisRef, type EditMatteState, type EditSourceState, type EditStream } from "@/lib/api";
+import { adoptParkedHistory, registerHistory } from "@/lib/parkedHistory";
 import { newHistory, pushHistory, redo as redoH, undo as undoH, type History } from "@/lib/history";
 import type { Analysis } from "@/viz/analysis";
 import { normalizeProject, type NormalProject } from "@/viz/edit/defaults";
@@ -135,7 +136,10 @@ const without = <T>(r: Record<string, T>, k: string): Record<string, T> => {
 export const useEditStudio = create<EditStudioState>((set, get) => ({
   ...initial,
 
-  open: (id, name, doc) => set({ ...initial, urls: get().urls, projectId: id, name, history: newHistory(normalizeProject(doc)), saveState: "saved", setupOpen: normalizeProject(doc).tracks.every((t) => t.clips.length === 0) }),
+  open: (id, name, doc) => {
+    set({ ...initial, urls: get().urls, projectId: id, name, history: newHistory(normalizeProject(doc)), saveState: "saved", setupOpen: normalizeProject(doc).tracks.every((t) => t.clips.length === 0) });
+    void adoptParkedHistory("editor", id);
+  },
   close: () => set({ ...initial, urls: get().urls }),
   setName: (name) => set({ name }),
   edit: (next, key = "") => {
@@ -194,6 +198,23 @@ export const useEditStudio = create<EditStudioState>((set, get) => ({
     set({ jobs: { ...j, interps: jobId ? { ...j.interps, [key]: jobId } : without(j.interps, key) } });
   },
 }));
+
+// Undo history survives popping the whole tool out and bringing it back (lib/parkedHistory.ts).
+registerHistory("editor", ["video-studio", "edit-studio"], {
+  docId: () => useEditStudio.getState().projectId,
+  read: () => {
+    const h = useEditStudio.getState().history;
+    return h ? { past: h.past, future: h.future } : null;
+  },
+  write: ({ past, future }) => {
+    const h = useEditStudio.getState().history;
+    if (h) useEditStudio.setState({ history: { ...h, past: past as NormalProject[], future: future as NormalProject[] } });
+  },
+  subscribe: (cb) =>
+    useEditStudio.subscribe((s, prev) => {
+      if (s.history !== prev.history) cb();
+    }),
+});
 
 // Dev builds only: a handle for automated UI checks (.dev QA scripts drive the editor over DevTools).
 if (import.meta.env.DEV && typeof window !== "undefined") (window as unknown as { __editStudio?: typeof useEditStudio }).__editStudio = useEditStudio;

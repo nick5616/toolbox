@@ -140,7 +140,7 @@ func newFixture(t *testing.T, goos, goarch string) *fixture {
 			t.Fatal(err)
 		}
 	}
-	for _, id := range []string{"stems", "transcribe", "bg-remover", "llm-chat", "audio-cleanup", "redact", "object-eraser", "visualizer"} {
+	for _, id := range []string{"stems", "transcribe", "bg-remover", "llm-chat", "audio-cleanup", "redact", "object-eraser", "visualizer", "tts"} {
 		if err := reg.Register(&fakeModels{w: w, id: id}); err != nil {
 			t.Fatal(err)
 		}
@@ -344,6 +344,7 @@ func TestStatusModelsUnlocksAndSharedEngine(t *testing.T) {
 	f.w.models["transcribe/small"] = true
 	f.w.models["audio-cleanup/voice"] = true
 	f.w.models["visualizer/mood"] = true
+	f.w.models["tts/kokoro"] = true
 	f.w.set(deps.FFmpeg, core.DepOK, core.SourceManaged)
 	f.s.cfg.Deps.Detect(context.Background())
 	if st := f.pack("speech").State; st != core.PackInstalled {
@@ -355,8 +356,8 @@ func TestStatusModelsUnlocksAndSharedEngine(t *testing.T) {
 	// Only registered tools are listed as unlocked.
 	speech := f.pack("speech")
 	// (the fake model providers register as tools, so audio-cleanup is listed; subtitles isn't registered)
-	if len(speech.Unlocks) != 2 || speech.Unlocks[0].ModuleID != "transcribe" || speech.Unlocks[0].Name != "Tool transcribe" ||
-		speech.Unlocks[1].ModuleID != "audio-cleanup" {
+	if len(speech.Unlocks) != 3 || speech.Unlocks[0].ModuleID != "transcribe" || speech.Unlocks[0].Name != "Tool transcribe" ||
+		speech.Unlocks[1].ModuleID != "audio-cleanup" || speech.Unlocks[2].ModuleID != "tts" {
 		t.Errorf("unlocks %+v", speech.Unlocks)
 	}
 	if len(f.pack("media").Unlocks) != 0 {
@@ -554,7 +555,7 @@ func TestRemovePreviewKeepsSharedAndSkipsSystem(t *testing.T) {
 	// Music and Image are installed and share the engine and ffmpeg.
 	pv := f.s.RemovePreview("image")
 	if len(pv.Kept) != 2 || pv.Kept[0].Component != "AI engine" || pv.Kept[1].Component != "FFmpeg" ||
-		!slices.Equal(pv.Kept[0].UsedBy, []string{"Music", "Documents"}) || !slices.Equal(pv.Kept[1].UsedBy, []string{"Music"}) {
+		!slices.Equal(pv.Kept[0].UsedBy, []string{"Music", "Text recognition"}) || !slices.Equal(pv.Kept[1].UsedBy, []string{"Music"}) {
 		t.Fatalf("kept %+v", pv.Kept)
 	}
 	want := int64(224_005_088 + 54_247_123 + 34_532_543 + 232_589 + 7_835_770 + 208_044_816)
@@ -614,7 +615,7 @@ func TestRemoveKeepsSharedModelsPackComponents(t *testing.T) {
 	f.s.cfg.Deps.Detect(context.Background())
 	// Documents (engine only) is installed, so removing Speech keeps the engine.
 	pv := f.s.RemovePreview("speech")
-	if len(pv.Kept) != 1 || pv.Kept[0].UsedBy[0] != "Documents" {
+	if len(pv.Kept) != 1 || pv.Kept[0].UsedBy[0] != "Text recognition" {
 		t.Fatalf("kept %+v", pv.Kept)
 	}
 	if err := f.s.Remove("speech"); err != nil {

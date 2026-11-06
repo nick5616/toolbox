@@ -15,6 +15,8 @@ export interface Handoff {
   postSlide?: PostSlideSeed;
   /** A piece of text for the tool (Phase 11 §5): Local Chat starts a conversation about it; Dev Utilities opens it in the matching utility. */
   text?: TextSeed;
+  /** A preset for the tool (e.g. the PDF Toolkit's "compress"). Tool-defined: the receiving tool validates it and ignores unknown values. */
+  action?: string;
   /** Set when the tool was opened from another tool's click-in into its own window: its "Use" sends results back (Phase 11 §4). */
   embed?: EmbedLink;
 }
@@ -94,6 +96,16 @@ interface UIState {
   drop: FilesDropped | null;
   handoff: Handoff | null;
   expandedLogJobId: string | null;
+  /** Tools pinned to the top of the sidebar, in pin order (persisted). */
+  pinned: string[];
+  /** The last tools used, newest first (persisted, at most RECENT_TOOLS). */
+  recentTools: string[];
+  /** Sidebar category groups the user collapsed (persisted). */
+  collapsedGroups: string[];
+  /** The keyboard shortcuts overlay. */
+  shortcutsOpen: boolean;
+  /** Failed job ids the user has already seen in the open tray (session only). */
+  seenFailed: string[];
 
   navigate: (view: ViewId) => void;
   setSidebarCollapsed: (v: boolean) => void;
@@ -111,10 +123,26 @@ interface UIState {
   /** Returns and clears the handoff if it targets moduleId. */
   takeHandoff: (moduleId: string) => Handoff | null;
   setExpandedLogJobId: (id: string | null) => void;
+  togglePin: (moduleId: string) => void;
+  toggleGroup: (groupId: string) => void;
+  setShortcutsOpen: (v: boolean) => void;
+  markFailedSeen: (ids: string[]) => void;
+}
+
+/** How many recently used tools the sidebar remembers. */
+export const RECENT_TOOLS = 5;
+
+/** Views that are not tools: they never count as a "recent tool". */
+const NOT_TOOLS = new Set(["library", "settings", "setup", "gallery", "pipelines", ""]);
+
+/** The recent list after using `view` (unchanged for non-tool views). */
+export function withRecent(list: readonly string[], view: string): string[] {
+  if (NOT_TOOLS.has(view)) return list.slice();
+  return [view, ...list.filter((v) => v !== view)].slice(0, RECENT_TOOLS);
 }
 
 const STORAGE_KEY = "toolbox.ui";
-type Persisted = Pick<UIState, "view" | "sidebarCollapsed" | "comingSoonOpen" | "trayOpen" | "trayHeight">;
+type Persisted = Pick<UIState, "view" | "sidebarCollapsed" | "comingSoonOpen" | "trayOpen" | "trayHeight" | "pinned" | "recentTools" | "collapsedGroups">;
 
 function load(): Partial<Persisted> {
   try {
@@ -124,6 +152,8 @@ function load(): Partial<Persisted> {
     return {};
   }
 }
+
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 
 function initialView(saved: Partial<Persisted>): ViewId {
   // A tool window's view is its `view` parameter (never the main window's saved one).
@@ -147,9 +177,14 @@ export const useUI = create<UIState>((set, get) => ({
   drop: null,
   handoff: null,
   expandedLogJobId: null,
+  pinned: strings(saved.pinned),
+  recentTools: strings(saved.recentTools).slice(0, RECENT_TOOLS),
+  collapsedGroups: strings(saved.collapsedGroups),
+  shortcutsOpen: false,
+  seenFailed: [],
 
   navigate: (view) =>
-    set((s) => (view === "setup" && s.view !== "setup" ? { view, returnView: s.view } : { view })),
+    set((s) => (view === "setup" && s.view !== "setup" ? { view, returnView: s.view } : { view, recentTools: withRecent(s.recentTools, view) })),
   setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
   sidebarNarrowOpen: false,
   toggleSidebar: () => set((s) => (matchesNow(NARROW_QUERY) ? { sidebarNarrowOpen: !s.sidebarNarrowOpen } : { sidebarCollapsed: !s.sidebarCollapsed })),
@@ -158,7 +193,7 @@ export const useUI = create<UIState>((set, get) => ({
   setTrayHeight: (trayHeight) => set({ trayHeight }),
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   setDrop: (drop) => set({ drop }),
-  handOff: (h) => set({ handoff: h, view: h.moduleId, drop: null }),
+  handOff: (h) => set((s) => ({ handoff: h, view: h.moduleId, drop: null, recentTools: withRecent(s.recentTools, h.moduleId) })),
   takeHandoff: (moduleId) => {
     const h = get().handoff;
     if (!h || h.moduleId !== moduleId) return null;
@@ -166,6 +201,14 @@ export const useUI = create<UIState>((set, get) => ({
     return h;
   },
   setExpandedLogJobId: (expandedLogJobId) => set({ expandedLogJobId }),
+  togglePin: (id) => set((s) => ({ pinned: s.pinned.includes(id) ? s.pinned.filter((p) => p !== id) : [...s.pinned, id] })),
+  toggleGroup: (id) => set((s) => ({ collapsedGroups: s.collapsedGroups.includes(id) ? s.collapsedGroups.filter((g) => g !== id) : [...s.collapsedGroups, id] })),
+  setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+  markFailedSeen: (ids) =>
+    set((s) => {
+      const add = ids.filter((id) => !s.seenFailed.includes(id));
+      return add.length ? { seenFailed: [...s.seenFailed, ...add] } : s;
+    }),
 }));
 
 useUI.subscribe((s) => {
@@ -176,6 +219,9 @@ useUI.subscribe((s) => {
     comingSoonOpen: s.comingSoonOpen,
     trayOpen: s.trayOpen,
     trayHeight: s.trayHeight,
+    pinned: s.pinned,
+    recentTools: s.recentTools,
+    collapsedGroups: s.collapsedGroups,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(p));

@@ -1,23 +1,17 @@
 /**
- * The editor's part windows (Phase 10, SPEC 5.5 WP-E4): the live preview and
- * any panel, popped out of a tool. A part window holds replicas of the editor
- * and focus stores (editor/bridge.ts); everything it changes runs on the host.
+ * What the editor's part windows render (Phase 10, SPEC 5.5 WP-E4): the live
+ * preview with a mini transport, and the hooks every replica runs. The parts
+ * themselves (`<moduleId>.preview`, `<moduleId>.panel`) are defined by the
+ * editor workspace (`workspace.tsx`); a part window holds replicas of the
+ * editor and focus stores and everything it changes runs on the host.
  */
 import { useEffect, useRef, useState } from "react";
-import { EmptyState, ErrorBoundary, IconButton } from "@/components";
+import { ErrorBoundary, IconButton } from "@/components";
 import { formatMs } from "@/components/media";
 import { useShortcut } from "@/lib/shortcuts";
-import { currentWindow } from "@/lib/windows";
-import { definePart } from "@/parts/registry";
-import type { PartProps } from "@/parts/types";
-import { useBridgesStatus } from "@/state/bridge";
 import { EditCanvas } from "@/viz/edit/EditCanvas";
 import { editLength, previewSize } from "@/viz/edit/types";
-import { startEditorReplica } from "./bridge";
 import { PreviewOverlays } from "./overlays/PreviewOverlays";
-import { getEditorPanel, panelPartId, previewPartId } from "./panels";
-import type { EditorProfile } from "./profile";
-import { EditorProfileProvider } from "./profileContext";
 import { useEditInputs, useEditStudio, useProject } from "./store";
 import { frameMs } from "./transport/logic";
 import { useEditData } from "./useEditData";
@@ -87,101 +81,37 @@ export function usePartShortcuts(): void {
   useShortcut(["Mod+Shift+Z", "Mod+Y"], () => useEditStudio.getState().redo());
 }
 
-function Waiting() {
-  return <div className={styles.waiting}>Connecting…</div>;
-}
-
-/** Whether the replica has the project (the shell only renders parts once the bridge is live). */
-function useReplicaReady(): boolean {
-  const status = useBridgesStatus();
-  const open = useEditStudio((s) => s.history !== null);
-  return status === "live" && open;
-}
-
-export function PreviewPart({ profile }: { profile: EditorProfile }) {
+/** Runs in every part window once connected: loads what a replica needs locally (analyses, sources) and forwards keys to the host. */
+export function useEditorReplica(): void {
   useEditData();
   usePartShortcuts();
-  const ready = useReplicaReady();
+}
+
+/** The live preview of a replica: the canvas and a mini transport that forwards to the host. */
+export function PreviewPart() {
   const project = useProject();
   const inputs = useEditInputs();
   const playing = useEditStudio((s) => s.playing);
   const playheadMs = useEditStudio((s) => s.playheadMs);
   const timeMs = useLocalClock();
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
-  if (!ready || !project) return <Waiting />;
+  if (!project) return null;
   const size = previewSize(project.aspect);
   const D = editLength(project);
   return (
-    <EditorProfileProvider profile={profile}>
-      <div className={styles.preview}>
-        <section className={styles.stage}>
-          <EditCanvas inputs={inputs} width={size.width} height={size.height} timeMs={timeMs} playing={playing} quality="draft" onCanvas={setCanvas} />
-          <ErrorBoundary label="The preview overlays" compact>
-            <PreviewOverlays canvas={canvas} width={size.width} height={size.height} />
-          </ErrorBoundary>
-        </section>
-        <div className={styles.bar} role="toolbar" aria-label="Transport">
-          <IconButton icon={playing ? "pause" : "play"} label={playing ? "Pause" : "Play"} data-tip="Play or pause the edit in the main window" kbd="Space" onClick={() => useEditStudio.getState().setPlaying(!playing)} />
-          <span className={styles.time} aria-label="Time">
-            {formatMs(playing ? timeMs : playheadMs)} / {formatMs(D)}
-          </span>
-        </div>
-      </div>
-    </EditorProfileProvider>
-  );
-}
-
-export function PanelPart({ profile }: { profile: EditorProfile }) {
-  useEditData();
-  usePartShortcuts();
-  const ready = useReplicaReady();
-  const id = currentWindow().params.get("panel") ?? "";
-  const panel = getEditorPanel(id);
-  if (!panel) return <EmptyState icon="circle-alert" title="Nothing to show here" body="This panel doesn't exist." />;
-  if (!ready) return <Waiting />;
-  const Panel = panel.component;
-  return (
-    <EditorProfileProvider profile={profile}>
-      <div className={styles.panel}>
-        <ErrorBoundary label={panel.title} resetKey={id}>
-          <Panel />
+    <div className={styles.preview}>
+      <section className={styles.stage}>
+        <EditCanvas inputs={inputs} width={size.width} height={size.height} timeMs={timeMs} playing={playing} quality="draft" onCanvas={setCanvas} />
+        <ErrorBoundary label="The preview overlays" compact>
+          <PreviewOverlays canvas={canvas} width={size.width} height={size.height} />
         </ErrorBoundary>
+      </section>
+      <div className={styles.bar} role="toolbar" aria-label="Transport">
+        <IconButton icon={playing ? "pause" : "play"} label={playing ? "Pause" : "Play"} data-tip="Play or pause the edit in the main window" kbd="Space" onClick={() => useEditStudio.getState().setPlaying(!playing)} />
+        <span className={styles.time} aria-label="Time">
+          {formatMs(playing ? timeMs : playheadMs)} / {formatMs(D)}
+        </span>
       </div>
-    </EditorProfileProvider>
+    </div>
   );
-}
-
-/** Defines `<moduleId>.preview` and `<moduleId>.panel` for a tool's profile. */
-export function makeEditorParts(moduleId: string, profile: EditorProfile): void {
-  const connect = (): Promise<() => void> => Promise.resolve(startEditorReplica(moduleId));
-  definePart({
-    id: previewPartId(moduleId),
-    host: moduleId,
-    title: "Preview",
-    icon: "monitor-play",
-    tip: "The live preview of the open project",
-    width: 960,
-    height: 600,
-    component: function Preview(_p: PartProps) {
-      return <PreviewPart profile={profile} />;
-    },
-    connect,
-  });
-  definePart({
-    id: panelPartId(moduleId),
-    host: moduleId,
-    title: "Panel",
-    icon: "panel-right",
-    headingFor: (params) => {
-      const panel = getEditorPanel(params.get("panel") ?? "");
-      return panel ? { title: panel.title, icon: panel.icon } : null;
-    },
-    tip: "A panel of the open project",
-    width: 380,
-    height: 720,
-    component: function Panel(_p: PartProps) {
-      return <PanelPart profile={profile} />;
-    },
-    connect,
-  });
 }

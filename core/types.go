@@ -377,8 +377,9 @@ type ClipboardState struct {
 
 // Hotkey action IDs.
 const (
-	HotkeyClipboard = "clipboard" // toggle the clipboard popup
-	HotkeyQuickOpen = "quickOpen" // show the main window with the command palette
+	HotkeyClipboard  = "clipboard"  // toggle the clipboard popup
+	HotkeyQuickOpen  = "quickOpen"  // show the main window with the command palette
+	HotkeyFocusStart = "focusStart" // start a focus session with the last profile (Phase 18; no default binding)
 )
 
 // HotkeyStatus reports whether a global hotkey is registered.

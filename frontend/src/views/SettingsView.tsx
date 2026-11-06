@@ -406,10 +406,10 @@ export function SettingsView() {
   return (
     <div className={styles.scroll}>
       <section className={styles.root} aria-label="Settings">
-        <h1 className={styles.title}>Settings</h1>
-
         <SettingsPacks />
 
+        <div className={styles.cols}>
+        <div className={styles.col}>
         <SettingsGeneral />
 
         <Section label="Library" tip="The folder where every tool saves its results">
@@ -455,11 +455,15 @@ export function SettingsView() {
           />
         </Section>
 
+        </div>
+        <div className={styles.col}>
         <SettingsClipboard />
 
         <SettingsChat />
 
         <SettingsVault />
+        </div>
+        </div>
 
         <DepsTable />
 

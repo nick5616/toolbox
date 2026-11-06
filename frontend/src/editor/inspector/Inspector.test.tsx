@@ -20,7 +20,7 @@ vi.mock("@/lib/api", async (orig) => {
 vi.mock("@/editor/useEditAutosave", () => ({ flushEdit: mocks.flush }));
 
 import { PLAIN_PROFILE, EditorProfileProvider } from "../profileContext";
-import { registerEditorPanel } from "../panels";
+import { defineEditorWorkspace } from "../workspace";
 import { InspectorHarness as InspectorPanel } from "./InspectorHarness";
 import { useMaskSelection } from "./inspectorState";
 
@@ -28,6 +28,7 @@ import { useMaskSelection } from "./inspectorState";
 const MARKER_PROFILE = { ...PLAIN_PROFILE, markerSignals: true };
 
 function renderPanel(profile = MARKER_PROFILE) {
+  defineEditorWorkspace(profile);
   return render(
     <EditorProfileProvider profile={profile}>
       <InspectorPanel />
@@ -319,8 +320,7 @@ describe("Track, Song and Project inspectors", () => {
   it("a profile's own song panel replaces the plain one", () => {
     open({ kind: "song" });
     const Own = () => <div data-testid="own-song" />;
-    registerEditorPanel({ id: "own-song", title: "Own", icon: "music", tip: "", component: Own });
-    renderPanel({ ...PLAIN_PROFILE, songPanel: "own-song" });
+    renderPanel({ ...PLAIN_PROFILE, moduleId: "own-song-tool", songPanel: "own-song", panels: [{ id: "own-song", title: "Own", icon: "music", tip: "", component: Own }] });
     expect(screen.getByTestId("own-song")).toBeTruthy();
     expect(screen.queryByLabelText("Music inspector")).toBeNull();
   });
@@ -328,8 +328,7 @@ describe("Track, Song and Project inspectors", () => {
   it("shows a profile's markers panel when markers are selected, else the project settings", () => {
     open({ kind: "markers", ids: ["beat:1000"] });
     const Own = () => <div data-testid="own-markers" />;
-    registerEditorPanel({ id: "own-markers", title: "Own", icon: "music", tip: "", component: Own });
-    renderPanel({ ...PLAIN_PROFILE, markersPanel: "own-markers" });
+    renderPanel({ ...PLAIN_PROFILE, moduleId: "own-markers-tool", markersPanel: "own-markers", panels: [{ id: "own-markers", title: "Own", icon: "music", tip: "", component: Own }] });
     expect(screen.getByTestId("own-markers")).toBeTruthy();
     cleanup();
     renderPanel(PLAIN_PROFILE);

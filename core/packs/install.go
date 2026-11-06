@@ -19,6 +19,9 @@ var installerModules = map[string]string{
 	deps.Llama:    deps.LlamaInstallModuleID,
 	deps.FFmpeg:   deps.FFmpegInstallModuleID,
 	deps.Deno:     deps.DenoInstallModuleID,
+	deps.Pandoc:   deps.PandocInstallModuleID,
+	deps.Typst:    deps.TypstInstallModuleID,
+	deps.Monolith: deps.MonolithInstallModuleID,
 }
 
 // installModule is the hidden system-pack-install module: one job installs

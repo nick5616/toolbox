@@ -22,8 +22,7 @@ import { SectionBands } from "./lanes/SectionBands";
 import { MomentsOverlay } from "./moments/MomentsOverlay";
 import { SectionStyleDialog } from "./sectionstyle/SectionStyleDialog";
 import { openStyleFromContext } from "./sectionstyle/useSectionStyle";
-import "./panels";
-import "@/editor/panelDefs";
+import { MUSIC_PANELS } from "./panels";
 import { SetupPanel } from "./setup/SetupPanel";
 import { SongChip } from "./song/SongChip";
 
@@ -92,6 +91,7 @@ export const MUSIC_EDIT_PROFILE: EditorProfile = {
 
   Setup: SetupPanel,
   TimelineTop,
+  panels: MUSIC_PANELS,
   rail: ["media", "song", "markers", "captions", "style", "project"],
   songPanel: "song",
   markersPanel: "markers",

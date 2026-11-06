@@ -19,7 +19,7 @@ vi.mock("@/lib/api", async (orig) => {
     SettingsService: { ModuleState: () => h.moduleState(), SetModuleState: (...a: unknown[]) => h.setModuleState(...(a as [])) },
   };
 });
-vi.mock("@/tools/_kit", () => ({ DepsGate: () => null }));
+vi.mock("@/tools/_kit", () => ({ DepsGate: () => null, FileActions: () => null }));
 vi.mock("@/viz/edit/EditCanvas", () => ({ EditCanvas: () => <div data-testid="canvas" /> }));
 vi.mock("./sources/SourcesPanel", () => ({ SourcesPanel: () => <div data-testid="sources" /> }));
 vi.mock("./overlays/PreviewOverlays", () => ({ PreviewOverlays: () => null }));
@@ -50,10 +50,9 @@ import { EditorShell, openInOtherTool } from "./EditorShell";
 import { useEditorFocus } from "./focus";
 import type { EditorFocus, EditorProfile } from "./profile";
 import { PLAIN_PROFILE } from "./profileContext";
-import { registerEditorPanel } from "./panels";
 import { useEditStudio } from "./store";
 
-registerEditorPanel({ id: "own", title: "Own", icon: "music", tip: "A panel of the profile", component: () => <div data-testid="own-panel" /> });
+const OWN_PANEL = { id: "own", title: "Own", icon: "music", tip: "A panel of the profile", component: () => <div data-testid="own-panel" /> };
 
 function TimelineTop({ focus }: { focus: EditorFocus }) {
   return <div data-testid="timeline-top" data-focus={focus} />;
@@ -71,6 +70,7 @@ const COMPOSED: EditorProfile = {
   Setup: () => <div data-testid="setup" />,
   TimelineTop,
   HeaderStart: ({ disabled }: { disabled: boolean }) => <span data-testid="header-start">{disabled ? "off" : "on"}</span>,
+  panels: [OWN_PANEL],
   rail: ["media", "own", "project"],
   moreItems: () => [{ id: "extra", label: "Export markers (CSV)", onSelect: () => undefined }],
   Dialogs: () => <div data-testid="dialogs" />,
@@ -152,7 +152,7 @@ describe("focus", () => {
     fireEvent.doubleClick(screen.getByRole("button", { name: "clip a" }));
     expect(useEditorFocus.getState().focus).toBe("video");
     expect(screen.getByTestId("timeline-top").getAttribute("data-focus")).toBe("video");
-    expect(screen.getByTestId("breadcrumb").textContent).toBe("Edit Studio›Video");
+    expect(screen.getByTestId("breadcrumb").textContent).toBe("Edit Studio›Clip view");
   });
 
   it("double-clicking the preview does the same", () => {
@@ -166,11 +166,11 @@ describe("focus", () => {
     ready();
     const user = userEvent.setup();
     render(shell(COMPOSED));
-    await user.click(screen.getByRole("radio", { name: "Video" }));
+    await user.click(screen.getByRole("radio", { name: "Clip view" }));
     expect(screen.getByTestId("timeline-top").getAttribute("data-focus")).toBe("video");
     await user.click(screen.getByRole("button", { name: "Back to Edit Studio" }));
     expect(screen.getByTestId("timeline-top").getAttribute("data-focus")).toBe("compose");
-    expect(screen.getByRole("radio", { name: "Music" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Song view" }).getAttribute("aria-checked")).toBe("true");
   });
 
   it("Esc returns to Music", () => {

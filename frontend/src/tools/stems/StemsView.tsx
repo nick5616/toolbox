@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Badge, Button, EmptyState, Icon, Section, SegmentedControl, cx, toast } from "@/components";
+import { Badge, Button, Section, SegmentedControl, cx, toast } from "@/components";
 import { JobStatus, LibraryService, StemsFormat, StemsService, type PresetInfo, type StemsPreset } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { type JobView } from "@/state/jobs";
 import { useToolJobs } from "@/tools/_kit/session";
-import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { EmptyLine, FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
-import { FileActions } from "@/tools/_kit/FileActions";
+import { ResultRow } from "@/tools/_kit/ResultRow";
+import { formatResultDate } from "@/tools/_kit/format";
+import { revealLabel } from "@/lib/platform";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import shared from "@/tools/_kit/results.module.css";
 import { DEFAULT_STEMS_OPTIONS, STEMS_SIZE_HINT, dirname, parseStemsResult, sanitizeStemsOptions } from "./options";
@@ -69,14 +71,16 @@ function PresetCards({ presets, value, onChange }: PresetCardsProps) {
                 {p.speed}
               </Badge>
             </span>
-            <span className={styles.chips}>
-              {(p.stems ?? []).map((s) => (
-                <Badge key={s} mono tip={`A separate ${s} track is saved`}>
-                  {s}
-                </Badge>
-              ))}
+            <span className={styles.foot}>
+              <span className={styles.chips}>
+                {(p.stems ?? []).map((s) => (
+                  <Badge key={s} mono tip={`A separate ${s} track is saved`}>
+                    {s}
+                  </Badge>
+                ))}
+              </span>
+              <span className={styles.note} data-tip="First-use model download; it is downloaded once and then works offline">{formatBytes(p.downloadBytes)}</span>
             </span>
-            <span className={styles.note} data-tip="The model is downloaded once and then works offline">{formatBytes(p.downloadBytes)} first-use download</span>
           </button>
         );
       })}
@@ -92,7 +96,7 @@ async function revealFolder(path: string) {
   }
 }
 
-function StemGroup({ job }: { job: JobView }) {
+function StemGroup({ job, showTime }: { job: JobView; showTime: boolean }) {
   const result = parseStemsResult(job.resultJson);
   if (!result || result.stems.length === 0) return null;
   const folder = dirname(result.stems[0]?.path ?? "");
@@ -101,28 +105,18 @@ function StemGroup({ job }: { job: JobView }) {
       <div className={styles.groupHead}>
         <span className={styles.track} data-tip={job.title}>
           {job.title}
+          {showTime && job.finishedAt ? <span className={styles.runTime} data-tip={new Date(job.finishedAt).toLocaleString()}> · {formatResultDate(job.finishedAt)}</span> : null}
         </span>
         <Button size="sm" variant="secondary" icon="folder-open" data-tip="Open the folder that holds all stems of this track" onClick={() => void revealFolder(folder)}>
-          Reveal folder
+          {revealLabel}
         </Button>
       </div>
       <ul className={shared.list}>
         {result.stems.map((s) => {
           const out = job.outputs.find((o) => o.path === s.path);
           return (
-            <li key={s.path} className={cx(shared.row, out?.missing && shared.missing)}>
-              <Icon name="music" size={14} className={shared.icon} />
-              <span className={shared.name} data-tip={s.path}>
-                {s.name}
-              </span>
-              {out && (
-                <span className={shared.meta} data-tip="File size on disk">
-                  {formatBytes(out.sizeBytes)}
-                </span>
-              )}
-              <span className={shared.actions}>
-                <FileActions outputId={out?.id} path={s.path} disabled={out?.missing} />
-              </span>
+            <li key={s.path}>
+              <ResultRow path={s.path} outputId={out?.id} missing={out?.missing} name={s.name} sizeBytes={out?.sizeBytes} icon="music" />
             </li>
           );
         })}
@@ -197,11 +191,12 @@ export default function StemsView({ moduleId }: ToolViewProps) {
         </div>
       }
       results={
+
         <Section label="Results" tip="Finished tracks; each shows its stems with open and reveal actions">
           {done.length === 0 ? (
-            <EmptyState icon="audio-lines" title="No stems yet." body="Split a track and its stems appear here." />
+            <EmptyLine title="No stems yet." body="Split a track and its stems appear here." />
           ) : (
-            done.map((j) => <StemGroup key={j.id} job={j} />)
+            done.map((j) => <StemGroup key={j.id} job={j} showTime={done.some((o) => o !== j && o.title === j.title)} />)
           )}
         </Section>
       }

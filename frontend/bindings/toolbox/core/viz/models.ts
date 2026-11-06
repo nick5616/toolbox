@@ -133,6 +133,11 @@ export interface RenderStart {
     "token": string;
     "planUrl": string;
     "jobId": string;
+
+    /**
+     * "" (a video stream), "composition" or "recipe": the host answers those itself
+     */
+    "kind": string;
 }
 
 /**

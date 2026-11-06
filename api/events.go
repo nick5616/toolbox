@@ -4,6 +4,8 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"toolbox/core"
+	"toolbox/core/focus"
+	"toolbox/core/lan"
 	"toolbox/core/viz"
 )
 
@@ -41,6 +43,15 @@ func init() {
 	application.RegisterEvent[core.WindowsChanged]("windows:changed")
 	application.RegisterEvent[core.WindowRelay]("windows:relay")
 	application.RegisterEvent[core.WindowHandoff]("windows:handoff")
+
+	application.RegisterEvent[lan.State](lan.EventState)
+	application.RegisterEvent[lan.DevicesChanged](lan.EventDevices)
+	application.RegisterEvent[lan.Prompt](lan.EventPrompt)
+	application.RegisterEvent[lan.PromptClosed](lan.EventPromptClose)
+	application.RegisterEvent[lan.Message](lan.EventMessage)
+	application.RegisterEvent[lan.Activity](lan.EventActivity)
+	application.RegisterEvent[focus.State](focus.EventChanged)
+	application.RegisterEvent[focus.BlockEvent](focus.EventBlocked)
 
 	application.RegisterEvent[viz.RenderStart]("viz:render")
 	application.RegisterEvent[viz.RenderAck]("viz:render-ack")

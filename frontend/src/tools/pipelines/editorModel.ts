@@ -20,7 +20,7 @@ export function newStepId(taken: Iterable<string>): string {
 }
 
 /** Step types that can run without files (From "none"). */
-export const NO_FILES_TYPES: ReadonlySet<string> = new Set(["pipelines.chat", "pipelines.table"]);
+export const NO_FILES_TYPES: ReadonlySet<string> = new Set(["pipelines.chat", "llm-chat", "pipelines.table"]);
 
 /** Tools whose manual step should not continue by itself when the tool finishes. */
 export const AUTO_CONTINUE_OFF: ReadonlySet<string> = new Set(["subtitles", "lyric-video", "visualizer", "pdf"]);
@@ -76,6 +76,7 @@ export function newStep(type: StepType, steps: readonly PipelineStep[], check: P
     autoContinue: autoContinueFor(type.id),
     keep: false,
     note: "",
+    binds: [],
   };
 }
 
@@ -151,6 +152,7 @@ export function blankPipeline(catalog: readonly StepType[], takenNames: readonly
         autoContinue: true,
         keep: true,
         note: "",
+        binds: [],
       };
   return {
     id: "",
@@ -158,8 +160,11 @@ export function blankPipeline(catalog: readonly StepType[], takenNames: readonly
     description: "",
     templateId: "",
     layout: "",
+    params: [],
     steps: [step],
     watch: { enabled: false, folder: "" },
+    clip: { enabled: false, kinds: [], pattern: "" },
+    schedule: { enabled: false, days: [], times: [], catchUpMin: 30 },
     createdAt: 0,
     updatedAt: 0,
   };

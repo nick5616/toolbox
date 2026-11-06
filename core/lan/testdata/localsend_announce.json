@@ -1,0 +1,12 @@
+{
+  "alias": "Nice Orange",
+  "version": "2.0",
+  "deviceModel": "Samsung",
+  "deviceType": "mobile",
+  "fingerprint": "5f1e1d4b2f0c93a5e8d1c6a7b9f3e2d4c5b6a79881726354a3b2c1d0e9f8a7b6",
+  "port": 53317,
+  "protocol": "https",
+  "download": true,
+  "announce": true,
+  "someFutureField": {"ignored": [1, 2, 3]}
+}

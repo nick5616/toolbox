@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Banner, Button, ClickInHost, ConfirmDialog, EmptyState, IconButton, MenuButton, SegmentedControl, Tooltip, cx, toast, useClickIn } from "@/components";
+import { Banner, Button, ClickInHost, ConfirmDialog, EmptyState, IconButton, MenuButton, SegmentedControl, ToolHeader, Tooltip, cx, toast, useClickIn } from "@/components";
 import { PipelinesService, RunStatus, type PipelineEntry, type PipelineStep, type StepCheck, type StepType } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/format";
 import { toAppError } from "@/lib/errors";
@@ -14,7 +14,7 @@ import { duplicateStep, firstProblem, stepsOf, insertStep, moveStep, newStep, re
 import { PipelinesTabs } from "./PipelinesTabs";
 import { useEditorMode } from "./editorMode";
 import { GraphEditor } from "./GraphEditor";
-import { RunHistoryBody, TriggersBody, stepPanelSummary, watchSummary } from "./panels";
+import { RunHistoryBody, TriggersBody, stepPanelSummary, triggersSummary } from "./panels";
 import { StepCard } from "./StepCard";
 import { pipelinesWorkspace } from "./workspace";
 import styles from "./PipelineEditor.module.css";
@@ -234,7 +234,9 @@ function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => voi
   }, [myRuns, entry.lastRun]);
   const runCount = Math.max(myRuns.length, entry.lastRun ? 1 : 0);
 
-  const compact = mode === "graph" && !!onNew;
+  const inPage = !!onNew;
+  const compact = mode === "graph" && inPage;
+  const showNew = inPage && !compact;
   const blocked = !check.ready;
   const problem = firstProblem(check);
   const pipelineProblems = check.problems ?? [];
@@ -242,28 +244,40 @@ function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => voi
   const status = check.ready ? "Ready" : missing.length > 0 && pipelineProblems.length === 0 ? "Tools missing" : "Has problems";
 
   const historyText = `${runCount === 0 ? "no runs yet" : `${runCount} ${runCount === 1 ? "run" : "runs"}`}${lastRun ? ` · last: ${RUN_STATUS_TEXT[lastRun.status] ?? lastRun.status} ${formatRelativeTime(lastRun.at)}` : ""}`;
-  const watchText = watchSummary(draft.watch.folder, draft.watch.enabled);
+  const watchText = triggersSummary(draft.watch.folder, draft.watch.enabled, draft.clip);
   const watchMessage = draft.watch.enabled ? entry.watch.message : "";
+  const clipActive = draft.clip.enabled && entry.clip.active;
+  const clipMessage = draft.clip.enabled ? entry.clip.message : "";
 
   // What the panels (and popped-out copies of them) show comes from here.
   useEffect(() => {
-    useDraft.getState().setLive({ watchMessage, runText: historyText, runCount, catalog: [...catalog] });
-  }, [watchMessage, historyText, runCount, catalog]);
+    useDraft.getState().setLive({ watchMessage, clipStatus: { active: clipActive, message: clipMessage }, runText: historyText, runCount, catalog: [...catalog] });
+  }, [watchMessage, clipActive, clipMessage, historyText, runCount, catalog]);
 
-  const openStep = (id: string) => {
+  const openStep = (id: string, pointer?: string) => {
     useDraft.getState().select(id);
     openDrawer(panelDrawerId("step"));
+    if (!pointer) return;
+    // Scroll the panel to that setting's field when the editor can say where it is (data-param="<pointer>"); otherwise it opens at the top.
+    window.setTimeout(() => {
+      const esc = typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape(pointer) : pointer.replace(/["\\]/g, "\\$&");
+      document.querySelector<HTMLElement>(`[data-param="${esc}"]`)?.scrollIntoView?.({ block: "center" });
+    }, 60);
   };
 
   return (
     <>
-      <header className={cx(styles.header, compact && styles.headerGraph)}>
-        {compact && <PipelinesTabs />}
-        {compact && (
+      <ToolHeader className={styles.header} aria-label="Pipeline">
+        {inPage && (
+          <span className={styles.tabs}>
+            <PipelinesTabs />
+          </span>
+        )}
+        {inPage && (
           <MenuButton
             label="Pipelines"
             icon="workflow"
-            variant="secondary"
+            variant="ghost"
             size="sm"
             tip="Switch to another pipeline or make a new one"
             items={() => [
@@ -280,7 +294,7 @@ function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => voi
         )}
         <div className={styles.titles}>
           <input
-            className={styles.name}
+            className={cx(styles.name, styles.nameFlush)}
             aria-label="Pipeline name"
             data-tip={compact && draft.description ? draft.description : "The name shown in the list and the command palette"}
             title={compact ? draft.description : undefined}
@@ -289,26 +303,14 @@ function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => voi
             placeholder="Name this pipeline"
             onChange={(e) => useDraft.getState().setName(e.target.value)}
           />
-          {!compact && (
-            <input
-              className={styles.description}
-              aria-label="Description"
-              data-tip={draft.description || "A note for yourself about what this pipeline is for"}
-              title={draft.description}
-              value={draft.description}
-              maxLength={300}
-              placeholder="Add a description"
-              onChange={(e) => useDraft.getState().setDescription(e.target.value)}
-            />
-            )}
         </div>
-        {compact && (
-          <span className={styles.statusInline}>
-            <span data-tip="The kinds of files you can start this pipeline with">Takes: {describeAccepts(check.accepts)}</span>
+        <span className={styles.statusInline}>
+          <span className={styles.takes} data-tip="The kinds of files you can start this pipeline with">
+            Takes: {describeAccepts(check.accepts)}
             {" · "}
-            <span data-tip={check.ready ? "Every step is set up and its tools are installed" : missing.length > 0 ? "Install the missing tool packs to run this" : "Fix the problems listed to run this"} className={check.ready ? styles.ok : missing.length > 0 ? styles.warn : styles.bad}>● {status}</span>
           </span>
-        )}
+          <span data-tip={check.ready ? "Every step is set up and its tools are installed" : missing.length > 0 ? "Install the missing tool packs to run this" : "Fix the problems listed to run this"} className={check.ready ? styles.ok : missing.length > 0 ? styles.warn : styles.bad}>● {status}</span>
+        </span>
         <div className={styles.actions}>
           <IconButton size="sm" icon="undo-2" label="Undo" disabled={!canUndo} onClick={undo} />
           <IconButton size="sm" icon="redo-2" label="Redo" disabled={!canRedo} onClick={redo} />
@@ -327,8 +329,9 @@ function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => voi
             {saveState.kind === "saved" && "Saved"}
             {saveState.kind === "error" && <span className={styles.saveError}>Couldn&apos;t save: {saveState.message}</span>}
           </span>
+          {showNew && <IconButton size="sm" icon="plus" label="New pipeline" data-tip="Create a pipeline from a ready-made template or from scratch" onClick={onNew} />}
           <Tooltip label={blocked ? problem || "Fix the problems first" : "Run on files or links"} side="bottom">
-            <Button variant="primary" icon="play" disabled={blocked} onClick={() => void runNow()}>
+            <Button size="sm" variant="primary" icon="play" disabled={blocked} onClick={() => void runNow()}>
               Run…
             </Button>
           </Tooltip>
@@ -337,22 +340,30 @@ function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => voi
             tip="Duplicate or delete this pipeline"
             icon="ellipsis"
             variant="ghost"
+            size="sm"
             items={() => [
               { id: "duplicate", label: "Duplicate", icon: "copy", tip: "Make a copy of this pipeline to change without touching the original", onSelect: () => void duplicatePipeline() },
               { id: "delete", label: "Delete…", icon: "trash-2", tip: "Remove this pipeline; files from earlier runs stay", onSelect: () => setConfirmDelete(true) },
             ]}
           />
         </div>
-      </header>
+      </ToolHeader>
 
       <div className={cx(styles.scroll, mode === "graph" && styles.scrollGraph)}>
         {!compact && (
-        <div className={styles.status}>
-          <span data-tip="The kinds of files you can start this pipeline with">Takes: {describeAccepts(check.accepts)}</span>
-          <span data-tip={check.ready ? "Every step is set up and its tools are installed" : missing.length > 0 ? "Install the missing tool packs to run this" : "Fix the problems listed to run this"} className={cx(styles.statusDot, check.ready ? styles.ok : missing.length > 0 ? styles.warn : styles.bad)}>● {status}</span>
-        </div>
+          <input
+            className={styles.description}
+            aria-label="Description"
+            data-tip={draft.description || "A note for yourself about what this pipeline is for"}
+            title={draft.description}
+            value={draft.description}
+            maxLength={300}
+            placeholder="Add a description"
+            onChange={(e) => useDraft.getState().setDescription(e.target.value)}
+          />
         )}
 
+        {(pipelineProblems.length > 0 || missing.length > 0) && <div className={styles.banners}>
         {pipelineProblems.length > 0 && (
           <Banner tone="danger" title="This pipeline can't run yet">
             <ul className={styles.problemList}>
@@ -375,6 +386,7 @@ function EditorInner({ entry, onNew }: { entry: PipelineEntry; onNew?: () => voi
             {missing.join(", ")}
           </Banner>
         )}
+        </div>}
 
         {mode === "graph" ? (
           <GraphEditor

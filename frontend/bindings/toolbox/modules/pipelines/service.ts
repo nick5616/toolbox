@@ -91,6 +91,10 @@ export function List(): $CancellablePromise<core$0.PipelineEntry[] | null> {
     return $Call.ByID(2859373583);
 }
 
+export function OpenShape(): $CancellablePromise<$models.OpenStep> {
+    return $Call.ByID(2379844468);
+}
+
 /**
  * Remove deletes a finished run.
  */
@@ -118,6 +122,10 @@ export function Retry(runID: string): $CancellablePromise<core$0.PipelineRun> {
  */
 export function Run(id: string): $CancellablePromise<core$0.PipelineRun> {
     return $Call.ByID(297136448, id);
+}
+
+export function RunShape(): $CancellablePromise<$models.RunStep> {
+    return $Call.ByID(845460277);
 }
 
 /**
@@ -164,6 +172,10 @@ export function TableShape(): $CancellablePromise<$models.TableStep> {
  */
 export function Templates(): $CancellablePromise<core$0.PipelineTemplate[] | null> {
     return $Call.ByID(1650033346);
+}
+
+export function WaitShape(): $CancellablePromise<$models.WaitStep> {
+    return $Call.ByID(2700502619);
 }
 
 export function ZipShape(): $CancellablePromise<$models.ZipStep> {

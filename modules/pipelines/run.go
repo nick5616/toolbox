@@ -52,6 +52,10 @@ func (m *Module) Validate(inputs []string, options json.RawMessage) error {
 			return core.ValidationError("The chat step has no settings", nil)
 		}
 		return validateChatJob(*o.Chat)
+	case ActionRun:
+		return validateRunJob(o.Run)
+	case ActionOpen:
+		return validateOpenJob(o.Open)
 	case ActionTable:
 		t := o.Table
 		if t == nil {
@@ -121,6 +125,10 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 		return m.runRename(ctx, job, o)
 	case ActionChat:
 		return m.runChat(ctx, job, o)
+	case ActionRun:
+		return m.runSub(ctx, job, o)
+	case ActionOpen:
+		return m.runOpen(ctx, job, o)
 	case ActionTable:
 		return m.runTable(ctx, job, o)
 	case ActionZip:

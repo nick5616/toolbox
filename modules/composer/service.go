@@ -2,6 +2,8 @@ package composer
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"toolbox/core"
 )
@@ -59,6 +61,28 @@ func (s *Service) LoadImage(path string, maxDim int) (string, error) {
 func (s *Service) RemoveBackground(path string) (core.Job, error) {
 	return s.m.RemoveBackground(context.Background(), path)
 }
+
+// Defaults are the options of a fill.
+func (s *Service) Defaults() Options { return DefaultOptions() }
+
+// Enqueue fills a template (opts.ProjectID) with inputs, in order, and
+// renders it: one job.
+func (s *Service) Enqueue(inputs []string, opts Options) ([]core.Job, error) {
+	if s.m.cfg.Jobs == nil {
+		return nil, core.Errorf(core.CodeInternal, "Jobs aren't available")
+	}
+	raw, err := json.Marshal(opts)
+	if err != nil {
+		return nil, fmt.Errorf("marshal fill options: %w", err)
+	}
+	return s.m.cfg.Jobs.Submit(context.Background(), ModuleID, inputs, string(raw))
+}
+
+// StepShape carries the Fill a template step's option type into the bindings.
+func (s *Service) StepShape() StepOptions { return DefaultStepOptions() }
+
+// Slots lists the photo slots of a composition (the step editor).
+func (s *Service) Slots(id string) (SlotInfo, error) { return s.m.Slots(context.Background(), id) }
 
 // Aspects lists the canvas shapes with their 1× sizes.
 func (s *Service) Aspects() []AspectInfo { return Aspects() }

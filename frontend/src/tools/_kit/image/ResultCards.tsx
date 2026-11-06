@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, type KeyboardEvent } from "react";
-import { CompareSlider, EmptyState, Icon, IconButton, Spinner, cx, toast } from "@/components";
+import { CompareSlider, Icon, IconButton, Spinner, cx, toast } from "@/components";
 import { FileActions } from "@/tools/_kit/FileActions";
+import { useResultBehaviour } from "@/tools/_kit/ResultRow";
+import { EmptyLine } from "../EmptyLine";
 import { useThumb } from "./common";
 import styles from "./image.module.css";
 
@@ -120,6 +122,37 @@ function PreviewDialog({ item, onClose }: { item: ResultItem; onClose: () => voi
   );
 }
 
+/** One before/after card: draggable, double-click or Enter opens the file, like every result row. */
+function ResultCard({ item, onPreview }: { item: ResultItem; onPreview: (id: string | null) => void }) {
+  const { draggable, onDragStart, onDoubleClick, ...behaviour } = useResultBehaviour({ path: item.output, outputId: item.outputId, missing: item.missing });
+  // Only the header and the footer start a drag or open the file: the compare slider keeps its own drags.
+  const grip = { draggable, onDragStart, onDoubleClick };
+  return (
+      <article {...behaviour} className={styles.resultCard} aria-label={item.title}>
+        <div className={styles.cardHead} {...grip}>
+          <span className={styles.name} data-tip={item.output}>
+            {item.title}
+          </span>
+          <IconButton
+            icon="maximize-2"
+            size="sm"
+            label={`Enlarge ${item.title}`}
+            data-tip="Open a large before and after comparison"
+            onClick={() => onPreview(item.id)}
+          />
+        </div>
+        <Compare item={item} dim={800} />
+        <div className={styles.meta} {...grip}>
+          <span className={styles.metaText} data-tip="Size of the result and what was done">
+            {item.meta}
+          </span>
+          <IconButton icon="copy" size="sm" label="Copy path" data-tip="Copy the full path of the result file" onClick={() => void copyPath(item.output)} />
+          <FileActions outputId={item.outputId} path={item.output} disabled={item.missing} />
+        </div>
+      </article>
+  );
+}
+
 export interface ResultCardsProps {
   items: ResultItem[];
   preview: string | null;
@@ -130,35 +163,14 @@ export interface ResultCardsProps {
 /** Grid of before/after cards for finished image jobs, with a large preview dialog. */
 export function ResultCards({ items, preview, onPreview, empty }: ResultCardsProps) {
   if (items.length === 0) {
-    return <EmptyState icon="image" title={empty.title} body={empty.body} />;
+    return <EmptyLine title={empty.title} body={empty.body} />;
   }
   const open = items.find((i) => i.id === preview);
   return (
     <>
       <div className={styles.grid}>
         {items.map((item) => (
-          <article key={item.id} className={styles.resultCard} aria-label={item.title}>
-            <div className={styles.cardHead}>
-              <span className={styles.name} data-tip={item.output}>
-                {item.title}
-              </span>
-              <IconButton
-                icon="maximize-2"
-                size="sm"
-                label={`Enlarge ${item.title}`}
-                data-tip="Open a large before and after comparison"
-                onClick={() => onPreview(item.id)}
-              />
-            </div>
-            <Compare item={item} dim={800} />
-            <div className={styles.meta}>
-              <span className={styles.metaText} data-tip="Size of the result and what was done">
-                {item.meta}
-              </span>
-              <IconButton icon="copy" size="sm" label="Copy path" data-tip="Copy the full path of the result file" onClick={() => void copyPath(item.output)} />
-              <FileActions outputId={item.outputId} path={item.output} disabled={item.missing} />
-            </div>
-          </article>
+          <ResultCard key={item.id} item={item} onPreview={onPreview} />
         ))}
       </div>
       {open && <PreviewDialog item={open} onClose={() => onPreview(null)} />}

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, EmptyState, Icon, Section, ToolClickIn, cx } from "@/components";
+import { Badge, Button, Section, ToolClickIn, cx } from "@/components";
 import { LanguageField, ModelCards, SkipSilence, TaskField, useSpeechData } from "@/blocks/speech";
 import { FilesService, JobStatus, TranscribeService, TranscribeTask, type Language, type TranscribeModel } from "@/lib/api";
-import { formatBytes, formatDuration } from "@/lib/format";
+import { formatDuration } from "@/lib/format";
 import { useOrderedJobs, type JobView } from "@/state/jobs";
-import { FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
+import { EmptyLine, FileToolLayout, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
-import { FileActions } from "@/tools/_kit/FileActions";
+import { ResultRow } from "@/tools/_kit/ResultRow";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import shared from "@/tools/_kit/results.module.css";
 import {
@@ -110,19 +110,8 @@ function TranscriptGroup({
         {result.outputs.map((path) => {
           const out = job.outputs.find((o) => o.path === path);
           return (
-            <li key={path} className={cx(shared.row, out?.missing && shared.missing)}>
-              <Icon name="file-text" size={14} className={shared.icon} />
-              <span className={shared.name} data-tip={path}>
-                {basename(path)}
-              </span>
-              {out && (
-                <span className={shared.meta} data-tip="File size on disk">
-                  {formatBytes(out.sizeBytes)}
-                </span>
-              )}
-              <span className={shared.actions}>
-                <FileActions outputId={out?.id} path={path} disabled={out?.missing} />
-              </span>
+            <li key={path}>
+              <ResultRow path={path} outputId={out?.id} missing={out?.missing} name={basename(path)} sizeBytes={out?.sizeBytes} icon="file-text" />
             </li>
           );
         })}
@@ -219,7 +208,7 @@ export default function TranscribeView({ moduleId }: ToolViewProps) {
         results={
           <Section label="Results" tip="Finished transcripts with their files">
             {done.length === 0 ? (
-              <EmptyState icon="captions" title="No transcripts yet." body="Transcribe a file and its transcript appears here." />
+              <EmptyLine title="No transcripts yet." body="Transcribe a file and its transcript appears here." />
             ) : (
               done.map((j) => (
                 <TranscriptGroup key={j.id} job={j} languages={languages} onPreview={(path, title) => setPreview({ path, title })} />

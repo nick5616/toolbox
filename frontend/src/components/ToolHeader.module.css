@@ -1,0 +1,27 @@
+.inline,
+.inTopbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.inline {
+  /* Inline (embedded in a drawer): always narrow, so collapsible buttons may shrink. */
+  container: toolbar-compact / inline-size;
+  flex: none;
+  height: 44px;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.inTopbar {
+  flex: 1;
+  height: 100%;
+}
+
+/* The slot's own width decides: secondary `collapsible` buttons shrink to icons when it's narrow
+   (primary buttons always keep their label). */
+.inTopbar {
+  container: toolbar-compact / inline-size;
+}

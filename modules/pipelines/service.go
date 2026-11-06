@@ -84,3 +84,6 @@ func (s *Service) ChatShape() ChatStep     { return DefaultChat() }
 func (s *Service) TableShape() TableStep   { return DefaultTable() }
 func (s *Service) ZipShape() ZipStep       { return DefaultZip() }
 func (s *Service) CopyShape() CopyStep     { return DefaultCopy() }
+func (s *Service) RunShape() RunStep       { return DefaultRun() }
+func (s *Service) WaitShape() WaitStep     { return DefaultWait() }
+func (s *Service) OpenShape() OpenStep     { return DefaultOpen() }

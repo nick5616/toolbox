@@ -305,7 +305,7 @@ function Tracks({ project }: { project: NormalProject }) {
       toast({ title: "Drop sources on an unlocked video track", tone: "warn" });
       return;
     }
-    insertSources(info.paths, track.id, Math.max(0, msAtX(info.x)), dragWantsSourceLength() ? "source" : "fill-next", live.current.markers);
+    insertSources(info.paths, track.id, Math.max(0, msAtX(info.x)), (info.shiftKey ?? dragWantsSourceLength()) ? "source" : "fill-next", live.current.markers);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reads live state
   }, []);
   useSourceDropTarget(rootRef, onDrop);

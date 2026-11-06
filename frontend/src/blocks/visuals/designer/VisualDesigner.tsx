@@ -254,12 +254,12 @@ function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, t
           </div>
         )}
         {visible.map((t) => (
-          <ClickIn key={t.id} id={`vd-${t.id}`} icon={t.icon} title={t.label} summary={summary[t.id]} tip={TAB_TIP[t.id]}>
+          <ClickIn key={t.id} className={styles.railRow} id={`vd-${t.id}`} icon={t.icon} title={t.label} summary={summary[t.id]} tip={TAB_TIP[t.id]}>
             {bodies[t.id]}
           </ClickIn>
         ))}
         {facts.length > 0 && (
-          <ClickIn id="vd-why" icon="info" title="Why" summary={facts[0]} tip="What is driving the visuals at the playhead right now">
+          <ClickIn className={styles.railRow} id="vd-why" icon="info" title="Why" summary={facts[0]} tip="What is driving the visuals at the playhead right now">
             <WhyPanel show={show} />
           </ClickIn>
         )}

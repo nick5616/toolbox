@@ -18,6 +18,16 @@ export function stepIcons(template: PipelineTemplate, catalog: readonly StepType
 
 const FOCUSABLE = "button:not(:disabled)";
 
+/** The gallery's sections, in order (core.TemplateGroup*). A template with another group goes under the first. */
+export const TEMPLATE_GROUPS = ["Practical", "Just cool"] as const;
+
+/** Templates split into the gallery's sections, keeping their order; empty sections are left out. */
+export function groupTemplates(templates: readonly PipelineTemplate[]): { group: string; templates: PipelineTemplate[] }[] {
+  const out = TEMPLATE_GROUPS.map((group) => ({ group: group as string, templates: [] as PipelineTemplate[] }));
+  for (const t of templates) (out.find((g) => g.group === t.group) ?? out[0])?.templates.push(t);
+  return out.filter((g) => g.templates.length > 0);
+}
+
 /** The "New pipeline" dialog: a blank pipeline and the built-in templates (SPEC.md §11.2). */
 export function TemplateGallery({ open, onClose }: TemplateGalleryProps) {
   const titleId = useId();
@@ -44,6 +54,41 @@ export function TemplateGallery({ open, onClose }: TemplateGalleryProps) {
     setBusy(null);
     if (id) onClose();
   };
+
+  const card = (t: PipelineTemplate) => {
+    const needs = (t.packs ?? []).map((id) => packs[id]);
+    const names = (t.packs ?? []).map((id, i) => needs[i]?.name ?? id);
+    const missing = needs.some((p) => p !== undefined && p.state !== PackState.PackInstalled);
+    return (
+      <div key={t.id} className={styles.card}>
+        <button type="button" className={styles.main} disabled={busy !== null} onClick={() => void choose(t.id)} aria-label={t.pipeline.name} data-tip={missing ? `Create this pipeline; install the ${names.join(", ")} pack to run it` : "Create a pipeline from this template; you can change every step"}>
+          <span className={styles.cardHead}>
+            <Icon name={t.icon} size={18} className={styles.icon} />
+            <span className={styles.name}>{t.pipeline.name}</span>
+            {busy === t.id && <Spinner size={14} label="Creating" />}
+          </span>
+          <span className={styles.blurb}>{t.blurb}</span>
+          <span className={styles.steps} aria-hidden="true" data-tip="The tools this template uses, in order">
+            {stepIcons(t, catalog).map((icon, i) => (
+              <Icon key={i} name={icon} size={14} />
+            ))}
+          </span>
+        </button>
+        {names.length > 0 && (
+          <div className={styles.needs}>
+            <span className={cx(styles.chip, missing && styles.missing)} data-tip={missing ? "A tool pack this template uses is not installed yet" : "The tool packs this template uses are installed"}>Needs: {names.join(", ")} pack</span>
+            {missing && (
+              <Button size="sm" variant="ghost" data-tip="Open Settings to install the missing tool pack" onClick={openToolPacks}>
+                Install
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const sections = groupTemplates(templates);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") {
@@ -73,49 +118,29 @@ export function TemplateGallery({ open, onClose }: TemplateGalleryProps) {
             Cancel
           </Button>
         </div>
-        <div className={styles.grid}>
-          <div className={cx(styles.card, styles.blank)}>
-            <button type="button" className={styles.main} disabled={busy !== null} data-tip="Create an empty pipeline to build step by step" onClick={() => void choose(null)}>
-              <span className={styles.cardHead}>
-                <Icon name="plus" size={18} className={styles.icon} />
-                <span className={styles.name}>Blank pipeline</span>
-                {busy === "" && <Spinner size={14} label="Creating" />}
-              </span>
-              <span className={styles.blurb}>Start from a Downloader step and build your own.</span>
-            </button>
+        <div className={styles.scroll}>
+          <div className={styles.grid}>
+            <div className={cx(styles.card, styles.blank)}>
+              <button type="button" className={styles.main} disabled={busy !== null} data-tip="Create an empty pipeline to build step by step" onClick={() => void choose(null)}>
+                <span className={styles.cardHead}>
+                  <Icon name="plus" size={18} className={styles.icon} />
+                  <span className={styles.name}>Blank pipeline</span>
+                  {busy === "" && <Spinner size={14} label="Creating" />}
+                </span>
+                <span className={styles.blurb}>Start from a Downloader step and build your own.</span>
+              </button>
+            </div>
           </div>
-          {templates.map((t) => {
-            const needs = (t.packs ?? []).map((id) => packs[id]);
-            const names = (t.packs ?? []).map((id, i) => needs[i]?.name ?? id);
-            const missing = needs.some((p) => p !== undefined && p.state !== PackState.PackInstalled);
-            return (
-              <div key={t.id} className={styles.card}>
-                <button type="button" className={styles.main} disabled={busy !== null} onClick={() => void choose(t.id)} aria-label={t.pipeline.name} data-tip={missing ? `Create this pipeline; install the ${names.join(", ")} pack to run it` : "Create a pipeline from this template; you can change every step"}>
-                  <span className={styles.cardHead}>
-                    <Icon name={t.icon} size={18} className={styles.icon} />
-                    <span className={styles.name}>{t.pipeline.name}</span>
-                    {busy === t.id && <Spinner size={14} label="Creating" />}
-                  </span>
-                  <span className={styles.blurb}>{t.blurb}</span>
-                  <span className={styles.steps} aria-hidden="true" data-tip="The tools this template uses, in order">
-                    {stepIcons(t, catalog).map((icon, i) => (
-                      <Icon key={i} name={icon} size={14} />
-                    ))}
-                  </span>
-                </button>
-                {names.length > 0 && (
-                  <div className={styles.needs}>
-                    <span className={cx(styles.chip, missing && styles.missing)} data-tip={missing ? "A tool pack this template uses is not installed yet" : "The tool packs this template uses are installed"}>Needs: {names.join(", ")} pack</span>
-                    {missing && (
-                      <Button size="sm" variant="ghost" data-tip="Open Settings to install the missing tool pack" onClick={openToolPacks}>
-                        Install
-                      </Button>
-                    )}
-                  </div>
-                )}
+          {sections.map((sec) => (
+            <section key={sec.group} className={styles.section} aria-labelledby={`${titleId}-${sec.group.replace(/\s+/g, "-")}`}>
+              <h3 id={`${titleId}-${sec.group.replace(/\s+/g, "-")}`} className={styles.group}>
+                {sec.group}
+              </h3>
+              <div className={styles.grid}>
+                {sec.templates.map(card)}
               </div>
-            );
-          })}
+            </section>
+          ))}
         </div>
       </div>
     </div>

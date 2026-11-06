@@ -46,6 +46,29 @@ export function Analyze(projectID: string, req: $models.AnalyzeRequest): $Cancel
 }
 
 /**
+ * AssembleStepShape carries the "Assemble a video" step's option type (and its
+ * defaults) into the bindings.
+ */
+export function AssembleStepShape(): $CancellablePromise<$models.AssembleRequest> {
+    return $Call.ByID(2059225613);
+}
+
+/**
+ * BeatRecipes lists the auto-fill recipes the "Cut to the beat" step offers.
+ */
+export function BeatRecipes(): $CancellablePromise<string[] | null> {
+    return $Call.ByID(3575022661);
+}
+
+/**
+ * BeatStepShape carries the "Cut to the beat" step's option type (and its
+ * defaults) into the bindings.
+ */
+export function BeatStepShape(): $CancellablePromise<$models.BeatRequest> {
+    return $Call.ByID(3807029321);
+}
+
+/**
  * Create makes an empty edit.
  */
 export function Create(name: string, aspect: string, fps: number): $CancellablePromise<core$0.ProjectInfo> {

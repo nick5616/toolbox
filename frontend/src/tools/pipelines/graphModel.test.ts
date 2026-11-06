@@ -137,7 +137,7 @@ describe("connect", () => {
   });
 
   it("always allows the input, any-readers, check and chat", () => {
-    const steps = [step(A, "stems"), step(B, "pipelines.check", { from: "none" }), step(C, "pipelines.chat", { from: "none" })];
+    const steps = [step(A, "stems"), step(B, "pipelines.check", { from: "none" }), step(C, "llm-chat", { from: "none" })];
     const c = check(steps.map((s) => stepCheck(s.id, {}, [product("", [".mp3"])])));
     expect(connectReason(steps, c, CATALOG, INPUT_NODE, ALL_PORT, A)).toBe("");
     expect(connectReason(steps, c, CATALOG, A, ALL_PORT, B)).toBe("");

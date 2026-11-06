@@ -15,6 +15,17 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as core$0 from "../core/models.js";
 
 /**
+ * ClipboardFiles returns the files copied in Explorer/Finder (existing
+ * absolute paths only) or, when the clipboard holds an image instead, saves it
+ * as a PNG in the app's tmp folder and returns that path. Anything else, or a
+ * platform that can't read file lists, returns an empty list. It never writes
+ * to the clipboard.
+ */
+export function ClipboardFiles(): $CancellablePromise<string[] | null> {
+    return $Call.ByID(427645788);
+}
+
+/**
  * ImageDataURL returns a browser-displayable image file (jpg, png, webp,
  * gif, bmp; ≤ 20 MB) as a data URL, for thumbnails. The user already chose
  * the file; non-image files are never read.

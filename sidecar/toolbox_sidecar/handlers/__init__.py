@@ -13,6 +13,7 @@ from . import (  # noqa: F401
     stems,
     system,
     transcribe,
+    tts,
     upscale,
     viz,
 )

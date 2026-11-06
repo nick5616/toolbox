@@ -26,6 +26,14 @@ export function Defaults(): $CancellablePromise<$models.Options> {
 }
 
 /**
+ * DeleteMask removes a saved mask. Pipelines that use it show a problem until
+ * another mask is chosen.
+ */
+export function DeleteMask(id: string): $CancellablePromise<void> {
+    return $Call.ByID(3943105923, id);
+}
+
+/**
  * Erase writes maskPNG (base64 PNG, white = erase, the image's aspect
  * ratio) to the mask folder and queues the job.
  */
@@ -46,4 +54,35 @@ export function ModelStatus(): $CancellablePromise<$models.ModelInfo[] | null> {
  */
 export function ResultShape(): $CancellablePromise<$models.Result> {
     return $Call.ByID(268646486);
+}
+
+/**
+ * SaveMask keeps a painted mask (base64 PNG, white = erase) under a name, for
+ * the automatic mode (the pipeline step) to erase the same area from photos
+ * of the same shape.
+ */
+export function SaveMask(name: string, maskPNG: string): $CancellablePromise<$models.SavedMask> {
+    return $Call.ByID(3087112325, name, maskPNG);
+}
+
+/**
+ * SavedMaskImage returns a saved mask as "data:image/png;base64,…".
+ */
+export function SavedMaskImage(id: string): $CancellablePromise<string> {
+    return $Call.ByID(343257800, id);
+}
+
+/**
+ * SavedMasks lists the saved masks, newest first.
+ */
+export function SavedMasks(): $CancellablePromise<$models.SavedMask[] | null> {
+    return $Call.ByID(2140568992);
+}
+
+/**
+ * StepShape exists so the binding generator emits the pipeline step's
+ * options; it returns the defaults.
+ */
+export function StepShape(): $CancellablePromise<$models.StepOptions> {
+    return $Call.ByID(123681019);
 }

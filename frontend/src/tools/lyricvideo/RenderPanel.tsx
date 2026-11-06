@@ -1,6 +1,6 @@
 /**
- * The Render panel (formerly the Render step): a short exact preview from a
- * chosen start, then the whole video. Opened by the header's Render button.
+ * The Export panel (formerly the Render step): a short exact preview from a
+ * chosen start, then the whole video. Opened by the header's Export button.
  * It submits jobs, so it only opens inline.
  */
 import { useMemo } from "react";
@@ -86,7 +86,7 @@ export default function RenderPanel() {
           </label>
           <div className={styles.buttonRow}>
             <Button icon="play" variant="secondary" onClick={onPreview} loading={preview.busy} disabled={gated || busy} data-tip={blocker || (gated ? "The AI engine isn't installed yet" : busy ? "Wait for the current render to finish" : "Render 10 seconds from the chosen start so you can check the exact result")}>
-              Render 10 s preview
+              Preview 10 s
             </Button>
           </div>
           <RunStatus run={preview} runningLabel="Rendering the preview…" showResult={false} />
@@ -98,7 +98,7 @@ export default function RenderPanel() {
         <div className={styles.form}>
           <div className={styles.buttonRow}>
             <Button icon="film" onClick={onRender} loading={render.busy} disabled={gated || busy} data-tip={blocker || (gated ? "The AI engine isn't installed yet" : busy ? "Wait for the current render to finish" : "Render the whole video and save it to your Library")}>
-              Render video
+              Export video
             </Button>
             <span className={styles.muted} data-tip="An .lrc file with the line times is saved next to the video">Also saves the timings as a .lrc file.</span>
           </div>

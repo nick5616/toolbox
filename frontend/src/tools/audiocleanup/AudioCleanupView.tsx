@@ -503,6 +503,7 @@ export default function AudioCleanupView({ moduleId }: ToolViewProps) {
             columns={columns}
             rowKey={(r) => r.id}
             label="cleaned files"
+            rowFile={(r) => ({ path: r.output, outputId: r.outputId, missing: r.missing })}
             empty="No cleaned files yet. Cleaned audio appears here with its loudness before and after."
           />
         </Section>

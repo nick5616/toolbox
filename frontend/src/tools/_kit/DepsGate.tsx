@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { create } from "zustand";
 import { Banner, Button, toast } from "@/components";
-import { DepState, DepsService, PacksService, PackState } from "@/lib/api";
+import { ChatService, DepState, DepsService, PacksService, PackState } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { isOk, useDeps } from "@/state/deps";
 import { isActive, useJobs, type JobView } from "@/state/jobs";
@@ -14,6 +14,9 @@ export const AUDIO_ENGINE_ID = "audio-engine";
 export const AUDIO_ENGINE_JOB_MODULE = "system-audio-engine";
 export const EXIFTOOL_ID = "exiftool";
 export const EXIFTOOL_JOB_MODULE = "system-exiftool-update";
+
+export const FFMPEG_JOB_MODULE = "system-ffmpeg-install";
+const CHAT_MODULE_ID = "llm-chat";
 
 export const UPSCAYL_ID = "upscayl";
 export const UPSCALER_JOB_MODULE = "system-upscaler-install";
@@ -78,18 +81,27 @@ export function useExiftoolJob(): JobView | undefined {
   return useJobs((s) => Object.values(s.byId).find((j) => j.moduleId === EXIFTOOL_JOB_MODULE && isActive(j)));
 }
 
+/** The active FFmpeg install/update job, if any (stable reference). */
+export function useFfmpegJob(): JobView | undefined {
+  return useJobs((s) => Object.values(s.byId).find((j) => j.moduleId === FFMPEG_JOB_MODULE && isActive(j)));
+}
+
 /** The active upscaler install/update job, if any (stable reference). */
 export function useUpscalerJob(): JobView | undefined {
   return useJobs((s) => Object.values(s.byId).find((j) => j.moduleId === UPSCALER_JOB_MODULE && isActive(j)));
 }
 
-async function copyHint(text: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast({ title: "Install command copied" });
-  } catch {
-    toast({ title: "Couldn't copy to the clipboard", tone: "danger" });
-  }
+/**
+ * Local Chat is useless without a model, so installing its engine also starts
+ * the default model download (the same call Settings → Local Chat makes),
+ * unless a model is installed or already downloading.
+ */
+export async function installDefaultChatModel(): Promise<void> {
+  const models = (await ChatService.Catalog()) ?? [];
+  if (models.some((m) => m.installed && !m.ollama)) return;
+  const def = models.find((m) => m.isDefault && !m.ollama);
+  if (!def || def.installed || def.jobId) return;
+  useJobs.getState().upsert(await ChatService.DownloadModel(def.id));
 }
 
 /**
@@ -102,7 +114,10 @@ function PackButtons({ moduleId, requires }: { moduleId: string; requires: strin
   const needs = moduleNeeds(packs, moduleId, requires);
   const pack = needs.pack;
   if (!pack || pack.state === PackState.PackUnsupported || pack.state === PackState.PackInstalled) return null;
-  const packDisk = packSizes(packs, [pack.id]).byPack[pack.id]?.disk ?? 0;
+  const packSize = packSizes(packs, [pack.id]).byPack[pack.id];
+  const packDisk = packSize?.disk ?? 0;
+  // The pack is exactly what this tool needs: one button, not two.
+  const same = needs.disk === packDisk && needs.download === (packSize?.download ?? 0);
 
   const run = async (kind: "needs" | "pack") => {
     setBusy(kind);
@@ -114,6 +129,7 @@ function PackButtons({ moduleId, requires }: { moduleId: string; requires: strin
         for (const j of res.jobs ?? []) useJobs.getState().upsert(j);
         if (res.restart) await PacksService.Relaunch();
       }
+      if (moduleId === CHAT_MODULE_ID) await installDefaultChatModel();
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     } finally {
@@ -121,6 +137,23 @@ function PackButtons({ moduleId, requires }: { moduleId: string; requires: strin
     }
   };
   const withSize = (label: string, bytes: number) => (bytes > 0 ? `${label} (${formatSize(bytes)})` : label);
+  if (same) {
+    return (
+      <div className={styles.packActions}>
+        <Button
+          variant="primary"
+          size="sm"
+          icon="download"
+          loading={busy === "needs"}
+          disabled={busy !== ""}
+          data-tip={`Download and set up everything this tool needs; the ${pack.name} pack is the same set`}
+          onClick={() => void run("needs")}
+        >
+          {withSize("Install what this tool needs", needs.disk)}
+        </Button>
+      </div>
+    );
+  }
   return (
     <div className={styles.packActions}>
       <Button
@@ -151,11 +184,13 @@ function PackButtons({ moduleId, requires }: { moduleId: string; requires: strin
 /** Banners for missing/outdated dependencies with install/update actions. */
 export function DepsGate({ moduleId }: { moduleId: string }) {
   const requires = useRequires(moduleId);
+  const packs = usePacks((s) => s.list);
   const byId = useDeps((s) => s.byId);
   const loaded = useDeps((s) => s.list.length > 0);
   const job = useAudioEngineJob();
   const exifJob = useExiftoolJob();
   const upscalerJob = useUpscalerJob();
+  const ffmpegJob = useFfmpegJob();
   const [queuing, setQueuing] = useState(false);
 
   if (!loaded || !requires) return null;
@@ -176,6 +211,17 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
     setQueuing(true);
     try {
       useJobs.getState().upsert(await DepsService.UpdateExiftool());
+    } catch (e) {
+      toast({ title: toAppError(e).message, tone: "danger" });
+    } finally {
+      setQueuing(false);
+    }
+  };
+
+  const installFfmpeg = async () => {
+    setQueuing(true);
+    try {
+      useJobs.getState().upsert(await DepsService.InstallFFmpeg());
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     } finally {
@@ -277,25 +323,26 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
     } else if (id === "ffmpeg" || id === "ffprobe") {
       if (ffDone) continue;
       ffDone = true;
-      const hint = d?.installHint ?? "";
+      const busy = queuing || !!ffmpegJob;
       banners.push(
         <Banner
           key="ffmpeg"
           tone="warn"
           title="ffmpeg is required"
           action={
-            hint ? (
-              <Button size="sm" variant="secondary" icon="copy" data-tip="Copy the install command to paste in a terminal" onClick={() => void copyHint(hint)}>
-                Copy
-              </Button>
-            ) : undefined
+            <Button
+              size="sm"
+              variant="primary"
+              icon="download"
+              loading={busy}
+              data-tip="Download FFmpeg, the program that reads and writes audio and video; it runs only on this computer"
+              onClick={() => void installFfmpeg()}
+            >
+              Install FFmpeg
+            </Button>
           }
         >
-          {hint && (
-            <code className={styles.hint} data-tip="Install command for ffmpeg">
-              {hint}
-            </code>
-          )}
+          {busy && ffmpegJob?.message ? ffmpegJob.message : "The audio and video tools use FFmpeg to read and write files."}
         </Banner>,
       );
     } else {
@@ -312,10 +359,30 @@ export function DepsGate({ moduleId }: { moduleId: string }) {
     }
   }
   if (banners.length === 0) return null;
+  // One message, not buttons + a banner per dependency (polish rule 3): when
+  // everything missing is simply not installed and a pack offers it, a single
+  // banner names what's missing and carries the pack's install buttons.
+  const missing = requires.map((id) => byId[id]).filter((d) => !isOk(d));
+  const allPlainMissing = missing.every((d) => !d || d.state === DepState.DepMissing) && !job && !exifJob && !upscalerJob && !ffmpegJob;
+  if (allPlainMissing && packOffered(packs, moduleId, requires)) {
+    const names = missing.map((d) => d?.name ?? "").filter(Boolean);
+    const title = names.length === 1 ? `${names[0]} isn't installed` : names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]} aren't installed` : "This tool needs a download";
+    return (
+      <div className={styles.root}>
+        <Banner tone="warn" title={title} action={<PackButtons moduleId={moduleId} requires={requires} />} />
+      </div>
+    );
+  }
   return (
     <div className={styles.root}>
       <PackButtons moduleId={moduleId} requires={requires} />
       {banners}
     </div>
   );
+}
+
+/** Whether a pack can install what this module needs here (the same test PackButtons uses). */
+function packOffered(packs: ReturnType<typeof usePacks.getState>["list"], moduleId: string, requires: string[]): boolean {
+  const pack = moduleNeeds(packs, moduleId, requires).pack;
+  return !!pack && pack.state !== PackState.PackUnsupported && pack.state !== PackState.PackInstalled;
 }

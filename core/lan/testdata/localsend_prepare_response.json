@@ -1,0 +1,7 @@
+{
+  "sessionId": "mySessionId",
+  "files": {
+    "some file id": "someFileToken",
+    "text file id": "otherFileToken"
+  }
+}

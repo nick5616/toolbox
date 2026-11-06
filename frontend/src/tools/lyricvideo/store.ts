@@ -41,6 +41,12 @@ export type SlotMap<T> = Record<JobSlot, T>;
 /** The host window's audio player (a replica has none; its playback actions run on the host). */
 export const playerHandle: { current: MediaPlayerHandle | null } = { current: null };
 
+/** The parts of the document that record undo steps. */
+export type HistoryDomain = "lines" | "design";
+
+/** The host window's design history (the designer's), registered while the workspace is mounted. */
+export const designHandle: { current: { undo(): void; redo(): void } | null } = { current: null };
+
 type Setter<T> = (v: T | ((prev: T) => T)) => void;
 
 const NO_IDS: SlotMap<string> = { gen: "", lrc: "", preview: "", render: "" };
@@ -57,6 +63,13 @@ export interface LyricVideoState {
   /** The sheet and its undo history; `rows`, `canUndo` and `canRedo` are what the windows share. */
   history: History<Row[]>;
   rows: Row[];
+  /**
+   * One undo history for the whole document: `journal` lists, oldest first,
+   * which part (the lines or the design) each undo step belongs to; undo
+   * takes the last one back. `canUndo`/`canRedo` are what the windows share.
+   */
+  journal: HistoryDomain[];
+  journalFuture: HistoryDomain[];
   canUndo: boolean;
   canRedo: boolean;
   matched: number | null;
@@ -127,6 +140,9 @@ export interface LyricVideoState {
   clearJobs(): void;
   // sheet
   dispatch(a: EditorAction): void;
+  /** The design recorded an undo step / forgot its history (the host's design history reports here). */
+  noteStep(domain: HistoryDomain): void;
+  dropDomain(domain: HistoryDomain): void;
   resetSheet(rows: Row[]): void;
   select(id: string): void;
   setStart(id: string, ms: number): void;
@@ -149,8 +165,32 @@ export interface LyricVideoState {
   reset(): void;
 }
 
-function sheet(h: History<Row[]>): Pick<LyricVideoState, "history" | "rows" | "canUndo" | "canRedo"> {
-  return { history: h, rows: h.present, canUndo: h.past.length > 0, canRedo: h.future.length > 0 };
+function sheet(h: History<Row[]>): Pick<LyricVideoState, "history" | "rows"> {
+  return { history: h, rows: h.present };
+}
+
+function flags(journal: HistoryDomain[], future: HistoryDomain[]): Pick<LyricVideoState, "journal" | "journalFuture" | "canUndo" | "canRedo"> {
+  return { journal, journalFuture: future, canUndo: journal.length > 0, canRedo: future.length > 0 };
+}
+
+/**
+ * The patch for a sheet that changed by an edit or a reset (not undo/redo): a
+ * new undo step is recorded in the journal; a reset forgets the lines' steps.
+ */
+function sheetPatch(s: Pick<LyricVideoState, "history" | "journal" | "journalFuture">, h: History<Row[]>): Partial<LyricVideoState> {
+  const prev = s.history.past;
+  let journal = s.journal;
+  let future = s.journalFuture;
+  if (h.past !== prev) {
+    if (h.past.length === 0 && prev.length > 0) {
+      journal = journal.filter((d) => d !== "lines");
+      future = future.filter((d) => d !== "lines");
+    } else if (h.past.length > 0 && h.past.length >= prev.length) {
+      journal = [...journal, "lines"];
+      future = [];
+    }
+  }
+  return { ...sheet(h), ...flags(journal, future) };
 }
 
 function initial() {
@@ -160,6 +200,7 @@ function initial() {
     text: "",
     lyricsPath: "",
     ...sheet(newHistory<Row[]>([])),
+    ...flags([], []),
     matched: null as number | null,
     noLyrics: false,
     hasInstrumental: false,
@@ -194,7 +235,7 @@ function apply<T>(v: T | ((p: T) => T), prev: T): T {
 
 export const useLyricVideo = create<LyricVideoState>((set, get) => {
   const edit = (fn: (r: Row[]) => Row[], key?: string) =>
-    set((s) => sheet(editorReducer(s.history, { type: "edit", fn, key, at: Date.now() })));
+    set((s) => sheetPatch(s, editorReducer(s.history, { type: "edit", fn, key, at: Date.now() })));
   const slotSet = <T,>(key: "jobIds" | "submitting" | "jobErrors", slot: JobSlot, v: T) =>
     set((s) => ({ [key]: { ...(s[key] as SlotMap<T>), [slot]: v } }) as unknown as Partial<LyricVideoState>);
 
@@ -210,7 +251,7 @@ export const useLyricVideo = create<LyricVideoState>((set, get) => {
         songPath: path,
       }),
     requestSong: (path) => {
-      if (get().canUndo) set({ pendingSong: path });
+      if (get().history.past.length > 0) set({ pendingSong: path });
       else get().applySong(path);
     },
     resolvePendingSong: (accept) => {
@@ -243,8 +284,14 @@ export const useLyricVideo = create<LyricVideoState>((set, get) => {
     setJobError: (slot, e) => slotSet("jobErrors", slot, e),
     clearJobs: () => set({ jobIds: NO_IDS, submitting: NO_BUSY, jobErrors: NO_ERRORS }),
 
-    dispatch: (a) => set((s) => sheet(editorReducer(s.history, a))),
-    resetSheet: (rows) => set({ ...sheet(newHistory(rows)), selectedId: "", playheadMs: 0 }),
+    dispatch: (a) => {
+      if (a.type === "undo") get().undo();
+      else if (a.type === "redo") get().redo();
+      else set((s) => sheetPatch(s, editorReducer(s.history, a)));
+    },
+    resetSheet: (rows) => set((s) => ({ ...sheetPatch(s, newHistory(rows)), selectedId: "", playheadMs: 0 })),
+    noteStep: (domain) => set((s) => flags([...s.journal, domain], [])),
+    dropDomain: (domain) => set((s) => flags(s.journal.filter((d) => d !== domain), s.journalFuture.filter((d) => d !== domain))),
     select: (selectedId) => set({ selectedId }),
     setStart: (id, ms) => edit((r) => setLineStart(r, id, ms), `start:${id}`),
     nudge: (id, d) => edit((r) => nudgeLine(r, id, d), `nudge:${id}`),
@@ -268,8 +315,37 @@ export const useLyricVideo = create<LyricVideoState>((set, get) => {
       set({ selectedId: neighbour?.id ?? "" });
     },
     shiftAll: (d) => edit((r) => shiftRows(r, d)),
-    undo: () => get().dispatch({ type: "undo" }),
-    redo: () => get().dispatch({ type: "redo" }),
+    // One history: the last step taken, whichever part of the document it changed.
+    undo: () => {
+      const s = get();
+      const d = s.journal[s.journal.length - 1];
+      if (!d) return;
+      const journal = s.journal.slice(0, -1);
+      if (d === "design") {
+        const design = designHandle.current;
+        if (!design) return set(flags(journal, s.journalFuture));
+        set(flags(journal, [d, ...s.journalFuture]));
+        design.undo();
+        return;
+      }
+      const h = editorReducer(s.history, { type: "undo" });
+      set({ ...sheet(h), ...flags(journal, [d, ...s.journalFuture]) });
+    },
+    redo: () => {
+      const s = get();
+      const d = s.journalFuture[0];
+      if (!d) return;
+      const future = s.journalFuture.slice(1);
+      if (d === "design") {
+        const design = designHandle.current;
+        if (!design) return set(flags(s.journal, future));
+        set(flags([...s.journal, d], future));
+        design.redo();
+        return;
+      }
+      const h = editorReducer(s.history, { type: "redo" });
+      set({ ...sheet(h), ...flags([...s.journal, d], future) });
+    },
 
     seek: (ms) => {
       set({ playheadMs: ms });

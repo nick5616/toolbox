@@ -12,6 +12,7 @@ import (
 	"toolbox/core/media"
 	"toolbox/core/projectdocs"
 	"toolbox/core/sidecar"
+	"toolbox/core/viz"
 )
 
 // ModuleID is the Photo Composer's module ID.
@@ -35,10 +36,12 @@ type Config struct {
 	Outputs     core.OutputStore
 	Emitter     core.Emitter
 	LibraryDir  func() string
+	Broker      *viz.RenderBroker // "Fill a template" renders in the main window through it
 }
 
-// Module is the Photo Composer. It runs no jobs (JobLess); background
-// removal is a Background Remover job.
+// Module is the Photo Composer. Interactively it runs no jobs (background
+// removal is a Background Remover job); its one job is "Fill a template", a
+// pipeline step (fill.go, pipeline.go).
 type Module struct {
 	cfg  Config
 	docs *projectdocs.Docs
@@ -63,16 +66,10 @@ func (m *Module) Descriptor() core.Descriptor {
 		Status:       core.StatusReady,
 		Accepts:      core.Accepts{Extensions: slices.Clone(media.ImageExtensions())},
 		Recommends:   []string{sidecar.DepID},
-		OutputSubdir: "Compositions", Order: 12, JobLess: true, NotAStep: true,
+		OutputSubdir: "Compositions", Order: 12, MaxConcurrent: 1,
 		Parts: []string{"bg-remover", "object-eraser", "upscaler"},
 	}
 }
-
-// Validate implements core.Module.
-func (m *Module) Validate([]string, json.RawMessage) error { return core.ErrJobLess }
-
-// Run implements core.Module.
-func (m *Module) Run(context.Context, *core.JobContext) error { return core.ErrJobLess }
 
 // Docs gives other modules (Post Builder) read access to compositions.
 func (m *Module) Docs() *projectdocs.Docs { return m.docs }

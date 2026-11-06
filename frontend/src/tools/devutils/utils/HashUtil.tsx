@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, DropZone, FileList, Switch, TextArea, TextField, toast } from "@/components";
+import { Badge, Button, DropZone, FileList, Switch, TextArea, TextField, toast, splitPath } from "@/components";
 import { DevUtilsService, JobStatus } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { isActive, useOrderedJobs } from "@/state/jobs";
-import { useFileInputs } from "@/tools/_kit";
+import { FailedJobs, useFileInputs } from "@/tools/_kit";
 import { mapInputErrors } from "@/tools/_kit/enqueue";
 import { ALGO_LABEL, HASH_ALGOS, matchingAlgo, parseHashResult, type HashAlgo } from "./hash.logic";
 import { CopyButton, useDebounced } from "./shared";
@@ -68,7 +68,7 @@ export default function HashUtil() {
     const paths = inputs.files.map((f) => f.path);
     setRunning(true);
     try {
-      await DevUtilsService.Enqueue(paths, { algorithms: algos });
+      await DevUtilsService.Enqueue(paths, { action: "", format: "", encoding: "", name: "", algorithms: algos });
       setInputErrors({});
       inputs.clear();
     } catch (e) {
@@ -148,19 +148,21 @@ export default function HashUtil() {
         </div>
       </div>
 
+      <FailedJobs moduleId={DEV_UTILS_ID} />
+
       {latest && (
         <div className={styles.col}>
-          <span className={styles.label}>Latest file hashes</span>
+          <span className={styles.label}>Results</span>
           {latest.map((f) => {
             const hit = matchingAlgo(f.hashes, compare);
             return (
               <div key={f.path} className={styles.col}>
                 <div className={styles.row}>
-                  <span className={styles.mono}>{f.path}</span>
+                  <span className={styles.mono} data-tip={f.path}>{splitPath(f.path)[1]}</span>
                   <Badge tip="File size">{formatBytes(f.size)}</Badge>
                   {compareHit && <Badge tone={hit ? "ok" : "neutral"} tip={hit ? "One of this file's hashes equals the one you pasted" : "None of this file's hashes equal the one you pasted"}>{hit ? `Matches ${ALGO_LABEL[hit as HashAlgo] ?? hit}` : "No match"}</Badge>}
                 </div>
-                <table className={styles.table} aria-label={`Hashes of ${f.path}`}>
+                <table className={styles.table} aria-label={`Hashes of ${splitPath(f.path)[1]}`}>
                   <tbody>
                     {shownAlgos
                       .filter((a) => a in f.hashes)

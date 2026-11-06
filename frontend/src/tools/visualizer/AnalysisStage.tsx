@@ -35,6 +35,7 @@ function StageIcon({ state }: { state: StageState }) {
 export default function AnalysisStage() {
   const input = useVisualizer((s) => s.input);
   const options = useVisualizer((s) => s.analyze);
+  const restored = useVisualizer((s) => s.restored);
   const run = useAnalyzeRun();
   const block = useAnalysisBlock();
   const media = useMediaSource(input);
@@ -45,7 +46,8 @@ export default function AnalysisStage() {
   // The file is read first (the probe decides audio or video), then the job starts by itself.
   const ready = !!input && !block.reason && media.status !== "loading";
   useEffect(() => {
-    if (started.current || !ready || useVisualizer.getState().analysis) return;
+    // A source that came back from the last session waits for the Analyze button.
+    if (started.current || !ready || useVisualizer.getState().analysis || useVisualizer.getState().restored) return;
     started.current = true;
     setBegan(true);
     void run.start();
@@ -54,7 +56,34 @@ export default function AnalysisStage() {
 
   const openOptions = () => open(panelDrawerId("analysis"));
 
+  const analyseNow = () => {
+    useVisualizer.setState({ restored: false });
+    started.current = true;
+    setBegan(true);
+    void run.start();
+  };
+
   if (!began && !run.job && !run.error) {
+    if (restored && !block.reason) {
+      return (
+        <div className={styles.body} data-testid="analysis-stage">
+          <div className={styles.box} role="status">
+            <div className={styles.head}>
+              <span>Ready to analyse</span>
+            </div>
+            <div className={styles.msg}>This is the song from last time. Nothing has been analysed yet.</div>
+            <div className={styles.footer}>
+              <Button variant="ghost" icon="audio-lines" onClick={openOptions} data-tip="Choose where the words come from and what to analyse">
+                Analysis options
+              </Button>
+              <Button variant="primary" disabled={!ready} onClick={analyseNow} data-tip="Analyse the song so the design can react to it">
+                Analyze
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className={styles.body} data-testid="analysis-stage">
         {block.reason ? (

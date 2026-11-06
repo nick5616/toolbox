@@ -220,7 +220,7 @@ describe("RedactView", () => {
 
   it("offers only the automatic path for HEIC photos", async () => {
     await load(["/photo.heic"]);
-    expect((await screen.findByRole("button", { name: "Find faces and plates" })).hasAttribute("disabled")).toBe(true);
+    expect((await screen.findByRole("button", { name: "Find faces and plates" })).getAttribute("aria-disabled")).toBe("true");
     expect(screen.getByText(/HEIC photos can't be previewed here/)).toBeTruthy();
     expect((screen.getByRole("button", { name: "Redact without review" }) as HTMLButtonElement).disabled).toBe(false);
   });

@@ -29,9 +29,8 @@
   gap: 2px;
   box-sizing: border-box;
   width: 56px;
-  padding: var(--space-2) 0;
+  padding: var(--space-1) 0;
   overflow: hidden;
-  border-right: 1px solid var(--border);
 }
 
 .railItem {
@@ -69,6 +68,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  min-height: 32px;
+  padding: 0 var(--space-2);
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -91,15 +92,9 @@
   min-height: 0;
 }
 
+/* The header lives in the shell's top bar; this only places the inline fallback. */
 .studioHeader {
   grid-area: header;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  height: 44px;
-  padding: 0 var(--space-3);
-  border-bottom: 1px solid var(--border);
 }
 
 .studioTitle {
@@ -143,7 +138,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--line);
 }
 
 .studioBottom {
@@ -152,5 +147,5 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--line);
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Banner, Button, ClickIn, ClickInHost, EmptyState, toast, useClickIn, type SelectOption } from "@/components";
+import { ToolHeader } from "@/components/ToolHeader";
 import {
   ChatBackend,
   ChatServerState,
@@ -269,6 +270,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
     onSearch: setSearch,
     onSelect: (id) => void select(id),
     onNew: newChat,
+    newDisabled: noModel,
     onRename: (id, t) => void rename(id, t),
     onDelete: (id) => void remove(id),
     onExport: (id) => void exportChat(id),
@@ -291,7 +293,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
       )}
       <section className={styles.main} aria-label="Chat">
         {!noModel && (
-          <header className={styles.topbar}>
+          <ToolHeader className={styles.headerBar} aria-label="Chat">
             <ChatSettingsDrawer
               modelId={modelId}
               modelOptions={modelOptions}
@@ -301,7 +303,7 @@ export default function ChatView({ moduleId }: ToolViewProps) {
               onModel={(v) => void changeModel(v)}
               onSavePrompt={savePrompt}
             />
-          </header>
+          </ToolHeader>
         )}
         <div className={styles.gate}>
           <DepsGate moduleId={moduleId} />
@@ -316,11 +318,10 @@ export default function ChatView({ moduleId }: ToolViewProps) {
         {seed && <ContextCard seed={seed} onRemove={messages.length === 0 ? () => setSeed(null) : undefined} />}
         {noModel && modelsLoaded ? (
           <div className={styles.empty}>
-            <EmptyState
-              icon="message-square"
-              title="Download a model to start chatting"
-              body="Models run on this computer. Nothing you write leaves it."
-            />
+            <div className={styles.emptyHead}>
+              <h2 className={styles.emptyTitle}>Download a model to start chatting</h2>
+              <p className={styles.emptyBody}>Models run on this computer. Nothing you write leaves it.</p>
+            </div>
             <ModelCards models={models} onChanged={() => void loadModels()} />
           </div>
         ) : messages.length === 0 ? (

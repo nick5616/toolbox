@@ -24,6 +24,9 @@ type PlanForWorker struct {
 	Seed     int64          `json:"seed"`
 	Kind     string         `json:"kind"` // "show" | "edit"
 	Edit     *workerEdit    `json:"edit,omitempty"`
+
+	Composition *CompositionPlan `json:"composition,omitempty"`
+	Recipe      *RecipePlan      `json:"recipe,omitempty"`
 }
 
 type workerEdit struct {
@@ -76,6 +79,19 @@ func buildWorkerPlan(plan RenderPlan, urlFor func(string) (string, error)) (Plan
 		return w, fmt.Errorf("image url: %w", err)
 	}
 	w.Kind = "show"
+	switch {
+	case plan.Composition != nil:
+		w.Kind = "composition"
+		c := *plan.Composition
+		w.Composition = &c
+	case plan.Recipe != nil:
+		w.Kind = "recipe"
+		r := *plan.Recipe
+		if r.Sources == nil {
+			r.Sources = []RecipeSource{}
+		}
+		w.Recipe = &r
+	}
 	if plan.Edit != nil {
 		w.Kind = "edit"
 		e := &workerEdit{ProjectJSON: plan.Edit.ProjectJSON, Streams: map[string]workerEditStream{}, Images: map[string]string{}}
@@ -123,6 +139,9 @@ func writePlan(dir string, plan RenderPlan, urlFor func(string) (string, error))
 // plannedFrames mirrors render.worker.ts: round((end-start)/1000*fps), at
 // least 1; an unset end means the analysed duration.
 func plannedFrames(plan RenderPlan) int {
+	if plan.hostKind() != hostStream {
+		return 1 // a still or a document
+	}
 	end := plan.EndMs
 	if end <= plan.StartMs {
 		end = plan.Analysis.Summary.DurationMs

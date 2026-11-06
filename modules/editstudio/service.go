@@ -335,6 +335,17 @@ func (s *Service) ListFolder(dir string) ([]string, error) {
 // Fonts lists the fonts offered for captions.
 func (s *Service) Fonts() []string { return media.Fonts() }
 
+// AssembleStepShape carries the "Assemble a video" step's option type (and its
+// defaults) into the bindings.
+func (s *Service) AssembleStepShape() AssembleRequest { return DefaultAssembleRequest() }
+
+// BeatStepShape carries the "Cut to the beat" step's option type (and its
+// defaults) into the bindings.
+func (s *Service) BeatStepShape() BeatRequest { return DefaultBeatRequest() }
+
+// BeatRecipes lists the auto-fill recipes the "Cut to the beat" step offers.
+func (s *Service) BeatRecipes() []string { return slices.Clone(BeatRecipes) }
+
 // ResultShape exists so the binding generator emits Result.
 func (s *Service) ResultShape() Result { return Result{} }
 

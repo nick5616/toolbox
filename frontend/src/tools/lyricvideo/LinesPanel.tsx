@@ -33,8 +33,6 @@ function TimingProgress() {
 
 export default function LinesPanel() {
   const rows = useLyricVideo((s) => s.rows);
-  const canUndo = useLyricVideo((s) => s.canUndo);
-  const canRedo = useLyricVideo((s) => s.canRedo);
   const selectedId = useLyricVideo((s) => s.selectedId);
   const tapIndex = useLyricVideo((s) => s.tapIndex);
   const playheadMs = useLyricVideo((s) => s.playheadMs);
@@ -68,8 +66,6 @@ export default function LinesPanel() {
       <div className={styles.linesTools}>
         <IconButton size="sm" icon="plus" label="Insert line" data-tip="Add a new line after the selected one" disabled={tapping} onClick={() => st().insertLine()} />
         <IconButton size="sm" icon="trash-2" label="Delete line" data-tip="Delete the selected line" disabled={!rows.some((r) => r.id === selectedId) || tapping} onClick={() => st().deleteSelected()} />
-        <IconButton size="sm" icon="undo-2" label="Undo" data-tip="Undo the last lyric edit" disabled={!canUndo} onClick={() => st().undo()} />
-        <IconButton size="sm" icon="redo-2" label="Redo" data-tip="Redo the edit you just undid" disabled={!canRedo} onClick={() => st().redo()} />
         <ClickIn variant="icon" icon="clock" title="Shift timing" tip="Move every line earlier or later by the same amount to fix a constant offset" width={320}>
           <span className={oldStyles.shiftGroup} style={{ padding: "var(--space-4)" }} data-tip="Move every line earlier or later by the same amount to fix a constant offset">
             <IconButton size="sm" icon="minus" label="Shift all earlier" data-tip="Move every line earlier by the amount in the box (100 ms if empty)" disabled={!hasRows || tapping} onClick={() => applyShift(-1)} />
@@ -100,7 +96,8 @@ export default function LinesPanel() {
         {!replica && (
           <MenuButton
             label="More"
-            icon="chevron-down"
+            icon="ellipsis"
+            variant="ghost"
             size="sm"
             items={() => [{ id: "lrc", label: "Export .lrc", tip: "Save the timed lyrics as an .lrc file you can use in music players", icon: "file-text", disabled: !songPath || !hasRows || !!issues.blocker || lrc.busy, onSelect: exportLrc }]}
           />

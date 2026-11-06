@@ -6,17 +6,21 @@
   background: var(--bg-app);
 }
 
+/* The tool's header lives in the shell's top bar (ToolHeader). */
 .bar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-6);
-  border-bottom: 1px solid var(--line);
+  gap: var(--space-1);
 }
 
-.pickerRow {
-  width: clamp(180px, 30vw, 280px);
+.bar .pickerRow {
+  width: auto;
+  min-height: 28px;
+  max-width: 280px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.bar .pickerRow:hover {
+  background: var(--bg-hover);
 }
 
 .picker {
@@ -70,7 +74,7 @@
   flex: 1;
   min-width: 0;
   overflow-y: auto;
-  padding: var(--space-5) var(--space-6);
+  padding: var(--space-4);
 }
 
 .note {
@@ -83,7 +87,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  max-width: 960px;
+}
+
+/* Inputs sit on an inset background, not in a border. */
+.util textarea,
+.util input[type="text"],
+.util input:not([type]) {
+  border-color: transparent;
+  background: var(--bg-inset);
 }
 
 .cols {
@@ -125,7 +136,6 @@
   margin: 0;
   padding: var(--space-3);
   min-height: var(--control-h);
-  border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: var(--bg-inset);
   color: var(--fg);
@@ -256,7 +266,6 @@
 }
 
 .diffBox {
-  border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: var(--bg-inset);
   max-height: 480px;

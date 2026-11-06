@@ -35,7 +35,7 @@ describe("editorModel", () => {
     expect(first).toMatchObject({ type: "downloader", from: "input", manual: false, optionsJson: '{"format":"video"}', keep: false });
     const eraser = newStep(type("object-eraser"), [], undefined, 0);
     expect(eraser).toMatchObject({ manual: true, optionsJson: "{}", autoContinue: true });
-    const chat = newStep(type("pipelines.chat"), [first], undefined, 1);
+    const chat = newStep(type("llm-chat"), [first], undefined, 1);
     expect(chat.from).toBe("none");
   });
 

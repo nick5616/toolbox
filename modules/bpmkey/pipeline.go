@@ -28,7 +28,7 @@ func (m *Module) DescribeStep(options json.RawMessage) (core.StepInfo, error) {
 	return core.StepInfo{
 		Accepts:  m.Descriptor().Accepts,
 		Produces: []core.StepProduct{},
-		Vars:     []core.StepVar{{Name: "bpm", Label: "BPM"}, {Name: "bpm_exact", Label: "BPM (exact)"}, {Name: "key", Label: "Key"}, {Name: "key_short", Label: "Key (short)"}, {Name: "camelot", Label: "Camelot"}},
+		Vars:     []core.StepVar{{Name: "bpm", Label: "BPM", Type: core.ValueNumber}, {Name: "bpm_exact", Label: "BPM (exact)", Type: core.ValueNumber}, {Name: "key", Label: "Key", Type: core.ValueText}, {Name: "key_short", Label: "Key (short)", Type: core.ValueText}, {Name: "camelot", Label: "Camelot", Type: core.ValueText}},
 		Summary:  "BPM & Key",
 	}, nil
 }

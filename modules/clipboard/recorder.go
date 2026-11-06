@@ -229,6 +229,8 @@ func (h *History) handle(ctx context.Context, c change) {
 	if inserted {
 		h.prune(ctx)
 	}
+	stored.Hash = item.Hash // the store doesn't return the dedupe key
+	h.notifyRecorded(stored)
 }
 
 // retention prunes on start, hourly and when retention settings change.

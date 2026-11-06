@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Button, ClickInHost, DropZone, FileList, Icon, Section, ToolClickIn, cx } from "@/components";
 import { PdfAction, PdfService } from "@/lib/api";
+import { useHandoffAction } from "@/lib/embed";
 import { formatBytes } from "@/lib/format";
 import { JobRow } from "@/shell/JobRow";
 import { isActive } from "@/state/jobs";
@@ -71,6 +72,12 @@ export default function PdfView({ moduleId }: ToolViewProps) {
     setUi((u) => ({ ...u, action: intent }));
     usePdfIntent.getState().clear();
   }, [intent, loaded, setUi]);
+
+  // Handoff action ("compress"): preselect it; unknown values are ignored.
+  useHandoffAction(moduleId, loaded, (a) => {
+    const known = ACTIONS.find((x) => x.id === a);
+    if (known) setUi((u) => ({ ...u, action: known.id }));
+  });
 
   // Route dropped files to an action that fits them.
   const fileKey = inputs.files.map((f) => f.path).join("\n");
@@ -170,16 +177,19 @@ export default function PdfView({ moduleId }: ToolViewProps) {
             </button>
           ))}
         </div>
-        <ToolClickIn
-          host={moduleId}
-          module="ocr"
-          variant="icon"
-          icon="scan-text"
-          title="Make searchable"
-          inputs={pdfPaths}
-          tip="Read the text of scanned PDFs so you can search and select it (opens OCR here)"
-          disabledReason={pdfPaths.length === 0 ? "Add a PDF first" : undefined}
-        />
+        <div className={styles.railOcr}>
+          <ToolClickIn
+            host={moduleId}
+            module="ocr"
+            variant="icon"
+            icon="scan-text"
+            title="Make searchable"
+            inputs={pdfPaths}
+            tip="Read the text of scanned PDFs so you can search and select it (opens OCR here)"
+            disabledReason={pdfPaths.length === 0 ? "Add a PDF first" : undefined}
+          />
+          <span className={styles.railOcrLabel}>Make searchable</span>
+        </div>
         </div>
 
         <div className={styles.main}>
@@ -206,7 +216,7 @@ export default function PdfView({ moduleId }: ToolViewProps) {
               <div data-tip={meta.input === "image" ? "Drag images here from your file manager" : "Drag PDF files here from your file manager"}>
               <DropZone
                 id={`tool-drop:${moduleId}`}
-                label={meta.input === "image" ? "Drop images here or Add files…" : "Drop PDFs here or Add files…"}
+                label={meta.input === "image" ? "Drop images here" : "Drop PDFs here"}
               >
                 <Button size="sm" variant="secondary" icon="plus" data-tip="Open a file picker" onClick={() => void inputs.pick()}>
                   Add files…

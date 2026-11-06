@@ -50,6 +50,14 @@ type Config struct {
 	// ProtectedDirs are folders a watch folder may not be inside (the support
 	// and tools directories). Optional.
 	ProtectedDirs []string
+
+	// TmpDir is <support>/tmp; text copied to the clipboard becomes a .txt in
+	// <TmpDir>/clipboard-runs for the run it starts. Optional: without it a
+	// text trigger can't start runs.
+	TmpDir string
+	// ClipboardOn reports whether clipboard recording is on right now. The
+	// "When I copy…" trigger fires only while it is. Optional: nil = never.
+	ClipboardOn func() bool
 }
 
 // builtin is a step type registered by modules/pipelines.
@@ -64,6 +72,7 @@ type Runner struct {
 
 	mu        sync.Mutex
 	builtins  []builtin
+	aliases   map[string]string // old step type ID -> its replacement
 	needsYou  func(total int, firstRunName string)
 	started   bool
 	stopped   bool
@@ -115,6 +124,7 @@ func New(cfg Config) *Runner {
 	}
 	return &Runner{
 		cfg:           cfg,
+		aliases:       map[string]string{},
 		lastRun:       map[string]core.RunBrief{},
 		watchMsg:      map[string]string{},
 		inbox:         make(chan func(), 64),
@@ -150,6 +160,16 @@ func (r *Runner) RegisterBuiltin(t core.StepType, a core.Chainable) error {
 	t.Builtin = true
 	r.builtins = append(r.builtins, builtin{t: t, a: a})
 	return nil
+}
+
+// RegisterAlias lets saved pipelines and runs that use the step type old keep
+// working after its type became canonical (Local Chat's step was the built-in
+// "pipelines.chat"). The alias is not listed in the catalogue, and saving a
+// pipeline rewrites it to the canonical ID.
+func (r *Runner) RegisterAlias(old, canonical string) {
+	r.mu.Lock()
+	r.aliases[old] = canonical
+	r.mu.Unlock()
 }
 
 // OnNeedsYou is called (from the loop) whenever the total of NeedsYou over
@@ -207,6 +227,7 @@ func (r *Runner) Start(ctx context.Context) error {
 	r.stopFuncs = append(r.stopFuncs, cancel)
 	r.mu.Unlock()
 	r.pruneSeen()
+	r.pruneClipRuns()
 	r.running.Store(true)
 	r.wg.Add(1)
 	go l.run()

@@ -1,4 +1,7 @@
-import { Banner, Button } from "@/components";
+import { Banner, Button, toast } from "@/components";
+import { DepsService } from "@/lib/api";
+import { toAppError } from "@/lib/errors";
+import { useFfmpegJob } from "@/tools/_kit/DepsGate";
 import { isActive, useJobs } from "@/state/jobs";
 import { isOk, useDeps } from "@/state/deps";
 import styles from "./DepsBanner.module.css";
@@ -28,13 +31,19 @@ export function DepsBanner() {
   const loaded = useDeps((s) => s.list.length > 0);
   const updateYtDlp = useDeps((s) => s.updateYtDlp);
   const installing = useJobs((s) => Object.values(s.byId).some((j) => j.moduleId === "system-ytdlp-update" && isActive(j)));
+  const ffJob = useFfmpegJob();
   if (!loaded) return null;
+
+  const installFfmpeg = () => {
+    DepsService.InstallFFmpeg()
+      .then((j) => useJobs.getState().upsert(j))
+      .catch((e: unknown) => toast({ title: toAppError(e).message, tone: "danger" }));
+  };
 
   const ytdlp = byId["yt-dlp"];
   const ffmpeg = byId["ffmpeg"];
   const ffprobe = byId["ffprobe"];
   const ffBad = !isOk(ffmpeg) || !isOk(ffprobe);
-  const ffHint = (!isOk(ffmpeg) ? ffmpeg : ffprobe)?.installHint ?? "";
   const noJs = !isOk(byId["deno"]) && !isOk(byId["node"]);
 
   return (
@@ -59,8 +68,16 @@ export function DepsBanner() {
         </Banner>
       )}
       {ffBad && (
-        <Banner tone="warn" title="ffmpeg is required for conversion and merging">
-          <Hint text={ffHint} />
+        <Banner
+          tone="warn"
+          title="ffmpeg is required for conversion and merging"
+          action={
+            <Button variant="primary" size="sm" icon="download" loading={!!ffJob} data-tip="Download FFmpeg, the program that converts and merges audio and video; it runs only on this computer" onClick={installFfmpeg}>
+              Install FFmpeg
+            </Button>
+          }
+        >
+          {ffJob?.message || "Toolbox can download and manage it for you."}
         </Banner>
       )}
       {noJs && (

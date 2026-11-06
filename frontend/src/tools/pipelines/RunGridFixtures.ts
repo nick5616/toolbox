@@ -19,6 +19,7 @@ export const cell = (stepId: string, status: CellStatus, o: Partial<RunCell> = {
   stepId,
   status,
   wait: WaitKind.$zero,
+  until: 0,
   jobIds: [],
   inputs: [],
   files: [],

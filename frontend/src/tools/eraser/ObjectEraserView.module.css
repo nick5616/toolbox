@@ -4,7 +4,7 @@
   gap: var(--space-3);
   height: 100%;
   min-height: 0;
-  padding: var(--space-5);
+  padding: var(--space-3);
   overflow: auto;
 }
 
@@ -37,14 +37,6 @@
   white-space: nowrap;
 }
 
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  max-width: 560px;
-  margin: var(--space-8) auto 0;
-}
 
 .toolbar {
   display: flex;
@@ -92,8 +84,6 @@
   position: relative;
   flex: 1;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
   background: var(--bg-inset);
   touch-action: none;
   user-select: none;
@@ -186,8 +176,6 @@
   justify-content: center;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
   background: var(--bg-inset);
 }
 
@@ -220,4 +208,34 @@
   gap: var(--space-3);
   min-width: 0;
   flex-wrap: wrap;
+}
+
+.rootEmpty {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.rootEmpty > :not(.empty) {
+  margin: var(--space-3) var(--space-4) 0;
+}
+
+/* Empty state: the whole area is the drop target, with one compact prompt in the middle. */
+.empty {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.empty > .fullDrop {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.empty > .fullDrop:global(.file-drop-target-active) {
+  background: var(--accent-soft);
 }

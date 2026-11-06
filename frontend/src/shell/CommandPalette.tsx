@@ -8,6 +8,7 @@ import { Icon, Kbd, toast, cx } from "@/components";
 import { useRecentOutputs } from "@/state/library";
 import { useUI } from "@/state/ui";
 import { RECENT_ITEM, SETTINGS_ITEM, useVisibleModules } from "./nav";
+import { keywordsFor, wordMatch } from "./keywords";
 import styles from "./CommandPalette.module.css";
 
 const MAX_RESULTS = 50;
@@ -17,6 +18,10 @@ interface Entry {
   key: string;
   section: string;
   title: string;
+  /** Second line (a tool's tagline). */
+  subtitle?: string;
+  /** Extra search words (not shown). */
+  words?: string[];
   icon: string;
   shortcut?: string;
   score: number;
@@ -71,10 +76,10 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
   const entries = useMemo<Entry[]>(() => {
     const navigate = useUI.getState().navigate;
     const all: Omit<Entry, "score" | "indices">[] = [];
-    const nav = (id: string, title: string, icon: string) =>
-      all.push({ key: `nav:${id}`, section: "Navigate", title, icon, run: () => navigate(id) });
-    nav(RECENT_ITEM.id, "Recent", RECENT_ITEM.icon);
-    for (const m of modules) nav(m.id, m.name, m.icon);
+    const nav = (id: string, title: string, icon: string, subtitle?: string, words?: string[]) =>
+      all.push({ key: `nav:${id}`, section: "Navigate", title, icon, subtitle, words, run: () => navigate(id) });
+    nav(RECENT_ITEM.id, "Library", RECENT_ITEM.icon, "Every file your tools have made");
+    for (const m of modules) nav(m.id, m.name, m.icon, m.tagline || undefined, keywordsFor(m.id, (m as { keywords?: string[] | null }).keywords));
     nav(SETTINGS_ITEM.id, "Settings", SETTINGS_ITEM.icon);
     if (import.meta.env.DEV) nav("gallery", "Component gallery", "box");
 
@@ -105,6 +110,10 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
       if (query && e.key.startsWith("cmd:")) {
         const k = kw.map((w) => fuzzyScore(query, w)).find((r) => r !== null);
         if (k) scored.push({ ...e, score: k.score - 20, indices: [] });
+      } else if (query && (e.subtitle || e.words)) {
+        // Tools match on their tagline and keywords too, by whole-word prefixes.
+        const hits = [e.subtitle ? wordMatch(query, e.subtitle) : null, ...(e.words ?? []).map((w) => wordMatch(query, w))].filter((v): v is number => v !== null);
+        if (hits.length) scored.push({ ...e, score: Math.max(...hits) - 30, indices: [] });
       }
     }
     // Keep registration order for an empty query; rank by score otherwise.
@@ -213,6 +222,7 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
                   <Icon name={e.icon} size={16} />
                   <span className={styles.title}>
                     <Highlighted text={e.title} indices={e.indices} />
+                    {e.subtitle && <span className={styles.subtitle}>{e.subtitle}</span>}
                   </span>
                   {e.shortcut && <Kbd combo={e.shortcut} />}
                 </div>

@@ -5,13 +5,10 @@ package placeholders
 
 import "toolbox/core"
 
-// Descriptors returns every placeholder.
+// Descriptors returns every placeholder. There are none right now (Local
+// File Transfer became a real tool in Phase 13).
 func Descriptors() []core.Descriptor {
-	return []core.Descriptor{
-		{ID: "archiver", Name: "Web Archiver", Icon: "archive", Category: core.CategoryUtility, Order: 200,
-			Tagline:     "Save pages and media for offline keeping",
-			Description: "Archive web pages and their media into self-contained local copies."},
-	}
+	return []core.Descriptor{}
 }
 
 // Register adds every placeholder to reg.

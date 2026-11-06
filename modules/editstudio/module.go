@@ -109,7 +109,7 @@ func (m *Module) Descriptor() core.Descriptor {
 		Status:       core.StatusReady,
 		Accepts:      core.Accepts{Extensions: slices.Concat(media.AudioExtensions(), media.VideoExtensions(), media.ImageExtensions())},
 		Requires:     []string{"ffmpeg", "ffprobe", sidecar.DepID},
-		OutputSubdir: "Edits", Order: 14, MaxConcurrent: 2, NotAStep: true,
+		OutputSubdir: "Edits", Order: 14, MaxConcurrent: 2,
 		Base:  VideoModuleID,
 		Parts: []string{"visualizer", "stems", "transcribe", "bg-remover"},
 	}
@@ -165,6 +165,16 @@ func (m *Module) validateOptions(o Options) error {
 			return vErr("text", "Nothing to save")
 		}
 		return validateText(*o.Text)
+	case ActionAssemble:
+		if o.Assemble == nil {
+			return vErr("assemble", "Nothing to assemble")
+		}
+		return validateAssemble(*o.Assemble)
+	case ActionBeat:
+		if o.Beat == nil {
+			return vErr("beat", "Pick a song and a style")
+		}
+		return validateBeat(*o.Beat)
 	}
 	return core.ValidationError("Unknown action", map[string]string{"action": "Unknown action"})
 }
@@ -191,6 +201,10 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 		return m.runRender(ctx, job, o.ProjectID)
 	case ActionText:
 		return m.runText(ctx, job, *o.Text)
+	case ActionAssemble:
+		return m.runAssemble(ctx, job, *o.Assemble)
+	case ActionBeat:
+		return m.runBeat(ctx, job, *o.Beat)
 	}
 	return core.ValidationError("Unknown action", nil)
 }

@@ -1,5 +1,5 @@
 /**
- * Edit Studio's panels (Phase 10 SPEC §5.5): the music layer's constituents,
+ * Edit Studio's panels (Phase 10 SPEC §5.5): the music layer's constituents (ToolPanels of the editor workspace),
  * each a click-in in the rail or the selection bar and poppable into its own
  * window. They read only the editor store and the profile context.
  */
@@ -9,7 +9,7 @@ import { MARKER_LANES, type MarkerLane } from "@/viz/edit/types";
 import { editDoc } from "@/editor/inspector/inspectorState";
 import styles from "@/editor/inspector/inspector.module.css";
 import { LANE_LABELS as EDITOR_LANE_LABELS } from "@/editor/inspector/EditSignalSelect";
-import { registerEditorPanel } from "@/editor/panels";
+import type { ToolPanel } from "@/workspace";
 import { useEditStudio, useMarkers, useProject } from "@/editor/store";
 import { useSelectedClip } from "@/editor/inspector/clipPanels";
 import { patchClip } from "@/editor/inspector/inspectorState";
@@ -98,8 +98,11 @@ function ClipMusic({ clip }: { clip: NonNullable<ReturnType<typeof useSelectedCl
   );
 }
 
-registerEditorPanel({ id: "song", title: "Song", icon: "music", tip: "The song: its range, analysis, volume and fades", component: SongInspector });
-registerEditorPanel({ id: "markers", title: "Markers", icon: "activity", tip: "Active lane, cut offset and which marker lanes show", component: MarkersPanel });
-registerEditorPanel({ id: "captions", title: "Captions", icon: "captions", tip: "Words from the song shown on the picture as captions", component: CaptionsPanel, width: 440 });
-registerEditorPanel({ id: "style", title: "Style", icon: "wand-sparkles", tip: "Style a part of the song: cuts, footage and reactions", component: StylePanel });
-registerEditorPanel({ id: "clip-music", title: "Auto-fill", icon: "wand-sparkles", tip: "Pin the selected clip and see its moments", component: ClipMusicPanel });
+/** The music layer's panels: the editor workspace appends them to its own (via `MUSIC_EDIT_PROFILE.panels`). */
+export const MUSIC_PANELS: readonly ToolPanel[] = [
+  { id: "song", title: "Song", icon: "music", tip: "The song: its range, analysis, volume and fades", component: SongInspector },
+  { id: "markers", title: "Markers", icon: "activity", tip: "Active lane, cut offset and which marker lanes show", component: MarkersPanel },
+  { id: "captions", title: "Captions", icon: "captions", tip: "Words from the song shown on the picture as captions", component: CaptionsPanel, drawerWidth: 420, width: 440 },
+  { id: "style", title: "Style", icon: "wand-sparkles", tip: "Style a part of the song: cuts, footage and reactions", component: StylePanel },
+  { id: "clip-music", title: "Auto-fill", icon: "wand-sparkles", tip: "Pin the selected clip and see its moments", component: ClipMusicPanel },
+];

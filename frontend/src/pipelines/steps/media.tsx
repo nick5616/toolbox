@@ -44,6 +44,7 @@ import { DEFAULT_MIDI_OPTIONS, sanitizeMidiOptions } from "@/tools/midi/options"
 import { DEFAULT_TRANSCRIBE_OPTIONS, FORMATS, sanitizeTranscribeOptions, toggleFormat } from "@/tools/transcribe/options";
 import { DEFAULT_OCR_OPTIONS, FALLBACK_LANGUAGES, sanitizeOcrOptions } from "@/tools/ocr/options";
 import { parseObject, registerSteps, type StepEditorProps, type StepUI } from "./registry";
+import { PARAMS } from "./paramDefs";
 import styles from "./media.module.css";
 
 // Step editors owned by WP-AD1 (downloader, converter, trimmer, audio-cleanup, redact, stems, bpm-key, audio-to-midi, transcribe, ocr).
@@ -609,7 +610,7 @@ function OcrEditor({ value, onChange }: StepEditorProps<OcrOptions>) {
 
 // registerSteps takes StepUI<never> (the registry stores them untyped), so each typed pair is widened here.
 const ui = <T,>(type: string, parse: (json: string) => T, Editor: StepUI<T>["Editor"]): StepUI<never> =>
-  ({ type, parse, Editor }) as unknown as StepUI<never>;
+  ({ type, parse, Editor, params: PARAMS[type] }) as unknown as StepUI<never>;
 
 registerSteps([
   ui<DownloaderOptions>("downloader", parseDownloader, DownloaderEditor),

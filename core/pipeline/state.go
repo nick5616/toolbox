@@ -213,6 +213,7 @@ func cloneSteps(in []core.PipelineStep) []core.PipelineStep {
 		s.Filter.Roles = append([]string{}, s.Filter.Roles...)
 		s.Filter.Kinds = append([]core.OutputKind{}, s.Filter.Kinds...)
 		s.Filter.Exts = append([]string{}, s.Filter.Exts...)
+		s.Binds = append([]core.StepBind{}, s.Binds...)
 		out[i] = s
 	}
 	return out

@@ -1,11 +1,13 @@
 import { useMemo } from "react";
-import { Button, EmptyState, Icon, Section, cx, toast } from "@/components";
+import { Button, EmptyState, Section, toast } from "@/components";
 import { JobStatus, LibraryService, PdfAction } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { type JobView } from "@/state/jobs";
 import { useToolJobs } from "@/tools/_kit/session";
-import { FileActions } from "@/tools/_kit/FileActions";
+import { FailedJobs } from "@/tools/_kit/FailedJobs";
+import { ResultRow } from "@/tools/_kit/ResultRow";
+import { revealLabel } from "@/lib/platform";
 import shared from "@/tools/_kit/results.module.css";
 import { basename, parsePdfResult } from "./options";
 import styles from "./Results.module.css";
@@ -50,7 +52,7 @@ function Group({ job }: { job: JobView }) {
         </span>
         {r.folder && (
           <Button size="sm" variant="secondary" icon="folder-open" data-tip="Open the folder with all the files this job made" onClick={() => void openFolder(r.folder)}>
-            Open folder
+            {revealLabel}
           </Button>
         )}
       </div>
@@ -59,19 +61,8 @@ function Group({ job }: { job: JobView }) {
         {shown.map((path) => {
           const out = job.outputs.find((o) => o.path === path);
           return (
-            <li key={path} className={cx(shared.row, out?.missing && shared.missing)}>
-              <Icon name={r.folder ? "image" : "file-text"} size={14} className={shared.icon} />
-              <span className={shared.name} data-tip={path}>
-                {basename(path)}
-              </span>
-              {out && (
-                <span className={shared.meta} data-tip="File size on disk">
-                  {formatBytes(out.sizeBytes)}
-                </span>
-              )}
-              <span className={shared.actions}>
-                <FileActions outputId={out?.id} path={path} disabled={out?.missing} />
-              </span>
+            <li key={path}>
+              <ResultRow path={path} outputId={out?.id} missing={out?.missing} name={basename(path)} sizeBytes={out?.sizeBytes} icon={r.folder ? "image" : "file-text"} />
             </li>
           );
         })}
@@ -94,6 +85,8 @@ export function Results({ moduleId }: { moduleId: string }) {
     [jobs],
   );
   return (
+    <>
+    <FailedJobs moduleId={moduleId} />
     <Section label="Results" tip="Finished PDF jobs and the files they made">
       {done.length === 0 ? (
         <EmptyState icon="file-text" title="No results yet." body="Finished PDFs appear here." />
@@ -101,5 +94,6 @@ export function Results({ moduleId }: { moduleId: string }) {
         done.map((j) => <Group key={j.id} job={j} />)
       )}
     </Section>
+    </>
   );
 }

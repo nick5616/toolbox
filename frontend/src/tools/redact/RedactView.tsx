@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ToolHeader } from "@/components/ToolHeader";
 import { Banner, Button, ClickInHost, DropZone, Icon, IconButton, Meter, Section, cx, toast } from "@/components";
 import { useMediaSource } from "@/components/media";
 import { JobStatus, JobsService, PackComponentState, PacksService, RedactAction, RedactService, type RedactOptions, type RedactTrack } from "@/lib/api";
@@ -233,11 +234,11 @@ export default function RedactView({ moduleId }: ToolViewProps) {
   // ---- render ----
   const header =
     files.length > 0 ? (
-      <header className={styles.header}>
+      <ToolHeader aria-label="Redact">
         <Button size="sm" variant="ghost" data-tip="Drop this session and pick other files" onClick={more}>
           Choose different files
         </Button>
-      </header>
+      </ToolHeader>
     ) : null;
   const warning = (
     <Banner tone="warn" title="Detection can miss faces and plates.">
@@ -248,11 +249,11 @@ export default function RedactView({ moduleId }: ToolViewProps) {
   if (files.length === 0) {
     return (
       <ClickInHost>
-        <section className={styles.root} aria-label="Redact">
+        <section className={cx(styles.root, styles.rootEmpty)} aria-label="Redact">
           {warning}
           <DepsGate moduleId={moduleId} />
           <div className={styles.empty}>
-            <DropZone id="redact-drop" label="Drop photos or one video" hint="Blur, pixelate or black out faces and number plates." icon="scan-face">
+            <DropZone id="redact-drop" className={styles.fullDrop} label="Drop photos or one video" hint="Blur, pixelate or black out faces and number plates." icon="scan-face">
               <Button variant="secondary" icon="folder-open" data-tip="Pick photos, or a single video, to hide faces and plates in" onClick={() => void inputs.pick()}>
                 Choose files
               </Button>

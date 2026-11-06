@@ -3,7 +3,7 @@ import type { Pipeline, PipelineStep } from "@/lib/api";
 import { fillVisualizerDesigns, presetShowJson } from "./visualizerDesigns";
 
 const step = (type: string, options: object): PipelineStep =>
-  ({ id: "s1", type, label: "", optionsJson: JSON.stringify(options), from: "input", filter: { roles: [], kinds: [], exts: [], name: "" }, manual: false, autoContinue: false, keep: true, note: "" });
+  ({ id: "s1", type, label: "", optionsJson: JSON.stringify(options), from: "input", filter: { roles: [], kinds: [], exts: [], name: "" }, manual: false, autoContinue: false, keep: true, note: "", binds: [] });
 
 describe("visualizer designs", () => {
   it("fills a preset's show once", () => {

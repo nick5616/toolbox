@@ -4,7 +4,7 @@
   gap: var(--space-4);
   height: 100%;
   min-height: 0;
-  padding: var(--space-5);
+  padding: var(--space-3);
   overflow: auto;
   container-type: inline-size;
 }
@@ -43,14 +43,6 @@
   white-space: nowrap;
 }
 
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  max-width: 560px;
-  margin: var(--space-8) auto 0;
-}
 
 .layout {
   display: grid;
@@ -86,7 +78,6 @@
   aspect-ratio: 16 / 9;
   padding: var(--space-6);
   background: var(--bg-inset);
-  border: 1px solid var(--line);
   border-radius: var(--r-lg);
   color: var(--fg-muted);
   text-align: center;
@@ -180,7 +171,6 @@
   gap: var(--space-4);
   padding: var(--space-3) var(--space-4);
   background: var(--bg-panel);
-  border: 1px solid var(--line);
   border-radius: var(--r-lg);
 }
 
@@ -212,7 +202,6 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   background: var(--bg-panel);
-  border: 1px solid var(--line);
   border-radius: var(--r-lg);
 }
 
@@ -242,4 +231,34 @@
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.rootEmpty {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.rootEmpty > :not(.empty) {
+  margin: var(--space-3) var(--space-4) 0;
+}
+
+/* Empty state: the whole area is the drop target, with one compact prompt in the middle. */
+.empty {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.empty > .fullDrop {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.empty > .fullDrop:global(.file-drop-target-active) {
+  background: var(--accent-soft);
 }

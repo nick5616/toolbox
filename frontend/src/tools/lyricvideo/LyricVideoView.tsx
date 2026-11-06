@@ -1,7 +1,7 @@
 /**
  * Lyric Video (SPEC.md §9.2; Phase 11 §5.4): a drop zone until a song is
  * chosen, then one workspace (`LyricVideoWorkspace`): song chip, undo/redo and
- * Render in the header, the Song / Lyrics / Visuals / Look panels in the rail,
+ * Export in the header, the Song / Lyrics / Visuals / Look panels in the rail,
  * the preview on the stage and the lyric lines at the side.
  *
  * The song, its lyric sheet and its undo history live in the store (they
@@ -13,7 +13,7 @@ import { Suspense, lazy, useEffect } from "react";
 import { Button, ClickInHost, DropZone, Spinner } from "@/components";
 import { fixtureFlag } from "@/components/viz/useVisualsAnalysis";
 import { SettingsService } from "@/lib/api";
-import { useToolHandoff } from "@/lib/embed";
+import { useIsEmbedded, useToolHandoff } from "@/lib/embed";
 import { useCompositionInputs } from "@/state/composition";
 import { DepsGate } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
@@ -21,6 +21,7 @@ import { useChooseSong } from "./actions";
 import { useEngineRequirement } from "./engine";
 import type { Row } from "./logic";
 import { DEFAULT_PREFS, sanitizePrefs } from "./options";
+import { restoreSession, serializeSession, SESSION_KEY, takeRestore } from "./session";
 import { useLyricVideo } from "./store";
 import { lyricVideoWorkspace as ws } from "./workspace";
 import styles from "./panels.module.css";
@@ -62,6 +63,35 @@ function usePrefsPersistence(moduleId: string): void {
   }, [prefs, dirty, moduleId]);
 }
 
+/**
+ * Reopens the last session (once per page, StrictMode-safe) and keeps it saved.
+ * A handoff wins; part windows (replicas) and embedded views neither restore nor save.
+ */
+function useSessionPersistence(): void {
+  const off = useIsEmbedded() || ws.isReplica();
+  useEffect(() => {
+    if (off || fixtureFlag() || !takeRestore()) return;
+    void restoreSession().catch(() => undefined);
+  }, [off]);
+
+  const songPath = useLyricVideo((s) => s.songPath);
+  const meta = useLyricVideo((s) => s.meta);
+  const text = useLyricVideo((s) => s.text);
+  const lyricsPath = useLyricVideo((s) => s.lyricsPath);
+  const rows = useLyricVideo((s) => s.rows);
+  const matched = useLyricVideo((s) => s.matched);
+  const noLyrics = useLyricVideo((s) => s.noLyrics);
+  const hasInstrumental = useLyricVideo((s) => s.hasInstrumental);
+  useEffect(() => {
+    if (off || !songPath || songPath === FIXTURE_SONG) return;
+    const t = setTimeout(() => {
+      const json = serializeSession({ songPath, meta, text, lyricsPath, rows, matched, noLyrics, hasInstrumental });
+      if (json) SettingsService.SetModuleState(SESSION_KEY, json).catch(() => undefined);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [off, songPath, meta, text, lyricsPath, rows, matched, noLyrics, hasInstrumental]);
+}
+
 function EmptySong({ moduleId }: { moduleId: string }) {
   const choose = useChooseSong();
   return (
@@ -88,6 +118,7 @@ export default function LyricVideoView({ moduleId }: ToolViewProps) {
     const first = h.inputs[0];
     if (first) useLyricVideo.getState().requestSong(first);
   });
+  useSessionPersistence();
   useCompositionInputs(moduleId, songPath ? { stems: [songPath], transcribe: [songPath], visualizer: [songPath] } : {});
 
   // Dev only: `?vizfixture=1` starts with a sample sheet.

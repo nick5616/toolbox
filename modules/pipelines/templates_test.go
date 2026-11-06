@@ -9,20 +9,33 @@ import (
 
 	"toolbox/core"
 	"toolbox/core/packs"
+	"toolbox/modules/archiver"
 	"toolbox/modules/audiocleanup"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
+	"toolbox/modules/clipboard"
+	"toolbox/modules/composer"
 	"toolbox/modules/converter"
+	"toolbox/modules/documents"
 	"toolbox/modules/downloader"
+	"toolbox/modules/editstudio"
+	"toolbox/modules/gif"
+	"toolbox/modules/imagebatch"
+	"toolbox/modules/lanshare"
 	"toolbox/modules/lyricvideo"
 	"toolbox/modules/midi"
 	"toolbox/modules/ocr"
+	"toolbox/modules/organize"
 	"toolbox/modules/pdf"
+	"toolbox/modules/posts"
 	"toolbox/modules/redact"
+	"toolbox/modules/scenes"
+	"toolbox/modules/silence"
 	"toolbox/modules/stems"
 	"toolbox/modules/subtitles"
 	"toolbox/modules/transcribe"
 	"toolbox/modules/trimmer"
+	"toolbox/modules/tts"
 	"toolbox/modules/upscale"
 	"toolbox/modules/vault"
 	"toolbox/modules/visualizer"
@@ -47,6 +60,20 @@ var strictDecoders = map[string]func(json.RawMessage) error{
 	stVault:        decodes[vault.StepOptions],
 	stRedact:       decodes[redact.StepOptions],
 	stVisualizer:   decodes[visualizer.StepOptions],
+	stDocuments:    decodes[documents.Options],
+	stArchiver:     decodes[archiver.Options],
+	stTTS:          decodes[tts.StepOptions],
+	stScenes:       decodes[scenes.StepOptions],
+	stGIF:          decodes[gif.StepOptions],
+	stSilence:      decodes[silence.StepOptions],
+	stImageBatch:   decodes[imagebatch.StepOptions],
+	stLanShare:     decodes[lanshare.StepOptions],
+	stOrganize:     decodes[organize.Options],
+	stClipboard:    decodes[clipboard.StepOptions],
+	stVideoStudio:  decodes[editstudio.AssembleRequest],
+	stEditStudio:   decodes[editstudio.BeatRequest],
+	stPostBuilder:  decodes[posts.StepOptions],
+	stPhotoCompose: decodes[composer.StepOptions],
 }
 
 func decodes[T any](raw json.RawMessage) error {
@@ -56,12 +83,18 @@ func decodes[T any](raw json.RawMessage) error {
 
 // toolVars are the variables each tool step defines (SPEC.md §4.3).
 var toolVars = map[string][]string{
-	stDownloader: {"title", "url"},
-	stBPMKey:     {"bpm", "bpm_exact", "key", "key_short", "camelot"},
-	stTranscribe: {"transcript", "transcript_timed", "language"},
-	stOCR:        {"text"},
-	stSubtitles:  {"subtitles", "language"},
-	stMIDI:       {"notes"},
+	stDownloader:  {"title", "url"},
+	stBPMKey:      {"bpm", "bpm_exact", "key", "key_short", "camelot"},
+	stTranscribe:  {"transcript", "transcript_timed", "language"},
+	stOCR:         {"text"},
+	stLanShare:    {"device"},
+	stSubtitles:   {"subtitles", "language"},
+	stMIDI:        {"notes"},
+	stTTS:         {"voice"},
+	stSilence:     {"removed_s", "kept_s"},
+	stScenes:      {"scene", "scene_total"},
+	stOrganize:    {"folder"},
+	stPostBuilder: {"post_folder", "caption"},
 }
 
 var builtinVars = []string{"item", "name", "ext", "role", "n", "date", "time", "pipeline"}
@@ -95,8 +128,10 @@ func pointerStrings(t *testing.T, optionsJSON, ptr string) []string {
 }
 
 func TestTemplatesShape(t *testing.T) {
-	want := []string{TplSocialClip, TplPodcast, TplSampling, TplKaraoke, TplProductPhotos, TplPaperArchive,
-		TplForeignVideo, TplReceipts, TplLecture, TplBeforeSharing, TplMusicVideo}
+	want := []string{TplSocialClip, TplPodcast, TplSampling, TplKaraoke, TplProductPhotos, TplPaperArchive, TplPaperToWord,
+		TplForeignVideo, TplReceipts, TplLecture, TplBeforeSharing, TplMusicVideo, TplReadingList,
+		TplReadItToMe, TplAudiobook, TplTightLecture, TplPodcastPolish, TplCameraRoll, TplShopShots, TplStoryboard,
+		TplMeetingMinutes, TplLinkToNotes, TplHighlightReel, TplReactionGIF, TplNarratedSlideshow, TplSongEverything, TplVerticalCut, TplSendToMyComputer}
 	tpls := Templates()
 	if len(tpls) != len(want) {
 		t.Fatalf("%d templates, want %d", len(tpls), len(want))
@@ -147,8 +182,8 @@ func TestTemplatesShape(t *testing.T) {
 					t.Errorf("step %d: manual steps carry {}", i+1)
 				}
 			}
-			if steps[len(steps)-1].Keep == false && tpl.ID != TplPaperArchive {
-				t.Errorf("the last step should keep its files")
+			if last := steps[len(steps)-1]; !last.Keep && last.Type != stVault && last.Type != stClipboard {
+				t.Errorf("the last step should keep its files (or end in the Vault or the clipboard)")
 			}
 		})
 	}
@@ -275,6 +310,44 @@ func TestTemplateSpecifics(t *testing.T) {
 		if !strings.Contains(ch.Prompt, "{transcript") || ch.Format != FormatMD {
 			t.Errorf("%s chat = %+v", tpl, ch)
 		}
+	}
+}
+
+func TestDocumentsTemplates(t *testing.T) {
+	pw := find(t, TplPaperToWord).Steps
+	if len(pw) != 2 || pw[0].Type != stOCR || pw[1].Type != stDocuments || pw[1].From != "ocr" ||
+		!slices.Equal(pw[1].Filter.Roles, []string{"text"}) || !pw[1].Keep {
+		t.Fatalf("paper to word = %+v", pw)
+	}
+	var wo documents.Options
+	_ = json.Unmarshal([]byte(pw[1].OptionsJSON), &wo)
+	var oo ocr.Options
+	_ = json.Unmarshal([]byte(pw[0].OptionsJSON), &oo)
+	if wo.To != documents.FormatDOCX || oo.PDFOutput != ocr.PDFText {
+		t.Errorf("word = %+v, ocr = %+v", wo, oo)
+	}
+	for _, tpl := range Templates() {
+		if tpl.ID == TplPaperToWord && !slices.Equal(tpl.Packs, []string{"documents", "docs"}) {
+			t.Errorf("paper to word packs = %v", tpl.Packs)
+		}
+		if tpl.ID == TplPaperArchive && !slices.Equal(tpl.Packs, []string{"documents"}) {
+			t.Errorf("paper archive packs = %v", tpl.Packs)
+		}
+		if tpl.ID == TplReadingList && (!slices.Equal(tpl.Packs, []string{"docs"}) || tpl.Icon != "book-open") {
+			t.Errorf("reading list = %v %q", tpl.Packs, tpl.Icon)
+		}
+	}
+	rl := find(t, TplReadingList).Steps
+	if len(rl) != 2 || rl[0].Type != stArchiver || rl[1].Type != stDocuments || rl[1].From != "archive" ||
+		!slices.Equal(rl[1].Filter.Roles, []string{"page"}) || !rl[0].Keep || !rl[1].Keep {
+		t.Fatalf("reading list = %+v", rl)
+	}
+	var ao archiver.Options
+	var eo documents.Options
+	_ = json.Unmarshal([]byte(rl[0].OptionsJSON), &ao)
+	_ = json.Unmarshal([]byte(rl[1].OptionsJSON), &eo)
+	if ao.AlsoPDF || eo.To != documents.FormatEPUB {
+		t.Errorf("options = %+v / %+v", ao, eo)
 	}
 }
 

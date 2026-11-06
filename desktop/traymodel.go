@@ -20,6 +20,9 @@ const (
 	// --- vault (VA1) ---
 	itemLockVault = "lock-vault"
 	// --- end vault ---
+	itemLanStatus = "lan-status"
+	itemLanStop   = "lan-stop"
+	itemLanStart  = "lan-start"
 	itemPipelines = "pipelines"
 	itemSep       = "-"
 )
@@ -39,6 +42,11 @@ type trayState struct {
 	// --- end vault ---
 	NeedYou     int    // pipeline steps waiting for the user
 	NeedYouName string // the first such run's name
+	// --- local file transfer (Phase 13) ---
+	LanListening bool   // receiving is on
+	LanAlias     string // this computer's alias
+	LanCanStart  bool   // off, but the mode was "always" (or the tray stopped it)
+	LanPrompt    string // alias of a device waiting for an answer ("" = none)
 }
 
 // trayItem is one row of the tray menu.
@@ -84,6 +92,7 @@ func trayModel(s trayState) []trayItem {
 		m = append(m, item(itemLockVault, "Lock vault"))
 	}
 	// --- end vault ---
+	m = append(m, lanTrayItems(s)...)
 	m = append(m, trayItem{ID: itemSep, Separator: true})
 	if s.Running > 0 {
 		label := fmt.Sprintf("Running: %d jobs", s.Running)

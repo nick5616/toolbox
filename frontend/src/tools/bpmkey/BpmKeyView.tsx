@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { Button, ConfirmDialog, EmptyState, Section } from "@/components";
+import { Button, ConfirmDialog, Section } from "@/components";
 import { BpmKeyService, JobStatus } from "@/lib/api";
 import { isActive, useJobs } from "@/state/jobs";
 import { useToolJobs } from "@/tools/_kit/session";
-import { FileToolLayout, ResultTable, runLabel, useFileInputs } from "@/tools/_kit";
+import { EmptyLine, FileToolLayout, ResultTable, runLabel, useFileInputs } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
 import { submitJobs } from "@/tools/_kit/enqueue";
 import { bpmColumns } from "./columns";
@@ -59,7 +59,7 @@ export default function BpmKeyView({ moduleId }: ToolViewProps) {
               columns={columns}
               rowKey={(r) => r.id}
               label="BPM and key"
-              empty={<EmptyState icon="activity" title="No analyses yet." body="Add tracks to detect their tempo and key." />}
+              empty={<EmptyLine title="No analyses yet." body="Add tracks to detect their tempo and key." />}
               actions={
                 <Button
                   size="sm"

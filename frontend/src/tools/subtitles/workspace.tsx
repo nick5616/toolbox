@@ -13,7 +13,7 @@ import { SourcePanel } from "./SourcePanel";
 import { StylePanel } from "./StylePanel";
 import { TranscriptionPanel } from "./TranscriptionPanel";
 import { TranslatePanel } from "./TranslatePanel";
-import { BRIDGED_ACTIONS, MODULE_ID, bridgedValues, useSubtitles, type SubtitlesState } from "./store";
+import { BRIDGED_ACTIONS, MODULE_ID, bridgedValues, editorFromView, useSubtitles, type SubtitlesState } from "./store";
 import { useEffect } from "react";
 
 export const subtitlesWorkspace = defineWorkspace({
@@ -21,7 +21,10 @@ export const subtitlesWorkspace = defineWorkspace({
   store: useSubtitles,
   bridge: {
     pick: bridgedValues,
-    apply: (store, values) => store.setState(values as Partial<SubtitlesState>),
+    apply: (store, values) => {
+      const { editorView: view, ...rest } = values;
+      store.setState(view ? { ...(rest as Partial<SubtitlesState>), editor: editorFromView(view) } : (rest as Partial<SubtitlesState>));
+    },
     actions: BRIDGED_ACTIONS,
   },
   isOpen: (s) => s.mediaPath !== null || s.editor.tabs.length > 0,

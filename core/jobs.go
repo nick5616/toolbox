@@ -366,11 +366,12 @@ func (m *Jobs) kick() {
 		var rest []*activeJob
 		for _, aj := range m.queue {
 			mod := aj.job.ModuleID
-			if running >= m.limit {
+			d, ok := m.reg.Descriptor(mod)
+			if running >= m.limit && !(ok && d.Immediate) {
 				rest = append(rest, aj)
 				continue
 			}
-			if d, ok := m.reg.Descriptor(mod); ok && d.MaxConcurrent > 0 && perMod[mod] >= d.MaxConcurrent {
+			if ok && d.MaxConcurrent > 0 && perMod[mod] >= d.MaxConcurrent {
 				rest = append(rest, aj)
 				continue
 			}

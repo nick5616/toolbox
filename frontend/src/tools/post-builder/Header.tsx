@@ -9,6 +9,7 @@ import { JobStatus, LibraryService, PostsService } from "@/lib/api";
 import { isActive, useJob, useJobs } from "@/state/jobs";
 import { Spacer, WorkspacePanel } from "@/workspace";
 import { firstError } from "./logic";
+import { useLastPostExport } from "./lastExport";
 import { usePostDialogs } from "./postDialogs";
 import { fail, useDoc, usePostBuilder, type SaveState } from "./postStore";
 import { copyText } from "./SidePanel";
@@ -19,12 +20,14 @@ const SAVE_LABEL: Record<SaveState, string> = { saved: "Saved", dirty: "Unsaved 
 
 interface ExportOutcome {
   folder: string;
+  files: string[];
 }
 
 function parseExport(json: string): ExportOutcome | null {
   try {
-    const r = JSON.parse(json) as { folder?: unknown };
-    return typeof r.folder === "string" ? { folder: r.folder } : null;
+    const r = JSON.parse(json) as { folder?: unknown; files?: unknown };
+    const files = Array.isArray(r.files) ? r.files.filter((x): x is string => typeof x === "string") : [];
+    return typeof r.folder === "string" ? { folder: r.folder, files } : null;
   } catch {
     return null;
   }
@@ -58,18 +61,17 @@ export function PostHeader() {
     if (!job || job.id !== jobId || announced.current === job.id) return;
     if (job.status === JobStatus.JobDone) {
       announced.current = job.id;
-      const folder = parseExport(job.resultJson)?.folder ?? "";
+      const outcome = parseExport(job.resultJson);
+      const folder = outcome?.folder ?? "";
       if (folder) {
         const cur = st().pstate;
-        st().persist({ ...cur, exports: { ...cur.exports, [exportPost.current || st().postId]: folder } });
+        const pid = exportPost.current || st().postId;
+        st().persist({ ...cur, exports: { ...cur.exports, [pid]: folder } });
+        // The result row under the stage carries Send to and the drag; no toast.
+        useLastPostExport.getState().set({ postId: pid, folder, files: outcome?.files ?? [] });
+      } else {
+        toast({ tone: "success", title: "Post exported" });
       }
-      toast({
-        tone: "success",
-        title: "Post exported",
-        description: folder || undefined,
-        duration: 10000,
-        action: { label: "Open folder", onClick: () => openFolder(folder) },
-      });
     } else if (job.status === JobStatus.JobFailed) {
       announced.current = job.id;
       toast({ tone: "danger", title: job.error || "The export failed", description: job.errorHint || undefined });

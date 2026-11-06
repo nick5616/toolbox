@@ -109,3 +109,18 @@
   align-items: stretch;
   gap: var(--space-3);
 }
+
+.railOcr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.railOcrLabel {
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  font-weight: 600;
+  text-align: center;
+  color: var(--fg-muted);
+}

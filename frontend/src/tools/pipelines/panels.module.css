@@ -44,4 +44,32 @@
 .stepBody {
   padding: var(--space-3);
   min-width: 0;
+  /* Step editors stack their rows when the panel is narrow (pipelines/steps/*.module.css). */
+  container: step-editor / inline-size;
+}
+
+/* Never wider than the panel: choice rows wrap and grow downwards instead of
+   scrolling sideways (the user's screenshot: a horizontal scrollbar in Step). */
+.stepBody :global([role="radiogroup"]) {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.stepBody :global(select),
+.stepBody :global(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) {
+  max-width: 100%;
+}
+
+.clip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.kinds {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }

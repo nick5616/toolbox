@@ -1,0 +1,223 @@
+.root {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  background: var(--bg-inset);
+  border-top: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+path.wireDim {
+  opacity: 0.3;
+}
+
+div.attention {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 12px var(--accent-soft);
+}
+
+div.failed {
+  border-color: var(--danger);
+}
+
+.foot {
+  box-sizing: border-box;
+  height: 48px;
+  padding: var(--space-1) var(--space-3) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.bar:has(*) {
+  visibility: visible;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--dur-fast);
+}
+
+.barIndeterminate {
+  width: 40%;
+  animation: slide 1.2s linear infinite;
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barIndeterminate {
+    width: 100%;
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+.line {
+  min-height: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+}
+
+.err {
+  color: var(--danger);
+}
+
+.panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  box-sizing: border-box;
+  width: min(340px, 70%);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-pop);
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.panelTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.panelBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.none {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.cellRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cellHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+}
+
+.cellIcon {
+  flex: none;
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.warn {
+  color: var(--warn);
+}
+
+.accent {
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--fg-muted);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cellItem {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellState {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.cellError {
+  padding: var(--space-2);
+  border-radius: var(--r-md);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.cellHint {
+  margin-top: var(--space-1);
+  color: var(--fg-muted);
+}
+
+.cellMsg {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.fileList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  cursor: grab;
+}

@@ -27,3 +27,6 @@ Thumbs.db
 # wails3 dev build output at the repo root
 /toolbox.exe
 /*.syso
+
+# QA screenshots taken at the repo root
+/shots/

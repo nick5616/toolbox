@@ -95,6 +95,7 @@ import { AddToPostDialog } from "./AddToPostDialog";
 import PostBuilderView from "./PostBuilderView";
 import { clearVisualCache } from "./useSlideVisual";
 import { useAddToPost } from "./store";
+import { usePostBuilder } from "./postStore";
 
 function renderView() {
   return render(<PostBuilderView moduleId="post-builder" />);
@@ -150,7 +151,10 @@ beforeEach(() => {
   useAddToPost.setState({ target: "" });
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  usePostBuilder.getState().reset(); // leaving the tool keeps the post (and its undo steps) in memory
+});
 
 describe("slides", () => {
   it("shows the slides in order with the first selected", async () => {
@@ -266,7 +270,7 @@ describe("export", () => {
     expect(screen.getByTestId("export-blocker").getAttribute("data-blocked")).toBe("true");
   });
 
-  it("starts the export and announces the finished folder with Open folder", async () => {
+  it("starts the export and ends in a draggable result row with Send to", async () => {
     h.exportFn.mockResolvedValue({ id: "j1", moduleId: "post-builder", status: JobStatus.JobRunning, progress: 0, message: "", inputs: [], outputs: [], resultJson: "" } as unknown as Job);
     await open();
     const user = userEvent.setup();
@@ -276,13 +280,15 @@ describe("export", () => {
     await screen.findByRole("progressbar");
 
     act(() => {
-      useJobs.getState().upsert({ id: "j1", moduleId: "post-builder", status: JobStatus.JobDone, progress: 1, message: "", resultJson: JSON.stringify({ folder: "/lib/Posts/Trip 2026-11-01", files: [] }) } as unknown as Job);
+      useJobs.getState().upsert({ id: "j1", moduleId: "post-builder", status: JobStatus.JobDone, progress: 1, message: "", resultJson: JSON.stringify({ folder: "/lib/Posts/Trip 2026-11-01", files: ["/lib/Posts/Trip 2026-11-01/1.jpg", "/lib/Posts/Trip 2026-11-01/2.jpg"] }) } as unknown as Job);
     });
-    await waitFor(() => expect(useToastStore.getState().toasts.some((t) => t.title === "Post exported")).toBe(true));
-    const toast = useToastStore.getState().toasts.find((t) => t.title === "Post exported")!;
-    expect(toast.action?.label).toBe("Open folder");
-    toast.action?.onClick();
-    expect(h.reveal).toHaveBeenCalledWith("/lib/Posts/Trip 2026-11-01");
+    const row = await screen.findByTestId("last-export");
+    expect(within(row).getByText("Trip 2026-11-01")).toBeTruthy();
+    expect(within(row).getByRole("button", { name: "Send to…" })).toBeTruthy();
+    expect(row.getAttribute("draggable")).toBe("true");
+    const data: Record<string, string> = {};
+    fireEvent.dragStart(row, { dataTransfer: { setData: (k: string, v: string) => (data[k] = v), types: [] } });
+    expect(JSON.parse(data["application/x-toolbox-paths"] ?? "[]")).toEqual(["/lib/Posts/Trip 2026-11-01/1.jpg", "/lib/Posts/Trip 2026-11-01/2.jpg"]);
 
     // The folder is remembered (by name in the menu), with Copy caption beside it.
     await user.click(await screen.findByRole("button", { name: "More export actions" }));

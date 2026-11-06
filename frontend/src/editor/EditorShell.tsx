@@ -5,12 +5,12 @@
  * Edit Studio is the same shell with the music layer plugged in.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, ClickInHost, ErrorBoundary, IconButton, MenuButton, SegmentedControl, toast, type MenuItem } from "@/components";
+import { Button, ClickInHost, ErrorBoundary, IconButton, MenuButton, SegmentedControl, ToolHeader, toast, type MenuItem } from "@/components";
 import { EditStudioService, SettingsService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { isEditableTarget } from "@/lib/shortcuts";
 import { useBeforePopOut } from "@/lib/popout";
-import { PartFrame } from "@/parts/PartFrame";
+import { WorkspacePreviewFrame } from "@/workspace";
 import { useUI } from "@/state/ui";
 import { DepsGate } from "@/tools/_kit";
 import { EditCanvas, type EditCanvasStats } from "@/viz/edit/EditCanvas";
@@ -24,8 +24,6 @@ import { useEditHandoff } from "./home/handoff";
 import { SongReplaceDialog } from "./home/SongReplaceDialog";
 import { ProjectsHome } from "./home/ProjectsHome";
 import { PreviewOverlays } from "./overlays/PreviewOverlays";
-import "./panelDefs";
-import { previewPartId } from "./panels";
 import { Rail } from "./Rail";
 import type { EditorProfile } from "./profile";
 import { EditorProfileProvider, profileTitle } from "./profileContext";
@@ -36,7 +34,7 @@ import { seekTo } from "./transport/player";
 import { Transport } from "./transport/Transport";
 import { flushEdit, markOpened, onEditSaved, useEditAutosave } from "./useEditAutosave";
 import { useEditData } from "./useEditData";
-import { useEditorBridgeHost } from "./bridge";
+import { defineEditorWorkspace } from "./workspace";
 import styles from "./EditorShell.module.css";
 
 const SAVE_LABEL: Record<string, string> = { idle: "", dirty: "Unsaved", saving: "Saving…", saved: "Saved", error: "Couldn't save" };
@@ -116,9 +114,10 @@ export function EditorShell({ moduleId, profile }: EditorShellProps) {
 }
 
 function Editor({ moduleId, profile }: { moduleId: string; profile: EditorProfile }) {
+  const ws = defineEditorWorkspace(profile);
   useEditAutosave();
   useEditData();
-  useEditorBridgeHost(moduleId); // WP-E4: hosts the store bridge for pop-out parts
+  ws.useHost(); // hosts the store bridge for pop-out parts
   useEditCommands();
   useEditorComposition(profile);
   const project = useProject();
@@ -196,20 +195,24 @@ function Editor({ moduleId, profile }: { moduleId: string; profile: EditorProfil
   return (
     <div className={styles.editor} data-focus={focus} data-profile={moduleId}>
       <ClickInHost className={styles.host}>
-      <header className={styles.header}>
+      <ToolHeader className={styles.header} aria-label={`${title} header`}>
         {videoFocus ? (
           <>
-            <IconButton icon="arrow-left" label={`Back to ${title}`} data-tip={`Back to the music view of ${title} (Esc)`} onClick={leaveVideoFocus} />
-            <span className={styles.crumb} data-testid="breadcrumb" aria-label={`${title}, Video`}>
+            <Button size="sm" variant="ghost" icon="chevron-left" aria-label={`Back to ${title}`} data-tip={`Back to the song view of ${title} (Esc)`} onClick={leaveVideoFocus}>
+              Song view
+            </Button>
+            <span className={styles.crumb} data-testid="breadcrumb" aria-label={`${title}, Clip view`}>
               <span className={styles.crumbParent}>{title}</span>
               <span className={styles.crumbSep} aria-hidden="true">
                 ›
               </span>
-              <span>Video</span>
+              <span>Clip view</span>
             </span>
           </>
         ) : (
-          <IconButton icon="arrow-left" label="All edits" data-tip={`Save and go back to the list of your ${profile.noun}s`} onClick={() => void close()} />
+          <Button size="sm" variant="ghost" icon="chevron-left" aria-label={`All ${profile.noun}s`} data-tip={`Save and go back to the list of your ${profile.noun}s`} onClick={() => void close()}>
+            {`${profile.noun.charAt(0).toUpperCase()}${profile.noun.slice(1)}s`}
+          </Button>
         )}
         <input
           className={styles.name}
@@ -228,8 +231,8 @@ function Editor({ moduleId, profile }: { moduleId: string; profile: EditorProfil
             value={focus}
             onChange={(v) => (v === "video" ? enterVideoFocus() : leaveVideoFocus())}
             options={[
-              { value: "compose", label: "Music", tip: "Song, markers and recipes" },
-              { value: "video", label: "Video", tip: "The video in depth: tracks, clips and effects" },
+              { value: "compose", label: "Song view", tip: "Song, markers and recipes" },
+              { value: "video", label: "Clip view", tip: "The video in depth: tracks, clips and effects" },
             ]}
           />
         )}
@@ -242,7 +245,7 @@ function Editor({ moduleId, profile }: { moduleId: string; profile: EditorProfil
         <Button variant="primary" icon="download" collapsible data-tip={setup ? "Set up the song first" : `Render the ${profile.noun} to a video file`} disabled={setup} onClick={() => useEditStudio.getState().openDialog({ kind: "export" })}>
           Export
         </Button>
-      </header>
+      </ToolHeader>
 
       <div className={styles.top} style={{ flex: `0 0 ${Math.round(split * 100)}%` }}>
         <Rail />
@@ -252,14 +255,14 @@ function Editor({ moduleId, profile }: { moduleId: string; profile: EditorProfil
             if (switchable && focus === "compose" && !setup) enterVideoFocus();
           }}
         >
-          <PartFrame part={previewPartId(moduleId)} chrome="overlay">
+          <WorkspacePreviewFrame ws={ws}>
             <div className={styles.canvasBox}>
               <EditCanvas inputs={setup ? null : inputs} width={size.width} height={size.height} timeMs={playheadMs} playing={playing} quality="draft" onStats={setStats} onCanvas={setCanvas} />
               <ErrorBoundary label="The preview overlays" compact>
                 <PreviewOverlays canvas={canvas} width={size.width} height={size.height} />
               </ErrorBoundary>
             </div>
-          </PartFrame>
+          </WorkspacePreviewFrame>
           {stats && playing && inputs && !setup && <span className={styles.stats} data-tip="Preview speed while playing: frames per second and frames that were dropped to keep up">{`${Math.round(stats.fps)} fps · ${stats.dropped} dropped`}</span>}
         </section>
       </div>
@@ -346,7 +349,7 @@ function thumbnail(src: HTMLCanvasElement): string | null {
   }
 }
 
-const HEADER_H = 46; // the editor header above the panels
+const HEADER_H = 0; // the header lives in the shell's top bar (inline only when embedded)
 const SPLIT_KEY = "edit-studio.split";
 const clampSplit = (f: number) => Math.max(0.28, Math.min(0.72, f));
 

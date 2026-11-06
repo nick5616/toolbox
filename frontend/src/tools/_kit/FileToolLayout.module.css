@@ -12,13 +12,13 @@
 .primary {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .panels {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .drawerBody {
@@ -28,20 +28,17 @@
   padding: var(--space-3);
 }
 
+/* Form page: uses the width it is given (SPEC §13.1 rules 4 and 9). */
 .root {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  max-width: 960px;
-  padding: var(--space-6);
-  margin: 0 auto;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
 }
 
-/* Inside another tool's drawer or window: tighter, no tagline, no centring. */
+/* Inside another tool's drawer or window: tighter, no tagline. */
 .root.embedded {
-  gap: var(--space-4);
-  max-width: none;
-  padding: var(--space-3) var(--space-4);
+  gap: var(--space-3);
 }
 
 .noFiles {
@@ -54,22 +51,20 @@
   color: var(--fg-subtle);
 }
 
-.header {
-  display: flex;
-  flex-direction: column;
-}
-
-.title {
-  margin: 0;
-  font-size: var(--text-xl);
-  line-height: var(--text-xl-lh);
-  font-weight: 600;
-}
-
+/* The tagline lives in the empty state only (rule 7). */
 .tagline {
   margin: 0;
   font-size: var(--text-md);
   color: var(--fg-muted);
+}
+
+/* One-line drop zone: the icon, the text and the button side by side. */
+.drop.drop {
+  flex-direction: row;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-md);
 }
 
 .summary {
@@ -80,7 +75,7 @@
 
 .mono {
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--fg-muted);
   margin-right: var(--space-1);
 }
@@ -90,7 +85,58 @@
   font-size: var(--text-sm);
 }
 
-/* The run button stays in view while the options scroll (it sits in the flow when everything fits). */
+/* Flat input list: no frame, rows highlight on hover (rules 2 and 8). */
+.files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--row-h);
+  padding: 0 var(--space-1) 0 var(--space-2);
+  border-radius: var(--r-md);
+}
+
+.file:hover,
+.file:focus-within {
+  background: var(--bg-hover);
+}
+
+.fileIcon {
+  flex: none;
+  color: var(--fg-subtle);
+}
+
+.fileName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSize {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
+.remove {
+  flex: none;
+  opacity: 0;
+}
+
+.file:hover .remove,
+.file:focus-within .remove {
+  opacity: 1;
+}
+
+/* The run button always sits in the same place, on a bar that stays in view while the page scrolls. */
 .run {
   position: sticky;
   bottom: 0;
@@ -98,11 +144,10 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-3));
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
-  backdrop-filter: blur(6px);
+  margin: 0 calc(-1 * var(--space-4));
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--line);
+  background: var(--bg-app);
 }
 
 .reason {
@@ -118,7 +163,6 @@
 
 @media (max-height: 759px) {
   .root {
-    gap: var(--space-4);
-    padding: var(--space-4) var(--space-5);
+    gap: var(--space-3);
   }
 }

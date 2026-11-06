@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Button, SegmentedControl, Switch, TextArea, toast } from "@/components";
+import { Button, SegmentedControl, Switch, TextArea, toast, splitPath } from "@/components";
 import { DevUtilsService, FilesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { decodeText, encodeText, mimeForPath, reshapeBase64, toDataUrl } from "./base64.logic";
@@ -81,7 +81,7 @@ export default function Base64Util() {
           <Button variant="secondary" icon="file" loading={busy} data-tip="Pick a file (up to 10 MiB) to see it as Base64 and as a data URL" onClick={() => void pickFile()}>
             Choose a file
           </Button>
-          {fileB64 && <span className={styles.mono} data-tip="The file that was encoded">{fileB64.path}</span>}
+          {fileB64 && <span className={styles.mono} data-tip={fileB64.path}>{splitPath(fileB64.path)[1]}</span>}
         </div>
       </div>
       {fileB64 && (

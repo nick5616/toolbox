@@ -1,10 +1,12 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DepState } from "@/lib/api";
 import { isMac } from "@/lib/platform";
-import { Badge, Icon, IconButton, Tooltip, cx } from "@/components";
+import { Badge, Icon, IconButton, cx } from "@/components";
+import { startToolDrag } from "@/lib/fileDrag";
 import { useDeps } from "@/state/deps";
 import { useJobs, isActive } from "@/state/jobs";
 import { useSidebarCollapsed, useUI } from "@/state/ui";
+import { useLanShare } from "@/state/lanshare";
 // --- pipelines ---
 import { isRunActive, useNeedsYou, usePipelines } from "@/state/pipelines";
 // --- end pipelines ---
@@ -18,19 +20,27 @@ interface ItemProps {
   active: boolean;
   dot?: "warn" | "danger" | null;
   running?: boolean;
+  /** Local File Transfer is listening. */
+  receiving?: boolean;
   /** Pipelines: number of steps waiting for the user. */
   badge?: number;
+  /** Mod+digit that opens this tool. */
+  digit?: number;
+  /** Tools can be pinned (hover pin + context menu) and dropped on. */
+  tool?: { pinned: boolean; onTogglePin: () => void; onContextMenu: (x: number, y: number) => void };
   onClick: () => void;
 }
 
-function SidebarItem({ item, collapsed, active, dot, running, badge, onClick }: ItemProps) {
+function SidebarItem({ item, collapsed, active, dot, running, receiving, badge, digit, tool, onClick }: ItemProps) {
+  const tipText = item.tip ? `${item.label}: ${item.tip}` : item.label;
   const btn = (
     <button
       type="button"
       className={cx(styles.item, active && styles.active, item.soon && styles.soon, item.variantOf && styles.variant)}
       aria-current={active ? "page" : undefined}
       aria-label={collapsed ? item.label : undefined}
-      data-tip={collapsed ? (item.tip ? `${item.label}: ${item.tip}` : item.label) : item.tip}
+      data-tip={collapsed ? tipText : item.tip}
+      data-tip-kbd={digit ? `Mod+${digit}` : undefined}
       data-tip-side="right"
       onClick={onClick}
     >
@@ -44,15 +54,39 @@ function SidebarItem({ item, collapsed, active, dot, running, badge, onClick }: 
         </span>
       ) : null}
       {running && <span className={styles.running} data-tip="A job from this tool is running" data-testid="running-indicator" />}
+      {receiving && <span className={styles.receiving} data-tip="Receiving files from other devices" data-testid="receiving-indicator" />}
       {dot && <span className={cx(styles.dot, styles[dot])} data-testid={`dot-${dot}`} data-tip={dot === "danger" ? "A required component failed to install: open Settings" : "A required component is missing: open Settings to install it"} />}
     </button>
   );
-  return collapsed ? (
-    <Tooltip label={item.tip ? `${item.label}: ${item.tip}` : item.label} side="right" className={styles.tipWrap}>
+  if (!tool) return btn;
+  return (
+    <div
+      className={styles.row}
+      id={`tool-drop:${item.id}`}
+      data-file-drop-target
+      data-testid={`nav-${item.id}`}
+      draggable={!item.soon}
+      onDragStart={(e) => startToolDrag(e, item.id)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        tool.onContextMenu(e.clientX, e.clientY);
+      }}
+    >
       {btn}
-    </Tooltip>
-  ) : (
-    btn
+      {!collapsed && !item.soon && (
+        <button
+          type="button"
+          className={cx(styles.pin, tool.pinned && styles.pinned)}
+          aria-label={tool.pinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+          aria-pressed={tool.pinned}
+          data-tip={tool.pinned ? "Remove from Pinned" : "Pin to the top of the sidebar"}
+          data-tip-side="right"
+          onClick={tool.onTogglePin}
+        >
+          <Icon name="pin" size={12} />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -63,9 +97,28 @@ export function Sidebar() {
   const navigate = useUI((s) => s.navigate);
   const toggleSidebar = useUI((s) => s.toggleSidebar);
   const setSoonOpen = useUI((s) => s.setComingSoonOpen);
-  const { tools, soon } = useNavGroups();
+  const { soon, groups, pinned, recent, digits } = useNavGroups();
+  const pinnedIds = useUI((s) => s.pinned);
+  const collapsedGroups = useUI((s) => s.collapsedGroups);
+  const togglePin = useUI((s) => s.togglePin);
+  const toggleGroup = useUI((s) => s.toggleGroup);
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("blur", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("blur", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
   const deps = useDeps((s) => s.list);
   const byId = useJobs((s) => s.byId);
+  const lanListening = useLanShare((s) => s.state.listening);
 
   const runningModules = useMemo(() => {
     const set = new Set<string>();
@@ -85,14 +138,25 @@ export function Sidebar() {
   const pipelinesRunning = usePipelines((st) => Object.values(st.runs).some(isRunActive));
   // --- end pipelines ---
 
-  const item = (it: NavItem, dot?: "warn" | "danger" | null, extra?: { badge?: number; running?: boolean }) => (
+  const item = (it: NavItem, dot?: "warn" | "danger" | null, extra?: { badge?: number; running?: boolean; tool?: boolean; keyPrefix?: string }) => (
     <SidebarItem
-      key={it.id}
+      key={`${extra?.keyPrefix ?? ""}${it.id}`}
       item={it}
+      digit={digits[it.id]}
+      tool={
+        extra?.tool
+          ? {
+              pinned: pinnedIds.includes(it.id),
+              onTogglePin: () => togglePin(it.id),
+              onContextMenu: (x, y) => setMenu({ id: it.id, x, y }),
+            }
+          : undefined
+      }
       collapsed={collapsed}
       active={view === it.id}
       dot={dot}
       running={extra?.running ?? runningModules.has(it.id)}
+      receiving={it.id === "lan-share" && lanListening}
       badge={extra?.badge}
       onClick={() => navigate(it.id)}
     />
@@ -119,26 +183,59 @@ export function Sidebar() {
         />
       </div>
       <div className={styles.scroll}>
-        <Section label="Library" collapsed={collapsed}>
+        <Section label="" collapsed={collapsed}>
           {item(RECENT_ITEM)}
-          {/* --- pipelines item (UI2 adds the "needs you" badge) --- */}
+        </Section>
+        {/* --- pipelines item (UI2 adds the "needs you" badge) --- */}
+        <Section label="Automation" collapsed={collapsed}>
           {item(PIPELINES_ITEM, null, { badge: needsYou, running: pipelinesRunning })}
-          {/* --- end pipelines item --- */}
         </Section>
-        <Section label="Tools" collapsed={collapsed}>
-          {tools.map((t) => item(t))}
-        </Section>
+        {/* --- end pipelines item --- */}
+        {pinned.length > 0 && (
+          <Section label="Pinned" collapsed={collapsed}>
+            {pinned.map((t) => item({ ...t, variantOf: undefined }, null, { tool: true, keyPrefix: "pin:" }))}
+          </Section>
+        )}
+        {recent.length > 0 && (
+          <Section label="Recent tools" collapsed={collapsed}>
+            {recent.map((t) => item({ ...t, variantOf: undefined }, null, { tool: true, keyPrefix: "recent:" }))}
+          </Section>
+        )}
+        {groups.map((g) => {
+          const open = !collapsedGroups.includes(g.id);
+          return (
+            <Section key={g.id} label={g.label} collapsed={collapsed} toggle={{ open, onToggle: () => toggleGroup(g.id), tip: open ? `Hide the ${g.label} tools` : `Show the ${g.label} tools` }}>
+              {(open || collapsed) && g.items.map((t) => item(t, null, { tool: true }))}
+            </Section>
+          );
+        })}
         {soon.length > 0 && (
           <Section
             label="Coming soon"
             collapsed={collapsed}
-            toggle={{ open: comingSoonOpen, onToggle: () => setSoonOpen(!comingSoonOpen) }}
+            toggle={{ open: comingSoonOpen, onToggle: () => setSoonOpen(!comingSoonOpen), tip: comingSoonOpen ? "Hide tools that are not ready yet" : "Show tools that are not ready yet" }}
           >
             {(comingSoonOpen || collapsed) && soon.map((t) => item(t))}
           </Section>
         )}
       </div>
       <div className={styles.footer}>{item(SETTINGS_ITEM, settingsDot)}</div>
+      {menu && (
+        <div className={styles.menu} role="menu" style={{ left: menu.x, top: menu.y }} onPointerDown={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.menuItem}
+            onClick={() => {
+              togglePin(menu.id);
+              setMenu(null);
+            }}
+          >
+            <Icon name="pin" size={14} />
+            {pinnedIds.includes(menu.id) ? "Unpin from sidebar" : "Pin to sidebar"}
+          </button>
+        </div>
+      )}
     </nav>
   );
 }
@@ -151,20 +248,21 @@ function Section({
 }: {
   label: string;
   collapsed: boolean;
-  toggle?: { open: boolean; onToggle: () => void };
+  toggle?: { open: boolean; onToggle: () => void; tip: string };
   children: React.ReactNode;
 }) {
   return (
     <div className={styles.section}>
-      {!collapsed &&
-        (toggle ? (
-          <button type="button" className={cx(styles.sectionLabel, styles.sectionToggle)} onClick={toggle.onToggle} aria-expanded={toggle.open} data-tip={toggle.open ? "Hide tools that are not ready yet" : "Show tools that are not ready yet"}>
-            <Icon name={toggle.open ? "chevron-down" : "chevron-right"} size={12} />
-            {label}
-          </button>
-        ) : (
-          <div className={styles.sectionLabel}>{label}</div>
-        ))}
+      {collapsed ? (
+        <hr className={styles.sep} />
+      ) : toggle ? (
+        <button type="button" className={cx(styles.sectionLabel, styles.sectionToggle)} onClick={toggle.onToggle} aria-expanded={toggle.open} data-tip={toggle.tip}>
+          <Icon name={toggle.open ? "chevron-down" : "chevron-right"} size={12} />
+          {label}
+        </button>
+      ) : label ? (
+        <div className={styles.sectionLabel}>{label}</div>
+      ) : null}
       {children}
     </div>
   );

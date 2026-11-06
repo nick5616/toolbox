@@ -7,6 +7,11 @@
 export interface ExportResult {
     "folder": string;
     "files": string[] | null;
+
+    /**
+     * the post that was exported
+     */
+    "projectId": string;
 }
 
 export interface Issue {

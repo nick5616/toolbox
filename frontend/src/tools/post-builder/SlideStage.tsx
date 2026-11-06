@@ -14,6 +14,9 @@ export interface SlideStageProps {
   aspect: string;
   project: ProjectInfo | undefined;
   onChange: (patch: Partial<PostSlide>) => void;
+  /** A pan drag: shown live (not recorded), then recorded once on release. */
+  onFramingLive?: (patch: Partial<PostSlide>) => void;
+  onFramingEnd?: (patch: Partial<PostSlide>) => void;
   /** Opens Photo Composer / the Sequence Editor for this slide, here or in its own window. */
   onEdit: (where: "here" | "window") => void;
   /** The frame shown while a clip is trimmed (set by the Trim click-in in the dock). */
@@ -42,12 +45,13 @@ export function FramingPanel({ slide, onChange }: { slide: PostSlide; onChange: 
   );
 }
 
-export function SlideStage({ slide, aspect, project, onChange, onEdit, stillMs }: SlideStageProps) {
+export function SlideStage({ slide, aspect, project, onChange, onFramingLive, onFramingEnd, onEdit, stillMs }: SlideStageProps) {
   const isClip = slide.kind === "clip";
   const stillSlide = useMemo(() => (isClip ? { ...slide, inMs: stillMs } : slide), [slide, isClip, stillMs]);
   const visual = useSlideVisual(stillSlide, project, 1280);
   const framable = slide.kind !== "video";
   const pending = isPending(slide);
+  const missing = !pending && (visual.status === "error" || visual.status === "none");
 
   const patchFraming = (p: Partial<Pick<PostSlide, "zoom" | "panX" | "panY">>) => onChange(p);
   return (
@@ -71,18 +75,16 @@ export function SlideStage({ slide, aspect, project, onChange, onEdit, stillMs }
             aspect={aspect}
             framing={framable ? slide : { zoom: 1, panX: 0, panY: 0, rotation: 0 }}
             onFraming={framable ? patchFraming : undefined}
-            placeholderIcon={KIND_ICON[slide.kind] ?? "image"}
+            onFramingLive={framable ? onFramingLive : undefined}
+            onFramingEnd={framable ? onFramingEnd : undefined}
+            placeholderIcon={missing ? "triangle-alert" : (KIND_ICON[slide.kind] ?? "image")}
             loading={visual.status === "loading"}
+            placeholderLabel={missing ? (slide.path ? "Media missing: the file moved or can't be read" : "Nothing to show yet: open it and save") : undefined}
+            placeholderTone={missing ? "warn" : undefined}
             alt={slide.altText || KIND_LABEL[slide.kind]}
           />
         )}
       </div>
-
-      {visual.status === "error" && !pending && (
-        <Banner tone="danger" title="This picture can't be shown">
-          {slide.path ? "The file may have moved or be in a format the preview can't read." : "The project has no picture yet; open it and save."}
-        </Banner>
-      )}
 
     </section>
   );

@@ -30,7 +30,10 @@ export function applySeed(seed: ToolSeed): void {
 export function applyHandoff(h: Handoff): void {
   const first = h.inputs[0];
   const s = useVisualizer.getState();
-  if (first) s.setInput(first, isVideoPath(first));
+  if (first) {
+    s.setInput(first, isVideoPath(first));
+    useVisualizer.setState({ restored: false }); // a handoff is a request: it analyses by itself again
+  }
   if (h.seed?.kind === "timed-text") {
     applySeed(h.seed);
     // A seed without a new file changes the words: the song is analysed again.

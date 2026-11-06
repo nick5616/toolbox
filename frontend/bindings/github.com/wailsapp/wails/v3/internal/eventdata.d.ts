@@ -10,6 +10,12 @@ import type { Events } from "@wailsio/runtime";
 import type * as core$0 from "../../../../../toolbox/core/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import type * as focus$0 from "../../../../../toolbox/core/focus/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import type * as lan$0 from "../../../../../toolbox/core/lan/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import type * as viz$0 from "../../../../../toolbox/core/viz/models.js";
 
 declare module "@wailsio/runtime" {
@@ -25,11 +31,19 @@ declare module "@wailsio/runtime" {
             "clipboard:removed": core$0.ClipsRemoved;
             "clipboard:state": core$0.ClipboardState;
             "deps:changed": core$0.DepsChanged;
+            "focus:blocked": focus$0.BlockEvent;
+            "focus:changed": focus$0.State;
             "hotkeys:status": core$0.HotkeysChanged;
             "jobs:changed": core$0.Job;
             "jobs:log": core$0.JobLogBatch;
             "jobs:progress": core$0.JobProgress;
             "jobs:removed": core$0.JobsRemoved;
+            "lanshare:activity": lan$0.Activity;
+            "lanshare:devices": lan$0.DevicesChanged;
+            "lanshare:message": lan$0.Message;
+            "lanshare:prompt": lan$0.Prompt;
+            "lanshare:prompt-closed": lan$0.PromptClosed;
+            "lanshare:state": lan$0.State;
             "library:added": core$0.Output;
             "library:removed": core$0.OutputsRemoved;
             "packs:changed": core$0.PacksChanged;

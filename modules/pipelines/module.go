@@ -6,6 +6,8 @@
 package pipelines
 
 import (
+	"time"
+
 	"toolbox/core"
 	"toolbox/core/pipeline"
 )
@@ -19,6 +21,9 @@ type Module struct {
 	outputs    core.OutputStore
 	em         core.Emitter
 	libraryDir func() string
+	runner     *pipeline.Runner
+	launcher   Launcher      // Phase 18: Open in app ↔ Focus Lock
+	subPoll    time.Duration // how often a sub-run is checked; tests shorten it
 }
 
 // Config wires the module.
@@ -28,15 +33,17 @@ type Config struct {
 	Outputs    core.OutputStore
 	Emitter    core.Emitter
 	LibraryDir func() string
+	Launcher   Launcher // optional
 }
 
 // Register adds the module and the built-in step types to the registry and
 // the runner.
 func Register(reg *core.Registry, cfg Config) (*Module, error) {
-	m := &Module{tg: cfg.Chat, outputs: cfg.Outputs, em: cfg.Emitter, libraryDir: cfg.LibraryDir}
+	m := &Module{tg: cfg.Chat, outputs: cfg.Outputs, em: cfg.Emitter, libraryDir: cfg.LibraryDir, runner: cfg.Runner, launcher: cfg.Launcher, subPoll: 500 * time.Millisecond}
 	if err := reg.Register(m); err != nil {
 		return nil, err
 	}
+	cfg.Runner.RegisterAlias(TypeChatLegacy, TypeChat)
 	for _, b := range m.builtins() {
 		if err := cfg.Runner.RegisterBuiltin(b.t, b.a); err != nil {
 			return nil, err

@@ -11,7 +11,7 @@ import { useToolHandoff } from "@/lib/embed";
 import { useShortcut } from "@/lib/shortcuts";
 import { useCompositionInputs } from "@/state/composition";
 import type { ToolViewProps } from "@/tools";
-import { OneLineBar, Spacer, StudioLayout, WorkspacePanel, WorkspacePreviewFrame, WorkspaceRail, panelDrawerId } from "@/workspace";
+import { Spacer, StudioLayout, WorkspacePanel, WorkspacePreviewFrame, WorkspaceRail, panelDrawerId } from "@/workspace";
 import { PartFrame } from "@/parts/PartFrame";
 import { CuesPanel } from "./CuesPanel";
 import { DesignerSheet } from "./DesignerSheet";
@@ -134,6 +134,7 @@ function Workspace() {
 
   const menu = (): MenuItem[] => [
     { id: "save", label: "Save subtitles", icon: "check", tip: blocker ?? "Write the subtitles to a file in your Library", disabled: !hasCues || blocker !== null || saveRun.busy, onSelect: () => save() },
+    { id: "lang", label: `Language: ${languageText}`, icon: "languages", tip: "The language of these subtitles (opens Translate)", onSelect: () => open(panelDrawerId("translate")) },
     { id: "file", label: "Use a subtitle file…", icon: "file-text", tip: "Open an .srt or .vtt file to edit", onSelect: () => void pickSubtitleFile() },
     { id: "media", label: mediaPath ? "Choose a different video or audio file…" : "Pick the video…", icon: "film", tip: "Choose the picture to preview and burn the subtitles onto", onSelect: () => void pickMedia() },
     { id: "viz", label: "Make it fully reactive in Visualizer", icon: "sparkles", tip: "Open Visualizer with this audio and these words", disabled: !mediaPath, onSelect: () => openInVisualizer() },
@@ -143,16 +144,10 @@ function Workspace() {
 
   const header = (
     <>
-      <OneLineBar aria-label="Source" widths={{ source: 220, language: 150 }}>
-        <button key="source" type="button" className={styles.headChip} onClick={() => open(panelDrawerId("source"))} data-tip={`${sourceTip} (opens the Source panel)`}>
-          <Icon name={mediaPath ? "film" : "file-text"} size={14} />
-          <span className={styles.headChipText}>{sourceName}</span>
-        </button>
-        <button key="language" type="button" className={styles.headChip} onClick={() => open(panelDrawerId("translate"))} data-tip="The language of these subtitles (opens Translate)">
-          <Icon name="languages" size={14} />
-          <span className={styles.headChipText}>{languageText}</span>
-        </button>
-      </OneLineBar>
+      <button type="button" className={styles.headChip} onClick={() => open(panelDrawerId("source"))} data-tip={`${sourceTip} (opens the Source panel)`}>
+        <Icon name={mediaPath ? "film" : "file-text"} size={14} />
+        <span className={styles.headChipText}>{sourceName}</span>
+      </button>
       {state && (
         <span className={styles.state}>
           {dirty && !saveRun.busy && <span className={styles.dot} role="img" aria-label="Unsaved changes" data-tip="You have edits that aren't saved yet" />}

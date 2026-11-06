@@ -59,7 +59,7 @@
   --line-strong: rgba(255, 255, 255, 0.12);
   --fg: #ededef;
   --fg-muted: #a1a2aa;
-  --fg-subtle: #6b6d76;
+  --fg-subtle: #9092a0;
   --fg-faint: #45474f;
   --accent: #ff8c42;
   --accent-fg: #1a0b02;
@@ -89,7 +89,7 @@
   --line-strong: rgba(10, 10, 20, 0.15);
   --fg: #121316;
   --fg-muted: #55575f;
-  --fg-subtle: #868892;
+  --fg-subtle: #62646d;
   --fg-faint: #b4b5bc;
   --accent: #bd5310;
   --accent-fg: #ffffff;
@@ -156,4 +156,29 @@
   --lane-word: #1d4ed8;
   --lane-custom: #a16207;
   --lane-accent: #be185d;
+}
+
+/* Value types (Phase 16): one colour per kind of value on a pipeline port, in the
+   step panel and anywhere a value's type is shown. Files are orange: they are
+   what a step takes in. */
+:root {
+  --type-files: #ff8c42;
+  --type-file: #ffb37a;
+  --type-text: #63e6be;
+  --type-number: #4cc9f0;
+  --type-toggle: #b388eb;
+  --type-choice: #8c9bff;
+  --type-color: #ff6bd6;
+  --type-any: #a1a2aa;
+}
+
+:root[data-theme="light"] {
+  --type-files: #c2410c;
+  --type-file: #c2620c;
+  --type-text: #0f766e;
+  --type-number: #0369a1;
+  --type-toggle: #7c3aed;
+  --type-choice: #3b5bdb;
+  --type-color: #c026d3;
+  --type-any: #55575f;
 }

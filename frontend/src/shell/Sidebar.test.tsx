@@ -32,20 +32,20 @@ describe("Sidebar", () => {
 
   it("renders ready tools and a collapsed coming-soon section", () => {
     render(<Sidebar />);
-    expect(screen.getByRole("button", { name: /Recent/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Downloader/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Stems/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Library/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Downloader/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Stems/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Coming soon/i }));
-    const stems = screen.getByRole("button", { name: /Stems/ });
+    const stems = screen.getByRole("button", { name: /^Stems/ });
     expect(stems.textContent).toContain("SOON");
   });
 
   it("navigates on click, including coming-soon items", () => {
     useUI.setState({ comingSoonOpen: true });
     render(<Sidebar />);
-    fireEvent.click(screen.getByRole("button", { name: /Downloader/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Downloader/ }));
     expect(useUI.getState().view).toBe("downloader");
-    fireEvent.click(screen.getByRole("button", { name: /Stems/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Stems/ }));
     expect(useUI.getState().view).toBe("stems");
     fireEvent.click(screen.getByRole("button", { name: /Settings/ }));
     expect(useUI.getState().view).toBe("settings");
@@ -53,7 +53,7 @@ describe("Sidebar", () => {
 
   it("marks the active item", () => {
     render(<Sidebar />);
-    expect(screen.getByRole("button", { name: /Recent/ }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("button", { name: /Library/ }).getAttribute("aria-current")).toBe("page");
   });
 
   it("shows an amber dot on Settings when a required dep is missing", () => {

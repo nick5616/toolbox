@@ -3,10 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { normalizeProject } from "@/viz/edit/defaults";
 import { fixtureProject } from "@/viz/edit/fixture";
-import { getEditorPanel } from "@/editor/panels";
+import { defineEditorWorkspace } from "@/editor/workspace";
 import { EditorProfileProvider } from "@/editor/profileContext";
 import { useEditStudio } from "@/editor/store";
 import { MUSIC_EDIT_PROFILE } from "./profile";
+
+const ws = defineEditorWorkspace(MUSIC_EDIT_PROFILE);
+const getEditorPanel = (id: string) => ws.getPanel(id);
 
 const st = () => useEditStudio.getState();
 const doc = () => st().history!.present;

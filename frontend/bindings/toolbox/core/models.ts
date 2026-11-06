@@ -355,6 +355,25 @@ export interface ClipQuery {
 }
 
 /**
+ * ClipTrigger starts a run when something is copied while clipboard recording
+ * is on (Phase 14). Sensitive copies never reach it. A copied link becomes a
+ * URL input, an image its saved PNG, text a .txt file.
+ */
+export interface ClipTrigger {
+    "enabled": boolean;
+
+    /**
+     * ClipTriggerLink | ClipTriggerImage | ClipTriggerText; 1–3
+     */
+    "kinds": string[] | null;
+
+    /**
+     * RE2 regular expression the text must contain a match for; required with "text"
+     */
+    "pattern": string;
+}
+
+/**
  * ClipboardSettings configure clipboard history recording.
  */
 export interface ClipboardSettings {
@@ -1067,6 +1086,24 @@ export interface Pipeline {
     "watch": WatchConfig;
 
     /**
+     * "When I copy…" (Phase 14)
+     */
+    "clip": ClipTrigger;
+
+    /**
+     * Schedule starts runs at set times (Phase 18). Runs start with no
+     * files, so only pipelines that read none can be scheduled.
+     */
+    "schedule": ScheduleTrigger;
+
+    /**
+     * Params are values asked for when a run starts (Phase 16): each is a
+     * variable every step can use, and step options can be wired to it.
+     * ≤ 20
+     */
+    "params": PipelineParam[] | null;
+
+    /**
      * Layout is the node editor's canvas state (Phase 10): JSON
      * {"v":1,"nodes":{"<stepId>|input":{"x":0,"y":0}},"view":{"x":0,"y":0,"zoom":1}}.
      * Opaque to the runner; ≤ 32 KiB; "" = auto layout.
@@ -1109,6 +1146,12 @@ export interface PipelineCheck {
      * no problems anywhere and nothing missing
      */
     "ready": boolean;
+
+    /**
+     * TakesFiles: some step reads From "input". A pipeline that takes no
+     * files starts with one item and no inputs (Phase 18).
+     */
+    "takesFiles": boolean;
 }
 
 /**
@@ -1118,7 +1161,44 @@ export interface PipelineEntry {
     "pipeline": Pipeline;
     "check": PipelineCheck;
     "watch": WatchState;
+
+    /**
+     * Active = the clipboard trigger is on and recording; Message says why not
+     */
+    "clip": WatchState;
+    "schedule": ScheduleState;
     "lastRun": RunBrief | null;
+}
+
+/**
+ * PipelineParam is a value asked for when a run starts. Runs started by a
+ * watch folder or the clipboard use Default.
+ */
+export interface PipelineParam {
+    /**
+     * variable name, [a-z][a-z0-9_]{0,31}; not a built-in or step variable
+     */
+    "name": string;
+
+    /**
+     * 1–60 chars
+     */
+    "label": string;
+
+    /**
+     * never ValueFile
+     */
+    "type": ValueType;
+
+    /**
+     * ≤ 1000 chars
+     */
+    "default": string;
+
+    /**
+     * ValueChoice: 2–30 values
+     */
+    "choices": string[] | null;
 }
 
 export interface PipelineRun {
@@ -1137,7 +1217,7 @@ export interface PipelineRun {
     "status": RunStatus;
 
     /**
-     * "manual" | "watch"
+     * "manual" | "watch" | "clipboard" | "pipeline" | "schedule"
      */
     "trigger": string;
     "inputs": string[] | null;
@@ -1210,10 +1290,23 @@ export interface PipelineStep {
      * manual/check: shown on the "needs you" card (≤ 200)
      */
     "note": string;
+
+    /**
+     * Binds wire option fields to variables (Phase 16): before the step is
+     * prepared, the runner writes each variable's value into its field. An
+     * empty or missing variable keeps the field's own value.
+     * ≤ 50, one per option
+     */
+    "binds": StepBind[] | null;
 }
 
 export interface PipelineTemplate {
     "id": string;
+
+    /**
+     * TemplateGroupPractical | TemplateGroupCool
+     */
+    "group": string;
 
     /**
      * one sentence
@@ -1364,6 +1457,11 @@ export interface RunCell {
      * when waiting
      */
     "wait": WaitKind;
+
+    /**
+     * WaitTime: when it is prepared again (Unix ms); 0 = none (Phase 18)
+     */
+    "until": number;
     "jobIds": string[] | null;
 
     /**
@@ -1460,7 +1558,7 @@ export interface RunRequest {
     "pipelineId": string;
 
     /**
-     * paths or http(s) links; 1–200
+     * paths or http(s) links; 1–200 (none when the pipeline takes no files)
      */
     "inputs": string[] | null;
 
@@ -1468,6 +1566,11 @@ export interface RunRequest {
      * "<stepId>.<key>" → value
      */
     "secrets": { [_ in string]?: string } | null;
+
+    /**
+     * PipelineParam.Name → value; missing = its default (Phase 16)
+     */
+    "params": { [_ in string]?: string } | null;
 }
 
 export enum RunStatus {
@@ -1509,6 +1612,47 @@ export enum RunStatus {
  */
 export interface RunsRemoved {
     "ids": string[] | null;
+}
+
+/**
+ * ScheduleState is a pipeline's schedule as listed.
+ */
+export interface ScheduleState {
+    "active": boolean;
+
+    /**
+     * "" = fine; else why not, or "Skipped 9:30: the last run is still going"
+     */
+    "message": string;
+
+    /**
+     * next fire, Unix ms; 0 = none
+     */
+    "next": number;
+}
+
+/**
+ * ScheduleTrigger starts a run at local clock times on chosen weekdays
+ * (Phase 18). It fires only while Toolbox runs; a slot missed while it was
+ * closed or asleep fires once on start/wake when it is within CatchUpMin.
+ */
+export interface ScheduleTrigger {
+    "enabled": boolean;
+
+    /**
+     * 0 = Sunday … 6; 1–7 unique values
+     */
+    "days": number[] | null;
+
+    /**
+     * "HH:MM" 24 h local; 1–12 unique
+     */
+    "times": string[] | null;
+
+    /**
+     * 0–720 (default 30)
+     */
+    "catchUpMin": number;
 }
 
 export interface SecretAsk {
@@ -1607,6 +1751,21 @@ export interface ShowView {
 export interface Size {
     "w": number;
     "h": number;
+}
+
+/**
+ * StepBind wires one option field of a step to a variable.
+ */
+export interface StepBind {
+    /**
+     * JSON pointer to a string, number or boolean field of OptionsJSON, e.g. "/speed" or "/show/music"
+     */
+    "option": string;
+
+    /**
+     * a variable the step can use (a built-in, a run parameter or an earlier step's)
+     */
+    "var": string;
 }
 
 export interface StepCheck {
@@ -1767,6 +1926,11 @@ export interface StepType {
 export interface StepVar {
     "name": string;
     "label": string;
+
+    /**
+     * "" = text (Phase 16)
+     */
+    "type"?: ValueType;
 }
 
 /**
@@ -1804,6 +1968,47 @@ export interface ToolsDirInfo {
      */
     "available": boolean;
 }
+
+/**
+ * ValueType is the type of a value on a pipeline port (Phase 16). It picks
+ * the port's colour and which wires may connect.
+ */
+export enum ValueType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * any text ("" means text too)
+     */
+    ValueText = "text",
+
+    /**
+     * a decimal number
+     */
+    ValueNumber = "number",
+
+    /**
+     * true/false (also yes/no, on/off, 1/0)
+     */
+    ValueToggle = "toggle",
+
+    /**
+     * one of a fixed set of words
+     */
+    ValueChoice = "choice",
+
+    /**
+     * #rrggbb
+     */
+    ValueColor = "color",
+
+    /**
+     * a path to one file
+     */
+    ValueFile = "file",
+};
 
 /**
  * VaultSettings configure the Vault.
@@ -1856,6 +2061,11 @@ export enum WaitKind {
      * e.g. "Unlock the Vault to continue"; retried every 5 s
      */
     WaitCondition = "condition",
+
+    /**
+     * waiting for a moment (RunCell.Until); Continue now skips it (Phase 18)
+     */
+    WaitTime = "time",
 };
 
 /**

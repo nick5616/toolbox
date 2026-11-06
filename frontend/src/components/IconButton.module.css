@@ -23,10 +23,6 @@
   height: var(--control-h-compact);
 }
 
-.button:disabled {
-  opacity: 0.45;
-  pointer-events: none;
-}
 
 .ghost:hover {
   background: var(--bg-hover);
@@ -52,5 +48,21 @@
 
 .pressed {
   background: var(--bg-active);
+  color: var(--fg);
+}
+
+/* Disabled: aria-disabled keeps the button hoverable so its tooltip can say why. */
+.button[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.button[aria-disabled="true"]:hover,
+.button[aria-disabled="true"]:active {
+  background: transparent;
+  color: var(--fg-muted);
+}
+.secondary[aria-disabled="true"]:hover,
+.secondary[aria-disabled="true"]:active {
+  background: var(--bg-raised);
   color: var(--fg);
 }

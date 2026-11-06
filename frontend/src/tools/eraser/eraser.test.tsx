@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
   erase: vi.fn(),
+  saveMask: vi.fn(),
+  deleteMask: vi.fn(async (_id: string) => undefined),
+  masks: [] as unknown[],
   cancel: vi.fn(async (_id: string) => undefined),
   urlFor: vi.fn(async (p: string) => `/media/t/${p.split("/").pop()}`),
   thumb: vi.fn(async (_p: string, _max: number) => "data:image/jpeg;base64,AAAA"),
@@ -22,6 +25,9 @@ vi.mock("@/lib/api", async (orig) => {
         { id: "fast", label: "Fast", downloadBytes: 28 * 1024 * 1024, present: true },
       ],
       Erase: (...a: unknown[]) => h.erase(...a),
+      SavedMasks: async () => h.masks,
+      SaveMask: (...a: unknown[]) => h.saveMask(...a),
+      DeleteMask: (id: string) => h.deleteMask(id),
     },
     MediaService: { URLFor: (p: string) => h.urlFor(p) },
     JobsService: { Cancel: (id: string) => h.cancel(id) },
@@ -96,6 +102,9 @@ const paint = () => {
 describe("ObjectEraserView", () => {
   beforeEach(() => {
     h.erase.mockReset();
+    h.saveMask.mockReset();
+    h.deleteMask.mockClear();
+    h.masks = [];
     h.cancel.mockClear();
     h.urlFor.mockClear();
     h.setState.mockClear();
@@ -162,7 +171,7 @@ describe("ObjectEraserView", () => {
     paint();
     await user.keyboard("{Enter}");
     await waitFor(() => expect(h.erase).toHaveBeenCalledTimes(1));
-    expect(h.erase).toHaveBeenCalledWith("/photo.jpg", "data:image/png;base64,QUJD", { model: "fast", maskPath: "" });
+    expect(h.erase).toHaveBeenCalledWith("/photo.jpg", "data:image/png;base64,QUJD", { model: "fast", maskPath: "", note: "" });
   });
 
   it("shows stage text and progress with Cancel while running", async () => {
@@ -228,6 +237,37 @@ describe("ObjectEraserView", () => {
     expect(img.src).toContain("data:image/jpeg");
     expect(h.thumb).toHaveBeenCalledWith("/scan.tiff", 1600);
     expect(h.urlFor).not.toHaveBeenCalled();
+  });
+
+  it("saves the painted mask for pipelines under a name", async () => {
+    h.saveMask.mockResolvedValue({ id: "m1", name: "photo mask", width: 2000, height: 1000, createdAt: 1 });
+    const user = await loaded();
+    await user.click(await screen.findByRole("button", { name: /^Saved masks/ }));
+    const save = screen.getByRole("button", { name: "Save mask for pipelines…" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true); // nothing painted yet
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    paint();
+    await user.click(screen.getByRole("button", { name: /^Saved masks/ }));
+    await user.click(screen.getByRole("button", { name: "Save mask for pipelines…" }));
+    const field = screen.getByLabelText("Mask name") as HTMLInputElement;
+    expect(field.value).toBe("photo mask");
+    await user.clear(field);
+    await user.type(field, "Corner logo");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(h.saveMask).toHaveBeenCalledWith("Corner logo", "data:image/png;base64,QUJD"));
+    expect(await screen.findByRole("list", { name: "Saved masks" })).toBeTruthy();
+    expect(screen.getByText("2000×1000")).toBeTruthy();
+  });
+
+  it("lists saved masks and deletes one", async () => {
+    h.masks = [{ id: "m1", name: "Watermark", width: 800, height: 600, createdAt: 1 }];
+    const user = await loaded();
+    const row = await screen.findByRole("button", { name: /^Saved masks/ });
+    await waitFor(() => expect(row.textContent).toContain("1 saved"));
+    await user.click(row);
+    await user.click(screen.getByRole("button", { name: "Delete Watermark" }));
+    await waitFor(() => expect(h.deleteMask).toHaveBeenCalledWith("m1"));
+    expect(await screen.findByText("No saved masks yet.")).toBeTruthy();
   });
 
   it("registers palette entries", () => {

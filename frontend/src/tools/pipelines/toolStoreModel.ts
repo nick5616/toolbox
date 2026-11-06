@@ -54,7 +54,8 @@ export function storeContents(catalog: readonly StepType[], modules: readonly Mo
     const list = tools.filter((t) => t.category === c);
     if (list.length > 0) groups.push({ id: c, label: CATEGORY_LABELS[c] ?? c, tools: list });
   }
-  const inCatalog = new Set(catalog.map((t) => t.moduleId).filter(Boolean));
+  // A tool is in the catalogue under its own id (Local Chat and Clipboard run their jobs on another module) or as its module.
+  const inCatalog = new Set(catalog.flatMap((t) => [t.id, t.moduleId]).filter(Boolean));
   const unavailable = modules
     .filter((m) => !m.hidden && m.id !== "pipelines" && !inCatalog.has(m.id))
     .filter((m) => matches(q, m.name, m.tagline))

@@ -49,6 +49,40 @@ func Catalog() []Spec {
 			},
 		},
 		{
+			ID: Pandoc, Name: "Pandoc", Purpose: "Converts documents between Markdown, Word, HTML, EPUB and more",
+			Binary: "pandoc", VersionArgs: []string{"--version"},
+			VersionRegex: regexp.MustCompile(`pandoc(?:\.exe)? (\S+)`),
+			Managed:      true, ArchiveDir: "pandoc", VersionFile: "VERSION", PinnedVersion: PandocVersion, AllowSystem: true,
+			InstallHint: map[string]string{
+				"darwin":  "Install it in Settings → Tool packs (or: brew install pandoc)",
+				"windows": "Install it in Settings → Tool packs (or: winget install JohnMacFarlane.Pandoc)",
+				"linux":   "sudo apt install pandoc",
+			},
+		},
+		{
+			ID: Typst, Name: "Typst", Purpose: "Typesetting engine that makes PDFs from documents",
+			Binary: "typst", VersionArgs: []string{"--version"},
+			VersionRegex: regexp.MustCompile(`typst (\S+)`),
+			Managed:      true, ArchiveDir: "typst", VersionFile: "VERSION", PinnedVersion: TypstVersion, AllowSystem: true,
+			MinVersion: TypstMinVersion,
+			InstallHint: map[string]string{
+				"darwin":  "Install it in Settings → Tool packs (or: brew install typst)",
+				"windows": "Install it in Settings → Tool packs (or: winget install Typst.Typst)",
+				"linux":   "Install Typst 0.12 or newer from your package manager",
+			},
+		},
+		{
+			ID: Monolith, Name: "Monolith", Purpose: "Saves a web page as one self-contained HTML file",
+			Binary: "monolith", VersionArgs: []string{"--version"},
+			VersionRegex: regexp.MustCompile(`monolith (\S+)`),
+			Managed:      true, ArchiveDir: "monolith", VersionFile: "VERSION", PinnedVersion: MonolithVersion,
+			InstallHint: map[string]string{
+				"darwin":  "Install it in Settings → Tool packs",
+				"windows": "Install it in Settings → Tool packs",
+				"linux":   "The web archiver isn't available for this platform yet",
+			},
+		},
+		{
 			ID: Node, Name: "Node.js", Purpose: "Fallback JavaScript runtime for yt-dlp",
 			Binary: "node", VersionArgs: []string{"--version"},
 			VersionRegex: regexp.MustCompile(`v?(\S+)`),

@@ -21,9 +21,9 @@
   flex: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--space-3);
   height: 44px;
-  padding: 0 var(--space-4);
+  padding: 0 var(--space-3) 0 var(--space-4);
   border-bottom: 1px solid var(--line);
 }
 
@@ -37,12 +37,24 @@
 
 .titleGroup {
   display: flex;
+  flex: 0 1 auto;
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
 }
 
+/* Where a tool's own header portals into (ToolHeader): takes the room between title and actions. */
+.slot {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .actions {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -55,6 +67,8 @@
 }
 
 .title {
+  flex: none;
+  white-space: nowrap;
   font-size: var(--text-lg);
   font-weight: 600;
   line-height: var(--text-lg-lh);

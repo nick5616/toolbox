@@ -57,11 +57,6 @@ export function CreateForm({ onCreated }: { onCreated: (recoveryKey: string) => 
 
   return (
     <>
-      <ul className={styles.list}>
-        <li>File names, folders and contents are encrypted. File count and approximate sizes stay visible on disk.</li>
-        <li>Forgetting the passphrase means losing the files unless you kept the recovery key.</li>
-        <li>Adding files copies them; your originals stay where they are. Delete them yourself if you want.</li>
-      </ul>
       <form className={styles.narrow} onSubmit={(e) => void submit(e)}>
         <Field label="Passphrase">
           {(c) => <TextField {...c} data-tip={`Choose a passphrase of at least ${MIN_PASSPHRASE} characters; a few random words work well`} type="password" autoComplete="new-password" value={pass} onChange={(e) => setPass(e.target.value)} />}
@@ -82,6 +77,11 @@ export function CreateForm({ onCreated }: { onCreated: (recoveryKey: string) => 
             Create vault
           </Button>
         </div>
+        <ul className={styles.list}>
+          <li>File names, folders and contents are encrypted. File count and approximate sizes stay visible on disk.</li>
+          <li>Forgetting the passphrase means losing the files unless you kept the recovery key.</li>
+          <li>Adding files copies them; your originals stay where they are. Delete them yourself if you want.</li>
+        </ul>
       </form>
     </>
   );

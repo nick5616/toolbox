@@ -103,7 +103,7 @@ import { useUI } from "@/state/ui";
 import { useComposer } from "./store";
 import PhotoComposerView from "./PhotoComposerView";
 import { discardedProjects } from "./useAutosave";
-import { displayToDocIndex, dropIndex, fitScale, moveWithSnap, nudge, panBackground, scaleByHandle } from "./logic";
+import { displayToDocIndex, dropIndex, fitScale, moveWithSnap, nudge, panBackground, scaleByHandle, slotsLine, templateSlotCount } from "./logic";
 import { layerBox } from "@/composer/hittest";
 
 const info = (id: string, name = id, items = 0): ProjectInfo =>
@@ -326,6 +326,33 @@ describe("editor", () => {
     expect(b?.rotation).toBe(30);
     expect(b?.shadow.on).toBe(true);
     expect(b?.flipX).toBe(true);
+  });
+
+  it("marks a photo layer as a template slot and says how many slots the template has", async () => {
+    renderView();
+    await openProject("Market");
+    await showPanel("Layers");
+    const rowB = within(layerList()).getAllByRole("listitem")[0] as HTMLElement;
+    fireEvent.pointerDown(rowB, { button: 0 });
+    fireEvent.pointerUp(rowB);
+    await showPanel("Layer");
+    await userEvent.click(screen.getByRole("switch", { name: "Template slot" }));
+    await waitFor(() => expect(m.save).toHaveBeenCalled());
+    const saved = m.save.mock.calls.at(-1)?.[2] as Composition;
+    expect(saved.layers?.find((l) => l.id === "B")?.slot).toBe(true);
+    expect(saved.layers?.find((l) => l.id === "A")?.slot).toBe(false);
+    await userEvent.click(screen.getByRole("button", { name: "More actions" }));
+    expect(await screen.findByRole("menuitem", { name: "Template: 1 photo slot" })).toBeTruthy();
+  });
+
+  it("counts template slots: the marked photos, else every visible photo", () => {
+    const d = twoPhotos();
+    const layers = d.layers ?? [];
+    expect(templateSlotCount(layers)).toBe(2);
+    expect(slotsLine(layers)).toBe("Template: 2 photo slots");
+    expect(templateSlotCount(layers.map((l) => (l.id === "A" ? { ...l, slot: true } : l)))).toBe(1);
+    expect(templateSlotCount(layers.map((l) => ({ ...l, hidden: true })))).toBe(0);
+    expect(slotsLine([])).toBe("Template: no photo slots");
   });
 
   it("applies a layout from the menu", async () => {
@@ -700,6 +727,24 @@ describe("sources tab", () => {
     expect((screen.getByLabelText("Y") as HTMLInputElement).value).toBe("675");
   });
 
+  it("ends an export in a draggable result row with Send to, and has a labelled Projects button", async () => {
+    m.exportFn.mockResolvedValue({ id: "o1", jobId: "", path: "C:/lib/Compositions/Market.jpg", name: "Market.jpg", missing: false });
+    renderView();
+    await openProject("Market");
+    expect(screen.getByRole("button", { name: "Projects" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Export" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Export as JPG" }));
+    const row = await screen.findByTestId("last-export");
+    expect(row.textContent).toContain("Market.jpg");
+    expect(row.getAttribute("draggable")).toBe("true");
+    expect(screen.getByRole("button", { name: "Send to…" })).toBeTruthy();
+    const data: Record<string, string> = {};
+    fireEvent.dragStart(row, { dataTransfer: { setData: (k: string, v: string) => (data[k] = v), types: [] } });
+    expect(JSON.parse(data["application/x-toolbox-paths"] ?? "[]")).toEqual(["C:/lib/Compositions/Market.jpg"]);
+    await userEvent.click(within(row).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByTestId("last-export")).toBeNull();
+  });
+
   it("adds sources dropped on the stage at the drop point", async () => {
     m.sources.mockResolvedValue(sources);
     await openFromPost();
@@ -780,6 +825,6 @@ describe("stage geometry", () => {
 });
 
 async function addText() {
-  await userEvent.click(screen.getByRole("button", { name: "Add" }));
+  await userEvent.click(screen.getByRole("button", { name: "More actions" }));
   await userEvent.click(await screen.findByRole("menuitem", { name: "Add text" }));
 }

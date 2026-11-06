@@ -14,7 +14,6 @@
 
 /* The header line: ← name state | spacer | undo redo + ⋯ Export. Never wraps. */
 .headerBar {
-  container: toolbar-compact / inline-size;
   display: flex;
   flex: 1;
   flex-wrap: nowrap;

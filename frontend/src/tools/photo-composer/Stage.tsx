@@ -68,7 +68,7 @@ export function Stage(props: StageProps) {
   propsRef.current = props;
 
   const dpr = typeof window !== "undefined" && window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
-  const fit = fitScale(avail.w, avail.h, doc.width, doc.height);
+  const fit = fitScale(avail.w, avail.h, doc.width, doc.height, 24);
   const scale = fit * zoom;
   const cssW = Math.round(doc.width * scale);
   const cssH = Math.round(doc.height * scale);

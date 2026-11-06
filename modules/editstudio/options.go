@@ -19,17 +19,23 @@ const (
 	ActionMatte   Action = "matte"   // a clip's matte
 	ActionRender  Action = "render"  // the export into <library>/Edits
 	ActionText    Action = "text"    // markers CSV/JSON or captions SRT into <library>/Edits
+
+	// Pipeline steps (Phase 14 A2): both build an edit in memory and export it.
+	ActionAssemble Action = "assemble" // "Assemble a video" (Video Editor): the inputs laid end to end, or into a template
+	ActionBeat     Action = "beat"     // "Cut to the beat" (Edit Studio): a song plus clips, filled by a recipe
 )
 
 // Options are the job options.
 type Options struct {
-	Action    Action          `json:"action"`
-	ProjectID string          `json:"projectId"`
-	Analyze   *AnalyzeRequest `json:"analyze"`
-	Prepare   *PrepareRequest `json:"prepare"`
-	Interp    *InterpRequest  `json:"interp"`
-	Matte     *MatteRequest   `json:"matte"`
-	Text      *TextRequest    `json:"text"`
+	Action    Action           `json:"action"`
+	ProjectID string           `json:"projectId"`
+	Analyze   *AnalyzeRequest  `json:"analyze"`
+	Prepare   *PrepareRequest  `json:"prepare"`
+	Interp    *InterpRequest   `json:"interp"`
+	Matte     *MatteRequest    `json:"matte"`
+	Text      *TextRequest     `json:"text"`
+	Assemble  *AssembleRequest `json:"assemble"`
+	Beat      *BeatRequest     `json:"beat"`
 }
 
 // AnalyzeRequest analyses a project's song (stems on, mood off).

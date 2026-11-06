@@ -24,6 +24,7 @@ import {
   type ProjectInfo,
 } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { adoptParkedHistory, registerHistory } from "@/lib/parkedHistory";
 import { newHistory, pushHistory, redo as redoH, undo as undoH, type History } from "@/lib/history";
 import { openTool } from "@/lib/openTool";
 import { useUI, type SlideBuild } from "@/state/ui";
@@ -56,6 +57,12 @@ export interface Still {
   ms: number;
 }
 
+/** The framing a slide has while it is dragged. */
+export interface LiveFraming {
+  id: string;
+  patch: Partial<Pick<PostSlide, "zoom" | "panX" | "panY">>;
+}
+
 export interface PostState {
   /** The posts list and the module state are loaded (host only). */
   ready: boolean;
@@ -81,6 +88,10 @@ export interface PostState {
   selectedId: string;
   /** The frame shown while a clip is trimmed. */
   still: Still | null;
+  /** A framing drag in progress on a slide (not recorded yet: no undo step, no autosave). */
+  liveFraming: LiveFraming | null;
+  /** `liveFraming` throttled to about 30 fps: what the bridge mirrors so pop-outs follow a drag. */
+  liveFramingOut: LiveFraming | null;
 
   // ---- host only ----
   init(): Promise<void>;
@@ -111,6 +122,10 @@ export interface PostState {
   redo(): void;
   select(id: string): void;
   setStill(still: Still | null): void;
+  /** Host: shows a framing drag without recording it. `null` ends it. */
+  setLiveFraming(live: LiveFraming | null): void;
+  /** Host: records the finished drag as one undo step. */
+  commitFraming(id: string, patch: LiveFraming["patch"]): void;
   patchSlide(id: string, patch: Partial<PostSlide>, key?: string): void;
   patchDoc(patch: Partial<PostDoc>, key?: string): void;
   setCaption(text: string): void;
@@ -151,7 +166,10 @@ const upsert = (list: ProjectInfo[], info: ProjectInfo): ProjectInfo[] => (list.
 
 const fullMessage = (doc: PostDoc, limits: PostLimits): string => (doc.format === "reel" ? "A reel is one video" : `A post holds at most ${limits.maxSlides} slides`);
 
-const EMPTY_POST = { history: null, loadedId: "", name: "", issues: [] as PostIssue[], saveState: "saved" as SaveState, dirty: false, selectedId: "", still: null, loadError: "" };
+export const LIVE_INTERVAL_MS = 33;
+const liveClock: { timer: ReturnType<typeof setTimeout> | undefined; last: number } = { timer: undefined, last: 0 };
+
+const EMPTY_POST = { liveFraming: null, liveFramingOut: null, history: null, loadedId: "", name: "", issues: [] as PostIssue[], saveState: "saved" as SaveState, dirty: false, selectedId: "", still: null, loadError: "" };
 
 const presentDoc = (s: PostState): PostDoc | null => (s.postId && s.loadedId === s.postId ? (s.history?.present ?? null) : null);
 
@@ -160,6 +178,25 @@ export const postInitializer: StateCreator<PostState> = (set, get) => {
     set({ dirty: true, saveState: "dirty" });
     clearTimeout(timer);
     timer = setTimeout(() => void get().save().catch(() => undefined), AUTOSAVE_MS);
+  };
+
+  /** Mirrors `liveFraming` into `liveFramingOut` at most every 33 ms (trailing); clearing is immediate. */
+  const mirrorLive = (live: LiveFraming | null): void => {
+    if (live === null) {
+      if (liveClock.timer !== undefined) clearTimeout(liveClock.timer);
+      liveClock.timer = undefined;
+      set({ liveFramingOut: null });
+      return;
+    }
+    if (liveClock.timer !== undefined) return;
+    const wait = Math.max(0, liveClock.last + LIVE_INTERVAL_MS - Date.now());
+    const fire = (): void => {
+      liveClock.timer = undefined;
+      liveClock.last = Date.now();
+      set({ liveFramingOut: get().liveFraming });
+    };
+    if (wait === 0) fire();
+    else liveClock.timer = setTimeout(fire, wait);
   };
 
   const edit: PostState["edit"] = (fn, key = "") => {
@@ -190,6 +227,9 @@ export const postInitializer: StateCreator<PostState> = (set, get) => {
     reset: () => {
       session++;
       clearTimeout(timer);
+      clearTimeout(liveClock.timer);
+      liveClock.timer = undefined;
+      liveClock.last = 0;
       inflight = Promise.resolve();
       pendingSelect = "";
       editingElsewhere = false;
@@ -219,7 +259,10 @@ export const postInitializer: StateCreator<PostState> = (set, get) => {
       }
       const all = list ?? [];
       set({ posts: all, limits: lim ?? DEFAULT_LIMITS, pstate: saved, ready: true });
-      await get().openPost(all.find((p) => p.id === saved.lastPostId)?.id ?? all[0]?.id ?? "");
+      const target = all.find((p) => p.id === saved.lastPostId)?.id ?? all[0]?.id ?? "";
+      // The same post is still open (the tool was left and came back): reload it, keeping its undo history.
+      if (target && get().postId === target && get().history) await get().load(target, true);
+      else await get().openPost(target);
     },
 
     persist: (next) => {
@@ -266,7 +309,8 @@ export const postInitializer: StateCreator<PostState> = (set, get) => {
         if (!current()) return;
         const d = normalizePost(post);
         const info = (list ?? []).find((p) => p.id === id);
-        set({ history: newHistory(d), name: info?.name ?? get().name, dirty: false, loadedId: id, saveState: "saved" });
+        set({ history: reloadedHistory(get().history, get().loadedId === id, d), name: info?.name ?? get().name, dirty: false, loadedId: id, saveState: "saved" });
+        void adoptParkedHistory(MODULE_ID, id);
       } catch (e) {
         if (current()) set({ loadError: toAppError(e).message });
       } finally {
@@ -308,6 +352,15 @@ export const postInitializer: StateCreator<PostState> = (set, get) => {
 
     select: (id) => set({ selectedId: id }),
     setStill: (still) => set({ still }),
+    setLiveFraming: (live) => {
+      set({ liveFraming: live });
+      mirrorLive(live);
+    },
+    commitFraming: (id, patch) => {
+      mirrorLive(null);
+      set({ liveFraming: null, liveFramingOut: null });
+      get().patchSlide(id, patch, "");
+    },
     setPendingSelect: (id) => {
       pendingSelect = id;
     },
@@ -547,13 +600,56 @@ export const postInitializer: StateCreator<PostState> = (set, get) => {
   };
 };
 
+/**
+ * The history after (re)loading a post. The same post keeps its undo steps: the
+ * loaded document becomes one more step when it differs from the one in memory
+ * (an editing window changed a slide), and nothing when it doesn't.
+ */
+export function reloadedHistory(h: History<PostDoc> | null, samePost: boolean, loaded: PostDoc): History<PostDoc> {
+  if (!h || !samePost) return newHistory(loaded);
+  if (JSON.stringify(docForSave(h.present)) === JSON.stringify(docForSave(loaded))) return h;
+  return pushHistory(h, loaded, "");
+}
+
 export const usePostBuilder = create<PostState>(postInitializer);
+
+// Undo history survives popping the whole tool out and bringing it back (lib/parkedHistory.ts).
+registerHistory(MODULE_ID, [MODULE_ID], {
+  docId: () => {
+    const s = usePostBuilder.getState();
+    return s.postId && s.loadedId === s.postId ? s.postId : null;
+  },
+  read: () => {
+    const h = usePostBuilder.getState().history;
+    return h ? { past: h.past, future: h.future } : null;
+  },
+  write: ({ past, future }) => {
+    const h = usePostBuilder.getState().history;
+    if (h) usePostBuilder.setState({ history: { ...h, past: past as PostDoc[], future: future as PostDoc[] } });
+  },
+  subscribe: (cb) =>
+    usePostBuilder.subscribe((s, prev) => {
+      if (s.history !== prev.history) cb();
+    }),
+});
 
 // ---- selectors with stable references ----
 
 /** The open post's document (null while it loads). */
-export function useDoc(): PostDoc | null {
+export function useRecordedDoc(): PostDoc | null {
   return usePostBuilder(presentDoc);
+}
+
+/** The document on screen: the recorded one with the framing drag in progress applied. */
+export function useDoc(): PostDoc | null {
+  const doc = useRecordedDoc();
+  const live = usePostBuilder((s) => s.liveFraming);
+  return useMemo(() => withLiveFraming(doc, live), [doc, live]);
+}
+
+export function withLiveFraming(doc: PostDoc | null, live: LiveFraming | null): PostDoc | null {
+  if (!doc || !live || !doc.slides.some((s) => s.id === live.id)) return doc;
+  return { ...doc, slides: doc.slides.map((s) => (s.id === live.id ? { ...s, ...live.patch } : s)) };
 }
 
 export function useSelectedSlide(): { slide: PostSlide | undefined; index: number } {

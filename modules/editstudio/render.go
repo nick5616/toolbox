@@ -233,7 +233,6 @@ func (m *Module) ensureExportFiles(ctx context.Context, job *core.JobContext, pr
 
 // runRender is the render action.
 func (m *Module) runRender(ctx context.Context, job *core.JobContext, projectID string) error {
-	start := exportNowFn()
 	stored, err := m.docs.Load(ctx, projectID)
 	if err != nil {
 		return err
@@ -242,7 +241,14 @@ func (m *Module) runRender(ctx context.Context, job *core.JobContext, projectID 
 	if err != nil {
 		return err
 	}
-	name := stored.Name
+	return m.renderDoc(ctx, job, projectID, stored.Name, doc)
+}
+
+// renderDoc exports doc as <library>/Edits/<name>.mp4. projectID names the
+// stored project whose mattes the clips use ("" = none, e.g. an edit a
+// pipeline step built in memory).
+func (m *Module) renderDoc(ctx context.Context, job *core.JobContext, projectID, name string, doc EditProject) error {
+	start := exportNowFn()
 	job.SetTitle("Exporting — " + name)
 	if err := m.validateDoc(ctx, projectID, doc); err != nil {
 		return err

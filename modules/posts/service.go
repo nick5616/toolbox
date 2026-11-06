@@ -38,15 +38,24 @@ var carouselAspects = []string{"4:5", "1:1", "3:4", "1.91:1"}
 // Create makes a post; paths become photo/clip slides by extension (other
 // files are ignored). Reels and stories are always 9:16.
 func (s *Service) Create(name, format, aspect string, paths []string) (core.ProjectInfo, error) {
-	aspect, err := normalizeFormat(format, aspect)
+	doc, err := s.m.newPost(context.Background(), format, aspect, paths)
 	if err != nil {
 		return core.ProjectInfo{}, err
 	}
-	doc := Post{Version: 1, Format: format, Aspect: aspect, Slides: []Slide{}}
-	limit := maxClipMs(DefaultLimits(), format)
-	infos, err := s.m.slideInfo(context.Background(), paths)
+	return s.m.docs.Create(context.Background(), name, doc)
+}
+
+// newPost builds a post document from files; unusable files are ignored.
+func (m *Module) newPost(ctx context.Context, format, aspect string, paths []string) (Post, error) {
+	aspect, err := normalizeFormat(format, aspect)
 	if err != nil {
-		return core.ProjectInfo{}, err
+		return Post{}, err
+	}
+	doc := Post{Version: 1, Format: format, Aspect: aspect, Slides: []Slide{}, Extra: []string{}, Hidden: []string{}}
+	limit := maxClipMs(DefaultLimits(), format)
+	infos, err := m.slideInfo(ctx, paths)
+	if err != nil {
+		return Post{}, err
 	}
 	for _, src := range infos {
 		sl := Slide{ID: core.NewID(), Kind: src.Kind, Path: src.Path, Zoom: 1}
@@ -59,7 +68,7 @@ func (s *Service) Create(name, format, aspect string, paths []string) (core.Proj
 		}
 		doc.Slides = append(doc.Slides, sl)
 	}
-	return s.m.docs.Create(context.Background(), name, doc)
+	return doc, nil
 }
 
 // normalizeFormat validates the format and aspect; reels and stories are 9:16.

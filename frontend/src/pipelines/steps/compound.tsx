@@ -30,6 +30,7 @@ import { toAppError } from "@/lib/errors";
 import { PRESETS } from "@/viz/presets";
 import { presetShowJson } from "../visualizerDesigns";
 import { parseObject, registerSteps, type StepEditorProps, type StepUI } from "./registry";
+import { PARAMS } from "./paramDefs";
 import styles from "./compound.module.css";
 
 // Step editors owned by WP-AD2: Subtitles, Lyric Video and Visualizer (SPEC.md §11.4).
@@ -756,7 +757,7 @@ function VisualizerEditor({ value, onChange }: StepEditorProps<VisualizerStepOpt
 
 /** Types a step editor against its own options (registerSteps takes the erased form). */
 function define<T>(ui: StepUI<T>): StepUI<never> {
-  return ui as unknown as StepUI<never>;
+  return { ...ui, params: PARAMS[ui.type] } as unknown as StepUI<never>;
 }
 
 registerSteps([

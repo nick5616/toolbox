@@ -1,16 +1,9 @@
-/* The wire colours: file kinds come from existing tokens; WireCanvas reads them with getComputedStyle. */
+/* Wire colours come from the value-type tokens (--type-*); WireCanvas reads them with getComputedStyle. */
 .canvas {
   position: absolute;
   left: 0;
   top: 0;
   pointer-events: none;
-  --wire-audio: var(--lane-bass);
-  --wire-video: var(--lane-kick);
-  --wire-image: var(--lane-hats);
-  --wire-document: var(--lane-break);
-  --wire-text: var(--lane-phrase);
-  --wire-other: var(--lane-other);
-  --wire-any: var(--accent);
   --wire-failed: var(--danger);
   --wire-bg: var(--bg-inset);
 }

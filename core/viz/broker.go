@@ -33,6 +33,7 @@ type RenderBroker struct {
 	origins map[string]bool
 	sem     chan struct{}
 	active  map[string]*render // by token (RB1)
+	hostUp  bool               // the main window's RenderHost is mounted
 }
 
 // Tunables (variables so tests can shorten them).
@@ -244,7 +245,7 @@ func (b *RenderBroker) render(ctx context.Context, job *core.JobContext, plan Re
 	}()
 
 	job.Progress(0, "Starting the visual renderer…")
-	b.emitter.Emit(EventRender, RenderStart{Token: r.token, PlanURL: planURL, JobID: job.ID})
+	b.emitter.Emit(EventRender, RenderStart{Token: r.token, PlanURL: planURL, JobID: job.ID, Kind: plan.hostKind().eventKind()})
 	cancelRenderer := func() { b.emitter.Emit(EventRenderCancel, RenderCancel{Token: r.token}) }
 
 	timer := time.NewTimer(startTimeout)
@@ -287,8 +288,12 @@ func (b *RenderBroker) render(ctx context.Context, job *core.JobContext, plan Re
 				job.Progress(0, "Rendering…")
 			case evProgress:
 				if ev.frames > 0 {
-					p := float64(ev.frame) / float64(ev.frames)
-					job.Progress(math.Min(math.Max(p, 0), 1), fmt.Sprintf("Rendering frame %d of %d", ev.frame, ev.frames))
+					p := math.Min(math.Max(float64(ev.frame)/float64(ev.frames), 0), 1)
+					if plan.hostKind() == hostStream {
+						job.Progress(p, fmt.Sprintf("Rendering frame %d of %d", ev.frame, ev.frames))
+					} else {
+						job.Progress(p, "Rendering…")
+					}
 				}
 			case evFail:
 				cancelRenderer()
@@ -324,7 +329,7 @@ func (b *RenderBroker) finish(r *render, start *startInfo, ev renderEvent) (Rend
 	r.mu.Lock()
 	received, codec, path := r.received, r.codec, ""
 	if start != nil {
-		path = filepath.Join(r.tempDir, streamFile(codec))
+		path = filepath.Join(r.tempDir, r.outFile(codec))
 	}
 	r.mu.Unlock()
 	if start == nil {
@@ -339,6 +344,14 @@ func (b *RenderBroker) finish(r *render, start *startInfo, ev renderEvent) (Rend
 	}
 	r.job.Progress(1, "Rendered")
 	return RenderOutput{Path: path, Codec: codec, Frames: ev.frames, Encoder: start.Encoder}, nil
+}
+
+// outFile is the file name the answer is written to.
+func (r *render) outFile(codec string) string {
+	if r.plan.hostKind() != hostStream {
+		return singleFile(codec)
+	}
+	return streamFile(codec)
 }
 
 func streamFile(codec string) string {
@@ -357,6 +370,12 @@ func (b *RenderBroker) HandleRawMessage(msg, origin, topOrigin string) {
 			slog.Debug("viz: dropped a render message from another origin")
 			return
 		}
+		if state, ok := strings.CutPrefix(msg[len(RawPrefix):], hostToken+"|"); ok {
+			b.mu.Lock()
+			b.hostUp = state == "up"
+			b.mu.Unlock()
+			return
+		}
 		b.handleRender(msg[len(RawPrefix):])
 	case strings.HasPrefix(msg, LabPrefix) && b.labDir != "":
 		if !b.originOK(origin, topOrigin) {
@@ -365,6 +384,10 @@ func (b *RenderBroker) HandleRawMessage(msg, origin, topOrigin string) {
 		b.handleLab(msg[len(LabPrefix):])
 	}
 }
+
+// hostToken is the pseudo-token of the RenderHost's presence messages
+// (`vz1|host|up`, `vz1|host|down`); render tokens are 32 hex digits.
+const hostToken = "host"
 
 // handleRender parses "<token>|<kind>|…" (SPEC.md §7.2). Unknown tokens and
 // malformed messages are dropped; content is never logged.
@@ -437,20 +460,30 @@ func (r *render) beginStream(b *RenderBroker, args string) bool {
 		r.failLocked(core.Errorf(core.CodeInternal, "The renderer sent an unreadable message"))
 		return false
 	}
-	switch info.Encoder {
-	case "h264-hw", "h264-sw":
-		r.codec = "h264"
-	case "jpeg":
-		r.codec = "mjpeg"
-	default:
-		r.failLocked(core.Errorf(core.CodeInternal, "The renderer chose an unknown encoder"))
-		return false
+	if kind := r.plan.hostKind(); kind != hostStream {
+		// A single file: the encoder must be the one the plan asked for.
+		if info.Encoder != r.plan.singleEncoder() || info.Frames != 1 ||
+			(kind == hostComposition && (info.Width != r.plan.Width || info.Height != r.plan.Height)) {
+			r.failLocked(core.Errorf(core.CodeInternal, "The renderer is set up differently from the plan"))
+			return false
+		}
+		r.codec = map[string]string{"png": "png", "jpg": "jpeg", "json": "json"}[info.Encoder]
+	} else {
+		switch info.Encoder {
+		case "h264-hw", "h264-sw":
+			r.codec = "h264"
+		case "jpeg":
+			r.codec = "mjpeg"
+		default:
+			r.failLocked(core.Errorf(core.CodeInternal, "The renderer chose an unknown encoder"))
+			return false
+		}
+		if info.Frames != r.planned || info.Width != r.plan.Width || !heightOK(r.plan, info.Height) || info.FPS != r.plan.FPS {
+			r.failLocked(core.Errorf(core.CodeInternal, "The renderer is set up differently from the plan"))
+			return false
+		}
 	}
-	if info.Frames != r.planned || info.Width != r.plan.Width || !heightOK(r.plan, info.Height) || info.FPS != r.plan.FPS {
-		r.failLocked(core.Errorf(core.CodeInternal, "The renderer is set up differently from the plan"))
-		return false
-	}
-	f, err := os.Create(filepath.Join(r.tempDir, streamFile(r.codec)))
+	f, err := os.Create(filepath.Join(r.tempDir, r.outFile(r.codec)))
 	if err != nil {
 		r.failLocked(core.Errorf(core.CodeInternal, "Couldn't save the rendered video").WithCause(err))
 		return false
@@ -483,7 +516,11 @@ func (b *RenderBroker) handleData(r *render, args string) {
 		r.failLocked(core.Errorf(core.CodeInternal, "The renderer sent damaged data"))
 		return
 	}
-	if r.received+int64(len(raw)) > maxBytes {
+	limit := maxBytes
+	if r.plan.hostKind() != hostStream {
+		limit = min(limit, maxSingleBytes)
+	}
+	if r.received+int64(len(raw)) > limit {
 		r.failLocked(core.Errorf(core.CodeInternal, "The rendered video is too large").
 			WithHint("Use a lower resolution or a shorter range"))
 		return

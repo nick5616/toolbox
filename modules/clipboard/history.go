@@ -50,6 +50,8 @@ type History struct {
 	started   bool
 	cancel    context.CancelFunc
 	self      selfCopy
+	quiet     selfCopy // a copy a pipeline step wrote: recorded, but it starts no pipeline
+	hooks     []func(core.ClipItem)
 
 	initMu    sync.Mutex
 	initDone  bool

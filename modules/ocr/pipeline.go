@@ -80,7 +80,7 @@ func (m *Module) DescribeStep(options json.RawMessage) (core.StepInfo, error) {
 	}
 	vars := []core.StepVar{}
 	if makesText(o) {
-		vars = append(vars, core.StepVar{Name: "text", Label: "Recognised text"})
+		vars = append(vars, core.StepVar{Name: "text", Label: "Recognised text", Type: core.ValueText})
 	}
 
 	pdf := map[PDFOutput]string{PDFSearchable: "searchable PDF", PDFText: "text", PDFBoth: "searchable PDF + text"}[o.PDFOutput]
