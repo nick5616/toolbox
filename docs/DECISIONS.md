@@ -659,3 +659,6 @@ Newest last. Format: date — decision — why.
     - real pen pressure/tilt and touch gestures (CDP only sends synthetic events);
     - the perception tools end to end (no engine models in the sandbox);
     - PNG/ORA export from the UI and Studio mode at 4K. These are covered by unit tests only.
+- **2026-11-06: Post Builder slide thumbnails and Sources → From Library.**
+  - **Black slide thumbnails:** `FramedMedia` reset its measured size in a `[url]` effect, and a small data-URL thumbnail could finish loading before that effect ran, so the picture stayed at `opacity: 0`. The size is now stored with its URL (no reset effect), and an image already decoded at mount is measured directly.
+  - **From Library…** in the Sources panel adds things Toolbox already made to the pool's extras: Library pictures and videos in a pool format (any tool, with search and a "Made with" tool filter built from the newest 500 outputs), and saved Photo Composer compositions. A composition is exported into `<library>/Compositions/` first (`ComposerService.Export`) so the source is a real file; picking it again makes another copy. Unexported Video Editor projects aren't offered (they need a render job); Add → Existing video still links them as slides.

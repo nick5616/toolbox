@@ -1,0 +1,117 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+}
+
+.tool {
+  flex: none;
+  max-width: 180px;
+}
+
+/* A steady height, so switching tabs doesn't resize the dialog. */
+.pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  height: min(56vh, 520px);
+  min-height: 160px;
+  overflow: auto;
+}
+
+.note {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 2px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: var(--space-2);
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-1);
+  color: var(--fg);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.card:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.card:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.on {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.on:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--bg-inset);
+  border-radius: var(--r-sm);
+  color: var(--fg-subtle);
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+}
+
+.sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-subtle);
+  font-size: var(--text-xs);
+}
+
+.check {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: flex;
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-fg, var(--bg-app));
+}

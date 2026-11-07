@@ -4,6 +4,8 @@ import { FilesService, PostsService, type PostSlide, type PostSourceFile } from 
 import { toAppError } from "@/lib/errors";
 import type { SlideBuild } from "@/state/ui";
 import { CollageDialog, StitchDialog } from "./buildDialogs";
+import { LibraryPickerDialog, poolKey } from "./LibraryPickerDialog";
+import { usePostBuilder } from "./postStore";
 import type { PostDoc } from "./logic";
 import {
   DEFAULT_SOURCE_VIEW,
@@ -57,7 +59,8 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, update
   const [view, setView] = useState<SourceView>(DEFAULT_SOURCE_VIEW);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
-  const [dialog, setDialog] = useState<"collage" | "stitch" | null>(null);
+  const [dialog, setDialog] = useState<"collage" | "stitch" | "library" | null>(null);
+  const compositions = usePostBuilder((s) => s.comps);
 
   const sig = poolSignature(doc);
   const hasPool = doc.folder !== "" || doc.extra.length > 0;
@@ -136,6 +139,18 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, update
     }
   };
 
+  const openLibrary = () => {
+    void usePostBuilder.getState().refreshProjects();
+    setDialog("library");
+  };
+
+  const addFromLibrary = (paths: string[]) => {
+    const picked = new Set(paths.map(poolKey));
+    update((d) => ({ ...d, extra: addExtras(d.extra, paths), hidden: d.hidden.filter((p) => !picked.has(poolKey(p))) }));
+  };
+
+  const inPool = useMemo(() => new Set(sources.map((s) => poolKey(s.path))), [sources]);
+
   const hide = () => {
     const paths = selectedInGrid.map((s) => s.path);
     if (paths.length === 0) return;
@@ -176,6 +191,9 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, update
         </Button>
         <Button size="sm" variant="secondary" icon="plus" data-tip="Add individual photos or clips that are not in the folder" onClick={() => void addFiles()}>
           Add files…
+        </Button>
+        <Button size="sm" variant="secondary" icon="history" data-tip="Add pictures and videos Toolbox already made (Library outputs and your compositions)" onClick={openLibrary}>
+          From Library…
         </Button>
       </div>
 
@@ -262,6 +280,7 @@ export function SourcesPanel({ postId, doc, format, saved, selectedSlide, update
           }}
         />
       )}
+      {dialog === "library" && <LibraryPickerDialog exts={MEDIA_EXTS} have={inPool} compositions={compositions} onAdd={addFromLibrary} onClose={() => setDialog(null)} />}
       {dialog === "stitch" && (
         <StitchDialog
           count={selectedInOrder.length}
