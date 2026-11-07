@@ -41,12 +41,20 @@ export interface FramedMediaProps {
  */
 export function FramedMedia({ url, aspect, framing, onFraming, onFramingLive, onFramingEnd, placeholderIcon = "image", placeholderLabel, placeholderTone, loading, alt = "", fit, className, children }: FramedMediaProps) {
   const frame = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  // The measured picture, tied to its URL: a small data URL can finish loading
+  // before an effect runs, so the size is never reset by an effect.
+  const [measured, setMeasured] = useState<{ url: string; w: number; h: number } | null>(null);
+  const size = measured && measured.url === url ? measured : null;
+  const img = useRef<HTMLImageElement>(null);
   const drag = useRef<{ id: number; x: number; y: number; panX: number; panY: number; last: Partial<Pick<Framing, "panX" | "panY">> | null } | null>(null);
   const live = useRef({ framing, onFraming });
   live.current = { framing, onFraming };
 
-  useEffect(() => setSize(null), [url]);
+  // An image that was already decoded (cached) may not fire load after mount.
+  useEffect(() => {
+    const el = img.current;
+    if (el?.complete && el.naturalWidth > 0) setMeasured({ url, w: el.naturalWidth, h: el.naturalHeight });
+  }, [url]);
 
   const fs = frameSize(aspect);
   const style = { aspectRatio: `${fs.w} / ${fs.h}`, "--ratio": fs.w / fs.h } as CSSProperties;
@@ -111,6 +119,7 @@ export function FramedMedia({ url, aspect, framing, onFraming, onFramingLive, on
           }
         >
           <img
+            ref={img}
             src={url}
             alt={alt}
             draggable={false}
@@ -120,7 +129,7 @@ export function FramedMedia({ url, aspect, framing, onFraming, onFramingLive, on
                 ? { width: `${layout.img.width}%`, height: `${layout.img.height}%`, transform: `translate(-50%, -50%) rotate(${layout.rotation}deg)` }
                 : undefined
             }
-            onLoad={(e) => setSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+            onLoad={(e) => setMeasured({ url, w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
           />
         </div>
       ) : (
