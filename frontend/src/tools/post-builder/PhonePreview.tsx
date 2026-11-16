@@ -4,7 +4,7 @@ import type { PostSlide, ProjectInfo } from "@/lib/api";
 import { FramedMedia } from "./FramedMedia";
 import { truncateCaption } from "./logic";
 import { KIND_ICON } from "./SlideStrip";
-import { useSlideVisual } from "./useSlideVisual";
+import { STAGE_DIM, useSlideVisual } from "./useSlideVisual";
 import styles from "./PhonePreview.module.css";
 
 export interface PhonePreviewProps {
@@ -18,7 +18,7 @@ export interface PhonePreviewProps {
 }
 
 function Page({ slide, aspect, project }: { slide: PostSlide; aspect: string; project: ProjectInfo | undefined }) {
-  const v = useSlideVisual(slide, project, 720);
+  const v = useSlideVisual(slide, project, STAGE_DIM);
   return (
     <FramedMedia
       url={v.url}

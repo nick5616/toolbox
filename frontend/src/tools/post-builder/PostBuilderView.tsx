@@ -5,7 +5,7 @@
  * and the slide selection bar. The state is in `usePostBuilder`; this window hosts it
  * (`host.ts`) for popped-out panels and the phone preview.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, ClickIn, ClickInHost, DropZone, EmptyState, Spinner, type MenuItem } from "@/components";
 import { useBeforePopOut } from "@/lib/popout";
 import { useCompositionInputs } from "@/state/composition";
@@ -24,6 +24,7 @@ import { MODULE_ID, useDoc, usePostBuilder, useProjects, useSelectedSlide } from
 import { SelectionBar } from "./SelectionBar";
 import { SlideStage } from "./SlideStage";
 import { SlideStrip } from "./SlideStrip";
+import { prefetchVisuals } from "./useSlideVisual";
 import { postWorkspace as ws } from "./workspace";
 import styles from "./PostBuilderView.module.css";
 
@@ -92,6 +93,14 @@ function Workspace() {
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
   const width = useElementSize(root).width;
   const wide = width === 0 || width >= WIDE_PX;
+
+  // Load every slide's stage picture in the background (nearest the selection first),
+  // so selecting another slide shows it at once.
+  const slides = doc?.slides;
+  useEffect(() => {
+    if (!slides || slides.length < 2) return;
+    return prefetchVisuals(slides, projects, Math.max(0, index));
+  }, [slides, projects, index]);
 
   // What the constituents get: the selected slide's photo.
   const photoPath = selected?.kind === "photo" ? selected.path : "";

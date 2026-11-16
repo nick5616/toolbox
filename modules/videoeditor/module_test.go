@@ -345,6 +345,17 @@ func TestServiceProjects(t *testing.T) {
 	if p := svc.PreviewPath(info.ID); p != filepath.Join(dir, "preview.mp4") {
 		t.Errorf("PreviewPath = %q", p)
 	}
+	// A preview made after the last save is fresh; saving again makes it stale.
+	if p := svc.FreshPreviewPath(info.ID); p != filepath.Join(dir, "preview.mp4") {
+		t.Errorf("FreshPreviewPath = %q, want the new preview", p)
+	}
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(filepath.Join(dir, "preview.mp4"), old, old); err != nil {
+		t.Fatal(err)
+	}
+	if p := svc.FreshPreviewPath(info.ID); p != "" {
+		t.Errorf("FreshPreviewPath = %q for a preview older than the last save", p)
+	}
 	if err := svc.Delete(info.ID); err != nil {
 		t.Fatal(err)
 	}

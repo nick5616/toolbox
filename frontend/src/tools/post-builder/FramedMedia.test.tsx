@@ -36,6 +36,16 @@ describe("FramedMedia", () => {
     expect(box().style.opacity).toBe("");
   });
 
+  // Switching slides remounts the stage: a picture seen before lays out in the first render.
+  it("lays out a picture it measured before as soon as it mounts again", () => {
+    const first = render(<FramedMedia url="data:seen" aspect="4:5" framing={FRAMING} />);
+    loadImage(300, 200);
+    first.unmount();
+    render(<FramedMedia url="data:seen" aspect="4:5" framing={FRAMING} />);
+    expect(box().style.opacity).toBe("");
+    expect(box().style.width).not.toBe("");
+  });
+
   // Small data-URL thumbnails could finish loading before the effect that reset the
   // size ran, which left every slide-strip thumbnail invisible (a black tile).
   it("measures a picture that was already decoded when it mounted", () => {

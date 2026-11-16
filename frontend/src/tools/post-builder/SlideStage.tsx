@@ -5,8 +5,10 @@ import type { PostLimits, PostSlide, ProjectInfo } from "@/lib/api";
 import { FramedMedia } from "./FramedMedia";
 import { clampZoom, normalizeRotation } from "./framing";
 import { isPending, maxClipMs } from "./logic";
+import { PlayBar } from "./PlayBar";
 import { KIND_ICON, KIND_LABEL } from "./SlideStrip";
-import { useSlideVisual } from "./useSlideVisual";
+import { useSlidePlayback } from "./useSlidePlayback";
+import { STAGE_DIM, useSlideVisual } from "./useSlideVisual";
 import styles from "./SlideStage.module.css";
 
 export interface SlideStageProps {
@@ -48,10 +50,13 @@ export function FramingPanel({ slide, onChange }: { slide: PostSlide; onChange: 
 export function SlideStage({ slide, aspect, project, onChange, onFramingLive, onFramingEnd, onEdit, stillMs }: SlideStageProps) {
   const isClip = slide.kind === "clip";
   const stillSlide = useMemo(() => (isClip ? { ...slide, inMs: stillMs } : slide), [slide, isClip, stillMs]);
-  const visual = useSlideVisual(stillSlide, project, 1280);
+  const visual = useSlideVisual(stillSlide, project, STAGE_DIM);
+  const playback = useSlidePlayback(slide, project, stillMs);
   const framable = slide.kind !== "video";
   const pending = isPending(slide);
   const missing = !pending && (visual.status === "error" || visual.status === "none");
+  // A Video Editor project shows a frame of its preview; until there is one, Play makes it.
+  const noPreview = slide.kind === "video" && visual.status === "none";
 
   const patchFraming = (p: Partial<Pick<PostSlide, "zoom" | "panX" | "panY">>) => onChange(p);
   return (
@@ -77,12 +82,23 @@ export function SlideStage({ slide, aspect, project, onChange, onFramingLive, on
             onFraming={framable ? patchFraming : undefined}
             onFramingLive={framable ? onFramingLive : undefined}
             onFramingEnd={framable ? onFramingEnd : undefined}
-            placeholderIcon={missing ? "triangle-alert" : (KIND_ICON[slide.kind] ?? "image")}
+            placeholderIcon={missing && !noPreview ? "triangle-alert" : (KIND_ICON[slide.kind] ?? "image")}
             loading={visual.status === "loading"}
-            placeholderLabel={missing ? (slide.path ? "Media missing: the file moved or can't be read" : "Nothing to show yet: open it and save") : undefined}
-            placeholderTone={missing ? "warn" : undefined}
+            placeholderLabel={
+              noPreview
+                ? "Press Play to make a preview of this video"
+                : missing
+                  ? slide.path
+                    ? "Media missing: the file moved or can't be read"
+                    : "Nothing to show yet: open it and save"
+                  : undefined
+            }
+            placeholderTone={missing && !noPreview ? "warn" : undefined}
             alt={slide.altText || KIND_LABEL[slide.kind]}
-          />
+            video={playback.video}
+          >
+            {playback.playable && (!missing || noPreview) && <PlayBar pb={playback} kind={isClip ? "clip" : "video"} />}
+          </FramedMedia>
         )}
       </div>
 

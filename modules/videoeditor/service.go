@@ -122,5 +122,24 @@ func (s *Service) PreviewPath(id string) string {
 	return p
 }
 
+// FreshPreviewPath is the project's preview file when it was made after the
+// project was last saved ("" if there is none or it is out of date). Post
+// Builder plays it for a video slide.
+func (s *Service) FreshPreviewPath(id string) string {
+	p := s.PreviewPath(id)
+	if p == "" {
+		return ""
+	}
+	stored, err := s.m.docs.Load(context.Background(), id)
+	if err != nil {
+		return ""
+	}
+	fi, err := os.Stat(p)
+	if err != nil || fi.ModTime().UnixMilli() < stored.UpdatedAt {
+		return ""
+	}
+	return p
+}
+
 // PlanShape and ResultShape only put types into the bindings.
 func (s *Service) PlanShape() PlanResult { return PlanResult{} }

@@ -5,7 +5,7 @@ import { FramedMedia } from "./FramedMedia";
 import { indexAtY, isPending, worstLevel } from "./logic";
 import { stripDrop, type StripDrop } from "./pool";
 import { useSourceDropTarget, type SourceDropInfo } from "@/blocks/sources/sourceDrag";
-import { useSlideVisual } from "./useSlideVisual";
+import { TILE_DIM, useSlideVisual } from "./useSlideVisual";
 import styles from "./SlideStrip.module.css";
 
 export const KIND_ICON: Record<string, string> = { photo: "image", clip: "film", composition: "layers", video: "clapperboard" };
@@ -28,7 +28,7 @@ export interface SlideStripProps {
 }
 
 function SlideThumb({ slide, aspect, project }: { slide: PostSlide; aspect: string; project: ProjectInfo | undefined }) {
-  const v = useSlideVisual(slide, project, 240);
+  const v = useSlideVisual(slide, project, TILE_DIM);
   return (
     <FramedMedia
       url={v.url}

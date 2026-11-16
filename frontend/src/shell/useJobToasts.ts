@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { JobStatus, LibraryService, type Output } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { toast } from "@/components";
-import { takeAnnounced, useJobs, type JobView as Job } from "@/state/jobs";
+import { takeAnnounced, takeMuted, useJobs, type JobView as Job } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { FOCUS_MODULE_ID } from "@/state/focus";
 import { openLibrary } from "@/lib/openLibrary";
@@ -34,6 +34,8 @@ export function notifyDone(moduleId: string, jobs: Job[]): void {
   const ui = useUI.getState();
   // Looking at the tool's results already: no toast, unless the tool asked for
   // one because it doesn't show this result itself.
+  // Started by a tool that shows the result itself (another module's job): no toast.
+  if (jobs.length > 0 && jobs.map((j) => takeMuted(j.id)).every(Boolean)) return;
   const announced = jobs.map((j) => takeAnnounced(j.id)).some(Boolean);
   if (!announced && (ui.view === moduleId || ui.trayOpen)) return;
   // Focus jobs start or end a session: the top-bar pill and focus toasts say so.

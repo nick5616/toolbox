@@ -19,7 +19,7 @@ vi.mock("./dropRouting", () => ({ routeFilesDropped: (d: unknown) => routed(d) }
 import { Category, JobStatus, ModuleStatus, type Descriptor, type Job } from "@/lib/api";
 import { useToastStore } from "@/components/toast";
 import { registerCommands, useCommandRegistry } from "@/lib/commands";
-import { announceWhenDone, useJobs } from "@/state/jobs";
+import { announceWhenDone, muteWhenDone, useJobs } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
 import { CommandPalette } from "./CommandPalette";
@@ -216,6 +216,17 @@ describe("completion toasts", () => {
     act(() => void vi.advanceTimersByTime(BATCH_SETTLE_MS + 10));
     expect(toasts()).toHaveLength(1);
     expect(toasts()[0]!.action?.label).toBe("Reveal");
+  });
+
+  it("no toast for a job another tool muted (it shows the result itself)", () => {
+    vi.useFakeTimers();
+    useUI.setState({ view: "post-builder" });
+    renderHook(() => useJobToasts());
+    act(() => void useJobs.getState().upsert(job("m", "stems", JobStatus.JobRunning)));
+    muteWhenDone("m");
+    act(() => void useJobs.getState().upsert(job("m", "stems", JobStatus.JobDone)));
+    act(() => void vi.advanceTimersByTime(BATCH_SETTLE_MS + 10));
+    expect(toasts()).toHaveLength(0);
   });
 });
 

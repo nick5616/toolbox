@@ -40,6 +40,15 @@ export function Duplicate(id: string): $CancellablePromise<core$0.ProjectInfo> {
 }
 
 /**
+ * FreshPreviewPath is the project's preview file when it was made after the
+ * project was last saved ("" if there is none or it is out of date). Post
+ * Builder plays it for a video slide.
+ */
+export function FreshPreviewPath(id: string): $CancellablePromise<string> {
+    return $Call.ByID(2276317035, id);
+}
+
+/**
  * Get returns a video project.
  */
 export function Get(id: string): $CancellablePromise<$models.VideoProject> {

@@ -30,6 +30,20 @@ export function takeAnnounced(jobId: string): boolean {
   return announced.delete(jobId);
 }
 
+/**
+ * The opposite: jobs a tool started for itself and shows the result of, even
+ * though they belong to another module (Post Builder rendering a Video Editor
+ * preview to play). Their finish never toasts; failures still do.
+ */
+const muted = new Set<string>();
+export function muteWhenDone(jobId: string): void {
+  if (jobId) muted.add(jobId);
+}
+/** True (once) when the job was marked with `muteWhenDone`. */
+export function takeMuted(jobId: string): boolean {
+  return muted.delete(jobId);
+}
+
 interface JobsState {
   byId: Record<string, JobView>;
   logs: Record<string, LogLine[]>;
