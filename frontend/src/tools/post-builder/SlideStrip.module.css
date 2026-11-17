@@ -56,6 +56,7 @@
   background: transparent;
   touch-action: none;
   user-select: none;
+  cursor: pointer;
 }
 
 .tile:hover {
@@ -75,10 +76,13 @@
   box-shadow: 0 -2px 0 var(--accent);
 }
 
+/* Fills the tile up to the actions, so the whole row is the click target. */
 .select {
   position: relative;
   display: block;
-  flex: none;
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 0;
   max-width: 100%;
   padding: 0;
   background: none;
@@ -87,9 +91,13 @@
   color: inherit;
 }
 
+/* The thumbnail and its badges (the badges sit on its corners). */
 .thumbWrap {
+  position: relative;
   display: flex;
   justify-content: flex-start;
+  width: fit-content;
+  max-width: 100%;
   height: 72px;
 }
 

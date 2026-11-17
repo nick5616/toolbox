@@ -163,6 +163,33 @@ describe("slides", () => {
     expect(selectedIndex()).toBe(0);
   });
 
+  it("selects a slide from anywhere on its tile", async () => {
+    await open();
+    const tile = (i: number) => slideButtons()[i]!.closest("li")!;
+    // Beside the thumbnail, not on it.
+    fireEvent.pointerDown(tile(2), { button: 0, pointerId: 1, clientY: 100 });
+    fireEvent.pointerUp(tile(2), { button: 0, pointerId: 1, clientY: 100 });
+    expect(selectedIndex()).toBe(2);
+    // The action buttons don't select or drag.
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Move earlier" }), { button: 0, pointerId: 2, clientY: 100 });
+    fireEvent.pointerUp(screen.getByRole("button", { name: "Move earlier" }), { button: 0, pointerId: 2, clientY: 100 });
+    expect(selectedIndex()).toBe(2);
+  });
+
+  it("steps through the slides with the arrow keys and moves one with Alt", async () => {
+    await open();
+    const list = slideButtons()[0]!.closest("ol")!;
+    fireEvent.keyDown(list, { key: "ArrowDown" });
+    expect(selectedIndex()).toBe(1);
+    fireEvent.keyDown(list, { key: "ArrowUp" });
+    fireEvent.keyDown(list, { key: "ArrowUp" }); // already first
+    expect(selectedIndex()).toBe(0);
+    fireEvent.keyDown(list, { key: "ArrowDown", altKey: true });
+    await waitFor(() => expect(h.save).toHaveBeenCalled(), { timeout: 3000 });
+    expect(lastSaved().slides.map((s) => s.id)).toEqual(["b", "a", "c"]);
+    expect(selectedIndex()).toBe(1);
+  });
+
   it("reorders with Move later and autosaves once, 800 ms after the last edit", async () => {
     await open();
     const user = userEvent.setup();

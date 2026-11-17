@@ -3,7 +3,7 @@ import { Button, Icon, SegmentedControl, Select, Spinner, TextField, cx, toast }
 import { ComposerService, LibraryService, LibrarySort, OutputKind, type Output, type ProjectInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { useModules } from "@/state/modules";
-import { loadSourceThumb } from "@/blocks/sources/sourceThumbs";
+import { cachedSourceThumb, loadSourceThumb } from "@/blocks/sources/sourceThumbs";
 import { Modal } from "./Modal";
 import { ProjectThumb } from "./ProjectThumb";
 import styles from "./LibraryPickerDialog.module.css";
@@ -14,6 +14,8 @@ import styles from "./LibraryPickerDialog.module.css";
 // first, so the source is a real file the user can find again.
 
 const PAGE = 200;
+/** The same size as the Sources grid's tiles, so both share one cache. */
+const THUMB_DIM = 256;
 
 /** Hidden modules that write Library files, by the tool the user knows them as. */
 const HIDDEN_TOOL_NAMES: Record<string, string> = { "lan-receive": "Local File Transfer" };
@@ -33,6 +35,19 @@ const extOf = (p: string) => {
   const i = p.lastIndexOf(".");
   return i < 0 ? "" : p.slice(i).toLowerCase();
 };
+
+/**
+ * The last listing shown, per (search, tool), and the tool list: opening the
+ * dialog again shows them at once while they are listed again.
+ */
+const lastPages = new Map<string, { items: Output[]; next: string }>();
+let lastTools: string[] = [];
+
+/** Forgets the remembered listings (tests). */
+export function clearLibraryPickerCache(): void {
+  lastPages.clear();
+  lastTools = [];
+}
 
 /** The key a path is compared by (Windows paths are case-insensitive). */
 export const poolKey = (p: string) => p.replace(/\//g, "\\").toLowerCase();
@@ -60,12 +75,12 @@ function useSeen(ref: React.RefObject<Element | null>): boolean {
 function OutputThumb({ output }: { output: Output }) {
   const ref = useRef<HTMLSpanElement>(null);
   const seen = useSeen(ref);
-  const [url, setUrl] = useState("");
   const kind = output.kind === OutputKind.KindVideo ? "clip" : "photo";
+  const [url, setUrl] = useState(() => cachedSourceThumb(output.path, kind, THUMB_DIM));
   useEffect(() => {
-    if (!seen || output.missing) return;
+    if (!seen || output.missing || cachedSourceThumb(output.path, kind, THUMB_DIM)) return;
     let off = false;
-    loadSourceThumb(output.path, kind, 256).then(
+    loadSourceThumb(output.path, kind, THUMB_DIM).then(
       (u) => !off && setUrl(u),
       () => undefined,
     );
@@ -84,15 +99,15 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
   const [tab, setTab] = useState<Tab>("library");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
-  const [items, setItems] = useState<Output[]>([]);
-  const [next, setNext] = useState("");
+  const [items, setItems] = useState<Output[]>(() => lastPages.get("|")?.items ?? []);
+  const [next, setNext] = useState(() => lastPages.get("|")?.next ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [files, setFiles] = useState<ReadonlySet<string>>(new Set());
   const [comps, setComps] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [tool, setTool] = useState("");
-  const [tools, setTools] = useState<string[]>([]);
+  const [tools, setTools] = useState<string[]>(lastTools);
   const modules = useModules((s) => s.byId);
 
   // Search as you type, a moment after the last key.
@@ -108,7 +123,8 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
       (page) => {
         if (off) return;
         const ids = new Set((page.items ?? []).filter((o) => !o.missing && exts.includes(extOf(o.path))).map((o) => o.moduleId));
-        setTools([...ids].filter((id) => id !== ""));
+        lastTools = [...ids].filter((id) => id !== "");
+        setTools(lastTools);
       },
       () => undefined,
     );
@@ -137,10 +153,22 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
 
   useEffect(() => {
     let off = false;
+    const key = `${query}|${tool}`;
+    const shown = lastPages.get(key);
+    if (shown) {
+      setItems(shown.items);
+      setNext(shown.next);
+    }
     setLoading(true);
     fetchPage("").then(
       (p) => {
         if (off) return;
+        lastPages.set(key, p);
+        while (lastPages.size > 8) {
+          const oldest = lastPages.keys().next();
+          if (oldest.done) break;
+          lastPages.delete(oldest.value);
+        }
         setItems(p.items);
         setNext(p.next);
         setError("");

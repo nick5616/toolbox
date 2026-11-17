@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEve
 import { cx, Icon } from "@/components";
 import type { PostSourceFile } from "@/lib/api";
 import { clickSelection, usedNumbers } from "./selection";
-import { formatDuration, loadClipDuration, loadSourceThumb } from "./sourceThumbs";
+import { cachedSourceThumb, formatDuration, loadClipDuration, loadSourceThumb } from "./sourceThumbs";
 import { startSourceDrag } from "./sourceDrag";
 import styles from "./SourceGrid.module.css";
 
@@ -65,10 +65,10 @@ interface TileProps {
 function Tile({ source, id, size, selected, highlighted, active, used, onPointerDown, onClick, onDoubleClick }: TileProps) {
   const ref = useRef<HTMLDivElement>(null);
   const seen = useSeen(ref);
-  const [url, setUrl] = useState("");
+  const { path, kind, missing } = source;
+  const [url, setUrl] = useState(() => cachedSourceThumb(path, kind));
   const [failed, setFailed] = useState(false);
   const [duration, setDuration] = useState(0);
-  const { path, kind, missing } = source;
 
   useEffect(() => {
     if (!seen || missing) return;

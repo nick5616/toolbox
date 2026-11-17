@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent } from "react";
 import { cx, Icon, IconButton, MenuButton, type MenuItem } from "@/components";
 import type { PostIssue, PostSlide, ProjectInfo } from "@/lib/api";
 import { FramedMedia } from "./FramedMedia";
@@ -66,8 +66,10 @@ export function SlideStrip({ slides, selectedId, aspect, issues, projects, addIt
     });
   };
 
+  // The whole tile selects its slide on a click and reorders on a drag; only
+  // the action buttons are left to themselves.
   const down = (e: RPointerEvent<HTMLLIElement>, id: string, index: number) => {
-    if (e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
+    if (e.button !== 0 || (e.target as HTMLElement).closest("[data-tile-action]")) return;
     dragRef.current = { id, from: index, over: index, startY: e.clientY, active: false, pointer: e.pointerId };
     e.currentTarget.setPointerCapture?.(e.pointerId);
   };
@@ -84,8 +86,27 @@ export function SlideStrip({ slides, selectedId, aspect, issues, projects, addIt
     if (!d || d.pointer !== e.pointerId) return;
     dragRef.current = null;
     setDrag(null);
-    if (d.active && d.over !== d.from) onReorder(d.from, d.over);
+    if (!d.active) onSelect(d.id);
+    else if (d.over !== d.from) onReorder(d.from, d.over);
   };
+
+  // Up/Down select the slide above/below; with Alt they move the slide.
+  const onListKey = (e: KeyboardEvent<HTMLOListElement>) => {
+    if ((e.key !== "ArrowUp" && e.key !== "ArrowDown") || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const i = slides.findIndex((s) => s.id === selectedId);
+    const to = e.key === "ArrowUp" ? i - 1 : i + 1;
+    const target = slides[to];
+    if (i < 0 || !target) return;
+    e.preventDefault();
+    if (e.altKey) onReorder(i, to);
+    else onSelect(target.id);
+    requestAnimationFrame(() => list.current?.querySelectorAll<HTMLElement>("[data-slide-select]")[to]?.focus());
+  };
+
+  // A slide selected elsewhere (the phone preview, Checks) scrolls into view.
+  useEffect(() => {
+    list.current?.querySelector("[data-slide-select][aria-current]")?.scrollIntoView?.({ block: "nearest" });
+  }, [selectedId]);
 
   return (
     <section ref={root} className={styles.root} aria-label="Slides">
@@ -98,7 +119,7 @@ export function SlideStrip({ slides, selectedId, aspect, issues, projects, addIt
       {slides.length === 0 ? (
         <p className={styles.empty} data-tip="Use Add or drop files onto this list">No slides yet. Add photos and clips, or drop them here.</p>
       ) : (
-        <ol ref={list} className={styles.list}>
+        <ol ref={list} className={styles.list} onKeyDown={onListKey}>
           {slides.map((s, i) => {
             const level = worstLevel(issues.get(s.id) ?? []);
             const selected = s.id === selectedId;
@@ -112,23 +133,23 @@ export function SlideStrip({ slides, selectedId, aspect, issues, projects, addIt
                 onPointerUp={up}
                 onPointerCancel={up}
               >
-                <button type="button" className={styles.select} onClick={() => onSelect(s.id)} aria-label={`Slide ${i + 1}, ${KIND_LABEL[s.kind] ?? s.kind}`} data-tip="Select this slide; drag a slide up or down to change the order" aria-current={selected || undefined}>
+                <button type="button" data-slide-select="" className={styles.select} onClick={() => onSelect(s.id)} aria-label={`Slide ${i + 1}, ${KIND_LABEL[s.kind] ?? s.kind}`} data-tip="Click to select this slide (Up and Down arrows step through them); drag it, or press Alt+Up or Alt+Down, to change the order" aria-current={selected || undefined}>
                   <span className={styles.thumbWrap}>
                     <SlideThumb slide={s} aspect={aspect} project={projects.get(s.projectId)} />
-                  </span>
-                  <span className={styles.badge} data-tip="Position in the post">{i + 1}</span>
-                  <span className={styles.kind} title={KIND_LABEL[s.kind]}>
-                    <Icon name={KIND_ICON[s.kind] ?? "image"} size={12} />
-                  </span>
-                  {(level === "error" || level === "warning") && (
-                    <span className={cx(styles.warn, level === "error" && styles.warnError)} title={(issues.get(s.id) ?? []).map((x) => x.message).join("\n")} data-testid={`issue-${s.id}`}>
-                      <Icon name="triangle-alert" size={12} />
+                    <span className={styles.badge} data-tip="Position in the post">{i + 1}</span>
+                    <span className={styles.kind} title={KIND_LABEL[s.kind]}>
+                      <Icon name={KIND_ICON[s.kind] ?? "image"} size={12} />
                     </span>
-                  )}
-                  {isPending(s) && <span className={styles.pending} data-tip="Open it to make the picture or video for this slide">Not made yet</span>}
+                    {(level === "error" || level === "warning") && (
+                      <span className={cx(styles.warn, level === "error" && styles.warnError)} title={(issues.get(s.id) ?? []).map((x) => x.message).join("\n")} data-testid={`issue-${s.id}`}>
+                        <Icon name="triangle-alert" size={12} />
+                      </span>
+                    )}
+                    {isPending(s) && <span className={styles.pending} data-tip="Open it to make the picture or video for this slide">Not made yet</span>}
+                  </span>
                 </button>
                 {selected && (
-                  <span className={styles.actions}>
+                  <span className={styles.actions} data-tile-action="">
                     <IconButton size="sm" icon="chevron-up" label="Move earlier" data-tip="Move this slide one place earlier in the post" disabled={i === 0} onClick={() => onReorder(i, i - 1)} />
                     <IconButton size="sm" icon="chevron-down" label="Move later" data-tip="Move this slide one place later in the post" disabled={i === slides.length - 1} onClick={() => onReorder(i, i + 1)} />
                     <IconButton size="sm" icon="copy" label="Duplicate slide" data-tip={slides.length >= maxSlides ? "The post is full" : "Add a copy of this slide right after it"} disabled={slides.length >= maxSlides} onClick={() => onDuplicate(s.id)} />

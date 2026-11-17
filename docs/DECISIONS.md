@@ -671,3 +671,18 @@ Newest last. Format: date — decision — why.
     - `FramedMedia` remembers each picture's size by URL, so it lays out without waiting for `onLoad`.
     - The phone preview uses the stage's size, so it reuses the same picture.
     - Measured in the sandbox on a 15-slide post: about 20 ms (one frame) per switch.
+- **2026-11-17: Post Builder: the whole slide tile is clickable; From Library loads faster.**
+  - **Slide strip:** a tile's select button only covered its thumbnail, so the rest of the row did nothing (and pressing on the thumbnail couldn't start a reorder drag). The whole tile now selects on a click and reorders on a drag; only the action buttons are left out. Up/Down step through the slides and Alt+Up/Down move the selected one. A slide selected elsewhere (phone preview, Checks) scrolls into view.
+  - **Why From Library was slow:** each thumbnail was built from scratch on every app start, all at once.
+    - Video thumbnails ran ffprobe and then ffmpeg, about 0.5 s each on Windows, even when the frame was already cached on disk.
+    - Image thumbnails were held in memory only (64 entries, 2 workers). CatmullRom on the whole photo took about 280 ms for 10 MP to 256 px.
+    - Every new frame walked the whole media cache to prune it.
+  - **Changes (shared by every tool):**
+    - `MediaService.Frame`/`Filmstrip` look for the cached file before probing. The first frame (ms 0) is taken without a probe; the file is only probed when that fails, to say why.
+    - The media cache is pruned at most once a minute after small files.
+    - `core/imaging` box-averages a big photo down to about 2× the size asked for before CatmullRom: 414 → 222 ms for a 10 MP JPEG, with the same look (mean difference under 2/255 in tests).
+    - Previews are also kept in `<support>/cache/thumbs/`, so they survive restarts. Unused ones go after 30 days, and the cache stays under 1 GB, pruned at start.
+    - Up to 4 preview workers run at once, depending on CPU count.
+    - In the picker and the Sources grid, clip frames run 4 at a time in the order the tiles asked. A thumbnail made before shows in its tile's first render.
+    - The dialog shows its last listing at once and refreshes it in the background.
+  - **Not measured in the app:** the sandbox dev app had been stopped for low memory, so the gains are timed in Go tests and by hand on ffprobe/ffmpeg, not in the running dialog.

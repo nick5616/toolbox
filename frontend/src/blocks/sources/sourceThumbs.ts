@@ -5,15 +5,37 @@ import { ComposerService, FilesService, MediaService, PostsService } from "@/lib
 
 const MAX_THUMBS = 400;
 const thumbs = new Map<string, Promise<string>>();
+/** Thumbnails that finished, so a tile mounted again shows its picture in its first render. */
+const done = new Map<string, string>();
 
 export function clearSourceCaches(): void {
   thumbs.clear();
+  done.clear();
   durations.clear();
   queue.length = 0;
+  frameWaiting.length = 0;
+  framesRunning = 0;
+}
+
+// A clip's first frame is an FFmpeg run: a few at a time, in the order the
+// tiles asked, so the first tiles fill in first instead of all at the end.
+export const FRAME_CONCURRENCY = 4;
+let framesRunning = 0;
+const frameWaiting: (() => void)[] = [];
+
+async function limitedFrame(path: string, maxDim: number): Promise<string> {
+  if (framesRunning >= FRAME_CONCURRENCY) await new Promise<void>((go) => frameWaiting.push(go));
+  framesRunning++;
+  try {
+    return await MediaService.Frame(path, 0, maxDim);
+  } finally {
+    framesRunning--;
+    frameWaiting.shift()?.();
+  }
 }
 
 async function resolveThumb(path: string, kind: string, maxDim: number): Promise<string> {
-  if (kind === "clip") return MediaService.Frame(path, 0, maxDim);
+  if (kind === "clip") return limitedFrame(path, maxDim);
   try {
     return await FilesService.ImageThumb(path, maxDim);
   } catch (e) {
@@ -37,13 +59,24 @@ export function loadSourceThumb(path: string, kind: string, maxDim = 256): Promi
   }
   const p = resolveThumb(path, kind, maxDim);
   thumbs.set(key, p);
-  p.catch(() => thumbs.delete(key));
+  p.then(
+    (url) => {
+      if (thumbs.get(key) === p) done.set(key, url);
+    },
+    () => thumbs.delete(key),
+  );
   while (thumbs.size > MAX_THUMBS) {
     const oldest = thumbs.keys().next();
     if (oldest.done) break;
     thumbs.delete(oldest.value);
+    done.delete(oldest.value);
   }
   return p;
+}
+
+/** The thumbnail `loadSourceThumb` already made ("" if none yet). */
+export function cachedSourceThumb(path: string, kind: string, maxDim = 256): string {
+  return done.get(`${kind}|${path}|${maxDim}`) ?? "";
 }
 
 // ---- clip durations, probed in small batches ----

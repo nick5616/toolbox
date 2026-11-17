@@ -18,7 +18,8 @@ vi.mock("@/lib/api", async (orig) => {
   };
 });
 
-import { LibraryPickerDialog } from "./LibraryPickerDialog";
+import { clearSourceCaches } from "@/blocks/sources/sourceThumbs";
+import { clearLibraryPickerCache, LibraryPickerDialog } from "./LibraryPickerDialog";
 import { MEDIA_EXTS } from "./SourcesPanel";
 
 const out = (id: string, path: string, moduleId: string, kind = "image"): Output => ({
@@ -44,6 +45,8 @@ const OUTPUTS = [
 const comp = (id: string, name: string): ProjectInfo => ({ id, kind: "composition" as ProjectInfo["kind"], name, thumb: "", items: 0, missing: 0, updatedAt: 1, flags: [] });
 
 beforeEach(() => {
+  clearLibraryPickerCache();
+  clearSourceCaches();
   h.query.mockImplementation(async (q: LibraryQuery) => ({ items: OUTPUTS.filter((o) => !q.moduleId || o.moduleId === q.moduleId), nextCursor: "" }));
   h.exportComp.mockImplementation(async (id: string) => out("x", `C:/lib/Compositions/${id}.png`, "photo-composer"));
 });
@@ -82,5 +85,26 @@ describe("LibraryPickerDialog", () => {
     await waitFor(() => expect(onAdd).toHaveBeenCalledWith(["C:/lib/Scenes/b.mp4", "C:/lib/Compositions/k1.png"]));
     expect(h.exportComp).toHaveBeenCalledWith("k1");
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows the last listing at once when it opens again, then lists again", async () => {
+    const props = { exts: MEDIA_EXTS, have: new Set<string>(), compositions: [], onAdd: vi.fn(), onClose: vi.fn() };
+    const first = render(<LibraryPickerDialog {...props} />);
+    await screen.findByRole("button", { name: /a\.jpg/ });
+    first.unmount();
+
+    let release = () => {};
+    h.query.mockImplementation(
+      (q: LibraryQuery) =>
+        new Promise((resolve) => {
+          release = () => resolve({ items: OUTPUTS.filter((o) => !q.moduleId || o.moduleId === q.moduleId).slice(1), nextCursor: "" });
+        }),
+    );
+    render(<LibraryPickerDialog {...props} />);
+    // Shown before the new listing came back.
+    expect(screen.getByRole("button", { name: /a\.jpg/ })).toBeTruthy();
+    expect(h.query).toHaveBeenCalled();
+    release();
+    await waitFor(() => expect(screen.queryByRole("button", { name: /a\.jpg/ })).toBeNull());
   });
 });
