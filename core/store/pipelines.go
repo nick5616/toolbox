@@ -19,7 +19,7 @@ const activeRunStatuses = `('running','waiting')`
 
 // ListPipelines implements core.PipelineStore (oldest first).
 func (d *DB) ListPipelines(ctx context.Context) ([]core.Pipeline, error) {
-	rows, err := d.sql.QueryContext(ctx, `SELECT id, definition FROM pipelines ORDER BY created_at, id`)
+	rows, err := d.ro.QueryContext(ctx, `SELECT id, definition FROM pipelines ORDER BY created_at, id`)
 	if err != nil {
 		return nil, fmt.Errorf("list pipelines: %w", err)
 	}
@@ -94,7 +94,7 @@ func (d *DB) PutRun(ctx context.Context, run core.PipelineRun, stateJSON string)
 // GetRun implements core.PipelineStore.
 func (d *DB) GetRun(ctx context.Context, id string) (string, error) {
 	var state string
-	err := d.sql.QueryRowContext(ctx, `SELECT state FROM pipeline_runs WHERE id = ?`, id).Scan(&state)
+	err := d.ro.QueryRowContext(ctx, `SELECT state FROM pipeline_runs WHERE id = ?`, id).Scan(&state)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", core.Errorf(core.CodeNotFound, "Run not found")
@@ -128,7 +128,7 @@ func (d *DB) ListRuns(ctx context.Context, f core.RunFilter) ([]string, error) {
 	}
 	q += ` ORDER BY created_at DESC, id DESC LIMIT ?`
 	args = append(args, limit)
-	rows, err := d.sql.QueryContext(ctx, q, args...)
+	rows, err := d.ro.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list runs: %w", err)
 	}
@@ -165,7 +165,7 @@ func (d *DB) DeleteRuns(ctx context.Context, ids []string) error {
 
 // PruneRuns implements core.PipelineStore.
 func (d *DB) PruneRuns(ctx context.Context, keepFinished int) ([]string, error) {
-	rows, err := d.sql.QueryContext(ctx, `SELECT id FROM pipeline_runs WHERE status NOT IN `+activeRunStatuses+`
+	rows, err := d.ro.QueryContext(ctx, `SELECT id FROM pipeline_runs WHERE status NOT IN `+activeRunStatuses+`
 		ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?`, max(keepFinished, 0))
 	if err != nil {
 		return nil, fmt.Errorf("prune runs: %w", err)
@@ -192,7 +192,7 @@ func (d *DB) PruneRuns(ctx context.Context, keepFinished int) ([]string, error) 
 
 // SeenFiles implements core.PipelineStore.
 func (d *DB) SeenFiles(ctx context.Context, pipelineID string) (map[string]core.SeenFile, error) {
-	rows, err := d.sql.QueryContext(ctx, `SELECT path, size, mtime FROM pipeline_watch_seen WHERE pipeline_id = ?`, pipelineID)
+	rows, err := d.ro.QueryContext(ctx, `SELECT path, size, mtime FROM pipeline_watch_seen WHERE pipeline_id = ?`, pipelineID)
 	if err != nil {
 		return nil, fmt.Errorf("list seen files: %w", err)
 	}
@@ -253,7 +253,7 @@ func (d *DB) ForgetSeen(ctx context.Context, pipelineID string, paths []string) 
 // schedule fired for (Unix ms), 0 if never.
 func (d *DB) ScheduleFired(ctx context.Context, pipelineID string) (int64, error) {
 	var at int64
-	err := d.sql.QueryRowContext(ctx, `SELECT last_fire_at FROM pipeline_schedule_state WHERE pipeline_id = ?`, pipelineID).Scan(&at)
+	err := d.ro.QueryRowContext(ctx, `SELECT last_fire_at FROM pipeline_schedule_state WHERE pipeline_id = ?`, pipelineID).Scan(&at)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}

@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"toolbox/core"
+	"toolbox/core/par"
 )
 
 // Dependency IDs.
@@ -90,6 +91,13 @@ type Service struct {
 
 	mu    sync.Mutex
 	cache map[string]core.DepStatus // base statuses (no RequiredBy)
+
+	// Persisted detection results (cache.go), single-flight checks, change hooks.
+	cachePath string
+	keyed     map[string]cacheEntry // guarded by mu
+	hooks     []func()              // guarded by mu
+	fmu       sync.Mutex
+	flights   map[string]*flight
 }
 
 // New builds a service. binDir is the managed bin dir (<support>/bin).
@@ -101,6 +109,8 @@ func New(binDir string, specs []Spec, reg *core.Registry, em core.Emitter) *Serv
 		binDir: binDir, specs: specs, reg: reg, em: em,
 		goos:     runtime.GOOS,
 		cache:    map[string]core.DepStatus{},
+		keyed:    map[string]cacheEntry{},
+		flights:  map[string]*flight{},
 		lookPath: lookPath,
 	}
 	s.knownDirs = func() []string { return defaultKnownDirs(s.goos) }
@@ -151,10 +161,16 @@ func (s *Service) spec(id string) (Spec, bool) {
 	return e.Spec, ok
 }
 
-// check detects one entry (no registry-derived fields).
+// check detects one entry (no registry-derived fields), always re-running it.
 func (s *Service) check(ctx context.Context, e entry) core.DepStatus {
+	return s.checkMode(ctx, e, true)
+}
+
+// checkMode is check; without force a binary may reuse its persisted result
+// when the file hasn't changed.
+func (s *Service) checkMode(ctx context.Context, e entry, force bool) core.DepStatus {
 	if e.detect == nil {
-		return s.detectOne(ctx, e.Spec)
+		return s.detectSpec(ctx, e.Spec, force)
 	}
 	st := e.detect(ctx)
 	base := s.missing(e.Spec)
@@ -196,11 +212,14 @@ func (s *Service) Resolve(depID string) (string, error) {
 	if cached && st.State == core.DepOK {
 		return st.Path, nil
 	}
-	st = s.check(context.Background(), e)
-	s.mu.Lock()
-	s.cache[depID] = st
-	s.mu.Unlock()
+	// Waits for a check of this dep already in flight (e.g. the start-up
+	// detection) instead of starting a second one.
+	st = s.checkShared(context.Background(), e, true)
+	changed := s.setStatus(e.ID, st)
 	s.emit()
+	if changed {
+		s.notify()
+	}
 	if st.State == core.DepOK {
 		return st.Path, nil
 	}
@@ -251,27 +270,128 @@ func (s *Service) emit() {
 	s.em.Emit(core.EventDepsChanged, core.DepsChanged{Deps: s.List()})
 }
 
+// Known returns the cached status of a dependency without running anything.
+// The bool is false while the dependency hasn't been detected yet (unknown is
+// not the same as missing).
+func (s *Service) Known(id string) (core.DepStatus, bool) {
+	s.mu.Lock()
+	st, ok := s.cache[id]
+	s.mu.Unlock()
+	if ok {
+		s.decorate(&st)
+	}
+	return st, ok
+}
+
+// OnChange registers fn to run (on the detecting goroutine, never holding a
+// lock) whenever a detection changes a dependency's state, path or version.
+func (s *Service) OnChange(fn func()) {
+	s.mu.Lock()
+	s.hooks = append(s.hooks, fn)
+	s.mu.Unlock()
+}
+
+func (s *Service) notify() {
+	s.mu.Lock()
+	hooks := append([]func(){}, s.hooks...)
+	s.mu.Unlock()
+	for _, h := range hooks {
+		h()
+	}
+}
+
+// setStatus stores a status and reports whether it differs from the cached one.
+func (s *Service) setStatus(id string, st core.DepStatus) bool {
+	s.mu.Lock()
+	old, had := s.cache[id]
+	s.cache[id] = st
+	s.mu.Unlock()
+	return !had || !sameStatus(old, st)
+}
+
+func sameStatus(a, b core.DepStatus) bool {
+	return a.State == b.State && a.Path == b.Path && a.Version == b.Version && a.Source == b.Source && a.Error == b.Error
+}
+
+// flight is one check of one dependency in progress.
+type flight struct {
+	done  chan struct{}
+	force bool
+	st    core.DepStatus
+}
+
+// checkShared runs checkMode single-flight per dependency: a caller arriving
+// while a check of the same dep runs waits for it (a forced caller waits for a
+// non-forced check, then runs its own).
+func (s *Service) checkShared(ctx context.Context, e entry, force bool) core.DepStatus {
+	for {
+		s.fmu.Lock()
+		f, busy := s.flights[e.ID]
+		if !busy {
+			f = &flight{done: make(chan struct{}), force: force}
+			s.flights[e.ID] = f
+			s.fmu.Unlock()
+			f.st = s.checkMode(ctx, e, force)
+			s.fmu.Lock()
+			delete(s.flights, e.ID)
+			s.fmu.Unlock()
+			close(f.done)
+			return f.st
+		}
+		s.fmu.Unlock()
+		select {
+		case <-f.done:
+		case <-ctx.Done():
+			if st, ok := s.Known(e.ID); ok {
+				return st
+			}
+			return s.missing(e.Spec)
+		}
+		if f.force || !force {
+			return f.st
+		}
+	}
+}
+
 // Detect re-checks every dependency in parallel (5 s timeout each for
-// binaries) and emits deps:changed.
+// binaries), always re-running the version commands, and emits deps:changed.
+// It is what Settings' "Recheck" calls.
 func (s *Service) Detect(ctx context.Context) []core.DepStatus {
+	return s.detectAll(ctx, true, 0)
+}
+
+// Refresh is the start-up detection: persisted results are reused for binaries
+// whose path, size and modification time haven't changed, and at most two
+// checks run at once so the window's own start isn't slowed.
+func (s *Service) Refresh(ctx context.Context) []core.DepStatus {
+	return s.detectAll(ctx, false, 2)
+}
+
+func (s *Service) detectAll(ctx context.Context, force bool, limit int) []core.DepStatus {
 	entries := s.entries()
 	res := make([]core.DepStatus, len(entries))
-	var wg sync.WaitGroup
-	for i, e := range entries {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			res[i] = s.check(ctx, e)
-		}()
+	if limit <= 0 {
+		limit = len(entries)
 	}
-	wg.Wait()
-	s.mu.Lock()
+	_ = par.ForEach(ctx, len(entries), limit, func(ctx context.Context, i int) error {
+		res[i] = s.checkShared(ctx, entries[i], force)
+		return nil
+	})
+	changed := false
 	for i, e := range entries {
-		s.cache[e.ID] = res[i]
+		if res[i].ID == "" { // cancelled before it started: keep what we had
+			continue
+		}
+		if s.setStatus(e.ID, res[i]) {
+			changed = true
+		}
 	}
-	s.mu.Unlock()
+	s.saveCache()
 	out := s.List()
 	s.em.Emit(core.EventDepsChanged, core.DepsChanged{Deps: out})
+	if changed {
+		s.notify()
+	}
 	return out
 }
 

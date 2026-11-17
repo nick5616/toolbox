@@ -180,7 +180,7 @@ func (d *DB) ListClips(ctx context.Context, q core.ClipQuery) (core.ClipPage, er
 	}
 	query += ` ORDER BY pinned DESC, last_used_at DESC, id DESC LIMIT ?`
 	args = append(args, limit+1)
-	items, err := queryClips(ctx, d.sql, query, args...)
+	items, err := queryClips(ctx, d.ro, query, args...)
 	if err != nil {
 		return core.ClipPage{}, err
 	}

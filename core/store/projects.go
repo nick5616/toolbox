@@ -25,7 +25,7 @@ func scanProject(sc interface{ Scan(...any) error }) (core.StoredProject, error)
 
 // ListProjects implements core.ProjectStore.
 func (d *DB) ListProjects(ctx context.Context, kind core.ProjectKind) ([]core.StoredProject, error) {
-	rows, err := d.sql.QueryContext(ctx, `SELECT `+projectCols+` FROM projects WHERE kind = ? ORDER BY updated_at DESC, id DESC`, string(kind))
+	rows, err := d.ro.QueryContext(ctx, `SELECT `+projectCols+` FROM projects WHERE kind = ? ORDER BY updated_at DESC, id DESC`, string(kind))
 	if err != nil {
 		return nil, fmt.Errorf("list projects: %w", err)
 	}
@@ -46,7 +46,7 @@ func (d *DB) ListProjects(ctx context.Context, kind core.ProjectKind) ([]core.St
 
 // GetProject implements core.ProjectStore.
 func (d *DB) GetProject(ctx context.Context, id string) (core.StoredProject, error) {
-	p, err := scanProject(d.sql.QueryRowContext(ctx, `SELECT `+projectCols+` FROM projects WHERE id = ?`, id))
+	p, err := scanProject(d.ro.QueryRowContext(ctx, `SELECT `+projectCols+` FROM projects WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return core.StoredProject{}, core.Errorf(core.CodeNotFound, "Project not found")
 	}

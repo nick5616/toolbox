@@ -12,14 +12,15 @@ import (
 	"strings"
 
 	"toolbox/core"
+	"toolbox/core/par"
 )
 
 const outputCols = `id, job_id, module_id, path, name, kind, size_bytes, created_at`
 
 // queryOutputs runs an outputs SELECT (using outputCols), then fills Tags and
-// Missing. Rows are fully read before the tag query (single connection).
+// Missing. Rows are fully read before the tag query (the tag query is a second read).
 func (d *DB) queryOutputs(ctx context.Context, q string, args ...any) ([]core.Output, error) {
-	rows, err := d.sql.QueryContext(ctx, q, args...)
+	rows, err := d.ro.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query outputs: %w", err)
 	}
@@ -52,11 +53,16 @@ func (d *DB) queryOutputs(ctx context.Context, q string, args ...any) ([]core.Ou
 		ph[i] = "?"
 		ids[i] = outs[i].ID
 		idx[outs[i].ID] = i
+	}
+	// Stat every file (missing detection) in parallel: serial stats crawl on
+	// OneDrive and network folders.
+	_ = par.ForEach(ctx, len(outs), 8, func(_ context.Context, i int) error {
 		if _, err := os.Stat(outs[i].Path); err != nil {
 			outs[i].Missing = true
 		}
-	}
-	trows, err := d.sql.QueryContext(ctx, `SELECT output_id, tag FROM output_tags WHERE output_id IN (`+strings.Join(ph, ",")+`) ORDER BY tag`, ids...)
+		return nil
+	})
+	trows, err := d.ro.QueryContext(ctx, `SELECT output_id, tag FROM output_tags WHERE output_id IN (`+strings.Join(ph, ",")+`) ORDER BY tag`, ids...)
 	if err != nil {
 		return nil, fmt.Errorf("query output tags: %w", err)
 	}

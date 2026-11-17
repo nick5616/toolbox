@@ -39,7 +39,7 @@ func (d *DB) AddOutputInputs(ctx context.Context, outputID string, inputs []stri
 
 // OutputInputs implements core.LineageStore.
 func (d *DB) OutputInputs(ctx context.Context, outputID string) ([]string, error) {
-	rows, err := d.sql.QueryContext(ctx, `SELECT input_path FROM output_inputs WHERE output_id = ? ORDER BY input_path`, outputID)
+	rows, err := d.ro.QueryContext(ctx, `SELECT input_path FROM output_inputs WHERE output_id = ? ORDER BY input_path`, outputID)
 	if err != nil {
 		return nil, fmt.Errorf("output inputs: %w", err)
 	}
@@ -62,9 +62,17 @@ func (d *DB) OutputsFromInput(ctx context.Context, path string) ([]core.Output, 
 		ORDER BY created_at DESC, id DESC`, path)
 }
 
+// lineageDoneKey is the settings row set after the first full backfill pass.
+const lineageDoneKey = "meta.lineageBackfilled"
+
 // BackfillLineage implements core.LineageStore.
 func (d *DB) BackfillLineage(ctx context.Context) (int, error) {
-	rows, err := d.sql.QueryContext(ctx, `SELECT o.id, o.path, j.inputs FROM outputs o
+	// One full pass is enough: outputs it couldn't link stay unlinkable, and
+	// new outputs get their lineage when they're registered.
+	if _, done, err := d.GetSetting(ctx, lineageDoneKey); err == nil && done {
+		return 0, nil
+	}
+	rows, err := d.ro.QueryContext(ctx, `SELECT o.id, o.path, j.inputs FROM outputs o
 		JOIN jobs j ON j.id = o.job_id
 		WHERE NOT EXISTS (SELECT 1 FROM output_inputs i WHERE i.output_id = o.id)`)
 	if err != nil {
@@ -103,6 +111,9 @@ func (d *DB) BackfillLineage(ctx context.Context) (int, error) {
 			return added, err
 		}
 		added += len(p.inputs)
+	}
+	if err := d.SetSetting(ctx, lineageDoneKey, "1"); err != nil {
+		return added, err
 	}
 	return added, nil
 }

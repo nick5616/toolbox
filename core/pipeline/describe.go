@@ -230,10 +230,10 @@ func (r *Runner) Describe(p core.Pipeline) core.PipelineCheck {
 				})
 			}
 		}
-		if ok && t.ModuleID != "" && r.cfg.Tools != nil {
+		if ok && t.ModuleID != "" && (r.cfg.Known != nil || r.cfg.Tools != nil) {
 			if d, found := r.cfg.Reg.Descriptor(t.ModuleID); found {
 				for _, dep := range d.Requires {
-					if _, err := r.cfg.Tools(dep); err != nil && !slices.Contains(check.Missing, dep) {
+					if r.depMissing(dep) && !slices.Contains(check.Missing, dep) {
 						check.Missing = append(check.Missing, dep)
 					}
 				}
@@ -581,4 +581,17 @@ func pointerStrings(raw json.RawMessage, ptr string) []string {
 		walk(n)
 	}
 	return out
+}
+
+// depMissing reports whether a required dependency is known not to be usable.
+// With Config.Known it only reads the cached status (an undetected dependency
+// is not missing; the list is re-sent when detection finishes). Without it,
+// Tools is asked, which may run a version check.
+func (r *Runner) depMissing(dep string) bool {
+	if r.cfg.Known != nil {
+		st, known := r.cfg.Known(dep)
+		return known && st.State != core.DepOK
+	}
+	_, err := r.cfg.Tools(dep)
+	return err != nil
 }

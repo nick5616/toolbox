@@ -17,7 +17,8 @@ import (
 
 // DB is the app database.
 type DB struct {
-	sql *sql.DB
+	sql *sql.DB // writer: one connection, BEGIN IMMEDIATE
+	ro  *sql.DB // read-only pool (WAL readers never wait for the writer)
 }
 
 var (
@@ -35,7 +36,7 @@ func Open(path string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve database path: %w", err)
 	}
-	db, err := sql.Open("sqlite", dsn(abs))
+	db, err := sql.Open("sqlite", dsn(abs, false))
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
@@ -48,23 +49,52 @@ func Open(path string) (*DB, error) {
 		db.Close()
 		return nil, err
 	}
-	return &DB{sql: db}, nil
+	ro, err := sql.Open("sqlite", dsn(abs, true))
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("open database (read pool): %w", err)
+	}
+	ro.SetMaxOpenConns(readPoolSize)
+	ro.SetMaxIdleConns(readPoolSize)
+	if err := ro.Ping(); err != nil {
+		ro.Close()
+		db.Close()
+		return nil, fmt.Errorf("open database %q (read pool): %w", path, err)
+	}
+	return &DB{sql: db, ro: ro}, nil
 }
 
+const readPoolSize = 4
+
 // dsn builds a file: URI with pragmas. The path is percent-encoded so spaces
-// and backslash-converted Windows paths survive.
-func dsn(abs string) string {
+// and backslash-converted Windows paths survive. readOnly gives the reader
+// pool's connections (query_only); the writer takes the write lock up front.
+func dsn(abs string, readOnly bool) string {
 	p := filepath.ToSlash(abs)
 	if !strings.HasPrefix(p, "/") {
 		p = "/" + p // C:/x -> /C:/x
 	}
 	u := url.URL{Scheme: "file", Path: p}
 	q := url.Values{}
-	for _, pr := range []string{"busy_timeout(5000)", "journal_mode(WAL)", "foreign_keys(1)", "synchronous(NORMAL)"} {
+	pragmas := []string{"busy_timeout(5000)", "journal_mode(WAL)", "foreign_keys(1)", "synchronous(NORMAL)",
+		"cache_size(-16000)", "temp_store(MEMORY)", "journal_size_limit(67108864)"}
+	if readOnly {
+		pragmas = append(pragmas, "query_only(1)")
+	} else {
+		q.Set("_txlock", "immediate")
+	}
+	for _, pr := range pragmas {
 		q.Add("_pragma", pr)
 	}
 	return u.String() + "?" + q.Encode()
 }
 
-// Close closes the database.
-func (d *DB) Close() error { return d.sql.Close() }
+// Close closes the database (letting SQLite refresh its planner statistics).
+func (d *DB) Close() error {
+	_, _ = d.sql.Exec(`PRAGMA optimize`)
+	err := d.ro.Close()
+	if e := d.sql.Close(); err == nil {
+		err = e
+	}
+	return err
+}
