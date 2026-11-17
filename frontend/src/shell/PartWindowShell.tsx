@@ -3,8 +3,8 @@ import { Banner, Button, EmptyState, ErrorBoundary, Icon, Toaster, toast } from 
 import { TooltipLayer } from "@/components/TooltipLayer";
 import { toAppError } from "@/lib/errors";
 import { closeWindow, currentWindow, focusWindow } from "@/lib/windows";
+import { loadPartHost } from "@/parts";
 import { getPart } from "@/parts/registry";
-import "@/parts";
 import { useBridgesStatus } from "@/state/bridge";
 import { useModules } from "@/state/modules";
 import styles from "./PartWindowShell.module.css";
@@ -19,7 +19,19 @@ export interface PartWindowShellProps {
 
 /** Root of a part window (`/?window=part&part=<id>`): connects to the host's store, then renders the part. */
 export function PartWindowShell({ part }: PartWindowShellProps) {
-  const spec = getPart(part);
+  // The tool's part definitions load on demand (parts/index.ts), not with the entry bundle.
+  const [loaded, setLoaded] = useState(() => !!getPart(part));
+  useEffect(() => {
+    let live = true;
+    loadPartHost(part).then(
+      () => live && setLoaded(true),
+      () => live && setLoaded(true), // falls through to "this panel doesn't exist"
+    );
+    return () => {
+      live = false;
+    };
+  }, [part]);
+  const spec = loaded ? getPart(part) : undefined;
   const host = useModules((s) => (spec ? s.byId[spec.host] : undefined));
   const hostName = host?.name ?? spec?.host ?? "the tool";
   const bridge = useBridgesStatus();
@@ -65,7 +77,9 @@ export function PartWindowShell({ part }: PartWindowShellProps) {
   };
 
   let body;
-  if (!spec) {
+  if (!loaded) {
+    body = null;
+  } else if (!spec) {
     body = <EmptyState icon="circle-alert" title="Nothing to show here" body="This panel doesn't exist." />;
   } else if (failed) {
     body = <EmptyState icon="circle-alert" title="This panel couldn't start" body={failed} />;

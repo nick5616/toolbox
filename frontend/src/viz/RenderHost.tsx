@@ -6,7 +6,7 @@
 import { System } from "@wailsio/runtime";
 import { useEffect } from "react";
 import { on } from "@/lib/events";
-import { defaultSingleDeps, runSingle, type SingleDeps, type SingleRun } from "./edit/headless";
+import type { SingleDeps, SingleRun } from "./edit/headless"; // types only: the headless runner (and the effects it pulls in) loads on first use
 import { announceHost } from "./edit/hostReply";
 import { Sender, type HostMessage, type WorkerMessage } from "./worker/transport";
 
@@ -75,12 +75,14 @@ export function routeRender(
   active: Map<string, Active>,
   singles: Singles,
   forceJpeg = false,
-  deps: SingleDeps = defaultSingleDeps,
+  deps?: SingleDeps,
 ): void {
   if (d.kind === "composition" || d.kind === "recipe") {
     const run: SingleRun = { token: d.token, abort: new AbortController() };
     singles.set(d.token, run);
-    void runSingle(run, d.planUrl, invoke, deps).finally(() => singles.delete(d.token));
+    void import("./edit/headless")
+      .then((m) => m.runSingle(run, d.planUrl, invoke, deps ?? m.defaultSingleDeps))
+      .finally(() => singles.delete(d.token));
     return;
   }
   startRender(d.token, d.planUrl, invoke, active, forceJpeg);

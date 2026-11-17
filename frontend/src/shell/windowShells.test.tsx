@@ -192,11 +192,11 @@ describe("PartWindowShell", () => {
   const spec = (connect?: (p: URLSearchParams) => Promise<() => void>) =>
     definePart({ id: "t.panel", host: "stems", title: "Panel", icon: "eye", tip: "", width: 1, height: 1, component: () => <div>panel body</div>, connect });
 
-  it("explains an unknown part", () => {
+  it("explains an unknown part", async () => {
     setCurrentWindowForTest(parseWindow("?window=part&part=nope&key=part:nope"));
     render(<PartWindowShell part="nope" />);
-    expect(screen.getByText("Nothing to show here")).toBeTruthy();
-  });
+    expect(await screen.findByText("Nothing to show here", {}, { timeout: 20000 })).toBeTruthy();
+  }, 30000);
 
   it("connects, then renders the part in window placement", async () => {
     setCurrentWindowForTest(parseWindow("?window=part&part=t.panel&key=part:t.panel&project=p9"));

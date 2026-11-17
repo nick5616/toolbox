@@ -3,7 +3,7 @@
  * answered with the render protocol, and the host's presence announcement.
  */
 import { render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Composition } from "@/lib/api";
 import { buildEditFixture, fixtureProject } from "@/viz/edit/fixture";
 import { normalizeProject } from "@/viz/edit/defaults";
@@ -43,6 +43,10 @@ beforeEach(() => {
   vi.stubGlobal("Worker", FakeWorker);
 });
 afterEach(() => vi.unstubAllGlobals());
+// RenderHost loads the headless runner on first use; warm it so the flushes below stay short.
+beforeAll(async () => {
+  await import("./edit/headless");
+});
 
 const parts = (m: string) => m.split("|");
 const flush = () => new Promise((r) => setTimeout(r, 0));
