@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"toolbox/core"
+	"toolbox/core/pdfium"
 )
 
 const (
@@ -49,11 +50,16 @@ func (m *Module) thumbnail(ctx context.Context, path string, page, width int, pa
 	if v, ok := m.state.thumbs.get(ck); ok {
 		return v, nil
 	}
-	doc, _, err := readPDF(path)
-	if err != nil {
-		return "", err
+	// The renderer reads the file only when no instance has this version of
+	// it open (a 100-page grid reads it once per instance, not once per page).
+	src := pdfium.Source{
+		Key: fmt.Sprintf("%s|%d|%d", path, fi.Size(), fi.ModTime().UnixNano()),
+		Load: func() ([]byte, error) {
+			doc, _, err := readPDF(path)
+			return doc, err
+		},
 	}
-	img, err := m.state.r.RenderWidth(ctx, doc, password, page, width)
+	img, err := m.state.r.RenderWidthFrom(ctx, src, password, page, width)
 	if err != nil {
 		return "", err
 	}

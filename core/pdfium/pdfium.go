@@ -39,17 +39,31 @@ const (
 	msgNeedPassword  = "This PDF needs a password"
 )
 
-// Renderer is the lazily started pool. One instance is held while the pool is
-// alive and used under mu.
+// maxSlots is how many instances (each its own WebAssembly module with its
+// own copy of the open documents) render at once; it matches the pool's
+// MaxTotal.
+const maxSlots = 2
+
+// Renderer is the lazily started pool. Up to maxSlots instances are used at
+// the same time, each exclusively by one call.
 type Renderer struct {
 	cacheDir string
 
 	mu     sync.Mutex
+	cond   *sync.Cond // signalled when a slot frees up or the renderer closes
 	pool   pdfium.Pool
-	inst   pdfium.Pdfium
-	docs   []docEntry // LRU, most recent last
+	slots  []*slot
 	idle   *time.Timer
 	closed bool
+}
+
+// slot is one pool instance with the documents it has open (LRU, most recent
+// last). busy and docs are guarded by Renderer.mu while the slot is idle and
+// owned by the one caller that holds it while busy.
+type slot struct {
+	inst pdfium.Pdfium
+	docs []docEntry
+	busy bool
 }
 
 type docEntry struct {
@@ -57,16 +71,34 @@ type docEntry struct {
 	doc references.FPDF_DOCUMENT
 }
 
+// Source names a document without reading it: Key identifies a version of the
+// bytes (a path with size and mtime, say) and Load reads them. Load is only
+// called when no instance already has the document open.
+type Source struct {
+	Key  string
+	Load func() ([]byte, error)
+}
+
+// BytesSource wraps bytes already in memory; the key is their SHA-256.
+func BytesSource(doc []byte) Source {
+	sum := sha256.Sum256(doc)
+	return Source{Key: fmt.Sprintf("sha:%x", sum), Load: func() ([]byte, error) { return doc, nil }}
+}
+
 // New returns a renderer whose WebAssembly compilation cache lives in
 // cacheDir (empty disables the cache). Nothing starts until first use.
-func New(cacheDir string) *Renderer { return &Renderer{cacheDir: cacheDir} }
+func New(cacheDir string) *Renderer {
+	r := &Renderer{cacheDir: cacheDir}
+	r.cond = sync.NewCond(&r.mu)
+	return r
+}
 
-// startLocked brings the pool up. Caller holds mu.
+// startLocked brings the pool and the first instance up. Caller holds mu.
 func (r *Renderer) startLocked() error {
 	if r.closed {
 		return errors.New("renderer is closed")
 	}
-	if r.inst != nil {
+	if len(r.slots) > 0 {
 		return nil
 	}
 	rc := wazero.NewRuntimeConfig().WithCoreFeatures(api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling)
@@ -78,7 +110,7 @@ func (r *Renderer) startLocked() error {
 		}
 	}
 	pool, err := webassembly.Init(webassembly.Config{
-		MinIdle: 0, MaxIdle: 1, MaxTotal: 2,
+		MinIdle: 0, MaxIdle: maxSlots, MaxTotal: maxSlots,
 		FSConfig:      wazero.NewFSConfig(), // no mounts: the default would expose the host root
 		RuntimeConfig: rc,
 		Stdout:        io.Discard,
@@ -92,31 +124,48 @@ func (r *Renderer) startLocked() error {
 		_ = pool.Close()
 		return fmt.Errorf("get pdfium instance: %w", err)
 	}
-	r.pool, r.inst = pool, inst
+	r.pool = pool
+	r.slots = []*slot{{inst: inst}}
 	return nil
 }
 
-// stopLocked closes documents and the pool. Caller holds mu.
+// stopLocked closes documents, instances and the pool. Caller holds mu and
+// no slot is busy.
 func (r *Renderer) stopLocked() {
-	if r.inst == nil {
+	if len(r.slots) == 0 {
 		return
 	}
-	for _, d := range r.docs {
-		_, _ = r.inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: d.doc})
+	for _, s := range r.slots {
+		for _, d := range s.docs {
+			_, _ = s.inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: d.doc})
+		}
+		_ = s.inst.Close()
 	}
-	r.docs = nil
-	_ = r.inst.Close()
 	_ = r.pool.Close()
-	r.inst, r.pool = nil, nil
+	r.slots, r.pool = nil, nil
 }
 
-// Close stops the pool; the renderer can't be used afterwards.
+func (r *Renderer) anyBusyLocked() bool {
+	for _, s := range r.slots {
+		if s.busy {
+			return true
+		}
+	}
+	return false
+}
+
+// Close stops the pool once running calls finish; the renderer can't be used
+// afterwards.
 func (r *Renderer) Close() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.closed = true
+	r.cond.Broadcast()
 	if r.idle != nil {
 		r.idle.Stop()
+	}
+	for r.anyBusyLocked() {
+		r.cond.Wait()
 	}
 	r.stopLocked()
 }
@@ -128,47 +177,123 @@ func (r *Renderer) touchLocked() {
 	r.idle = time.AfterFunc(renderIdle, func() {
 		r.mu.Lock()
 		defer r.mu.Unlock()
+		if r.anyBusyLocked() {
+			r.touchLocked() // still in use: look again later
+			return
+		}
 		r.stopLocked()
 	})
 }
 
-func docKey(doc []byte, password string) string {
-	h := sha256.New()
-	h.Write(doc)
-	h.Write([]byte{0})
-	h.Write([]byte(password))
-	return fmt.Sprintf("%x", h.Sum(nil))
+// docKey identifies a document version and password without keeping the
+// password: the password is hashed into the key.
+func docKey(srcKey, password string) string {
+	if password == "" {
+		return srcKey + "|"
+	}
+	pw := sha256.Sum256([]byte(password))
+	return fmt.Sprintf("%s|%x", srcKey, pw[:8])
+}
+
+// acquire hands out an idle instance, preferring one that already has the
+// document open, starting the second instance when the first is busy, and
+// otherwise waiting.
+func (r *Renderer) acquire(ctx context.Context, key string) (*slot, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	stop := context.AfterFunc(ctx, func() {
+		r.mu.Lock()
+		r.cond.Broadcast()
+		r.mu.Unlock()
+	})
+	defer stop()
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if err := r.startLocked(); err != nil {
+			return nil, err
+		}
+		var free *slot
+		for _, s := range r.slots {
+			if s.busy {
+				continue
+			}
+			for _, d := range s.docs {
+				if d.key == key {
+					s.busy = true
+					return s, nil
+				}
+			}
+			if free == nil {
+				free = s
+			}
+		}
+		if free != nil {
+			free.busy = true
+			return free, nil
+		}
+		if len(r.slots) < maxSlots {
+			s := &slot{busy: true}
+			r.slots = append(r.slots, s)
+			pool := r.pool
+			r.mu.Unlock()
+			inst, err := pool.GetInstance(time.Minute)
+			r.mu.Lock()
+			if err != nil {
+				for i, x := range r.slots {
+					if x == s {
+						r.slots = append(r.slots[:i:i], r.slots[i+1:]...)
+						break
+					}
+				}
+				r.cond.Broadcast()
+				return nil, fmt.Errorf("get pdfium instance: %w", err)
+			}
+			s.inst = inst
+			return s, nil
+		}
+		r.cond.Wait()
+	}
+}
+
+func (r *Renderer) release(s *slot) {
+	r.mu.Lock()
+	s.busy = false
+	r.cond.Broadcast()
+	r.touchLocked()
+	r.mu.Unlock()
 }
 
 // with opens (or reuses) the document and runs fn with exclusive access to
-// the instance.
-func (r *Renderer) with(ctx context.Context, doc []byte, password string, fn func(inst pdfium.Pdfium, doc references.FPDF_DOCUMENT) error) error {
-	key := docKey(doc, password)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if err := ctx.Err(); err != nil {
+// one instance. Other calls may run on the second instance meanwhile.
+func (r *Renderer) with(ctx context.Context, src Source, password string, fn func(inst pdfium.Pdfium, doc references.FPDF_DOCUMENT) error) error {
+	key := docKey(src.Key, password)
+	s, err := r.acquire(ctx, key)
+	if err != nil {
 		return err
 	}
-	if err := r.startLocked(); err != nil {
-		return err
-	}
-	defer r.touchLocked()
+	defer r.release(s)
 
 	var d references.FPDF_DOCUMENT
 	found := false
-	for i, e := range r.docs {
+	for i, e := range s.docs {
 		if e.key == key {
 			d, found = e.doc, true
-			r.docs = append(append(r.docs[:i:i], r.docs[i+1:]...), e)
+			s.docs = append(append(s.docs[:i:i], s.docs[i+1:]...), e)
 			break
 		}
 	}
 	if !found {
+		doc, err := src.Load()
+		if err != nil {
+			return err
+		}
 		req := &requests.OpenDocument{File: &doc}
 		if password != "" {
 			req.Password = &password
 		}
-		res, err := r.inst.OpenDocument(req)
+		res, err := s.inst.OpenDocument(req)
 		if err != nil {
 			if strings.Contains(strings.ToLower(err.Error()), "password") {
 				if password == "" {
@@ -179,13 +304,13 @@ func (r *Renderer) with(ctx context.Context, doc []byte, password string, fn fun
 			return core.ValidationError(msgDamaged, nil).WithCause(err)
 		}
 		d = res.Document
-		r.docs = append(r.docs, docEntry{key: key, doc: d})
-		for len(r.docs) > docCacheSize {
-			_, _ = r.inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: r.docs[0].doc})
-			r.docs = r.docs[1:]
+		s.docs = append(s.docs, docEntry{key: key, doc: d})
+		for len(s.docs) > docCacheSize {
+			_, _ = s.inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: s.docs[0].doc})
+			s.docs = s.docs[1:]
 		}
 	}
-	return fn(r.inst, d)
+	return fn(s.inst, d)
 }
 
 func pageCount(inst pdfium.Pdfium, doc references.FPDF_DOCUMENT) (int, error) {
@@ -217,7 +342,7 @@ func copyImage(src image.Image) image.Image {
 // PageCount returns the number of pages.
 func (r *Renderer) PageCount(ctx context.Context, doc []byte, password string) (int, error) {
 	var n int
-	err := r.with(ctx, doc, password, func(inst pdfium.Pdfium, d references.FPDF_DOCUMENT) (err error) {
+	err := r.with(ctx, BytesSource(doc), password, func(inst pdfium.Pdfium, d references.FPDF_DOCUMENT) (err error) {
 		n, err = pageCount(inst, d)
 		return err
 	})
@@ -231,7 +356,7 @@ func (r *Renderer) Render(ctx context.Context, doc []byte, password string, page
 	}
 	index := page - 1
 	var out image.Image
-	err := r.with(ctx, doc, password, func(inst pdfium.Pdfium, d references.FPDF_DOCUMENT) error {
+	err := r.with(ctx, BytesSource(doc), password, func(inst pdfium.Pdfium, d references.FPDF_DOCUMENT) error {
 		pc, err := pageCount(inst, d)
 		if err != nil {
 			return err
@@ -263,11 +388,17 @@ func (r *Renderer) Render(ctx context.Context, doc []byte, password string, page
 // RenderWidth renders one page (1-based) scaled to the given pixel width
 // (used for thumbnails). Not part of the SPEC §3.2 minimum.
 func (r *Renderer) RenderWidth(ctx context.Context, doc []byte, password string, page, width int) (image.Image, error) {
+	return r.RenderWidthFrom(ctx, BytesSource(doc), password, page, width)
+}
+
+// RenderWidthFrom is RenderWidth for a Source: a document some instance
+// already has open is never read or hashed again.
+func (r *Renderer) RenderWidthFrom(ctx context.Context, src Source, password string, page, width int) (image.Image, error) {
 	if page < 1 {
 		return nil, core.ValidationError("Page numbers start at 1", nil)
 	}
 	var out image.Image
-	err := r.with(ctx, doc, password, func(inst pdfium.Pdfium, d references.FPDF_DOCUMENT) error {
+	err := r.with(ctx, src, password, func(inst pdfium.Pdfium, d references.FPDF_DOCUMENT) error {
 		pc, err := pageCount(inst, d)
 		if err != nil {
 			return err
@@ -304,7 +435,7 @@ func (r *Renderer) PageText(ctx context.Context, doc []byte, password string, pa
 		return "", core.ValidationError("Page numbers start at 1", nil)
 	}
 	var text string
-	err := r.with(ctx, doc, password, func(inst pdfium.Pdfium, d references.FPDF_DOCUMENT) error {
+	err := r.with(ctx, BytesSource(doc), password, func(inst pdfium.Pdfium, d references.FPDF_DOCUMENT) error {
 		pc, err := pageCount(inst, d)
 		if err != nil {
 			return err

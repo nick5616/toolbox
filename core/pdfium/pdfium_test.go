@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/klippa-app/go-pdfium/requests"
@@ -171,13 +172,13 @@ func TestPdfiumHasNoFilesystem(t *testing.T) {
 	if err := r.startLocked(); err != nil {
 		t.Fatal(err)
 	}
-	res, err := r.inst.OpenDocument(&requests.OpenDocument{File: &b})
+	res, err := r.slots[0].inst.OpenDocument(&requests.OpenDocument{File: &b})
 	if err != nil {
 		t.Fatalf("open from bytes: %v", err)
 	}
-	_, _ = r.inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: res.Document})
-	if res, err := r.inst.OpenDocument(&requests.OpenDocument{FilePath: &src}); err == nil {
-		_, _ = r.inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: res.Document})
+	_, _ = r.slots[0].inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: res.Document})
+	if res, err := r.slots[0].inst.OpenDocument(&requests.OpenDocument{FilePath: &src}); err == nil {
+		_, _ = r.slots[0].inst.FPDF_CloseDocument(&requests.FPDF_CloseDocument{Document: res.Document})
 		t.Fatal("pdfium opened a host file path: the filesystem is mounted")
 	}
 }
@@ -188,4 +189,66 @@ func isValidation(err error) bool {
 	}
 	ae := core.AsAppError(err)
 	return ae != nil && ae.Code == core.CodeValidation
+}
+
+// A Source's bytes are read only until some instance has the document open,
+// and concurrent calls use both instances and still get correct pages.
+func TestSourceLoadsOnceAndRendersConcurrently(t *testing.T) {
+	r := newTestRenderer(t)
+	ctx := context.Background()
+	doc := makePDF(8, 300, 400, "x")
+	var loads atomic.Int32
+	src := Source{Key: "test|doc", Load: func() ([]byte, error) { loads.Add(1); return doc, nil }}
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 16)
+	for i := 1; i <= 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			img, err := r.RenderWidthFrom(ctx, src, "", i, 120)
+			if err == nil && (img.Bounds().Dx() != 120 || img.Bounds().Dy() != 160) {
+				err = fmt.Errorf("page %d is %v", i, img.Bounds())
+			}
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := loads.Load(); n < 1 || n > maxSlots {
+		t.Fatalf("document read %d times, want 1..%d", n, maxSlots)
+	}
+	before := loads.Load()
+	for i := 1; i <= 8; i++ {
+		if _, err := r.RenderWidthFrom(ctx, src, "", i, 120); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if loads.Load() != before {
+		t.Fatalf("a cached document was read again (%d -> %d)", before, loads.Load())
+	}
+	// A failing loader reports its error and a cancelled context returns early.
+	bad := Source{Key: "test|bad", Load: func() ([]byte, error) { return nil, fmt.Errorf("gone") }}
+	if _, err := r.RenderWidthFrom(ctx, bad, "", 1, 100); err == nil || !strings.Contains(err.Error(), "gone") {
+		t.Fatalf("loader error lost: %v", err)
+	}
+	cctx, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := r.RenderWidthFrom(cctx, src, "", 1, 100); err == nil {
+		t.Fatal("cancelled context must fail")
+	}
+}
+
+func TestDocKeyHashesPassword(t *testing.T) {
+	if k := docKey("a", "secret"); strings.Contains(k, "secret") || k == docKey("a", "other") || k == docKey("a", "") {
+		t.Fatalf("bad key %q", k)
+	}
+	if docKey("a", "x") != docKey("a", "x") || docKey("a", "") == docKey("b", "") {
+		t.Fatal("keys must be stable and per source")
+	}
 }
