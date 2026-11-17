@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import { JobsService, JobStatus, type Job, type JobLogBatch, type JobProgress, type LogLine } from "@/lib/api";
 
 /** In-memory cap per job; older lines are dropped from the front. */
@@ -52,6 +53,8 @@ interface JobsState {
   setAll: (jobs: Job[]) => void;
   upsert: (job: Job) => void;
   applyProgress: (p: JobProgress) => void;
+  /** Applies many progress updates in one store update (later entries win per job). */
+  applyProgressBatch: (batch: readonly JobProgress[]) => void;
   appendLogs: (batch: JobLogBatch) => void;
   removeLocal: (ids: string[]) => void;
 
@@ -80,6 +83,18 @@ export const useJobs = create<JobsState>((set, get) => ({
       const j = s.byId[p.id];
       if (!j || j.status !== JobStatus.JobRunning) return s;
       return { byId: { ...s.byId, [p.id]: { ...j, progress: p.progress, message: p.message } } };
+    }),
+  applyProgressBatch: (batch) =>
+    set((s) => {
+      let byId: Record<string, JobView> | null = null;
+      for (const p of batch) {
+        const j = (byId ?? s.byId)[p.id];
+        if (!j || j.status !== JobStatus.JobRunning) continue;
+        if (j.progress === p.progress && j.message === p.message) continue;
+        byId ??= { ...s.byId };
+        byId[p.id] = { ...j, progress: p.progress, message: p.message };
+      }
+      return byId ? { byId } : s;
     }),
   appendLogs: (batch) =>
     set((s) => {
@@ -137,6 +152,44 @@ export const useJobs = create<JobsState>((set, get) => ({
   },
 }));
 
+// --- progress batching -----------------------------------------------------
+// Go sends up to ~10 progress events per second per job. They are buffered by
+// job id (latest wins) and applied in one store update per animation frame
+// (250 ms timer while the window is hidden, where rAF doesn't fire).
+// Status changes (`jobs:changed`) are never batched; call flushProgress() first.
+
+const pendingProgress = new Map<string, JobProgress>();
+let flushHandle: { kind: "raf" | "timeout"; id: number } | null = null;
+
+function cancelScheduled(): void {
+  if (!flushHandle) return;
+  if (flushHandle.kind === "raf") cancelAnimationFrame(flushHandle.id);
+  else clearTimeout(flushHandle.id);
+  flushHandle = null;
+}
+
+/** Applies every buffered progress update now. */
+export function flushProgress(): void {
+  cancelScheduled();
+  if (pendingProgress.size === 0) return;
+  const batch = Array.from(pendingProgress.values());
+  pendingProgress.clear();
+  useJobs.getState().applyProgressBatch(batch);
+}
+
+/** Buffers a progress event and schedules one flush. */
+export function queueProgress(p: JobProgress): void {
+  pendingProgress.set(p.id, p);
+  if (flushHandle) return;
+  if (typeof document !== "undefined" && document.hidden) {
+    flushHandle = { kind: "timeout", id: window.setTimeout(flushProgress, 250) };
+  } else if (typeof requestAnimationFrame === "function") {
+    flushHandle = { kind: "raf", id: requestAnimationFrame(flushProgress) };
+  } else {
+    flushHandle = { kind: "timeout", id: window.setTimeout(flushProgress, 16) };
+  }
+}
+
 /** Active jobs (oldest first) followed by finished jobs (most recently finished first). */
 export function orderJobs(jobs: JobView[]): JobView[] {
   const active = jobs.filter(isActive).sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
@@ -169,11 +222,19 @@ export function countJobs(jobs: JobView[]): JobCounts {
 
 /** All jobs in display order (optionally for one module). Stable across unrelated renders. */
 export function useOrderedJobs(moduleId?: string): JobView[] {
-  const byId = useJobs((s) => s.byId);
-  return useMemo(() => {
-    const all = Object.values(byId);
-    return orderJobs(moduleId ? all.filter((j) => j.moduleId === moduleId) : all);
-  }, [byId, moduleId]);
+  // Shallow-stable: another module's progress doesn't change this list's identity.
+  const list = useJobs(
+    useShallow((s) => {
+      const all = Object.values(s.byId);
+      return moduleId ? all.filter((j) => j.moduleId === moduleId) : all;
+    }),
+  );
+  return useMemo(() => orderJobs(list), [list]);
+}
+
+/** True while any job of the module is queued or running (a boolean: progress ticks don't re-render). */
+export function useModuleBusy(moduleId: string): boolean {
+  return useJobs((s) => Object.values(s.byId).some((j) => j.moduleId === moduleId && isActive(j)));
 }
 
 export function useJobCounts(): JobCounts {

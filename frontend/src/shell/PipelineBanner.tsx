@@ -9,9 +9,10 @@ import styles from "./PipelineBanner.module.css";
 /** A thin bar above a tool whose step a pipeline run is waiting on (SPEC.md §11.7). */
 export function PipelineBanner({ view }: { view: string }) {
   const waiting = useWaitingForModule(view);
-  const byId = useJobs((s) => s.byId);
   const toolName = useModules((s) => s.byId[view]?.name ?? view);
   const first = waiting[0];
+  // A boolean selector: progress ticks don't re-render the banner.
+  const canContinue = useJobs((s) => (first ? hasDoneAdopted(adoptedJobs(first, s.byId)) : false));
   if (!first) return null;
 
   const show = () => {
@@ -24,7 +25,6 @@ export function PipelineBanner({ view }: { view: string }) {
   };
 
   const many = waiting.length > 1;
-  const canContinue = hasDoneAdopted(adoptedJobs(first, byId));
 
   return (
     <div className={styles.bar} role="status" aria-label="Pipeline step waiting">

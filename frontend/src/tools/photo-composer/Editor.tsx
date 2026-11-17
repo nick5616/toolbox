@@ -8,7 +8,8 @@ import { loadImage } from "@/composer/loadImages";
 import { addLayer, findLayer, layerList, MAX_LAYERS, newImageLayer, setLayerSource } from "@/composer/model";
 import { imageSize, layerSize } from "@/composer/render";
 import { useCompositionInputs } from "@/state/composition";
-import { useJobs } from "@/state/jobs";
+import { useShallow } from "zustand/react/shallow";
+import { useJobs, type JobView } from "@/state/jobs";
 import type { PostSlideSeed } from "@/state/ui";
 import { LastExport } from "@/editor/export/LastExport";
 import { StudioLayout, Spacer, WorkspacePreviewFrame, WorkspaceRail } from "@/workspace";
@@ -63,6 +64,69 @@ const sameLabels = (a: Record<string, string>, b: Record<string, string>): boole
 };
 
 /**
+ * Remove background: jobs finishing, and the busy labels. A component of its own so only it
+ * re-renders on job progress (it selects just this project's pending jobs), not the whole editor.
+ */
+function PendingJobs() {
+  const st = useComposer.getState;
+  const pending = useComposer((s) => s.pending);
+  const jobList = useJobs(useShallow((s) => Object.values(pending).map((p) => s.byId[p.jobId])));
+  const jobsById = useMemo(() => {
+    const m: Record<string, JobView> = {};
+    for (const j of jobList) if (j) m[j.id] = j;
+    return m;
+  }, [jobList]);
+
+  useEffect(() => {
+    const entries = Object.entries(pending);
+    if (entries.length === 0) {
+      resetFailureToasts();
+      return;
+    }
+    const finished: string[] = [];
+    for (const [layerId, p] of entries) {
+      const job = jobsById[p.jobId];
+      if (!job) continue;
+      if (job.status === "done") {
+        finished.push(layerId);
+        const out = job.outputs[0]?.path;
+        if (out) {
+          st().edit((d) => {
+            const l = findLayer(d, layerId);
+            if (!l?.image) return d;
+            return setLayerSource(d, layerId, out, l.image.ref.original || p.from);
+          });
+        } else {
+          toast({ title: "Background removal produced no file", tone: "warn" });
+        }
+      } else if (job.status === "failed") {
+        finished.push(layerId);
+        toastFailureOnce("Couldn't remove the background", [job.error, job.errorHint].filter(Boolean).join(" "));
+      } else if (job.status === "cancelled") {
+        finished.push(layerId);
+      }
+    }
+    if (finished.length > 0) {
+      const next: Record<string, Pending> = { ...st().pending };
+      for (const id of finished) delete next[id];
+      st().setPending(next);
+    }
+  }, [jobsById, pending, st]);
+
+  useEffect(() => {
+    const out: Record<string, string> = {};
+    for (const [layerId, p] of Object.entries(pending)) {
+      const job = jobsById[p.jobId];
+      if (!job) continue;
+      out[layerId] = job.status === "queued" ? "queued" : job.progress > 0 && job.progress <= 1 ? `${Math.round(job.progress * 100)}%` : "";
+    }
+    if (!sameLabels(out, st().busyLabels)) st().setBusyLabels(out);
+  }, [pending, jobsById, st]);
+
+  return null;
+}
+
+/**
  * The open composition: header, rail, canvas and the selection bar. This
  * component is the host's logic (autosave, jobs, the collage build, keys); the
  * state is in `useComposer` and the panels/preview are the workspace's.
@@ -82,7 +146,6 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   const selected = useSelectedLayers();
   const images = useComposerImages((s) => s.images);
   const clickIn = useClickIn();
-  const jobsById = useJobs((s) => s.byId);
 
   const renameSeen = useRef(renameTo?.n ?? 0);
   useEffect(() => {
@@ -139,53 +202,6 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
   const photoInputs = useMemo(() => (photoPath ? [photoPath] : []), [photoPath]);
   useCompositionInputs(MODULE_ID, { "bg-remover": photoInputs, "object-eraser": photoInputs, upscaler: photoInputs });
 
-  // ---- remove background: jobs finishing ----
-  useEffect(() => {
-    const entries = Object.entries(pending);
-    if (entries.length === 0) {
-      resetFailureToasts();
-      return;
-    }
-    const finished: string[] = [];
-    for (const [layerId, p] of entries) {
-      const job = jobsById[p.jobId];
-      if (!job) continue;
-      if (job.status === "done") {
-        finished.push(layerId);
-        const out = job.outputs[0]?.path;
-        if (out) {
-          st().edit((d) => {
-            const l = findLayer(d, layerId);
-            if (!l?.image) return d;
-            return setLayerSource(d, layerId, out, l.image.ref.original || p.from);
-          });
-        } else {
-          toast({ title: "Background removal produced no file", tone: "warn" });
-        }
-      } else if (job.status === "failed") {
-        finished.push(layerId);
-        toastFailureOnce("Couldn't remove the background", [job.error, job.errorHint].filter(Boolean).join(" "));
-      } else if (job.status === "cancelled") {
-        finished.push(layerId);
-      }
-    }
-    if (finished.length > 0) {
-      const next: Record<string, Pending> = { ...st().pending };
-      for (const id of finished) delete next[id];
-      st().setPending(next);
-    }
-  }, [jobsById, pending, st]);
-
-  useEffect(() => {
-    const out: Record<string, string> = {};
-    for (const [layerId, p] of Object.entries(pending)) {
-      const job = jobsById[p.jobId];
-      if (!job) continue;
-      out[layerId] = job.status === "queued" ? "queued" : job.progress > 0 && job.progress <= 1 ? `${Math.round(job.progress * 100)}%` : "";
-    }
-    if (!sameLabels(out, st().busyLabels)) st().setBusyLabels(out);
-  }, [pending, jobsById, st]);
-
   // ---- collage build (SPEC.md §B13.5) ----
   const build = postSlide?.build?.kind === "collage" ? postSlide.build : null;
   const buildIds = useRef<string[]>([]);
@@ -218,17 +234,24 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
       { internal: true },
     );
     const layers: ComposerLayer[] = [];
-    for (const path of paths) {
-      if (path === b.background || layers.length >= MAX_LAYERS) continue;
-      try {
-        const bmp = await loadImage(path);
-        const { w, h } = imageSize(bmp);
-        const cur = st().history?.present;
-        if (!cur) return;
-        layers.push(newImageLayer(path, w, h, cur));
-      } catch (e) {
-        toastFailureOnce(`Couldn't add ${baseName(path)}`, toAppError(e).message, "warn");
-      }
+    // Photos decode in parallel (in the original order, in rounds of at most the free slots, so a
+    // failed photo is replaced by the next one exactly as before); layers are added in that order.
+    const candidates = paths.filter((path) => path !== b.background);
+    for (let next = 0; next < candidates.length && layers.length < MAX_LAYERS; ) {
+      const round = candidates.slice(next, next + (MAX_LAYERS - layers.length));
+      next += round.length;
+      const loaded = await Promise.allSettled(round.map((path) => loadImage(path)));
+      const cur = st().history?.present;
+      if (!cur) return;
+      loaded.forEach((r, i) => {
+        const path = round[i] as string;
+        if (r.status === "fulfilled") {
+          const { w, h } = imageSize(r.value);
+          layers.push(newImageLayer(path, w, h, cur));
+        } else {
+          toastFailureOnce(`Couldn't add ${baseName(path)}`, toAppError(r.reason).message, "warn");
+        }
+      });
     }
     st().edit((d) => layers.reduce(addLayer, d), { internal: true });
     buildIds.current = layers.map((l) => l.id);
@@ -413,6 +436,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
 
   return (
     <div className={styles.editor} onKeyDown={onKeyDown}>
+      <PendingJobs />
       <StudioLayout
         header={header}
         rail={<WorkspaceRail ws={ws} panels={postSlide ? ["sources", "layers", "layouts", "background", "canvas"] : ["layers", "layouts", "background", "canvas"]} summaries={summaries} />}

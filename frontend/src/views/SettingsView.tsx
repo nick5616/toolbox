@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   Badge,
   Banner,
@@ -16,7 +16,7 @@ import { DepSource, DepState, DepsService, LibraryService, SettingsService, Them
 import { toAppError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { useDeps, type DepView } from "@/state/deps";
-import { isActive, useJobs } from "@/state/jobs";
+import { useJobs, useModuleBusy } from "@/state/jobs";
 import { useModules } from "@/state/modules";
 import { useSettings } from "@/state/settings";
 import { SettingsChat } from "./SettingsChat";
@@ -76,11 +76,7 @@ function DepChip({ dep }: { dep: DepView }) {
 
 /** AI engine actions (install/update/repair/remove) plus the models sub-row. */
 function AudioEngineActions({ dep }: { dep: DepView }) {
-  const jobsById = useJobs((s) => s.byId);
-  const busy = useMemo(
-    () => Object.values(jobsById).some((j) => j.moduleId === AUDIO_ENGINE_JOB_MODULE && isActive(j)),
-    [jobsById],
-  );
+  const busy = useModuleBusy(AUDIO_ENGINE_JOB_MODULE);
   const [queuing, setQueuing] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const installed = dep.state === DepState.DepOK || dep.state === DepState.DepOutdated;
@@ -182,24 +178,14 @@ function DepsTable() {
   const list = useDeps((s) => s.list);
   const checking = useDeps((s) => s.checking);
   const modulesById = useModules((s) => s.byId);
-  const jobsById = useJobs((s) => s.byId);
-  const updating = useMemo(
-    () => Object.values(jobsById).some((j) => j.moduleId === YTDLP_JOB_MODULE && isActive(j)),
-    [jobsById],
-  );
+  const updating = useModuleBusy(YTDLP_JOB_MODULE);
   const [queuing, setQueuing] = useState(false);
   const [uvQueuing, setUvQueuing] = useState(false);
   const [exifQueuing, setExifQueuing] = useState(false);
-  const exifUpdating = useMemo(
-    () => Object.values(jobsById).some((j) => j.moduleId === EXIFTOOL_JOB_MODULE && isActive(j)),
-    [jobsById],
-  );
+  const exifUpdating = useModuleBusy(EXIFTOOL_JOB_MODULE);
 
   const [upscalerQueuing, setUpscalerQueuing] = useState(false);
-  const upscalerInstalling = useMemo(
-    () => Object.values(jobsById).some((j) => j.moduleId === UPSCALER_JOB_MODULE && isActive(j)),
-    [jobsById],
-  );
+  const upscalerInstalling = useModuleBusy(UPSCALER_JOB_MODULE);
 
   const installUpscaler = async () => {
     setUpscalerQueuing(true);

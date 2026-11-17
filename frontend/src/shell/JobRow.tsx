@@ -1,5 +1,5 @@
 // Used by the job tray and by tool views (e.g. the downloader's "Active" list).
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { JobStatus, LibraryService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { formatElapsed, formatRelativeTime } from "@/lib/format";
@@ -34,7 +34,8 @@ function useNow(active: boolean): number {
   return now;
 }
 
-export function JobRow({ job, compact = false }: JobRowProps) {
+/** Memoised: job objects keep their identity while unchanged. */
+export const JobRow = memo(function JobRow({ job, compact = false }: JobRowProps) {
   const icon = useModules((s) => s.byId[job.moduleId]?.icon ?? "box");
   const expanded = useUI((s) => s.expandedLogJobId === job.id);
   const setExpanded = useUI((s) => s.setExpandedLogJobId);
@@ -151,4 +152,4 @@ export function JobRow({ job, compact = false }: JobRowProps) {
       {!compact && expanded && <LogPanel jobId={job.id} />}
     </div>
   );
-}
+});

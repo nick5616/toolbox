@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { DepState } from "@/lib/api";
 import { isMac } from "@/lib/platform";
 import { Badge, Icon, IconButton, cx } from "@/components";
@@ -34,7 +34,32 @@ interface ItemProps {
   onClick: () => void;
 }
 
-function SidebarItem({ item, collapsed, active, dot, running, receiving, badge, digit, tool, focusing, onClick }: ItemProps) {
+/**
+ * Re-render only when something visible changed. The callbacks (`onClick`, `tool.*`) are
+ * rebuilt every render but only close over stable store actions and `item.id`.
+ */
+function itemPropsEqual(a: ItemProps, b: ItemProps): boolean {
+  return (
+    a.item.id === b.item.id &&
+    a.item.label === b.item.label &&
+    a.item.icon === b.item.icon &&
+    a.item.soon === b.item.soon &&
+    a.item.variantOf === b.item.variantOf &&
+    a.item.tip === b.item.tip &&
+    a.collapsed === b.collapsed &&
+    a.active === b.active &&
+    a.dot === b.dot &&
+    a.running === b.running &&
+    a.receiving === b.receiving &&
+    a.focusing === b.focusing &&
+    a.badge === b.badge &&
+    a.digit === b.digit &&
+    !a.tool === !b.tool &&
+    a.tool?.pinned === b.tool?.pinned
+  );
+}
+
+const SidebarItem = memo(function SidebarItem({ item, collapsed, active, dot, running, receiving, badge, digit, tool, focusing, onClick }: ItemProps) {
   const tipText = item.tip ? `${item.label}: ${item.tip}` : item.label;
   const btn = (
     <button
@@ -92,7 +117,7 @@ function SidebarItem({ item, collapsed, active, dot, running, receiving, badge, 
       )}
     </div>
   );
-}
+}, itemPropsEqual);
 
 export function Sidebar() {
   const view = useUI((s) => s.view);
@@ -121,14 +146,15 @@ export function Sidebar() {
     };
   }, [menu]);
   const deps = useDeps((s) => s.list);
-  const byId = useJobs((s) => s.byId);
   const lanListening = useLanShare((s) => s.state.listening);
 
-  const runningModules = useMemo(() => {
-    const set = new Set<string>();
-    for (const j of Object.values(byId)) if (isActive(j)) set.add(j.moduleId);
-    return set;
-  }, [byId]);
+  // A stable string key: progress ticks don't change it, so the sidebar doesn't re-render for them.
+  const runningKey = useJobs((s) => {
+    const ids = new Set<string>();
+    for (const j of Object.values(s.byId)) if (isActive(j)) ids.add(j.moduleId);
+    return Array.from(ids).sort().join("\n");
+  });
+  const runningModules = useMemo(() => new Set(runningKey ? runningKey.split("\n") : []), [runningKey]);
 
   const settingsDot = useMemo<"warn" | "danger" | null>(() => {
     const required = deps.filter((d) => d.required);

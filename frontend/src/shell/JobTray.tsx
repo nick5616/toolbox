@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { toAppError } from "@/lib/errors";
 import { Button, Icon, IconButton, Kbd, Meter, toast, cx, type MeterStatus } from "@/components";
 import { JobStatus } from "@/lib/api";
+import { useShallow } from "zustand/react/shallow";
 import { isActive, useJobs, useJobCounts, useOrderedJobs } from "@/state/jobs";
 import { useUI } from "@/state/ui";
 import { JobRow } from "./JobRow";
@@ -38,7 +39,7 @@ export function JobTray() {
 
   // Failures count as "new" until the tray has been open with them in the list.
   const seenFailed = useUI((s) => s.seenFailed);
-  const failedIds = useMemo(() => Object.values(byId).filter((j) => j.status === JobStatus.JobFailed).map((j) => j.id), [byId]);
+  const failedIds = useJobs(useShallow((s) => Object.values(s.byId).filter((j) => j.status === JobStatus.JobFailed).map((j) => j.id)));
   const newFailures = failedIds.filter((id) => !seenFailed.includes(id)).length;
   useEffect(() => {
     if (open && failedIds.length > 0) useUI.getState().markFailedSeen(failedIds);

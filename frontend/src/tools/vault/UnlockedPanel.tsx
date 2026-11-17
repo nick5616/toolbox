@@ -108,9 +108,13 @@ export function UnlockedPanel({ state }: { state: VaultState }) {
   const refresh = useCallback(async () => {
     const my = ++seq.current;
     try {
-      const fs = (await VaultService.Folders()) ?? [];
-      // List("") returns every entry (all folders); the root view filters it.
-      const list = (await VaultService.List(folder === ALL ? ROOT : folder, search)) ?? [];
+      // List("") returns every entry (all folders); the root view filters it. Independent calls: together.
+      const [fsRaw, listRaw] = await Promise.all([
+        VaultService.Folders(),
+        VaultService.List(folder === ALL ? ROOT : folder, search),
+      ]);
+      const fs = fsRaw ?? [];
+      const list = listRaw ?? [];
       if (my !== seq.current) return;
       setFolders(fs);
       setEntries(folder === ROOT ? list.filter((e) => e.folder === ROOT) : list);

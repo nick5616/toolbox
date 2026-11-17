@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { Button, IconButton, cx } from "@/components";
 import { useElementSize } from "@/lib/useElementSize";
 import { useJobs } from "@/state/jobs";
@@ -50,7 +51,8 @@ function RunFoot({ stats, progress }: { stats: StepRunStats; progress: number })
 /** A run as a read-only graph (the editor's nodes and glowing wires); a click on a step shows its cells. */
 export function RunGraph({ run }: { run: RunView }) {
   const catalog = usePipelines((s) => s.catalog);
-  const byId = useJobs((s) => s.byId);
+  // Per-step progress numbers, shallow-stable: unrelated job ticks (or unchanged values) don't re-render the graph.
+  const stepPcts = useJobs(useShallow((s) => run.steps.map((st) => stepProgress(run, st.id, (c) => cellProgress(c, s.byId)))));
   const [vp, setVp] = useState<HTMLDivElement | null>(null);
   const size = useElementSize(vp);
   const [view, setViewState] = useState<View>({ x: 24, y: 24, zoom: 1 });
@@ -71,7 +73,7 @@ export function RunGraph({ run }: { run: RunView }) {
   const wiredBy = useMemo(() => wiredPortsByNode(graph), [graph]);
   const bands = useMemo(() => focusBands(focusSpans(run.steps ?? []), graph.nodes), [run.steps, graph.nodes]);
   const stats = useMemo(() => new Map(run.steps.map((s) => [s.id, stepStats(run, s.id)] as const)), [run]);
-  const progress = useMemo(() => new Map(run.steps.map((s) => [s.id, stepProgress(run, s.id, (c) => cellProgress(c, byId))] as const)), [run, byId]);
+  const progress = useMemo(() => new Map(run.steps.map((s, i) => [s.id, stepPcts[i] ?? -1] as const)), [run.steps, stepPcts]);
   const needs = useMemo(() => needsYouSteps(run), [run]);
   const files = useMemo(() => (run.inputs.length === 0 ? 0 : run.items.filter((i) => i.merged.length === 0).length), [run.inputs, run.items]);
 
