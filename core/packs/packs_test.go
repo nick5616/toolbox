@@ -396,8 +396,8 @@ func TestInstallSkipsPresentAndSharesComponents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{sidecar.DepID, "stems/four-fast", "stems/vocals-fast", "transcribe/small", "visualizer/mood"}; !slices.Equal(f.w.log, want) {
-		t.Fatalf("install order %v, want %v (ffmpeg skipped)", f.w.log, want)
+	if want := []string{sidecar.DepID, "stems/four-fast", "stems/vocals-fast", "transcribe/small", "visualizer/mood"}; !sameSet(f.w.log, want) || f.w.log[0] != sidecar.DepID {
+		t.Fatalf("installed %v, want %v with the engine first (ffmpeg skipped)", f.w.log, want)
 	}
 	if p.title != "Install Music pack" {
 		t.Errorf("title %q", p.title)
@@ -415,8 +415,15 @@ func TestInstallSkipsPresentAndSharesComponents(t *testing.T) {
 	if _, err := f.runInstall("image"); err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"bg-remover/balanced", deps.Upscayl, deps.ExifTool, "redact/faces", "redact/plates", "object-eraser/best", "edit-studio/select", "upscaler/photo"}; !slices.Equal(f.w.log, want) {
+	if want := []string{"bg-remover/balanced", deps.Upscayl, deps.ExifTool, "redact/faces", "redact/plates", "object-eraser/best", "edit-studio/select", "upscaler/photo"}; !sameSet(f.w.log, want) {
 		t.Errorf("second pack installed %v, want %v", f.w.log, want)
+	}
+	// Tools install first (together), models after them.
+	for i, k := range f.w.log {
+		isTool := k == deps.Upscayl || k == deps.ExifTool
+		if isTool && i >= 2 {
+			t.Errorf("tool %s ran after a model: %v", k, f.w.log)
+		}
 	}
 
 	// Everything present: nothing runs.
@@ -437,15 +444,43 @@ func TestInstallProgressIsByteWeighted(t *testing.T) {
 		t.Fatal(err)
 	}
 	monotonic(t, p.pcts)
-	// ffmpeg (114.8 MB of 181.3 MB) completes at about 0.63.
-	var sawFFmpegDone bool
+	if last := p.pcts[len(p.pcts)-1]; last != 1 {
+		t.Errorf("final progress %v", last)
+	}
+	// Components run together, so the exact values depend on timing; the
+	// summed progress must still pass through the middle, not jump 0 -> 1.
+	var mid bool
 	for _, v := range p.pcts {
-		if v > 0.62 && v < 0.64 {
-			sawFFmpegDone = true
+		if v > 0.1 && v < 0.95 {
+			mid = true
 		}
 	}
-	if !sawFFmpegDone {
-		t.Errorf("no progress near the ffmpeg share: %v", p.pcts)
+	if !mid {
+		t.Errorf("progress never showed a partial total: %v", p.pcts)
+	}
+}
+
+func sameSet(a, b []string) bool {
+	x, y := slices.Clone(a), slices.Clone(b)
+	slices.Sort(x)
+	slices.Sort(y)
+	return slices.Equal(x, y)
+}
+
+// Components installing at the same time report one summed, monotonic value.
+func TestInstallProgressAggregates(t *testing.T) {
+	var got []float64
+	job := core.NewJobContext(core.JobContext{}, core.JobHooks{Progress: func(p float64, _ string) { got = append(got, p) }})
+	a := newInstallProgress(job, []float64{3, 1})
+	c0, c1 := a.child(job, 0, "a"), a.child(job, 1, "b")
+	c0.Progress(0.5, "x")
+	c1.Progress(1, "y")
+	c0.Progress(0.2, "backwards") // a component going backwards must not move the total
+	c1.Progress(core.IndeterminateProgress, "waiting")
+	c0.Progress(1, "z")
+	monotonic(t, got)
+	if len(got) != 5 || got[0] != 0.375 || got[1] != 0.625 || got[2] != 0.625 || got[3] != 0.625 || got[4] != 1 {
+		t.Fatalf("progress %v", got)
 	}
 }
 
