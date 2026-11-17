@@ -6,8 +6,9 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "@/components/toast";
-import { FilesService, LibraryService, PaintService, type ProjectInfo } from "@/lib/api";
+import { LibraryService, PaintService, type ProjectInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { useLazyThumb } from "@/lib/thumbs";
 import { formatResultDate, RecentResults } from "../_kit";
 import { PRESETS, MAX_PIXELS, MAX_SIDE, sizeProblem, type CanvasPreset } from "./limits";
 import type { OpenImages } from "./useOpenImages";
@@ -15,31 +16,9 @@ import { Dialog, FieldRow, IconButton, MenuButton, PaintIcon, Segmented, Stepper
 import { markPaper } from "./paper";
 import styles from "./gallery.module.css";
 
-const thumbCache = new Map<string, string>();
-
 function Thumb({ info }: { info: ProjectInfo }) {
-  const key = `${info.thumb}|${info.updatedAt}`;
-  const [src, setSrc] = useState(() => thumbCache.get(key) ?? "");
-  useEffect(() => {
-    if (!info.thumb) return;
-    const hit = thumbCache.get(key);
-    if (hit) {
-      setSrc(hit);
-      return;
-    }
-    let off = false;
-    FilesService.ImageThumb(info.thumb, 480).then(
-      (url) => {
-        thumbCache.set(key, url);
-        if (!off) setSrc(url);
-      },
-      () => undefined,
-    );
-    return () => {
-      off = true;
-    };
-  }, [info.thumb, key]);
-  return <div className={styles.thumb}>{src ? <img src={src} alt="" draggable={false} /> : <PaintIcon name="brush" size={28} />}</div>;
+  const [ref, src] = useLazyThumb<HTMLDivElement>(info.thumb, 480, String(info.updatedAt));
+  return <div ref={ref} className={styles.thumb}>{src ? <img src={src} alt="" draggable={false} /> : <PaintIcon name="brush" size={28} />}</div>;
 }
 
 type Bg = "paper" | "transparent" | "color";

@@ -36,6 +36,26 @@ const HIDDEN_MODULE_NAMES: Record<string, string> = {
 
 export { sendToItems };
 
+const DIR_REFRESH_MS = 500;
+
+const slashes = (p: string): string => p.replaceAll("\\", "/").toLowerCase();
+
+/** True when an output was added to or removed from the list somewhere under the open folder (library-relative; "" = the root). */
+export function changedUnder(prev: readonly Output[], next: readonly Output[], root: string, folder: string): boolean {
+  const before = new Map(prev.map((o) => [o.id, o.path]));
+  const after = new Set<string>();
+  const trimEnd = (p: string): string => p.replace(/\/+$/, "");
+  const trimBoth = (p: string): string => p.replace(/^\/+|\/+$/g, "");
+  const base = root ? trimEnd(slashes(root)) + (folder ? "/" + trimBoth(slashes(folder)) : "") + "/" : "";
+  const under = (p: string): boolean => base === "" || slashes(p).startsWith(base);
+  for (const o of next) {
+    after.add(o.id);
+    if (!before.has(o.id) && under(o.path)) return true;
+  }
+  for (const [id, p] of before) if (!after.has(id) && under(p)) return true;
+  return false;
+}
+
 function fail(e: unknown): void {
   const err = toAppError(e);
   toast({ tone: "danger", title: err.message, description: err.hint });
@@ -162,30 +182,54 @@ export function LibraryView() {
     };
   }, []);
 
-  // The selected folder's contents (Folders view). A change to the list (live added/removed) re-reads it.
+  // The selected folder's contents (Folders view). Opening a folder or Refresh reads it at once; live
+  // adds/removes under the open folder re-read it after a pause (a batch of files = one listing); stale answers are dropped.
+  const dirSeq = useRef(0);
+  const loadDir = useCallback((rel: string) => {
+    const seq = ++dirSeq.current;
+    setDirLoading(true);
+    LibraryService.ListDir(rel, 5000)
+      .then((l) => {
+        if (seq !== dirSeq.current) return;
+        setDirItems((l.entries ?? []).map(fromEntry));
+        setDirTruncated(l.truncated);
+      })
+      .catch((e: unknown) => {
+        if (seq !== dirSeq.current) return;
+        setDirItems([]);
+        if (!isNotImplemented(e)) fail(e);
+      })
+      .finally(() => {
+        if (seq === dirSeq.current) setDirLoading(false);
+      });
+  }, []);
   useEffect(() => {
     if (view !== "folders") return;
-    let alive = true;
-    setDirLoading(true);
-    const t = setTimeout(() => {
-      LibraryService.ListDir(folder, 5000)
-        .then((l) => {
-          if (!alive) return;
-          setDirItems((l.entries ?? []).map(fromEntry));
-          setDirTruncated(l.truncated);
-        })
-        .catch((e: unknown) => {
-          if (!alive) return;
-          setDirItems([]);
-          if (!isNotImplemented(e)) fail(e);
-        })
-        .finally(() => alive && setDirLoading(false));
-    }, 0);
+    const t = setTimeout(() => loadDir(folder), 0);
     return () => {
-      alive = false;
       clearTimeout(t);
+      dirSeq.current++;
     };
-  }, [view, folder, refreshNonce, list]);
+  }, [view, folder, refreshNonce, loadDir]);
+  const seenList = useRef(list);
+  const rootRef = useRef("");
+  rootRef.current = folders?.path || libraryDir;
+  const dirTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const prev = seenList.current;
+    seenList.current = list;
+    if (view !== "folders" || prev === list) return;
+    if (!changedUnder(prev, list, rootRef.current, folder)) return;
+    if (dirTimer.current) clearTimeout(dirTimer.current);
+    dirTimer.current = setTimeout(() => loadDir(folder), DIR_REFRESH_MS);
+  }, [list, view, folder, loadDir]);
+  useEffect(
+    () => () => {
+      if (dirTimer.current) clearTimeout(dirTimer.current);
+      dirTimer.current = null;
+    },
+    [view, folder],
+  );
 
   // Search: typed text becomes a server filter after a short pause.
   useEffect(() => {
@@ -495,14 +539,24 @@ export function LibraryView() {
 
   // --- render ---
 
+  // Stable handlers: cards are memoised, so these never change identity (they read the latest state through a ref).
+  const live = useRef({ onItemClick, open, forget, selection, targets });
+  live.current = { onItemClick, open, forget, selection, targets };
+  const stableClick = useCallback((e: MouseEvent, item: LibItem) => live.current.onItemClick(e, item), []);
+  const stableOpen = useCallback((item: LibItem) => live.current.open(item), []);
+  const stableForget = useCallback((item: LibItem) => live.current.forget([item]), []);
+  const stableDragPaths = useCallback((i: LibItem) => {
+    const { selection: sel, targets: tg } = live.current;
+    return sel.has(i.key) && sel.size > 1 ? tg.filter((t) => !t.missing).map((t) => t.path) : [i.path];
+  }, []);
   const handlers = {
     selection,
     activeKey,
     moduleName,
-    onClick: onItemClick,
-    onEnterFolder: open,
-    dragPaths: (i: LibItem) => (selection.has(i.key) && selection.size > 1 ? targets.filter((t) => !t.missing).map((t) => t.path) : [i.path]),
-    onForget: (i: LibItem) => forget([i]),
+    onClick: stableClick,
+    onEnterFolder: stableOpen,
+    dragPaths: stableDragPaths,
+    onForget: stableForget,
   };
 
   const filterSummary = [filters.moduleId ? moduleName(filters.moduleId) : "All tools", filters.range !== "all" ? (RANGE_OPTIONS.find((r) => r.value === filters.range)?.label ?? "") : "", filters.sort !== LibrarySort.SortNewest ? (SORT_OPTIONS.find((r) => r.value === filters.sort)?.label ?? "") : ""]

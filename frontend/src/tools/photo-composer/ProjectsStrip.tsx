@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import { Badge, Button, Icon, MenuButton, cx } from "@/components";
-import { FilesService, type ProjectInfo } from "@/lib/api";
+import { type ProjectInfo } from "@/lib/api";
+import { useLazyThumb } from "@/lib/thumbs";
 import styles from "./ProjectsStrip.module.css";
 
 export interface ProjectsStripProps {
@@ -13,33 +13,9 @@ export interface ProjectsStripProps {
   onDelete: (info: ProjectInfo) => void;
 }
 
-const thumbCache = new Map<string, string>();
-
 function ProjectThumb({ info }: { info: ProjectInfo }) {
-  const key = `${info.thumb}|${info.updatedAt}`;
-  const [src, setSrc] = useState(() => thumbCache.get(key) ?? "");
-  useEffect(() => {
-    if (!info.thumb) {
-      setSrc("");
-      return;
-    }
-    const hit = thumbCache.get(key);
-    if (hit) {
-      setSrc(hit);
-      return;
-    }
-    let off = false;
-    FilesService.ImageThumb(info.thumb, 240)
-      .then((url) => {
-        thumbCache.set(key, url);
-        if (!off) setSrc(url);
-      })
-      .catch(() => undefined);
-    return () => {
-      off = true;
-    };
-  }, [info.thumb, key]);
-  return <span className={styles.thumb}>{src ? <img src={src} alt="" draggable={false} /> : <Icon name="layers" size={22} />}</span>;
+  const [ref, src] = useLazyThumb<HTMLSpanElement>(info.thumb, 240, String(info.updatedAt));
+  return <span ref={ref} className={styles.thumb}>{src ? <img src={src} alt="" draggable={false} /> : <Icon name="layers" size={22} />}</span>;
 }
 
 /** Recent compositions: open, duplicate, rename or delete one, or start a new one. */

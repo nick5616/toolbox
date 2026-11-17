@@ -1,8 +1,9 @@
 /** Visuals for the burn (SPEC.md 9.3): helpers and small hooks shared by the Export step and the designer sheet. */
-import { useEffect, useMemo, useState } from "react";
-import { FilesService, VisualizerService, type AnalyzeOptions, type TimedLine, type VisualsSpec } from "@/lib/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FilesService, JobStatus, VisualizerService, type AnalyzeOptions, type TimedLine, type VisualsSpec } from "@/lib/api";
 import { loadRef, fixtureFlag } from "@/components/viz/useVisualsAnalysis";
 import { pickerAnalyzeOptions, presetItems } from "@/components/viz/pickerModel";
+import { useJobs } from "@/state/jobs";
 import type { ToolSeed } from "@/state/ui";
 import { Analysis } from "@/viz/analysis";
 import { buildFixture } from "@/viz/fixture";
@@ -49,43 +50,56 @@ export function useAnalyzeOptions(spec: VisualsSpec | null, lines: TimedLine[]):
   );
 }
 
-const POLL_MS = 3000;
+const VISUALIZER_MODULE = "visualizer";
+
+/** How many Visualizer jobs have finished (the signal that an analysis may now exist). */
+function useFinishedAnalyses(): number {
+  return useJobs((s) => {
+    let n = 0;
+    for (const j of Object.values(s.byId)) if (j.moduleId === VISUALIZER_MODULE && j.status === JobStatus.JobDone) n++;
+    return n;
+  });
+}
 
 /**
  * Picks up the analysis the picker makes (it submits the job): looks in the
- * cache now and then until one is there. Never submits anything itself.
+ * cache once, then again whenever a Visualizer job finishes. Never polls and
+ * never submits anything itself.
  */
 export function useCachedAnalysis(path: string | null, stems: boolean, enabled: boolean): Analysis | null {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const found = useRef(false);
+  const finished = useFinishedAnalyses();
   useEffect(() => {
+    found.current = false;
     setAnalysis(null);
-    if (!enabled) return;
+  }, [path, stems, enabled]);
+  useEffect(() => {
+    if (!enabled || found.current) return;
     if (fixtureFlag()) {
+      found.current = true;
       setAnalysis(buildFixture());
       return;
     }
     if (!path) return;
     let alive = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const look = async () => {
+    void (async () => {
       try {
         const [ref, ok] = await VisualizerService.AnalysisFor(path, stems);
-        if (ok && alive) {
-          const a = await loadRef(ref);
-          if (alive) setAnalysis(a);
-          return;
+        if (!ok || !alive) return;
+        const a = await loadRef(ref);
+        if (alive && !found.current) {
+          found.current = true;
+          setAnalysis(a);
         }
       } catch {
-        /* try again */
+        /* the next finished analysis checks again */
       }
-      if (alive) timer = setTimeout(() => void look(), POLL_MS);
-    };
-    void look();
+    })();
     return () => {
       alive = false;
-      if (timer) clearTimeout(timer);
     };
-  }, [path, stems, enabled]);
+  }, [path, stems, enabled, finished]);
   return analysis;
 }
 

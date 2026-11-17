@@ -1,4 +1,4 @@
-import type { DragEvent, MouseEvent } from "react";
+import { memo, type DragEvent, type MouseEvent } from "react";
 import { startPathsDrag } from "@/lib/fileDrag";
 import { Badge, Icon, IconButton, cx } from "@/components";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
@@ -33,11 +33,14 @@ export function dragHandler(item: LibItem, dragPaths: (i: LibItem) => string[], 
   };
 }
 
-export interface ItemCardProps extends ItemHandlers {
+export interface ItemCardProps extends Omit<ItemHandlers, "selection" | "activeKey"> {
   item: LibItem;
   size: CardSize;
-  /** The first card is the tab stop when nothing is active. */
-  fallbackStop?: boolean;
+  selected: boolean;
+  /** The focused item. */
+  active: boolean;
+  /** The tab stop (the active card, or the first when nothing is active). */
+  stop: boolean;
 }
 
 /** The "not from a job" dot of a file no tool made. */
@@ -49,10 +52,8 @@ export function NotFromJob() {
  * One file or folder as a thumbnail card: draggable, double-click or Enter
  * opens it (a folder opens in place), Send to and the file actions below.
  */
-export function ItemCard({ item, size, selection, activeKey, fallbackStop, moduleName, onClick, onEnterFolder, onForget, dragPaths }: ItemCardProps) {
+export const ItemCard = memo(function ItemCard({ item, size, selected, active, stop, moduleName, onClick, onEnterFolder, onForget, dragPaths }: ItemCardProps) {
   const behaviour = useResultBehaviour({ path: item.path, outputId: item.outputId || undefined, missing: item.missing || item.isDir });
-  const selected = selection.has(item.key);
-  const stop = item.key === activeKey || (fallbackStop === true && activeKey === "");
   const props = item.isDir
     ? {
         ...behaviour,
@@ -74,7 +75,7 @@ export function ItemCard({ item, size, selection, activeKey, fallbackStop, modul
       tabIndex={stop ? 0 : -1}
       onDragStart={dragHandler(item, dragPaths, behaviour.onDragStart)}
       data-lib-key={item.key}
-      className={cx(styles.card, styles[`size_${size}`], selected && styles.selected, item.key === activeKey && styles.active, item.missing && styles.missingCard)}
+      className={cx(styles.card, styles[`size_${size}`], selected && styles.selected, active && styles.active, item.missing && styles.missingCard)}
       onClick={(e) => onClick(e, item)}
     >
       <div className={styles.cardThumb}>
@@ -110,4 +111,4 @@ export function ItemCard({ item, size, selection, activeKey, fallbackStop, modul
       )}
     </div>
   );
-}
+});
