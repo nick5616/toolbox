@@ -60,6 +60,6 @@ func (m *Module) Descriptor() core.Descriptor {
 		Description:  "Run several tools one after another on the files you drop, with built-in templates.",
 		Status:       core.StatusReady,
 		Accepts:      core.Accepts{Extensions: []string{}},
-		OutputSubdir: "Pipelines", Order: 0,
+		OutputSubdir: "Pipelines", Order: 0, Interactive: true,
 	}
 }

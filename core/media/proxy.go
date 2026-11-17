@@ -38,7 +38,7 @@ func (m *ProxyModule) Descriptor() core.Descriptor {
 	return core.Descriptor{
 		ID: ProxyModuleID, Name: "Preview copy", Tagline: "Makes a playable preview copy",
 		Icon: "film", Category: core.CategoryMedia, Status: core.StatusReady,
-		Hidden: true, MaxConcurrent: 2, MaxInputs: 1,
+		Hidden: true, MaxConcurrent: 2, MaxInputs: 1, Interactive: true,
 		Requires: []string{"ffmpeg", "ffprobe"},
 	}
 }

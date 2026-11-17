@@ -184,7 +184,7 @@ type CopyModule struct{ h *History }
 func (m *CopyModule) Descriptor() core.Descriptor {
 	return core.Descriptor{
 		ID: CopyModuleID, Name: "Copy to clipboard", Icon: "clipboard", Category: core.CategoryUtility,
-		Status: core.StatusReady, Hidden: true, MaxConcurrent: 1,
+		Status: core.StatusReady, Hidden: true, MaxConcurrent: 1, Interactive: true,
 	}
 }
 

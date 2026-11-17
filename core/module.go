@@ -67,6 +67,11 @@ type Descriptor struct {
 	// Immediate jobs start at once, outside the global parallel-job limit
 	// (Local File Transfer's receive jobs: a sender is waiting on the other end).
 	Immediate bool `json:"-"`
+	// Interactive jobs are short and a user is waiting on them (preview
+	// copies, clip prepare, cheap pipeline steps). They start ahead of queued
+	// non-interactive jobs and may use one slot beyond the global limit;
+	// MaxConcurrent still applies.
+	Interactive bool `json:"-"`
 	// MaxInputs caps inputs per submission; 0 = no limit.
 	MaxInputs int `json:"maxInputs"`
 	// NotAStep keeps a module out of the pipeline step catalogue (creator
@@ -97,4 +102,12 @@ type Module interface {
 	// Run does the work, honouring ctx cancellation promptly, and reports
 	// through job.
 	Run(ctx context.Context, job *JobContext) error
+}
+
+// InteractiveJobs is implemented by modules where only some jobs are ones a
+// user is waiting on (Edit Studio's clip prepare, not its renders). Such jobs
+// are scheduled like Descriptor.Interactive ones. Called with the queue lock
+// held: it must be quick and must not call back into Jobs.
+type InteractiveJobs interface {
+	IsInteractive(options json.RawMessage) bool
 }

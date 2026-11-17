@@ -47,7 +47,16 @@ type Jobs struct {
 	obsMu     sync.Mutex
 	observers map[int]func(Job)
 	obsNext   int
+
+	// pend holds the trailing, coalesced jobs:changed emit of jobs that are
+	// registering outputs (see publishOutput).
+	pmu  sync.Mutex
+	pend map[string]timerHandle
 }
+
+// outputEmitInterval is how often a job that keeps registering outputs sends
+// its full snapshot to the UI.
+const outputEmitInterval = 250 * time.Millisecond
 
 // activeJob is the live state of a queued or running job. job is guarded by
 // Jobs.mu; pmu serialises persist+emit of snapshots.
@@ -195,6 +204,12 @@ type PipelineTag struct{ RunID, StepID string }
 func (m *Jobs) changed(j Job) {
 	m.markQuiet(&j)
 	m.em.Emit(EventJobsChanged, j)
+	m.notifyObservers(j)
+}
+
+// notifyObservers passes a snapshot to the observers (immediately, always).
+func (m *Jobs) notifyObservers(j Job) {
+	m.markQuiet(&j)
 	m.obsMu.Lock()
 	fns := make([]func(Job), 0, len(m.observers))
 	for _, fn := range m.observers {
@@ -365,25 +380,41 @@ func (m *Jobs) kick() {
 				perMod[aj.job.ModuleID]++
 			}
 		}
+		// Interactive jobs (a user is waiting) go first and may take one slot
+		// beyond the limit; everything else keeps queue order.
+		started := map[*activeJob]bool{}
+		for _, interactive := range []bool{true, false} {
+			for _, aj := range m.queue {
+				mod := aj.job.ModuleID
+				d, ok := m.reg.Descriptor(mod)
+				if m.isInteractive(aj, d, ok) != interactive {
+					continue
+				}
+				slots := m.limit
+				if interactive {
+					slots = m.limit + 1
+				}
+				if running >= slots && !(ok && d.Immediate) {
+					continue
+				}
+				if ok && d.MaxConcurrent > 0 && perMod[mod] >= d.MaxConcurrent {
+					continue
+				}
+				aj.job.Status = JobRunning
+				aj.job.StartedAt = NowMillis()
+				aj.ctx, aj.cancel = context.WithCancel(m.root)
+				running++
+				perMod[mod]++
+				m.wg.Add(1)
+				start = append(start, aj)
+				started[aj] = true
+			}
+		}
 		var rest []*activeJob
 		for _, aj := range m.queue {
-			mod := aj.job.ModuleID
-			d, ok := m.reg.Descriptor(mod)
-			if running >= m.limit && !(ok && d.Immediate) {
+			if !started[aj] {
 				rest = append(rest, aj)
-				continue
 			}
-			if ok && d.MaxConcurrent > 0 && perMod[mod] >= d.MaxConcurrent {
-				rest = append(rest, aj)
-				continue
-			}
-			aj.job.Status = JobRunning
-			aj.job.StartedAt = NowMillis()
-			aj.ctx, aj.cancel = context.WithCancel(m.root)
-			running++
-			perMod[mod]++
-			m.wg.Add(1)
-			start = append(start, aj)
 		}
 		m.queue = rest
 	}
@@ -393,6 +424,20 @@ func (m *Jobs) kick() {
 	}
 }
 
+// isInteractive reports whether a queued job is one a user is waiting on: its
+// module says so (Descriptor.Interactive) or, per job, through InteractiveJobs.
+func (m *Jobs) isInteractive(aj *activeJob, d Descriptor, ok bool) bool {
+	if ok && d.Interactive {
+		return true
+	}
+	if mod, found := m.reg.Get(aj.job.ModuleID); found {
+		if ij, is := mod.(InteractiveJobs); is {
+			return ij.IsInteractive(json.RawMessage(aj.job.OptionsJSON))
+		}
+	}
+	return false
+}
+
 // publish persists the latest snapshot of aj and emits it.
 func (m *Jobs) publish(aj *activeJob) {
 	aj.pmu.Lock()
@@ -400,10 +445,61 @@ func (m *Jobs) publish(aj *activeJob) {
 	m.mu.Lock()
 	s := snap(aj.job)
 	m.mu.Unlock()
+	m.cancelPendingEmit(s.ID) // this snapshot is newer than any coalesced one
 	if err := m.store.UpdateJob(context.Background(), s); err != nil {
 		slog.Error("persist job", "job", s.ID, "err", err)
 	}
 	m.changed(s)
+}
+
+// publishOutput is publish for a newly registered output. Outputs aren't part
+// of the job row (they live in the outputs table), so nothing is persisted;
+// observers see the snapshot at once and the UI gets one coalesced
+// jobs:changed per outputEmitInterval. The next regular publish supersedes the
+// pending one, so the final state is always sent. library:added already
+// carries the output itself.
+func (m *Jobs) publishOutput(aj *activeJob) {
+	aj.pmu.Lock()
+	defer aj.pmu.Unlock()
+	m.mu.Lock()
+	s := snap(aj.job)
+	m.mu.Unlock()
+	m.notifyObservers(s)
+	m.pmu.Lock()
+	if m.pend == nil {
+		m.pend = map[string]timerHandle{}
+	}
+	if _, ok := m.pend[s.ID]; !ok {
+		id := s.ID
+		m.pend[id] = m.clk.AfterFunc(outputEmitInterval, func() { m.fireEmit(aj, id) })
+	}
+	m.pmu.Unlock()
+}
+
+func (m *Jobs) fireEmit(aj *activeJob, id string) {
+	m.pmu.Lock()
+	_, ok := m.pend[id]
+	delete(m.pend, id)
+	m.pmu.Unlock()
+	if !ok {
+		return
+	}
+	aj.pmu.Lock()
+	defer aj.pmu.Unlock()
+	m.mu.Lock()
+	s := snap(aj.job)
+	m.mu.Unlock()
+	m.markQuiet(&s)
+	m.em.Emit(EventJobsChanged, s)
+}
+
+func (m *Jobs) cancelPendingEmit(id string) {
+	m.pmu.Lock()
+	if t, ok := m.pend[id]; ok {
+		t.Stop()
+		delete(m.pend, id)
+	}
+	m.pmu.Unlock()
 }
 
 func (m *Jobs) update(aj *activeJob, fn func(j *Job)) {
@@ -796,6 +892,6 @@ func (m *Jobs) registerOutput(aj *activeJob, job Job, path string, inputs []stri
 	}
 	m.mu.Unlock()
 	m.em.Emit(EventLibraryAdded, o)
-	m.publish(aj)
+	m.publishOutput(aj)
 	return o, nil
 }

@@ -12,11 +12,13 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -43,6 +45,26 @@ type Decoder struct {
 
 	mu       sync.Mutex
 	inflight map[string]*call
+
+	slotsOnce sync.Once
+	slots     chan struct{}
+}
+
+// maxConversions bounds concurrent conversions: each runs ffprobe + ffmpeg
+// (and sometimes the engine), and a grid of photos asks for hundreds at once.
+func maxConversions() int {
+	return max(1, min(4, runtime.NumCPU()/2))
+}
+
+// acquire takes a conversion slot or fails with the context's error.
+func (d *Decoder) acquire(ctx context.Context) (release func(), err error) {
+	d.slotsOnce.Do(func() { d.slots = make(chan struct{}, maxConversions()) })
+	select {
+	case d.slots <- struct{}{}:
+		return func() { <-d.slots }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 type call struct {
@@ -71,18 +93,25 @@ func (d *Decoder) ToPNG(ctx context.Context, path string) (string, error) {
 		return out, nil
 	}
 
-	d.mu.Lock()
-	if d.inflight == nil {
-		d.inflight = map[string]*call{}
-	}
-	if c, ok := d.inflight[key]; ok {
+	for {
+		d.mu.Lock()
+		if d.inflight == nil {
+			d.inflight = map[string]*call{}
+		}
+		c, ok := d.inflight[key]
+		if !ok {
+			break
+		}
 		d.mu.Unlock()
 		select {
 		case <-c.done:
-			return c.path, c.err
 		case <-ctx.Done():
 			return "", ctx.Err()
 		}
+		if errors.Is(c.err, context.Canceled) && ctx.Err() == nil {
+			continue // the first caller gave up; this one still wants it
+		}
+		return c.path, c.err
 	}
 	c := &call{done: make(chan struct{})}
 	d.inflight[key] = c
@@ -97,6 +126,11 @@ func (d *Decoder) ToPNG(ctx context.Context, path string) (string, error) {
 }
 
 func (d *Decoder) convert(ctx context.Context, src, out string) (string, error) {
+	release, err := d.acquire(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	if err := os.MkdirAll(d.CacheDir, 0o755); err != nil {
 		return "", fmt.Errorf("create HEIC cache: %w", err)
 	}

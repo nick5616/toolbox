@@ -7,6 +7,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -31,9 +32,10 @@ type MediaService struct {
 	GOOS    string                             // runtime.GOOS; tests override
 
 	// unexported (MD1): token LRU and job hooks (nil = use Jobs).
-	tokens tokenTable
-	submit func(ctx context.Context, moduleID string, inputs []string, optionsJSON string) ([]core.Job, error)
-	list   func(ctx context.Context, f core.JobFilter) ([]core.Job, error)
+	tokens         tokenTable
+	probeCacheOnce sync.Once
+	submit         func(ctx context.Context, moduleID string, inputs []string, optionsJSON string) ([]core.Job, error)
+	list           func(ctx context.Context, f core.JobFilter) ([]core.Job, error)
 }
 
 // MediaPrefix is the URL path prefix the middleware serves.
