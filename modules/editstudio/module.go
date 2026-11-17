@@ -115,6 +115,15 @@ func (m *Module) Descriptor() core.Descriptor {
 	}
 }
 
+// IsInteractive implements core.InteractiveJobs: preparing clips for the open
+// project is something the user is waiting on; analysis and renders are not.
+func (m *Module) IsInteractive(options json.RawMessage) bool {
+	var o struct {
+		Action string `json:"action"`
+	}
+	return json.Unmarshal(options, &o) == nil && Action(o.Action) == ActionPrepare
+}
+
 // Validate implements core.Module: the request's shape; files are checked in Run.
 func (m *Module) Validate(_ []string, options json.RawMessage) error {
 	o, err := core.DecodeOptionsJSON[Options](options)
