@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"image/jpeg"
@@ -46,7 +47,11 @@ func (m *Module) thumbnail(ctx context.Context, path string, page, width int, pa
 	if err != nil {
 		return "", err
 	}
-	ck := fmt.Sprintf("%s|%d|%d|%s|%d|%d", path, fi.ModTime().UnixNano(), fi.Size(), password, page, width)
+	pw := ""
+	if password != "" { // never keep a password in a cache key in clear
+		pw = fmt.Sprintf("%x", sha256.Sum256([]byte(password)))
+	}
+	ck := fmt.Sprintf("%s|%d|%d|%s|%d|%d", path, fi.ModTime().UnixNano(), fi.Size(), pw, page, width)
 	if v, ok := m.state.thumbs.get(ck); ok {
 		return v, nil
 	}

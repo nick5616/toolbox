@@ -358,6 +358,8 @@ func run() error {
 	imaging.SetHEICConverter(heicDec)
 	// Image previews survive restarts (30 days, 1 GB).
 	imaging.SetCacheDir(filepath.Join(paths.CacheDir, "thumbs"))
+	// ffprobe results and keyframe lists survive restarts (under cache/media, pruned with it).
+	media.SetCacheDir(media.CacheDir(paths))
 
 	// --- Phase 8 Part B: creator tools (architect) ---
 	projectsDir := filepath.Join(paths.SupportDir, "projects")

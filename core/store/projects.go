@@ -56,6 +56,19 @@ func (d *DB) GetProject(ctx context.Context, id string) (core.StoredProject, err
 	return p, nil
 }
 
+// ProjectKind reads a project's kind without its document (projectdocs.KindReader).
+func (d *DB) ProjectKind(ctx context.Context, id string) (core.ProjectKind, error) {
+	var kind string
+	err := d.ro.QueryRowContext(ctx, `SELECT kind FROM projects WHERE id = ?`, id).Scan(&kind)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", core.Errorf(core.CodeNotFound, "Project not found")
+	}
+	if err != nil {
+		return "", fmt.Errorf("get project kind %s: %w", id, err)
+	}
+	return core.ProjectKind(kind), nil
+}
+
 // PutProject implements core.ProjectStore.
 func (d *DB) PutProject(ctx context.Context, p core.StoredProject) error {
 	if len(p.Data) > core.MaxProjectBytes {
