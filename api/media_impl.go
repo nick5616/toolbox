@@ -372,19 +372,24 @@ func (s *MediaService) filmstrip(path string, count, height int) (string, error)
 	if len(fields) > 0 {
 		return "", core.ValidationError("Invalid filmstrip size", fields)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
-	defer cancel()
-	info, fi, err := s.probe(ctx, path)
+	// A strip made before needs no probe (an ffprobe run costs ~0.5 s on Windows).
+	fi, err := statFile(path)
 	if err != nil {
 		return "", err
-	}
-	if info.Video == nil {
-		return "", core.ValidationError("This file has no video", nil)
 	}
 	key := media.CacheKey(path, fi.Size(), fi.ModTime().UnixNano())
 	final := filepath.Join(s.cacheDir(), "strip", fmt.Sprintf("%s-%d-%d.jpg", key, count, height))
 	if cached(final) {
 		return s.mediaURL(final), nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
+	defer cancel()
+	info, _, err := s.probe(ctx, path)
+	if err != nil {
+		return "", err
+	}
+	if info.Video == nil {
+		return "", core.ValidationError("This file has no video", nil)
 	}
 	dur := float64(info.DurationMs) / 1000
 	if dur <= 0 {
@@ -397,9 +402,31 @@ func (s *MediaService) filmstrip(path string, count, height int) (string, error)
 	if err != nil {
 		return "", err
 	}
-	media.PruneCache(s.cacheDir(), media.CacheLimitBytes)
+	s.pruneSoon()
 	return s.mediaURL(final), nil
 }
+
+// pruneSoon keeps the media cache under its limit after a small file (frame,
+// strip, waveform) was added. Walking the cache costs more than making the
+// file, so it runs at most once a minute per folder.
+func (s *MediaService) pruneSoon() {
+	dir := s.cacheDir()
+	pruneMu.Lock()
+	last := pruneLast[dir]
+	due := time.Since(last) >= time.Minute
+	if due {
+		pruneLast[dir] = time.Now()
+	}
+	pruneMu.Unlock()
+	if due {
+		media.PruneCache(dir, media.CacheLimitBytes)
+	}
+}
+
+var (
+	pruneMu   sync.Mutex
+	pruneLast = map[string]time.Time{}
+)
 
 func cached(p string) bool {
 	fi, err := os.Stat(p)
@@ -422,28 +449,43 @@ func (s *MediaService) frame(path string, ms int64, maxDim int) (string, error) 
 	if len(fields) > 0 {
 		return "", core.ValidationError("Invalid frame request", fields)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
-	defer cancel()
-	info, fi, err := s.probe(ctx, path)
+	// A frame made before needs no probe (an ffprobe run costs ~0.5 s on Windows).
+	fi, err := statFile(path)
 	if err != nil {
 		return "", err
-	}
-	if info.Video == nil {
-		return "", core.ValidationError("This file has no video", nil)
 	}
 	key := media.CacheKey(path, fi.Size(), fi.ModTime().UnixNano())
 	final := filepath.Join(s.cacheDir(), "frame", fmt.Sprintf("%s-%d-%d.jpg", key, ms, maxDim))
 	if cached(final) {
 		return s.mediaURL(final), nil
 	}
-	sec := strconv.FormatFloat(float64(ms+info.StartMs)/1000, 'f', 3, 64)
-	err = s.runFFmpeg(ctx, final, []string{"-ss", sec, "-i", path, "-frames:v", "1",
+	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
+	defer cancel()
+	scaleArgs := []string{"-frames:v", "1",
 		"-vf", fmt.Sprintf("scale=w='min(%d,iw)':h='min(%d,ih)':force_original_aspect_ratio=decrease", maxDim, maxDim),
-		"-q:v", "3", "-update", "1"})
+		"-q:v", "3", "-update", "1"}
+	// The first frame (thumbnails) needs no probe either: ffmpeg starts there.
+	// Only when that fails is the file probed, to say why.
+	if ms == 0 {
+		if err := s.runFFmpeg(ctx, final, append([]string{"-i", path}, scaleArgs...)); err == nil {
+			s.pruneSoon()
+			return s.mediaURL(final), nil
+		} else if ctx.Err() != nil {
+			return "", err
+		}
+	}
+	info, _, err := s.probe(ctx, path)
 	if err != nil {
 		return "", err
 	}
-	media.PruneCache(s.cacheDir(), media.CacheLimitBytes)
+	if info.Video == nil {
+		return "", core.ValidationError("This file has no video", nil)
+	}
+	sec := strconv.FormatFloat(float64(ms+info.StartMs)/1000, 'f', 3, 64)
+	if err := s.runFFmpeg(ctx, final, append([]string{"-ss", sec, "-i", path}, scaleArgs...)); err != nil {
+		return "", err
+	}
+	s.pruneSoon()
 	return s.mediaURL(final), nil
 }
 
@@ -495,7 +537,7 @@ func (s *MediaService) waveform(path string, buckets int) ([]float32, error) {
 		return nil, err
 	}
 	writeWaveCache(final, peaks)
-	media.PruneCache(s.cacheDir(), media.CacheLimitBytes)
+	s.pruneSoon()
 	return peaks, nil
 }
 

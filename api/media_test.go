@@ -353,6 +353,49 @@ func TestFilmstripAndFrame(t *testing.T) {
 	}
 }
 
+// A cached frame or strip, and any first frame, never runs ffprobe (one run
+// costs about half a second on Windows, per thumbnail).
+func TestFrameAndStripSkipTheProbe(t *testing.T) {
+	s := fakeService(t)
+	argsFile := filepath.Join(t.TempDir(), "args")
+	t.Setenv("FAKE_ARGS_FILE", argsFile)
+	f := writeFile(t, "b.mp4", 100)
+	exe, _ := os.Executable()
+	probes := 0
+	s.Resolve = func(id string) (string, error) {
+		if id == "ffprobe" {
+			probes++
+		}
+		return exe, nil
+	}
+	u, err := s.Frame(f, 0, 256)
+	if err != nil || !strings.HasPrefix(u, MediaPrefix) {
+		t.Fatalf("first frame: %v %q", err, u)
+	}
+	if args, _ := os.ReadFile(argsFile); strings.Contains(string(args), "-ss") {
+		t.Errorf("the first frame needs no seek: %s", args)
+	}
+	if probes != 0 {
+		t.Errorf("first frame probed %d times", probes)
+	}
+	if _, err := s.Frame(f, 1000, 256); err != nil || probes != 1 {
+		t.Fatalf("a later frame probes once: %v, %d", err, probes)
+	}
+	if _, err := s.Filmstrip(f, 8, 120); err != nil || probes != 2 {
+		t.Fatalf("a new strip probes once: %v, %d", err, probes)
+	}
+	// Cached now: no ffprobe and no ffmpeg.
+	s.Resolve = func(id string) (string, error) { return "", fmt.Errorf("%s must not run", id) }
+	for _, ms := range []int64{0, 1000} {
+		if again, err := s.Frame(f, ms, 256); err != nil || again == "" {
+			t.Errorf("cached frame %d: %v", ms, err)
+		}
+	}
+	if _, err := s.Filmstrip(f, 8, 120); err != nil {
+		t.Errorf("cached strip: %v", err)
+	}
+}
+
 func TestKeyframesSubtractStart(t *testing.T) {
 	s := fakeService(t)
 	f := writeFile(t, "a.mp4", 10)
