@@ -1,7 +1,8 @@
 // The project list: open, create, duplicate, rename and delete video projects.
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Badge, Button, ConfirmDialog, DropZone, EmptyState, Icon, MenuButton, TextField, type MenuItem } from "@/components";
-import { FilesService, type ProjectInfo } from "@/lib/api";
+import { type ProjectInfo } from "@/lib/api";
+import { useLazyThumb } from "@/lib/thumbs";
 import { ASPECTS } from "./edit";
 import styles from "./VideoEditorView.module.css";
 
@@ -17,19 +18,8 @@ export interface ProjectsHomeProps {
 }
 
 function Thumb({ path }: { path: string }) {
-  const [url, setUrl] = useState("");
-  useEffect(() => {
-    if (!path) return;
-    let cancelled = false;
-    FilesService.ImageThumb(path, 240).then(
-      (u) => !cancelled && setUrl(u),
-      () => undefined,
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [path]);
-  return url ? <img className={styles.cardThumb} src={url} alt="" /> : <div className={styles.cardThumb}><Icon name="clapperboard" size={22} /></div>;
+  const [ref, url] = useLazyThumb<HTMLDivElement>(path, 240);
+  return url ? <img className={styles.cardThumb} src={url} alt="" /> : <div ref={ref} className={styles.cardThumb}><Icon name="clapperboard" size={22} /></div>;
 }
 
 export function ProjectsHome(p: ProjectsHomeProps) {

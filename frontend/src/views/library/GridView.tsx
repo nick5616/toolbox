@@ -11,11 +11,11 @@ export interface GridViewProps extends ItemHandlers {
 }
 
 /** Thumbnail cards in a wrapping grid (S, M or L). */
-export function GridView({ items, size, label = "Files", ...handlers }: GridViewProps) {
+export function GridView({ items, size, label = "Files", selection, activeKey, ...handlers }: GridViewProps) {
   return (
     <div className={cx(styles.grid, styles[`grid_${size}`])} role="listbox" aria-label={label} aria-multiselectable="true">
       {items.map((it, i) => (
-        <ItemCard key={it.key} item={it} size={size} fallbackStop={i === 0} {...handlers} />
+        <ItemCard key={it.key} item={it} size={size} selected={selection.has(it.key)} active={it.key === activeKey} stop={it.key === activeKey || (i === 0 && activeKey === "")} {...handlers} />
       ))}
     </div>
   );

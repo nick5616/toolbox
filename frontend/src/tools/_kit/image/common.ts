@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { FilesService } from "@/lib/api";
+import { clearThumbs, useThumbState } from "@/lib/thumbs";
 import { toAppError } from "@/lib/errors";
 
 export function basename(path: string): string {
@@ -37,46 +36,19 @@ export type ThumbState =
   | { status: "heic" }
   | { status: "error"; message: string };
 
-const cache = new Map<string, string>();
-
-/** Loads an `ImageThumb` data URL (cached per path+size); HEIC is converted by Go (a tile if it can't be). */
-export function useThumb(path: string, maxDim: number): ThumbState {
-  const key = `${path}\u0000${maxDim}`;
-  const [state, setState] = useState<ThumbState>(() => {
-    const hit = cache.get(key);
-    return hit ? { status: "ok", src: hit } : { status: "loading" };
-  });
-
-  useEffect(() => {
-    const hit = cache.get(key);
-    if (hit) {
-      setState({ status: "ok", src: hit });
-      return;
-    }
-    let cancelled = false;
-    setState({ status: "loading" });
-    FilesService.ImageThumb(path, maxDim)
-      .then((src) => {
-        if (cache.size > 80) cache.clear();
-        cache.set(key, src);
-        if (!cancelled) setState({ status: "ok", src });
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        const err = toAppError(e);
-        // HEIC that can't be converted (no FFmpeg or engine) falls back to a tile.
-        setState(isHeic(path) ? { status: "heic" } : { status: "error", message: err.message });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [path, maxDim, key]);
-
-  return state;
+/**
+ * Loads an ImageThumb data URL through the shared queue and cache; HEIC is converted by Go (a tile if it can't be).
+ * Pass `enabled` = the `seen` flag of `useInView` so off-screen cards don't load.
+ */
+export function useThumb(path: string, maxDim: number, enabled = true): ThumbState {
+  const t = useThumbState(path, maxDim, enabled);
+  if (t.status !== "error") return t;
+  // HEIC that can't be converted (no FFmpeg or engine) falls back to a tile.
+  return isHeic(path) ? { status: "heic" } : { status: "error", message: toAppError(t.error).message };
 }
 
 export function clearThumbCache(): void {
-  cache.clear();
+  clearThumbs();
 }
 
 /** Display text for megapixels, e.g. "12.3 MP". */

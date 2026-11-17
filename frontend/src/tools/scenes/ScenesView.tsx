@@ -5,6 +5,7 @@ import { JobStatus, SceneKeep, SceneOutput, ScenesService } from "@/lib/api";
 import { useToolJobs } from "@/tools/_kit/session";
 import { EmptyLine, FileToolLayout, ResultRow, runLabel, summarize, useFileInputs, useModuleOptions } from "@/tools/_kit";
 import { submitJobs } from "@/tools/_kit/enqueue";
+import { useInView } from "@/lib/thumbs";
 import { basename, useThumb } from "@/tools/_kit/image/common";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { useResultBehaviour } from "@/tools/_kit/ResultRow";
@@ -45,10 +46,11 @@ function SceneCell({ scene, item }: { scene: SceneItem; item: ScenesResultItem }
   const path = scene.still !== "" ? scene.still : scene.clip;
   const file = item.files.get(path);
   const behaviour = useResultBehaviour({ path, outputId: file?.id || undefined, missing: file?.missing });
-  const thumb = useThumb(scene.still, 288);
+  const [ref, seen] = useInView<HTMLDivElement>();
+  const thumb = useThumb(scene.still, 288, seen);
   const label = `Scene ${scene.n}, ${range(scene)}`;
   return (
-    <div {...behaviour} className={styles.cell} aria-label={label} data-tip={`${path} · double-click to open; drag it into another app`}>
+    <div {...behaviour} ref={(el) => { behaviour.ref.current = el as never; ref.current = el; }} className={styles.cell} aria-label={label} data-tip={`${path} · double-click to open; drag it into another app`}>
       {scene.still !== "" && thumb.status === "ok" ? (
         <img className={styles.thumb} src={thumb.src} alt="" draggable={false} />
       ) : (

@@ -7,8 +7,9 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, ConfirmDialog, DropZone, EmptyState, Icon, MenuButton, TextField, toast } from "@/components";
-import { EditStudioService, FilesService, SettingsService, VideoEditorService, type ProjectInfo } from "@/lib/api";
+import { EditStudioService, SettingsService, VideoEditorService, type ProjectInfo } from "@/lib/api";
 import { useCommands } from "@/lib/commands";
+import { useLazyThumb } from "@/lib/thumbs";
 import { toAppError } from "@/lib/errors";
 import { formatRelativeTime } from "@/lib/format";
 import { useUI } from "@/state/ui";
@@ -51,20 +52,9 @@ export async function openSequenceEditor(patch: { lastProjectId?: string; quickV
 }
 
 function Thumb({ path, icon }: { path: string; icon: "audio-waveform" | "clapperboard" }) {
-  const [url, setUrl] = useState("");
-  useEffect(() => {
-    if (!path) return;
-    let cancelled = false;
-    FilesService.ImageThumb(path, 240).then(
-      (u) => !cancelled && setUrl(u),
-      () => undefined,
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [path]);
+  const [ref, url] = useLazyThumb<HTMLDivElement>(path, 240);
   return url ? <img className={styles.cardThumb} src={url} alt="" /> : (
-    <div className={styles.cardThumb}>
+    <div ref={ref} className={styles.cardThumb}>
       <Icon name={icon} size={22} />
     </div>
   );

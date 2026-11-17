@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Badge, IconButton, cx } from "@/components";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { FileActions } from "@/tools/_kit/FileActions";
@@ -7,10 +8,8 @@ import { itemIcon, type LibItem } from "./items";
 import { Icon } from "@/components";
 import styles from "./Library.module.css";
 
-function ListRow({ item, fallbackStop, selection, activeKey, moduleName, onClick, onForget, dragPaths }: ItemHandlers & { item: LibItem; fallbackStop: boolean }) {
+const ListRow = memo(function ListRow({ item, selected, active, stop, moduleName, onClick, onForget, dragPaths }: Omit<ItemHandlers, "selection" | "activeKey"> & { item: LibItem; selected: boolean; active: boolean; stop: boolean }) {
   const behaviour = useResultBehaviour({ path: item.path, outputId: item.outputId || undefined, missing: item.missing });
-  const selected = selection.has(item.key);
-  const stop = item.key === activeKey || (fallbackStop && activeKey === "");
   return (
     <div
       {...behaviour}
@@ -20,7 +19,7 @@ function ListRow({ item, fallbackStop, selection, activeKey, moduleName, onClick
       tabIndex={stop ? 0 : -1}
       onDragStart={dragHandler(item, dragPaths, behaviour.onDragStart)}
       data-lib-key={item.key}
-      className={cx(styles.row, selected && styles.selected, item.key === activeKey && styles.active, item.missing && styles.missingRow)}
+      className={cx(styles.row, selected && styles.selected, active && styles.active, item.missing && styles.missingRow)}
       onClick={(e) => onClick(e, item)}
     >
       <span className={styles.rowKind} data-tip="File type">
@@ -52,18 +51,18 @@ function ListRow({ item, fallbackStop, selection, activeKey, moduleName, onClick
       </span>
     </div>
   );
-}
+});
 
 export interface ListViewProps extends ItemHandlers {
   items: LibItem[];
 }
 
 /** Dense rows: icon, name, tool, size, age and the file actions. */
-export function ListView({ items, ...handlers }: ListViewProps) {
+export function ListView({ items, selection, activeKey, ...handlers }: ListViewProps) {
   return (
     <div className={styles.list} role="listbox" aria-label="Outputs" aria-multiselectable="true">
       {items.map((it, i) => (
-        <ListRow key={it.key} item={it} fallbackStop={i === 0} {...handlers} />
+        <ListRow key={it.key} item={it} selected={selection.has(it.key)} active={it.key === activeKey} stop={it.key === activeKey || (i === 0 && activeKey === "")} {...handlers} />
       ))}
     </div>
   );

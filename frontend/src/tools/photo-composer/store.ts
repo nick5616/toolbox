@@ -14,7 +14,7 @@ import { useMemo } from "react";
 import { create, type StateCreator } from "zustand";
 import { toast } from "@/components";
 import { applyLayout, type LayoutKind } from "@/composer/layouts";
-import { loadImage } from "@/composer/loadImages";
+import { loadImage, loadImages } from "@/composer/loadImages";
 import {
   addLayer,
   aspectSize,
@@ -383,6 +383,11 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
     shuffleLayout: () => get().applyLayoutKind(layoutKindNow),
     addPhotos: async (paths, at) => {
       let n = 0;
+      // Decode everything in parallel first (HEIC goes through the engine), then add the layers in the given order.
+      const first = present(get());
+      if (!first) return;
+      const room = Math.max(0, MAX_LAYERS - layerList(first).length);
+      const loaded = await loadImages(paths.slice(0, room));
       for (const path of paths) {
         const d = present(get());
         if (!d) return;
@@ -391,7 +396,9 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
           return;
         }
         try {
-          const bmp = await loadImage(path);
+          // Photos past the room we preloaded (earlier ones failed) load now.
+          if (loaded.failed.has(path)) throw new Error(loaded.failed.get(path));
+          const bmp = loaded.images.get(path) ?? (await loadImage(path));
           const { w, h } = imageSize(bmp);
           let layer = newImageLayer(path, w, h, present(get()) ?? d);
           if (at) {

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type KeyboardEvent } from "react";
+import { useInView } from "@/lib/thumbs";
 import { CompareSlider, Icon, IconButton, Spinner, cx, toast } from "@/components";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { useResultBehaviour } from "@/tools/_kit/ResultRow";
@@ -44,12 +45,13 @@ function Tile({ text, aspect }: { text: string; aspect: number }) {
 }
 
 function Compare({ item, dim }: { item: ResultItem; dim: number }) {
-  const before = useThumb(item.original, dim);
-  const after = useThumb(item.output, dim);
+  const [ref, seen] = useInView<HTMLDivElement>();
+  const before = useThumb(item.original, dim, seen);
+  const after = useThumb(item.output, dim, seen);
 
   if (after.status === "loading" || before.status === "loading") {
     return (
-      <div className={styles.tile} style={{ aspectRatio: String(item.aspect) }}>
+      <div ref={ref} className={styles.tile} style={{ aspectRatio: String(item.aspect) }}>
         <Spinner label="Loading preview" />
       </div>
     );

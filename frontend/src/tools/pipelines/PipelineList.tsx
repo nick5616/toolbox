@@ -60,16 +60,23 @@ export function PipelineList({ onNew }: PipelineListProps) {
 
   usePipelineListEffects();
 
-  // The runner doesn't announce a next-fire time that simply passes, so refetch the list once a minute while a schedule is on.
+  // The runner doesn't announce a next-fire time that simply passes, so refetch the list once a minute while a schedule is on
+  // and the window is showing; coming back to the window refetches at once.
   const scheduled = entries.some((e) => e.pipeline.schedule?.enabled === true);
   useEffect(() => {
     if (!scheduled) return;
-    const id = setInterval(() => {
+    const refetch = () => {
+      if (document.hidden) return;
       PipelinesService.List()
         .then((list) => usePipelines.getState().setEntries(list ?? []))
         .catch(() => undefined);
-    }, 60_000);
-    return () => clearInterval(id);
+    };
+    const id = setInterval(refetch, 60_000);
+    document.addEventListener("visibilitychange", refetch);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", refetch);
+    };
   }, [scheduled]);
 
   if (entries.length === 0) {
