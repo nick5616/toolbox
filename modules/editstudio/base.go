@@ -71,5 +71,8 @@ func (v *VideoModule) Validate(inputs []string, options json.RawMessage) error {
 	return v.m.Validate(inputs, options)
 }
 
+// IsInteractive implements core.InteractiveJobs (clip prepare, as Edit Studio).
+func (v *VideoModule) IsInteractive(o json.RawMessage) bool { return v.m.IsInteractive(o) }
+
 // Run implements core.Module.
 func (v *VideoModule) Run(ctx context.Context, job *core.JobContext) error { return v.m.Run(ctx, job) }

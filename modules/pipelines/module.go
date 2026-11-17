@@ -6,6 +6,7 @@
 package pipelines
 
 import (
+	"encoding/json"
 	"time"
 
 	"toolbox/core"
@@ -52,6 +53,23 @@ func Register(reg *core.Registry, cfg Config) (*Module, error) {
 	return m, nil
 }
 
+// IsInteractive implements core.InteractiveJobs: the quick built-in steps
+// (rename, table, run another pipeline, open in app) start ahead of queued
+// batch jobs; chat, zip and copy can take long and queue normally.
+func (m *Module) IsInteractive(options json.RawMessage) bool {
+	var o struct {
+		Action Action `json:"action"`
+	}
+	if json.Unmarshal(options, &o) != nil {
+		return false
+	}
+	switch o.Action {
+	case ActionRename, ActionTable, ActionRun, ActionOpen:
+		return true
+	}
+	return false
+}
+
 // Descriptor implements core.Module.
 func (m *Module) Descriptor() core.Descriptor {
 	return core.Descriptor{
@@ -60,6 +78,6 @@ func (m *Module) Descriptor() core.Descriptor {
 		Description:  "Run several tools one after another on the files you drop, with built-in templates.",
 		Status:       core.StatusReady,
 		Accepts:      core.Accepts{Extensions: []string{}},
-		OutputSubdir: "Pipelines", Order: 0, Interactive: true,
+		OutputSubdir: "Pipelines", Order: 0,
 	}
 }
