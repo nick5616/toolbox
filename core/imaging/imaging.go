@@ -176,6 +176,22 @@ func (t *Thumbnailer) Thumb(path string, maxDim int) (string, error) {
 	return url, nil
 }
 
+// ThumbUncached is Thumb without any cache: it neither reads nor fills the
+// memory or disk caches and takes no worker slot (the caller bounds its own
+// concurrency). Bulk analysis (Organizer's look-alike scan) uses it so it
+// doesn't evict the previews the UI is showing.
+func ThumbUncached(path string, maxDim int) (string, error) {
+	maxDim = min(max(maxDim, MinThumbDim), MaxThumbDim)
+	path, err := ToReadable(context.Background(), path)
+	if err != nil {
+		return "", err
+	}
+	if _, err := checkPath(path); err != nil {
+		return "", err
+	}
+	return build(path, maxDim)
+}
+
 func (t *Thumbnailer) get(key string) (string, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()

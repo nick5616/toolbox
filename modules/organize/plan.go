@@ -11,9 +11,12 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"toolbox/core"
+	"toolbox/core/par"
 )
 
 // entry is one file in a plan.
@@ -214,35 +217,49 @@ func (p *planner) findExact(ctx context.Context, pl *plan) error {
 			}
 		}
 	}
-	var done int64
-	hashed := 0
-	byHash := map[string][]int{}
+	// Hash two files at a time (SSD-friendly without thrashing a spinning
+	// disk); results are kept by position so grouping stays deterministic.
 	sizes := make([]int64, 0, len(bySize))
 	for s := range bySize {
 		sizes = append(sizes, s)
 	}
 	sort.Slice(sizes, func(i, j int) bool { return sizes[i] < sizes[j] })
+	var order []int
 	for _, s := range sizes {
-		idx := bySize[s]
-		if len(idx) < 2 {
+		if idx := bySize[s]; len(idx) >= 2 {
+			order = append(order, idx...)
+		}
+	}
+	sums := make([]string, len(order))
+	var (
+		done    atomic.Int64
+		mu      sync.Mutex
+		checked int
+	)
+	if err := par.ForEach(ctx, len(order), 2, func(ctx context.Context, k int) error {
+		sum, err := sha256File(ctx, pl.Entries[order[k]].Src, func(n int64) { done.Add(n) })
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return nil // unreadable: never a duplicate
+		}
+		sums[k] = sum
+		mu.Lock()
+		checked++
+		p.report(metaEnd, hashEnd, float64(done.Load())/float64(max(total, 1)), fmt.Sprintf("Comparing files \u00b7 %d checked", checked))
+		mu.Unlock()
+		return nil
+	}); err != nil {
+		return err
+	}
+	byHash := map[string][]int{}
+	for k, i := range order {
+		if sums[k] == "" {
 			continue
 		}
-		for _, i := range idx {
-			e := pl.Entries[i]
-			sum, err := sha256File(ctx, e.Src, func(n int64) {
-				done += n
-			})
-			if err != nil {
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
-				continue // unreadable: never a duplicate
-			}
-			e.Hash = sum
-			byHash[sum] = append(byHash[sum], i)
-			hashed++
-			p.report(metaEnd, hashEnd, float64(done)/float64(max(total, 1)), fmt.Sprintf("Comparing files · %d checked", hashed))
-		}
+		pl.Entries[i].Hash = sums[k]
+		byHash[sums[k]] = append(byHash[sums[k]], i)
 	}
 	for _, idx := range byHash {
 		if len(idx) < 2 {
@@ -267,19 +284,41 @@ func (p *planner) findSimilar(ctx context.Context, pl *plan) error {
 			cand = append(cand, i)
 		}
 	}
+	// Decode and hash in parallel (the slow part), then keep everything that
+	// depends on order sequential: results sit at their candidate's index.
+	type look struct {
+		h     photoHash
+		w, ht int
+		ok    bool
+	}
+	looks := make([]look, len(cand))
+	var (
+		mu   sync.Mutex
+		done int
+	)
+	if err := par.ForEach(ctx, len(cand), par.CPUHalf(), func(ctx context.Context, n int) error {
+		e := pl.Entries[cand[n]]
+		h, err := p.hashPhoto(e.Src)
+		if err == nil {
+			w, ht := p.photoSize(e.Src)
+			looks[n] = look{h: h, w: w, ht: ht, ok: true}
+		}
+		mu.Lock()
+		done++
+		p.report(hashEnd, likeEnd, float64(done)/float64(len(cand)), fmt.Sprintf("Comparing photos \u00b7 %d of %d", done, len(cand)))
+		mu.Unlock()
+		return nil
+	}); err != nil {
+		return err
+	}
 	hashed := cand[:0:0]
 	for n, i := range cand {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		e := pl.Entries[i]
-		h, err := p.hashPhoto(e.Src)
-		p.report(hashEnd, likeEnd, float64(n+1)/float64(len(cand)), fmt.Sprintf("Comparing photos · %d of %d", n+1, len(cand)))
-		if err != nil {
+		if !looks[n].ok {
 			continue // can't be read as a picture: not a candidate
 		}
-		e.Photo, e.HasHash = h, true
-		e.W, e.H = p.photoSize(e.Src)
+		e := pl.Entries[i]
+		e.Photo, e.HasHash = looks[n].h, true
+		e.W, e.H = looks[n].w, looks[n].ht
 		hashed = append(hashed, i)
 	}
 	sort.Slice(hashed, func(a, b int) bool { return better(pl.Entries[hashed[a]], pl.Entries[hashed[b]]) })

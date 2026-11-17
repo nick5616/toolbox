@@ -97,7 +97,7 @@ func dataURLImage(url string) (image.Image, error) {
 // fileHash hashes a photo from a small decoded thumbnail (core/imaging reads
 // orientation and HEIC, and bounds big files).
 func fileHash(path string) (photoHash, error) {
-	url, err := imaging.Default().Thumb(path, imaging.MinThumbDim)
+	url, err := imaging.ThumbUncached(path, imaging.MinThumbDim)
 	if err != nil {
 		return photoHash{}, err
 	}
