@@ -10,9 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"toolbox/core"
 	"toolbox/core/media"
+	"toolbox/core/par"
 	"toolbox/core/proc"
 )
 
@@ -119,6 +121,9 @@ func (m *Module) runLoop(ctx context.Context, job *core.JobContext, ffmpeg, inpu
 	return out, ".gif", res, nil
 }
 
+// sheetParallel bounds concurrent single-frame runs.
+const sheetParallel = 4
+
 // runSheet writes a contact sheet JPG into TempDir: one frame per tile
 // (with its timecode burned in by libass), then one tile pass.
 func (m *Module) runSheet(ctx context.Context, job *core.JobContext, ffmpeg, input string, info media.Info, o Options) (string, string, Result, error) {
@@ -129,33 +134,45 @@ func (m *Module) runSheet(ctx context.Context, job *core.JobContext, ffmpeg, inp
 	res.Width = o.Columns*cw + (o.Columns+1)*6
 	res.Height = o.Rows*ch + (o.Rows+1)*6
 	times := tileTimes(info.DurationMs, n)
-	for i, t := range times {
+	if err := ctx.Err(); err != nil {
+		return "", "", res, fmt.Errorf("render cancelled: %w", err)
+	}
+	// Frames are independent single-frame runs with distinct file names:
+	// 4 at a time; progress is a monotonic count of finished frames.
+	var done atomic.Int64
+	err := par.ForEach(ctx, len(times), sheetParallel, func(ctx context.Context, i int) error {
+		t := times[i]
 		if err := ctx.Err(); err != nil {
-			return "", "", res, fmt.Errorf("render cancelled: %w", err)
+			return fmt.Errorf("render cancelled: %w", err)
 		}
-		job.Progress(0.9*float64(i)/float64(n), fmt.Sprintf("Frame %d of %d", i+1, n))
 		label := ""
 		if o.Labels {
 			label = fmt.Sprintf("t%03d.ass", i+1)
 			f, err := os.Create(filepath.Join(job.TempDir, label))
 			if err != nil {
-				return "", "", res, fmt.Errorf("create %s: %w", label, err)
+				return fmt.Errorf("create %s: %w", label, err)
 			}
 			_, werr := labelDoc(timecode(t), cw, ch).WriteTo(f)
 			if cerr := f.Close(); werr == nil {
 				werr = cerr
 			}
 			if werr != nil {
-				return "", "", res, fmt.Errorf("write %s: %w", label, werr)
+				return fmt.Errorf("write %s: %w", label, werr)
 			}
 		}
 		frame := fmt.Sprintf("t%03d.png", i+1)
 		if err := runFF(ctx, job, ffmpeg, frameArgs(input, frame, float64(t)/1000, cw, ch, label), job.TempDir, 0, "Reading frames"); err != nil {
-			return "", "", res, err
+			return err
 		}
 		if _, err := os.Stat(filepath.Join(job.TempDir, frame)); err != nil {
-			return "", "", res, core.Errorf(core.CodeToolFailed, "Couldn't read the frame at %s", timecode(t)).WithCause(err)
+			return core.Errorf(core.CodeToolFailed, "Couldn't read the frame at %s", timecode(t)).WithCause(err)
 		}
+		k := done.Add(1)
+		job.Progress(0.9*float64(k)/float64(n), fmt.Sprintf("Frame %d of %d", k, n))
+		return nil
+	})
+	if err != nil {
+		return "", "", res, err
 	}
 	job.Progress(0.92, "Laying out the sheet…")
 	out := "sheet.jpg"
