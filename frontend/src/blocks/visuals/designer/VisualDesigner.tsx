@@ -26,13 +26,14 @@ import { timelineFor } from "@/viz/director";
 import { Signals } from "@/viz/signals";
 import type { Show } from "@/viz/types";
 import { validateShow } from "@/viz/validate";
-import { SongMap, type SongMapLane } from "../songmap/SongMap";
-import { DesignerContext, useThrottled, type DesignerContextValue } from "./context";
+import { SongMap, type SongMapLane, type SongMapProps } from "../songmap/SongMap";
+import { DesignerContext, type DesignerContextValue } from "./context";
 import { LayersTab } from "./LayersTab";
 import { LookTab } from "./LookTab";
 import { reactionMod, setReactionAmount, withoutText } from "./model";
 import { PresetsTab } from "./PresetsTab";
-import { Preview, type DesignerText } from "./Preview";
+import { createPlayheadStore, followPlayer, usePlayhead, useThrottledPlayhead, type PlayheadStore } from "./playhead";
+import { Preview, type DesignerText, type PreviewProps } from "./Preview";
 import { ReactionsTab } from "./ReactionsTab";
 import { layersSummary, lookSummary, presetSummary, reactionsSummary, timelineSummary } from "./summaries";
 import { TimelineTab } from "./TimelineTab";
@@ -100,7 +101,9 @@ function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, t
   const engineText = text === "engine";
   const visible = useMemo(() => ALL_TABS.filter((t) => !tabs || tabs.includes(t.id)), [tabs]);
   const short = useMediaQuery(SHORT_QUERY);
-  const [playheadMs, setPlayheadMs] = useState(0);
+  // The playhead ticks ~30x a second: it lives in a store only the preview and the Song Map read.
+  const playhead = useMemo(() => createPlayheadStore(0), []);
+  const setPlayheadMs = playhead.set;
   const [section, setSection] = useState(0);
   const ownPlayer = useRef<MediaPlayerHandle>(null);
   const toggleFs = useRef<(() => void) | null>(null);
@@ -112,28 +115,20 @@ function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, t
   const previewOut = useWindowOpen(previewPart ? partWindowKey(previewPart) : "");
   useEffect(() => {
     if (previewPart && previewOut && windowPlayheadMs !== undefined) setPlayheadMs(windowPlayheadMs);
-  }, [previewPart, previewOut, windowPlayheadMs]);
+  }, [previewPart, previewOut, windowPlayheadMs, setPlayheadMs]);
 
   // A host that draws its own words never gets text in the design.
   const emit = useCallback((next: Show) => onChange(engineText ? next : withoutText(next)), [onChange, engineText]);
 
   const signals = useMemo(() => new Signals(analysis), [analysis]);
-  const liveMs = useThrottled(playheadMs, 250);
+  const liveMs = useThrottledPlayhead(playhead, 250);
   const ctx = useMemo<DesignerContextValue>(() => ({ analysis, signals, liveMs }), [analysis, signals, liveMs]);
 
-  // The host's player has no time callback: follow it.
+  // The host's player has no time callback: follow it (fast while it plays, slowly otherwise).
   useEffect(() => {
     if (!player) return;
-    let last = -1;
-    const t = setInterval(() => {
-      const ms = player.currentMs();
-      if (ms !== last) {
-        last = ms;
-        setPlayheadMs(ms);
-      }
-    }, 33);
-    return () => clearInterval(t);
-  }, [player]);
+    return followPlayer(player, playhead);
+  }, [player, playhead]);
 
   const seek = useCallback(
     (ms: number) => {
@@ -141,7 +136,7 @@ function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, t
       p?.seek(ms);
       setPlayheadMs(ms);
     },
-    [player],
+    [player, setPlayheadMs],
   );
 
   useEffect(() => {
@@ -159,52 +154,46 @@ function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, t
   const manual = show.timeline.mode === "manual";
   const facts = useMemo(() => whyFacts(show, analysis, signals, liveMs), [show, analysis, signals, liveMs]);
 
-  const previewEl = (
-    <Preview
-      inputPath={inputPath}
-      analysis={analysis}
-      show={show}
-      aspect={aspect}
-      mode={mode}
-      hostPlayer={player}
-      ownPlayer={ownPlayer}
-      text={text}
-      timeMs={playheadMs}
-      onTime={setPlayheadMs}
-      fsRef={toggleFs}
-    />
-  );
+  const previewEl = <LivePreview store={playhead} inputPath={inputPath} analysis={analysis} show={show} aspect={aspect} mode={mode} hostPlayer={player} ownPlayer={ownPlayer} text={text} onTime={setPlayheadMs} fsRef={toggleFs} />;
 
-  const bodies: Record<DesignerTab, ReactNode> = {
-    presets: <PresetsTab show={show} onChange={emit} analysis={analysis} mode={mode} aspect={aspect} playheadMs={liveMs} engineText={engineText} onSavePreset={onSavePreset} />,
-    look: <LookTab show={show} onChange={emit} engineText={engineText} />,
-    reactions: <ReactionsTab show={show} onChange={emit} />,
-    layers: <LayersTab show={show} onChange={emit} />,
-    timeline: (
-      <TimelineTab
-        show={show}
-        onChange={emit}
-        analysis={analysis}
-        selected={section}
-        onSelect={(i) => {
-          setSection(i);
-          const s = analysis.audio.sections[i];
-          if (s) seek(s.startMs);
-        }}
-        onPreviewTransition={(ms) => {
-          seek(ms);
-          (player ?? ownPlayer.current)?.play();
-        }}
-      />
-    ),
-  };
-  const summary: Record<DesignerTab, string> = {
-    presets: presetSummary(show),
-    look: lookSummary(show),
-    reactions: reactionsSummary(show),
-    layers: layersSummary(show),
-    timeline: timelineSummary(show, analysis),
-  };
+  // Each tab body is memoised: a playhead tick or another tab's edit never rebuilds it (only the open one mounts).
+  const onTimelineSelect = useCallback(
+    (i: number) => {
+      setSection(i);
+      const s = analysis.audio.sections[i];
+      if (s) seek(s.startMs);
+    },
+    [analysis, seek],
+  );
+  const onPreviewTransition = useCallback(
+    (ms: number) => {
+      seek(ms);
+      (player ?? ownPlayer.current)?.play();
+    },
+    [seek, player],
+  );
+  const presetsBody = useMemo(
+    () => <PresetsTab show={show} onChange={emit} analysis={analysis} mode={mode} aspect={aspect} playheadMs={liveMs} engineText={engineText} onSavePreset={onSavePreset} />,
+    [show, emit, analysis, mode, aspect, liveMs, engineText, onSavePreset],
+  );
+  const lookBody = useMemo(() => <LookTab show={show} onChange={emit} engineText={engineText} />, [show, emit, engineText]);
+  const reactionsBody = useMemo(() => <ReactionsTab show={show} onChange={emit} />, [show, emit]);
+  const layersBody = useMemo(() => <LayersTab show={show} onChange={emit} />, [show, emit]);
+  const timelineBody = useMemo(
+    () => <TimelineTab show={show} onChange={emit} analysis={analysis} selected={section} onSelect={onTimelineSelect} onPreviewTransition={onPreviewTransition} />,
+    [show, emit, analysis, section, onTimelineSelect, onPreviewTransition],
+  );
+  const bodies: Record<DesignerTab, ReactNode> = { presets: presetsBody, look: lookBody, reactions: reactionsBody, layers: layersBody, timeline: timelineBody };
+  const summary = useMemo<Record<DesignerTab, string>>(
+    () => ({
+      presets: presetSummary(show),
+      look: lookSummary(show),
+      reactions: reactionsSummary(show),
+      layers: layersSummary(show),
+      timeline: timelineSummary(show, analysis),
+    }),
+    [show, analysis],
+  );
 
   const headline = show.controls.slice(0, short ? HEADLINE_CONTROLS_SHORT : HEADLINE_CONTROLS);
   const showReactions = !tabs || tabs.includes("reactions");
@@ -226,14 +215,14 @@ function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, t
             previewEl
           )}
         </div>
-        <SongMap
+        <LiveSongMap
+          store={playhead}
           analysis={analysis}
           timeline={timeline}
-          playheadMs={playheadMs}
           onSeek={seek}
           selection={selection}
           onSelect={setSelection}
-          onSectionClick={manual ? (i) => setSection(i) : undefined}
+          onSectionClick={manual ? setSection : undefined}
           lanes={short ? SHORT_LANES : undefined}
           className={styles.songMap}
         />
@@ -266,4 +255,15 @@ function Designer({ inputPath, analysis, show, onChange, aspect, mode, player, t
       </nav>
     </DesignerContext.Provider>
   );
+}
+
+/** The preview, subscribed to the playhead (with the Song Map, the only part of the designer that follows every tick). */
+function LivePreview({ store, ...rest }: Omit<PreviewProps, "timeMs"> & { store: PlayheadStore; fsRef: Parameters<typeof Preview>[0]["fsRef"] }) {
+  const timeMs = usePlayhead(store);
+  return <Preview {...rest} timeMs={timeMs} />;
+}
+
+function LiveSongMap({ store, ...rest }: Omit<SongMapProps, "playheadMs"> & { store: PlayheadStore }) {
+  const playheadMs = usePlayhead(store);
+  return <SongMap {...rest} playheadMs={playheadMs} />;
 }
