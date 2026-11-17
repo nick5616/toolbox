@@ -51,19 +51,51 @@ const PANEL_TITLES: Record<PanelId, string> = { brushes: "Brushes", brushstudio:
 const PANEL_WIDTH: Record<PanelId, number> = { brushes: 340, brushstudio: 360, color: 320, layers: 320, history: 320, lab: 360, guides: 320 };
 const PANEL_ANCHOR: Record<PanelId, string> = { brushes: "brush", brushstudio: "brush", color: "color", layers: "layers", history: "layers", lab: "layers", guides: "layers" };
 
+/** How many tile images are fetched and decoded at once. */
+const TILE_DECODE_CONCURRENCY = 8;
+
+async function loadTile(url: string): Promise<ImageBitmap> {
+  const blob = await (await fetch(url)).blob();
+  return createImageBitmap(blob);
+}
+
 function tileSource(projectId: string, onFail: (layerId: string, keys: string[]) => void): TileSource {
   return {
     async load(layerId, keys) {
       const out = new Map<string, ImageBitmap>();
-      for (let i = 0; i < keys.length; i += 64) {
-        const chunk = keys.slice(i, i + 64);
+      const chunks: string[][] = [];
+      for (let i = 0; i < keys.length; i += 64) chunks.push(keys.slice(i, i + 64));
+      const urlsFor = (chunk: string[] | undefined) => (chunk ? PaintService.Tiles(projectId, layerId, chunk).then((u) => u ?? {}) : null);
+      let next = urlsFor(chunks[0]);
+      if (next) next.catch(() => undefined); // handled when awaited below
+      for (let c = 0; c < chunks.length; c++) {
+        const chunk = chunks[c] as string[];
+        const current = next;
+        next = urlsFor(chunks[c + 1]); // asked for while this chunk decodes
+        if (next) next.catch(() => undefined);
         try {
-          const urls = (await PaintService.Tiles(projectId, layerId, chunk)) ?? {};
-          for (const [k, url] of Object.entries(urls)) {
-            if (!url) continue;
-            const blob = await (await fetch(url)).blob();
-            out.set(k, await createImageBitmap(blob));
+          const urls = Object.entries((await current) ?? {}).filter(([, url]) => !!url);
+          const decoded: Array<[string, ImageBitmap]> = [];
+          let cursor = 0;
+          let failed = false;
+          const worker = async () => {
+            while (!failed && cursor < urls.length) {
+              const [k, url] = urls[cursor++] as [string, string];
+              try {
+                decoded.push([k, await loadTile(url)]);
+              } catch (e) {
+                failed = true;
+                throw e;
+              }
+            }
+          };
+          const results = await Promise.allSettled(Array.from({ length: Math.min(TILE_DECODE_CONCURRENCY, urls.length) }, worker));
+          const bad = results.find((r) => r.status === "rejected");
+          if (bad) {
+            for (const [, bmp] of decoded) bmp.close();
+            throw (bad as PromiseRejectedResult).reason;
           }
+          for (const [k, bmp] of decoded) out.set(k, bmp);
         } catch {
           onFail(layerId, chunk);
         }

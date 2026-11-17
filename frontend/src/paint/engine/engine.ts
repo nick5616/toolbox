@@ -413,6 +413,7 @@ class Engine implements PaintEngine, PaintEngineExt {
     this.dirtySave.clear();
     this.failed.clear();
     this.nextLayerNum = 1;
+    const work: Array<{ layer: Layer; batch: string[] }> = [];
     for (const l of doc.layers ?? []) {
       const layer: Layer = {
         id: l.id,
@@ -424,29 +425,45 @@ class Engine implements PaintEngine, PaintEngineExt {
       if (n) this.nextLayerNum = Math.max(this.nextLayerNum, Number(n[1]) + 1);
       this.layers.push(layer);
       const keys = [...(l.tiles ?? [])];
-      for (let i = 0; i < keys.length; i += 64) {
-        const batch = keys.slice(i, i + 64);
+      for (let i = 0; i < keys.length; i += 64) work.push({ layer, batch: keys.slice(i, i + 64) });
+    }
+    // Pipelined: the next batch is being fetched and decoded while the current one uploads.
+    const start = (i: number): Promise<{ got: Map<string, ImageBitmap> } | null> | null => {
+      const w = work[i];
+      return w ? tiles.load(w.layer.id, w.batch).then((got) => ({ got }), () => null) : null;
+    };
+    let pending = start(0);
+    for (let i = 0; i < work.length; i++) {
+      const { layer, batch } = work[i] as { layer: Layer; batch: string[] };
+      const res = await pending;
+      pending = start(i + 1);
+      if (!res) {
+        for (const key of batch) this.fail(layer.id, key);
+        continue;
+      }
+      for (const key of batch) {
+        const bmp = res.got.get(key);
+        if (!bmp) {
+          this.fail(layer.id, key);
+          continue;
+        }
         try {
-          const got = await tiles.load(l.id, batch);
-          for (const key of batch) {
-            const bmp = got.get(key);
-            if (!bmp) {
-              this.fail(l.id, key);
-              continue;
-            }
-            const raw = this.codec.fromBitmap(bmp);
-            const s = be.createSurface();
-            be.clear(s);
-            const w = Math.min(raw.width, TILE);
-            const h = Math.min(raw.height, TILE);
-            const pm = premultiplied({ data: raw.data, width: raw.width, height: raw.height });
-            be.upload(s, w === raw.width ? pm.data : cropRows(pm, w, h), 0, 0, w, h);
-            layer.tiles.set(key, s);
-          }
+          const raw = this.codec.fromBitmap(bmp);
+          const s = be.createSurface();
+          be.clear(s);
+          const w = Math.min(raw.width, TILE);
+          const h = Math.min(raw.height, TILE);
+          const pm = premultiplied({ data: raw.data, width: raw.width, height: raw.height });
+          be.upload(s, w === raw.width ? pm.data : cropRows(pm, w, h), 0, 0, w, h);
+          layer.tiles.set(key, s);
         } catch {
-          for (const key of batch) this.fail(l.id, key);
+          this.fail(layer.id, key);
+        } finally {
+          // Decoded tiles are big; free them now instead of waiting for GC.
+          (bmp as { close?: () => void }).close?.();
         }
       }
+      res.got.clear();
     }
     if (this.layers.length === 0) this.layers.push(this.makeLayer({ name: "Layer 1" }));
     this.activeId = this.layers.some((l) => l.id === doc.active) ? doc.active : (this.layers[this.layers.length - 1] as Layer).id;
