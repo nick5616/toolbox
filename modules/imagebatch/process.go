@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "golang.org/x/image/bmp"
@@ -186,7 +187,46 @@ type engine struct {
 	ffmpeg func() (string, error) // resolves FFmpeg when a step needs it
 	now    func() time.Time
 	logf   func(format string, args ...any)
+
+	// gate (optional) makes the final naming, move and registration of a
+	// batch happen in input order while the heavy work runs in parallel.
+	gate *orderGate
+	// saved (optional) runs inside the ordered section once a file has been
+	// moved into place (the module registers it in the library there).
+	saved func(in string, fr FileResult) error
 }
+
+// orderGate lets items finish their work in any order but enter the commit
+// section strictly in index order: names (UniquePath) and output order stay
+// exactly what a sequential run produces.
+type orderGate struct {
+	done []chan struct{}
+	once []sync.Once
+}
+
+func newOrderGate(n int) *orderGate {
+	g := &orderGate{done: make([]chan struct{}, n), once: make([]sync.Once, n)}
+	for i := range g.done {
+		g.done[i] = make(chan struct{})
+	}
+	return g
+}
+
+// wait blocks until every earlier index has finished (or ctx ends).
+func (g *orderGate) wait(ctx context.Context, idx int) error {
+	if idx <= 0 {
+		return ctx.Err()
+	}
+	select {
+	case <-g.done[idx-1]:
+		return ctx.Err()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// finish releases idx's successor; safe to call more than once.
+func (g *orderGate) finish(idx int) { g.once[idx].Do(func() { close(g.done[idx]) }) }
 
 func (e *engine) log(format string, args ...any) {
 	if e.logf != nil {
@@ -252,6 +292,13 @@ func (e *engine) processOne(ctx context.Context, in string, o Options, logo imag
 	if err := ctx.Err(); err != nil {
 		return FileResult{}, fmt.Errorf("image batch cancelled: %w", err)
 	}
+	if e.gate != nil {
+		if err := e.gate.wait(ctx, idx); err != nil {
+			return FileResult{}, fmt.Errorf("image batch cancelled: %w", err)
+		}
+	}
+	// Ordered section: UniquePath + move must not interleave (os.Rename
+	// overwrites on Windows), and registration keeps input order.
 	final := core.UniquePath(outDir, stem, format.ext())
 	if err := moveFile(tmp, final); err != nil {
 		return FileResult{}, core.Errorf(core.CodeToolFailed, "Couldn't save %s", filepath.Base(final)).WithCause(err)
@@ -260,7 +307,13 @@ func (e *engine) processOne(ctx context.Context, in string, o Options, logo imag
 	if err != nil {
 		return FileResult{}, fmt.Errorf("stat %s: %w", final, err)
 	}
-	return FileResult{Input: in, Output: final, Width: canvas.Bounds().Dx(), Height: canvas.Bounds().Dy(), Bytes: st.Size()}, nil
+	fr := FileResult{Input: in, Output: final, Width: canvas.Bounds().Dx(), Height: canvas.Bounds().Dy(), Bytes: st.Size()}
+	if e.saved != nil {
+		if err := e.saved(in, fr); err != nil {
+			return FileResult{}, err
+		}
+	}
+	return fr, nil
 }
 
 // isOpaque reports whether src has no transparency, cheaply: only
