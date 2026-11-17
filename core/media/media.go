@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -87,13 +88,44 @@ func Probe(ctx context.Context, ffprobe, path string) (Info, error) {
 		return Info{}, core.Errorf(core.CodeNotFound, "This file doesn't exist any more").WithHint(path)
 	}
 	key := cacheKey{path, fi.Size(), fi.ModTime().UnixNano()}
-	cacheMu.Lock()
-	if info, ok := cache[key]; ok {
-		cacheMu.Unlock()
+	if info, ok := cacheGet(key); ok {
 		return info, nil
 	}
-	cacheMu.Unlock()
+	// Opening a clip asks for the probe from several places at once: one
+	// ffprobe serves them all.
+	info, err := probeFlight.do(ctx, key, func() (Info, error) {
+		if info, ok := cacheGet(key); ok {
+			return info, nil
+		}
+		return probeRun(ctx, ffprobe, path, fi, key)
+	})
+	if err != nil {
+		return Info{}, err
+	}
+	return cloneInfo(info), nil
+}
 
+func cacheGet(key cacheKey) (Info, bool) {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	info, ok := cache[key]
+	if !ok {
+		return Info{}, false
+	}
+	return cloneInfo(info), true
+}
+
+// probeRun reads the disk copy or runs ffprobe, and fills the memory cache.
+func probeRun(ctx context.Context, ffprobe, path string, fi os.FileInfo, key cacheKey) (Info, error) {
+	file := ""
+	if d := diskSub("probe"); d != "" {
+		file = filepath.Join(d, CacheKey(path, key.size, key.mtime)+".json")
+		var info Info
+		if readJSONFile(file, &info) && (info.Video != nil || len(info.Audio) > 0 || info.DurationMs > 0) {
+			cachePut(key, info)
+			return info, nil
+		}
+	}
 	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
 	var out strings.Builder
@@ -119,17 +151,24 @@ func Probe(ctx context.Context, ffprobe, path string) (Info, error) {
 	if info.SizeBytes == 0 {
 		info.SizeBytes = fi.Size()
 	}
+	cachePut(key, info)
+	if file != "" {
+		writeJSONFile(file, info)
+	}
+	return info, nil
+}
+
+func cachePut(key cacheKey, info Info) {
 	cacheMu.Lock()
+	defer cacheMu.Unlock()
 	if _, ok := cache[key]; !ok {
-		cache[key] = info
+		cache[key] = cloneInfo(info)
 		cacheOrder = append(cacheOrder, key)
 		if len(cacheOrder) > cacheMax {
 			delete(cache, cacheOrder[0])
 			cacheOrder = cacheOrder[1:]
 		}
 	}
-	cacheMu.Unlock()
-	return info, nil
 }
 
 // probeJSON mirrors the parts of ffprobe's JSON we read.

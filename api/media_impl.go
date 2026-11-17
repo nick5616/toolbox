@@ -224,6 +224,7 @@ func (s *MediaService) probe(ctx context.Context, path string) (media.Info, os.F
 	if err != nil {
 		return media.Info{}, nil, err
 	}
+	s.enableProbeCache()
 	info, err := media.Probe(ctx, ffprobe, path)
 	return info, fi, err
 }
@@ -300,23 +301,25 @@ func (s *MediaService) open(path string) (MediaSource, error) {
 func (s *MediaService) keyframes(path string) ([]int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*opTimeout)
 	defer cancel()
-	info, _, err := s.probe(ctx, path)
-	if err != nil {
+	if _, err := statFile(path); err != nil {
 		return nil, err
 	}
 	ffprobe, err := s.tool("ffprobe")
 	if err != nil {
 		return nil, err
 	}
-	kf, err := media.Keyframes(ctx, ffprobe, path)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]int64, len(kf))
-	for i, v := range kf {
-		out[i] = max(v-info.StartMs, 0)
-	}
-	return out, nil
+	s.enableProbeCache()
+	return media.TimelineKeyframes(ctx, ffprobe, path)
+}
+
+// enableProbeCache points core/media's on-disk probe and keyframe copies at
+// the media cache (once).
+func (s *MediaService) enableProbeCache() {
+	s.probeCacheOnce.Do(func() {
+		if dir := s.cacheDir(); s.Paths.CacheDir != "" {
+			media.SetCacheDir(dir)
+		}
+	})
 }
 
 // tempSibling returns a temp file name next to final that keeps its extension.
@@ -496,17 +499,22 @@ func (s *MediaService) waveform(path string, buckets int) ([]float32, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
 	defer cancel()
-	info, fi, err := s.probe(ctx, path)
+	fi, err := statFile(path)
+	if err != nil {
+		return nil, err
+	}
+	key := media.CacheKey(path, fi.Size(), fi.ModTime().UnixNano())
+	final := filepath.Join(s.cacheDir(), "wave", fmt.Sprintf("%s-%d.bin", key, buckets))
+	// A saved waveform means the file had audio: no probe needed.
+	if peaks, ok := readWaveCache(final, buckets); ok {
+		return peaks, nil
+	}
+	info, _, err := s.probe(ctx, path)
 	if err != nil {
 		return nil, err
 	}
 	if len(info.Audio) == 0 {
 		return nil, core.ValidationError("This file has no audio", nil)
-	}
-	key := media.CacheKey(path, fi.Size(), fi.ModTime().UnixNano())
-	final := filepath.Join(s.cacheDir(), "wave", fmt.Sprintf("%s-%d.bin", key, buckets))
-	if peaks, ok := readWaveCache(final, buckets); ok {
-		return peaks, nil
 	}
 	ffmpeg, err := s.tool("ffmpeg")
 	if err != nil {
