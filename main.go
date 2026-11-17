@@ -362,6 +362,9 @@ func run() error {
 	heicDec := &heic.Decoder{Resolve: depSvc.Resolve, Engine: engine, CacheDir: filepath.Join(paths.CacheDir, "heic")}
 	imaging.SetHEICConverter(heicDec)
 	go heicDec.Prune()
+	// Image previews survive restarts (30 days, 1 GB).
+	imaging.SetCacheDir(filepath.Join(paths.CacheDir, "thumbs"))
+	go imaging.PruneCache()
 
 	// --- Phase 8 Part B: creator tools (architect) ---
 	projectsDir := filepath.Join(paths.SupportDir, "projects")

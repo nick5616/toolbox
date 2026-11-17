@@ -191,7 +191,7 @@ The audio tools, transcription, background removal, CPU upscaling and HEIC decod
 
 ## Image tools and PDF Toolkit (Phase 4)
 
-- **Previews:** use `FilesService.ImageThumb(path, maxDim)` (cached, bounded, works for huge outputs, EXIF-oriented) for thumbnails; `ImageDataURL` only for small originals.
+- **Previews:** use `FilesService.ImageThumb(path, maxDim)` (cached in memory and in `<support>/cache/thumbs/` (30 days, 1 GB), bounded, works for huge outputs, EXIF-oriented) for thumbnails; `ImageDataURL` only for small originals.
 - **HEIC:** Go has no decoder, so `core/heic` converts HEIC/HEIF to an upright cached PNG (`<support>/cache/heic/`): FFmpeg stitches the iPhone tile grid (`xstack` over the "Tile Grid" stream group + crop + the display-matrix rotation), and the AI engine's `image.convert` is the fallback. main.go registers it with `imaging.SetHEICConverter`; any code that reads a photo calls `imaging.ToReadable(ctx, path)` first (`imaging.Size`/`Thumbnailer` already do). FFmpeg also ignores EXIF orientation on stills: pre-orient JPEGs with `imaging.Orient` before handing them to FFmpeg.
 - **Upscaler:** `upscayl-bin` (AGPL-3.0) is only ever run as a separate process; its install (`<bin>/upscaler/`) is pinned by version + sha256 in `core/deps` (managed archive v2 with a `VERSION` file).
 - **PDF:** all PDF work stays in Go. pdfcpu must never write its config dir: `api.DisableConfigDir()` once, and always a `model.NewStatelessConfiguration()`. go-pdfium runs as WebAssembly with **no filesystem mounts** (documents are opened from bytes). Passwords are never stored in job options or the DB — only in the PDF module's in-memory secret store, referenced by `passwordRef`.

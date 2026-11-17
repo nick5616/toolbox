@@ -13,8 +13,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/image/bmp"
+	"golang.org/x/image/draw"
 	"golang.org/x/image/tiff"
 
 	"toolbox/core"
@@ -185,5 +187,167 @@ func TestSize(t *testing.T) {
 	s, err := Size(p)
 	if err != nil || s != (core.Size{W: 321, H: 123}) {
 		t.Fatalf("Size = %+v, %v", s, err)
+	}
+}
+
+// meanDiff is the mean absolute difference of two same-sized images (0..255).
+func meanDiff(t *testing.T, a, b image.Image) float64 {
+	t.Helper()
+	if a.Bounds().Size() != b.Bounds().Size() {
+		t.Fatalf("sizes differ: %v vs %v", a.Bounds(), b.Bounds())
+	}
+	var sum, n float64
+	for y := range a.Bounds().Dy() {
+		for x := range a.Bounds().Dx() {
+			ar, ag, ab, _ := a.At(a.Bounds().Min.X+x, a.Bounds().Min.Y+y).RGBA()
+			br, bg, bb, _ := b.At(b.Bounds().Min.X+x, b.Bounds().Min.Y+y).RGBA()
+			for _, d := range []int{int(ar>>8) - int(br>>8), int(ag>>8) - int(bg>>8), int(ab>>8) - int(bb>>8)} {
+				sum += float64(max(d, -d))
+				n++
+			}
+		}
+	}
+	return sum / n
+}
+
+func TestReduceLooksLikeTheFullScaler(t *testing.T) {
+	// A big JPEG (YCbCr) and a big opaque NRGBA: the box pre-reduction ends
+	// at (almost) the same picture as CatmullRom on the whole source.
+	big := image.NewNRGBA(image.Rect(0, 0, 2400, 1500))
+	for y := range 1500 {
+		for x := range 2400 {
+			big.SetNRGBA(x, y, color.NRGBA{uint8(x / 10), uint8(y / 6), uint8((x + y) / 16), 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, big, &jpeg.Options{Quality: 95}); err != nil {
+		t.Fatal(err)
+	}
+	ycc, err := jpeg.Decode(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := ycc.(*image.YCbCr); !ok {
+		t.Fatalf("expected a YCbCr image, got %T", ycc)
+	}
+	for _, src := range []image.Image{ycc, big} {
+		r := reduce(src, 200)
+		if r == src {
+			t.Fatalf("%T was not reduced", src)
+		}
+		if b := r.Bounds(); b.Dx() != 400 || b.Dy() != 250 { // k = 2400 / 400 = 6
+			t.Fatalf("%T reduced to %v", src, b)
+		}
+		if d := meanDiff(t, scale(r, 200), scale(src, 200)); d > 2 {
+			t.Errorf("%T: mean difference %.2f", src, d)
+		}
+	}
+	if small := gradient(300, 200, false); reduce(small, 100) != image.Image(small) {
+		t.Error("an image under 4× the size is used as it is")
+	}
+}
+
+func TestReduceKeepsTransparency(t *testing.T) {
+	im := gradient(1000, 400, true) // left half transparent, right half opaque
+	r := reduce(im, 100).(*image.NRGBA)
+	if b := r.Bounds(); b.Dx() != 200 || b.Dy() != 80 {
+		t.Fatalf("size %v", b)
+	}
+	if a := r.NRGBAAt(10, 10).A; a != 0 {
+		t.Errorf("transparent block has alpha %d", a)
+	}
+	c := r.NRGBAAt(150, 40)
+	if c.A != 255 || c.B != 128 {
+		t.Errorf("opaque block = %+v", c)
+	}
+	edge := r.NRGBAAt(100, 40) // x 500..504: all opaque
+	if edge.A != 255 {
+		t.Errorf("edge = %+v", edge)
+	}
+	// Premultiplied RGBA averages to the same colours.
+	rgba := image.NewRGBA(im.Bounds())
+	draw.Draw(rgba, rgba.Bounds(), im, image.Point{}, draw.Src)
+	r2 := reduce(rgba, 100).(*image.NRGBA)
+	if got := r2.NRGBAAt(150, 40); got != c {
+		t.Errorf("RGBA: %+v, NRGBA: %+v", got, c)
+	}
+}
+
+func TestThumbDiskCache(t *testing.T) {
+	dir := t.TempDir()
+	p := writeImage(t, "a.png", gradient(300, 200, false))
+	th := NewThumbnailer()
+	th.SetDiskCache(dir)
+	first, err := th.Thumb(p, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, _ := filepath.Glob(filepath.Join(dir, "*"+diskExt))
+	if len(files) != 1 {
+		t.Fatalf("cache files: %v", files)
+	}
+	// A new Thumbnailer (a restart) reads it back without decoding: mark the file to prove it.
+	marked := "data:image/png;base64,TUFSSw=="
+	if err := os.WriteFile(files[0], []byte(marked), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	again := NewThumbnailer()
+	again.SetDiskCache(dir)
+	if got, err := again.Thumb(p, 100); err != nil || got != marked {
+		t.Fatalf("not read from disk: %v %.40s", err, got)
+	}
+	// Another size, or a changed file, is built anew.
+	if got, _ := again.Thumb(p, 80); got == marked || got == "" {
+		t.Error("another size must be built")
+	}
+	if err := os.Chtimes(p, time.Now().Add(time.Hour), time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	fresh := NewThumbnailer()
+	fresh.SetDiskCache(dir)
+	if got, err := fresh.Thumb(p, 100); err != nil || got == marked || got != first {
+		t.Errorf("changed file: %v (same as marked: %v)", err, got == marked)
+	}
+	// Junk in the cache is ignored and rebuilt.
+	for _, f := range mustGlob(t, filepath.Join(dir, "*"+diskExt)) {
+		_ = os.WriteFile(f, []byte("junk"), 0o644)
+	}
+	junk := NewThumbnailer()
+	junk.SetDiskCache(dir)
+	if got, err := junk.Thumb(p, 100); err != nil || got != first {
+		t.Errorf("junk not rebuilt: %v %.20s", err, got)
+	}
+}
+
+func mustGlob(t *testing.T, pattern string) []string {
+	t.Helper()
+	m, err := filepath.Glob(pattern)
+	if err != nil || len(m) == 0 {
+		t.Fatalf("glob %s: %v %v", pattern, m, err)
+	}
+	return m
+}
+
+func TestPruneDisk(t *testing.T) {
+	dir := t.TempDir()
+	th := NewThumbnailer()
+	th.SetDiskCache(dir)
+	old := filepath.Join(dir, "old"+diskExt)
+	part := filepath.Join(dir, "x"+diskExt+".part-0000")
+	keep := filepath.Join(dir, "keep"+diskExt)
+	for _, p := range []string{old, part, keep} {
+		if err := os.WriteFile(p, []byte("data:image/png;base64,"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	long := time.Now().Add(-40 * 24 * time.Hour)
+	_ = os.Chtimes(old, long, long)
+	hour := time.Now().Add(-2 * time.Hour)
+	_ = os.Chtimes(part, hour, hour)
+	th.PruneDisk()
+	for p, want := range map[string]bool{old: false, part: false, keep: true} {
+		if _, err := os.Stat(p); (err == nil) != want {
+			t.Errorf("%s exists = %v, want %v", filepath.Base(p), err == nil, want)
+		}
 	}
 }

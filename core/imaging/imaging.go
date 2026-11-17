@@ -15,6 +15,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -33,7 +34,8 @@ const (
 	MinThumbDim  = 64
 	MaxThumbDim  = 1600
 	cacheEntries = 64
-	workers      = 2
+	// Decoding a big photo holds ~50 MB, so only a few run at once.
+	maxWorkers = 4
 	// Above this many source pixels, scale with bilinear (CatmullRom is slow).
 	fastScalePixels = 40_000_000
 )
@@ -115,6 +117,8 @@ type Thumbnailer struct {
 	mu    sync.Mutex
 	lru   *list.List // of *cacheEntry, front = most recent
 	index map[string]*list.Element
+	// dir keeps built previews on disk too ("" = memory only).
+	dir string
 }
 
 type cacheEntry struct {
@@ -123,6 +127,7 @@ type cacheEntry struct {
 
 // NewThumbnailer builds a Thumbnailer.
 func NewThumbnailer() *Thumbnailer {
+	workers := min(maxWorkers, max(2, runtime.NumCPU()/2))
 	return &Thumbnailer{sem: make(chan struct{}, workers), lru: list.New(), index: map[string]*list.Element{}}
 }
 
@@ -153,6 +158,10 @@ func (t *Thumbnailer) Thumb(path string, maxDim int) (string, error) {
 	if url, ok := t.get(key); ok {
 		return url, nil
 	}
+	if url, ok := t.readDisk(key); ok {
+		t.put(key, url)
+		return url, nil
+	}
 	t.sem <- struct{}{}
 	defer func() { <-t.sem }()
 	if url, ok := t.get(key); ok { // another worker may have built it meanwhile
@@ -163,6 +172,7 @@ func (t *Thumbnailer) Thumb(path string, maxDim int) (string, error) {
 		return "", err
 	}
 	t.put(key, url)
+	t.writeDisk(key, url)
 	return url, nil
 }
 
@@ -208,7 +218,7 @@ func build(path string, maxDim int) (string, error) {
 	if err != nil {
 		return "", core.Errorf(core.CodeValidation, "Couldn't read this image")
 	}
-	dst := scale(src, maxDim)
+	dst := scale(reduce(src, maxDim), maxDim)
 	if o := Orientation(path); o > 1 {
 		dst = toNRGBA(Orient(dst, o))
 	}
