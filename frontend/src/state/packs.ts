@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import { PacksService, type PackStatus, type ToolsDirInfo } from "@/lib/api";
 import { on } from "@/lib/events";
 import { normalizePack, type PackView } from "@/views/setup/packSizes";
@@ -30,16 +31,17 @@ export const usePacks = create<PacksState>((set, get) => ({
   },
   setToolsDir: (toolsDir) => set({ toolsDir }),
   load: async () => {
-    try {
-      get().setAll(await PacksService.List());
-    } catch {
-      /* keep what we have; packs:changed will refresh */
-    }
-    try {
-      set({ toolsDir: await PacksService.ToolsDir() });
-    } catch {
-      /* unknown tools folder state: no banner */
-    }
+    // Independent calls: run together, apply each result as it lands.
+    await Promise.all([
+      PacksService.List().then(
+        (packs) => get().setAll(packs),
+        () => undefined, // keep what we have; packs:changed will refresh
+      ),
+      PacksService.ToolsDir().then(
+        (toolsDir) => set({ toolsDir }),
+        () => undefined, // unknown tools folder state: no banner
+      ),
+    ]);
   },
 }));
 
@@ -58,11 +60,12 @@ export function usePacksSync(): void {
   }, []);
 }
 
-/** Pack id an install job was submitted for (`{pack, only}` options), or "". */
-export function jobPackId(j: JobView): string {
-  if (j.moduleId !== PACK_INSTALL_MODULE) return "";
+const packIdCache = new Map<string, string>();
+const PACK_ID_CACHE_MAX = 256;
+
+function parsePackId(optionsJson: string): string {
   try {
-    const o: unknown = JSON.parse(j.optionsJson || "{}");
+    const o: unknown = JSON.parse(optionsJson || "{}");
     if (typeof o === "object" && o !== null && typeof (o as { pack?: unknown }).pack === "string") {
       return (o as { pack: string }).pack;
     }
@@ -72,27 +75,40 @@ export function jobPackId(j: JobView): string {
   return "";
 }
 
+/** Pack id an install job was submitted for (`{pack, only}` options), or "". Parsed once per options string. */
+export function jobPackId(j: JobView): string {
+  if (j.moduleId !== PACK_INSTALL_MODULE) return "";
+  const key = j.optionsJson;
+  const hit = packIdCache.get(key);
+  if (hit !== undefined) return hit;
+  const id = parsePackId(key);
+  if (packIdCache.size >= PACK_ID_CACHE_MAX) packIdCache.clear();
+  packIdCache.set(key, id);
+  return id;
+}
+
+/** The newest pack-install job per pack id (created at or after `since` ms). */
+export function latestPackJobs(byId: Record<string, JobView>, since: number): Record<string, JobView> {
+  const out: Record<string, JobView> = {};
+  for (const j of Object.values(byId)) {
+    if (j.createdAt < since) continue;
+    const id = jobPackId(j);
+    if (!id) continue;
+    const prev = out[id];
+    if (!prev || j.createdAt >= prev.createdAt) out[id] = j;
+  }
+  return out;
+}
+
 /**
  * The newest pack-install job per pack id (created at or after `since` ms).
- * Returns a stable reference while the jobs map is unchanged.
+ * Shallow-stable: the same reference until one of those jobs actually changes.
  */
 export function useLatestPackJobs(since = 0): Record<string, JobView> {
-  const byId = useJobs((s) => s.byId);
-  return useMemo(() => {
-    const out: Record<string, JobView> = {};
-    for (const j of Object.values(byId)) {
-      if (j.createdAt < since) continue;
-      const id = jobPackId(j);
-      if (!id) continue;
-      const prev = out[id];
-      if (!prev || j.createdAt >= prev.createdAt) out[id] = j;
-    }
-    return out;
-  }, [byId, since]);
+  return useJobs(useShallow((s) => latestPackJobs(s.byId, since)));
 }
 
 /** True if any pack has an active install job. */
 export function useAnyPackInstalling(): boolean {
-  const byId = useJobs((s) => s.byId);
-  return useMemo(() => Object.values(byId).some((j) => jobPackId(j) !== "" && isActive(j)), [byId]);
+  return useJobs((s) => Object.values(s.byId).some((j) => isActive(j) && jobPackId(j) !== ""));
 }

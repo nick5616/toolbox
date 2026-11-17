@@ -13,7 +13,7 @@ import { routeFilesDropped } from "@/shell/dropRouting";
 import { notifyHiddenToTray } from "@/shell/hiddenToTray";
 import { useDesktop } from "./desktop";
 import { useDeps } from "./deps";
-import { useJobs } from "./jobs";
+import { flushProgress, queueProgress, useJobs } from "./jobs";
 import { subscribeLanShare } from "./lanshare";
 import { useLibrary } from "./library";
 import { useModules } from "./modules";
@@ -31,9 +31,13 @@ export function subscribeAll(): void {
   // (tool and part windows) take drops only when `drop.window` is theirs (routeFilesDropped).
   const isMain = currentWindow().kind === "main";
   unsubscribers = [
-    on("jobs:changed", (j) => useJobs.getState().upsert(j)),
+    on("jobs:changed", (j) => {
+      // Buffered progress is older than this event: land it first so it never overwrites it.
+      flushProgress();
+      useJobs.getState().upsert(j);
+    }),
     on("jobs:removed", (p) => useJobs.getState().removeLocal(p.ids ?? [])),
-    on("jobs:progress", (p) => useJobs.getState().applyProgress(p)),
+    on("jobs:progress", queueProgress),
     on("jobs:log", (b) => useJobs.getState().appendLogs(b)),
     on("library:added", (o) => useLibrary.getState().add(o)),
     on("library:removed", (p) => useLibrary.getState().removeLocal(p.ids ?? [])),
@@ -98,6 +102,13 @@ export async function bootstrapPopup(): Promise<void> {
 export async function bootstrap(): Promise<void> {
   // Subscribe first so nothing emitted during loading is lost.
   subscribeAll();
+  // Pipelines (list, runs, catalogue) load in parallel but never gate the first render:
+  // views read `loaded` and show empty until it flips. A failure leaves `loaded` false and
+  // the pipelines tool retries on open (PipelineList).
+  usePipelines
+    .getState()
+    .load()
+    .catch((e: unknown) => console.warn("pipelines failed to load", e));
   const depsGen = useDeps.getState().gen;
   const [settings, appInfo, modules, jobs, deps, recent, clip, hotkeys] = await Promise.all([
     SettingsService.Get(),
@@ -108,7 +119,6 @@ export async function bootstrap(): Promise<void> {
     LibraryService.Recent({ moduleId: "", search: "", limit: 100, cursor: "" }),
     ClipboardService.State(),
     DesktopService.HotkeyStatus(),
-    usePipelines.getState().load(),
     loadWindows(),
   ]);
   useSettings.getState().set(settings);

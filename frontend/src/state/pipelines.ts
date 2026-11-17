@@ -151,6 +151,9 @@ export const usePipelines = create<PipelinesState>((set, get) => ({
       return { runs, selectedRunId: s.selectedRunId && ids.includes(s.selectedRunId) ? null : s.selectedRunId };
     }),
   load: async () => {
+    // The catalogue loads alongside the list; `loaded` flips as soon as the list and runs are in.
+    const catalog = get().ensureCatalog();
+    catalog.catch(() => undefined); // surfaced below; avoid an unhandled rejection if List fails first
     const [entries, runs] = await Promise.all([
       PipelinesService.List(),
       PipelinesService.Runs({ pipelineId: "", activeOnly: false, limit: 50 }),
@@ -158,7 +161,7 @@ export const usePipelines = create<PipelinesState>((set, get) => ({
     get().setEntries(entries ?? []);
     get().setRuns(runs ?? []);
     set({ loaded: true });
-    await get().ensureCatalog();
+    await catalog;
   },
   ensureCatalog: async () => {
     if (get().catalog.length > 0) return;
