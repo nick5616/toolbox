@@ -115,7 +115,7 @@ func (d *DB) ListJobs(ctx context.Context, f core.JobFilter) ([]core.Job, error)
 
 // queryJobs runs a job SELECT and populates Outputs for all results.
 func (d *DB) queryJobs(ctx context.Context, q string, args ...any) ([]core.Job, error) {
-	rows, err := d.sql.QueryContext(ctx, q, args...)
+	rows, err := d.ro.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query jobs: %w", err)
 	}
@@ -209,7 +209,7 @@ func (d *DB) AppendLogs(ctx context.Context, jobID string, lines []core.LogLine)
 }
 
 func (d *DB) Logs(ctx context.Context, jobID string) ([]core.LogLine, error) {
-	rows, err := d.sql.QueryContext(ctx, `SELECT seq, ts, stream, line FROM job_logs WHERE job_id = ? ORDER BY seq`, jobID)
+	rows, err := d.ro.QueryContext(ctx, `SELECT seq, ts, stream, line FROM job_logs WHERE job_id = ? ORDER BY seq`, jobID)
 	if err != nil {
 		return nil, fmt.Errorf("query logs: %w", err)
 	}
@@ -232,7 +232,7 @@ func (d *DB) Logs(ctx context.Context, jobID string) ([]core.LogLine, error) {
 
 func (d *DB) CountLogs(ctx context.Context, jobID string) (int, error) {
 	var n int
-	err := d.sql.QueryRowContext(ctx, `SELECT count(*) FROM job_logs WHERE job_id = ?`, jobID).Scan(&n)
+	err := d.ro.QueryRowContext(ctx, `SELECT count(*) FROM job_logs WHERE job_id = ?`, jobID).Scan(&n)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("count logs: %w", err)
 	}

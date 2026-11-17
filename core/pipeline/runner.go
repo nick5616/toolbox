@@ -38,12 +38,16 @@ const (
 
 // Config wires a Runner.
 type Config struct {
-	Store    core.PipelineStore
-	Outputs  core.OutputStore
-	Jobs     *core.Jobs
-	Reg      *core.Registry
-	Em       core.Emitter
-	Tools    func(depID string) (string, error) // dependency check at Start
+	Store   core.PipelineStore
+	Outputs core.OutputStore
+	Jobs    *core.Jobs
+	Reg     *core.Registry
+	Em      core.Emitter
+	Tools   func(depID string) (string, error) // dependency check at Start
+	// Known reads a dependency's cached status without running anything
+	// (deps.Service.Known). Optional: describing a pipeline then falls back to
+	// Tools, which can run version checks.
+	Known    func(depID string) (core.DepStatus, bool)
 	Settings func() core.Settings
 	Clock    func() time.Time // tests; nil = time.Now
 	// Location is the zone schedules are read in; nil = time.Local (tests).
@@ -60,6 +64,19 @@ type Config struct {
 	// ClipboardOn reports whether clipboard recording is on right now. The
 	// "When I copy…" trigger fires only while it is. Optional: nil = never.
 	ClipboardOn func() bool
+}
+
+// DepsChanged re-sends the pipelines list after a dependency's state changed
+// (wire it with deps.Service.OnChange): each pipeline's Check.Missing is
+// derived from the cached dependency statuses.
+func (r *Runner) DepsChanged() {
+	r.mu.Lock()
+	started := r.started
+	r.mu.Unlock()
+	if !started {
+		return
+	}
+	r.emitPipelines()
 }
 
 // builtin is a step type registered by modules/pipelines.

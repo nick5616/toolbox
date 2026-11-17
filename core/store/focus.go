@@ -25,7 +25,7 @@ type focusStore struct{ d *DB }
 var _ focus.Store = (*focusStore)(nil)
 
 func (f *focusStore) Profiles(ctx context.Context) ([]focus.Profile, error) {
-	rows, err := f.d.sql.QueryContext(ctx, `SELECT json FROM focus_profiles ORDER BY name COLLATE NOCASE, id`)
+	rows, err := f.d.ro.QueryContext(ctx, `SELECT json FROM focus_profiles ORDER BY name COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, fmt.Errorf("list focus profiles: %w", err)
 	}
@@ -94,7 +94,7 @@ func decodeSession(js string) (focus.Session, error) {
 
 func (f *focusStore) ActiveSession(ctx context.Context) (*focus.Session, error) {
 	var js string
-	err := f.d.sql.QueryRowContext(ctx,
+	err := f.d.ro.QueryRowContext(ctx,
 		`SELECT json FROM focus_sessions WHERE ended_at = 0 ORDER BY started_at DESC LIMIT 1`).Scan(&js)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -127,7 +127,7 @@ func (f *focusStore) RecentSessions(ctx context.Context, limit int) ([]focus.Ses
 	if limit <= 0 {
 		limit = 20
 	}
-	rows, err := f.d.sql.QueryContext(ctx,
+	rows, err := f.d.ro.QueryContext(ctx,
 		`SELECT json FROM focus_sessions WHERE ended_at > 0 ORDER BY started_at DESC, id DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("recent focus sessions: %w", err)
@@ -171,7 +171,7 @@ func (f *focusStore) Events(ctx context.Context, sessionID string, limit int) ([
 	if limit <= 0 {
 		limit = 500
 	}
-	rows, err := f.d.sql.QueryContext(ctx, `SELECT session_id, at, path, name, result, error FROM focus_events
+	rows, err := f.d.ro.QueryContext(ctx, `SELECT session_id, at, path, name, result, error FROM focus_events
 		WHERE session_id = ? ORDER BY at DESC, id DESC LIMIT ?`, sessionID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("focus events: %w", err)
@@ -189,7 +189,7 @@ func (f *focusStore) Events(ctx context.Context, sessionID string, limit int) ([
 }
 
 func (f *focusStore) LearnEntries(ctx context.Context, since int64) ([]focus.LearnEntry, error) {
-	rows, err := f.d.sql.QueryContext(ctx, `SELECT path, MAX(name), COUNT(*), MAX(at) FROM focus_events
+	rows, err := f.d.ro.QueryContext(ctx, `SELECT path, MAX(name), COUNT(*), MAX(at) FROM focus_events
 		WHERE session_id = '' AND result = ? AND at >= ? GROUP BY path ORDER BY MAX(at) DESC, path`,
 		focus.ResultWouldStop, since)
 	if err != nil {

@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -125,6 +126,9 @@ func run() error {
 
 	reg := core.NewRegistry()
 	depSvc := deps.New(paths.BinDir, deps.Catalog(), reg, emitter)
+	// Detection results persist (path+size+mtime keyed), so the UI knows each
+	// tool's state at once and a start only re-checks what changed.
+	depSvc.SetCacheFile(filepath.Join(paths.SupportDir, "deps-cache.json"))
 	jobs := core.NewJobs(db, db, reg, emitter, depSvc.Resolve, settings.Current, paths.TmpDir)
 	jobs.SetLineage(db)
 	go func() { // Phase 19: lineage for outputs made before it existed (cheap, idempotent)
@@ -259,16 +263,6 @@ func run() error {
 	lyricMod.SetVisuals(vizAnalyzer, vizBroker)
 	subtitlesMod.SetVisuals(vizAnalyzer, vizBroker)
 	// --- end Phase 7 ---
-	go func() { // start-up cleanup of Phase 6 caches (SPEC.md §3.9)
-		eraserMod.ClearMasks()
-		cleanupMod.PrunePreviews()
-		lyricMod.PruneCache()
-		ttsMod.PruneCache()
-		redactMod.PruneCache()
-		media.PruneCache(media.CacheDir(paths), media.CacheLimitBytes)
-		vizAnalyzer.Prune()
-		visualizerMod.PrunePreviews()
-	}()
 	// --- end Phase 6 tools ---
 
 	for _, register := range []func() error{
@@ -334,12 +328,13 @@ func run() error {
 	// --- Phase 8 Pipelines (architect) ---
 	runner := pipeline.New(pipeline.Config{
 		Store: db, Outputs: db, Jobs: jobs, Reg: reg, Em: emitter,
-		Tools: depSvc.Resolve, Settings: settings.Current,
+		Tools: depSvc.Resolve, Known: depSvc.Known, Settings: settings.Current,
 		ProtectedDirs: []string{paths.SupportDir, paths.ToolsDir},
 		TmpDir:        paths.TmpDir,
 		ClipboardOn:   func() bool { return clipHistory.Recording() },
 	})
 	defer runner.Stop()
+	depSvc.OnChange(runner.DepsChanged) // Check.Missing comes from cached statuses
 	clipHistory.OnRecorded(runner.ClipboardCopied)
 	pipeMod, err := pipelines.Register(reg, pipelines.Config{
 		Runner: runner, Chat: chatSvc, Outputs: db, Emitter: emitter, LibraryDir: libraryDir,
@@ -361,10 +356,8 @@ func run() error {
 	// fallback; every image reader goes through imaging.ToReadable.
 	heicDec := &heic.Decoder{Resolve: depSvc.Resolve, Engine: engine, CacheDir: filepath.Join(paths.CacheDir, "heic")}
 	imaging.SetHEICConverter(heicDec)
-	go heicDec.Prune()
 	// Image previews survive restarts (30 days, 1 GB).
 	imaging.SetCacheDir(filepath.Join(paths.CacheDir, "thumbs"))
-	go imaging.PruneCache()
 
 	// --- Phase 8 Part B: creator tools (architect) ---
 	projectsDir := filepath.Join(paths.SupportDir, "projects")
@@ -379,7 +372,6 @@ func run() error {
 		Store: db, ProjectsDir: projectsDir, Engine: engine, Composer: composerMod, Video: videoMod, Resolve: depSvc.Resolve,
 		LibraryDir: libraryDir,
 	})
-	go composerMod.PruneCache() // start-up cleanup of cache/composer (30 days, 2 GB)
 	for _, register := range []func() error{
 		func() error { return composer.Register(reg, composerMod) },
 		func() error { return videoeditor.Register(reg, videoMod) },
@@ -400,7 +392,6 @@ func run() error {
 	if err := editstudio.Register(reg, editMod); err != nil {
 		return err
 	}
-	go editMod.PruneCache() // start-up cleanup of cache/editstudio (30 days, 10 GB)
 	// --- end Phase 9 ---
 
 	// --- Phase 19: Paint+ (architect) ---
@@ -414,7 +405,6 @@ func run() error {
 	if err := paint.Register(reg, paintMod); err != nil {
 		return err
 	}
-	paintMod.PruneTmp() // start-up cleanup of tmp/paint (Lab crops and results)
 	// --- end Phase 19 ---
 
 	settings.OnChange(func(old, new core.Settings) {
@@ -436,7 +426,41 @@ func run() error {
 	if err := runner.Start(ctx); err != nil {
 		return err
 	}
-	go depSvc.Detect(ctx)
+	// Start-up chores wait until the window's page is running (or a few
+	// seconds), so they don't compete with WebView2 for CPU and disk: the
+	// dependency re-check (two at a time; unchanged tools reuse their cached
+	// result) in one goroutine, every cache prune one after another in another.
+	chores := make(chan struct{})
+	startChores := sync.OnceFunc(func() { close(chores) })
+	go func() {
+		select {
+		case <-chores:
+		case <-time.After(3 * time.Second):
+		case <-ctx.Done():
+			return
+		}
+		go depSvc.Refresh(ctx)
+		for _, chore := range []func(){
+			eraserMod.ClearMasks,
+			cleanupMod.PrunePreviews,
+			lyricMod.PruneCache,
+			ttsMod.PruneCache,
+			redactMod.PruneCache,
+			func() { media.PruneCache(media.CacheDir(paths), media.CacheLimitBytes) },
+			vizAnalyzer.Prune,
+			visualizerMod.PrunePreviews,
+			heicDec.Prune,
+			imaging.PruneCache,
+			composerMod.PruneCache, // cache/composer (30 days, 2 GB)
+			editMod.PruneCache,     // cache/editstudio (30 days, 10 GB)
+			paintMod.PruneTmp,      // tmp/paint (Lab crops and results)
+		} {
+			if ctx.Err() != nil {
+				return
+			}
+			chore()
+		}
+	}()
 	clipHistory.Start(ctx)
 	vaultSvc.Start(ctx)
 	if len(pendingPacks) > 0 { // a relaunch for a new tools folder: continue the install
@@ -574,6 +598,7 @@ func run() error {
 		dark := t == core.ThemeDark || (t == core.ThemeSystem && app.Env.IsDarkMode())
 		application.InvokeSync(func() { setTitleBarDark(win, dark) })
 	}
+	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) { startChores() })
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) { applyTitleBar() })
 	app.Event.OnApplicationEvent(events.Common.ThemeChanged, func(*application.ApplicationEvent) { applyTitleBar() })
 	settings.OnChange(func(old, new core.Settings) {

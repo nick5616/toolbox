@@ -85,7 +85,7 @@ func (d *DB) DeleteConversation(ctx context.Context, id string) error {
 
 // GetConversation implements core.ChatStore.
 func (d *DB) GetConversation(ctx context.Context, id string) (core.ChatConversation, error) {
-	c, err := scanConv(d.sql.QueryRowContext(ctx, `SELECT `+convCols+` FROM chat_conversations WHERE id = ?`, id))
+	c, err := scanConv(d.ro.QueryRowContext(ctx, `SELECT `+convCols+` FROM chat_conversations WHERE id = ?`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return core.ChatConversation{}, chatNotFound()
 	}
@@ -141,7 +141,7 @@ func (d *DB) ListConversations(ctx context.Context, search string, limit int, cu
 	}
 	q += ` ORDER BY updated_at DESC, id DESC LIMIT ?`
 	args = append(args, limit+1)
-	rows, err := d.sql.QueryContext(ctx, q, args...)
+	rows, err := d.ro.QueryContext(ctx, q, args...)
 	if err != nil {
 		return core.ChatPage{}, fmt.Errorf("list conversations: %w", err)
 	}
@@ -193,7 +193,7 @@ func (d *DB) UpdateMessage(ctx context.Context, id, content string, status core.
 
 // ListMessages implements core.ChatStore.
 func (d *DB) ListMessages(ctx context.Context, conversationID string) ([]core.ChatMessage, error) {
-	rows, err := d.sql.QueryContext(ctx, `SELECT `+msgCols+` FROM chat_messages WHERE conversation_id = ? ORDER BY created_at, rowid`, conversationID)
+	rows, err := d.ro.QueryContext(ctx, `SELECT `+msgCols+` FROM chat_messages WHERE conversation_id = ? ORDER BY created_at, rowid`, conversationID)
 	if err != nil {
 		return []core.ChatMessage{}, fmt.Errorf("list messages: %w", err)
 	}
@@ -215,7 +215,7 @@ func (d *DB) ListMessages(ctx context.Context, conversationID string) ([]core.Ch
 // message (by creation order) of the conversation.
 func (d *DB) DeleteMessagesFrom(ctx context.Context, conversationID, messageID string) error {
 	var at, rowid int64
-	err := d.sql.QueryRowContext(ctx, `SELECT created_at, rowid FROM chat_messages WHERE id = ? AND conversation_id = ?`,
+	err := d.ro.QueryRowContext(ctx, `SELECT created_at, rowid FROM chat_messages WHERE id = ? AND conversation_id = ?`,
 		messageID, conversationID).Scan(&at, &rowid)
 	if errors.Is(err, sql.ErrNoRows) {
 		return core.Errorf(core.CodeNotFound, "Message not found")

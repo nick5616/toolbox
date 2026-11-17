@@ -119,8 +119,16 @@ func (s *Service) missing(sp Spec) core.DepStatus {
 	}
 }
 
-// detectOne checks a single dependency (no registry-derived fields).
+// detectOne checks a single dependency (no registry-derived fields), always
+// running the version command.
 func (s *Service) detectOne(ctx context.Context, sp Spec) core.DepStatus {
+	return s.detectSpec(ctx, sp, true)
+}
+
+// detectSpec is detectOne; without force, a binary whose path, size and
+// modification time match the persisted detection result reuses it instead of
+// running its version command.
+func (s *Service) detectSpec(ctx context.Context, sp Spec, force bool) core.DepStatus {
 	st := s.missing(sp)
 	st.CheckedAt = time.Now().UnixMilli()
 	path, src := s.find(sp)
@@ -143,6 +151,12 @@ func (s *Service) detectOne(ctx context.Context, sp Spec) core.DepStatus {
 		}
 		return st
 	}
+	key := s.runKey(sp, path)
+	if !force {
+		if cached, ok := s.cachedRun(sp.ID, key); ok {
+			return cached
+		}
+	}
 	out, err := proc.Output(ctx, versionTimeout, path, sp.VersionArgs...)
 	if err != nil {
 		st.State = core.DepError
@@ -161,6 +175,7 @@ func (s *Service) detectOne(ctx context.Context, sp Spec) core.DepStatus {
 		st.State = core.DepMissing
 		st.Path, st.Source = "", core.SourceNone
 		st.Error = fmt.Sprintf("%s %s is too old (%s or newer is needed)", sp.Name, v, sp.MinVersion)
+		s.storeRun(sp.ID, key, st)
 		return st
 	}
 	st.State = core.DepOK
@@ -170,6 +185,7 @@ func (s *Service) detectOne(ctx context.Context, sp Spec) core.DepStatus {
 	if sp.PinnedVersion != "" && v != sp.PinnedVersion && !sp.AllowSystem {
 		st.State = core.DepOutdated
 	}
+	s.storeRun(sp.ID, key, st)
 	return st
 }
 

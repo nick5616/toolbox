@@ -138,7 +138,7 @@ func (d *DB) QueryLibrary(ctx context.Context, q core.LibraryQuery, libraryDir s
 // depth) to its module ID. The Library's folder tree uses it for counts.
 func (d *DB) OutputModulesUnder(ctx context.Context, dir string) (map[string]string, error) {
 	prefix := strings.TrimRight(dir, `/\`) + string(os.PathSeparator)
-	rows, err := d.sql.QueryContext(ctx, `SELECT path, module_id FROM outputs WHERE lower(substr(path, 1, ?)) = lower(?)`,
+	rows, err := d.ro.QueryContext(ctx, `SELECT path, module_id FROM outputs WHERE lower(substr(path, 1, ?)) = lower(?)`,
 		utf8.RuneCountInString(prefix), prefix)
 	if err != nil {
 		return nil, fmt.Errorf("output paths: %w", err)

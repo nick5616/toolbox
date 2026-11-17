@@ -293,3 +293,30 @@ func TestDescribeWatchFolderRules(t *testing.T) {
 		t.Fatalf("problems = %q", c.Problems)
 	}
 }
+
+// With Config.Known, Describe reads cached statuses only: it never calls
+// Tools (which can run version checks) and an undetected tool isn't missing.
+func TestDescribeUsesKnownStatuses(t *testing.T) {
+	e := describeEnv(t)
+	e.tools = func(id string) (string, error) {
+		t.Errorf("Tools(%q) called while describing", id)
+		return "", errors.New("must not run")
+	}
+	status := map[string]core.DepStatus{"ffmpeg": {ID: "ffmpeg", State: core.DepMissing}}
+	e.r.cfg.Known = func(id string) (core.DepStatus, bool) {
+		st, ok := status[id]
+		return st, ok
+	}
+	p := pl("P", step("aaaaaaa1", "needy", FromInput, fakeOpts{}))
+	if c := e.r.Describe(p); !slices.Equal(c.Missing, []string{"ffmpeg"}) {
+		t.Fatalf("missing = %v", c.Missing)
+	}
+	status["ffmpeg"] = core.DepStatus{ID: "ffmpeg", State: core.DepOK}
+	if c := e.r.Describe(p); len(c.Missing) != 0 {
+		t.Fatalf("known OK still missing: %v", c.Missing)
+	}
+	delete(status, "ffmpeg") // unknown, not missing
+	if c := e.r.Describe(p); len(c.Missing) != 0 {
+		t.Fatalf("unknown reported missing: %v", c.Missing)
+	}
+}
