@@ -34,6 +34,25 @@ export function getToolView(moduleId: string): ToolView | undefined {
   return views[moduleId];
 }
 
+let preload: (moduleId: string) => Promise<unknown> | undefined = () => undefined;
+
+/** Called once by `tools/index.ts`: starts downloading a tool view's code. */
+export function registerToolPreload(fn: (moduleId: string) => Promise<unknown> | undefined): void {
+  preload = fn;
+}
+
+/**
+ * Starts loading a tool's view code (idempotent, never throws) so opening it is
+ * instant: call it for the restored view at start-up and on hover/selection.
+ */
+export function preloadToolView(moduleId: string): void {
+  try {
+    void Promise.resolve(preload(moduleId)).catch(() => undefined);
+  } catch {
+    /* no loader: nothing to preload */
+  }
+}
+
 /** Called once by `tools/index.ts` (tests may register fakes). */
 export function registerToolActions(a: Partial<ToolActions>): void {
   actions = { ...actions, ...a };

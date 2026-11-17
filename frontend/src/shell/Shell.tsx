@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { isMac } from "@/lib/platform";
 import { Button, ClickInHost, ErrorBoundary, Gallery, IconButton, Kbd, Toaster, cx } from "@/components";
 import { HeaderPresenceContext } from "@/components/ToolHeader";
@@ -10,10 +10,7 @@ import { useModules } from "@/state/modules";
 import { useSidebarCollapsed, useUI } from "@/state/ui";
 import { shellOverlays, toolViews } from "@/tools";
 import { ComingSoonView } from "@/views/ComingSoonView";
-import { LibraryView } from "@/views/LibraryView";
-import { SetupView } from "@/views/setup/SetupView";
 import { ToolsFolderBanner } from "@/views/setup/ToolsFolderBanner";
-import { SettingsView } from "@/views/SettingsView";
 import { BatchResultsDialog } from "./BatchResultsDialog";
 import { CommandPalette } from "./CommandPalette";
 import { CompositionBar } from "./CompositionBar";
@@ -35,6 +32,19 @@ import { usePipelineNotices } from "./usePipelineNotices";
 // --- end pipelines ---
 import { useShellShortcuts } from "./useShellShortcuts";
 import styles from "./Shell.module.css";
+
+const loadLibrary = () => import("@/views/LibraryView");
+const loadSettings = () => import("@/views/SettingsView");
+const loadSetup = () => import("@/views/setup/SetupView");
+const LibraryView = lazy(() => loadLibrary().then((m) => ({ default: m.LibraryView })));
+const SettingsView = lazy(() => loadSettings().then((m) => ({ default: m.SettingsView })));
+const SetupView = lazy(() => loadSetup().then((m) => ({ default: m.SetupView })));
+
+/** Starts downloading the shell view for `view` (Library, Settings; tools preload through lib/toolActions). */
+export function preloadShellView(view: string): void {
+  if (view === "library") void loadLibrary().catch(() => undefined);
+  else if (view === "settings") void loadSettings().catch(() => undefined);
+}
 
 /** Views that are not tools (no Pop out). */
 /** Below this top bar width, Search collapses to an icon so a tool header fits. */
@@ -60,8 +70,8 @@ function ToolSlot({ view }: { view: string }) {
 }
 
 function ViewRouter({ view }: { view: string }) {
-  if (view === "library") return <LibraryView />;
-  if (view === "settings") return <SettingsView />;
+  if (view === "library") return <Suspense fallback={null}><LibraryView /></Suspense>;
+  if (view === "settings") return <Suspense fallback={null}><SettingsView /></Suspense>;
   if (view === "gallery" && import.meta.env.DEV) return <Gallery />;
   const Tool = toolViews[view];
   if (Tool) return <ToolSlot view={view} />;
@@ -143,7 +153,11 @@ export function Shell() {
         </HeaderPresenceContext.Provider>
         <JobTray />
       </div>
-      {view === "setup" ? <SetupView overlay onClose={() => useUI.getState().navigate(returnView)} /> : null}
+      {view === "setup" ? (
+        <Suspense fallback={null}>
+          <SetupView overlay onClose={() => useUI.getState().navigate(returnView)} />
+        </Suspense>
+      ) : null}
       <CommandPalette />
       <ShortcutsOverlay />
       <BatchResultsDialog />
