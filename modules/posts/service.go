@@ -13,6 +13,7 @@ import (
 	"toolbox/core"
 	"toolbox/core/imaging"
 	"toolbox/core/media"
+	"toolbox/core/par"
 	"toolbox/core/projectdocs"
 )
 
@@ -223,9 +224,10 @@ func (s *Service) SlideInfo(paths []string) ([]SlideSource, error) {
 
 // slideInfo inspects each path (kind by extension, size, duration, GPS, HEIC).
 func (m *Module) slideInfo(ctx context.Context, paths []string) ([]SlideSource, error) {
-	out := make([]SlideSource, 0, len(paths))
 	photoExt, videoExt := media.ImageExtensions(), media.VideoExtensions()
-	for _, p := range paths {
+	// Files are independent (ffprobe ≈ 0.65 s each): 6 at a time, by index.
+	return par.Map(ctx, len(paths), 6, func(ctx context.Context, i int) (SlideSource, error) {
+		p := paths[i]
 		src := SlideSource{Path: p}
 		ext := strings.ToLower(filepath.Ext(p))
 		switch {
@@ -260,9 +262,8 @@ func (m *Module) slideInfo(ctx context.Context, paths []string) ([]SlideSource, 
 		default:
 			src.Error = "Not a photo or video"
 		}
-		out = append(out, src)
-	}
-	return out, nil
+		return src, nil
+	})
 }
 
 // Limits returns the Instagram limits the checks use.

@@ -12,6 +12,7 @@ import (
 
 	"toolbox/core/imaging"
 	"toolbox/core/media"
+	"toolbox/core/par"
 )
 
 // Seams for tests.
@@ -30,12 +31,23 @@ func kindByExt(path string) string {
 // ProbeFiles describes source files in order (Edit Studio uses it). A file
 // that can't be read still gets a row, with Error set.
 func ProbeFiles(ctx context.Context, ffprobe string, paths []string) []ClipInfo {
-	out := make([]ClipInfo, 0, len(paths))
-	for _, p := range paths {
-		out = append(out, probeFile(ctx, ffprobe, p))
+	out := make([]ClipInfo, len(paths))
+	// Independent probes (ffprobe ≈ 0.65 s each on Windows): 6 at a time,
+	// results by index so the order is kept.
+	_ = par.ForEach(ctx, len(paths), probeParallel, func(ctx context.Context, i int) error {
+		out[i] = probeFile(ctx, ffprobe, paths[i])
+		return nil
+	})
+	for i := range out {
+		if out[i].Path == "" { // never started: the context was cancelled first
+			out[i] = ClipInfo{Path: paths[i], Error: "Cancelled"}
+		}
 	}
 	return out
 }
+
+// probeParallel bounds concurrent probes.
+const probeParallel = 6
 
 // probeFile describes one source file. Failures go into ClipInfo.Error.
 func probeFile(ctx context.Context, ffprobe, path string) ClipInfo {
