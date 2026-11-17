@@ -3,6 +3,7 @@ import { DepState } from "@/lib/api";
 import { isMac } from "@/lib/platform";
 import { Badge, Icon, IconButton, cx } from "@/components";
 import { startToolDrag } from "@/lib/fileDrag";
+import { preloadToolView } from "@/lib/toolActions";
 import { useDeps } from "@/state/deps";
 import { useJobs, isActive } from "@/state/jobs";
 import { useSidebarCollapsed, useUI } from "@/state/ui";
@@ -71,6 +72,8 @@ const SidebarItem = memo(function SidebarItem({ item, collapsed, active, dot, ru
       data-tip-kbd={digit ? `Mod+${digit}` : undefined}
       data-tip-side="right"
       onClick={onClick}
+      onPointerEnter={() => preloadToolView(item.id)}
+      onFocus={() => preloadToolView(item.id)}
     >
       <Icon name={item.icon} size={item.variantOf && !collapsed ? 14 : 16} />
       {collapsed && item.variantOf && <span className={styles.variantBadge} aria-hidden="true" data-testid="variant-badge" />}
