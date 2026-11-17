@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"toolbox/core"
+	"toolbox/core/par"
 )
 
 const (
@@ -94,7 +95,9 @@ func walkFolder(ctx context.Context, f *core.LibraryFolder, rel string, depth in
 				}
 				continue
 			}
-			info, err := os.Lstat(full)
+			// DirEntry.Info is an lstat (on Windows it carries the find-data
+			// attributes, reparse and hidden bits included, with no syscall).
+			info, err := e.Info()
 			if err != nil || !info.Mode().IsRegular() {
 				continue
 			}
@@ -111,9 +114,10 @@ func walkFolder(ctx context.Context, f *core.LibraryFolder, rel string, depth in
 			}
 		}
 		if depth < maxFolderDepth {
+			type child struct{ name, full, rel string }
+			var todo []child
 			for _, e := range dirs {
-				full := filepath.Join(f.Path, e.Name())
-				info, err := os.Lstat(full)
+				info, err := e.Info()
 				if err != nil {
 					continue
 				}
@@ -124,9 +128,23 @@ func walkFolder(ctx context.Context, f *core.LibraryFolder, rel string, depth in
 				if rel != "" {
 					childRel = rel + "/" + e.Name()
 				}
-				c := core.LibraryFolder{Name: e.Name(), Path: full, Children: []core.LibraryFolder{}, ModuleIDs: []string{}}
-				walkFolder(ctx, &c, childRel, depth+1, registered, subdirs)
-				f.Children = append(f.Children, c)
+				todo = append(todo, child{e.Name(), filepath.Join(f.Path, e.Name()), childRel})
+			}
+			// The top-level subtrees are independent: walk them side by side
+			// (each is a separate metadata scan), keeping their order.
+			limit := 1
+			if depth == 0 {
+				limit = 4
+			}
+			kids := make([]core.LibraryFolder, len(todo))
+			_ = par.ForEach(ctx, len(todo), limit, func(ctx context.Context, i int) error {
+				c := core.LibraryFolder{Name: todo[i].name, Path: todo[i].full, Children: []core.LibraryFolder{}, ModuleIDs: []string{}}
+				walkFolder(ctx, &c, todo[i].rel, depth+1, registered, subdirs)
+				kids[i] = c
+				return nil
+			})
+			if ctx.Err() == nil {
+				f.Children = append(f.Children, kids...)
 			}
 		}
 	}
@@ -175,7 +193,7 @@ func (s *LibraryService) listDir(ctx context.Context, rel string, limit int) (co
 	var dirs, files []core.LibraryEntry
 	for _, e := range des {
 		full := filepath.Join(dir, e.Name())
-		info, err := os.Lstat(full)
+		info, err := e.Info()
 		if err != nil {
 			continue
 		}

@@ -56,6 +56,50 @@ type doc struct {
 	Paths []string `json:"paths"`
 }
 
+// kindStore is a memStore that can answer "what kind is this?" without
+// returning the document, and counts full reads.
+type kindStore struct {
+	*memStore
+	gets int
+}
+
+func (s *kindStore) GetProject(ctx context.Context, id string) (core.StoredProject, error) {
+	s.gets++
+	return s.memStore.GetProject(ctx, id)
+}
+
+func (s *kindStore) ProjectKind(ctx context.Context, id string) (core.ProjectKind, error) {
+	p, err := s.memStore.GetProject(ctx, id) // the inner store isn't counted
+	return p.Kind, err
+}
+
+func TestSaveUsesKindReader(t *testing.T) {
+	ctx := context.Background()
+	ks := &kindStore{memStore: &memStore{m: map[string]core.StoredProject{}}}
+	d := &Docs{Store: ks, Root: t.TempDir(), Kind: core.ProjectPost}
+	info, err := d.Create(ctx, "A", doc{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, err := d.Save(ctx, info.ID, "B", doc{Paths: []string{"x"}})
+	if err != nil || saved.Name != "B" {
+		t.Fatalf("save = %+v, %v", saved, err)
+	}
+	if ks.gets != 0 {
+		t.Fatalf("Save read the stored document %d times", ks.gets)
+	}
+	if got, err := Get[doc](ctx, d, info.ID); err != nil || len(got.Paths) != 1 {
+		t.Fatalf("saved doc lost: %+v %v", got, err)
+	}
+	other := &Docs{Store: ks, Root: d.Root, Kind: core.ProjectVideo}
+	if _, err := other.Save(ctx, info.ID, "X", doc{}); !core.IsCode(err, core.CodeNotFound) {
+		t.Fatalf("wrong kind: %v", err)
+	}
+	if _, err := d.Save(ctx, "missing", "X", doc{}); !core.IsCode(err, core.CodeNotFound) {
+		t.Fatalf("missing: %v", err)
+	}
+}
+
 func TestDocs(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
