@@ -414,6 +414,14 @@ A tool may have **its own design language** when its spec says so. **Paint+ is t
   - **Lineage:** `output_inputs` (migration 0009), filled by `JobContext.Output` (default rule `core.LineageInputs`) or `JobContext.OutputFrom(path, inputs...)` in multi-input jobs. Use `OutputFrom` when a job has several inputs.
   - **Safety:** `ListDir`/`Rename`/`Trash` refuse anything outside the library and never follow links. Delete goes to the OS trash (`core/trash`).
 
+## Performance rules (2026-11-17)
+
+- **Fan-out** over independent inputs uses `core/par` (`ForEach`/`Map`, bounded, results by index, first error cancels). Bounds: probes/subprocess-light work ≈ 6, pure-Go image work `par.CPUHalf()`, FFmpeg encodes 1 (already multi-threaded). Naming (`UniquePath`), moves and `job.Output` stay in input order.
+- **Jobs a user is waiting on** set `Descriptor.Interactive` (or implement `core.InteractiveJobs` per job): they start ahead of queued batch jobs with one slot beyond the limit.
+- **Start-up stays light:** nothing slow before the window (no subprocesses, no prunes); chores go in main.go's deferred chores goroutine. Boot calls never run tool version checks (use `deps.Known`, not `Resolve`, outside jobs). Don't add eager imports of tools/workspaces to `App.tsx`, the shells or `parts/index.ts` (startup JS ≈ 0.4 MB).
+- **Store reads** use `d.ro` (read-only pool); writes and reads inside a write transaction use `d.sql`.
+- **Frontend:** thumbnails go through `lib/thumbs.ts` (bounded, visible-only); select narrowly from `useJobs` (progress ticks are batched per frame, but a selector over `byId` still re-renders on every tick).
+
 ## Polish rules (every screen)
 
 Full list in docs/specs/phase-12.md §13.1. In short:
