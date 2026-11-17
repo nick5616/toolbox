@@ -6,13 +6,16 @@ package imagebatch
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"toolbox/core"
 	"toolbox/core/media"
+	"toolbox/core/par"
 )
 
 // ModuleID is Image Batch's module ID.
@@ -85,14 +88,38 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 	if err := os.MkdirAll(job.OutputDir, 0o755); err != nil {
 		return fmt.Errorf("create output dir: %w", err)
 	}
-	res := Result{Files: []FileResult{}, Failed: []string{}}
-	var firstErr error
 	n := len(job.Inputs)
-	for i, in := range job.Inputs {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("image batch cancelled: %w", err)
+	// Pictures are processed in parallel (decode, scale, encode); naming,
+	// moving and registering happen in input order through the gate, so the
+	// result is exactly what a sequential run gives. Bounded at min(4, half
+	// the CPUs): a 24 MP decode is ~100 MB.
+	e.gate = newOrderGate(n)
+	e.saved = func(in string, fr FileResult) error {
+		if _, err := job.OutputFrom(fr.Output, in); err != nil {
+			return &fatalError{fmt.Errorf("register output: %w", err)}
 		}
-		job.Progress(float64(i)/float64(n), fmt.Sprintf("%s (%d of %d)", filepath.Base(in), i+1, n))
+		return nil
+	}
+	type slot struct {
+		fr     FileResult
+		failed string
+		ok     bool
+	}
+	slots := make([]slot, n)
+	errs := make([]error, n)
+	var (
+		progMu sync.Mutex
+		fin    int
+	)
+	report := func(msg string) {
+		progMu.Lock()
+		job.Progress(float64(fin)/float64(n), msg)
+		progMu.Unlock()
+	}
+	err = par.ForEach(ctx, n, min(4, par.CPUHalf()), func(ctx context.Context, i int) error {
+		in := job.Inputs[i]
+		defer e.gate.finish(i)
+		report(fmt.Sprintf("%s (%d of %d)", filepath.Base(in), i+1, n))
 		work := filepath.Join(job.TempDir, fmt.Sprintf("f%d", i))
 		if err := os.MkdirAll(work, 0o755); err != nil {
 			return fmt.Errorf("create work dir: %w", err)
@@ -100,25 +127,45 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 		fr, err := e.processOne(ctx, in, o, logo, job.OutputDir, work, i, n)
 		_ = os.RemoveAll(work)
 		if err != nil {
+			var fe *fatalError
+			if errors.As(err, &fe) {
+				return fe.error
+			}
 			if ctx.Err() != nil {
 				return fmt.Errorf("image batch cancelled: %w", ctx.Err())
 			}
-			if firstErr == nil {
-				firstErr = err
-			}
-			msg := core.AsAppError(err)
+			errs[i] = err
 			why := err.Error()
-			if msg != nil {
+			if msg := core.AsAppError(err); msg != nil {
 				why = msg.Message
 			}
-			res.Failed = append(res.Failed, filepath.Base(in)+": "+why)
+			slots[i].failed = filepath.Base(in) + ": " + why
 			job.Logf("%s: %v", filepath.Base(in), err)
+		} else {
+			slots[i].fr, slots[i].ok = fr, true
+		}
+		progMu.Lock()
+		fin++
+		progMu.Unlock()
+		return nil
+	})
+	if err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("image batch cancelled: %w", ctx.Err())
+		}
+		return err
+	}
+	res := Result{Files: []FileResult{}, Failed: []string{}}
+	var firstErr error
+	for i := range slots {
+		if slots[i].ok {
+			res.Files = append(res.Files, slots[i].fr)
 			continue
 		}
-		if _, err := job.OutputFrom(fr.Output, in); err != nil {
-			return fmt.Errorf("register output: %w", err)
+		res.Failed = append(res.Failed, slots[i].failed)
+		if firstErr == nil {
+			firstErr = errs[i]
 		}
-		res.Files = append(res.Files, fr)
 	}
 	if len(res.Files) == 0 {
 		return firstErr
@@ -136,6 +183,12 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 	job.Progress(1, msg)
 	return nil
 }
+
+// fatalError marks a failure that stops the whole batch (a registration
+// error), as opposed to one picture that couldn't be processed.
+type fatalError struct{ error }
+
+func (f *fatalError) Unwrap() error { return f.error }
 
 // fontOK reports whether a text watermark's font is offered.
 func fontOK(w Watermark) bool { return w.Kind != WatermarkText || media.ValidFont(w.Font) }

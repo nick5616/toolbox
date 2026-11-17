@@ -134,6 +134,29 @@ func TestThumbCache(t *testing.T) {
 	}
 }
 
+func TestThumbUncachedLeavesCachesAlone(t *testing.T) {
+	p := writeImage(t, "u.png", gradient(100, 100, false))
+	th := Default()
+	before := th.lru.Len()
+	want, err := NewThumbnailer().Thumb(p, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ThumbUncached(p, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatal("uncached thumbnail differs from the cached builder's")
+	}
+	if th.lru.Len() != before {
+		t.Fatalf("shared cache changed: %d -> %d", before, th.lru.Len())
+	}
+	if _, err := ThumbUncached(filepath.Join(t.TempDir(), "missing.png"), 64); err == nil {
+		t.Fatal("missing file must fail")
+	}
+}
+
 func TestThumbAndSizeErrors(t *testing.T) {
 	dir := t.TempDir()
 	bad := filepath.Join(dir, "bad.png")

@@ -93,6 +93,33 @@ func (d *Docs) Load(ctx context.Context, id string) (core.StoredProject, error) 
 	return p, nil
 }
 
+// KindReader is an optional capability of a ProjectStore: reading a project's
+// kind without reading its (large) document. Save uses it when present.
+type KindReader interface {
+	// ProjectKind returns an *AppError with CodeNotFound for unknown IDs.
+	ProjectKind(ctx context.Context, id string) (core.ProjectKind, error)
+}
+
+// checkKind confirms id exists and is this Docs' kind, and returns the stored
+// project when the store had to read it to find out (nil otherwise).
+func (d *Docs) checkKind(ctx context.Context, id string) (*core.StoredProject, error) {
+	if kr, ok := d.Store.(KindReader); ok {
+		k, err := kr.ProjectKind(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if k != d.Kind {
+			return nil, core.Errorf(core.CodeNotFound, "Project not found")
+		}
+		return nil, nil
+	}
+	p, err := d.Load(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
 // Get decodes a project's document into T.
 func Get[T any](ctx context.Context, d *Docs, id string) (T, error) {
 	var doc T
@@ -133,13 +160,20 @@ func (d *Docs) Create(ctx context.Context, name string, doc any) (core.ProjectIn
 
 // Save replaces an existing project's name and document.
 func (d *Docs) Save(ctx context.Context, id, name string, doc any) (core.ProjectInfo, error) {
-	p, err := d.Load(ctx, id)
+	// Only the kind is needed to validate a save (the old document is replaced
+	// whole; PutProject's upsert keeps created_at), so don't read the old doc
+	// when the store can answer cheaply.
+	loaded, err := d.checkKind(ctx, id)
 	if err != nil {
 		return core.ProjectInfo{}, err
 	}
 	data, err := encode(doc)
 	if err != nil {
 		return core.ProjectInfo{}, err
+	}
+	p := core.StoredProject{ID: id, Kind: d.Kind}
+	if loaded != nil {
+		p = *loaded
 	}
 	p.Name, p.Data, p.UpdatedAt = CleanName(name), data, core.NowMillis()
 	if err := d.Store.PutProject(ctx, p); err != nil {

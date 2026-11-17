@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"toolbox/core"
@@ -104,6 +105,31 @@ func TestLibraryQuery(t *testing.T) {
 	}
 	if p, _ := e.svc.Query(core.LibraryQuery{Folder: "Nope"}); p.Items == nil || len(p.Items) != 0 {
 		t.Fatalf("empty must be non-nil: %#v", p.Items)
+	}
+}
+
+// Top-level folders are walked in parallel but come back in directory order.
+func TestLibraryFoldersKeepOrder(t *testing.T) {
+	e := newLibEnv(t)
+	var want []string
+	for i := 0; i < 12; i++ {
+		name := fmt.Sprintf("F%02d", i)
+		want = append(want, name)
+		write(t, filepath.Join(e.lib, name, "Sub", "a.txt"), []byte("x"))
+	}
+	root, err := e.svc.Folders()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, c := range root.Children {
+		got = append(got, c.Name)
+		if len(c.Children) != 1 || c.Children[0].Rel != c.Name+"/Sub" || c.Children[0].Files != 1 {
+			t.Fatalf("%s children %+v", c.Name, c.Children)
+		}
+	}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("order %v, want %v", got, want)
 	}
 }
 
