@@ -5,6 +5,7 @@
  * with their layers.
  */
 import { useCallback, useState, type ReactNode } from "react";
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { toast } from "@/components/toast";
 import { FilesService, PaintService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -23,6 +24,8 @@ export interface OpenImages {
   openPaths(paths: string[]): Promise<string[]>;
   /** The native picker, then `openPaths`. */
   pick(): Promise<string[]>;
+  /** The Library picker (files Toolbox already made), then `openPaths`. */
+  pickLibrary(): Promise<string[]>;
   /** Render this once: the over-limit offer. */
   dialogs: ReactNode;
 }
@@ -92,5 +95,10 @@ export function useOpenImages(): OpenImages {
     </Dialog>
   ) : null;
 
-  return { openPaths, pick, dialogs };
+  const pickLibrary = useCallback(async () => {
+    const paths = await pickFromLibrary({ title: "Open a picture from Library", exts: IMAGE_PICK_EXTS, multiple: true });
+    return paths.length ? openPaths(paths) : [];
+  }, [openPaths]);
+
+  return { openPaths, pick, pickLibrary, dialogs };
 }

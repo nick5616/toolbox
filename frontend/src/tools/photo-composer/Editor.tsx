@@ -414,6 +414,7 @@ export function Editor({ project, initialDoc, postSlide, incoming, onClose, onIn
         data-tip="Add photos or text, zoom, duplicate"
         items={() => [
           { id: "photo", label: "Add photo", icon: "image", tip: "Add photos from your computer as new layers", onSelect: () => void st().pickPhotos() },
+          { id: "photo-lib", label: "Add photo from Library", icon: "history", tip: "Add photos Toolbox already made, or saved compositions, as new layers", onSelect: () => void st().pickPhotosFromLibrary() },
           { id: "text", label: "Add text", icon: "type", tip: "Add a text layer you can type into, style and move", onSelect: () => st().addText() },
           { id: "fit", label: "Zoom to fit", icon: "maximize-2", tip: "Reset the canvas zoom so the whole picture fits", onSelect: () => st().setZoom(1) },
           { id: "slots", label: slotsLine(layerList(doc)), icon: "layers", tip: "How many photos a pipeline's Fill a template step puts into this composition. Mark photo layers as Template slot in the Layer panel", disabled: true, onSelect: () => undefined },

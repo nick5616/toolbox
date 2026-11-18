@@ -2,7 +2,7 @@ import type { Command } from "@/lib/commands";
 import { useUI } from "@/state/ui";
 
 /** Actions the palette can ask the Redact view to perform. */
-export type RedactViewAction = "choose-file" | "detect" | "redact" | "add-box";
+export type RedactViewAction = "choose-file" | "choose-library" | "detect" | "redact" | "add-box";
 
 type Listener = (a: RedactViewAction) => void;
 const listeners = new Set<Listener>();
@@ -33,6 +33,17 @@ export function redactCommands(): Command[] {
       run: () => {
         useUI.getState().navigate("redact");
         setTimeout(() => emit("choose-file"), 0);
+      },
+    },
+    {
+      id: "redact.choose-library",
+      title: "Redact: choose photos or a video from Library…",
+      section: "Actions",
+      icon: "scan-face",
+      keywords: ["blur", "faces", "plates", "privacy", "censor", "pixelate", "open", "library"],
+      run: () => {
+        useUI.getState().navigate("redact");
+        setTimeout(() => emit("choose-library"), 0);
       },
     },
     { id: "redact.detect", title: "Redact: find faces and plates", section: "Actions", icon: "scan-search", enabled: inRedact, run: () => emit("detect") },

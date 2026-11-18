@@ -124,6 +124,11 @@ export default function Gallery({ openImages, onOpen, studio, onToggleStudio, co
     else if (ids.length === 0) void refresh();
   };
 
+  const openFromLibrary = async () => {
+    const ids = await openImages.pickLibrary();
+    if (ids[0]) onOpen(ids[0]);
+  };
+
   const act = async (fn: () => Promise<unknown>, fail: string) => {
     try {
       await fn();
@@ -176,6 +181,13 @@ export default function Gallery({ openImages, onOpen, studio, onToggleStudio, co
               </span>
               <span className={styles.tileName}>Open image…</span>
               <span className={styles.tileDims}>Photo, PNG, ORA</span>
+            </button>
+            <button type="button" className={styles.tile} data-tip="Open a picture Toolbox already made (the Library) to paint on" onClick={() => void openFromLibrary()}>
+              <span className={styles.shape} aria-hidden="true">
+                <PaintIcon name="history" size={28} />
+              </span>
+              <span className={styles.tileName}>From Library…</span>
+              <span className={styles.tileDims}>Made in Toolbox</span>
             </button>
           </div>
           <div className={styles.options}>

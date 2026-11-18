@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
+  pickLib: vi.fn(async (_o: unknown) => [] as string[]),
   erase: vi.fn(),
   saveMask: vi.fn(),
   deleteMask: vi.fn(async (_id: string) => undefined),
@@ -14,6 +15,11 @@ const h = vi.hoisted(() => ({
   setState: vi.fn(async (..._a: unknown[]) => undefined),
   maskImage: vi.fn(async (_id: string) => "data:image/png;base64,QUJD"),
 }));
+
+vi.mock("@/blocks/library-picker", async (orig) => {
+  const actual = await orig<typeof import("@/blocks/library-picker")>();
+  return { ...actual, pickFromLibrary: (o: unknown) => h.pickLib(o) };
+});
 
 vi.mock("./stamp", async (orig) => {
   const actual = await orig<typeof import("./stamp")>();
@@ -309,8 +315,17 @@ describe("ObjectEraserView", () => {
     useLibrary.setState({ items: [] });
   });
 
+  it("opens a photo chosen from the Library like a native pick", async () => {
+    h.pickLib.mockResolvedValueOnce(["/lib/made.png"]);
+    const user = userEvent.setup();
+    render(<ObjectEraserView moduleId="object-eraser" />);
+    await user.click(screen.getByRole("button", { name: "From Library…" }));
+    expect(h.pickLib).toHaveBeenCalledTimes(1);
+    expect(await screen.findByAltText("Photo to edit")).toBeTruthy();
+  });
+
   it("registers palette entries", () => {
     const ids = eraserCommands().map((c) => c.id);
-    expect(ids).toEqual(["eraser.choose-file", "eraser.erase", "eraser.undo", "eraser.redo", "eraser.clear"]);
+    expect(ids).toEqual(["eraser.choose-file", "eraser.choose-library", "eraser.erase", "eraser.undo", "eraser.redo", "eraser.clear"]);
   });
 });

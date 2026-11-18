@@ -8,6 +8,7 @@ export interface BackgroundPanelProps {
   onAdjust: (on: boolean) => void;
   onChange: (b: ComposerBackground) => void;
   onChoosePhoto: () => void;
+  onChoosePhotoFromLibrary?: () => void;
 }
 
 type Kind = "color" | "gradient" | "image";
@@ -15,7 +16,7 @@ type Kind = "color" | "gradient" | "image";
 const pct = (v: number): string => `${Math.round(v * 100)}`;
 
 /** The canvas background (shown when no layer is selected). */
-export function BackgroundPanel({ background: b, adjust, onAdjust, onChange, onChoosePhoto }: BackgroundPanelProps) {
+export function BackgroundPanel({ background: b, adjust, onAdjust, onChange, onChoosePhoto, onChoosePhotoFromLibrary }: BackgroundPanelProps) {
   const set = (patch: Partial<ComposerBackground>) => onChange({ ...b, ...patch });
   const hasPhoto = !!b.image?.path;
   return (
@@ -39,6 +40,13 @@ export function BackgroundPanel({ background: b, adjust, onAdjust, onChange, onC
             set({ kind });
           }}
         />
+        {!hasPhoto && onChoosePhotoFromLibrary && (
+          <Row label="Photo" tip="Use one of the files Toolbox already made as the background">
+            <Button size="sm" variant="secondary" icon="history" data-tip="Pick a background photo from files Toolbox already made (the Library)" onClick={onChoosePhotoFromLibrary}>
+              From Library…
+            </Button>
+          </Row>
+        )}
         <Row label={b.kind === "gradient" ? "From" : "Colour"} tip={b.kind === "gradient" ? "Colour at the start of the gradient" : "Background colour"}>
           <Colour label="Background colour" value={b.color} onChange={(color) => set({ color })} />
         </Row>
@@ -60,6 +68,13 @@ export function BackgroundPanel({ background: b, adjust, onAdjust, onChange, onC
               Replace…
             </Button>
           </Row>
+          {onChoosePhotoFromLibrary && (
+            <Row label="Library">
+              <Button size="sm" variant="secondary" icon="history" data-tip="Pick a background photo from files Toolbox already made (the Library)" onClick={onChoosePhotoFromLibrary}>
+                From Library…
+              </Button>
+            </Row>
+          )}
           <Row label="Adjust">
             <Switch checked={adjust} label="Adjust background" tip="Drag and scroll on the canvas to move and zoom the background photo instead of the layers" onChange={onAdjust} />
           </Row>

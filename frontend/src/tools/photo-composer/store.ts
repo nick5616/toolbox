@@ -12,6 +12,7 @@
  */
 import { useMemo } from "react";
 import { create, type StateCreator } from "zustand";
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { toast } from "@/components";
 import { applyLayout, type LayoutKind } from "@/composer/layouts";
 import { loadImage, loadImages } from "@/composer/loadImages";
@@ -124,11 +125,13 @@ export interface ComposerState {
   arrangeLayer(id: string, dir: MoveDirection): void;
   setBackground(bg: ComposerBackground): void;
   chooseBackground(): Promise<void>;
+  chooseBackgroundFromLibrary(): Promise<void>;
   setCanvas(patch: { aspect?: string; format?: "jpg" | "png" }): void;
   applyLayoutKind(kind: LayoutKind): void;
   shuffleLayout(): void;
   addPhotos(paths: string[], at?: { x: number; y: number }): Promise<void>;
   pickPhotos(): Promise<void>;
+  pickPhotosFromLibrary(): Promise<void>;
   addText(): void;
   removeBackgrounds(ids: string[]): Promise<void>;
   restoreOriginals(ids: string[]): void;
@@ -211,6 +214,11 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
     if (next === h.present) return;
     const touched = get().touched || (!opts.internal && geometryChanged(h.present, next));
     set({ history: pushHistory(h, next, opts.key ?? ""), touched });
+  };
+
+  const setBackgroundPhoto = (path: string | undefined) => {
+    if (!path) return;
+    edit((d) => ({ ...d, background: { ...d.background, kind: "image", image: { path, original: "" }, panX: 0, panY: 0, zoom: 1 } }));
   };
 
   return {
@@ -354,11 +362,17 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
     chooseBackground: async () => {
       try {
         const paths = (await FilesService.PickWith("Choose a background photo", imageExts(), false)) ?? [];
-        const path = paths[0];
-        if (!path) return;
-        edit((d) => ({ ...d, background: { ...d.background, kind: "image", image: { path, original: "" }, panX: 0, panY: 0, zoom: 1 } }));
+        setBackgroundPhoto(paths[0]);
       } catch (e) {
         toastError("Couldn't open the file picker", e);
+      }
+    },
+    chooseBackgroundFromLibrary: async () => {
+      try {
+        const paths = await pickFromLibrary({ title: "Choose a background photo from Library", exts: imageExts(), multiple: false });
+        setBackgroundPhoto(paths[0]);
+      } catch (e) {
+        toastError("Couldn't open the Library", e);
       }
     },
     setCanvas: (patch) =>
@@ -412,6 +426,16 @@ export const composerInitializer: StateCreator<ComposerState> = (set, get) => {
         } catch (e) {
           toastError(`Couldn't add ${baseName(path)}`, e);
         }
+      }
+    },
+    pickPhotosFromLibrary: async () => {
+      try {
+        const d = present(get());
+        const have = d ? layerList(d).flatMap((l) => (l.image?.ref.path ? [l.image.ref.path] : [])) : [];
+        const paths = await pickFromLibrary({ title: "Add photos from Library", exts: imageExts(), multiple: true, have });
+        if (paths.length > 0) await get().addPhotos(paths);
+      } catch (e) {
+        toastError("Couldn't open the Library", e);
       }
     },
     pickPhotos: async () => {

@@ -10,6 +10,7 @@ import ed from "./editor.module.css";
 export interface ChromeActions {
   onBack(): void;
   onImportImage(): void;
+  onImportImageFromLibrary(): void;
   onCopyImage(): void;
   onShowLibrary(): void;
   onDuplicate(): void;
@@ -118,6 +119,7 @@ export function TopLeftIsland({ actions, compact }: { actions: ChromeActions; co
     actions: [
       head("Add"),
       item("img", "Add image as layer…", actions.onImportImage, { icon: "image" }),
+      item("imglib", "Add image from Library…", actions.onImportImageFromLibrary, { icon: "history" }),
       head("Canvas"),
       item("cs", "Canvas size…", () => openDialog("canvasSize"), { icon: "canvas" }),
       item("is", "Image size…", () => openDialog("imageSize"), { icon: "size" }),

@@ -3,6 +3,7 @@
  * islands, docked or popover panels, autosave, Studio mode.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { ToolHeader } from "@/components/ToolHeader";
 import { toast } from "@/components/toast";
 import { FilesService, PaintService } from "@/lib/api";
@@ -53,6 +54,7 @@ const PANEL_ANCHOR: Record<PanelId, string> = { brushes: "brush", brushstudio: "
 
 /** How many tile images are fetched and decoded at once. */
 const TILE_DECODE_CONCURRENCY = 8;
+const IMPORT_EXTS = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".heif"];
 
 async function loadTile(url: string): Promise<ImageBitmap> {
   const blob = await (await fetch(url)).blob();
@@ -589,8 +591,12 @@ export default function Editor({ projectId, initialName, studio, onToggleStudio,
     onSelectSubject: () => runSubject("select-subject"),
     onCutSubject: () => runSubject("cut-subject"),
     onImportImage: () =>
-      void FilesService.PickWith("Add a picture as a layer", [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".heif"], true).then((p) => {
+      void FilesService.PickWith("Add a picture as a layer", IMPORT_EXTS, true).then((p) => {
         if (p && p.length) setPending((q) => [...q, ...p]);
+      }),
+    onImportImageFromLibrary: () =>
+      void pickFromLibrary({ title: "Add a picture as a layer from Library", exts: IMPORT_EXTS, multiple: true }).then((p) => {
+        if (p.length) setPending((q) => [...q, ...p]);
       }),
     onCopyImage: () => void copyImage(engine).then(() => toast({ title: "Copied the picture", tone: "success" }), (e) => toast({ title: "Couldn't copy", description: toAppError(e).message, tone: "danger" })),
     onShowLibrary: () => openLibrary({ moduleId: MODULE_ID }),

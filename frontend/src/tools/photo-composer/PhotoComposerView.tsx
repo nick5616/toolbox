@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FromLibraryButton } from "@/blocks/library-picker";
 import { Button, ClickInHost, ConfirmDialog, EmptyState, Field, Select, TextField, toast } from "@/components";
 import { ComposerService, FilesService, SettingsService, type ComposerAspect, type Composition, type ProjectInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -43,10 +44,13 @@ function NewDialog({ aspects, initialAspect, exts, onCreate, onCancel }: NewDial
   const [name, setName] = useState(DEFAULT_NAME);
   const [aspect, setAspect] = useState(initialAspect);
   const [bg, setBg] = useState("");
+  const pickLib = (paths: string[]) => {
+    if (paths[0]) setBg(paths[0]);
+  };
   const pick = async () => {
     try {
       const paths = (await FilesService.PickWith("Choose a background photo", [...exts], false)) ?? [];
-      if (paths[0]) setBg(paths[0]);
+      pickLib(paths);
     } catch (e) {
       toastError("Couldn't open the file picker", e);
     }
@@ -71,6 +75,7 @@ function NewDialog({ aspects, initialAspect, exts, onCreate, onCancel }: NewDial
             <Button size="sm" variant="secondary" icon="image" data-tip="Pick a photo to fill the canvas background" onClick={() => void pick()}>
               {bg ? "Replace…" : "Choose photo…"}
             </Button>
+            <FromLibraryButton title="Choose a background photo from Library" exts={exts} multiple={false} have={bg ? [bg] : undefined} onPick={pickLib} />
             {bg && <span className={styles.bgName} data-tip={bg}>{baseName(bg)}</span>}
             {bg && (
               <Button size="sm" variant="ghost" data-tip="Use a plain colour background instead" onClick={() => setBg("")}>

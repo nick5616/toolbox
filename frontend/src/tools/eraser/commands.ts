@@ -2,7 +2,7 @@ import type { Command } from "@/lib/commands";
 import { useUI } from "@/state/ui";
 
 /** Actions the palette can ask the Object Eraser view to perform. */
-export type EraserAction = "choose-file" | "erase" | "clear" | "undo" | "redo";
+export type EraserAction = "choose-file" | "choose-library" | "erase" | "clear" | "undo" | "redo";
 
 type Listener = (a: EraserAction) => void;
 const listeners = new Set<Listener>();
@@ -33,6 +33,17 @@ export function eraserCommands(): Command[] {
       run: () => {
         useUI.getState().navigate("object-eraser");
         setTimeout(() => emit("choose-file"), 0);
+      },
+    },
+    {
+      id: "eraser.choose-library",
+      title: "Object Eraser: choose a photo from Library…",
+      section: "Actions",
+      icon: "eraser",
+      keywords: ["remove", "object", "inpaint", "retouch", "open", "library"],
+      run: () => {
+        useUI.getState().navigate("object-eraser");
+        setTimeout(() => emit("choose-library"), 0);
       },
     },
     { id: "eraser.erase", title: "Object Eraser: erase the painted area", section: "Actions", icon: "eraser", shortcut: "Enter", enabled: inEraser, run: () => emit("erase") },
