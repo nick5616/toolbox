@@ -288,7 +288,7 @@ describe("TrimmerView", () => {
     const cmds = trimmerCommands();
     act(() => cmds.find((c) => c.id === "trimmer.set-end")?.run());
     expect(endField(1).value).toBe("0:03.000");
-    expect(cmds.map((c) => c.id)).toEqual(["trimmer.choose-file", "trimmer.set-start", "trimmer.set-end", "trimmer.add-segment", "trimmer.export"]);
+    expect(cmds.map((c) => c.id)).toEqual(["trimmer.choose-file", "trimmer.choose-library", "trimmer.set-start", "trimmer.set-end", "trimmer.add-segment", "trimmer.export"]);
   });
 
   it("ignores I/O while typing in a field", async () => {

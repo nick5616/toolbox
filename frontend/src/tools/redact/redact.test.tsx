@@ -333,6 +333,6 @@ describe("RedactView", () => {
   });
 
   it("registers palette entries", () => {
-    expect(redactCommands().map((c) => c.id)).toEqual(["redact.choose-file", "redact.detect", "redact.apply", "redact.add-box"]);
+    expect(redactCommands().map((c) => c.id)).toEqual(["redact.choose-file", "redact.choose-library", "redact.detect", "redact.apply", "redact.add-box"]);
   });
 });

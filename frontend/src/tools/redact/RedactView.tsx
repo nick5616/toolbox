@@ -245,12 +245,13 @@ export default function RedactView({ moduleId }: ToolViewProps) {
   }, []);
 
   // Palette entries.
-  const live = useRef({ pick: inputs.pick, detect, apply });
-  live.current = { pick: inputs.pick, detect, apply };
+  const live = useRef({ pick: inputs.pick, pickLibrary: inputs.pickLibrary, detect, apply });
+  live.current = { pick: inputs.pick, pickLibrary: inputs.pickLibrary, detect, apply };
   useEffect(
     () =>
       onRedactAction((a) => {
         if (a === "choose-file") void live.current.pick();
+        else if (a === "choose-library") void live.current.pickLibrary();
         else if (a === "detect") live.current.detect();
         else if (a === "redact") live.current.apply();
       }),
@@ -290,9 +291,14 @@ export default function RedactView({ moduleId }: ToolViewProps) {
           <DepsGate moduleId={moduleId} />
           <div className={styles.empty}>
             <DropZone id="redact-drop" className={styles.fullDrop} label="Drop photos or one video" hint="Blur, pixelate or black out faces and number plates." icon="scan-face">
-              <Button variant="secondary" icon="folder-open" data-tip="Pick photos, or a single video, to hide faces and plates in" onClick={() => void inputs.pick()}>
-                Choose files
-              </Button>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "center" }}>
+                <Button variant="secondary" icon="folder-open" data-tip="Pick photos, or a single video, to hide faces and plates in" onClick={() => void inputs.pick()}>
+                  Choose files
+                </Button>
+                <Button variant="secondary" icon="history" data-tip="Pick photos or a video Toolbox already made (the Library)" onClick={() => void inputs.pickLibrary()}>
+                  From Library…
+                </Button>
+              </div>
             </DropZone>
             {recent}
           </div>
@@ -382,7 +388,7 @@ export default function RedactView({ moduleId }: ToolViewProps) {
         </>
       ) : (
         <div className={styles.setup}>
-          <Section label="Files" tip="The photos or the single video that will be searched" action={<Button size="sm" variant="ghost" icon="plus" data-tip="Add more photos to this batch" onClick={() => void inputs.pick()}>Add more</Button>}>
+          <Section label="Files" tip="The photos or the single video that will be searched" action={<span style={{ display: "inline-flex", gap: "var(--space-1)" }}><Button size="sm" variant="ghost" icon="plus" data-tip="Add more photos to this batch" onClick={() => void inputs.pick()}>Add more</Button><Button size="sm" variant="ghost" icon="history" data-tip="Add more from files Toolbox already made (the Library)" onClick={() => void inputs.pickLibrary()}>From Library…</Button></span>}>
             <ul className={styles.fileList}>
               {paths.map((p) => (
                 <li key={p} className={styles.fileRow}>

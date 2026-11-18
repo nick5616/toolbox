@@ -205,6 +205,9 @@ export default function PdfView({ moduleId }: ToolViewProps) {
                   <Button size="sm" variant="secondary" icon="plus" data-tip="Choose more files to add to the list" onClick={() => void inputs.pick()}>
                     Add files…
                   </Button>
+                  <Button size="sm" variant="secondary" icon="history" data-tip="Add files Toolbox already made (the Library)" onClick={() => void inputs.pickLibrary()}>
+                    From Library…
+                  </Button>
                   <Button size="sm" variant="ghost" data-tip="Remove every file from the list; the files on disk are untouched" onClick={inputs.clear}>
                     Clear
                   </Button>
@@ -218,9 +221,14 @@ export default function PdfView({ moduleId }: ToolViewProps) {
                 id={`tool-drop:${moduleId}`}
                 label={meta.input === "image" ? "Drop images here" : "Drop PDFs here"}
               >
-                <Button size="sm" variant="secondary" icon="plus" data-tip="Open a file picker" onClick={() => void inputs.pick()}>
-                  Add files…
-                </Button>
+                <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "center" }}>
+                  <Button size="sm" variant="secondary" icon="plus" data-tip="Open a file picker" onClick={() => void inputs.pick()}>
+                    Add files…
+                  </Button>
+                  <Button size="sm" variant="secondary" icon="history" data-tip="Add files Toolbox already made (the Library)" onClick={() => void inputs.pickLibrary()}>
+                    From Library…
+                  </Button>
+                </div>
               </DropZone>
               </div>
             ) : ORDERED.has(ui.action) ? (

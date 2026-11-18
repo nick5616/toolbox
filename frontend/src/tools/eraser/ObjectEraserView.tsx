@@ -365,13 +365,14 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
 
   // ---- keys ----
 
-  const live = useRef({ erase, undo, redo, clearMask, pick: inputs.pick });
-  live.current = { erase, undo, redo, clearMask, pick: inputs.pick };
+  const live = useRef({ erase, undo, redo, clearMask, pick: inputs.pick, pickLibrary: inputs.pickLibrary });
+  live.current = { erase, undo, redo, clearMask, pick: inputs.pick, pickLibrary: inputs.pickLibrary };
   useEffect(
     () =>
       onEraserAction((a) => {
         const l = live.current;
         if (a === "choose-file") void l.pick();
+        else if (a === "choose-library") void l.pickLibrary();
         else if (a === "erase") void l.erase();
         else if (a === "undo") l.undo();
         else if (a === "redo") l.redo();
@@ -435,6 +436,19 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
         >
           Choose another
         </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="history"
+          collapsible
+          data-tip="Pick another photo from the Library; this one is closed"
+          onClick={() => {
+            inputs.clear();
+            void inputs.pickLibrary();
+          }}
+        >
+          From Library…
+        </Button>
       </span>
     </ToolHeader>
   ) : null;
@@ -446,9 +460,14 @@ export default function ObjectEraserView({ moduleId }: ToolViewProps) {
           <DepsGate moduleId={moduleId} />
           <div className={styles.empty}>
             <DropZone id="eraser-drop" className={styles.fullDrop} label="Drop a photo" hint="Paint over what you want gone, then erase it." icon="eraser">
-              <Button variant="secondary" icon="folder-open" data-tip="Pick the photo you want to remove things from" onClick={() => void inputs.pick()}>
-                Choose photo
-              </Button>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "center" }}>
+                <Button variant="secondary" icon="folder-open" data-tip="Pick the photo you want to remove things from" onClick={() => void inputs.pick()}>
+                  Choose photo
+                </Button>
+                <Button variant="secondary" icon="history" data-tip="Pick a photo Toolbox already made (the Library)" onClick={() => void inputs.pickLibrary()}>
+                  From Library…
+                </Button>
+              </div>
             </DropZone>
             <RecentResults
               moduleId={moduleId}

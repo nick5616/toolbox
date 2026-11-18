@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { FromLibraryButton } from "@/blocks/library-picker";
 import { Button, ColorSwatchPicker, Section, SegmentedControl, Select, Slider, Spinner, Stepper, Switch, TextField } from "@/components";
 import {
   BatchCorner,
@@ -35,6 +36,7 @@ import {
 } from "./options";
 import styles from "./ImageBatchView.module.css";
 
+const LOGO_EXTS = [".png", ".jpg", ".jpeg", ".webp"];
 const PREVIEW_DELAY_MS = 500;
 const MAX_ROWS = 100;
 
@@ -134,11 +136,11 @@ export default function ImageBatchView({ moduleId }: ToolViewProps) {
     setInputErrors(res.inputErrors);
   };
 
-  const pickLogo = async () => {
-    const picked = (await FilesService.PickWith("Choose a logo", [".png", ".jpg", ".jpeg", ".webp"], false)) ?? [];
+  const applyLogo = (picked: string[]) => {
     const first = picked[0];
     if (first) setMark({ logo: first });
   };
+  const pickLogo = async () => applyLogo((await FilesService.PickWith("Choose a logo", LOGO_EXTS, false)) ?? []);
 
   const { rows, failed } = useMemo(() => {
     const out: Array<BatchFileOutcome & { id: string; outputId?: string; missing?: boolean }> = [];
@@ -324,6 +326,7 @@ export default function ImageBatchView({ moduleId }: ToolViewProps) {
                   <Button size="sm" variant="secondary" icon="image" onClick={() => void pickLogo()} data-tip="Choose a PNG with a transparent background for best results">
                     {wm.logo ? "Change logo…" : "Choose logo…"}
                   </Button>
+                  <FromLibraryButton iconOnly label="Choose a logo from Library…" title="Choose a logo from Library" exts={LOGO_EXTS} multiple={false} have={wm.logo ? [wm.logo] : undefined} onPick={applyLogo} />
                   {wm.logo && <span className={styles.fileName} data-tip={wm.logo}>{basename(wm.logo)}</span>}
                 </div>
               )}

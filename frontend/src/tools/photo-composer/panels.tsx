@@ -100,6 +100,7 @@ export function BackgroundPanelView() {
         onAdjust={(on) => st().setAdjustBg(on)}
         onChange={(bg) => st().setBackground(bg)}
         onChoosePhoto={() => void st().chooseBackground()}
+        onChoosePhotoFromLibrary={() => void st().chooseBackgroundFromLibrary()}
       />
     </div>
   );

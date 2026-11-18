@@ -4,8 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   paint: {} as ReturnType<typeof import("./testing/env").paintServiceMock>,
   pickWith: vi.fn(async (): Promise<string[]> => []),
+  pickLib: vi.fn(async (_o: unknown): Promise<string[]> => []),
   imageSize: vi.fn(async () => ({ w: 100, h: 100 })),
 }));
+
+vi.mock("@/blocks/library-picker", async (orig) => {
+  const real = await orig<typeof import("@/blocks/library-picker")>();
+  return { ...real, pickFromLibrary: (o: unknown) => h.pickLib(o) };
+});
 
 vi.mock("@/lib/api", async (orig) => {
   const real = await orig<typeof import("@/lib/api")>();
@@ -37,6 +43,7 @@ beforeEach(() => {
   setViewport(1400, 800);
   h.paint = paintServiceMock();
   h.pickWith.mockReset().mockResolvedValue([]);
+  h.pickLib.mockReset().mockResolvedValue([]);
   h.imageSize.mockReset().mockResolvedValue({ w: 100, h: 100 });
 });
 
@@ -100,6 +107,18 @@ describe("Gallery", () => {
     render(<Harness onOpen={() => undefined} />);
     fireEvent.click(screen.getByRole("button", { name: /Open image/ }));
     await waitFor(() => expect(h.paint.CreateFromImage).toHaveBeenCalledWith("C:/photos/small.jpg", "small", false));
+  });
+
+  it("opens a picture chosen from the Library exactly like a native pick", async () => {
+    h.pickLib.mockResolvedValue(["C:/lib/made.png"]);
+    h.imageSize.mockResolvedValue({ w: 800, h: 600 });
+    const onOpen = vi.fn();
+    render(<Harness onOpen={onOpen} />);
+    fireEvent.click(screen.getByRole("button", { name: /From Library/ }));
+    await waitFor(() => expect(h.paint.CreateFromImage).toHaveBeenCalledWith("C:/lib/made.png", "made", false));
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith("p-img"));
+    expect(h.pickWith).not.toHaveBeenCalled();
+    expect(h.pickLib.mock.calls[0]?.[0]).toMatchObject({ multiple: true });
   });
 
   it("imports an .ora file as a project", async () => {

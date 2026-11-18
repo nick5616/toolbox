@@ -2,7 +2,7 @@ import type { Command } from "@/lib/commands";
 import { useUI } from "@/state/ui";
 
 /** Actions the palette can ask the Trimmer view to perform. */
-export type TrimmerAction = "set-start" | "set-end" | "add-segment" | "export" | "choose-file";
+export type TrimmerAction = "set-start" | "set-end" | "add-segment" | "export" | "choose-file" | "choose-library";
 
 type Listener = (a: TrimmerAction) => void;
 const listeners = new Set<Listener>();
@@ -33,6 +33,17 @@ export function trimmerCommands(): Command[] {
       run: () => {
         useUI.getState().navigate("trimmer");
         setTimeout(() => emit("choose-file"), 0);
+      },
+    },
+    {
+      id: "trimmer.choose-library",
+      title: "Trimmer: choose a file to trim from Library…",
+      section: "Actions",
+      icon: "scissors",
+      keywords: ["video", "cut", "trim", "open", "library"],
+      run: () => {
+        useUI.getState().navigate("trimmer");
+        setTimeout(() => emit("choose-library"), 0);
       },
     },
     {

@@ -248,13 +248,14 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
   };
 
   // Always call the latest closures from stable subscriptions.
-  const live = useRef({ doSetStart, doSetEnd, doAdd, doExport, pick: inputs.pick });
-  live.current = { doSetStart, doSetEnd, doAdd, doExport, pick: inputs.pick };
+  const live = useRef({ doSetStart, doSetEnd, doAdd, doExport, pick: inputs.pick, pickLibrary: inputs.pickLibrary });
+  live.current = { doSetStart, doSetEnd, doAdd, doExport, pick: inputs.pick, pickLibrary: inputs.pickLibrary };
   const hasFile = !!path;
   useEffect(() => {
     return onTrimmerAction((a: TrimmerAction) => {
       const l = live.current;
       if (a === "choose-file") void l.pick();
+      else if (a === "choose-library") void l.pickLibrary();
       else if (!hasFile) return;
       else if (a === "set-start") l.doSetStart();
       else if (a === "set-end") l.doSetEnd();
@@ -319,6 +320,19 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
         >
           Choose another
         </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="history"
+          collapsible
+          data-tip="Pick a different file to trim from the Library; this one is closed"
+          onClick={() => {
+            inputs.clear();
+            void inputs.pickLibrary();
+          }}
+        >
+          From Library…
+        </Button>
       </span>
     </ToolHeader>
   ) : null;
@@ -329,9 +343,14 @@ export default function TrimmerView({ moduleId }: ToolViewProps) {
       <section ref={embedFocus.ref} className={cx(styles.root, styles.rootEmpty)} aria-label="Video Trimmer">
         <div className={styles.empty}>
           <DropZone id="trimmer-drop" className={styles.fullDrop} label="Drop a video or audio file" hint="Cut one or more ranges, losslessly or frame-accurately." icon="scissors">
-            <Button variant="secondary" icon="folder-open" data-tip="Choose a video or audio file to trim" onClick={() => void inputs.pick()}>
-              Choose file
-            </Button>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "center" }}>
+              <Button variant="secondary" icon="folder-open" data-tip="Choose a video or audio file to trim" onClick={() => void inputs.pick()}>
+                Choose file
+              </Button>
+              <Button variant="secondary" icon="history" data-tip="Pick a video or audio file Toolbox already made (the Library)" onClick={() => void inputs.pickLibrary()}>
+                From Library…
+              </Button>
+            </div>
           </DropZone>
         </div>
       </section>
