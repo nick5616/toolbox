@@ -14,13 +14,14 @@ export interface NewPostDialogProps {
   /** Files that will become the first slides of an empty post. */
   fileCount: number;
   onPickFiles: () => void;
+  onPickLibrary: () => void;
   onCreate: (name: string, format: PostFormat, aspect: string) => void;
   /** A post whose source pool is a folder (SPEC.md §B13.4). */
   onCreateFromFolder: (name: string, format: PostFormat, aspect: string, folder: string, subfolders: boolean) => void;
   onClose: () => void;
 }
 
-export function NewPostDialog({ fileCount, onPickFiles, onCreate, onCreateFromFolder, onClose }: NewPostDialogProps) {
+export function NewPostDialog({ fileCount, onPickFiles, onPickLibrary, onCreate, onCreateFromFolder, onClose }: NewPostDialogProps) {
   const [mode, setMode] = useState<"folder" | "empty">("folder");
   const [folder, setFolder] = useState("");
   const [subfolders, setSubfolders] = useState(false);
@@ -83,6 +84,9 @@ export function NewPostDialog({ fileCount, onPickFiles, onCreate, onCreateFromFo
         <div className={styles.files}>
           <Button size="sm" variant="secondary" icon="plus" data-tip="Pick photos and clips to start the post with, one slide each" onClick={onPickFiles}>
             Add photos and clips…
+          </Button>
+          <Button size="sm" variant="secondary" icon="history" data-tip="Choose photos and clips Toolbox already made (the Library)" onClick={onPickLibrary}>
+            From Library…
           </Button>
           {fileCount > 0 && (
             <span className={styles.note}>

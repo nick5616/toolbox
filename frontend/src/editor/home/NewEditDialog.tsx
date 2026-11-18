@@ -1,5 +1,6 @@
 /** The New edit dialog (Phase 9 SPEC §14.1): name, song, shape and frame rate. */
 import { useEffect, useState } from "react";
+import { FromLibraryButton } from "@/blocks/library-picker";
 import { Button, ConfirmDialog, Field, IconButton, SegmentedControl, TextField, cx, toast } from "@/components";
 import { FilesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -50,13 +51,14 @@ export function NewEditDialog({ open, song: songIn = "", sources: sourcesIn = []
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on open only
   }, [open]);
 
+  const useSong = (p: string | undefined) => {
+    if (!p) return;
+    setSong(p);
+    if (!named) setName(baseName(p));
+  };
   const pickSong = async () => {
     try {
-      const picked = (await FilesService.PickWith("Pick a song", SONG_EXTENSIONS, false)) ?? [];
-      const p = picked[0];
-      if (!p) return;
-      setSong(p);
-      if (!named) setName(baseName(p));
+      useSong(((await FilesService.PickWith("Pick a song", SONG_EXTENSIONS, false)) ?? [])[0]);
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     }
@@ -103,6 +105,7 @@ export function NewEditDialog({ open, song: songIn = "", sources: sourcesIn = []
               <Button size="sm" icon="music" data-tip="Choose the song to cut to; an audio file or a video's sound works" onClick={() => void pickSong()}>
                 {song ? "Change song" : "Pick a song"}
               </Button>
+              <FromLibraryButton exts={SONG_EXTENSIONS} multiple={false} title="Pick a song from Library" have={song ? [song] : undefined} onPick={(p) => useSong(p[0])} />
               {song && (
                 <>
                   <span className={styles.muted} data-tip={song}>

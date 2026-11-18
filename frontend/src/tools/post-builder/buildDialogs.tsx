@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { Button, Field, SegmentedControl, Select, Switch, toast } from "@/components";
 import { FilesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -82,9 +83,11 @@ export function StitchDialog({ count, onConfirm, onClose }: StitchDialogProps) {
   const [beatCut, setBeatCut] = useState(true);
   const [transition, setTransition] = useState("fade");
 
-  const pickSong = async () => {
+  const pickSong = async (fromLibrary = false) => {
     try {
-      const picked = (await FilesService.PickWith("Choose a song", AUDIO_EXTS, false)) ?? [];
+      const picked = fromLibrary
+        ? await pickFromLibrary({ title: "Choose a song from Library", exts: AUDIO_EXTS, multiple: false, have: music ? [music] : undefined })
+        : ((await FilesService.PickWith("Choose a song", AUDIO_EXTS, false)) ?? []);
       if (picked[0]) setMusic(picked[0]);
     } catch (e) {
       toast({ tone: "danger", title: toAppError(e).message });
@@ -116,6 +119,9 @@ export function StitchDialog({ count, onConfirm, onClose }: StitchDialogProps) {
       <div className={styles.files}>
         <Button size="sm" variant="secondary" icon="music" data-tip="Choose a song to play under the video" onClick={() => void pickSong()}>
           {music ? "Change song…" : "Choose a song…"}
+        </Button>
+        <Button size="sm" variant="secondary" icon="history" data-tip="Choose a song Toolbox already made (the Library)" onClick={() => void pickSong(true)}>
+          From Library…
         </Button>
         {music ? (
           <>

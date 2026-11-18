@@ -1,4 +1,5 @@
 /** The music bed's file: its length (cached), the "Add music" picker and Remove (SPEC §5.3). */
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { EditStudioService, FilesService, type EditSong } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { toast } from "@/components";
@@ -49,6 +50,17 @@ export async function addMusic(path?: string): Promise<void> {
     if (!info || info.error || info.durationMs < MIN_BED_MS) throw new Error(info?.error || "That file is too short or can't be read as music.");
     const doc = currentDoc();
     if (doc) commit({ ...doc, song: bedFor(doc, file, info.durationMs) });
+  } catch (e) {
+    toast({ title: toAppError(e).message, tone: "danger" });
+  }
+}
+
+/** Picks a song from the Library and makes it the music bed (same path as Add music). */
+export async function addMusicFromLibrary(): Promise<void> {
+  try {
+    const have = currentDoc()?.song?.path;
+    const picked = await pickFromLibrary({ title: "Pick a song from Library", exts: SONG_EXTENSIONS, multiple: false, have: have ? [have] : undefined });
+    if (picked[0]) await addMusic(picked[0]);
   } catch (e) {
     toast({ title: toAppError(e).message, tone: "danger" });
   }

@@ -10,7 +10,7 @@ import type { NormalProject } from "@/viz/edit/defaults";
 import { useEditStudio, useMarkers, useProject } from "@/editor/store";
 import { useEditorProfile } from "../profileContext";
 import { commit, insertAtPlayhead } from "../timeline/actions";
-import { addSourcePaths, pickAndAddSources, pickFolderAndAddSources, prepare, relinkSource, watchPrepareJobs } from "./actions";
+import { addSourcePaths, pickAndAddSources, pickFolderAndAddSources, pickLibraryAndAddSources, prepare, relinkSource, watchPrepareJobs } from "./actions";
 import { startSourcesDrag, useSourceDropTarget } from "./dragSource";
 import { useSourceSelection } from "./selection";
 import { SourceTile } from "./SourceTile";
@@ -111,6 +111,7 @@ function Sources({ project }: { project: NormalProject }) {
           Add
         </Button>
         <IconButton size="sm" icon="folder-plus" label="Add a folder" data-tip={project.sources.length >= MAX_SOURCES ? `An edit can have at most ${MAX_SOURCES} sources` : "Add every photo and video in a folder at once"} onClick={() => void pickFolderAndAddSources()} disabled={project.sources.length >= MAX_SOURCES} />
+        <IconButton size="sm" icon="history" label="Add from Library" data-tip={project.sources.length >= MAX_SOURCES ? `An edit can have at most ${MAX_SOURCES} sources` : "Add photos and videos Toolbox already made (the Library)"} onClick={() => void pickLibraryAndAddSources()} disabled={project.sources.length >= MAX_SOURCES} />
       </div>
       {project.sources.length > 0 && (
         <div className={styles.filters} role="group" aria-label="Filter by tag" data-tip="Tags you gave your sources; click one to show only those sources">
@@ -130,7 +131,7 @@ function Sources({ project }: { project: NormalProject }) {
       )}
       {project.sources.length === 0 ? (
         <div data-tip="Drop video and photo files here to add them as sources">
-          <DropZone id={`tool-drop:${profile.moduleId}`} label="Drop clips and photos here" hint="Or use Add. They're prepared for the editor." />
+          <DropZone id={`tool-drop:${profile.moduleId}`} label="Drop clips and photos here" hint="Or use Add or the Library button. They're prepared for the editor." />
         </div>
       ) : (
         <div className={styles.grid} role="list" aria-label="Sources">
