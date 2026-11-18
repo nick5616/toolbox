@@ -4,6 +4,7 @@ import { basename } from "./logic";
 import { RunStatus } from "./RunStatus";
 import { useRun } from "./runs";
 import { MODULE_ID, useSubtitles } from "./store";
+import { MediaFromLibraryButton, SubtitleFromLibraryButton } from "./library";
 import styles from "./SubtitlesView.module.css";
 
 /** Source panel: the file (change it, trim it first), a subtitle file, and the tracks already inside the video. */
@@ -48,6 +49,7 @@ export function SourcePanel() {
           <Button size="sm" variant="ghost" onClick={() => void pickMedia()} disabled={busy} data-tip={busy ? "Wait for the current task to finish" : "Choose a different video or audio file"}>
             Change
           </Button>
+          <MediaFromLibraryButton iconOnly variant="ghost" disabled={busy} label="Change from Library…" />
         </div>
       )}
 
@@ -82,9 +84,11 @@ export function SourcePanel() {
             Pick the video (optional)
           </Button>
         )}
+        {!mediaPath && <MediaFromLibraryButton />}
         <Button size="sm" variant="secondary" icon="file-text" onClick={() => void pickSubtitleFile()} disabled={busy} data-tip={busy ? "Wait for the current task to finish" : "Open an .srt or .vtt file you already have, to edit it"}>
           Use a subtitle file…
         </Button>
+        <SubtitleFromLibraryButton disabled={busy} />
         {mediaPath && (
           <ToolClickIn
             host={MODULE_ID}

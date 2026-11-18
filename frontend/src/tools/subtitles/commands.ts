@@ -2,7 +2,10 @@ import { toast } from "@/components";
 import { FilesService } from "@/lib/api";
 import type { Command } from "@/lib/commands";
 import { toAppError } from "@/lib/errors";
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { useUI } from "@/state/ui";
+import { mediaExts } from "./library";
+import { SUBTITLE_EXTS } from "./store";
 
 const MODULE_ID = "subtitles";
 
@@ -46,6 +49,28 @@ export function subtitlesCommands(): Command[] {
         } catch (e) {
           toast({ title: toAppError(e).message, tone: "danger" });
         }
+      },
+    },
+    {
+      id: "subtitles.generate-library",
+      title: "Generate subtitles from a video or audio file in Library…",
+      section: "Actions",
+      icon: "history",
+      keywords: ["transcribe", "whisper", "captions", "speech", "library"],
+      run: async () => {
+        const paths = await pickFromLibrary({ title: "Choose a video or audio file from Library", exts: mediaExts(), multiple: false });
+        if (paths[0]) useUI.getState().handOff({ moduleId: MODULE_ID, inputs: [paths[0]] });
+      },
+    },
+    {
+      id: "subtitles.edit-file-library",
+      title: "Edit a subtitle file from Library…",
+      section: "Actions",
+      icon: "history",
+      keywords: ["srt", "vtt", "captions", "edit", "library"],
+      run: async () => {
+        const paths = await pickFromLibrary({ title: "Choose a subtitle file from Library", exts: SUBTITLE_EXTS, multiple: false });
+        if (paths[0]) useUI.getState().handOff({ moduleId: MODULE_ID, inputs: [paths[0]] });
       },
     },
   ];

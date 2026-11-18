@@ -8,7 +8,14 @@ const h = vi.hoisted(() => ({
   cancel: vi.fn(),
   pick: vi.fn(),
   chatReady: { value: false },
+  lib: vi.fn(),
 }));
+// "From Library…" resolves with these paths instead of opening the dialog.
+vi.mock("@/blocks/library-picker/pick", async (orig) => {
+  const actual = await orig<typeof import("@/blocks/library-picker/pick")>();
+  return { ...actual, pickFromLibrary: (...a: unknown[]) => h.lib(...a) };
+});
+
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -79,6 +86,8 @@ beforeEach(() => {
   h.cancel.mockReset();
   h.pick.mockReset();
   h.pick.mockResolvedValue([]);
+  h.lib.mockReset();
+  h.lib.mockResolvedValue([]);
   h.chatReady.value = false;
   useVisualizer.getState().reset();
   useJobs.setState({ byId: {}, logs: {}, logsLoaded: {} });
@@ -277,5 +286,30 @@ describe("Analysis stage (the former Analyze step)", () => {
     expect(await screen.findByText("The AI engine isn't installed")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Analysis options" })).toBeTruthy();
+  });
+});
+
+describe("Source from the Library", () => {
+  it("the drop zone's From Library… makes the pick the source, like a native pick", async () => {
+    h.lib.mockResolvedValue(["C:/Toolbox/Stems/vocals.flac"]);
+    render(<EmptySource />);
+    await userEvent.click(screen.getByRole("button", { name: "From Library…" }));
+    await waitFor(() => expect(useVisualizer.getState().input).toBe("C:/Toolbox/Stems/vocals.flac"));
+    expect(useVisualizer.getState().isVideo).toBe(false);
+    expect(h.lib).toHaveBeenCalledWith(expect.objectContaining({ multiple: false, exts: [".mp3", ".mp4"] }));
+    expect(h.pick).not.toHaveBeenCalled();
+  });
+
+  it("a cancelled Library pick changes nothing; a video pick is treated as a video", async () => {
+    useVisualizer.getState().setInput("C:/m/song.mp3", false);
+    render(<SourcePanel />);
+    await screen.findByText("Night Drive");
+    await userEvent.click(screen.getByRole("button", { name: "Change from Library…" }));
+    await waitFor(() => expect(h.lib).toHaveBeenCalled());
+    expect(useVisualizer.getState().input).toBe("C:/m/song.mp3");
+    h.lib.mockResolvedValue(["C:/Toolbox/Clips/clip.mp4"]);
+    await userEvent.click(screen.getByRole("button", { name: "Change from Library…" }));
+    await waitFor(() => expect(useVisualizer.getState().input).toBe("C:/Toolbox/Clips/clip.mp4"));
+    expect(useVisualizer.getState().isVideo).toBe(true);
   });
 });

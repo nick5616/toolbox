@@ -6,6 +6,7 @@ import { RunStatus } from "./RunStatus";
 import { useRun } from "./runs";
 import { useSubtitles } from "./store";
 import { defaultVisuals } from "./visuals";
+import { MediaFromLibraryButton } from "./library";
 import styles from "./SubtitlesView.module.css";
 
 /** Export panel: save .srt/.vtt files, add a subtitle track to a copy of the video, or burn the text into the picture. */
@@ -87,9 +88,12 @@ export function ExportPanel() {
       <Section label="Add as a track" tip="Put the subtitles inside a copy of the video as a track the player can switch on or off">
         <div className={styles.form}>
           {needVideo ? (
-            <Button variant="secondary" icon="film" onClick={() => void pickMedia()} data-tip="A track needs a video to ride with; choose one">
-              Pick the video
-            </Button>
+            <div className={styles.buttonRow}>
+              <Button variant="secondary" icon="film" onClick={() => void pickMedia()} data-tip="A track needs a video to ride with; choose one">
+                Pick the video
+              </Button>
+              <MediaFromLibraryButton />
+            </div>
           ) : (
             <>
               <label className={styles.field}>
@@ -121,6 +125,7 @@ export function ExportPanel() {
               <Button variant="secondary" icon="film" onClick={() => void pickMedia()} data-tip="Choose the video or audio file to draw the subtitles on">
                 Pick the video
               </Button>
+              <MediaFromLibraryButton />
             </>
           ) : (
             <Button

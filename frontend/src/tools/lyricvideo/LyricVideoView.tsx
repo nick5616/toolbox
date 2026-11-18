@@ -17,7 +17,8 @@ import { useIsEmbedded, useToolHandoff } from "@/lib/embed";
 import { useCompositionInputs } from "@/state/composition";
 import { DepsGate } from "@/tools/_kit";
 import type { ToolViewProps } from "@/tools";
-import { useChooseSong } from "./actions";
+import { FromLibraryButton } from "@/blocks/library-picker";
+import { useChooseSong, adoptSong, useSongExts } from "./actions";
 import { useEngineRequirement } from "./engine";
 import type { Row } from "./logic";
 import { DEFAULT_PREFS, sanitizePrefs } from "./options";
@@ -94,6 +95,7 @@ function useSessionPersistence(): void {
 
 function EmptySong({ moduleId }: { moduleId: string }) {
   const choose = useChooseSong();
+  const exts = useSongExts();
   return (
     <div className={styles.sourceEmpty}>
       <DropZone id="tool-drop:lyric-video" icon="mic-vocal" label="Drop a song" hint="Turn a song and its lyrics into a video with the words on screen.">
@@ -101,6 +103,7 @@ function EmptySong({ moduleId }: { moduleId: string }) {
           <Button icon="plus" onClick={() => void choose()} data-tip="Pick an audio file from your computer">
             Choose a song…
           </Button>
+          <FromLibraryButton title="Choose a song from Library" exts={exts} multiple={false} onPick={adoptSong} tip="Use a song Toolbox already made (the Library)" />
         </div>
       </DropZone>
       <DepsGate moduleId={moduleId} />

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { FromLibraryButton } from "@/blocks/library-picker";
 import { Button, ColorSwatchPicker, IconButton, Section, SegmentedControl, Select, cx, toast, useClickIn } from "@/components";
 import { VisualsCanvas, VisualsPicker } from "@/components/viz";
 import { parseShow } from "@/components/viz/pickerModel";
@@ -136,11 +137,13 @@ export function StylePanel() {
   const sampleText = rows[activeCueIndex(rows, playheadMs)]?.text || SAMPLE;
   const fontOptions = Array.from(new Set([prefs.font, ...fonts])).map((f) => ({ value: f, label: f }));
 
+  const applyImage = (paths: string[]) => {
+    const first = paths[0];
+    if (first) patchPrefs({ backgroundPath: first });
+  };
   const pickImage = async () => {
     try {
-      const paths = (await FilesService.PickWith("Choose a background image", IMAGE_EXTS, false)) ?? [];
-      const first = paths[0];
-      if (first) patchPrefs({ backgroundPath: first });
+      applyImage((await FilesService.PickWith("Choose a background image", IMAGE_EXTS, false)) ?? []);
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     }
@@ -227,6 +230,7 @@ export function StylePanel() {
                 <Button variant="secondary" icon="image" data-tip="Pick a picture to use as the background" onClick={() => void pickImage()}>
                   {prefs.backgroundPath ? "Change the image" : "Choose an image"}
                 </Button>
+                <FromLibraryButton title="Choose a background image from Library" label="Image from Library…" exts={IMAGE_EXTS} multiple={false} have={prefs.backgroundPath ? [prefs.backgroundPath] : undefined} onPick={applyImage} />
                 {prefs.backgroundPath && (
                   <span className={styles.muted} data-tip={prefs.backgroundPath}>
                     {basename(prefs.backgroundPath)}

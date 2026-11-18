@@ -24,7 +24,14 @@ const svc = vi.hoisted(() => ({
   Settings: vi.fn(),
   SetSettings: vi.fn(),
 }));
-const files = vi.hoisted(() => ({ picked: [] as string[] }));
+const files = vi.hoisted(() => ({ picked: [] as string[], lib: [] as string[] }));
+const libPick = vi.hoisted(() => vi.fn());
+
+// "From Library…" resolves with these paths instead of opening the dialog.
+vi.mock("@/blocks/library-picker/pick", async (orig) => {
+  const actual = await orig<typeof import("@/blocks/library-picker/pick")>();
+  return { ...actual, pickFromLibrary: (...a: unknown[]) => libPick(...a) };
+});
 
 vi.mock("@/lib/events", () => ({
   on: (name: string, cb: (d: unknown) => void) => {
@@ -99,6 +106,9 @@ const view = (props: Partial<{ moduleId: string }> = {}) => render(<LanShareView
 beforeEach(() => {
   handlers.map = {};
   files.picked = [];
+  files.lib = [];
+  libPick.mockReset();
+  libPick.mockImplementation(async () => files.lib);
   for (const f of Object.values(svc)) f.mockReset();
   svc.Hold.mockResolvedValue(undefined);
   svc.Release.mockResolvedValue(undefined);
@@ -258,6 +268,17 @@ describe("LanShareView", () => {
     const dialog = await screen.findByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: /Pixel/ }));
     expect(svc.Send).toHaveBeenCalledWith({ fingerprint: "n", paths: ["/p.png"], text: "", pin: "" });
+  });
+
+  it("Add files from Library… queues the pick (any file type), then sends it", async () => {
+    files.lib = ["/lib/Videos/a.mp4", "/lib/Docs/b.pdf"];
+    useLanShare.setState({ devices: [dev({ fingerprint: "n", alias: "Pixel" })] });
+    view();
+    await userEvent.click(screen.getByRole("button", { name: "Add files from Library…" }));
+    await waitFor(() => expect(screen.getByTestId("queue").textContent).toContain("2 files ready"));
+    expect(libPick).toHaveBeenCalledWith(expect.objectContaining({ exts: null }));
+    await userEvent.click(within(screen.getByTestId("device-n")).getByRole("button", { name: /Send…/ }));
+    expect(svc.Send).toHaveBeenCalledWith({ fingerprint: "n", paths: ["/lib/Videos/a.mp4", "/lib/Docs/b.pdf"], text: "", pin: "" });
   });
 
   it("asks for the PIN inline when the receiver wants one, then resends with it", async () => {

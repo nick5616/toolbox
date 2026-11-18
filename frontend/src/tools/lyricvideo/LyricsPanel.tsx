@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import { Banner, Button, ConfirmDialog, SegmentedControl, Select, TextArea, toast } from "@/components";
+import { FromLibraryButton } from "@/blocks/library-picker";
 import { FilesService, LyricAction, LyricSource, TranscribeService, type Language } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { DepsGate } from "@/tools/_kit";
@@ -54,10 +55,12 @@ export default function LyricsPanel() {
   const fileOk = source !== "file" || lyricsPath !== "";
   const canGet = textOk && fileOk && !gen.busy && !gate.blocked;
 
+  const applyLyricsFile = (paths: string[]) => {
+    if (paths[0]) st().setLyricsPath(paths[0]);
+  };
   const onPickFile = async () => {
     try {
-      const paths = (await FilesService.PickWith("Choose a lyrics file", LYRIC_EXTS, false)) ?? [];
-      if (paths[0]) st().setLyricsPath(paths[0]);
+      applyLyricsFile((await FilesService.PickWith("Choose a lyrics file", LYRIC_EXTS, false)) ?? []);
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     }
@@ -103,6 +106,7 @@ export default function LyricsPanel() {
             <Button variant="secondary" icon="file-text" onClick={() => void onPickFile()} data-tip="Pick a lyrics file: .lrc, .srt, .vtt or .txt">
               Choose a .lrc, .srt, .vtt or .txt…
             </Button>
+            <FromLibraryButton iconOnly title="Choose a lyrics file from Library" label="Lyrics file from Library…" exts={LYRIC_EXTS} multiple={false} onPick={applyLyricsFile} tip="Use a lyrics file Toolbox already made, such as a transcript (the Library)" />
             <span className={styles.muted}>{lyricsPath ? basenameOf(lyricsPath) : "No file chosen"}</span>
           </div>
         )}

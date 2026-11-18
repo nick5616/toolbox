@@ -2,6 +2,8 @@ import { toast } from "@/components";
 import { FilesService } from "@/lib/api";
 import type { Command } from "@/lib/commands";
 import { toAppError } from "@/lib/errors";
+import { pickFromLibrary } from "@/blocks/library-picker";
+import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
 import { useVisualizer } from "./store";
 
@@ -39,6 +41,18 @@ export function visualizerCommands(): Command[] {
         } catch (e) {
           toast({ title: toAppError(e).message, tone: "danger" });
         }
+      },
+    },
+    {
+      id: "visualizer.analyze-library",
+      title: "Visualizer: analyze a song from Library…",
+      section: "Actions",
+      icon: "history",
+      keywords: ["listen", "beats", "sections", "library"],
+      run: async () => {
+        const exts = useModules.getState().byId[MODULE_ID]?.accepts.extensions;
+        const paths = await pickFromLibrary({ title: "Choose a song or video from Library", exts: exts && exts.length > 0 ? exts : null, multiple: false });
+        if (paths[0]) useUI.getState().handOff({ moduleId: MODULE_ID, inputs: [paths[0]] });
       },
     },
     {

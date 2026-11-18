@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge, Banner, Button, Section, SegmentedControl, Select, Switch, TextArea, toast, useClickIn } from "@/components";
 import { FilesService, PackComponentState, PacksService, TranscribeService, VisualizerService, type Language } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
+import { FromLibraryButton } from "@/blocks/library-picker";
 import { usePacks } from "@/state/packs";
 import { DepsGate, useDepsGate } from "@/tools/_kit";
 import { basename, hasWords, languageName, LYRIC_EXTS, neededModels, optionsIssue, SEED_LABEL, wordsChoiceOf, wordsSourceOf, type WordsChoice } from "./source/logic";
@@ -160,14 +161,19 @@ export default function AnalysisPanel() {
     if (!chatReady && o.deepRead) set({ deepRead: false });
   }, [chatReady, o.deepRead, set]);
 
+  const applyLyricsFile = useCallback(
+    (paths: string[]) => {
+      if (paths[0]) set({ lyricsPath: paths[0] });
+    },
+    [set],
+  );
   const pickLyrics = useCallback(async () => {
     try {
-      const paths = (await FilesService.PickWith("Choose a lyrics file", LYRIC_EXTS, false)) ?? [];
-      if (paths[0]) set({ lyricsPath: paths[0] });
+      applyLyricsFile((await FilesService.PickWith("Choose a lyrics file", LYRIC_EXTS, false)) ?? []);
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     }
-  }, [set]);
+  }, [applyLyricsFile]);
 
   const choice = wordsChoiceOf(o.words);
   const words = hasWords(o);
@@ -196,6 +202,7 @@ export default function AnalysisPanel() {
               <Button size="sm" variant="secondary" icon="file-text" onClick={() => void pickLyrics()} data-tip="Pick a lyrics file: .lrc, .srt, .vtt or .txt">
                 {o.lyricsPath ? "Change file…" : "Choose a lyrics file…"}
               </Button>
+              <FromLibraryButton size="sm" iconOnly title="Choose a lyrics file from Library" label="Lyrics file from Library…" exts={LYRIC_EXTS} multiple={false} onPick={applyLyricsFile} tip="Use a lyrics file Toolbox already made, such as a transcript (the Library)" />
               <span className={styles.hint} data-tip={o.lyricsPath || "Accepted lyrics file types"}>
                 {o.lyricsPath ? basename(o.lyricsPath) : ".lrc, .srt, .vtt or .txt"}
               </span>
