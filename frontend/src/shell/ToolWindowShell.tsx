@@ -1,3 +1,4 @@
+import { LibraryPickerHost } from "@/blocks/library-picker";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { HeaderPresenceContext } from "@/components/ToolHeader";
 import { Button, ClickInHost, HeaderSlotProvider, ErrorBoundary, Icon, Toaster, toast } from "@/components";
@@ -153,6 +154,7 @@ export function ToolWindowShell({ view }: ToolWindowShellProps) {
       <JobTray />
       <DropOverlay />
       <Toaster />
+      <LibraryPickerHost />
       <TooltipLayer />
     </div>
   );

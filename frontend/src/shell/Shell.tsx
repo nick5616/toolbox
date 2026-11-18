@@ -1,3 +1,4 @@
+import { LibraryPickerHost } from "@/blocks/library-picker";
 import { lazy, Suspense, useCallback, useState } from "react";
 import { isMac } from "@/lib/platform";
 import { Button, ClickInHost, ErrorBoundary, Gallery, IconButton, Kbd, Toaster, cx } from "@/components";
@@ -168,6 +169,7 @@ export function Shell() {
         ))}
       </Suspense>
       <Toaster />
+      <LibraryPickerHost />
     </div>
   );
 }

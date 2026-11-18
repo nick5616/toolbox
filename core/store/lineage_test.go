@@ -124,6 +124,15 @@ func TestQueryLibrary(t *testing.T) {
 	if p := page(core.LibraryQuery{Kinds: []core.OutputKind{core.KindImage}}); len(p.Items) != 4 {
 		t.Fatalf("kinds: %d", len(p.Items))
 	}
+	if p := page(core.LibraryQuery{Exts: []string{"DAT", ".png"}}); len(p.Items) != 7 {
+		t.Fatalf("exts: %d", len(p.Items))
+	}
+	if p := page(core.LibraryQuery{Exts: []string{".png", "jpg"}}); len(p.Items) != 0 {
+		t.Fatalf("exts none: %d", len(p.Items))
+	}
+	if p := page(core.LibraryQuery{Exts: []string{"_at"}}); len(p.Items) != 0 {
+		t.Fatalf("exts escape: %d", len(p.Items))
+	}
 	if p := page(core.LibraryQuery{Search: "FILE3"}); len(p.Items) != 1 {
 		t.Fatalf("search: %d", len(p.Items))
 	}

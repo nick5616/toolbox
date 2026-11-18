@@ -4,7 +4,7 @@ import { FilesService, type ProjectInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { CAROUSEL_ASPECTS, FORMAT_LABELS, FORMAT_TIPS, defaultPostName, type PostFormat } from "./logic";
 import { folderBaseName } from "./pool";
-import { Modal } from "./Modal";
+import { Modal } from "@/components";
 import { ProjectThumb } from "./ProjectThumb";
 import styles from "./dialogs.module.css";
 

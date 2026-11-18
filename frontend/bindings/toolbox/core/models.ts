@@ -909,6 +909,11 @@ export interface LibraryQuery {
     "kinds": OutputKind[] | null;
 
     /**
+     * file extensions, with or without the dot, any case; empty = every extension
+     */
+    "exts": string[] | null;
+
+    /**
      * Unix ms, 0 = no bound
      */
     "since": number;

@@ -56,7 +56,7 @@ export function buildQuery(f: LibraryFilters, folder = "", limit = 100, now = Da
             : f.type === "document"
               ? [OutputKind.KindDocument]
               : [OutputKind.KindOther];
-  return { moduleId: f.moduleId, search: f.search, kinds, since, until: 0, sort: f.sort, folder, limit, cursor: "" };
+  return { moduleId: f.moduleId, search: f.search, kinds, exts: [], since, until: 0, sort: f.sort, folder, limit, cursor: "" };
 }
 
 export function isNotImplemented(e: unknown): boolean {

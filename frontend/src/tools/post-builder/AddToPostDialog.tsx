@@ -5,7 +5,7 @@ import { PostsService, type ProjectInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { useUI } from "@/state/ui";
 import { PostChoice } from "./dialogs";
-import { Modal } from "./Modal";
+import { Modal } from "@/components";
 import { NEW_POST, useAddToPost } from "./store";
 
 export interface AddToPostDialogProps {

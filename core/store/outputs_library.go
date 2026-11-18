@@ -69,6 +69,14 @@ func (d *DB) QueryLibrary(ctx context.Context, q core.LibraryQuery, libraryDir s
 		}
 		where = append(where, "kind IN ("+strings.Join(ph, ",")+")")
 	}
+	if exts := normExts(q.Exts); len(exts) > 0 {
+		ors := make([]string, len(exts))
+		for i, e := range exts {
+			ors[i] = `lower(path) LIKE ? ESCAPE '\'`
+			args = append(args, "%"+escapeLike(e))
+		}
+		where = append(where, "("+strings.Join(ors, " OR ")+")")
+	}
 	if q.Since > 0 {
 		where = append(where, "created_at >= ?")
 		args = append(args, q.Since)
@@ -183,4 +191,29 @@ func (d *DB) OutputsByPaths(ctx context.Context, paths []string) ([]core.Output,
 		res = append(res, outs...)
 	}
 	return res, nil
+}
+
+// normExts lowercases extensions and gives each one its dot, dropping blanks
+// and duplicates (at most 64).
+func normExts(in []string) []string {
+	out := make([]string, 0, len(in))
+	seen := make(map[string]bool, len(in))
+	for _, e := range in {
+		e = strings.ToLower(strings.TrimSpace(e))
+		if e == "" || e == "." {
+			continue
+		}
+		if !strings.HasPrefix(e, ".") {
+			e = "." + e
+		}
+		if seen[e] {
+			continue
+		}
+		seen[e] = true
+		out = append(out, e)
+		if len(out) == 64 {
+			break
+		}
+	}
+	return out
 }

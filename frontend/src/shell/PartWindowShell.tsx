@@ -1,3 +1,4 @@
+import { LibraryPickerHost } from "@/blocks/library-picker";
 import { Suspense, useEffect, useState } from "react";
 import { Banner, Button, EmptyState, ErrorBoundary, Icon, Toaster, toast } from "@/components";
 import { TooltipLayer } from "@/components/TooltipLayer";
@@ -125,6 +126,7 @@ export function PartWindowShell({ part }: PartWindowShellProps) {
       </header>
       <main className={styles.view}>{body}</main>
       <Toaster />
+      <LibraryPickerHost />
       <TooltipLayer />
     </div>
   );

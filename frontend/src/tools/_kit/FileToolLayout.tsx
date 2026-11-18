@@ -65,7 +65,15 @@ export function FileToolLayout({
   const embed = useEmbed();
   const embedded = embed !== null;
   // Mod+O (the shell's "tool.addFiles" convention): add files to this tool. Not when embedded (the host owns its shortcuts).
-  useCommands(embedded ? [] : [{ id: "tool.addFiles", title: "Add files…", section: "Actions", shortcut: "Mod+O", run: () => void inputs.pick() }], [embedded]);
+  useCommands(
+    embedded
+      ? []
+      : [
+          { id: "tool.addFiles", title: "Add files…", section: "Actions", shortcut: "Mod+O", run: () => void inputs.pick() },
+          { id: "tool.addFromLibrary", title: "Add from Library…", section: "Actions", run: () => void inputs.pickLibrary() },
+        ],
+    [embedded],
+  );
   const session = useSessionJobIds();
   // Embedded: only the jobs this embed session submitted are "Active" here.
   const active = jobs.filter((j) => isActive(j) && (!session || session.has(j.id)));
@@ -118,6 +126,9 @@ export function FileToolLayout({
               <Button size="sm" variant="secondary" icon="plus" data-tip="Choose more files to process together" onClick={() => void inputs.pick()}>
                 Add files…
               </Button>
+              <Button size="sm" variant="secondary" icon="history" data-tip="Choose files Toolbox already made (the Library)" onClick={() => void inputs.pickLibrary()}>
+                From Library…
+              </Button>
               <Button size="sm" variant="ghost" data-tip="Remove every file from the list; the files on disk are untouched" onClick={inputs.clear}>
                 Clear
               </Button>
@@ -131,12 +142,18 @@ export function FileToolLayout({
             <Button size="sm" variant="secondary" icon="plus" data-tip="Choose files to process" onClick={() => void inputs.pick()}>
               Add files…
             </Button>
+            <Button size="sm" variant="secondary" icon="history" data-tip="Choose files Toolbox already made (the Library)" onClick={() => void inputs.pickLibrary()}>
+              From Library…
+            </Button>
           </p>
         ) : empty ? (
           <div data-tip="Drag files here from your file manager, or use Add files">
             <DropZone id={`tool-drop:${moduleId}`} className={styles.drop} label="Drop files here">
               <Button size="sm" variant="secondary" icon="plus" data-tip="Open a file picker" onClick={() => void inputs.pick()}>
                 Add files…
+              </Button>
+              <Button size="sm" variant="secondary" icon="history" data-tip="Choose files Toolbox already made (the Library)" onClick={() => void inputs.pickLibrary()}>
+                From Library…
               </Button>
             </DropZone>
           </div>

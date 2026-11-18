@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
-import { Button } from "@/components";
+import { Button } from "./Button";
 import styles from "./Modal.module.css";
 
 export interface ModalProps {

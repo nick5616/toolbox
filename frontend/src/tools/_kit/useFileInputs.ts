@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { toast } from "@/components";
 import { FilesService, type FileInfo } from "@/lib/api";
 import { useEmbed, useToolHandoff } from "@/lib/embed";
@@ -18,6 +19,8 @@ export interface FileInputs {
   clear: () => void;
   /** Opens the native picker for this module and adds the result. */
   pick: () => Promise<void>;
+  /** Opens the Library picker (files Toolbox made that this module accepts) and adds the result. */
+  pickLibrary: () => Promise<void>;
 }
 
 /** Manages a file tool's inputs, including handoffs (drop/paste/Send to). */
@@ -82,8 +85,18 @@ export function useFileInputs(moduleId: string): FileInputs {
     }
   }, [moduleId, add]);
 
+  const pickLibrary = useCallback(async () => {
+    const mod = useModules.getState().byId[moduleId];
+    const paths = await pickFromLibrary({
+      exts: mod?.accepts.extensions ?? null,
+      multiple: (mod?.maxInputs ?? 0) !== 1,
+      have: latest().map((f) => f.path),
+    });
+    if (paths.length > 0) await add(paths);
+  }, [moduleId, add, latest]);
+
   // Dropped/pasted/Send to files; embedded, the embed's own handoff.
   useToolHandoff(moduleId, (h) => void add(h.inputs));
 
-  return { files, add, remove, clear, pick };
+  return { files, add, remove, clear, pick, pickLibrary };
 }

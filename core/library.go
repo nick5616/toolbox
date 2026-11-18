@@ -19,6 +19,7 @@ type LibraryQuery struct {
 	ModuleID string       `json:"moduleId"` // "" = every tool
 	Search   string       `json:"search"`   // name contains, case-insensitive
 	Kinds    []OutputKind `json:"kinds"`    // empty = every kind
+	Exts     []string     `json:"exts"`     // file extensions, with or without the dot, any case; empty = every extension
 	Since    int64        `json:"since"`    // Unix ms, 0 = no bound
 	Until    int64        `json:"until"`    // Unix ms, 0 = no bound
 	Sort     LibrarySort  `json:"sort"`     // "" = newest

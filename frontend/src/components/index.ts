@@ -42,3 +42,4 @@ export { TemplateField, type TemplateFieldProps, type TemplateVar } from "./Temp
 export { ClickIn, ClickInHost, useClickIn, type ClickInHostProps, type ClickInProps } from "./ClickIn";
 export { ToolClickIn, ToolEmbed, toolDrawerId, toolUnavailableReason, type ToolClickInProps, type ToolEmbedProps } from "./ToolClickIn";
 export { HeaderSlotProvider, ToolHeader, type ToolHeaderProps } from "./ToolHeader";
+export { Modal, type ModalProps } from "./Modal";

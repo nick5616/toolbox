@@ -3,7 +3,7 @@ import { Button, Field, SegmentedControl, Select, Switch, toast } from "@/compon
 import { FilesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import type { SlideBuild } from "@/state/ui";
-import { Modal } from "./Modal";
+import { Modal } from "@/components";
 import { AUDIO_EXTS, fileName } from "./pool";
 import styles from "./dialogs.module.css";
 

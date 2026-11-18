@@ -5,6 +5,7 @@ import type { LibraryQuery, Output, ProjectInfo } from "@/lib/api";
 const h = vi.hoisted(() => ({
   query: vi.fn(),
   exportComp: vi.fn(),
+  listComps: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async (orig) => {
@@ -12,7 +13,7 @@ vi.mock("@/lib/api", async (orig) => {
   return {
     ...actual,
     LibraryService: { Query: (q: LibraryQuery) => h.query(q) },
-    ComposerService: { Export: (id: string) => h.exportComp(id), LoadImage: async () => "" },
+    ComposerService: { Export: (id: string) => h.exportComp(id), List: () => h.listComps(), LoadImage: async () => "" },
     FilesService: { ImageThumb: async () => "" },
     MediaService: { Frame: async () => "" },
   };
@@ -20,7 +21,11 @@ vi.mock("@/lib/api", async (orig) => {
 
 import { clearSourceCaches } from "@/blocks/sources/sourceThumbs";
 import { clearLibraryPickerCache, LibraryPickerDialog } from "./LibraryPickerDialog";
-import { MEDIA_EXTS } from "./SourcesPanel";
+import { LibraryPickerHost } from "./LibraryPickerHost";
+import { normExts } from "./options";
+import { pickFromLibrary } from "./pick";
+
+const MEDIA_EXTS = [".jpg", ".jpeg", ".png", ".mp4", ".mov"];
 
 const out = (id: string, path: string, moduleId: string, kind = "image"): Output => ({
   id,
@@ -48,6 +53,7 @@ beforeEach(() => {
   clearLibraryPickerCache();
   clearSourceCaches();
   h.query.mockImplementation(async (q: LibraryQuery) => ({ items: OUTPUTS.filter((o) => !q.moduleId || o.moduleId === q.moduleId), nextCursor: "" }));
+  h.listComps.mockResolvedValue([]);
   h.exportComp.mockImplementation(async (id: string) => out("x", `C:/lib/Compositions/${id}.png`, "photo-composer"));
 });
 
@@ -60,7 +66,8 @@ describe("LibraryPickerDialog", () => {
   it("lists Library pictures and videos the pool accepts, filters by tool, and adds files plus exported compositions", async () => {
     const onAdd = vi.fn();
     const onClose = vi.fn();
-    render(<LibraryPickerDialog exts={MEDIA_EXTS} have={new Set(["c:\\lib\\compositions\\c.png"])} compositions={[comp("k1", "Collage")]} onAdd={onAdd} onClose={onClose} />);
+    h.listComps.mockResolvedValue([comp("k1", "Collage")]);
+    render(<LibraryPickerDialog exts={MEDIA_EXTS} have={["C:/lib/Compositions/c.png"]} onAdd={onAdd} onClose={onClose} />);
 
     await screen.findByRole("button", { name: /a\.jpg/ });
     expect(screen.getByRole("button", { name: /b\.mp4/ })).toBeTruthy();
@@ -73,14 +80,14 @@ describe("LibraryPickerDialog", () => {
     await waitFor(() => expect([...tool.options].map((o) => o.value)).toEqual(expect.arrayContaining(["", "compress", "scenes", "photo-composer"])));
     expect([...tool.options].map((o) => o.value)).not.toContain("gif");
     fireEvent.change(tool, { target: { value: "scenes" } });
-    await waitFor(() => expect(h.query).toHaveBeenLastCalledWith(expect.objectContaining({ moduleId: "scenes" })));
+    await waitFor(() => expect(h.query).toHaveBeenLastCalledWith(expect.objectContaining({ moduleId: "scenes", exts: MEDIA_EXTS })));
     await waitFor(() => expect(screen.queryByRole("button", { name: /a\.jpg/ })).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: /b\.mp4/ }));
 
     // A pick survives switching tabs; a composition is exported into the Library first.
     fireEvent.click(screen.getByRole("radio", { name: "Compositions" }));
-    fireEvent.click(screen.getByRole("button", { name: /Collage/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Add 2 to sources" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Collage/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add 2" }));
 
     await waitFor(() => expect(onAdd).toHaveBeenCalledWith(["C:/lib/Scenes/b.mp4", "C:/lib/Compositions/k1.png"]));
     expect(h.exportComp).toHaveBeenCalledWith("k1");
@@ -88,7 +95,7 @@ describe("LibraryPickerDialog", () => {
   });
 
   it("shows the last listing at once when it opens again, then lists again", async () => {
-    const props = { exts: MEDIA_EXTS, have: new Set<string>(), compositions: [], onAdd: vi.fn(), onClose: vi.fn() };
+    const props = { exts: MEDIA_EXTS, onAdd: vi.fn(), onClose: vi.fn() };
     const first = render(<LibraryPickerDialog {...props} />);
     await screen.findByRole("button", { name: /a\.jpg/ });
     first.unmount();
@@ -106,5 +113,42 @@ describe("LibraryPickerDialog", () => {
     expect(h.query).toHaveBeenCalled();
     release();
     await waitFor(() => expect(screen.queryByRole("button", { name: /a\.jpg/ })).toBeNull());
+  });
+
+  it("picks one file: a tile replaces the pick, double-click uses it, and no compositions for non-pictures", async () => {
+    const onAdd = vi.fn();
+    const onClose = vi.fn();
+    render(<LibraryPickerDialog exts={["MP4"]} multiple={false} onAdd={onAdd} onClose={onClose} />);
+    await waitFor(() => expect(h.query).toHaveBeenCalledWith(expect.objectContaining({ exts: [".mp4"] })));
+    expect(screen.getByRole("dialog", { name: "Choose from Library" })).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: "Compositions" })).toBeNull();
+    expect(h.listComps).not.toHaveBeenCalled();
+    fireEvent.doubleClick(await screen.findByRole("button", { name: /b\.mp4/ }));
+    await waitFor(() => expect(onAdd).toHaveBeenCalledWith(["C:/lib/Scenes/b.mp4"]));
+    expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("pickFromLibrary", () => {
+  it("shows the request in the host and resolves with the pick, or [] when cancelled", async () => {
+    render(<LibraryPickerHost />);
+    const picked = pickFromLibrary({ exts: MEDIA_EXTS });
+    fireEvent.click(await screen.findByRole("button", { name: /a\.jpg/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add 1" }));
+    await expect(picked).resolves.toEqual(["C:/lib/Compress/a.jpg"]);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const cancelled = pickFromLibrary({ exts: MEDIA_EXTS, multiple: false });
+    fireEvent.click(await screen.findByRole("button", { name: /^Cancel/ }));
+    await expect(cancelled).resolves.toEqual([]);
+  });
+
+  it("resolves [] at once without a host", async () => {
+    await expect(pickFromLibrary({})).resolves.toEqual([]);
+  });
+
+  it("normalises extensions", () => {
+    expect(normExts([" JPG", ".png", "jpg", "", "."])).toEqual([".jpg", ".png"]);
+    expect(normExts(null)).toEqual([]);
   });
 });

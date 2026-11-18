@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Icon, SegmentedControl, Select, Spinner, TextField, cx, toast } from "@/components";
-import { ComposerService, LibraryService, LibrarySort, OutputKind, type Output, type ProjectInfo } from "@/lib/api";
+import { Button, Icon, Modal, SegmentedControl, Select, Spinner, TextField, cx, toast } from "@/components";
+import { ComposerService, FilesService, LibraryService, LibrarySort, OutputKind, type Output, type ProjectInfo } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { useModules } from "@/state/modules";
 import { cachedSourceThumb, loadSourceThumb } from "@/blocks/sources/sourceThumbs";
-import { Modal } from "./Modal";
-import { ProjectThumb } from "./ProjectThumb";
+import { libraryKey, normExts, offersCompositions, type LibraryPickOptions } from "./options";
 import styles from "./LibraryPickerDialog.module.css";
 
-// Sources → From Library…: pictures and videos Toolbox already made (Library
-// outputs of any tool) and saved Photo Composer compositions, added to the
-// post's pool as extras. A composition is exported into Library › Compositions
-// first, so the source is a real file the user can find again.
+// From Library…: files Toolbox already made (Library outputs of any tool) and,
+// for pictures, saved Photo Composer compositions. A composition is exported
+// into Library › Compositions first, so the pick is a real file the user can
+// find again. Shared by every tool that takes files (blocks/library-picker).
 
 const PAGE = 200;
 /** The same size as the Sources grid's tiles, so both share one cache. */
@@ -21,12 +20,7 @@ const THUMB_DIM = 256;
 const HIDDEN_TOOL_NAMES: Record<string, string> = { "lan-receive": "Local File Transfer" };
 type Tab = "library" | "compositions";
 
-export interface LibraryPickerDialogProps {
-  /** Extensions the pool accepts (lowercase, with the dot). */
-  exts: readonly string[];
-  /** Paths already in the pool (shown as added). */
-  have: ReadonlySet<string>;
-  compositions: ProjectInfo[];
+export interface LibraryPickerDialogProps extends LibraryPickOptions {
   onAdd: (paths: string[]) => void;
   onClose: () => void;
 }
@@ -37,20 +31,17 @@ const extOf = (p: string) => {
 };
 
 /**
- * The last listing shown, per (search, tool), and the tool list: opening the
- * dialog again shows them at once while they are listed again.
+ * The last listing shown, per (extensions, search, tool), and the tool lists:
+ * opening the dialog again shows them at once while they are listed again.
  */
 const lastPages = new Map<string, { items: Output[]; next: string }>();
-let lastTools: string[] = [];
+const lastTools = new Map<string, string[]>();
 
 /** Forgets the remembered listings (tests). */
 export function clearLibraryPickerCache(): void {
   lastPages.clear();
-  lastTools = [];
+  lastTools.clear();
 }
-
-/** The key a path is compared by (Windows paths are case-insensitive). */
-export const poolKey = (p: string) => p.replace(/\//g, "\\").toLowerCase();
 
 function useSeen(ref: React.RefObject<Element | null>): boolean {
   const [seen, setSeen] = useState(() => typeof IntersectionObserver === "undefined");
@@ -72,13 +63,21 @@ function useSeen(ref: React.RefObject<Element | null>): boolean {
   return seen;
 }
 
+const KIND_ICON: Record<string, string> = {
+  [OutputKind.KindAudio]: "music",
+  [OutputKind.KindVideo]: "film",
+  [OutputKind.KindImage]: "image",
+  [OutputKind.KindDocument]: "file-text",
+};
+
 function OutputThumb({ output }: { output: Output }) {
   const ref = useRef<HTMLSpanElement>(null);
   const seen = useSeen(ref);
+  const pictured = output.kind === OutputKind.KindVideo || output.kind === OutputKind.KindImage;
   const kind = output.kind === OutputKind.KindVideo ? "clip" : "photo";
-  const [url, setUrl] = useState(() => cachedSourceThumb(output.path, kind, THUMB_DIM));
+  const [url, setUrl] = useState(() => (pictured ? cachedSourceThumb(output.path, kind, THUMB_DIM) : ""));
   useEffect(() => {
-    if (!seen || output.missing || cachedSourceThumb(output.path, kind, THUMB_DIM)) return;
+    if (!pictured || !seen || output.missing || cachedSourceThumb(output.path, kind, THUMB_DIM)) return;
     let off = false;
     loadSourceThumb(output.path, kind, THUMB_DIM).then(
       (u) => !off && setUrl(u),
@@ -87,27 +86,63 @@ function OutputThumb({ output }: { output: Output }) {
     return () => {
       off = true;
     };
-  }, [seen, output.path, output.missing, kind]);
+  }, [pictured, seen, output.path, output.missing, kind]);
   return (
     <span ref={ref} className={styles.thumb}>
-      {url ? <img src={url} alt="" draggable={false} /> : <Icon name={kind === "clip" ? "film" : "image"} size={20} />}
+      {url ? <img src={url} alt="" draggable={false} /> : <Icon name={KIND_ICON[output.kind] ?? "file"} size={20} />}
     </span>
   );
 }
 
-export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }: LibraryPickerDialogProps) {
+function CompositionThumb({ project }: { project: ProjectInfo }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const seen = useSeen(ref);
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    if (!seen || !project.thumb) return;
+    let off = false;
+    FilesService.ImageThumb(project.thumb, THUMB_DIM).then(
+      (u) => !off && setUrl(u),
+      () => undefined,
+    );
+    return () => {
+      off = true;
+    };
+  }, [seen, project.thumb, project.updatedAt]);
+  return (
+    <span ref={ref} className={styles.thumb}>
+      {url ? <img src={url} alt="" draggable={false} /> : <Icon name="layers" size={20} />}
+    </span>
+  );
+}
+
+const toggle = (set: ReadonlySet<string>, key: string, multiple: boolean): Set<string> => {
+  if (!multiple) return set.has(key) ? new Set() : new Set([key]);
+  const n = new Set(set);
+  if (n.has(key)) n.delete(key);
+  else n.add(key);
+  return n;
+};
+
+export function LibraryPickerDialog({ title, exts: rawExts, multiple = true, have: rawHave, compositions: wantComps, confirmLabel, onAdd, onClose }: LibraryPickerDialogProps) {
+  const exts = useMemo(() => normExts(rawExts), [rawExts]);
+  const extsKey = exts.join(",");
+  const have = useMemo(() => new Set([...(rawHave ?? [])].map(libraryKey)), [rawHave]);
+  const showComps = offersCompositions(exts, wantComps);
+
   const [tab, setTab] = useState<Tab>("library");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
-  const [items, setItems] = useState<Output[]>(() => lastPages.get("|")?.items ?? []);
-  const [next, setNext] = useState(() => lastPages.get("|")?.next ?? "");
+  const [items, setItems] = useState<Output[]>(() => lastPages.get(`${extsKey}||`)?.items ?? []);
+  const [next, setNext] = useState(() => lastPages.get(`${extsKey}||`)?.next ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [files, setFiles] = useState<ReadonlySet<string>>(new Set());
   const [comps, setComps] = useState<ReadonlySet<string>>(new Set());
+  const [compositions, setCompositions] = useState<ProjectInfo[]>([]);
   const [busy, setBusy] = useState(false);
   const [tool, setTool] = useState("");
-  const [tools, setTools] = useState<string[]>(lastTools);
+  const [tools, setTools] = useState<string[]>(() => lastTools.get(extsKey) ?? []);
   const modules = useModules((s) => s.byId);
 
   // Search as you type, a moment after the last key.
@@ -116,44 +151,50 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
     return () => clearTimeout(t);
   }, [search]);
 
-  // The tools that made pictures or videos, for the tool filter (from the newest 500).
+  // Saved compositions (pictures only).
+  useEffect(() => {
+    if (!showComps) return;
+    let off = false;
+    ComposerService.List().then(
+      (list) => !off && setCompositions(list ?? []),
+      () => undefined,
+    );
+    return () => {
+      off = true;
+    };
+  }, [showComps]);
+
+  // The tools that made matching files, for the tool filter (from the newest 500).
   useEffect(() => {
     let off = false;
-    LibraryService.Query({ moduleId: "", search: "", kinds: [OutputKind.KindImage, OutputKind.KindVideo], since: 0, until: 0, sort: LibrarySort.SortNewest, folder: "", limit: 500, cursor: "" }).then(
+    LibraryService.Query({ moduleId: "", search: "", kinds: [], exts, since: 0, until: 0, sort: LibrarySort.SortNewest, folder: "", limit: 500, cursor: "" }).then(
       (page) => {
         if (off) return;
-        const ids = new Set((page.items ?? []).filter((o) => !o.missing && exts.includes(extOf(o.path))).map((o) => o.moduleId));
-        lastTools = [...ids].filter((id) => id !== "");
-        setTools(lastTools);
+        const ids = new Set((page.items ?? []).filter((o) => !o.missing && (exts.length === 0 || exts.includes(extOf(o.path)))).map((o) => o.moduleId));
+        const list = [...ids].filter((id) => id !== "");
+        lastTools.set(extsKey, list);
+        setTools(list);
       },
       () => undefined,
     );
     return () => {
       off = true;
     };
-  }, [exts]);
+    // exts is memoised on extsKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extsKey]);
 
   const fetchPage = async (cursor: string): Promise<{ items: Output[]; next: string }> => {
-    const page = await LibraryService.Query({
-      moduleId: tool,
-      search: query,
-      kinds: [OutputKind.KindImage, OutputKind.KindVideo],
-      since: 0,
-      until: 0,
-      sort: LibrarySort.SortNewest,
-      folder: "",
-      limit: PAGE,
-      cursor,
-    });
+    const page = await LibraryService.Query({ moduleId: tool, search: query, kinds: [], exts, since: 0, until: 0, sort: LibrarySort.SortNewest, folder: "", limit: PAGE, cursor });
     return {
-      items: (page.items ?? []).filter((o) => !o.missing && exts.includes(extOf(o.path))),
+      items: (page.items ?? []).filter((o) => !o.missing && (exts.length === 0 || exts.includes(extOf(o.path)))),
       next: page.nextCursor,
     };
   };
 
   useEffect(() => {
     let off = false;
-    const key = `${query}|${tool}`;
+    const key = `${extsKey}|${query}|${tool}`;
     const shown = lastPages.get(key);
     if (shown) {
       setItems(shown.items);
@@ -187,7 +228,7 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
     };
     // fetchPage only reads query, tool and exts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, tool]);
+  }, [query, tool, extsKey]);
 
   const more = async () => {
     setLoading(true);
@@ -207,21 +248,14 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
     return q ? compositions.filter((c) => c.name.toLowerCase().includes(q)) : compositions;
   }, [compositions, query]);
 
-  const toggle = (set: ReadonlySet<string>, key: string): Set<string> => {
-    const n = new Set(set);
-    if (n.has(key)) n.delete(key);
-    else n.add(key);
-    return n;
-  };
-
   const count = files.size + comps.size;
 
-  const confirm = async () => {
-    if (count === 0 || busy) return;
+  const confirm = async (pickedFiles: ReadonlySet<string> = files, pickedComps: ReadonlySet<string> = comps) => {
+    if (pickedFiles.size + pickedComps.size === 0 || busy) return;
     setBusy(true);
-    const paths = [...files];
+    const paths = [...pickedFiles];
     let failed = 0;
-    for (const c of compositions.filter((p) => comps.has(p.id))) {
+    for (const c of compositions.filter((p) => pickedComps.has(p.id))) {
       try {
         const out = await ComposerService.Export(c.id);
         paths.push(out.path);
@@ -240,37 +274,36 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
     if (failed === 0 || paths.length > 0) onClose();
   };
 
+  // Picking one file: choosing a tile replaces the pick (files and compositions alike).
+  const pickFile = (path: string) => {
+    if (!multiple) setComps(new Set());
+    setFiles((s) => toggle(s, path, multiple));
+  };
+  const pickComp = (id: string) => {
+    if (!multiple) setFiles(new Set());
+    setComps((s) => toggle(s, id, multiple));
+  };
+
   const toolName = (id: string) => modules[id]?.name ?? HIDDEN_TOOL_NAMES[id] ?? id;
   const toolOptions = [{ value: "", label: "Every tool" }, ...tools.map((id) => ({ value: id, label: toolName(id) })).sort((a, b) => a.label.localeCompare(b.label))];
+  const label = busy ? "Adding…" : (confirmLabel ?? (multiple ? (count > 0 ? `Add ${count}` : "Add") : "Use"));
+  const pictures = exts.length > 0 && exts.every((e) => PICTURE_EXTS.has(e));
 
   return (
-    <Modal
-      title="Add from Library"
-      confirmLabel={busy ? "Adding…" : count > 0 ? `Add ${count} to sources` : "Add to sources"}
-      confirmDisabled={count === 0 || busy}
-      onConfirm={() => void confirm()}
-      onClose={onClose}
-      wide
-    >
+    <Modal title={title ?? (multiple ? "Add from Library" : "Choose from Library")} confirmLabel={label} confirmDisabled={count === 0 || busy} onConfirm={() => void confirm()} onClose={onClose} wide>
       <div className={styles.bar}>
-        <SegmentedControl
-          size="sm"
-          value={tab}
-          onChange={setTab}
-          aria-label="Show"
-          options={[
-            {
-              value: "library",
-              label: "Made in Toolbox",
-              tip: "Pictures and videos any tool saved to the Library",
-            },
-            {
-              value: "compositions",
-              label: "Compositions",
-              tip: "Your saved Photo Composer compositions",
-            },
-          ]}
-        />
+        {showComps && (
+          <SegmentedControl
+            size="sm"
+            value={tab}
+            onChange={setTab}
+            aria-label="Show"
+            options={[
+              { value: "library", label: "Made in Toolbox", tip: "Files any tool saved to the Library" },
+              { value: "compositions", label: "Compositions", tip: "Your saved Photo Composer compositions" },
+            ]}
+          />
+        )}
         <TextField
           size="sm"
           icon="search"
@@ -292,12 +325,12 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
               {error}
             </p>
           ) : items.length === 0 && !loading ? (
-            <p className={styles.note}>{query || tool ? "Nothing matches." : "No pictures or videos in the Library yet."}</p>
+            <p className={styles.note}>{query || tool ? "Nothing matches." : `No ${pictures ? "pictures" : "files this tool can use"} in the Library yet.`}</p>
           ) : (
             <>
-              <ul className={styles.grid} aria-label="Library pictures and videos">
+              <ul className={styles.grid} aria-label="Library files">
                 {items.map((o) => {
-                  const added = have.has(poolKey(o.path));
+                  const added = have.has(libraryKey(o.path));
                   const on = files.has(o.path);
                   return (
                     <li key={o.id}>
@@ -307,12 +340,13 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
                         aria-pressed={on}
                         disabled={added}
                         title={o.path}
-                        data-tip={added ? "Already in this post's sources" : `Made with ${toolName(o.moduleId)}`}
-                        onClick={() => setFiles((s) => toggle(s, o.path))}
+                        data-tip={added ? "Already added" : `Made with ${toolName(o.moduleId)}${multiple ? "" : " (double-click to use it)"}`}
+                        onClick={() => pickFile(o.path)}
+                        onDoubleClick={() => !multiple && void confirm(new Set([o.path]), new Set())}
                       >
                         <OutputThumb output={o} />
                         <span className={styles.name}>{o.name}</span>
-                        <span className={styles.sub}>{added ? "In sources" : toolName(o.moduleId)}</span>
+                        <span className={styles.sub}>{added ? "Added" : toolName(o.moduleId)}</span>
                         {on && (
                           <span className={styles.check}>
                             <Icon name="check" size={12} />
@@ -324,7 +358,7 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
                 })}
               </ul>
               {next && (
-                <Button size="sm" variant="ghost" disabled={loading} onClick={() => void more()} data-tip="List older pictures and videos">
+                <Button size="sm" variant="ghost" disabled={loading} onClick={() => void more()} data-tip="List older files">
                   Show more
                 </Button>
               )}
@@ -344,10 +378,11 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
                       type="button"
                       className={cx(styles.card, on && styles.on)}
                       aria-pressed={on}
-                      data-tip="Add this composition's picture to the sources"
-                      onClick={() => setComps((s) => toggle(s, p.id))}
+                      data-tip={multiple ? "Add this composition's picture" : "Use this composition's picture (double-click to use it)"}
+                      onClick={() => pickComp(p.id)}
+                      onDoubleClick={() => !multiple && void confirm(new Set(), new Set([p.id]))}
                     >
-                      <ProjectThumb project={p} className={styles.thumb} />
+                      <CompositionThumb project={p} />
                       <span className={styles.name}>{p.name}</span>
                       <span className={styles.sub}>Composition</span>
                       {on && (
@@ -366,3 +401,5 @@ export function LibraryPickerDialog({ exts, have, compositions, onAdd, onClose }
     </Modal>
   );
 }
+
+const PICTURE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".heif"]);
