@@ -8,6 +8,7 @@ import { MediaCtx } from "./host";
 import { useRows } from "./hooks";
 import { MAX_MARKERS, activeCueIndex } from "./logic";
 import { MODULE_ID, useSubtitles } from "./store";
+import { MediaFromLibraryButton } from "./library";
 import styles from "./SubtitlesView.module.css";
 
 /** A replica reports time at most this often (every report is a relay message). */
@@ -107,9 +108,12 @@ export function SubtitlesPreview() {
         title="No video to preview against"
         body="You can edit without one. Pick the video to see the subtitles on the picture."
         action={
-          <Button icon="film" onClick={() => void pickMedia()} data-tip="Choose the video to preview the subtitles against">
-            Pick the video…
-          </Button>
+          <div className={styles.buttonRow}>
+            <Button icon="film" onClick={() => void pickMedia()} data-tip="Choose the video to preview the subtitles against">
+              Pick the video…
+            </Button>
+            <MediaFromLibraryButton />
+          </div>
         }
       />
     );

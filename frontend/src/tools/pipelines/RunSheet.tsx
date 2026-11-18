@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from "react";
 import { Banner, Button, DropZone, Icon, IconButton, TextArea, TextField, cx } from "@/components";
+import { FromLibraryButton } from "@/blocks/library-picker";
 import { FilesService, PipelinesService, type PipelineParam } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { describeAccepts } from "@/pipelines/compat";
@@ -67,10 +68,13 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
   const noFiles = startsWithoutFiles(entry);
   const canStart = ready && !busy && (noFiles || accepted.length > 0) && !tooMany && !missingSecret && !badParam;
 
+  const addPicked = (picked: string[] | null | undefined) => {
+    if (picked && picked.length > 0) setInputs(mergeInputs(inputs, picked));
+  };
+
   const choose = async () => {
     try {
-      const picked = await FilesService.PickWith(`Run ${name}`, accepts.extensions ?? [], true);
-      if (picked && picked.length > 0) setInputs(mergeInputs(inputs, picked));
+      addPicked(await FilesService.PickWith(`Run ${name}`, accepts.extensions ?? [], true));
     } catch (e) {
       const err = toAppError(e);
       setError({ message: err.message, hint: err.hint ?? "" });
@@ -135,9 +139,12 @@ export function RunSheet({ pipelineId }: RunSheetProps) {
           hint={accepts.urls ? "or paste links below" : undefined}
           className={styles.drop}
         >
-          <Button size="sm" icon="folder-open" data-tip="Pick the files to run this pipeline on" onClick={() => void choose()}>
-            Choose files
-          </Button>
+          <div className={styles.dropButtons}>
+            <Button size="sm" icon="folder-open" data-tip="Pick the files to run this pipeline on" onClick={() => void choose()}>
+              Choose files
+            </Button>
+            <FromLibraryButton title={`Choose files to run ${name} on, from Library`} exts={accepts.extensions ?? []} have={inputs} onPick={addPicked} />
+          </div>
         </DropZone>
         )}
 

@@ -26,6 +26,7 @@ import {
   type VisualizerStepOptions,
   type VisualsSpec,
 } from "@/lib/api";
+import { FromLibraryButton } from "@/blocks/library-picker";
 import { toAppError } from "@/lib/errors";
 import { PRESETS } from "@/viz/presets";
 import { presetShowJson } from "../visualizerDesigns";
@@ -359,6 +360,7 @@ function SubtitlesEditor({ value, onChange }: StepEditorProps<SubtitlesStepOptio
                 >
                   {value.backgroundPath ? "Change…" : "Choose an image…"}
                 </Button>
+                <FromLibraryButton iconOnly size="sm" title="Choose a background image from Library" label="Image from Library…" exts={IMAGE_EXTS} multiple={false} have={value.backgroundPath ? [value.backgroundPath] : undefined} onPick={(p) => p[0] && set({ backgroundPath: p[0] })} />
                 <span className={styles.muted}>{value.backgroundPath ? baseName(value.backgroundPath) : "Nothing chosen yet"}</span>
               </Row>
             ) : (
@@ -508,6 +510,16 @@ function LyricVideoEditor({ value, onChange, vars }: StepEditorProps<LyricVideoS
               >
                 {look.backgroundPath ? "Change…" : "Choose a file…"}
               </Button>
+              <FromLibraryButton
+                iconOnly
+                size="sm"
+                title={look.background === "image" ? "Choose a background image from Library" : "Choose a background video from Library"}
+                label={look.background === "image" ? "Image from Library…" : "Video from Library…"}
+                exts={look.background === "image" ? IMAGE_EXTS : VIDEO_EXTS}
+                multiple={false}
+                have={look.backgroundPath ? [look.backgroundPath] : undefined}
+                onPick={(p) => p[0] && setLook({ backgroundPath: p[0] })}
+              />
               <span className={styles.muted}>{look.backgroundPath ? baseName(look.backgroundPath) : "Nothing chosen yet"}</span>
             </Row>
           )}

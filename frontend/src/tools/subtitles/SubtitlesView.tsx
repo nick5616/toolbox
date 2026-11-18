@@ -27,6 +27,7 @@ import { useRun } from "./runs";
 import { MODULE_ID, useSubtitles } from "./store";
 import { cuesToLines, defaultVisuals } from "./visuals";
 import { subtitlesWorkspace as ws } from "./workspace";
+import { MediaFromLibraryButton, pickMediaFromLibrary, pickSubtitleFromLibrary, SubtitleFromLibraryButton } from "./library";
 import styles from "./SubtitlesView.module.css";
 
 function EmptyDrop() {
@@ -48,6 +49,8 @@ function EmptyDrop() {
           <Button variant="secondary" icon="file-text" onClick={() => void pickSubtitleFile()} data-tip="Open an .srt or .vtt file you already have to edit it">
             Use a subtitle file…
           </Button>
+          <MediaFromLibraryButton />
+          <SubtitleFromLibraryButton />
         </div>
       </DropZone>
     </div>
@@ -77,6 +80,7 @@ function GenerateCta() {
         <Button variant="ghost" size="sm" icon="file-text" disabled={busy} onClick={() => void pickSubtitleFile()} data-tip="Open an .srt or .vtt file you already have, to edit it">
           Use a subtitle file…
         </Button>
+        <SubtitleFromLibraryButton iconOnly variant="ghost" disabled={busy} label="Subtitle file from Library…" />
         <RunStatus run={gen} runningLabel="Listening for speech…" showResult={false} />
       </div>
     </div>
@@ -136,7 +140,9 @@ function Workspace() {
     { id: "save", label: "Save subtitles", icon: "check", tip: blocker ?? "Write the subtitles to a file in your Library", disabled: !hasCues || blocker !== null || saveRun.busy, onSelect: () => save() },
     { id: "lang", label: `Language: ${languageText}`, icon: "languages", tip: "The language of these subtitles (opens Translate)", onSelect: () => open(panelDrawerId("translate")) },
     { id: "file", label: "Use a subtitle file…", icon: "file-text", tip: "Open an .srt or .vtt file to edit", onSelect: () => void pickSubtitleFile() },
+    { id: "file-lib", label: "Use a subtitle file from Library…", icon: "history", tip: "Open an .srt or .vtt Toolbox already made", onSelect: () => void pickSubtitleFromLibrary() },
     { id: "media", label: mediaPath ? "Choose a different video or audio file…" : "Pick the video…", icon: "film", tip: "Choose the picture to preview and burn the subtitles onto", onSelect: () => void pickMedia() },
+    { id: "media-lib", label: "Choose a video or audio file from Library…", icon: "history", tip: "Use a video or audio file Toolbox already made", onSelect: () => void pickMediaFromLibrary() },
     { id: "viz", label: "Make it fully reactive in Visualizer", icon: "sparkles", tip: "Open Visualizer with this audio and these words", disabled: !mediaPath, onSelect: () => openInVisualizer() },
     { id: "vizw", label: "Open Visualizer in its own window", icon: "app-window", tip: "Open Visualizer with this in its own window", disabled: !mediaPath, onSelect: () => openInVisualizer(true) },
     { id: "over", label: "Start over", icon: "trash-2", tip: "Discard these subtitles and begin again", onSelect: startOver },

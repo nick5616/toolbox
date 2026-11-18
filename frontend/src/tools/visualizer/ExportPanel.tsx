@@ -12,6 +12,7 @@ import { FilesService, JobStatus, VisualizerAction, VisualizerMode, type Visuali
 import { toAppError } from "@/lib/errors";
 import { copyText } from "@/lib/copy";
 import { startPathsDrag } from "@/lib/fileDrag";
+import { FromLibraryButton } from "@/blocks/library-picker";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { chooseEncoder } from "@/viz/worker/encoder";
 import { validateShow } from "@/viz/validate";
@@ -234,10 +235,12 @@ export default function ExportPanel() {
     void run.start([input], options(action));
   };
 
+  const applyBackground = (kind: "image" | "video", paths: string[]) => {
+    if (paths[0]) onPrefs({ background: kind, backgroundPath: paths[0] });
+  };
   const pickBackground = async (kind: "image" | "video") => {
     try {
-      const paths = (await FilesService.PickWith(kind === "image" ? "Choose a background image" : "Choose a background video", kind === "image" ? IMAGE_EXTS : VIDEO_EXTS, false)) ?? [];
-      if (paths[0]) onPrefs({ background: kind, backgroundPath: paths[0] });
+      applyBackground(kind, (await FilesService.PickWith(kind === "image" ? "Choose a background image" : "Choose a background video", kind === "image" ? IMAGE_EXTS : VIDEO_EXTS, false)) ?? []);
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     }
@@ -333,6 +336,20 @@ export default function ExportPanel() {
                   {base(prefs.backgroundPath)}
                 </button>
               )}
+              {(["image", "video"] as const)
+                .filter((k) => prefs.background !== "image" && prefs.background !== "video" ? true : prefs.background === k)
+                .map((k) => (
+                  <FromLibraryButton
+                    key={k}
+                    size="sm"
+                    title={k === "image" ? "Choose a background image from Library" : "Choose a background video from Library"}
+                    label={k === "image" ? "Image from Library…" : "Video from Library…"}
+                    exts={k === "image" ? IMAGE_EXTS : VIDEO_EXTS}
+                    multiple={false}
+                    have={prefs.background === k && prefs.backgroundPath ? [prefs.backgroundPath] : undefined}
+                    onPick={(p) => applyBackground(k, p)}
+                  />
+                ))}
             </div>
           )}
         </div>

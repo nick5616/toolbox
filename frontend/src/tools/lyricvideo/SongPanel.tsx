@@ -6,7 +6,8 @@
 import { Banner, Button, Section, SegmentedControl, Spinner, TextField, Icon } from "@/components";
 import { formatMs, useMediaSource } from "@/components/media";
 import { DepsGate } from "@/tools/_kit";
-import { useChooseSong } from "./actions";
+import { FromLibraryButton } from "@/blocks/library-picker";
+import { useChooseSong, adoptSong, useSongExts } from "./actions";
 import { useEngineGate } from "./engine";
 import { basename } from "./logic";
 import { LYRIC_VIDEO_ID, useLyricVideo } from "./store";
@@ -20,6 +21,7 @@ export default function SongPanel() {
   const coverUrl = useLyricVideo((s) => s.coverUrl);
   const media = useMediaSource(songPath);
   const choose = useChooseSong();
+  const exts = useSongExts();
   const gate = useEngineGate("render");
   const info = media.source?.info;
   if (!songPath) return null;
@@ -48,6 +50,7 @@ export default function SongPanel() {
         <Button size="sm" variant="ghost" onClick={() => void choose()} data-tip="Choose a different song">
           Change
         </Button>
+        <FromLibraryButton iconOnly variant="ghost" title="Choose a song from Library" label="Change from Library…" exts={exts} multiple={false} have={[songPath]} onPick={adoptSong} tip="Use a song Toolbox already made (the Library)" />
       </div>
 
       {media.status === "error" && (

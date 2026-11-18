@@ -8,6 +8,7 @@ const translatorStatus = vi.hoisted(() => vi.fn());
 const open = vi.hoisted(() => vi.fn());
 const pickWith = vi.hoisted(() => vi.fn());
 const copy = vi.hoisted(() => vi.fn());
+const libPick = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -41,6 +42,12 @@ vi.mock("@/lib/api", async (orig) => {
     LibraryService: { Reveal: async () => undefined, RevealPath: async () => undefined, Open: async () => undefined },
     ClipboardService: { CopyText: (...a: unknown[]) => copy(...a) },
   };
+});
+
+// "From Library…" resolves with these paths instead of opening the dialog.
+vi.mock("@/blocks/library-picker/pick", async (orig) => {
+  const actual = await orig<typeof import("@/blocks/library-picker/pick")>();
+  return { ...actual, pickFromLibrary: (...a: unknown[]) => libPick(...a) };
 });
 
 // The real player drives a <video>; jsdom can't play, so stand in for it and the timeline.
@@ -542,3 +549,37 @@ function TrimmerStub() {
     </div>
   );
 }
+
+describe("Subtitles from the Library", () => {
+  beforeEach(() => {
+    enqueue.mockReset();
+    load.mockReset();
+    open.mockReset();
+    open.mockResolvedValue(VIDEO_SOURCE);
+    libPick.mockReset();
+    libPick.mockResolvedValue([]);
+    useJobs.setState({ byId: {} });
+    useUI.setState({ handoff: null, view: "subtitles" });
+    useSubtitles.setState(initialData());
+  });
+
+  it("Video from Library… makes the pick the media, with video and audio extensions only", async () => {
+    libPick.mockResolvedValue(["/lib/Videos/talk.mp4"]);
+    render(<SubtitlesView moduleId="subtitles" />);
+    await userEvent.click(screen.getByRole("button", { name: "Video from Library…" }));
+    await waitFor(() => expect(useSubtitles.getState().mediaPath).toBe("/lib/Videos/talk.mp4"));
+    expect(libPick).toHaveBeenCalledWith(expect.objectContaining({ multiple: false }));
+    const exts = (libPick.mock.calls[0]?.[0] as { exts: string[] | null }).exts ?? [];
+    expect(exts).not.toContain(".srt");
+  });
+
+  it("Subtitles from Library… opens the .srt like a native pick", async () => {
+    load.mockResolvedValue(CUES);
+    libPick.mockResolvedValue(["/lib/Transcripts/talk.srt"]);
+    render(<SubtitlesView moduleId="subtitles" />);
+    await userEvent.click(screen.getByRole("button", { name: "Subtitles from Library…" }));
+    await screen.findByLabelText("Subtitle 1 text");
+    expect(load).toHaveBeenCalledWith("/lib/Transcripts/talk.srt");
+    expect(libPick).toHaveBeenCalledWith(expect.objectContaining({ exts: [".srt", ".vtt"], multiple: false }));
+  });
+});

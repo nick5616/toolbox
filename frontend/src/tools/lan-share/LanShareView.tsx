@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { FromLibraryButton, pickFromLibrary } from "@/blocks/library-picker";
 import { Button, ClickIn, ClickInHost, Icon, IconButton, SegmentedControl, TextField, ToolHeader, toast } from "@/components";
 import { FilesService, LanReceiveMode, LanShareService, type LanDevice } from "@/lib/api";
 import { useCommands } from "@/lib/commands";
@@ -112,6 +113,12 @@ export default function LanShareView({ moduleId }: ToolViewProps) {
     }
   }, [addPaths]);
 
+  /** Files Toolbox already made (the Library): queued like a native pick. */
+  const pickLibrary = useCallback(async () => {
+    const picked = await pickFromLibrary({ title: "Choose files to send from Library", exts: null, multiple: true, have: queue });
+    if (picked.length > 0) addPaths(picked);
+  }, [addPaths, queue]);
+
   const addFolder = async () => {
     try {
       const dir = await FilesService.PickFolder("Choose a folder to send");
@@ -166,7 +173,10 @@ export default function LanShareView({ moduleId }: ToolViewProps) {
     if (sendPending && useLanShare.getState().takeSendRequest()) void startSend();
   }, [sendPending, startSend]);
 
-  useCommands([{ id: "tool.addFiles", title: "Add files…", section: "Actions", shortcut: "Mod+O", icon: "plus", run: () => void pick() }]);
+  useCommands([
+    { id: "tool.addFiles", title: "Add files…", section: "Actions", shortcut: "Mod+O", icon: "plus", run: () => void pick() },
+    { id: "lanshare.addFilesLibrary", title: "Add files to send from Library…", section: "Actions", icon: "history", run: () => void pickLibrary() },
+  ]);
 
   const sendToDevice = (d: LanDevice) => {
     if (queue.length === 0 && text.trim() === "") {
@@ -221,6 +231,7 @@ export default function LanShareView({ moduleId }: ToolViewProps) {
           <div className={styles.queue} data-testid="queue">
             <Icon name="arrow-left-right" size={14} />
             <span className={styles.queueText}>{queue.length > 0 ? queueSummary(queue.length) : "Message ready — click Send on a device"}</span>
+            <FromLibraryButton iconOnly size="sm" variant="ghost" title="Choose files to send from Library" label="Add files from Library…" exts={null} have={queue} onPick={addPaths} />
             <Button size="sm" variant="ghost" icon="plus" data-tip="Add another folder" onClick={() => void addFolder()}>
               Folder
             </Button>
@@ -247,7 +258,10 @@ export default function LanShareView({ moduleId }: ToolViewProps) {
             onChange={(e) => setText(e.target.value)}
           />
           {queue.length === 0 && (
-            <IconButton size="sm" icon="plus" label="Add files…" kbd="Mod+O" onClick={() => void pick()} />
+            <>
+              <IconButton size="sm" icon="plus" label="Add files…" kbd="Mod+O" onClick={() => void pick()} />
+              <FromLibraryButton iconOnly size="sm" title="Choose files to send from Library" label="Add files from Library…" exts={null} onPick={addPaths} />
+            </>
           )}
         </div>
 

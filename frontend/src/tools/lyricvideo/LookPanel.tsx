@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import { Banner, Button, ColorSwatchPicker, Icon, Section, SegmentedControl, Select, Switch, cx, toast } from "@/components";
+import { FromLibraryButton } from "@/blocks/library-picker";
 import { FilesService, LyricVideoService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { basename } from "./logic";
@@ -59,12 +60,14 @@ export default function LookPanel() {
   const visuals = look.background === "visualizer";
   const needsFile = (look.background === "image" || look.background === "video") && !look.backgroundPath;
 
+  const applyBackground = (paths: string[]) => {
+    const path = paths[0];
+    if (path) setLook({ backgroundPath: path });
+  };
   const onPickBackground = async (kind: "image" | "video") => {
     try {
       const title = kind === "image" ? "Choose a background image" : "Choose a background video";
-      const paths = (await FilesService.PickWith(title, kind === "image" ? IMAGE_EXTS : VIDEO_EXTS, false)) ?? [];
-      const path = paths[0];
-      if (path) setLook({ backgroundPath: path });
+      applyBackground((await FilesService.PickWith(title, kind === "image" ? IMAGE_EXTS : VIDEO_EXTS, false)) ?? []);
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     }
@@ -128,6 +131,16 @@ export default function LookPanel() {
                 <Button size="sm" variant="secondary" icon="folder-open" data-tip={look.background === "image" ? "Pick a picture to use as the background" : "Pick a video to play behind the words"} onClick={() => void onPickBackground(look.background === "image" ? "image" : "video")}>
                   {look.backgroundPath ? "Change…" : look.background === "image" ? "Choose an image…" : "Choose a video…"}
                 </Button>
+                <FromLibraryButton
+                  size="sm"
+                  iconOnly
+                  title={look.background === "image" ? "Choose a background image from Library" : "Choose a background video from Library"}
+                  label={look.background === "image" ? "Image from Library…" : "Video from Library…"}
+                  exts={look.background === "image" ? IMAGE_EXTS : VIDEO_EXTS}
+                  multiple={false}
+                  have={look.backgroundPath ? [look.backgroundPath] : undefined}
+                  onPick={applyBackground}
+                />
                 <span className={styles.muted}>{look.backgroundPath ? basename(look.backgroundPath) : "Nothing chosen yet"}</span>
               </div>
             )}
