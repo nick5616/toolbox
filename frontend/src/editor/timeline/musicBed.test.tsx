@@ -2,7 +2,12 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ probe: vi.fn(), pick: vi.fn() }));
+const h = vi.hoisted(() => ({ probe: vi.fn(), pick: vi.fn(), library: vi.fn() }));
+
+vi.mock("@/blocks/library-picker", async (orig) => {
+  const actual = await orig<typeof import("@/blocks/library-picker")>();
+  return { ...actual, pickFromLibrary: (...a: unknown[]) => h.library(...a) };
+});
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -19,7 +24,7 @@ import { newClip } from "@/editor/doc";
 import { useEditStudio } from "@/editor/store";
 import { MusicInspector } from "../inspector/MusicInspector";
 import { EditorProfileProvider, PLAIN_PROFILE } from "../profileContext";
-import { addMusic, bedFor, clipsEndMs, removeMusic, timelineRoomMs } from "./songFile";
+import { addMusic, addMusicFromLibrary, bedFor, clipsEndMs, removeMusic, timelineRoomMs } from "./songFile";
 import { SongTrack } from "./SongTrack";
 
 function doc(clipEnds: number[], song = false): NormalProject {
@@ -33,6 +38,7 @@ const project = () => useEditStudio.getState().history!.present;
 beforeEach(() => {
   h.probe.mockReset();
   h.pick.mockReset();
+  h.library.mockReset();
   useEditStudio.getState().close();
 });
 afterEach(cleanup);
@@ -73,6 +79,19 @@ describe("Add music", () => {
     expect(project().song).toBeNull();
     useEditStudio.getState().undo();
     expect(project().song?.path).toBe("/c/song.mp3");
+  });
+
+  it("From Library sets the bed exactly like the native pick, with one file and the song extensions", async () => {
+    useEditStudio.getState().open("p1", "V", doc([8000]));
+    h.library.mockResolvedValue(["/lib/song.mp3"]);
+    h.probe.mockResolvedValue([{ path: "/lib/song.mp3", kind: "audio", durationMs: 120_000, error: "" }]);
+    await addMusicFromLibrary();
+    expect(h.library).toHaveBeenCalledWith(expect.objectContaining({ multiple: false, exts: expect.arrayContaining([".mp3"]) }));
+    expect(h.pick).not.toHaveBeenCalled();
+    expect(project().song).toMatchObject({ path: "/lib/song.mp3", startMs: 0, endMs: 8000 });
+    h.library.mockResolvedValue([]); // cancelled: nothing changes
+    await addMusicFromLibrary();
+    expect(project().song?.path).toBe("/lib/song.mp3");
   });
 
   it("leaves the edit alone when the file is too short or the picker is cancelled", async () => {

@@ -1,4 +1,5 @@
 /** The Inspector for the song track: range, gain, fades, cut offset (§14.8). */
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { Button, Section, Slider, toast } from "@/components";
 import { FilesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -24,9 +25,11 @@ export function cutOffsetText(frames: number): string {
 }
 
 /** Picks another song; the replace dialog asks whether to keep the clips. */
-async function changeSong(): Promise<void> {
+async function changeSong(fromLibrary = false): Promise<void> {
   try {
-    const picked = (await FilesService.PickWith("Pick a song", SONG_EXTENSIONS, false)) ?? [];
+    const picked = fromLibrary
+      ? await pickFromLibrary({ title: "Pick a song from Library", exts: SONG_EXTENSIONS, multiple: false, have: useEditStudio.getState().history?.present.song ? [useEditStudio.getState().history?.present.song?.path ?? ""] : undefined })
+      : ((await FilesService.PickWith("Pick a song", SONG_EXTENSIONS, false)) ?? []);
     const p = picked[0];
     if (p) useNewEditRequest.getState().askSong(p);
   } catch (e) {
@@ -76,6 +79,9 @@ export function SongInspector() {
         <div className={styles.stack}>
           <Button size="sm" icon="music" data-tip="Pick a different song; you choose whether to keep your clips" onClick={() => void changeSong()}>
             Change song…
+          </Button>
+          <Button size="sm" icon="history" data-tip="Pick a different song from files Toolbox already made (the Library); you choose whether to keep your clips" onClick={() => void changeSong(true)}>
+            Song from Library…
           </Button>
           <Button size="sm" icon="audio-lines" data-tip="Open the Stems tool to separate the song into vocals, drums, bass and other" onClick={() => useUI.getState().handOff({ moduleId: "stems", inputs: [song.path] })}>
             Split into stems…

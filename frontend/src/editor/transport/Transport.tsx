@@ -5,6 +5,7 @@
  * reach the player through ./player.ts.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { Banner, Button, IconButton, toast } from "@/components";
 import { MediaPlayer, formatMs, useMediaSource, type MediaPlayerHandle } from "@/components/media";
 import { EditStudioService, FilesService } from "@/lib/api";
@@ -119,11 +120,13 @@ export function Transport() {
 
   const missing = !!song && media.status === "error";
   const [finding, setFinding] = useState(false);
-  const findSong = async () => {
+  const findSong = async (fromLibrary = false) => {
     if (!project?.song || finding) return;
     setFinding(true);
     try {
-      const picked = (await FilesService.PickWith("Find the song", SONG_EXTENSIONS, false)) ?? [];
+      const picked = fromLibrary
+        ? await pickFromLibrary({ title: "Find the song in Library", exts: SONG_EXTENSIONS, multiple: false })
+        : ((await FilesService.PickWith("Find the song", SONG_EXTENSIONS, false)) ?? []);
       const path = picked[0];
       if (!path) return;
       const info = (await EditStudioService.Probe([path]))?.[0];
@@ -173,9 +176,14 @@ export function Transport() {
           tone="warn"
           title="The song file is missing"
           action={
-            <Button size="sm" data-tip="Pick the song file again; markers and clips are kept" onClick={() => void findSong()} disabled={finding}>
-              Find the song…
-            </Button>
+            <>
+              <Button size="sm" data-tip="Pick the song file again; markers and clips are kept" onClick={() => void findSong()} disabled={finding}>
+                Find the song…
+              </Button>
+              <Button size="sm" variant="secondary" icon="history" data-tip="Pick the song from files Toolbox already made (the Library); markers and clips are kept" onClick={() => void findSong(true)} disabled={finding}>
+                From Library…
+              </Button>
+            </>
           }
           className={styles.banner}
         >

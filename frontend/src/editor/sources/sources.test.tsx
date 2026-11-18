@@ -8,7 +8,13 @@ const h = vi.hoisted(() => ({
   sources: vi.fn(),
   pickWith: vi.fn(),
   drag: vi.fn(),
+  library: vi.fn(),
 }));
+
+vi.mock("@/blocks/library-picker", async (orig) => {
+  const actual = await orig<typeof import("@/blocks/library-picker")>();
+  return { ...actual, pickFromLibrary: (...a: unknown[]) => h.library(...a) };
+});
 
 vi.mock("@/blocks/sources/sourceDrag", async (orig) => {
   const actual = await orig<typeof import("@/blocks/sources/sourceDrag")>();
@@ -132,6 +138,19 @@ describe("SourcesPanel", () => {
     expect(project().sources.map((s) => s.path)).toEqual(["/c/a.mp4", "/c/b.mp4"]);
     expect(h.prepare).toHaveBeenCalledWith("p1", ["/c/b.mp4"], 30);
     expect(useEditStudio.getState().jobs.prepare).toBe("job1");
+  });
+
+  it("Add from Library takes the same path as the native pick", async () => {
+    open(["/c/a.mp4"], [st("/c/a.mp4")]);
+    h.library.mockResolvedValue(["/c/a.mp4", "/c/b.mp4"]);
+    h.probe.mockResolvedValue([{ path: "/c/b.mp4", kind: "video", durationMs: 4000, error: "" }]);
+    render(<SourcesPanel />);
+    await userEvent.click(screen.getByRole("button", { name: "Add from Library" }));
+    await waitFor(() => expect(h.prepare).toHaveBeenCalled());
+    expect(h.library).toHaveBeenCalledWith(expect.objectContaining({ multiple: true, exts: expect.arrayContaining([".mp4", ".jpg"]), have: ["/c/a.mp4"] }));
+    expect(h.pickWith).not.toHaveBeenCalled();
+    expect(project().sources.map((s) => s.path)).toEqual(["/c/a.mp4", "/c/b.mp4"]);
+    expect(h.prepare).toHaveBeenCalledWith("p1", ["/c/b.mp4"], 30);
   });
 
   it("refreshes the states when the prepare job ends", async () => {

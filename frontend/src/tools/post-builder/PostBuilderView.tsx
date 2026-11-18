@@ -113,6 +113,7 @@ function Workspace() {
     const why = "This post is full";
     return [
       { id: "files", label: "Photos & clips…", tip: full ? why : "Pick photos and videos from your computer; each becomes a slide", icon: "image", disabled: full, onSelect: () => void pickMediaFiles().then((p) => st().addPaths(p)) },
+      { id: "library", label: "From Library…", tip: full ? why : "Pick photos and videos Toolbox already made (the Library); each becomes a slide", icon: "history", disabled: full, onSelect: () => void pickMediaFiles(true).then((p) => st().addPaths(p)) },
       { id: "new-comp", label: "New composition", tip: full ? why : "Design a collage or graphic in Photo Composer and use it as a slide", icon: "layers", disabled: full, onSelect: () => void st().newProjectSlide("composition") },
       { id: "new-video", label: "New video", tip: full ? why : "Edit a video in Video Editor and use it as a slide", icon: "clapperboard", disabled: full, onSelect: () => void st().newProjectSlide("video") },
       { id: "old-comp", label: "Existing composition…", tip: full ? why : "Use a composition you already made in Photo Composer", icon: "layers", disabled: full, onSelect: () => setPick("composition") },

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { Banner, Button, ClickIn, ClickInHost, IconButton, Meter, Select, Slider, TextField, toast } from "@/components";
 import { formatMs, useMediaSource } from "@/components/media";
 import {
@@ -60,6 +61,8 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_MS = 800;
 const MAX_RETAINED_SOURCES = 6;
 const SONG_EXTENSIONS = [".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac", ".opus"];
+/** What the module accepts (core/media video + image + audio extensions): the same set the native "Add files" dialog filters by. */
+const CLIP_EXTENSIONS = [".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp", ".ogv", ".mpg", ".mpeg", ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic", ".heif", ".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".opus", ".wma", ".aiff", ".aif"];
 
 function sameSource(a: ClipSource | undefined, b: ClipSource): boolean {
   return !!a && a.status === b.status && a.url === b.url && a.progress === b.progress && a.error === b.error;
@@ -619,25 +622,25 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
   };
 
   // ---- pickers ----
-  const pickClips = async () => {
+  const pickClips = async (fromLibrary = false) => {
     try {
-      const paths = (await FilesService.Pick(moduleId)) ?? [];
+      const paths = fromLibrary ? await pickFromLibrary({ title: "Add clips and photos from Library", exts: CLIP_EXTENSIONS, multiple: true }) : ((await FilesService.Pick(moduleId)) ?? []);
       if (paths.length > 0) await addPaths(paths);
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     }
   };
-  const pickVlogClips = async () => {
+  const pickVlogClips = async (fromLibrary = false) => {
     try {
-      const paths = (await FilesService.Pick(moduleId)) ?? [];
+      const paths = fromLibrary ? await pickFromLibrary({ title: "Add clips and photos from Library", exts: CLIP_EXTENSIONS, multiple: true, have: vlog.paths }) : ((await FilesService.Pick(moduleId)) ?? []);
       if (paths.length > 0) setVlog((f) => addVlogPaths(f, paths));
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     }
   };
-  const pickSong = async (forVlog: boolean) => {
+  const pickSong = async (forVlog: boolean, fromLibrary = false) => {
     try {
-      const paths = (await FilesService.PickWith("Pick a song", SONG_EXTENSIONS, false)) ?? [];
+      const paths = fromLibrary ? await pickFromLibrary({ title: "Pick a song from Library", exts: SONG_EXTENSIONS, multiple: false }) : ((await FilesService.PickWith("Pick a song", SONG_EXTENSIONS, false)) ?? []);
       const path = paths[0];
       if (!path) return;
       if (forVlog) {
@@ -736,7 +739,9 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
       busy={planning}
       onChange={setVlog}
       onPickClips={() => void pickVlogClips()}
+      onPickClipsLibrary={() => void pickVlogClips(true)}
       onPickSong={() => void pickSong(true)}
+      onPickSongLibrary={() => void pickSong(true, true)}
       onBuild={() => void buildVlog()}
       onCancel={() => setVlogOpen(false)}
     />
@@ -953,6 +958,7 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
             onTitleFocused={() => setTitleFocus(null)}
             onChange={edit}
             onPickMusic={() => void pickSong(false)}
+            onPickMusicLibrary={() => void pickSong(false, true)}
             onSelect={setSelection}
             trailing={
               postSlide ? (
@@ -981,8 +987,10 @@ export default function VideoEditorView({ moduleId }: ToolViewProps) {
           setTitleFocus(id);
         }}
         onAddClips={() => void pickClips()}
+        onAddClipsLibrary={() => void pickClips(true)}
         onAddTitle={addTitle}
         onPickMusic={() => void pickSong(false)}
+        onPickMusicLibrary={() => void pickSong(false, true)}
         onDropSources={(paths, index) => void addPaths(paths, index)}
       />
       {loaders}

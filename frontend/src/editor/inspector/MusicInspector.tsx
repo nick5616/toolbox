@@ -6,7 +6,7 @@ import { editLength } from "@/viz/edit/types";
 import { useProject } from "@/editor/store";
 import { useAsMusic } from "../constituents/useUseResult";
 import { useEditorProfile } from "../profileContext";
-import { addMusic, fileDuration, removeMusic } from "../timeline/songFile";
+import { addMusic, addMusicFromLibrary, fileDuration, removeMusic } from "../timeline/songFile";
 import { editDoc } from "./inspectorState";
 import styles from "./inspector.module.css";
 
@@ -32,6 +32,9 @@ export function MusicInspector() {
       <div className={styles.root} aria-label="Music inspector">
         <Button icon="plus" data-tip="Pick a song or sound file to play under the video; you can trim it and set its volume here" onClick={() => void addMusic()}>
           Add music
+        </Button>
+        <Button icon="history" variant="secondary" data-tip="Use a song or sound Toolbox already made (the Library)" onClick={() => void addMusicFromLibrary()}>
+          From Library…
         </Button>
         <p className={styles.hint}>Music plays under the whole video. You choose which part of the file to use and how loud it is.</p>
       </div>

@@ -39,6 +39,7 @@ export interface InspectorProps {
   titleTextRef?: Ref<HTMLTextAreaElement>;
   onChange: (next: VideoProject, key?: string) => void;
   onPickMusic: () => void;
+  onPickMusicLibrary: () => void;
   onSelect: (s: Selection) => void;
   /** A title id whose Text click-in should open and take focus (a new title, or a double-click on one). */
   titleFocus?: string | null;
@@ -428,6 +429,9 @@ function MusicInspector({ p }: { p: InspectorProps }) {
           <div className={styles.row}>
             <Button size="sm" icon="music" data-tip="Pick a different song" onClick={p.onPickMusic}>
               Change song
+            </Button>
+            <Button size="sm" icon="history" data-tip="Pick a different song from files Toolbox already made (the Library)" onClick={p.onPickMusicLibrary}>
+              From Library…
             </Button>
             <Button size="sm" variant="danger" icon="trash-2" data-tip="Remove the song from the video" onClick={() => { onChange({ ...doc, music: null }); p.onSelect(null); }}>
               Remove

@@ -3,6 +3,7 @@
  * and by the empty state. Each action runs on the host through the store.
  */
 import { useCallback, useState, type ReactNode } from "react";
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { ConfirmDialog, toast } from "@/components";
 import { FilesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -12,8 +13,10 @@ import { usePostBuilder } from "./postStore";
 
 type Dialog = { kind: "new" } | { kind: "rename"; id: string } | { kind: "delete"; id: string } | null;
 
-export async function pickMediaFiles(): Promise<string[]> {
+/** Picks photos and clips with the native dialog, or from the Library (same extensions, several files). */
+export async function pickMediaFiles(fromLibrary = false): Promise<string[]> {
   try {
+    if (fromLibrary) return await pickFromLibrary({ title: "Choose photos and clips from Library", exts: MEDIA_EXTS, multiple: true });
     return (await FilesService.PickWith("Choose photos and clips", MEDIA_EXTS, true)) ?? [];
   } catch (e) {
     const err = toAppError(e);
@@ -34,6 +37,7 @@ export function usePostDialogs(): PostDialogs {
   const [newFiles, setNewFiles] = useState<string[]>([]);
   const posts = usePostBuilder((s) => s.posts);
   const st = usePostBuilder.getState;
+  const addNewFiles = (p: string[]) => setNewFiles((cur) => [...cur, ...p.filter((x) => !cur.includes(x))]);
   const close = useCallback(() => setDialog(null), []);
 
   const renameTarget = dialog?.kind === "rename" ? posts.find((p) => p.id === dialog.id) : undefined;
@@ -44,7 +48,8 @@ export function usePostDialogs(): PostDialogs {
       {dialog?.kind === "new" && (
         <NewPostDialog
           fileCount={newFiles.length}
-          onPickFiles={() => void pickMediaFiles().then((p) => setNewFiles((cur) => [...cur, ...p.filter((x) => !cur.includes(x))]))}
+          onPickFiles={() => void pickMediaFiles().then(addNewFiles)}
+          onPickLibrary={() => void pickMediaFiles(true).then(addNewFiles)}
           onClose={close}
           onCreate={(name, format, aspect) => {
             setDialog(null);

@@ -37,8 +37,10 @@ export interface TimelinePanelProps {
   onChange: (next: VideoProject, key?: string) => void;
   onEditTitle: (id: string) => void;
   onAddClips: () => void;
+  onAddClipsLibrary: () => void;
   onAddTitle: () => void;
   onPickMusic: () => void;
+  onPickMusicLibrary: () => void;
   /** Post sources dropped on the clips lane: insert them as clips at index. */
   onDropSources?: (paths: string[], index: number) => void;
 }
@@ -335,12 +337,14 @@ export function TimelinePanel(p: TimelinePanelProps) {
         <Button size="sm" variant="ghost" icon="plus" data-tip="Add videos or photos to the end of the timeline" onClick={p.onAddClips}>
           Clips
         </Button>
+        <IconButton size="sm" icon="history" label="Add clips from Library" data-tip="Add videos or photos Toolbox already made (the Library) to the end of the timeline" onClick={p.onAddClipsLibrary} />
         <Button size="sm" variant="ghost" icon="type" data-tip={clips.length === 0 ? "Add a clip first, then add text on top of it" : "Add a text title at the playhead"} onClick={p.onAddTitle} disabled={clips.length === 0}>
           Title
         </Button>
         <Button size="sm" variant="ghost" icon="music" data-tip={music ? "Replace the background song" : "Add a background song under the whole video"} onClick={p.onPickMusic}>
           {music ? "Change song" : "Song"}
         </Button>
+        <IconButton size="sm" icon="history" label="Song from Library" data-tip="Pick the background song from files Toolbox already made (the Library)" onClick={p.onPickMusicLibrary} />
         <span className={styles.spacer} />
         <IconButton size="sm" icon="zoom-out" label="Zoom out" data-tip="Show more time on the timeline (Ctrl + scroll also zooms)" onClick={() => setPps((v) => clampPps(v / 1.4))} />
         <IconButton size="sm" icon="zoom-in" label="Zoom in" data-tip="Show less time, larger clips (Ctrl + scroll also zooms)" onClick={() => setPps((v) => clampPps(v * 1.4))} />

@@ -1,5 +1,6 @@
 /** The Video Editor's New video dialog (Phase 10 SPEC §5.4): name, shape, frame rate and optional files. No song needed. */
 import { useEffect, useState } from "react";
+import { FromLibraryButton } from "@/blocks/library-picker";
 import { Button, ConfirmDialog, Field, IconButton, SegmentedControl, TextField, cx, toast } from "@/components";
 import { FilesService } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
@@ -45,10 +46,10 @@ export function NewVideoDialog({ open, files: filesIn = [], onCreated, onCancel 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on open only
   }, [open]);
 
+  const useFiles = (picked: string[]) => setFiles((cur) => [...cur, ...picked.filter((p) => !cur.includes(p))]);
   const addFiles = async () => {
     try {
-      const picked = (await FilesService.PickWith("Add clips, photos and music", EXTENSIONS, true)) ?? [];
-      setFiles((cur) => [...cur, ...picked.filter((p) => !cur.includes(p))]);
+      useFiles((await FilesService.PickWith("Add clips, photos and music", EXTENSIONS, true)) ?? []);
     } catch (e) {
       toast({ title: toAppError(e).message, tone: "danger" });
     }
@@ -109,6 +110,7 @@ export function NewVideoDialog({ open, files: filesIn = [], onCreated, onCancel 
               <Button size="sm" icon="plus" data-tip="Choose clips, photos and music to start the video with" onClick={() => void addFiles()}>
                 Add files
               </Button>
+              <FromLibraryButton exts={EXTENSIONS} multiple title="Add clips, photos and music from Library" have={files} onPick={useFiles} />
               {files.length > 0 && (
                 <>
                   <span className={styles.muted}>

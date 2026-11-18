@@ -3,6 +3,7 @@
  * Prepare), re-prepare, relink a missing file. Used by the panel, handoffs and
  * the New edit dialog.
  */
+import { pickFromLibrary } from "@/blocks/library-picker";
 import { toast } from "@/components";
 import { EditStudioService, FilesService } from "@/lib/api";
 import type { Job } from "@/lib/api";
@@ -88,6 +89,17 @@ export async function addSourcePaths(paths: readonly string[]): Promise<string[]
 export async function pickAndAddSources(): Promise<void> {
   try {
     const picked = (await FilesService.PickWith("Add clips and photos", MEDIA_EXTENSIONS, true)) ?? [];
+    if (picked.length) await addSourcePaths(picked);
+  } catch (e) {
+    toast({ title: toAppError(e).message, tone: "danger" });
+  }
+}
+
+/** Picks files from the Library and adds them (same path as the native pick). */
+export async function pickLibraryAndAddSources(): Promise<void> {
+  try {
+    const have = currentDoc()?.sources.map((s) => s.path);
+    const picked = await pickFromLibrary({ title: "Add clips and photos from Library", exts: MEDIA_EXTENSIONS, multiple: true, have });
     if (picked.length) await addSourcePaths(picked);
   } catch (e) {
     toast({ title: toAppError(e).message, tone: "danger" });

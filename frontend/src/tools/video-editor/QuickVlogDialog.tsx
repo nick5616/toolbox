@@ -9,14 +9,16 @@ export interface QuickVlogDialogProps {
   busy: boolean;
   onChange: (f: VlogForm) => void;
   onPickClips: () => void;
+  onPickClipsLibrary: () => void;
   onPickSong: () => void;
+  onPickSongLibrary: () => void;
   onBuild: () => void;
   onCancel: () => void;
 }
 
 const base = (p: string) => p.split(/[\\/]/).pop() ?? p;
 
-export function QuickVlogDialog({ open, form, busy, onChange, onPickClips, onPickSong, onBuild, onCancel }: QuickVlogDialogProps) {
+export function QuickVlogDialog({ open, form, busy, onChange, onPickClips, onPickClipsLibrary, onPickSong, onPickSongLibrary, onBuild, onCancel }: QuickVlogDialogProps) {
   const problem = vlogProblem(form);
   return (
     <ConfirmDialog
@@ -34,6 +36,9 @@ export function QuickVlogDialog({ open, form, busy, onChange, onPickClips, onPic
               <div className={styles.vlogFileRow}>
                 <Button size="sm" icon="plus" data-tip="Choose the videos and photos to cut together" onClick={onPickClips}>
                   Add clips and photos
+                </Button>
+                <Button size="sm" variant="secondary" icon="history" data-tip="Choose videos and photos Toolbox already made (the Library)" onClick={onPickClipsLibrary}>
+                  From Library…
                 </Button>
                 <span className={styles.muted} data-tip="How many files will be used">{form.paths.length === 0 ? "None yet" : `${form.paths.length} added`}</span>
               </div>
@@ -54,6 +59,9 @@ export function QuickVlogDialog({ open, form, busy, onChange, onPickClips, onPic
             <div className={styles.vlogFileRow}>
               <Button size="sm" icon="music" data-tip="Choose a song to play under the vlog; it can set the length and cut points" onClick={onPickSong}>
                 {form.musicPath ? "Change song" : "Pick a song"}
+              </Button>
+              <Button size="sm" variant="secondary" icon="history" data-tip="Choose a song Toolbox already made (the Library)" onClick={onPickSongLibrary}>
+                From Library…
               </Button>
               {form.musicPath && (
                 <>
