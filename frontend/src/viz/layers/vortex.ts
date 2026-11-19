@@ -33,12 +33,12 @@ registerLayer({
         const arms = Math.round(p.lines as number);
         const S = f.quality === "draft" ? 12 : 22;
         const ramp = buildRamp(f.palette, p.color as string);
-        const bass = f.signals.value("bass.level", f.tMs);
-        const kick = f.signals.value("kick", f.tMs);
-        const level = f.signals.value("mix.level", f.tMs);
+        const bass = f.signals.smoothed("bass.level", f.tMs);
+        const kick = f.signals.smoothed("kick", f.tMs);
+        const level = f.signals.smoothed("mix.level", f.tMs);
         const maxLen = (p.length as number) * b.short * b.scale;
         const tw = (p.twist as number) * (1 + 0.5 * bass) * (1 + 0.25 * kick);
-        const spin = b.rot + (p.spin as number) * (f.motionSec * 0.08 + f.analysis.cum("bass.level", f.tMs) * 0.9);
+        const spin = b.rot + f.integral("spin") * 0.08 + f.integral("spin*intensity*bass.level") * 0.9;
         const thick = (p.thickness as number) * b.short * 0.5;
         const inner = b.short * 0.02 * b.scale;
         f.analysis.vector("spectrum", f.tMs, spec);

@@ -13,6 +13,7 @@ import (
 
 	"toolbox/core"
 	"toolbox/core/proc"
+	"toolbox/core/workspace"
 	sidecarfiles "toolbox/sidecar"
 )
 
@@ -86,6 +87,11 @@ func scaled(job *core.JobContext, lo, hi float64) *core.JobContext {
 }
 
 func (s *setupModule) Run(ctx context.Context, job *core.JobContext) error {
+	ctx, unlock, err := workspace.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if s.mgr != nil {
 		if err := s.mgr.Stop(); err != nil {
 			return err

@@ -1,4 +1,5 @@
 import { ErrorCode } from "./api";
+import { currentPresenter, rewriteText } from "./pathRewrite";
 
 /** The JSON shape of core.AppError as marshalled by api.MarshalError. */
 export interface AppErrorShape {
@@ -29,6 +30,10 @@ function fromObject(v: unknown): AppErrorShape | null {
  * `cause`, a plain Error, a string…) into an AppErrorShape.
  */
 export function toAppError(e: unknown): AppErrorShape {
+  return presentError(rawAppError(e));
+}
+
+function rawAppError(e: unknown): AppErrorShape {
   if (isRecord(e)) {
     const fromCause = fromObject(e.cause);
     if (fromCause) return fromCause;
@@ -45,4 +50,17 @@ export function toAppError(e: unknown): AppErrorShape {
     if (typeof e.message === "string") return { code: ErrorCode.CodeInternal, message: e.message };
   }
   return { code: ErrorCode.CodeInternal, message: String(e) };
+}
+
+/**
+ * With "Hide personal details" on, the root and home folders inside an error's message, hint
+ * and field texts are rewritten (SPEC A5), so a toast never shows the user name.
+ */
+function presentError(err: AppErrorShape): AppErrorShape {
+  const pr = currentPresenter();
+  if (!pr.on) return err;
+  const out: AppErrorShape = { ...err, message: rewriteText(err.message, pr) };
+  if (err.hint) out.hint = rewriteText(err.hint, pr);
+  if (err.fields) out.fields = Object.fromEntries(Object.entries(err.fields).map(([k, v]) => [k, rewriteText(v, pr)]));
+  return out;
 }

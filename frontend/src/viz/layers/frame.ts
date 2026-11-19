@@ -62,7 +62,7 @@ registerLayer({
     return {
       render(f) {
         const scale = f.h / 1080;
-        const beat = f.signals.value("beat.pulse", f.tMs);
+        const beat = f.signals.smoothed("beat.pulse", f.tMs);
         const pulse = f.params.pulse as number;
         const chase = f.params.chase as number;
         const short = Math.min(f.w, f.h);
@@ -77,7 +77,7 @@ registerLayer({
           .f1("u_corners", f.params.cornersOnly ? 1 : 0)
           .f1("u_cornerLen", f.params.cornerLength as number)
           .f1("u_phase", chase * (f.analysis.cum("mix.level", f.tMs) * 2.2 + f.motionSec * 0.35))
-          .f1("u_haze", (f.params.haze as number) * (0.5 + 0.7 * f.signals.value("mix.level", f.tMs)))
+          .f1("u_haze", (f.params.haze as number) * (0.5 + 0.7 * f.signals.smoothed("mix.level", f.tMs)))
           .f1("u_run", chase > 0 ? 1 : 0)
           .f1("u_opacity", f.opacity)
           .f3("u_c0", f.palette.colors[0])

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Analysis, Section } from "./analysis";
-import { activeAt, autoTimeline, DEFAULT_SCENE_FOR, MAX_MOTIFS, MIN_EMOTION_BARS, motifsAt, sceneOrFallback, timelineFor } from "./director";
+import { activeAt, autoTimeline, DEFAULT_SCENE_FOR, MAX_MOTIFS, MIN_EMOTION_BARS, MIN_SECTION_BARS, MORPH_BARS, morphAt, motifsAt, sceneOrFallback, timelineFor } from "./director";
+import { splitDrops } from "./signals";
 import { buildFixture } from "./fixture";
 import { presetById, showFromPreset } from "./presets";
 import type { Emotion, Motif, SectionLabel, Show, TimelineEntry } from "./types";
@@ -27,16 +28,16 @@ function sectionsOf(a: Analysis, list: Array<[number, number, SectionLabel]>): v
 describe("director: sections to scenes", () => {
   it("maps every label to its scene", () => {
     expect(DEFAULT_SCENE_FOR).toEqual({ intro: "calm", outro: "calm", bridge: "calm", break: "calm", verse: "main", section: "main", chorus: "full", drop: "full" });
-    const a = buildFixture({ durationMs: 60_000 });
+    const a = buildFixture({ durationMs: 120_000 });
     const tl = autoTimeline(a, show());
     expect(tl.map((e) => e.sceneId)).toEqual(["calm", "main", "full", "calm"]); // the drop continues the chorus scene
     expect(tl[0]).toMatchObject({ startMs: 0, transition: { kind: "cut", ms: 0 } });
-    expect(tl[tl.length - 1]?.endMs).toBe(60_000);
+    expect(tl[tl.length - 1]?.endMs).toBe(120_000);
     for (let i = 1; i < tl.length; i++) expect(tl[i]?.startMs).toBe(tl[i - 1]?.endMs);
   });
 
   it("uses a preset's own map and falls back to main for a missing scene", () => {
-    const a = buildFixture({ durationMs: 60_000 });
+    const a = buildFixture({ durationMs: 120_000 });
     const s = show("spectrum-classic", (x) => {
       x.director = { sceneFor: { verse: "full", chorus: "ghost" }, transitions: {} };
     });
@@ -50,24 +51,24 @@ describe("director: sections to scenes", () => {
   });
 
   it("snaps scene changes to the nearest downbeat", () => {
-    const a = buildFixture({ durationMs: 60_000 });
+    const a = buildFixture({ durationMs: 120_000 });
     sectionsOf(a, [
-      [0, 8_900, "intro"],
-      [8_900, 21_900, "verse"],
-      [21_900, 60_000, "chorus"],
+      [0, 16_900, "intro"],
+      [16_900, 41_900, "verse"],
+      [41_900, 120_000, "chorus"],
     ]);
     const tl = autoTimeline(a, show());
-    expect(tl.map((e) => e.startMs)).toEqual([0, 8_000, 22_000]);
+    expect(tl.map((e) => e.startMs)).toEqual([0, 16_000, 42_000]);
     for (const e of tl) expect(e.startMs % BAR).toBe(0);
   });
 
   it("flashes on a drop and crossfades by default", () => {
-    const a = buildFixture({ durationMs: 60_000 });
+    const a = buildFixture({ durationMs: 100_000 });
     sectionsOf(a, [
-      [0, 10_000, "verse"],
-      [10_000, 20_000, "drop"],
-      [20_000, 40_000, "intro"],
-      [40_000, 60_000, "verse"],
+      [0, 20_000, "verse"],
+      [20_000, 40_000, "drop"],
+      [40_000, 70_000, "intro"],
+      [70_000, 100_000, "verse"],
     ]);
     const s = show("spectrum-classic", (x) => {
       x.director = { sceneFor: { drop: "full" }, transitions: {} };
@@ -94,8 +95,8 @@ describe("director: sections to scenes", () => {
 
   it("zooms into a chorus that follows a build-up, and crossfades otherwise", () => {
     const sections: Array<[number, number, SectionLabel]> = [
-      [0, 10_000, "verse"],
-      [10_000, 60_000, "chorus"],
+      [0, 20_000, "verse"],
+      [20_000, 60_000, "chorus"],
     ];
     const plain = buildFixture({ durationMs: 60_000 });
     sectionsOf(plain, sections);
@@ -106,7 +107,7 @@ describe("director: sections to scenes", () => {
 
     const lifted = buildFixture({ durationMs: 60_000 });
     sectionsOf(lifted, sections);
-    lifted.audio.events.lift = [[4_000, 200]];
+    lifted.audio.events.lift = [[16_000, 200]];
     expect(autoTimeline(lifted, noRules)[1]?.transition.kind).toBe("zoom");
     // A preset's own rule wins over the default.
     const custom = show("spectrum-classic", (x) => {
@@ -306,7 +307,7 @@ describe("director: following the mood", () => {
   });
 
   it("falls back to the sections without words", () => {
-    const a = buildFixture({ durationMs: 60_000, words: false });
+    const a = buildFixture({ durationMs: 120_000, words: false });
     const tl = autoTimeline(a, emotional);
     expect(tl.map((e) => e.sceneId)).toEqual(["calm", "main", "full", "calm"]);
   });
@@ -318,5 +319,71 @@ describe("director: following the mood", () => {
       x.timeline = { mode: "manual", entries };
     });
     expect(timelineFor(a, s)).toBe(entries);
+  });
+});
+
+describe("director: calm rules (SPEC section C2.5)", () => {
+  it("holds a scene for at least eight bars, unless a counted drop cuts in", () => {
+    const a = buildFixture({ durationMs: 120_000 });
+    sectionsOf(a, [
+      [0, 10_000, "verse"],
+      [10_000, 20_000, "chorus"], // 5 bars after the start: too soon
+      [20_000, 60_000, "intro"],
+      [60_000, 120_000, "drop"],
+    ]);
+    a.audio.events.drop = [[60_000, 255]];
+    const tl = autoTimeline(a, show("spectrum-classic", (x) => void (x.director = { sceneFor: {}, transitions: {} })));
+    for (const e of tl.slice(1, -1)) expect(e.endMs - e.startMs).toBeGreaterThanOrEqual(MIN_SECTION_BARS * BAR);
+    expect(tl.map((e) => e.startMs)).toEqual([0, 20_000, 60_000]);
+    // a counted drop may follow sooner than eight bars
+    const b = buildFixture({ durationMs: 120_000 });
+    sectionsOf(b, [
+      [0, 8_000, "verse"],
+      [8_000, 120_000, "drop"],
+    ]);
+    b.audio.events.drop = [[8_000, 255]];
+    const t2 = autoTimeline(b, show("spectrum-classic", (x) => void (x.director = { sceneFor: {}, transitions: {} })));
+    expect(t2[1]).toMatchObject({ startMs: 8_000 });
+    expect(t2[1]?.transition.kind).toBe("flash");
+  });
+
+  it("counts a drop less than eight bars after the last one as a lift", () => {
+    const a = buildFixture({ durationMs: 120_000 });
+    a.audio.events.drop = [
+      [10_000, 255],
+      [20_000, 255], // 5 bars later
+      [40_000, 255], // 10 bars after the first counted drop
+    ];
+    a.audio.events.lift = [[5_000, 200]];
+    const split = splitDrops(a);
+    expect(split.drops.map((e) => e[0])).toEqual([10_000, 40_000]);
+    expect(split.lifts.map((e) => e[0])).toEqual([5_000, 20_000]);
+  });
+
+  it("morphs between scenes that share their layers, over two bars", () => {
+    const a = buildFixture({ durationMs: 60_000 });
+    const s = show("spectrum-classic");
+    const first = s.scenes[0] as Show["scenes"][number];
+    const second = { ...first, id: "other", layers: first.layers.map((l) => ({ ...l })) };
+    s.scenes = [first, second];
+    const entries: TimelineEntry[] = [
+      { startMs: 0, endMs: 20_000, sceneId: first.id, transition: { kind: "cut", ms: 0 } },
+      { startMs: 20_000, endMs: 60_000, sceneId: "other", transition: { kind: "crossfade", ms: BAR } },
+    ];
+    expect(morphAt(a, s, entries, 19_999)).toBeNull();
+    expect(morphAt(a, s, entries, 20_000)?.amount).toBe(0);
+    const mid = morphAt(a, s, entries, 20_000 + BAR)?.amount ?? -1; // halfway through two bars
+    expect(mid).toBeCloseTo(0.5, 6);
+    expect(morphAt(a, s, entries, 20_000 + MORPH_BARS * BAR)).toBeNull();
+    // eased in and out: slow at both ends
+    const early = morphAt(a, s, entries, 20_000 + 200)?.amount ?? 1;
+    expect(early).toBeLessThan(0.02);
+    // different layers, or another kind of transition: two pictures are crossfaded instead
+    const different = { ...second, layers: first.layers.slice(1) };
+    s.scenes = [first, different];
+    expect(morphAt(a, s, entries, 20_500)).toBeNull();
+    s.scenes = [first, second];
+    const flash = entries.map((e, i) => (i === 1 ? { ...e, transition: { kind: "flash" as const, ms: BAR } } : e));
+    expect(morphAt(a, s, flash, 20_500)).toBeNull();
   });
 });

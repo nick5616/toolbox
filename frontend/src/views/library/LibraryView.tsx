@@ -33,6 +33,7 @@ import { hitToItem } from "./searchHits";
 import { useSearchCommands } from "./searchCommands";
 import { fromEntry, fromOutput, fromPath, type LibItem } from "./items";
 import { sendToItems } from "./sendTo";
+import { displayPath } from "@/lib/displayPath";
 import styles from "./Library.module.css";
 import searchStyles from "./Search.module.css";
 
@@ -567,7 +568,7 @@ export function LibraryView() {
     if (ids.length === 0) return;
     try {
       const dir = await LibraryService.SaveCopies(ids);
-      if (dir) toast({ tone: "success", title: `Saved ${ids.length === 1 ? "a copy" : `${ids.length} copies`} to ${dir}` });
+      if (dir) toast({ tone: "success", title: `Saved ${ids.length === 1 ? "a copy" : `${ids.length} copies`} to ${displayPath(dir)}` });
     } catch (e) {
       fail(e);
     }

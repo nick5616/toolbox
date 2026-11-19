@@ -27,6 +27,7 @@ const (
 	itemFocus      = "focus"
 	itemFocusStart = "focus-start"
 	itemSep        = "-"
+	itemWorkspace  = "ws:" // + workspace ID
 )
 
 const maxRecent = 5
@@ -53,6 +54,17 @@ type trayState struct {
 	LanAlias     string // this computer's alias
 	LanCanStart  bool   // off, but the mode was "always" (or the tray stopped it)
 	LanPrompt    string // alias of a device waiting for an answer ("" = none)
+	// --- workspaces (Phase 21) ---
+	WorkspaceName string          // "" = Personal (no tooltip suffix)
+	Workspaces    []trayWorkspace // every workspace; the submenu shows with two or more
+}
+
+// trayWorkspace is one row of the Workspace submenu.
+type trayWorkspace struct {
+	ID      string
+	Name    string
+	Current bool
+	Missing bool
 }
 
 // trayItem is one row of the tray menu.
@@ -128,7 +140,21 @@ func trayModel(s trayState) []trayItem {
 	if len(recent.Children) == 0 {
 		recent.Children = []trayItem{{ID: "recent:none", Label: "No outputs yet"}}
 	}
-	m = append(m, recent,
+	m = append(m, recent)
+	if len(s.Workspaces) > 1 {
+		ws := trayItem{ID: "workspaces", Label: "Workspace", Enabled: true, Submenu: true}
+		for _, w := range s.Workspaces {
+			it := item(itemWorkspace+w.ID, w.Name)
+			it.Checkbox, it.Checked = true, w.Current
+			it.Enabled = !w.Missing
+			if w.Missing {
+				it.Label = w.Name + " (not found)"
+			}
+			ws.Children = append(ws.Children, it)
+		}
+		m = append(m, ws)
+	}
+	m = append(m,
 		trayItem{ID: itemSep, Separator: true},
 		item(itemSettings, "Settings…"),
 		item(itemQuit, "Quit Toolbox"))

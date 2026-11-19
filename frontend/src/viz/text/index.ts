@@ -311,7 +311,7 @@ export function createTextLayer(ctx: TextLayerContext): TextLayer {
           rasterStyle,
         );
       };
-      const rk = style.react.signal ? Math.max(0.5, Math.min(2, 1 + style.react.amount * 0.12 * f.signals.value(style.react.signal, t))) : 1;
+      const rk = style.react.signal ? Math.max(0.5, Math.min(2, 1 + style.react.amount * 0.12 * f.signals.smoothed(style.react.signal, t))) : 1;
 
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);

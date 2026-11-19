@@ -3,7 +3,9 @@ package desktop
 import (
 	_ "embed"
 	"fmt"
+	"log/slog"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 
 	"toolbox/core"
 	"toolbox/core/lan"
+	"toolbox/core/workspace"
 )
 
 //go:embed icons/tray.png
@@ -56,6 +59,7 @@ func (t *tray) start() {
 		core.EventSettingsChanged, core.EventHotkeysStatus,
 		core.EventVaultState, // --- vault (VA1) ---
 		lan.EventState,       // --- local file transfer (Phase 13) ---
+		workspace.EventChanged,
 	} {
 		t.s.o.App.Event.On(name, func(*application.CustomEvent) { t.refresh() })
 	}
@@ -121,6 +125,12 @@ func (t *tray) state() trayState {
 		st.VaultUnlocked = o.Vault.State().Unlocked
 	}
 	// --- end vault ---
+	st.WorkspaceName = o.WorkspaceName
+	if o.Workspaces != nil {
+		for _, w := range o.Workspaces() {
+			st.Workspaces = append(st.Workspaces, trayWorkspace{ID: w.ID, Name: w.Name, Current: w.Current, Missing: w.Missing})
+		}
+	}
 	st.NeedYou, st.NeedYouName = t.s.pipelinesNeedYou()
 	if eng := t.s.focusEngine(); eng != nil {
 		focusTray(&st, eng, time.Now())
@@ -233,6 +243,12 @@ func (t *tray) handler(id string, st trayState) func(*application.Context) {
 			s.startLastFocus()
 		case id == itemPipelines:
 			_ = s.ShowMain(NavigatePipelineRuns)
+		case strings.HasPrefix(id, itemWorkspace):
+			if s.o.SwitchWorkspace != nil {
+				if err := s.o.SwitchWorkspace(strings.TrimPrefix(id, itemWorkspace)); err != nil {
+					slog.Warn("tray: switch workspace", "err", err)
+				}
+			}
 		case id == itemSettings:
 			_ = s.ShowMain("settings")
 		case id == itemQuit:

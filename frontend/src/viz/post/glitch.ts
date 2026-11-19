@@ -32,7 +32,7 @@ registerPost({
   create(ctx) {
     return simplePass(ctx, SRC, (p, f) => {
       const drop = triggerDrive(f.params.trigger, () => f.signals.value("drop.pulse", f.tMs, 5, 200));
-      p.f1("u_strength", glitchStrength(drop, f.params.amount as number))
+      p.f1("u_strength", glitchStrength(Math.min(1, drop * f.intensity), f.params.amount as number))
         .f1("u_step", glitchStep(f.tMs))
         .f1("u_seed", (f.seed % 1000) * 0.137);
     });

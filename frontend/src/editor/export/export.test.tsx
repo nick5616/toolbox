@@ -36,7 +36,7 @@ vi.mock("@/lib/api", async (orig) => {
 });
 vi.mock("@/lib/toolActions", () => ({ toolAction: () => (...a: unknown[]) => h.addToPost(...a) }));
 
-import { JobStatus, type EditMatteState, type EditSourceState, type Job } from "@/lib/api";
+import { EditStudioService, JobStatus, type EditMatteState, type EditSourceState, type Job } from "@/lib/api";
 import { useJobs } from "@/state/jobs";
 import { emptyEditProject, normalizeProject, type NormalProject } from "@/viz/edit/defaults";
 import { newClip } from "@/editor/doc";
@@ -112,7 +112,8 @@ describe("ExportDialog", () => {
   it("shows size, fps and length, and exports with the chosen size", async () => {
     const user = userEvent.setup();
     const onClose = open(makeProject(), [src("/a.mov"), src("/b.jpg")]);
-    expect(await screen.findByText("30 fps")).toBeTruthy();
+    expect(await screen.findByLabelText("Frame rate")).toBeTruthy();
+    expect((screen.getByLabelText("Frame rate") as HTMLSelectElement).selectedOptions[0]?.textContent).toBe("Project (30 fps)");
     expect(screen.getByText(/0:30 · 900 frames/)).toBeTruthy();
     await user.selectOptions(screen.getByLabelText("Size"), "720");
     const exportBtn = screen.getByRole("button", { name: "Export" });
@@ -126,6 +127,106 @@ describe("ExportDialog", () => {
     expect((h.save.mock.calls[0]![2] as NormalProject).exportHeight).toBe(720);
     expect(useEditStudio.getState().jobs.render).toBe("j1");
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("has every setting, starts from the defaults and saves the choices into project.export", async () => {
+    const user = userEvent.setup();
+    open(makeProject(), [src("/a.mov"), src("/b.jpg")]);
+    const sel = (n: string) => screen.getByLabelText(n) as HTMLSelectElement;
+    expect(Array.from(sel("Size").options).map((o) => o.value)).toEqual(["720", "1080", "1440", "2160"]);
+    expect(Array.from(sel("Frame rate").options).map((o) => o.value)).toEqual(["0", "24", "25", "30", "60"]);
+    expect(Array.from(sel("Format").options).map((o) => o.textContent)).toEqual(["H.264 MP4", "H.265 MP4"]);
+    expect(Array.from(sel("Quality").options).map((o) => o.textContent)).toEqual(["Draft", "Good", "Best"]);
+    expect(Array.from(sel("Audio").options).map((o) => o.value)).toEqual(["128", "192", "320"]);
+    expect(sel("Quality").value).toBe("good");
+    expect(sel("Audio").value).toBe("192");
+    await user.selectOptions(sel("Frame rate"), "60");
+    await user.selectOptions(sel("Format"), "h265");
+    await user.selectOptions(sel("Quality"), "best");
+    await user.selectOptions(sel("Audio"), "320");
+    expect(screen.getByText(/0:30 · 1800 frames/)).toBeTruthy();
+    const btn = screen.getByRole("button", { name: "Export" });
+    await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
+    await user.click(btn);
+    await waitFor(() => expect(h.render).toHaveBeenCalledWith("p1"));
+    expect(useEditStudio.getState().history!.present.export).toEqual({ fps: 60, codec: "h265", quality: "best", audioKbps: 320, inMs: 0, outMs: 0 });
+    expect((h.save.mock.calls[0]![2] as NormalProject).export).toMatchObject({ codec: "h265" });
+  });
+
+  it("the In-Out range is disabled without a range and says why", () => {
+    open(makeProject(), [src("/a.mov"), src("/b.jpg")]);
+    const range = screen.getByLabelText("Range") as HTMLSelectElement;
+    const inOut = Array.from(range.options).find((o) => o.value === "range")!;
+    expect(inOut.disabled).toBe(true);
+    expect(screen.getByText("Set In and Out points first")).toBeTruthy();
+  });
+
+  it("exports only the In-Out range when chosen", async () => {
+    const user = userEvent.setup();
+    useEditStudio.setState({ rangeInMs: 2000, rangeOutMs: 12_000 } as never);
+    open(makeProject(), [src("/a.mov"), src("/b.jpg")]);
+    const range = screen.getByLabelText("Range") as HTMLSelectElement;
+    expect(Array.from(range.options).find((o) => o.value === "range")!.disabled).toBe(false);
+    await user.selectOptions(range, "range");
+    expect(screen.getByText(/0:10 · 300 frames/)).toBeTruthy();
+    const btn = screen.getByRole("button", { name: "Export" });
+    await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
+    await user.click(btn);
+    await waitFor(() => expect(h.render).toHaveBeenCalled());
+    expect(useEditStudio.getState().history!.present.export).toMatchObject({ inMs: 2000, outMs: 12_000 });
+    useEditStudio.setState({ rangeInMs: undefined, rangeOutMs: undefined } as never);
+  });
+
+  it("shows an estimated size that follows the quality", async () => {
+    const user = userEvent.setup();
+    open(makeProject(), [src("/a.mov"), src("/b.jpg")]);
+    const text = () => screen.getByText(/^≈ /).textContent ?? "";
+    const mb = (t: string) => Number(/([\d.]+) MB/.exec(t)?.[1] ?? 0);
+    const good = mb(text());
+    expect(good).toBeGreaterThan(5);
+    await user.selectOptions(screen.getByLabelText("Quality"), "best");
+    expect(mb(text())).toBeGreaterThan(good);
+    await user.selectOptions(screen.getByLabelText("Quality"), "draft");
+    expect(mb(text())).toBeLessThan(good);
+  });
+
+  it("Audio only and Still frame call their render services, and say so when the build lacks them", async () => {
+    const user = userEvent.setup();
+    const audio = vi.fn().mockResolvedValue(job({ id: "ja", status: JobStatus.JobQueued, progress: 0 }));
+    const still = vi.fn().mockResolvedValue(job({ id: "js", status: JobStatus.JobQueued, progress: 0 }));
+    const svc = EditStudioService as unknown as Record<string, unknown>;
+    open(makeProject(), [src("/a.mov"), src("/b.jpg")]);
+    const aBtn = screen.getByRole("button", { name: "Audio only (.m4a)" });
+    await waitFor(() => expect((aBtn as HTMLButtonElement).disabled).toBe(false));
+    await user.click(aBtn); // the services aren't there yet
+    expect((await screen.findAllByText(/Audio-only export isn't available/)).length).toBeGreaterThan(0);
+    svc.RenderAudio = audio;
+    svc.RenderStill = still;
+    try {
+      await user.click(screen.getByRole("button", { name: "Audio only (.m4a)" }));
+      await waitFor(() => expect(audio).toHaveBeenCalledWith("p1"));
+      expect(useEditStudio.getState().jobs.render).toBe("ja");
+    } finally {
+      delete svc.RenderAudio;
+      delete svc.RenderStill;
+    }
+  });
+
+  it("Still frame renders the frame under the playhead", async () => {
+    const user = userEvent.setup();
+    const still = vi.fn().mockResolvedValue(job({ id: "js", status: JobStatus.JobQueued, progress: 0 }));
+    const svc = EditStudioService as unknown as Record<string, unknown>;
+    svc.RenderStill = still;
+    try {
+      open(makeProject(), [src("/a.mov"), src("/b.jpg")]);
+      useEditStudio.getState().setPlayhead(1234);
+      const btn = screen.getByRole("button", { name: "Still frame (.png)" });
+      await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(false));
+      await user.click(btn);
+      await waitFor(() => expect(still).toHaveBeenCalledWith("p1", 1234));
+    } finally {
+      delete svc.RenderStill;
+    }
   });
 
   it("exports a video with no song and no analysis; its length follows the clips", async () => {

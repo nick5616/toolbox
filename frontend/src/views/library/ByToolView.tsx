@@ -6,6 +6,7 @@ import { GridView } from "./GridView";
 import type { ItemHandlers } from "./ItemCard";
 import { dirOf, type LibItem } from "./items";
 import { Places } from "./Places";
+import { displayPath } from "@/lib/displayPath";
 import styles from "./Library.module.css";
 
 /** Items shown per tool before "Show all". */
@@ -76,7 +77,7 @@ export function ByToolView({ items, root, size, moduleIcon, onShowAll, onOpenFol
             <header className={styles.toolHead}>
               <Icon name={moduleIcon(g.moduleId)} size={16} />
               <h3 className={styles.toolName}>{name}</h3>
-              <span className={styles.toolFolder} data-tip={folder.path}>
+              <span className={styles.toolFolder} data-tip={displayPath(folder.path)}>
                 {folder.name}
               </span>
               <span className={styles.spacer} />

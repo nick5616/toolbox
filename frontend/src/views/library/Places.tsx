@@ -7,6 +7,7 @@ import { useLibrary } from "@/state/library";
 import { useModules } from "@/state/modules";
 import { ItemThumb } from "./previews/ItemThumb";
 import { fromPath } from "./items";
+import { displayPath } from "@/lib/displayPath";
 import styles from "./Library.module.css";
 
 export const ERASER_ID = "object-eraser";
@@ -104,7 +105,7 @@ export function Places({ root, onFolder }: PlacesProps) {
           <ul className={styles.maskList}>
             {devices.map((d) => (
               <li key={d.rel}>
-                <button type="button" className={styles.maskBtn} aria-label={`Received from ${d.name}`} onClick={() => onFolder(d.rel)} data-tip={d.path}>
+                <button type="button" className={styles.maskBtn} aria-label={`Received from ${d.name}`} onClick={() => onFolder(d.rel)} data-tip={displayPath(d.path)}>
                   <Icon name="folder" size={14} />
                   <span>{d.name}</span>
                   <span className={styles.mono}>{d.files}</span>

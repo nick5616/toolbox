@@ -72,7 +72,9 @@ export function setKeyAt(p: EditParam, t: number, v: number, ease?: Key["ease"])
   const i = keyIndexAt(keys, at);
   if (i >= 0) {
     const cur = keys[i] as Key;
-    keys[i] = { t: cur.t, v, ease: ease ?? cur.ease };
+    const next: Key = { ...cur, v, ease: ease ?? cur.ease };
+    if (next.ease !== "bezier") delete next.bez;
+    keys[i] = next;
   } else {
     if (keys.length >= MAX_KEYS) return p;
     keys.push({ t: at, v, ease: ease ?? "ease" });
@@ -91,11 +93,29 @@ export function removeKeyAt(p: EditParam, t: number): EditParam {
   return buildParam(base, keys, paramMods(p));
 }
 
+/** The default custom curve: CSS "ease". */
+export const DEFAULT_BEZ: [number, number, number, number] = [0.25, 0.1, 0.25, 1];
+
+/** Sets the ease of the key at t. "bezier" keeps its curve (or starts from CSS "ease"); every other ease drops it. */
 export function setEaseAt(p: EditParam, t: number, ease: Key["ease"]): EditParam {
   const keys = paramKeys(p).slice();
   const i = keyIndexAt(keys, t);
   if (i < 0) return p;
-  keys[i] = { ...(keys[i] as Key), ease };
+  const cur = keys[i] as Key;
+  const next: Key = { ...cur, ease };
+  if (ease === "bezier") next.bez = cur.bez ?? [...DEFAULT_BEZ];
+  else delete next.bez;
+  keys[i] = next;
+  return withKeys(p, keys);
+}
+
+/** Makes the key at t a custom-curve key. x1, x2 clamp to 0..1 and y1, y2 to −1..2. */
+export function setBezierAt(p: EditParam, t: number, bez: readonly [number, number, number, number]): EditParam {
+  const keys = paramKeys(p).slice();
+  const i = keyIndexAt(keys, t);
+  if (i < 0) return p;
+  const c = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(v * 1000) / 1000));
+  keys[i] = { ...(keys[i] as Key), ease: "bezier", bez: [c(bez[0], 0, 1), c(bez[1], -1, 2), c(bez[2], 0, 1), c(bez[3], -1, 2)] };
   return withKeys(p, keys);
 }
 

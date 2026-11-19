@@ -6,7 +6,7 @@
  * On its own it seeds the buffer with orbiting lights and kick rings so it
  * never shows black. Rates are per 1/60 s, so preview and export match.
  */
-import { barPosition, bgShader, cumSignal, drive, fullscreenLayer, speedScale } from "./_bg/util";
+import { bgShader, drive, fullscreenLayer } from "./_bg/util";
 import { registerLayer } from "./registry";
 
 const FS = bgShader(`
@@ -77,9 +77,9 @@ registerLayer({
       const dt = f.dtMs / (1000 / 60);
       const segs = Math.max(4, Math.round((f.params.segments as number) / 2) * 2);
       const seg = (Math.PI * 2) / segs;
-      const spin = f.params.spin as number;
-      // one wedge per bar (smooth, and the picture repeats exactly at bar lines), plus slow drift and the drums
-      const rot = spin * (barPosition(f) * seg * 0.5 + f.motionSec * 0.04 + cumSignal(f.signals, "drums.level", f.tMs) * speedScale(f) * 0.05 * react);
+      // one wedge per bar, plus slow drift and the drums: the angle is the integral of the spin rate
+      const bpb = Math.max(1, f.analysis.audio.beatsPerBar);
+      const rot = (f.beatIntegral("spin") / bpb) * seg * 0.5 + f.integral("spin") * 0.04 + f.integral("spin*react*intensity*drums.level") * 0.05;
       const zoomRate = (f.params.zoom as number) * (0.006 + 0.018 * d.kick + 0.01 * d.drop) * sp;
       const trail = f.params.trail as number;
       const decay = Math.pow(0.996, dt);
@@ -98,7 +98,7 @@ registerLayer({
         .f1("u_bass", d.bass)
         .f1("u_beat", d.beat)
         .f1("u_snare", d.snare)
-        .f1("u_orbit", f.motionSec * sp * 0.6 + cumSignal(f.signals, "mix.level", f.tMs) * speedScale(f) * sp * react * 0.8);
+        .f1("u_orbit", f.integral("speed") * 0.6 + f.integral("speed*react*intensity*mix.level") * 0.8);
     });
   },
 });

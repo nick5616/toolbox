@@ -167,7 +167,15 @@ func (m *Module) validateOptions(o Options) error {
 			return err
 		}
 		return validateMatte(*o.Matte)
-	case ActionRender:
+	case ActionRender, ActionRenderAudio:
+		return needProject()
+	case ActionRenderStill:
+		if o.Still == nil {
+			return vErr("still", "Pick a frame")
+		}
+		if o.Still.AtMs < 0 {
+			return vErr("still.atMs", "Pick a frame inside the edit")
+		}
 		return needProject()
 	case ActionText:
 		if o.Text == nil {
@@ -208,6 +216,10 @@ func (m *Module) Run(ctx context.Context, job *core.JobContext) error {
 		return m.runMatte(ctx, job, o.ProjectID, *o.Matte)
 	case ActionRender:
 		return m.runRender(ctx, job, o.ProjectID)
+	case ActionRenderAudio:
+		return m.runRenderAudio(ctx, job, o.ProjectID)
+	case ActionRenderStill:
+		return m.runRenderStill(ctx, job, o.ProjectID, *o.Still)
 	case ActionText:
 		return m.runText(ctx, job, *o.Text)
 	case ActionAssemble:

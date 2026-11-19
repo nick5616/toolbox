@@ -1,4 +1,4 @@
-/** Zoom pulse (SPEC.md §6.7): the frame breathes in on every beat. */
+/** Zoom pulse (SPEC.md §6.7): the frame breathes in on every bar (3% at most). */
 import { zoomPulseScale } from "./px1math";
 import { triggerDrive } from "./px2math";
 import { simplePass } from "./pass";
@@ -14,11 +14,12 @@ registerPost({
   kind: "pass",
   params: {
     amount: { kind: "number", label: "Amount", min: 0, max: 1, default: 0.35 },
-    trigger: { kind: "enum", label: "Triggered by", options: ["beat", "amount"], default: "beat" },
+    trigger: { kind: "enum", label: "Triggered by", options: ["bar", "beat", "amount"], default: "bar" },
   },
   create(ctx) {
     return simplePass(ctx, SRC, (p, f) => {
-      p.f1("u_scale", zoomPulseScale(triggerDrive(f.params.trigger, () => f.signals.value("beat.pulse", f.tMs)), f.params.amount as number));
+      const drive = triggerDrive(f.params.trigger, () => (f.params.trigger === "beat" ? f.signals.value("beat.pulse", f.tMs) : f.signals.value("bar.pulse", f.tMs)));
+      p.f1("u_scale", zoomPulseScale(drive * f.intensity, f.params.amount as number));
     });
   },
 });

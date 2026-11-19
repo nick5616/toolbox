@@ -2,7 +2,6 @@ package editstudio
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -26,7 +25,8 @@ var (
 		}
 		return br.Render(ctx, job, plan)
 	}
-	exportMuxFn    = viz.MuxOpaque
+	exportMuxFn    = muxEdit
+	exportAudioFn  = encodeAudioOnly
 	exportProbeFn  = videoeditor.ProbeFiles
 	exportNowFn    = time.Now
 	exportMixFn    = (*Module).mixAudio
@@ -58,6 +58,16 @@ func exportSize(aspect string, short int) (w, h int) {
 		return even(float64(short) * 16 / 9), short
 	}
 	return short, short
+}
+
+// docOutputSize is the export's size in pixels: an explicit Size when the
+// document has one (Color Grader and still plans), else the aspect at the
+// export height.
+func docOutputSize(doc EditProject) (w, h int) {
+	if doc.Size != nil {
+		return doc.Size.W, doc.Size.H
+	}
+	return exportSize(doc.Aspect, doc.ExportHeight)
 }
 
 // uprightSize is a probed video's size after rotation.
@@ -229,110 +239,6 @@ func (m *Module) ensureExportFiles(ctx context.Context, job *core.JobContext, pr
 	}
 	job.Progress(1, "Sources ready")
 	return streams, images, nil
-}
-
-// runRender is the render action.
-func (m *Module) runRender(ctx context.Context, job *core.JobContext, projectID string) error {
-	stored, err := m.docs.Load(ctx, projectID)
-	if err != nil {
-		return err
-	}
-	doc, err := m.Get(ctx, projectID)
-	if err != nil {
-		return err
-	}
-	return m.renderDoc(ctx, job, projectID, stored.Name, doc)
-}
-
-// renderDoc exports doc as <library>/Edits/<name>.mp4. projectID names the
-// stored project whose mattes the clips use ("" = none, e.g. an edit a
-// pipeline step built in memory).
-func (m *Module) renderDoc(ctx context.Context, job *core.JobContext, projectID, name string, doc EditProject) error {
-	start := exportNowFn()
-	job.SetTitle("Exporting — " + name)
-	if err := m.validateDoc(ctx, projectID, doc); err != nil {
-		return err
-	}
-	ffmpeg, err := job.Tool("ffmpeg")
-	if err != nil {
-		return err
-	}
-	ffprobe, err := job.Tool("ffprobe")
-	if err != nil {
-		return err
-	}
-	// Without an analysis (a Video Editor project) the plan carries the zero ref
-	// and the worker renders against an empty analysis.
-	var ref viz.AnalysisRef
-	if doc.AnalysisKey != "" {
-		var ok bool
-		ref, ok = m.cfg.Analyzer.Lookup(doc.AnalysisKey)
-		if !ok {
-			return core.ValidationError("The song's analysis isn't cached any more. Analyze it again", map[string]string{"analysisKey": "Analyze the song again"})
-		}
-	}
-	cancelled := func(err error) error {
-		if ctx.Err() != nil {
-			return fmt.Errorf("export cancelled: %w", ctx.Err())
-		}
-		return err
-	}
-
-	outW, outH := exportSize(doc.Aspect, doc.ExportHeight)
-	streams, images, err := m.ensureExportFiles(ctx, job.Scoped(0, exportSourcesTo), projectID, doc, ffprobe, outW, outH)
-	if err != nil {
-		return cancelled(err)
-	}
-
-	pj, err := json.Marshal(normalize(doc))
-	if err != nil {
-		return fmt.Errorf("encode project: %w", err)
-	}
-	if len(pj) > maxProjectJSON {
-		return core.ValidationError("This edit is too large to export", nil)
-	}
-	plan := newRenderPlan(doc, ref, outW, outH, string(pj), streams, images)
-	enc, err := exportRenderFn(ctx, m.cfg.Broker, job.Scoped(exportSourcesTo, exportRenderTo), plan)
-	if err != nil {
-		return cancelled(err)
-	}
-	if enc.Path != "" {
-		defer os.Remove(enc.Path) // the stream is large; the TempDir goes later anyway
-	}
-	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("export cancelled: %w", err)
-	}
-
-	job.Progress(exportRenderTo, "Mixing the audio…")
-	mixPath := filepath.Join(job.TempDir, "mix.wav")
-	if err := exportMixFn(m, ctx, job.Scoped(exportRenderTo, exportAudioTo), doc, ffmpeg, mixPath); err != nil {
-		return cancelled(err)
-	}
-
-	job.Progress(exportAudioTo, "Finishing the video…")
-	tmp := filepath.Join(job.TempDir, "edit.mp4")
-	err = exportMuxFn(ctx, ffmpeg, enc, mixPath, 0, 0, doc.FPS, "", tmp, func(p float64) {
-		job.Progress(exportAudioTo+p*(1-exportAudioTo), "Finishing the video…")
-	})
-	if err != nil {
-		_ = os.Remove(tmp)
-		return cancelled(err)
-	}
-	// The mux writes into the TempDir and the finished file is moved into the
-	// Library, so a cancel never leaves a half file there.
-	dst := core.UniquePath(job.OutputDir, fileStem(name, "Edit"), ".mp4")
-	if err := exportMove(tmp, dst); err != nil {
-		return cancelled(core.Errorf(core.CodeToolFailed, "Couldn't save the video").WithCause(err))
-	}
-	if _, err := job.Output(dst); err != nil {
-		return fmt.Errorf("register output: %w", err)
-	}
-	res := Result{Action: ActionRender, Outputs: []string{dst}, Encoder: enc.Encoder}
-	if wall := exportNowFn().Sub(start).Seconds(); wall > 0 {
-		res.Speed = float64(editLen(doc)) / 1000 / wall
-	}
-	job.Progress(1, "Saved "+filepath.Base(dst))
-	return job.SetResult(res)
 }
 
 // exportMove renames src to dst, copying across volumes when needed; a failed

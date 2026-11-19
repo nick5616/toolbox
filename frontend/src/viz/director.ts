@@ -12,7 +12,8 @@
  *   draws them on top of the active scene.
  */
 import type { Analysis, Section, TextLine } from "./analysis";
-import type { Emotion, LayerConfig, Motif, SectionLabel, Show, TimelineEntry, Transition } from "./types";
+import { DROP_GAP_BARS, splitDrops } from "./signals";
+import type { Emotion, LayerConfig, Motif, Scene, SectionLabel, Show, TimelineEntry, Transition } from "./types";
 
 export const DEFAULT_SCENE_FOR: Record<SectionLabel, string> = {
   intro: "calm",
@@ -27,6 +28,10 @@ export const DEFAULT_SCENE_FOR: Record<SectionLabel, string> = {
 
 /** Minimum length of a scene when it follows the mood, in bars. */
 export const MIN_EMOTION_BARS = 2;
+/** Minimum length of a scene in section mode, in bars (a counted drop may cut in sooner; SPEC section C2.5). */
+export const MIN_SECTION_BARS = 8;
+/** Scenes that share their layers morph their base parameters over this many bars instead of crossfading pictures. */
+export const MORPH_BARS = 2;
 /** How many motif layers can play at once. */
 export const MAX_MOTIFS = 2;
 
@@ -59,21 +64,26 @@ export function sceneOrFallback(show: Show, id: string): string {
   return show.scenes[0]?.id ?? "main";
 }
 
-/** True when a build-up (lift) was happening in the four bars before t. */
+function inRange(list: readonly [number, number][], t0: number, t1: number): boolean {
+  return list.some((e) => e[0] >= t0 && e[0] <= t1);
+}
+
+/** True when a build-up (a lift, or a drop too close to the last one) was happening in the four bars before t. */
 function liftBefore(a: Analysis, t: number, barMs: number): boolean {
-  return a.eventsBetween("lift", t - 4 * barMs, t + barMs / 2).length > 0;
+  return inRange(splitDrops(a).lifts, t - 4 * barMs, t + barMs / 2);
 }
 
+/** True when a counted drop (see splitDrops) lands around t. */
 function dropAt(a: Analysis, t: number, barMs: number): boolean {
-  return a.eventsBetween("drop", t - barMs / 2, t + barMs).length > 0;
+  return inRange(splitDrops(a).drops, t - barMs / 2, t + barMs);
 }
 
-function transitionFor(a: Analysis, show: Show, s: Section, start: number, barMs: number): Transition {
+function transitionFor(a: Analysis, show: Show, s: Section, start: number, barMs: number, drop: boolean, demoted: boolean): Transition {
   const rules = show.director?.transitions;
   const explicit = rules?.[s.label];
   if (explicit) return explicit;
-  if (s.label === "drop" || dropAt(a, start, barMs)) return rules?.drop ?? { kind: "flash", ms: Math.round(barMs / 2) };
-  if (s.label === "chorus" && liftBefore(a, start, barMs)) return rules?.chorusAfterLift ?? { kind: "zoom", ms: Math.round(barMs) };
+  if (drop) return rules?.drop ?? { kind: "flash", ms: Math.round(barMs / 2) };
+  if (demoted || (s.label === "chorus" && liftBefore(a, start, barMs))) return rules?.chorusAfterLift ?? { kind: "zoom", ms: Math.round(barMs) };
   return { kind: "crossfade", ms: Math.round(barMs) };
 }
 
@@ -82,6 +92,7 @@ function sectionTimeline(a: Analysis, show: Show): TimelineEntry[] {
   const rules = show.director;
   const sections: Section[] = a.audio.sections.length > 0 ? a.audio.sections : [{ startMs: 0, endMs: a.durationMs, label: "section", group: "A", energy: 0.5 }];
   const out: TimelineEntry[] = [];
+  let lastDrop = -Infinity; // start of the last drop that flashed
   for (const [i, s] of sections.entries()) {
     const sceneId = sceneOrFallback(show, rules?.sceneFor?.[s.label] ?? DEFAULT_SCENE_FOR[s.label]);
     const start = i === 0 ? 0 : nearestDownbeat(a, s.startMs, barMs);
@@ -90,8 +101,17 @@ function sectionTimeline(a: Analysis, show: Show): TimelineEntry[] {
       prev.endMs = s.endMs; // same scene continues: no transition
       continue;
     }
+    // A drop counts only when the last one is at least DROP_GAP_BARS back; otherwise it is just a lift.
+    const wantsDrop = i > 0 && (s.label === "drop" || dropAt(a, start, barMs));
+    const drop = wantsDrop && start - lastDrop >= DROP_GAP_BARS * barMs;
+    // A scene holds for at least MIN_SECTION_BARS bars; only a counted drop cuts in sooner.
+    if (prev && !drop && start - prev.startMs < MIN_SECTION_BARS * barMs) {
+      prev.endMs = s.endMs;
+      continue;
+    }
+    if (drop) lastDrop = start;
     if (prev) prev.endMs = start;
-    out.push({ startMs: start, endMs: s.endMs, sceneId, transition: i === 0 ? { kind: "cut", ms: 0 } : transitionFor(a, show, s, start, barMs) });
+    out.push({ startMs: start, endMs: s.endMs, sceneId, transition: i === 0 ? { kind: "cut", ms: 0 } : transitionFor(a, show, s, start, barMs, drop, wantsDrop && !drop) });
   }
   const last = out[out.length - 1];
   if (last) last.endMs = Math.max(last.endMs, a.durationMs);
@@ -157,6 +177,45 @@ export function activeAt(entries: TimelineEntry[], tMs: number): ActiveScenes | 
     return { current: cur, previous: prev, mix: Math.max(0, (tMs - cur.startMs) / ms) };
   }
   return { current: cur, previous: null, mix: 1 };
+}
+
+// ---- Morphs ----
+
+/** The enabled layer types of a scene, sorted: two scenes "use the same layers" when these are equal. */
+function layerTypes(sc: Scene | undefined): string {
+  return (sc?.layers ?? [])
+    .filter((l) => l.enabled)
+    .map((l) => l.type)
+    .sort()
+    .join(",");
+}
+
+export interface Morph {
+  from: TimelineEntry;
+  to: TimelineEntry;
+  /** 0..1, eased in and out. */
+  amount: number;
+}
+
+/**
+ * While a crossfade lands on a scene that uses the same layers as the one before,
+ * the engine draws only the new scene and morphs its base parameters from the old
+ * ones over MORPH_BARS bars (ease in-out), instead of crossfading two pictures.
+ */
+export function morphAt(a: Analysis, show: Show, entries: TimelineEntry[], tMs: number): Morph | null {
+  let i = -1;
+  for (let k = 0; k < entries.length; k++) if ((entries[k] as TimelineEntry).startMs <= tMs) i = k;
+  if (i < 1) return null;
+  const cur = entries[i] as TimelineEntry;
+  const prev = entries[i - 1] as TimelineEntry;
+  if (cur.transition.kind !== "crossfade" || cur.sceneId === prev.sceneId) return null;
+  const ms = MORPH_BARS * barLengthMs(a);
+  const x = (tMs - cur.startMs) / ms;
+  if (x >= 1) return null;
+  const sc = (id: string) => show.scenes.find((s) => s.id === id);
+  if (layerTypes(sc(cur.sceneId)) !== layerTypes(sc(prev.sceneId))) return null;
+  const t = Math.max(0, x);
+  return { from: prev, to: cur, amount: t * t * (3 - 2 * t) };
 }
 
 // ---- Motifs ----

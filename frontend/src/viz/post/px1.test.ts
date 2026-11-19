@@ -15,12 +15,12 @@ import {
 } from "./px1math";
 
 describe("shake", () => {
-  it("is deterministic and bounded to 2% of the short side", () => {
+  it("is deterministic and bounded to 1% of the short side", () => {
     const short = 720;
     for (let t = 0; t < 20000; t += 37) {
       const [x, y] = shakeOffset(t, 7, 1, short, 1);
-      expect(Math.abs(x)).toBeLessThanOrEqual(0.02 * short + 1e-9);
-      expect(Math.abs(y)).toBeLessThanOrEqual(0.02 * short + 1e-9);
+      expect(Math.abs(x)).toBeLessThanOrEqual(0.01 * short + 1e-9);
+      expect(Math.abs(y)).toBeLessThanOrEqual(0.01 * short + 1e-9);
       expect(shakeOffset(t, 7, 1, short, 1)).toEqual([x, y]);
     }
   });
@@ -38,8 +38,8 @@ describe("zoom pulse and chromatic", () => {
   it("zooms only inward and scales with amount", () => {
     expect(zoomPulseScale(0, 1)).toBe(1);
     expect(zoomPulseScale(1, 0)).toBe(1);
-    expect(zoomPulseScale(1, 1)).toBeCloseTo(1.06);
-    expect(zoomPulseScale(5, 9)).toBeCloseTo(1.06);
+    expect(zoomPulseScale(1, 1)).toBeCloseTo(1.03);
+    expect(zoomPulseScale(5, 9)).toBeCloseTo(1.03);
   });
   it("keeps chromatic aberration to a few pixels", () => {
     expect(chromaticPx(4, 1, 720)).toBeCloseTo(4);
@@ -93,7 +93,9 @@ describe("glitch", () => {
 
 describe("transition curves", () => {
   it("flash starts bright and decays to nothing", () => {
-    expect(flashLevel(0)).toBeGreaterThan(1);
+    expect(flashLevel(0)).toBeCloseTo(1);
+    expect(flashLevel(0, 0.5)).toBeCloseTo(0.5);
+    expect(flashLevel(0, 2)).toBeLessThanOrEqual(1.5);
     expect(flashLevel(1)).toBe(0);
     expect(flashLevel(0.3)).toBeGreaterThan(flashLevel(0.6));
   });

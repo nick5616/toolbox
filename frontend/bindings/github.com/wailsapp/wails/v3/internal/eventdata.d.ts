@@ -19,6 +19,9 @@ import type * as lan$0 from "../../../../../toolbox/core/lan/models.js";
 import type * as viz$0 from "../../../../../toolbox/core/viz/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import type * as workspace$0 from "../../../../../toolbox/core/workspace/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import type * as captions$0 from "../../../../../toolbox/modules/captions/models.js";
 
 declare module "@wailsio/runtime" {
@@ -66,6 +69,8 @@ declare module "@wailsio/runtime" {
             "windows:changed": core$0.WindowsChanged;
             "windows:handoff": core$0.WindowHandoff;
             "windows:relay": core$0.WindowRelay;
+            "workspace:changed": workspace$0.Info;
+            "workspace:switch-request": workspace$0.SwitchRequest;
         }
     }
 }

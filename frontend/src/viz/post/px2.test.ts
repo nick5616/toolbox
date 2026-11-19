@@ -32,17 +32,17 @@ describe("trigger params (additive, defaults unchanged)", () => {
     expect(glitchStrength(triggerDrive("drop", () => kick), 0.7)).toBe(glitchStrength(kick, 0.7));
   });
   it("amount makes Amount the whole strength", () => {
-    expect(zoomPulseScale(triggerDrive("amount", () => 0), 1)).toBeCloseTo(1.06);
+    expect(zoomPulseScale(triggerDrive("amount", () => 0), 1)).toBeCloseTo(1.03);
     expect(glitchStrength(triggerDrive("amount", () => 0), 0.4)).toBeCloseTo(0.4);
     const [x, y] = shakeOffset(500, 1, triggerDrive("amount", () => 0), 720, 1);
     expect(Math.abs(x) + Math.abs(y)).toBeGreaterThan(0);
     // chromatic "amount": drive 1, radius equals the amount (at 720 lines)
     expect(chromaticPx(6, 1, 720)).toBeCloseTo(6);
   });
-  it("registers the new enum options with unchanged defaults", () => {
+  it("registers the enum options (calm defaults: zoom on bars, chromatic on drops)", () => {
     const want: [PostType, string, string[], string][] = [
       ["shake", "trigger", ["kick", "amount"], "kick"],
-      ["zoompulse", "trigger", ["beat", "amount"], "beat"],
+      ["zoompulse", "trigger", ["bar", "beat", "amount"], "bar"],
       ["glitch", "trigger", ["drop", "amount"], "drop"],
     ];
     for (const [type, key, opts, def] of want) {
@@ -50,8 +50,8 @@ describe("trigger params (additive, defaults unchanged)", () => {
       expect(p).toMatchObject({ kind: "enum", options: opts, default: def });
     }
     const src = postDef("chromatic")?.params.source;
-    expect(src).toMatchObject({ kind: "enum", default: "kick" });
-    expect(src && src.kind === "enum" ? src.options : []).toEqual(["kick", "snare", "balance", "none", "amount"]);
+    expect(src).toMatchObject({ kind: "enum", default: "drop" });
+    expect(src && src.kind === "enum" ? src.options : []).toEqual(["drop", "kick", "snare", "balance", "none", "amount"]);
   });
 });
 

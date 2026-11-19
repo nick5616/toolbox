@@ -2,7 +2,7 @@
  * Ink (SPEC.md §6.7 #4): metaball ink in water, slow and soft. Blobs drift on
  * seeded Lissajous paths, swell with the vocals and are nudged by the kick.
  */
-import { bgShader, commonParams, cumSignal, drive, fullscreenLayer, speedScale } from "./_bg/util";
+import { bgShader, commonParams, drive, fullscreenLayer } from "./_bg/util";
 import { registerLayer } from "./registry";
 
 const MAX = 12;
@@ -86,8 +86,8 @@ registerLayer({
       const react = f.params.react as number;
       const d = drive(f, react);
       const visc = f.params.viscosity as number;
-      const sp = (f.params.speed as number) * (1.15 - 0.8 * visc);
-      const flow = f.motionSec * sp * 0.8 + cumSignal(f.signals, "mix.level", f.tMs) * speedScale(f) * sp * react * 0.5;
+      const thin = 1.15 - 0.8 * visc; // (a modulated viscosity scales the flow rate smoothly, as a rate should)
+      const flow = (f.integral("speed") * 0.8 + f.integral("speed*react*intensity*mix.level") * 0.5) * thin;
       p.gl.uniform4fv(p.loc("u_a"), a);
       p.gl.uniform4fv(p.loc("u_b"), b);
       p.f1("u_blobs", Math.round(f.params.blobs as number))

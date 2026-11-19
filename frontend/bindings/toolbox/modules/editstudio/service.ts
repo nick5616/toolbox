@@ -189,6 +189,23 @@ export function Render(projectID: string): $CancellablePromise<core$0.Job> {
 }
 
 /**
+ * RenderAudio submits the audio-only export: the edit's mix (song, the sound
+ * of video clips, audio clips; the export range and audio rate) as an .m4a in
+ * <library>/Edits.
+ */
+export function RenderAudio(projectID: string): $CancellablePromise<core$0.Job> {
+    return $Call.ByID(1473045740, projectID);
+}
+
+/**
+ * RenderStill submits a still export: the frame at atMs (timeline ms) as a
+ * .png in <library>/Edits, at the export size.
+ */
+export function RenderStill(projectID: string, atMs: number): $CancellablePromise<core$0.Job> {
+    return $Call.ByID(2998923372, projectID, atMs);
+}
+
+/**
  * ResultShape exists so the binding generator emits Result.
  */
 export function ResultShape(): $CancellablePromise<$models.Result> {

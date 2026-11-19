@@ -107,7 +107,68 @@
 }
 
 .easeSelect {
-  width: 84px;
+  width: 96px;
+}
+
+.toggleWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.curvePanel {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 5;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-pop);
+}
+
+.curve {
+  display: block;
+  touch-action: none;
+}
+
+.curveGrid {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.curveStem {
+  stroke: var(--fg-faint);
+  stroke-width: 1;
+}
+
+.curveLine {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.curveHandle {
+  fill: var(--bg-raised);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  cursor: grab;
+}
+
+.curveHandle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.pickBtn {
+  align-self: flex-start;
+}
+
+.pipGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-1);
 }
 
 .linkBtn {

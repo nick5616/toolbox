@@ -3,7 +3,7 @@
 
 /**
  * WorkspacesService lists, creates and switches workspaces (Phase 21 SPEC
- * §A6). FROZEN signatures after Wave 0; W1 implements the bodies.
+ * §A6). The method signatures are frozen; the exported fields wire it up.
  * @module
  */
 
@@ -45,6 +45,14 @@ export function Current(): $CancellablePromise<workspace$0.Info> {
  */
 export function List(): $CancellablePromise<workspace$0.Info[] | null> {
     return $Call.ByID(2537530702);
+}
+
+/**
+ * Notice returns the start-up notice once ("Demo's folder isn't there", a
+ * corrupt workspace list); later calls return "".
+ */
+export function Notice(): $CancellablePromise<string> {
+    return $Call.ByID(1422167122);
 }
 
 /**

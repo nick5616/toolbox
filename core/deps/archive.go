@@ -19,6 +19,7 @@ import (
 
 	"toolbox/core"
 	"toolbox/core/proc"
+	"toolbox/core/workspace"
 )
 
 // Managed archive tools (Phase 3 SPEC.md §3.5).
@@ -711,5 +712,10 @@ func (u *archiveUpdater) Validate(inputs []string, _ json.RawMessage) error {
 }
 
 func (u *archiveUpdater) Run(ctx context.Context, job *core.JobContext) error {
+	ctx, unlock, err := workspace.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	return u.svc.InstallManagedArchive(ctx, job, u.spec)
 }

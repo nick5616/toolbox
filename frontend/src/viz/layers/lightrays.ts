@@ -65,8 +65,8 @@ registerLayer({
     return {
       render(f) {
         const held = f.signals.value("vocals.held", f.tMs, 60, 500);
-        const beat = f.signals.value("beat.pulse", f.tMs);
-        const energy = Math.min(1, 0.15 + (f.params.held as number) * held * 0.9 + (f.params.pulse as number) * beat * 0.45 + 0.25 * f.signals.value("mix.level", f.tMs));
+        const beat = f.signals.smoothed("beat.pulse", f.tMs);
+        const energy = Math.min(1, 0.15 + (f.params.held as number) * held * 0.9 + (f.params.pulse as number) * beat * 0.45 + 0.25 * f.signals.smoothed("mix.level", f.tMs));
         prog
           .use()
           .f2("u_res", f.w, f.h)

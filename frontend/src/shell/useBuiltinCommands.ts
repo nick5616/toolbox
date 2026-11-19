@@ -11,6 +11,8 @@ import { useDesktop } from "@/state/desktop";
 import { useJobs } from "@/state/jobs";
 import { useSettings } from "@/state/settings";
 import { useUI } from "@/state/ui";
+import { openNewWorkspace, openWorkspaceSettings, switchTo, useWorkspace, workspaceIcon } from "@/state/workspace";
+import type { WorkspaceInfo } from "@/lib/api";
 import { useVaultState } from "@/tools/vault/useVaultState";
 import { extractUrls } from "./useGlobalPaste";
 import { trimmerCommands } from "@/tools/trimmer/commands";
@@ -58,11 +60,44 @@ function openSettingsSection(id: string) {
   setTimeout(tick, 0);
 }
 
+/** Palette entries for workspaces (Phase 21): the manager, New, and one per other workspace. */
+export function workspaceCommands(list: WorkspaceInfo[]): Command[] {
+  return [
+    {
+      id: "workspace.switch",
+      title: "Switch workspace…",
+      section: "Actions",
+      icon: "layers",
+      keywords: ["workspace", "demo", "personal", "profile"],
+      run: () => openWorkspaceSettings(),
+    },
+    {
+      id: "workspace.new",
+      title: "New workspace…",
+      section: "Actions",
+      icon: "folder-plus",
+      keywords: ["workspace", "demo", "create"],
+      run: () => openNewWorkspace(),
+    },
+    ...list
+      .filter((w) => !w.current && !w.missing)
+      .map((w) => ({
+        id: `workspace.switch.${w.id}`,
+        title: `Switch to workspace: ${w.name}`,
+        section: "Actions",
+        icon: workspaceIcon(w),
+        keywords: ["workspace", w.name],
+        run: () => void switchTo(w.id),
+      })),
+  ];
+}
+
 export function useBuiltinCommands(): void {
   const vault = useVaultState();
   // --- pipelines ---
   const pipelineEntries = usePipelines((s) => s.entries);
   // --- end pipelines ---
+  const workspaces = useWorkspace((s) => s.list);
   const modules = useModules((s) => s.list);
   const popOutCommands = useMemo<Command[]>(
     () =>
@@ -312,6 +347,7 @@ export function useBuiltinCommands(): void {
     // --- pipelines ---
     ...pipelinesCommands(pipelineEntries),
     // --- end pipelines ---
+    ...workspaceCommands(workspaces),
   ];
   useCommands(cmds);
 }

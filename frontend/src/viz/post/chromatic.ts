@@ -1,4 +1,4 @@
-/** Chromatic aberration (SPEC.md §6.7): RGB split that grows toward the edges, driven by kick, snare or the left/right balance. */
+/** Chromatic aberration (SPEC.md §6.7): RGB split that grows toward the edges, driven by drops (or kick, snare, the left/right balance). */
 import { chromaticPx } from "./px1math";
 import { simplePass } from "./pass";
 import { registerPost } from "./registry";
@@ -23,7 +23,7 @@ registerPost({
   kind: "pass",
   params: {
     amount: { kind: "number", label: "Amount (px)", min: 0, max: 24, default: 4 },
-    source: { kind: "enum", label: "Driven by", options: ["kick", "snare", "balance", "none", "amount"], default: "kick" },
+    source: { kind: "enum", label: "Driven by", options: ["drop", "kick", "snare", "balance", "none", "amount"], default: "drop" },
   },
   create(ctx) {
     return simplePass(ctx, SRC, (p, f, w, h) => {
@@ -41,7 +41,8 @@ registerPost({
       } else if (src === "none") {
         radial = chromaticPx(amount, 1, short) * 0.5;
       } else {
-        radial = chromaticPx(amount, f.signals.value(src === "snare" ? "snare" : "kick", f.tMs, 5, 140), short);
+        const id = src === "snare" ? "snare" : src === "kick" ? "kick" : "drop.pulse";
+        radial = chromaticPx(amount, Math.min(1, f.signals.value(id, f.tMs, 5, id === "drop.pulse" ? 400 : 140) * f.intensity), short);
       }
       p.f1("u_radial", radial).f1("u_shift", shift);
     });

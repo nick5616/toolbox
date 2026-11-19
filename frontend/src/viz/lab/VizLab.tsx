@@ -20,6 +20,7 @@ import { runDecodeBench } from "./decodeBench";
 import { runE2E } from "./e2e";
 import { runEditE2E, runEditLab } from "./editLab";
 import RenderHost from "../RenderHost";
+import { runMotion } from "./motionLab";
 import { runParity } from "./parity";
 
 function send(name: string, bytes: Uint8Array): void {
@@ -166,6 +167,12 @@ export default function VizLab() {
         say("synthetic fixture (60 s)");
       }
       const canvas = ref.current as HTMLCanvasElement;
+      // --- motion mode (Phase 21 C4): ?mode=motion ---
+      if (q.get("mode") === "motion") {
+        await runMotion({ analysis: a, source: key ?? "fixture", canvas, q, say, send, sendJSON, stopped: () => stop });
+        return;
+      }
+      // --- end motion mode ---
       // --- parity mode (SPEC.md 11.4): ?parity=1 --------------------------------
       if (q.get("parity") === "1") {
         const all = PRESETS.filter((p) => !q.get("only") || p.id === q.get("only"));

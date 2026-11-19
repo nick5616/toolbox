@@ -1,6 +1,7 @@
 import { useRef, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode, type RefObject } from "react";
 import { Badge, Icon, cx, splitPath, toast } from "@/components";
 import { LibraryService } from "@/lib/api";
+import { displayPath } from "@/lib/displayPath";
 import { toAppError } from "@/lib/errors";
 import { startPathsDrag } from "@/lib/fileDrag";
 import { FileActions } from "./FileActions";
@@ -93,7 +94,7 @@ export function ResultRow({ path, outputId, missing, name, sizeBytes, at, icon =
   return (
     <div {...behaviour} className={cx(styles.resultRow, missing && styles.missing, className)} data-missing={missing ? "" : undefined} role="group" aria-label={label}>
       <Icon name={icon} size={14} className={styles.icon} />
-      <span className={styles.nameCol} data-tip={path}>
+      <span className={styles.nameCol} data-tip={displayPath(path)}>
         {label}
       </span>
       {missing && (

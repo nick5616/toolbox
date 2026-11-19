@@ -6,50 +6,7 @@ const h = vi.hoisted(() => ({
   open: vi.fn(),
   probe: vi.fn(),
   pickWith: vi.fn(),
-  player: {
-    props: null as null | {
-      source: { url: string; info: { startMs: number; durationMs: number } };
-      onTime: (ms: number) => void;
-      onPlayingChange: (p: boolean) => void;
-    },
-    playing: false,
-    play: vi.fn(),
-    pause: vi.fn(),
-    seek: vi.fn(),
-  },
 }));
-
-vi.mock("@/components/media", async (orig) => {
-  const actual = await orig<typeof import("@/components/media")>();
-  const React = await import("react");
-  return {
-    ...actual,
-    MediaPlayer: React.forwardRef(function MediaPlayerStub(p: NonNullable<typeof h.player.props>, ref: React.Ref<unknown>) {
-      h.player.props = p;
-      React.useImperativeHandle(ref, () => ({
-        play() {
-          h.player.play();
-          h.player.playing = true;
-          p.onPlayingChange(true);
-        },
-        pause() {
-          h.player.pause();
-          h.player.playing = false;
-          p.onPlayingChange(false);
-        },
-        toggle() {},
-        seek(ms: number) {
-          h.player.seek(ms);
-          p.onTime(ms);
-        },
-        step() {},
-        currentMs: () => 0,
-        playing: () => h.player.playing,
-      }));
-      return <audio data-testid="audio" />;
-    }),
-  };
-});
 
 vi.mock("@/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/lib/api")>();
@@ -62,6 +19,7 @@ vi.mock("@/lib/api", async (orig) => {
 });
 
 import { emptyEditProject, type NormalProject } from "@/viz/edit/defaults";
+import { newClip } from "@/editor/doc";
 import { useEditStudio } from "@/editor/store";
 import { getPlayer } from "./player";
 import { Transport } from "./Transport";
@@ -73,84 +31,100 @@ function openEdit(startMs = 10_000, endMs = 30_000): void {
   doc.song = { path: "/song.mp3", startMs, endMs, gainDb: 0, fadeInMs: 0, fadeOutMs: 500 };
   useEditStudio.getState().open("p1", "Edit", doc);
 }
+/** An edit with no song: one video clip, 4 s. */
+function openSongless(): void {
+  const doc = emptyEditProject("9:16", 30, 1) as NormalProject;
+  doc.tracks = [{ id: "t1", kind: "video", name: "V", muted: false, locked: false, matte: "", clips: [newClip({ id: "a", kind: "video", path: "/a.mp4", startMs: 0, endMs: 4000 })] }];
+  useEditStudio.getState().open("p1", "Edit", doc);
+}
 const project = () => useEditStudio.getState().history!.present;
-const audio = () => screen.getByTestId("audio") as HTMLAudioElement;
 
 beforeEach(() => {
   h.open.mockReset();
   h.probe.mockReset();
   h.pickWith.mockReset();
   h.open.mockResolvedValue(source);
-  Object.assign(h.player, { props: null, playing: false });
-  h.player.play.mockReset();
-  h.player.pause.mockReset();
-  h.player.seek.mockReset();
   useEditStudio.getState().close();
 });
 afterEach(cleanup);
 
 describe("Transport", () => {
-  it("shows the time, and gives the player the song's range as its clock", async () => {
+  it("shows the timecode as HH:MM:SS:FF with the edit's length", () => {
     openEdit(10_000, 30_000);
     render(<Transport />);
-    expect(screen.getByLabelText("Time").textContent).toBe("0:00.000 / 0:20.000");
-    await waitFor(() => expect(h.player.props).toBeTruthy());
-    expect(h.player.props?.source.info).toMatchObject({ startMs: 10_000, durationMs: 20_000 });
+    expect(screen.getByLabelText("Time").textContent).toBe("00:00:00:00");
+    expect(screen.getByText("/ 00:00:20:00")).toBeTruthy();
   });
 
-  it("plays and pauses through the player; the store follows", async () => {
-    openEdit();
+  it("plays and pauses without a song; the store follows", async () => {
+    openSongless();
     render(<Transport />);
-    await waitFor(() => expect((screen.getByRole("button", { name: "Play" }) as HTMLButtonElement).disabled).toBe(false));
-    await userEvent.click(screen.getByRole("button", { name: "Play" }));
-    expect(h.player.play).toHaveBeenCalled();
+    const play = screen.getByRole("button", { name: "Play" });
+    expect(play.getAttribute("disabled")).toBeNull();
+    await userEvent.click(play);
     expect(useEditStudio.getState().playing).toBe(true);
     await userEvent.click(screen.getByRole("button", { name: "Pause" }));
-    expect(h.player.pause).toHaveBeenCalled();
     expect(useEditStudio.getState().playing).toBe(false);
   });
 
-  it("registers a controller for the shortcuts", async () => {
+  it("registers a controller for the shortcuts, with reverse and loop", async () => {
     openEdit();
     const { unmount } = render(<Transport />);
-    await waitFor(() => expect(getPlayer()).toBeTruthy());
-    getPlayer()?.seek(4000);
+    const p = getPlayer();
+    expect(p).toBeTruthy();
+    p?.seek(4000);
     expect(useEditStudio.getState().playheadMs).toBe(4000);
+    p?.reverse();
+    expect(useEditStudio.getState().playing).toBe(true);
+    expect(p?.rate()).toBe(-1);
+    p?.reverse();
+    expect(p?.rate()).toBe(-2);
+    p?.pause();
+    expect(useEditStudio.getState().playing).toBe(false);
+    p?.loop({ inMs: 1000, outMs: 2000 });
     unmount();
     expect(getPlayer()).toBeNull();
   });
 
-  it("onTime moves the playhead and applies gain and fades to the volume", async () => {
+  it("moves the playhead when it is set from outside", () => {
     openEdit();
     render(<Transport />);
-    await waitFor(() => expect(h.player.props).toBeTruthy());
-    act(() => h.player.props?.onTime(5000));
-    expect(useEditStudio.getState().playheadMs).toBe(5000);
-    expect(audio().volume).toBe(1);
-    act(() => h.player.props?.onTime(19_750));
-    expect(audio().volume).toBeCloseTo(0.5);
-  });
-
-  it("stops at the end of the edit", async () => {
-    openEdit();
-    render(<Transport />);
-    await waitFor(() => expect(h.player.props).toBeTruthy());
-    await userEvent.click(screen.getByRole("button", { name: "Play" }));
-    act(() => h.player.props?.onTime(20_000));
-    expect(h.player.pause).toHaveBeenCalled();
-    expect(useEditStudio.getState().playheadMs).toBe(20_000);
-    expect(useEditStudio.getState().playing).toBe(false);
-  });
-
-  it("seeks the audio when the playhead is moved from outside, not for its own ticks", async () => {
-    openEdit();
-    render(<Transport />);
-    await waitFor(() => expect(h.player.props).toBeTruthy());
-    h.player.seek.mockClear();
-    act(() => h.player.props?.onTime(1000));
-    expect(h.player.seek).not.toHaveBeenCalled();
     act(() => useEditStudio.getState().setPlayhead(7000));
-    expect(h.player.seek).toHaveBeenCalledWith(7000);
+    expect(getPlayer()?.rate()).toBe(1);
+    expect(screen.getByLabelText("Time").textContent).toBe("00:00:07:00");
+  });
+
+  it("click the time, type one and press Enter to seek; a bad time is refused", async () => {
+    openSongless();
+    render(<Transport />);
+    await userEvent.click(screen.getByLabelText("Time"));
+    const box = screen.getByLabelText("Go to time");
+    await userEvent.clear(box);
+    await userEvent.type(box, "nope{Enter}");
+    expect(box.getAttribute("aria-invalid")).toBe("true");
+    await userEvent.clear(box);
+    await userEvent.type(box, "00:00:02:15{Enter}");
+    expect(useEditStudio.getState().playheadMs).toBe(2500);
+    expect(screen.queryByLabelText("Go to time")).toBeNull();
+  });
+
+  it("Draft / Full quality toggles in the store", async () => {
+    openEdit();
+    render(<Transport />);
+    expect(useEditStudio.getState().previewQuality).toBe("full");
+    await userEvent.click(screen.getByRole("button", { name: "Full" }));
+    expect(useEditStudio.getState().previewQuality).toBe("draft");
+    await userEvent.click(screen.getByRole("button", { name: "Draft" }));
+    expect(useEditStudio.getState().previewQuality).toBe("full");
+  });
+
+  it("scrub audio is a toggle in the More menu", async () => {
+    openEdit();
+    render(<Transport />);
+    expect(useEditStudio.getState().scrubAudio).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "More transport options" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: /Scrub audio: on/ }));
+    expect(useEditStudio.getState().scrubAudio).toBe(false);
   });
 
   it("minimal controls: snap, zoom and fit; nothing music-specific", async () => {

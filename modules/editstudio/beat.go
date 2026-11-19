@@ -91,7 +91,7 @@ func validateBeat(r BeatRequest) error {
 	case !slices.Contains(aspects, r.Aspect):
 		return vErr("aspect", "Pick 9:16, 4:5, 1:1 or 16:9")
 	case !slices.Contains(fpsValues, r.FPS):
-		return vErr("fps", "Pick 30 or 60 fps")
+		return vErr("fps", "Pick 24, 25, 30 or 60 fps")
 	case !slices.Contains(exportHeights, r.Height):
 		return vErr("height", "Pick 720, 1080 or 1440")
 	}

@@ -33,14 +33,14 @@ registerLayer({
         const p = f.params;
         const N = f.quality === "draft" ? 120 : 220;
         const ramp = buildRamp(f.palette, p.color as string);
-        const bass = f.signals.value("bass.level", f.tMs);
-        const kick = f.signals.value("kick", f.tMs);
-        const level = f.signals.value("mix.level", f.tMs);
+        const bass = f.signals.smoothed("bass.level", f.tMs);
+        const kick = f.signals.smoothed("kick", f.tMs);
+        const level = f.signals.smoothed("mix.level", f.tMs);
         const turns = p.turns as number;
         const A = (p.amplitude as number) * f.h * b.scale * (0.55 + 0.6 * bass + 0.15 * kick);
         const wPx = f.w * (p.span as number);
         const rungs = Math.round(p.rungs as number);
-        const phase = (p.speed as number) * (f.motionSec * 0.9 + f.analysis.cum("bass.level", f.tMs) * 2.4);
+        const phase = f.integral("speed") * 0.9 + f.integral("speed*intensity*bass.level") * 2.4;
         const thick = (p.thickness as number) * b.short * 0.5;
         const cr = Math.cos(b.rot);
         const sr = Math.sin(b.rot);

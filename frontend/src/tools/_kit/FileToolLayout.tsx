@@ -10,6 +10,7 @@ import { useModules } from "@/state/modules";
 import { DepsGate, useDepsGate } from "./DepsGate";
 import { FailedJobs } from "./FailedJobs";
 import { useSessionJobIds } from "./session";
+import { displayPath } from "@/lib/displayPath";
 import { KitToolContext } from "./toolContext";
 import type { FileInputs } from "./useFileInputs";
 import styles from "./FileToolLayout.module.css";
@@ -164,7 +165,7 @@ export function FileToolLayout({
               return (
                 <li key={f.path} className={styles.file}>
                   <Icon name="file" size={14} className={styles.fileIcon} />
-                  <span className={styles.fileName} data-tip={f.path}>
+                  <span className={styles.fileName} data-tip={displayPath(f.path)}>
                     {splitPath(f.path)[1]}
                   </span>
                   {err && (

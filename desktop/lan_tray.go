@@ -20,6 +20,13 @@ func lanTrayItems(s trayState) []trayItem {
 
 // trayTooltip is the tray icon's tooltip.
 func trayTooltip(s trayState) string {
+	if s.WorkspaceName != "" {
+		return trayTooltipBase(s) + " · " + s.WorkspaceName
+	}
+	return trayTooltipBase(s)
+}
+
+func trayTooltipBase(s trayState) string {
 	switch {
 	case s.LanPrompt != "":
 		return fmt.Sprintf("Toolbox — %s wants to send you files", s.LanPrompt)
