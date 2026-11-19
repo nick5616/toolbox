@@ -46,8 +46,15 @@ func (t *searchTee) attach(idx *mi.Index) {
 
 // depReady reports whether a dependency is known to be installed (never runs
 // a version check: deps.Known, per the start-up rule).
+//
+// An outdated AI engine doesn't count: its files predate the search.*
+// handlers, so batches would only fail until the user updates it (the
+// Smart search pack button does).
 func depReady(depSvc *deps.Service, id string) bool {
 	st, ok := depSvc.Known(id)
+	if id == sidecar.DepID {
+		return ok && st.State == core.DepOK
+	}
 	return ok && (st.State == core.DepOK || st.State == core.DepOutdated)
 }
 
