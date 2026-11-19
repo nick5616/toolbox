@@ -107,6 +107,19 @@ export function extrasDir(t, role) {
   return path.join(path.dirname(t.role(role)), "Extras");
 }
 
+/** Joins the six generated B-roll clips into one reel (Extras/B-roll reel.mp4, no re-encode) and returns its path. */
+export function makeReel(t) {
+  const clips = t.roles("video.broll");
+  const dir = extrasDir(t, "video.broll");
+  const out = path.join(dir, "B-roll reel.mp4");
+  if (fs.existsSync(out)) return out;
+  const list = path.join(dir, "_reel.txt");
+  fs.writeFileSync(list, clips.map((c) => `file '${c.replace(/\\/g, "/")}'`).join("\n") + "\n");
+  ffmpeg(["-f", "concat", "-safe", "0", "-i", list, "-c", "copy", "-movflags", "+faststart", out]);
+  fs.rmSync(list, { force: true });
+  return out;
+}
+
 /** Output file paths of the newest finished job of a module (e.g. to hand a result to the next step). */
 export async function latestOutputs(t, moduleId) {
   const jobs = (await t.jobs()).filter((j) => j.moduleId === moduleId && j.status === "done");
