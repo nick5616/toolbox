@@ -17,6 +17,9 @@ import type * as lan$0 from "../../../../../toolbox/core/lan/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import type * as viz$0 from "../../../../../toolbox/core/viz/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import type * as captions$0 from "../../../../../toolbox/modules/captions/models.js";
 
 declare module "@wailsio/runtime" {
     namespace Events {
@@ -24,6 +27,7 @@ declare module "@wailsio/runtime" {
             "app:files-dropped": core$0.FilesDropped;
             "app:hidden-to-tray": core$0.HiddenToTray;
             "app:navigate": core$0.Navigate;
+            "captions:item": captions$0.ItemEvent;
             "chat:delta": core$0.ChatDelta;
             "chat:done": core$0.ChatDone;
             "chat:status": core$0.ChatStatus;
@@ -50,6 +54,9 @@ declare module "@wailsio/runtime" {
             "pipelines:changed": core$0.PipelinesChanged;
             "pipelines:run": core$0.PipelineRun;
             "pipelines:runs-removed": core$0.RunsRemoved;
+            "search:indexed": core$0.SearchIndexed;
+            "search:ready": core$0.SearchReady;
+            "search:status": core$0.SearchStatus;
             "settings:changed": core$0.Settings;
             "vault:state": core$0.VaultState;
             "viz:render": viz$0.RenderStart;

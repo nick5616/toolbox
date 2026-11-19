@@ -372,7 +372,7 @@ func TestCatalogAndExport(t *testing.T) {
 	}
 	real := New(Config{Settings: h.c.cfg.Settings})
 	infos := NewService(real).Catalog()
-	if len(infos) != 3 || infos[0].ID != "qwen3-4b" || !infos[0].IsDefault || infos[0].Installed {
+	if len(infos) != 4 || infos[0].ID != "qwen3-4b" || !infos[0].IsDefault || infos[0].Installed {
 		t.Fatalf("real catalog = %+v", infos)
 	}
 

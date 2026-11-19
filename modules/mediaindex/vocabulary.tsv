@@ -1,0 +1,68 @@
+# Smart search label vocabulary (SPEC.md §3.4). Frozen data, UTF-8, tab-separated.
+# Columns: id	category	display	prompts	parent	threshold
+# - id: lowercase [a-z0-9-]; unique. category: people|animals|food|nature|things|vehicles|documents|art.
+# - prompts: "|"-separated; "{}" is replaced by display. parent: another id or empty. threshold: empty = default.
+# - No identity labels: no names, ethnicity, gender, age, religion or health.
+# Wave 0 starter set; V1 completes it to about 1,500 concepts.
+person	people	person	a photo of a person|a person	
+group	people	group of people	a photo of a group of people|a crowd of people	person
+selfie	people	selfie	a selfie|a close-up selfie photo	person
+wedding	people	wedding	a photo of a wedding|a wedding ceremony	
+birthday	people	birthday	a birthday party|a birthday cake with candles	
+concert	people	concert	a photo of a concert|a band playing on stage	
+animal	animals	animal	a photo of an animal	
+dog	animals	dog	a photo of a dog|a dog	animal
+cat	animals	cat	a photo of a cat|a cat	animal
+bird	animals	bird	a photo of a bird|a bird	animal
+horse	animals	horse	a photo of a horse	animal
+fish	animals	fish	a photo of a fish	animal
+food	food	food	a photo of food|a plate of food	
+fruit	food	fruit	a photo of fruit	food
+apple	food	apple	a photo of an apple|an apple	fruit
+banana	food	banana	a photo of a banana|a banana	fruit
+pizza	food	pizza	a photo of a pizza|a pizza	food
+cake	food	cake	a photo of a cake|a cake	food
+coffee	food	coffee	a cup of coffee|a photo of coffee	drink
+drink	food	drink	a photo of a drink|a glass with a drink	
+salad	food	salad	a photo of a salad	food
+bread	food	bread	a photo of bread	food
+beach	nature	beach	a photo of a beach|a sandy beach by the sea	
+sea	nature	sea	a photo of the sea|the ocean	
+mountain	nature	mountain	a photo of mountains|a mountain landscape	
+forest	nature	forest	a photo of a forest|trees in a forest	
+sunset	nature	sunset	a photo of a sunset|the sky at sunset	sky
+sky	nature	sky	a photo of the sky	
+snow	nature	snow	a photo of snow|a snowy landscape	
+flower	nature	flower	a photo of a flower|flowers	
+city	nature	city	a photo of a city|a city street	
+building	nature	building	a photo of a building	
+garden	nature	garden	a photo of a garden	
+table	things	table	a photo of a table	
+chair	things	chair	a photo of a chair	
+book	things	book	a photo of a book|a book	
+phone	things	phone	a photo of a smartphone|a mobile phone	
+laptop	things	laptop	a photo of a laptop	computer
+computer	things	computer	a photo of a computer	
+guitar	things	guitar	a photo of a guitar	instrument
+instrument	things	musical instrument	a photo of a musical instrument	
+camera	things	camera	a photo of a camera	
+cup	things	cup	a photo of a cup|a mug	
+car	vehicles	car	a photo of a car|a car	vehicle
+bicycle	vehicles	bicycle	a photo of a bicycle	vehicle
+train	vehicles	train	a photo of a train	vehicle
+airplane	vehicles	airplane	a photo of an airplane	vehicle
+boat	vehicles	boat	a photo of a boat	vehicle
+vehicle	vehicles	vehicle	a photo of a vehicle	
+document	documents	document	a photo of a document|a page of text	
+screenshot	documents	screenshot	a screenshot|a screenshot of a computer screen	
+receipt	documents	receipt	a photo of a receipt|a shop receipt	document
+whiteboard	documents	whiteboard	a photo of a whiteboard|writing on a whiteboard	
+slide	documents	slide	a presentation slide|a slide from a presentation	
+code	documents	code	a screenshot of source code|computer code on a screen	screenshot
+chart	documents	chart	a chart|a graph with data	
+map	documents	map	a map	
+handwriting	documents	handwriting	handwritten notes|handwriting on paper	
+painting	art	painting	a painting|an oil painting	
+sketch	art	sketch	a pencil sketch|a drawing	
+illustration	art	illustration	a digital illustration	
+logo	art	logo	a logo|a company logo	

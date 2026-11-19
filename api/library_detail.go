@@ -211,3 +211,6 @@ func fileExists(p string) bool {
 	info, err := os.Stat(p)
 	return err == nil && info.Mode().IsRegular()
 }
+
+// ModuleForProject is the tool that opens a project (Smart search's project hits).
+func ModuleForProject(p core.StoredProject) string { return moduleForProject(p) }

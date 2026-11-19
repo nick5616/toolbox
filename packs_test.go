@@ -13,6 +13,7 @@ import (
 	"toolbox/modules/audiocleanup"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
+	"toolbox/modules/captions"
 	"toolbox/modules/chat"
 	"toolbox/modules/clipboard"
 	"toolbox/modules/compress"
@@ -28,6 +29,7 @@ import (
 	"toolbox/modules/imagebatch"
 	"toolbox/modules/lanshare"
 	"toolbox/modules/lyricvideo"
+	"toolbox/modules/mediaindex"
 	"toolbox/modules/midi"
 	"toolbox/modules/ocr"
 	"toolbox/modules/organize"
@@ -103,6 +105,8 @@ func TestEveryToolIsInOnePack(t *testing.T) {
 			return err
 		},
 		func() error { return editstudio.Register(reg, editstudio.New(editstudio.Config{})) },
+		func() error { _, err := mediaindex.Register(reg, mediaindex.Deps{}); return err },
+		func() error { return captions.Register(reg, captions.New(captions.Config{})) },
 	} {
 		if err := register(); err != nil {
 			t.Fatal(err)

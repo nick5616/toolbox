@@ -9,6 +9,7 @@ import * as LibraryService from "./libraryservice.js";
 import * as MediaService from "./mediaservice.js";
 import * as ModulesService from "./modulesservice.js";
 import * as PacksService from "./packsservice.js";
+import * as SearchService from "./searchservice.js";
 import * as SettingsService from "./settingsservice.js";
 export {
     DepsService,
@@ -19,6 +20,7 @@ export {
     MediaService,
     ModulesService,
     PacksService,
+    SearchService,
     SettingsService
 };
 

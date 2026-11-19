@@ -23,6 +23,7 @@ import { SettingsChat } from "./SettingsChat";
 import { SettingsClipboard } from "./SettingsClipboard";
 import { SettingsGeneral } from "./SettingsGeneral";
 import { ManagedDepActions, SettingsPacks, isManagedDep } from "./SettingsPacks";
+import { SettingsSearch } from "./SettingsSearch";
 import { SettingsVault } from "./SettingsVault";
 import styles from "./SettingsView.module.css";
 
@@ -448,6 +449,8 @@ export function SettingsView() {
         <SettingsChat />
 
         <SettingsVault />
+
+        <SettingsSearch />
         </div>
         </div>
 

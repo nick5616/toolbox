@@ -36,6 +36,7 @@ const loaders: Record<string, ToolLoader> = {
   scenes: () => import("./scenes/ScenesView"),
   gif: () => import("./gif/GifView"),
   organize: () => import("./organize/OrganizeView"),
+  captions: () => import("./captions/CaptionsView"),
   "lan-share": () => import("./lan-share/LanShareView"),
   silence: () => import("./silence/SilenceView"),
   compress: () => import("./compress/CompressView"),

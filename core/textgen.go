@@ -36,4 +36,24 @@ type CompletionRequest struct {
 	// Purpose is shown in Local Chat while the request runs, e.g.
 	// "Translating subtitles".
 	Purpose string
+	// Images are local picture files sent with the prompt (Phase 20). The
+	// chat module reads, scales (≤ 896 px) and encodes them; paths never
+	// leave Go. Only a model that can see accepts them: see VisionGenerator.
+	Images []string
+	// Model picks a catalog/Ollama model for this request; "" = the chat
+	// model. Caption Writer passes VisionGenerator.Vision()'s answer.
+	Model string
+	// Seed makes sampling repeatable (llama-server "seed"); 0 = the server's default.
+	Seed int64
+}
+
+// VisionGenerator is a TextGenerator that can also look at pictures
+// (Phase 20, SPEC.md §5.2; implemented by modules/chat).
+type VisionGenerator interface {
+	TextGenerator
+	// Vision returns the model that will read images: the chat model when it
+	// can see, else the installed vision-default model, else a
+	// CodeDependencyMissing AppError naming the Caption Writer pack. It never
+	// starts anything.
+	Vision() (model string, err error)
 }

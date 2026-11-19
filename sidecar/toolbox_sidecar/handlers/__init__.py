@@ -11,6 +11,7 @@ from . import (  # noqa: F401
     ocr,
     paint,
     redact,
+    search,
     stems,
     system,
     transcribe,

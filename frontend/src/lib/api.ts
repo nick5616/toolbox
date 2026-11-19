@@ -11,6 +11,7 @@ export {
   MediaService,
   ModulesService,
   PacksService,
+  SearchService,
   SettingsService,
 } from "@bindings/api";
 
@@ -520,3 +521,38 @@ export type {
   OutputDetail,
   TrashResult,
 } from "@bindings/core/models";
+
+// --- Phase 20: Smart search and Caption Writer ---
+export type {
+  LabelCount,
+  MediaLabel,
+  MediaText,
+  SearchFailure,
+  SearchHit,
+  SearchIndexed,
+  SearchPage,
+  SearchQuery,
+  SearchReady,
+  SearchSettings,
+  SearchStatus,
+} from "@bindings/core/models";
+export * as CaptionService from "@bindings/modules/captions/service";
+export {
+  Action as CaptionAction,
+  Field as CaptionField,
+  Length as CaptionLength,
+  NamePattern as CaptionNamePattern,
+  Preset as CaptionPreset,
+  Then as CaptionThen,
+  Tone as CaptionTone,
+} from "@bindings/modules/captions/models";
+export type {
+  Batch as CaptionBatch,
+  BatchInfo as CaptionBatchInfo,
+  Fields as CaptionFields,
+  Item as CaptionItem,
+  ItemEvent as CaptionItemEvent,
+  Options as CaptionOptions,
+  Status as CaptionStatus,
+  WriteOptions as CaptionWriteOptions,
+} from "@bindings/modules/captions/models";

@@ -32,6 +32,11 @@ const (
 	EventPipelinesChanged     = "pipelines:changed"      // PipelinesChanged
 	EventPipelinesRun         = "pipelines:run"          // PipelineRun (throttled ≤ 1/250ms/run)
 	EventPipelinesRunsRemoved = "pipelines:runs-removed" // RunsRemoved
+
+	// Phase 20
+	EventSearchStatus  = "search:status"  // SearchStatus (throttled ≤ 2/s)
+	EventSearchIndexed = "search:indexed" // SearchIndexed (per batch)
+	EventSearchReady   = "search:ready"   // SearchReady (a query's text vector is cached)
 )
 
 // Emitter publishes events to the UI. Core code depends on this interface,

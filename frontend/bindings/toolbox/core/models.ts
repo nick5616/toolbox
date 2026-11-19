@@ -773,6 +773,33 @@ export interface JobsRemoved {
 }
 
 /**
+ * LabelCount is a label with how many files carry it (chip row, Things view).
+ */
+export interface LabelCount {
+    /**
+     * vocabulary id or the user's text
+     */
+    "label": string;
+
+    /**
+     * shown text
+     */
+    "display": string;
+
+    /**
+     * vocabulary category; "" for user labels
+     */
+    "category": string;
+    "count": number;
+    "user": boolean;
+
+    /**
+     * path of the highest-scoring file
+     */
+    "cover": string;
+}
+
+/**
  * LibraryEntry is one file or folder inside a library folder.
  */
 export interface LibraryEntry {
@@ -1007,6 +1034,42 @@ export interface MatchResult {
      * includes directories
      */
     "unmatched": string[] | null;
+}
+
+/**
+ * MediaLabel is one label on one file.
+ */
+export interface MediaLabel {
+    "label": string;
+    "display": string;
+
+    /**
+     * auto | user | hidden
+     */
+    "source": string;
+    "score": number;
+    "pos": number;
+}
+
+/**
+ * MediaText is one chunk of text found in a file.
+ */
+export interface MediaText {
+    /**
+     * ocr | pdf | doc | speech | subs | caption
+     */
+    "source": string;
+
+    /**
+     * -1 | ms | page/slide index
+     */
+    "pos": number;
+
+    /**
+     * speech: chunk end ms; else -1
+     */
+    "endPos": number;
+    "text": string;
 }
 
 /**
@@ -1925,6 +1988,204 @@ export interface ScheduleTrigger {
      * 0–720 (default 30)
      */
     "catchUpMin": number;
+}
+
+/**
+ * SearchFailure is a file the index couldn't read.
+ */
+export interface SearchFailure {
+    "path": string;
+    "reason": string;
+
+    /**
+     * failed | skipped
+     */
+    "state": string;
+
+    /**
+     * pictures | speech
+     */
+    "stage": string;
+    "attempts": number;
+    "at": number;
+}
+
+/**
+ * SearchHit is one result.
+ */
+export interface SearchHit {
+    "path": string;
+
+    /**
+     * library | project
+     */
+    "source": string;
+
+    /**
+     * Source == project
+     */
+    "projectId": string;
+
+    /**
+     * when the file is a registered library output
+     */
+    "output": Output | null;
+    "kind": OutputKind;
+
+    /**
+     * 0..1
+     */
+    "score": number;
+
+    /**
+     * label | strong | good | maybe | name
+     */
+    "strength": string;
+
+    /**
+     * Via says how it matched: "label", "concept", a text source
+     * (ocr, pdf, doc, speech, subs, caption) or "name".
+     */
+    "via": string[] | null;
+
+    /**
+     * -1, video/audio ms, or page/slide index
+     */
+    "pos": number;
+
+    /**
+     * \u0002…\u0003 around matched words; "" when not a text hit
+     */
+    "snippet": string;
+
+    /**
+     * ≤ 5 other matching positions
+     */
+    "moments": number[] | null;
+}
+
+/**
+ * SearchIndexed is the search:indexed payload.
+ */
+export interface SearchIndexed {
+    "paths": string[] | null;
+}
+
+/**
+ * SearchPage is Query's answer.
+ */
+export interface SearchPage {
+    "hits": SearchHit[] | null;
+
+    /**
+     * labels whose display starts with the text (≤ 8)
+     */
+    "labels": LabelCount[] | null;
+
+    /**
+     * concept scoring ran
+     */
+    "concept": boolean;
+
+    /**
+     * the text vector is being computed; ask again on search:ready
+     */
+    "warming": boolean;
+}
+
+/**
+ * SearchQuery is one Library search.
+ */
+export interface SearchQuery {
+    /**
+     * free text; "" = labels/similar/filters only
+     */
+    "text": string;
+
+    /**
+     * all must match (auto or user, not hidden)
+     */
+    "labels": string[] | null;
+
+    /**
+     * a path: rank by look instead of text
+     */
+    "similar": string;
+
+    /**
+     * the frame (ms) or page of Similar; -1 = whole
+     */
+    "similarPos": number;
+
+    /**
+     * kinds, module, since/until, folder (Search/Sort/Cursor ignored)
+     */
+    "filter": LibraryQuery;
+
+    /**
+     * default 200, max 500
+     */
+    "limit": number;
+}
+
+/**
+ * SearchReady is the search:ready payload: the text vector for Text is cached.
+ */
+export interface SearchReady {
+    "text": string;
+}
+
+/**
+ * SearchSettings are stored under the settings key "search".
+ */
+export interface SearchSettings {
+    "enabled": boolean;
+    "paused": boolean;
+    "readText": boolean;
+    "speech": boolean;
+    "speechMaxMin": number;
+
+    /**
+     * library-relative folders, "/"-separated
+     */
+    "skip": string[] | null;
+}
+
+/**
+ * SearchStatus is the index's state for the status line and Settings.
+ */
+export interface SearchStatus {
+    /**
+     * the pack's required components are present
+     */
+    "installed": boolean;
+    "enabled": boolean;
+    "paused": boolean;
+
+    /**
+     * work is pending but the user's jobs are running
+     */
+    "waiting": boolean;
+    "total": number;
+    "done": number;
+    "pending": number;
+    "failed": number;
+    "skipped": number;
+    "speechPending": number;
+    "speechDone": number;
+
+    /**
+     * "" | pictures | text | speech
+     */
+    "stage": string;
+
+    /**
+     * file name being worked on
+     */
+    "current": string;
+    "model": string;
+    "indexBytes": number;
+    "lastError": string;
 }
 
 export interface SecretAsk {

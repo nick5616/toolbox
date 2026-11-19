@@ -17,6 +17,8 @@ import "./imagebatch";
 import "./focus";
 import "./wait";
 import "./open";
+import "./search";
+import "./captions";
 import { registerSteps as registerTts } from "./registry";
 import { ttsSteps } from "./tts";
 

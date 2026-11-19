@@ -42,6 +42,7 @@ import (
 	"toolbox/modules/audiocleanup"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
+	"toolbox/modules/captions"
 	"toolbox/modules/chat"
 	"toolbox/modules/clipboard"
 	"toolbox/modules/composer"
@@ -58,6 +59,7 @@ import (
 	"toolbox/modules/imagebatch"
 	"toolbox/modules/lanshare"
 	"toolbox/modules/lyricvideo"
+	"toolbox/modules/mediaindex"
 	"toolbox/modules/midi"
 	"toolbox/modules/ocr"
 	"toolbox/modules/organize"
@@ -109,7 +111,9 @@ func run() error {
 
 	// The Wails app is created after the services that need an emitter, so
 	// emit through a late-bound adapter.
-	emitter := &api.Emitter{}
+	appEmitter := &api.Emitter{}
+	// Phase 20: library:added also reaches Smart search's index.
+	emitter := &searchTee{inner: appEmitter}
 
 	defaultLib, err := core.DefaultLibraryDir()
 	if err != nil {
@@ -409,6 +413,26 @@ func run() error {
 	}
 	// --- end Phase 19 ---
 
+	// --- Phase 20: Smart search and Caption Writer ---
+	var searchMod *mediaindex.IndexModule
+	searchIdx := newSearchIndex(db, jobs, engine, emitter, depSvc, settings, paths,
+		func() bool { return searchMod != nil && searchMod.ModelPresent(mediaindex.ModelPreset) },
+		func() bool { return modelPresent(reg, "transcribe", "small") })
+	emitter.attach(searchIdx)
+	searchMod, err = mediaindex.Register(reg, mediaindex.Deps{Writer: searchIdx, Caller: engine, PDF: pdfRenderer, ModelsDir: paths.ModelsDir})
+	if err != nil {
+		return err
+	}
+	defer searchIdx.Close()
+	captionsMod := captions.New(captions.Config{
+		Vision: chatSvc, Hints: searchIdx, Sink: searchIdx, Emitter: emitter, Resolve: depSvc.Resolve, LibraryDir: libraryDir,
+		SearchInstalled: func() bool { return searchIdx.Status().Installed },
+	})
+	if err := captions.Register(reg, captionsMod); err != nil {
+		return err
+	}
+	// --- end Phase 20 ---
+
 	settings.OnChange(func(old, new core.Settings) {
 		if old.Concurrency != new.Concurrency {
 			jobs.SetConcurrency(new.Concurrency)
@@ -456,6 +480,11 @@ func run() error {
 			composerMod.PruneCache, // cache/composer (30 days, 2 GB)
 			editMod.PruneCache,     // cache/editstudio (30 days, 10 GB)
 			paintMod.PruneTmp,      // tmp/paint (Lab crops and results)
+			func() { // Phase 20: Smart search (reconciles 60 s later, then idle-only batches)
+				if err := searchIdx.Start(ctx); err != nil {
+					slog.Warn("smart search", "err", err)
+				}
+			},
 		} {
 			if ctx.Err() != nil {
 				return
@@ -487,6 +516,8 @@ func run() error {
 				SavedMasks: eraserSavedMasks(eraserMod),
 			}, opts),
 			application.NewServiceWithOptions(&api.SettingsService{Settings: settings, Paths: paths}, opts),
+			application.NewServiceWithOptions(&api.SearchService{Index: searchIdx, SaveDialog: paintSaveDialog}, opts),
+			application.NewServiceWithOptions(captions.NewService(jobs, captionsMod), opts),
 			application.NewServiceWithOptions(&api.DepsService{Deps: depSvc, Jobs: jobs, Reg: reg, Engine: engine, Paths: paths, StopExiftool: exifMod.Close}, opts),
 			application.NewServiceWithOptions(&api.FilesService{Reg: reg, Settings: settings, Paths: paths}, opts),
 			application.NewServiceWithOptions(desktopSvc, opts),
@@ -571,7 +602,7 @@ func run() error {
 			},
 		},
 	})
-	emitter.App = app
+	appEmitter.App = app
 	packsAPI.RelaunchFn = func() error { return desktop.Relaunch(app.Quit) }
 	api.ObservePacks(app, packsAPI)
 

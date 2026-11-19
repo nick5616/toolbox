@@ -233,6 +233,18 @@ func Components() []ComponentSpec {
 			Kind: core.ComponentModel, Module: "llm-chat", Preset: "qwen3-4b",
 			Sizes: same(Size{Download: 2_497_281_120, Disk: 2_497_281_120}),
 		},
+		{
+			// Phase 20: Smart search (SPEC.md §3.8). Five pinned files, summed.
+			ID: "search-default", Name: "SigLIP 2 image understanding", Href: "https://huggingface.co/google/siglip2-base-patch16-224", License: "Apache-2.0",
+			Kind: core.ComponentModel, Module: "media-index", Preset: "siglip2-b16",
+			Sizes: same(Size{Download: 1_535_473_697, Disk: 1_535_473_697}),
+		},
+		{
+			// Phase 20: Caption Writer (SPEC.md §5.2). Q4_K_M GGUF + F16 mmproj.
+			ID: "vision-default", Name: "Qwen3.5 4B (sees pictures)", Href: "https://huggingface.co/Qwen/Qwen3.5-4B", License: "Apache-2.0",
+			Kind: core.ComponentModel, Module: "llm-chat", Preset: "qwen3.5-4b",
+			Sizes: same(Size{Download: 3_413_361_504, Disk: 3_413_361_504}),
+		},
 	}
 }
 
@@ -319,6 +331,20 @@ func Catalog() []PackSpec {
 			Description: "A private assistant that runs on your GPU · needs about 4 GB of free memory",
 			Components:  []string{"chat-engine", "chat-default"},
 			Unlocks:     []Unlock{{Module: "llm-chat", Needs: []string{"chat-engine", "chat-default"}}},
+		},
+		{
+			ID: "search", Name: "Smart search", Icon: "scan-eye",
+			Description: "Search your library by what's in pictures and videos and by the words in files and speech",
+			Components:  []string{"engine", "ffmpeg", "search-default", "whisper-default"},
+			// It unlocks no sidebar tool: Smart search lives in the Library
+			// (its job modules and step are hidden; docs/DECISIONS.md).
+			Unlocks: []Unlock{},
+		},
+		{
+			ID: "captions", Name: "Caption Writer", Icon: "message-square-quote",
+			Description: "Alt text, captions, keywords and file names written by a local model that sees your pictures",
+			Components:  []string{"chat-engine", "vision-default", "exiftool", "ffmpeg"},
+			Unlocks:     []Unlock{{Module: "captions", Needs: []string{"chat-engine", "vision-default"}}},
 		},
 	}
 }

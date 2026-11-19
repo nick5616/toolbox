@@ -14,6 +14,7 @@ import (
 	"toolbox/modules/audiocleanup"
 	"toolbox/modules/bgremove"
 	"toolbox/modules/bpmkey"
+	"toolbox/modules/captions"
 	"toolbox/modules/chat"
 	"toolbox/modules/clipboard"
 	"toolbox/modules/composer"
@@ -30,6 +31,7 @@ import (
 	"toolbox/modules/imagebatch"
 	"toolbox/modules/lanshare"
 	"toolbox/modules/lyricvideo"
+	"toolbox/modules/mediaindex"
 	"toolbox/modules/midi"
 	"toolbox/modules/ocr"
 	"toolbox/modules/organize"
@@ -113,6 +115,8 @@ func TestEveryToolIsAPipelineStep(t *testing.T) {
 		func() error { return videoeditor.Register(reg, videoeditor.New(videoeditor.Config{})) },
 		func() error { return posts.Register(reg, posts.New(posts.Config{})) },
 		func() error { return editstudio.Register(reg, editstudio.New(editstudio.Config{})) },
+		func() error { return captions.Register(reg, captions.New(captions.Config{})) },
+		func() error { _, err := mediaindex.Register(reg, mediaindex.Deps{}); return err },
 	} {
 		if err := register(); err != nil {
 			t.Fatal(err)
@@ -129,6 +133,10 @@ func TestEveryToolIsAPipelineStep(t *testing.T) {
 			t.Errorf("step type %q is in the catalogue twice", st.ID)
 		}
 		steps[st.ID] = st
+	}
+	// Phase 20: a hidden module offered as a step anyway (Descriptor.HiddenStep).
+	if st, ok := steps["search-filter"]; !ok || !st.Auto {
+		t.Error("Keep files that show… (search-filter) isn't an automatic step")
 	}
 	if _, ok := reg.Descriptor("llm-chat"); !ok {
 		t.Fatal("llm-chat isn't registered")

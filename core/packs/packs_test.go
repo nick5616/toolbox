@@ -296,7 +296,7 @@ func TestStatusStates(t *testing.T) {
 	if ff.State != core.ComponentMissing || ff.DownloadBytes != 114_768_076 || ff.DiskBytes != 210_680_000 {
 		t.Errorf("ffmpeg %+v", ff)
 	}
-	if !slices.Equal(ff.Packs, []string{"media", "music", "image", "edit", "speech"}) {
+	if !slices.Equal(ff.Packs, []string{"media", "music", "image", "edit", "speech", "search", "captions"}) {
 		t.Errorf("ffmpeg packs %v", ff.Packs)
 	}
 
@@ -350,7 +350,7 @@ func TestStatusModelsUnlocksAndSharedEngine(t *testing.T) {
 	if st := f.pack("speech").State; st != core.PackInstalled {
 		t.Errorf("speech = %s", st)
 	}
-	if got := f.comp("image", "engine").Packs; !slices.Equal(got, []string{"music", "image", "edit", "speech", "documents"}) {
+	if got := f.comp("image", "engine").Packs; !slices.Equal(got, []string{"music", "image", "edit", "speech", "documents", "search"}) {
 		t.Errorf("engine packs %v", got)
 	}
 	// Only registered tools are listed as unlocked.

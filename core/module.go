@@ -77,6 +77,9 @@ type Descriptor struct {
 	// NotAStep keeps a module out of the pipeline step catalogue (creator
 	// tools whose work is an interactive project).
 	NotAStep bool `json:"-"`
+	// HiddenStep offers a Hidden module as a pipeline step anyway (Phase 20:
+	// Smart search's "Keep files that show…", which has no tool of its own).
+	HiddenStep bool `json:"-"`
 
 	// Composition (Phase 10, SPEC.md §3). Base is the tool this one is a
 	// variant of: the same core with a composition layered on top (Edit

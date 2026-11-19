@@ -24,6 +24,11 @@ export const AppHiddenToTray = "app:hidden-to-tray";
 export const AppNavigate = "app:navigate";
 
 /**
+ * Name of the custom event "captions:item".
+ */
+export const CaptionsItem = "captions:item";
+
+/**
  * Name of the custom event "chat:delta".
  */
 export const ChatDelta = "chat:delta";
@@ -152,6 +157,21 @@ export const PipelinesRun = "pipelines:run";
  * Name of the custom event "pipelines:runs-removed".
  */
 export const PipelinesRunsRemoved = "pipelines:runs-removed";
+
+/**
+ * Name of the custom event "search:indexed".
+ */
+export const SearchIndexed = "search:indexed";
+
+/**
+ * Name of the custom event "search:ready".
+ */
+export const SearchReady = "search:ready";
+
+/**
+ * Name of the custom event "search:status".
+ */
+export const SearchStatus = "search:status";
 
 /**
  * Name of the custom event "settings:changed".

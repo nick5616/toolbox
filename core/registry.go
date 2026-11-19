@@ -185,3 +185,16 @@ func (r *Registry) withDep(depID string, field func(Descriptor) []string) []stri
 	}
 	return ids
 }
+
+// ListAll returns every descriptor, hidden ones included, sorted like List
+// (the pipeline step catalogue: hidden modules with HiddenStep are steps).
+func (r *Registry) ListAll() []Descriptor {
+	r.mu.RLock()
+	out := make([]Descriptor, 0, len(r.descriptors))
+	for _, d := range r.descriptors {
+		out = append(out, d)
+	}
+	r.mu.RUnlock()
+	sortDescriptors(out)
+	return out
+}

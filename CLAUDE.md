@@ -415,6 +415,27 @@ A tool may have **its own design language** when its spec says so. **Paint+ is t
   - **Lineage:** `output_inputs` (migration 0009), filled by `JobContext.Output` (default rule `core.LineageInputs`) or `JobContext.OutputFrom(path, inputs...)` in multi-input jobs. Use `OutputFrom` when a job has several inputs.
   - **Safety:** `ListDir`/`Rename`/`Trash` refuse anything outside the library and never follow links. Delete goes to the OS trash (`core/trash`).
 
+## Smart search and Caption Writer (Phase 20)
+
+- **Smart search lives in the Library** (no sidebar tool).
+  - `core/mediaindex.Index` is the index: SigLIP 2 vectors + auto/user/hidden labels + text chunks in FTS5, migration 0011, settings key `search`.
+  - The hidden quiet modules do the work: `media-index` (one batch, ≤ 32 files: pictures, OCR, PDF/document text) and `media-speech` (one file).
+  - The scheduler submits a batch **only when no other non-quiet job is queued or running**.
+  - It covers the library and project thumbnails only. It **never** covers the support dir, clipboard history, the Vault, hidden files or symlinks.
+- **Scoring:** `p = sigmoid(scale·cos + bias)` with the model's pinned constants (`modules/mediaindex/models.go`). Labels and Strong/Good/Maybe cut-offs are probabilities, so a query with nothing like it returns nothing. User labels and hidden labels survive re-indexing.
+- **Text in files:**
+  - OCR runs only on pictures that pass the text gate.
+  - PDF text layers and `core/doctext` (pure Go) run first.
+  - Speech reuses existing transcripts (through lineage) before running Whisper, and is capped at `speechMaxMin` per file unless the user asks.
+  - Snippets use `0002`/`0003` markers. The UI bolds between them and never uses `innerHTML`.
+- **The engine's `search.*` handlers never download** except `search.prefetch` (pinned sha256). Query vectors are cached in `media_text_vectors`.
+- **Caption Writer** (`modules/captions`, `tools/captions/`) reads pictures through `core.VisionGenerator` (Local Chat's engine with `--mmproj`; no new listener).
+  - The model **never identifies people**: names come only from the user's context.
+  - Batches are `<library>/Captions/<name> <date>/captions.json` (+ csv).
+  - "Write into copies" (ExifTool XMP/IPTC alt text and description) and "Rename copies" only write copies. Inputs are never modified.
+  - Saved captions go to Smart search via `core.MediaTextSink`.
+- **Hidden steps:** `Descriptor.HiddenStep` makes a hidden module a pipeline step (the step catalogue uses `Registry.ListAll`).
+
 ## Performance rules (2026-11-17)
 
 - **Fan-out** over independent inputs uses `core/par` (`ForEach`/`Map`, bounded, results by index, first error cancels). Bounds: probes/subprocess-light work ≈ 6, pure-Go image work `par.CPUHalf()`, FFmpeg encodes 1 (already multi-threaded). Naming (`UniquePath`), moves and `job.Output` stay in input order.

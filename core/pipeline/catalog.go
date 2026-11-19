@@ -43,7 +43,7 @@ func (r *Runner) canonicalType(id string) string {
 // moduleStep resolves a module to its step type: a StepProvider's own, or the
 // module itself when it is step-capable.
 func moduleStep(d core.Descriptor, mod core.Module) (core.StepType, core.Chainable, bool) {
-	if d.Status != core.StatusReady || d.Hidden || d.NotAStep || d.ID == "pipelines" {
+	if d.Status != core.StatusReady || (d.Hidden && !d.HiddenStep) || d.NotAStep || d.ID == "pipelines" {
 		return core.StepType{}, nil, false
 	}
 	if sp, ok := mod.(core.StepProvider); ok {
@@ -91,7 +91,7 @@ func providerStepType(d core.Descriptor, sp core.StepProvider) core.StepType {
 // drops but reads any file as a step), so a descriptor's Accepts stay about
 // drops only.
 func stepCapable(d core.Descriptor, ch core.Chainable) bool {
-	if d.Status != core.StatusReady || d.Hidden || d.JobLess || d.NotAStep || d.ID == "pipelines" {
+	if d.Status != core.StatusReady || (d.Hidden && !d.HiddenStep) || d.JobLess || d.NotAStep || d.ID == "pipelines" {
 		return false
 	}
 	return ch != nil || d.Accepts.URLs || d.Accepts.Any || len(d.Accepts.Extensions) > 0
@@ -128,7 +128,7 @@ func (r *Runner) Catalog() []core.StepType {
 		out = append(out, b.t)
 	}
 	r.mu.Unlock()
-	ds := r.cfg.Reg.List()
+	ds := r.cfg.Reg.ListAll()
 	sort.SliceStable(ds, func(i, j int) bool { return ds[i].Order < ds[j].Order })
 	for _, d := range ds {
 		mod, _ := r.cfg.Reg.Get(d.ID)

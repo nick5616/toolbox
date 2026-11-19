@@ -705,3 +705,38 @@ Newest last. Format: date — decision — why.
   - **`LibraryQuery.Exts`** filters by extension in SQL (`lower(path) LIKE '%.ext'`, escaped, ≤ 64), so a narrow picker (e.g. `.srt`) never pages through unrelated outputs. Post Builder's `Modal` moved to `components/Modal`.
   - **Rule for every pick site:** the Library pick uses the same extensions and single/multiple mode as the native dialog and feeds the same "use paths" code; placement is a sibling button where there is room, icon-only in one-line bars, a menu item in More menus, and a sibling palette command "… from Library…". The kit (`useFileInputs().pickLibrary`, `FileToolLayout`) covers every file tool. Wired: editor family (Sources, New video/edit, music bed, missing song, Edit Studio song, Sequence Editor, Post Builder new post/Add menu/stitch song), Photo Composer (photos, background), Paint+ (open, add as layer), Image Batch logo, Object Eraser, Redact, Trimmer, PDF, Visualizer, Lyric Video, Subtitles, Local File Transfer, pipeline run sheet and compound-step backgrounds.
   - **Not wired:** folder pickers; relinking a missing editor source; Vault, Document Converter's styles document, Base64 and the app picker (not media); LAN Send's fallback picker when the queue is empty (add from Library to the queue first).
+
+## Phase 20: Smart search and Caption Writer (SPEC.md approved 2026-11-18)
+
+- **2026-11-18: Your answers to rev 1.** SigLIP 2 (the better model), indexing starts on install, library only (project thumbnails count as library), text inside files this phase, and a new captions tool of my choosing: **Caption Writer** (SPEC §9 says why).
+- **2026-11-18: Wave 0 pins (spike a, from the Hugging Face API; nothing guessed).**
+  - **SigLIP 2:** `immich-app/ViT-B-16-SigLIP2__webli` at commit `5f3fc291…`: `visual/model.onnx` (371,674,292 B), `textual/model.onnx` (1,129,435,819 B), `textual/tokenizer.json`, `visual/preprocess_cfg.json`, `config.json`; 1,535,473,697 B in all. Dim 768, context 64.
+  - **Scale and bias** came from the official checkpoint's safetensors (range requests, 8 bytes): `logit_scale` 4.7244535 (raw log; exp = 112.6689), `logit_bias` −16.7717247. They're identical in `timm/ViT-B-16-SigLIP2`, which Immich exported from.
+  - **Tokenizer:** Gemma BPE (`tokenizer.json`, no BOS). open_clip's `canonicalize` cleaning (underscores to spaces, ASCII punctuation removed, lowercase, whitespace collapsed), then tokens + `<eos>`(1), padded with `<pad>`(0) to 64.
+  - **Images:** squashed (not cropped) to 224 × 224 bicubic, mean/std 0.5.
+  - The Immich repo has no licence field. The weights are Google's Apache-2.0 SigLIP 2.
+- **2026-11-18: FTS5 (spike b).** modernc.org/sqlite has FTS5 with `unicode61 remove_diacritics 2` and `snippet()`, so there's no LIKE fallback.
+- **2026-11-18: Caption Writer's model (spike c).**
+  - **The pick: Qwen3.5 4B Q4_K_M + `mmproj-F16.gguf`** (unsloth, Apache-2.0, a native vision–language model; 3,413,361,504 B). Catalog id `qwen3.5-4b`, `VisionDefault`.
+  - Qwen3.5 2B and Gemma 4 E4B, already in the chat catalog, got their mmproj pins too, so a user whose chat model is one of them doesn't need a second model.
+  - Qwen3-VL 4B Instruct (Qwen/ and unsloth/, Apache-2.0) is pinned in the notes, not the catalog, as the fallback.
+  - **Not done in Wave 0:** the timing and quality rubric needs the 3.4 GB download and a real llama-server, so it moved to Wave 2 integration (I1). If Qwen3.5 4B misses ≤ 8 s per image or the rubric, I1 switches the default and records it here.
+- **2026-11-18: The pack shapes.**
+  - **Smart search** (`search`): engine, FFmpeg, `search-default`, `whisper-default`. It unlocks no sidebar tool, because its job modules and its step are hidden and Smart search lives in the Library.
+  - **Caption Writer** (`captions`): `chat-engine`, `vision-default`, ExifTool, FFmpeg. It unlocks `captions` with Needs `chat-engine` + `vision-default`.
+- **2026-11-18: Hidden steps.** `Descriptor.HiddenStep` plus `Registry.ListAll()` let the hidden `search-filter` be a pipeline step ("Keep files that show…") without appearing in the sidebar. The step catalogue now enumerates hidden descriptors and skips them unless `HiddenStep` is set. `TestEveryToolIsAPipelineStep` checks it's an automatic step.
+- **2026-11-18: Contract simplifications vs SPEC §3.7.**
+  - `SearchService` has one `Settings`/`SetSettings(core.SearchSettings)` instead of `SetEnabled`/`SetPaused`/`SetOptions`/`SetSkip`.
+  - `SaveDialog` takes (title, default name), like Paint+'s dialog.
+  - `TextGenerator` is unchanged: vision is a separate `core.VisionGenerator` (TextGenerator + `Vision()`), so the existing fakes still compile. `CompletionRequest` gained `Images`, `Model` and `Seed`.
+- **2026-11-18: Wiring.**
+  - `captions:item` is registered in the main package (`wiring_captions.go`) because `api` never imports modules.
+  - `library:added` reaches the index through `searchTee` (main.go), which wraps the app's emitter. Every emitter of that event (jobs, rename, composer, pipelines) is covered.
+  - The index starts in the deferred chores. `Start` returns at once, and its first reconcile waits 60 s.
+- **2026-11-18: Wave 0 scope moved.**
+  - The vocabulary ships with 63 starter labels (format frozen); V1 writes the full ≈ 1,500.
+  - The calibration harness goes to S2, because it needs the scoring code.
+  - The acceptance sample set goes to I1.
+  - The OCR/Whisper timing (spike d) goes to I1.
+- **2026-11-18: The mmproj files share one name** (`mmproj-F16.gguf`) across repos. C1 stores each one under its model's own name, so two vision models never overwrite each other's projector.
+- **2026-11-18: The dHash moved** from `modules/organize` to `core/imaging/dhash.go` (`DHash`, `DHashImage`, `Alike`, `Distance`). Organizer uses an alias, with no behaviour change.

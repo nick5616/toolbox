@@ -756,6 +756,42 @@ const BASE: Readonly<Record<string, ParamOverrides>> = {
     "/subfolder": { label: "Subfolder (optional)" },
   },
   "pipelines.check": {},
+
+  // ── search.tsx (Phase 20) ──
+  "search-filter": {
+    "/query": { label: "Keep files that show", primary: true },
+    "/match": { label: "Match by", type: "choice", choices: ch(["both", "Picture or text"], ["picture", "Picture"], ["text", "Text"]) },
+    "/strength": { label: "How sure", type: "choice", choices: ch(["strong", "Strong matches only"], ["good", "Good matches"], ["maybe", "Include maybes"]) },
+    "/invert": { label: "Keep the ones that don't match" },
+  },
+  // ── captions.tsx (Phase 20) ──
+  captions: {
+    "/preset": { label: "Write", type: "choice", choices: ch(["posting", "For posting"], ["accessible", "Accessible"], ["catalogue", "Catalogue"], ["rename", "Rename"], ["everything", "Everything"]), primary: true },
+    "/context": { label: "Context", primary: true },
+    "/tone": { label: "Tone", type: "choice", choices: ch(["plain", "Plain"], ["warm", "Warm"], ["playful", "Playful"], ["professional", "Professional"], ["poetic", "Poetic"]) },
+    "/length": { label: "Length", type: "choice", choices: ch(["short", "Short"], ["medium", "Medium"], ["long", "Long"]) },
+    "/language": { label: "Language" },
+    "/emoji": { label: "Emoji" },
+    "/hashtags": { label: "Hashtags", min: 0, max: 15 },
+    "/namePattern": { label: "File names", type: "choice", choices: ch(["name", "Name"], ["date-name", "Date + name"], ["number-name", "Number + name"]) },
+    "/kebab": { label: "kebab-case names" },
+    "/useHints": { label: "Use Smart search hints" },
+    "/readText": { label: "Mention words in the picture" },
+    "/then": { label: "Then", type: "choice", choices: ch(["nothing", "Just the table"], ["writeCopies", "Write into copies"], ["renameCopies", "Rename copies"]), primary: true },
+    "/action": { hidden: true },
+    "/model": { hidden: true },
+    "/batch": { hidden: true },
+    "/index": { hidden: true },
+    "/keepEdited": { hidden: true },
+    "/seed": { hidden: true },
+    "/write/alt": { label: "Write alt text" },
+    "/write/description": { label: "Write description" },
+    "/write/caption": { label: "Write caption" },
+    "/write/captionFrom": { hidden: true },
+    "/write/title": { label: "Write title" },
+    "/write/keywords": { label: "Write keywords" },
+    "/write/keepLocation": { label: "Keep location data" },
+  },
 };
 
 /** The old Local Chat id shares Local Chat's parameters. */

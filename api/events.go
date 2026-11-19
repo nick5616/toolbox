@@ -56,6 +56,10 @@ func init() {
 	application.RegisterEvent[viz.RenderStart]("viz:render")
 	application.RegisterEvent[viz.RenderAck]("viz:render-ack")
 	application.RegisterEvent[viz.RenderCancel]("viz:render-cancel")
+
+	application.RegisterEvent[core.SearchStatus]("search:status")
+	application.RegisterEvent[core.SearchIndexed]("search:indexed")
+	application.RegisterEvent[core.SearchReady]("search:ready")
 }
 
 // Emitter adapts the Wails event manager to core.Emitter.
