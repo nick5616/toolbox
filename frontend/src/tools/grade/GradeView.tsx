@@ -150,6 +150,7 @@ export default function GradeView({ moduleId }: ToolViewProps) {
         variant="primary"
         size="sm"
         icon="download"
+        data-testid="grade-export"
         loading={exporting}
         aria-disabled={!!exportWhy || undefined}
         data-tip={exportWhy || "Grade every file with this look and save the results to the Graded folder of your Library"}

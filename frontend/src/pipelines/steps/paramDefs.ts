@@ -799,6 +799,7 @@ const BASE: Readonly<Record<string, ParamOverrides>> = {
     "/vibe": { label: "Vibe" },
     "/seed": { label: "Chaos seed", min: 0, max: 4294967295 },
     "/format": { label: "Format", type: "choice", choices: ch(["same", "Same as the input"], ["jpg", "JPEG"], ["png", "PNG"], ["webp", "WebP"]) },
+    "/recipe": { hidden: true },
   },
 };
 
