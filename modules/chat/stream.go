@@ -16,8 +16,10 @@ import (
 
 // wireMsg is one message sent to a backend.
 type wireMsg struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	// Images (Ollama only) are base64 pictures; llama-server gets content parts instead.
+	Images  []string `json:"images,omitempty"`
+	Role    string   `json:"role"`
+	Content string   `json:"content"`
 }
 
 // streamStats is what a finished stream reports.
@@ -91,7 +93,7 @@ func streamOpenAI(ctx context.Context, base, key string, msgs []wireMsg, temp fl
 
 // streamOpenAIExtra is streamOpenAI with extra top-level request fields
 // (max_tokens, response_format).
-func streamOpenAIExtra(ctx context.Context, base, key string, msgs []wireMsg, temp float64, extra map[string]any, onDelta func(string)) (streamStats, error) {
+func streamOpenAIExtra(ctx context.Context, base, key string, msgs any, temp float64, extra map[string]any, onDelta func(string)) (streamStats, error) {
 	payload := map[string]any{
 		"model": "local", "messages": msgs, "stream": true, "temperature": temp,
 		"stream_options": map[string]any{"include_usage": true},

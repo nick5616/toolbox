@@ -4,6 +4,7 @@ package chat
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"strings"
 
@@ -48,7 +49,7 @@ func (c *Chat) ContextTokens() int { return c.cfg.Settings.Current().Chat.Contex
 
 // Complete implements core.TextGenerator.
 func (c *Chat) Complete(ctx context.Context, req core.CompletionRequest) (string, error) {
-	model, err := c.pickModel()
+	model, err := c.requestModel(req)
 	if err != nil {
 		return "", err
 	}
@@ -81,31 +82,83 @@ func (c *Chat) Complete(ctx context.Context, req core.CompletionRequest) (string
 	return out, nil
 }
 
+// requestModel is the model a request runs on: req.Model when set (it must be
+// installed), else the chat model. Pictures need a model that can see.
+func (c *Chat) requestModel(req core.CompletionRequest) (string, error) {
+	model := req.Model
+	if model == "" {
+		m, err := c.pickModel()
+		if err != nil {
+			return "", err
+		}
+		model = m
+	} else if isOllamaID(model) {
+		if c.cfg.Settings.Current().Chat.OllamaURL == "" || ollamaName(model) == "" {
+			return "", core.Errorf(core.CodeValidation, "Ollama isn't turned on").WithHint("Add its address in Settings → Chat")
+		}
+	} else {
+		e, ok := c.lookup(model)
+		if !ok {
+			return "", core.Errorf(core.CodeNotFound, "Unknown chat model")
+		}
+		if !c.modelPresent(model) {
+			return "", core.Errorf(core.CodeNotFound, "%s isn't downloaded yet", e.Label).WithHint("Download it from the model list")
+		}
+	}
+	if len(req.Images) > 0 && !c.canSee(model) {
+		return "", errCantSee()
+	}
+	return model, nil
+}
+
 func (c *Chat) complete(ctx context.Context, model string, req core.CompletionRequest) (string, error) {
 	st := c.cfg.Settings.Current().Chat
 	maxTokens := req.MaxTokens
 	if maxTokens <= 0 {
 		maxTokens = defaultCompletionTokens
 	}
+	var jpegs [][]byte
+	if len(req.Images) > 0 {
+		var err error
+		if jpegs, err = encodeImages(ctx, req.Images); err != nil {
+			return "", err
+		}
+	}
 	var msgs []wireMsg
 	if strings.TrimSpace(req.System) != "" {
 		msgs = append(msgs, wireMsg{Role: "system", Content: req.System})
 	}
-	msgs = append(msgs, wireMsg{Role: "user", Content: req.Prompt})
-
+	user := wireMsg{Role: "user", Content: req.Prompt}
 	if isOllamaID(model) {
+		for _, j := range jpegs {
+			user.Images = append(user.Images, base64.StdEncoding.EncodeToString(j))
+		}
+		msgs = append(msgs, user)
 		c.setStatus(core.ChatStatus{State: core.ChatReady, Model: model, Backend: core.ChatBackendOllama})
-		return completeOllama(ctx, st.OllamaURL, ollamaName(model), msgs, req.Temperature, st.ContextSize, maxTokens, req.JSONSchema)
+		return completeOllama(ctx, st.OllamaURL, ollamaName(model), msgs, req.Temperature, st.ContextSize, maxTokens, req.JSONSchema, req.Seed)
 	}
 	e, ok := c.lookup(model)
 	if !ok {
 		return "", core.Errorf(core.CodeNotFound, "Unknown chat model")
+	}
+	// The message list: plain messages, and content parts when pictures ride along.
+	var wire []any
+	for _, m := range msgs {
+		wire = append(wire, m)
+	}
+	if len(jpegs) > 0 {
+		wire = append(wire, visionMsg{Role: "user", Content: imageParts(req.Prompt, jpegs)})
+	} else {
+		wire = append(wire, user)
 	}
 	srv, err := c.ensureServer(ctx, e)
 	if err != nil {
 		return "", err
 	}
 	extra := map[string]any{"max_tokens": maxTokens}
+	if req.Seed != 0 {
+		extra["seed"] = req.Seed
+	}
 	if len(req.JSONSchema) > 0 {
 		extra["response_format"] = map[string]any{
 			"type": "json_schema",
@@ -115,7 +168,7 @@ func (c *Chat) complete(ctx context.Context, model string, req core.CompletionRe
 		}
 	}
 	var b strings.Builder
-	_, err = streamOpenAIExtra(ctx, srv.base(), srv.key, msgs, req.Temperature, extra, func(d string) { b.WriteString(d) })
+	_, err = streamOpenAIExtra(ctx, srv.base(), srv.key, wire, req.Temperature, extra, func(d string) { b.WriteString(d) })
 	if err != nil {
 		if ctx.Err() == nil && !srv.alive() {
 			err = core.Errorf(core.CodeToolFailed, "The chat engine stopped unexpectedly").

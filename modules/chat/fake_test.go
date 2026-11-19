@@ -96,7 +96,10 @@ func runFakeLlama() {
 			return
 		}
 		var req struct {
-			Messages []struct{ Role, Content string } `json:"messages"`
+			Messages []struct {
+				Role    string
+				Content any
+			} `json:"messages"`
 		}
 		var raw json.RawMessage
 		dec := json.NewDecoder(r.Body)
@@ -111,7 +114,7 @@ func runFakeLlama() {
 		}
 		last := ""
 		if n := len(req.Messages); n > 0 {
-			last = req.Messages[n-1].Content
+			last, _ = req.Messages[n-1].Content.(string)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		fl := w.(http.Flusher)
