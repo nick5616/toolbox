@@ -1,0 +1,593 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the 40 built-in looks > compile at Wildness 0, 0.5 and 1 (goldens) 1`] = `
+{
+  "acid-bath @0": [
+    "look1 gradelook[huecycle+solarize+balance] #f8e0085e",
+    "bqumgt glow #673b80e9",
+  ],
+  "acid-bath @0.5": [
+    "look1 gradelook[huecycle+solarize+balance] #31919589",
+    "bqumgt glow #7f64fbc7",
+  ],
+  "acid-bath @1": [
+    "look1 gradelook[huecycle+solarize+balance] #6b61c150",
+    "bqumgt glow #2c3a0b31",
+    "9sxem0 chromatic #997b30c1",
+  ],
+  "aerochrome @0": [
+    "look1 gradelook[chanmix+balance+hsl] #652bc2ca",
+    "ti3mnx halation #02c83f89",
+    "look2 gradelook[grain] #48fa0047",
+  ],
+  "aerochrome @0.5": [
+    "look1 gradelook[chanmix+balance+hsl] #5d1e7bc8",
+    "ti3mnx halation #88b2f306",
+    "look2 gradelook[grain] #16c13a88",
+  ],
+  "aerochrome @1": [
+    "look1 gradelook[chanmix+balance+hsl] #cee5ced7",
+    "ti3mnx halation #c9fbe205",
+    "look2 gradelook[grain] #1ac5a3e5",
+  ],
+  "arctic @0": [
+    "look1 gradelook[balance+split+hsl] #db7cc8b7",
+    "71iccy glow #439e9a53",
+  ],
+  "arctic @0.5": [
+    "look1 gradelook[balance+split+hsl] #570ff620",
+    "71iccy glow #5c538318",
+  ],
+  "arctic @1": [
+    "look1 gradelook[balance+split+hsl] #52ec831b",
+    "71iccy glow #f7876e73",
+  ],
+  "bleach-bypass @0": [
+    "look1 gradelook[bleach+balance+grain] #abe2bf54",
+  ],
+  "bleach-bypass @0.5": [
+    "look1 gradelook[bleach+balance+grain] #75c20e60",
+  ],
+  "bleach-bypass @1": [
+    "look1 gradelook[bleach+balance+grain] #ab4b362b",
+  ],
+  "blockbuster @0": [
+    "look1 gradelook[balance+curves+split+hsl] #437e6cc9",
+    "6h94bd glow #cd3d1cd3",
+    "look2 gradelook[vignette] #030bfee3",
+  ],
+  "blockbuster @0.5": [
+    "look1 gradelook[balance+curves+split+hsl] #bf03d675",
+    "6h94bd glow #f410e77b",
+    "look2 gradelook[vignette] #14bd3c0e",
+  ],
+  "blockbuster @1": [
+    "look1 gradelook[balance+curves+split+hsl] #8ce3cf49",
+    "6h94bd glow #3edba226",
+    "look2 gradelook[vignette] #4ffacc3e",
+  ],
+  "candy @0": [
+    "look1 gradelook[balance+curves+split] #ec74c3c1",
+    "rn6x71 glow #2036d6cb",
+  ],
+  "candy @0.5": [
+    "look1 gradelook[balance+curves+split] #2413c61f",
+    "rn6x71 glow #ebe8c2f8",
+  ],
+  "candy @1": [
+    "look1 gradelook[balance+curves+split] #5109f290",
+    "rn6x71 glow #57d05157",
+  ],
+  "clean @0": [
+    "look1 gradelook[balance] #22409c74",
+    "d891vr sharpen #73cbef30",
+  ],
+  "clean @0.5": [
+    "look1 gradelook[balance] #e96da343",
+    "d891vr sharpen #8a3c6bd5",
+  ],
+  "clean @1": [
+    "look1 gradelook[balance] #7926aa4b",
+    "d891vr sharpen #b2e17a82",
+  ],
+  "cool-film @0": [
+    "look1 gradelook[balance+curves+split+grain] #f04daa94",
+  ],
+  "cool-film @0.5": [
+    "look1 gradelook[balance+curves+split+grain] #eb07aa3e",
+  ],
+  "cool-film @1": [
+    "look1 gradelook[balance+curves+split+grain] #58a18c86",
+  ],
+  "cross-process @0": [
+    "look1 gradelook[curves+balance+split] #ec7163aa",
+  ],
+  "cross-process @0.5": [
+    "look1 gradelook[curves+balance+split] #740a3482",
+  ],
+  "cross-process @1": [
+    "look1 gradelook[curves+balance+split] #6090206d",
+  ],
+  "cyberpunk @0": [
+    "look1 gradelook[balance+split+hsl] #84899892",
+    "n1497t glow #24b71a70",
+    "nb3uws chromatic #6bd30fed",
+    "look2 gradelook[vignette] #3e48e837",
+  ],
+  "cyberpunk @0.5": [
+    "look1 gradelook[balance+split+hsl] #c97cee99",
+    "n1497t glow #ad4e6075",
+    "nb3uws chromatic #5b7877f1",
+    "look2 gradelook[vignette] #b2c4b89e",
+  ],
+  "cyberpunk @1": [
+    "look1 gradelook[balance+split+hsl] #e47206b8",
+    "n1497t glow #8a05a433",
+    "nb3uws chromatic #241be4be",
+    "look2 gradelook[vignette] #b8b096fd",
+  ],
+  "deep-fried @0": [
+    "look1 gradelook[balance+wheels+posterize] #09d93c3f",
+    "gb76hn sharpen #39b6e3dc",
+    "hp56yi chromatic #21bfc08e",
+    "look2 gradelook[grain] #4ab5a456",
+  ],
+  "deep-fried @0.5": [
+    "look1 gradelook[balance+wheels+posterize] #f31f5bfb",
+    "gb76hn sharpen #41dc7569",
+    "hp56yi chromatic #87cc3a31",
+    "look2 gradelook[grain] #0a7a3871",
+  ],
+  "deep-fried @1": [
+    "look1 gradelook[balance+wheels+posterize] #48119856",
+    "gb76hn sharpen #77ddffe8",
+    "hp56yi chromatic #044cdf60",
+    "look2 gradelook[grain] #16f7a8eb",
+  ],
+  "depth-rainbow @0": [
+    "look1 gradelook[gradmap+balance] #eb9d4f26",
+    "4bzxdt glow #01f89497",
+  ],
+  "depth-rainbow @0.5": [
+    "look1 gradelook[gradmap+balance] #ad790bfa",
+    "4bzxdt glow #744f8563",
+  ],
+  "depth-rainbow @1": [
+    "look1 gradelook[gradmap+balance] #87689e42",
+    "4bzxdt glow #ff83c856",
+  ],
+  "desert-heat @0": [
+    "look1 gradelook[balance+split+hsl] #c5202594",
+    "23s8dq halation #e6f6caba",
+    "look2 gradelook[vignette] #030bfee3",
+  ],
+  "desert-heat @0.5": [
+    "look1 gradelook[balance+split+hsl] #c59d5471",
+    "23s8dq halation #33603522",
+    "look2 gradelook[vignette] #c4e23559",
+  ],
+  "desert-heat @1": [
+    "look1 gradelook[balance+split+hsl] #a82e3a9a",
+    "23s8dq halation #23c39d87",
+    "look2 gradelook[vignette] #4ffacc3e",
+  ],
+  "dreamcore @0": [
+    "look1 gradelook[curves+balance+gradmap] #e845127c",
+    "fieibk depthfog #9f14587d",
+    "hgbq6ds gradelook stash #cf378dc2",
+    "hgbq6d glow #289f45eb",
+    "hgbq6dr gradelook[gate] restore #80c75ee8",
+    "look2 gradelook[grain] #ce5807cc",
+  ],
+  "dreamcore @0.5": [
+    "look1 gradelook[curves+balance+gradmap] #708558b5",
+    "fieibk depthfog #206797f0",
+    "hgbq6ds gradelook stash #cf378dc2",
+    "hgbq6d glow #0a9b6661",
+    "hgbq6dr gradelook[gate] restore #80c75ee8",
+    "look2 gradelook[grain] #0dd28ccb",
+  ],
+  "dreamcore @1": [
+    "look1 gradelook[curves+balance+gradmap] #d205ad0a",
+    "fieibk depthfog #058fb5a9",
+    "hgbq6ds gradelook stash #cf378dc2",
+    "hgbq6d glow #8eb72eb7",
+    "hgbq6dr gradelook[gate] restore #80c75ee8",
+    "look2 gradelook[grain] #4ee1c899",
+  ],
+  "faded-matte @0": [
+    "look1 gradelook[curves+balance+split+grain] #a381b9cd",
+  ],
+  "faded-matte @0.5": [
+    "look1 gradelook[curves+balance+split+grain] #9f352474",
+  ],
+  "faded-matte @1": [
+    "look1 gradelook[curves+balance+split+grain] #155a88bc",
+  ],
+  "glitch-prophet @0": [
+    "look1 gradelook[balance+huecycle] #e28088af",
+    "9kvr93s gradelook stash #1d170636",
+    "9kvr93 glitch #fd803554",
+    "9kvr93r gradelook[gate] restore #85780e73",
+    "9aw5k4s gradelook stash #2eab59f0",
+    "9aw5k4 chromatic #92367c42",
+    "9aw5k4r gradelook[gate] restore #27f2725d",
+  ],
+  "glitch-prophet @0.5": [
+    "look1 gradelook[balance+huecycle] #903a1d50",
+    "9kvr93s gradelook stash #1d170636",
+    "9kvr93 glitch #10477747",
+    "9kvr93r gradelook[gate] restore #85780e73",
+    "9aw5k4s gradelook stash #2eab59f0",
+    "9aw5k4 chromatic #8739c0dd",
+    "9aw5k4r gradelook[gate] restore #27f2725d",
+  ],
+  "glitch-prophet @1": [
+    "look1 gradelook[balance+huecycle] #a3e0ab3e",
+    "9kvr93s gradelook stash #1d170636",
+    "9kvr93 glitch #40790f40",
+    "9kvr93r gradelook[gate] restore #85780e73",
+    "9aw5k4s gradelook stash #2eab59f0",
+    "9aw5k4 chromatic #a9566095",
+    "9aw5k4r gradelook[gate] restore #27f2725d",
+    "90wjv5s gradelook stash #bad03c70",
+    "90wjv5 edgeglow #afaea039",
+    "90wjv5r gradelook[gate] restore #d63488c1",
+  ],
+  "golden-hour @0": [
+    "look1 gradelook[balance+split] #d1ec7195",
+    "ie16jx halation #8b971824",
+    "look2 gradelook[vignette] #b1996dfc",
+  ],
+  "golden-hour @0.5": [
+    "look1 gradelook[balance+split] #2f1caabe",
+    "ie16jx halation #7a978645",
+    "look2 gradelook[vignette] #2dd62004",
+  ],
+  "golden-hour @1": [
+    "look1 gradelook[balance+split] #6be239e6",
+    "ie16jx halation #586d66f5",
+    "look2 gradelook[vignette] #a334abd3",
+  ],
+  "hyperreal @0": [
+    "look1 gradelook[balance+hsl] #4fd9c8f2",
+    "oi4tvd sharpen #77b534c8",
+    "o8586e glow #673049f1",
+    "look2 gradelook[vignette] #6528e135",
+  ],
+  "hyperreal @0.5": [
+    "look1 gradelook[balance+hsl] #f8bca714",
+    "oi4tvd sharpen #e49ff1e5",
+    "o8586e glow #dcfb3942",
+    "look2 gradelook[vignette] #8cadcc95",
+  ],
+  "hyperreal @1": [
+    "look1 gradelook[balance+hsl] #f9c4465a",
+    "oi4tvd sharpen #0b4bf241",
+    "o8586e glow #56df7b63",
+    "look2 gradelook[vignette] #1f52ff22",
+  ],
+  "inferno-by-depth @0": [
+    "look1 gradelook[balance+gradmap] #35875ca6",
+    "mi4toy depthfog #4c612911",
+    "ms4fdx halation #de29b7d3",
+    "look2 gradelook[grain] #9e7f55c6",
+  ],
+  "inferno-by-depth @0.5": [
+    "look1 gradelook[balance+gradmap] #b25c4caf",
+    "mi4toy depthfog #dfedb918",
+    "ms4fdx halation #a62f0c7c",
+    "look2 gradelook[grain] #fdaae203",
+  ],
+  "inferno-by-depth @1": [
+    "look1 gradelook[balance+gradmap] #41cc4989",
+    "mi4toy depthfog #3fce8215",
+    "ms4fdx halation #39d6e1f7",
+    "look2 gradelook[grain] #094142e8",
+  ],
+  "lomo @0": [
+    "look1 gradelook[balance+curves+split] #2e4d0141",
+    "kszfwb chromatic #4815789a",
+    "look2 gradelook[grain+vignette] #4db9eb8d",
+  ],
+  "lomo @0.5": [
+    "look1 gradelook[balance+curves+split] #8f3a0de5",
+    "kszfwb chromatic #b8ffaec0",
+    "look2 gradelook[grain+vignette] #dd2827f2",
+  ],
+  "lomo @1": [
+    "look1 gradelook[balance+curves+split] #7d979ea2",
+    "kszfwb chromatic #8dca0a27",
+    "look2 gradelook[grain+vignette] #a547046d",
+  ],
+  "miami-neon @0": [
+    "look1 gradelook[balance+gradmap] #14b187ba",
+    "u4iz9f glow #4666353b",
+    "look2 gradelook[grain] #f70e5990",
+  ],
+  "miami-neon @0.5": [
+    "look1 gradelook[balance+gradmap] #9858fa09",
+    "u4iz9f glow #021e91d5",
+    "look2 gradelook[grain] #4e2c5dbb",
+  ],
+  "miami-neon @1": [
+    "look1 gradelook[balance+gradmap] #a58d9d8a",
+    "u4iz9f glow #8b540cec",
+    "look2 gradelook[grain] #4bbac08e",
+  ],
+  "midas @0": [
+    "look1 gradelook[balance+gradmap] #50446438",
+    "58y4jp glow #ce329adb",
+    "4yyiuq halation #6c89f63d",
+    "look2 gradelook[vignette] #3e48e837",
+  ],
+  "midas @0.5": [
+    "look1 gradelook[balance+gradmap] #5b93fca0",
+    "58y4jp glow #ddb64872",
+    "4yyiuq halation #e4dd07c8",
+    "look2 gradelook[vignette] #c33f4c56",
+  ],
+  "midas @1": [
+    "look1 gradelook[balance+gradmap] #0bc6e3ec",
+    "58y4jp glow #bef55f9f",
+    "4yyiuq halation #ddeee0c1",
+    "look2 gradelook[vignette] #b8b096fd",
+  ],
+  "moody-forest @0": [
+    "look1 gradelook[balance+hsl+split+vignette+grain] #20bbdbda",
+  ],
+  "moody-forest @0.5": [
+    "look1 gradelook[balance+hsl+split+vignette+grain] #2625ee6c",
+  ],
+  "moody-forest @1": [
+    "look1 gradelook[balance+hsl+split+vignette+grain] #c9081272",
+  ],
+  "moonlight @0": [
+    "look1 gradelook[balance+split+wheels+vignette+grain] #547a2c0f",
+  ],
+  "moonlight @0.5": [
+    "look1 gradelook[balance+split+wheels+vignette+grain] #f27d40bc",
+  ],
+  "moonlight @1": [
+    "look1 gradelook[balance+split+wheels+vignette+grain] #c2b2f740",
+  ],
+  "neon-noir @0": [
+    "look1 gradelook[balance+gradmap+balance+split] #5e359264",
+    "ghc83a glow #684e328e",
+    "look2 gradelook[vignette] #4a7be9c8",
+  ],
+  "neon-noir @0.5": [
+    "look1 gradelook[balance+gradmap+balance+split] #592dc636",
+    "ghc83a glow #c0242eaa",
+    "look2 gradelook[vignette] #b8b096fd",
+  ],
+  "neon-noir @1": [
+    "look1 gradelook[balance+gradmap+balance+split] #d94c10c4",
+    "ghc83a glow #1303fe57",
+    "look2 gradelook[vignette] #230a8db4",
+    "fxd0pcs gradelook stash #76820824",
+    "fxd0pc edgeglow #51a9c8c3",
+    "fxd0pcr gradelook[gate] restore #255052c1",
+    "g7cmeb chromatic #79ff9dae",
+  ],
+  "night-vision @0": [
+    "look1 gradelook[balance+gradmap] #45ca4fdb",
+    "cneymg vhs #1becf795",
+    "look2 gradelook[grain+vignette] #5d3bd59e",
+  ],
+  "night-vision @0.5": [
+    "look1 gradelook[balance+gradmap] #353ebf9f",
+    "cneymg vhs #f8144bce",
+    "look2 gradelook[grain+vignette] #5b1920f3",
+  ],
+  "night-vision @1": [
+    "look1 gradelook[balance+gradmap] #60b91c51",
+    "cneymg vhs #4ccf2d56",
+    "look2 gradelook[grain+vignette] #a289b865",
+  ],
+  "noir @0": [
+    "look1 gradelook[balance+curves+grain+vignette] #757bc0a6",
+  ],
+  "noir @0.5": [
+    "look1 gradelook[balance+curves+grain+vignette] #070b1c36",
+  ],
+  "noir @1": [
+    "look1 gradelook[balance+curves+grain+vignette] #1f067585",
+  ],
+  "oil-slick @0": [
+    "look1 gradelook[huecycle+huecycle+balance] #c1de11ac",
+    "jzb2tt glow #02c16765",
+  ],
+  "oil-slick @0.5": [
+    "look1 gradelook[huecycle+huecycle+balance] #8933b13a",
+    "jzb2tt glow #bb136d19",
+  ],
+  "oil-slick @1": [
+    "look1 gradelook[huecycle+huecycle+balance] #2fd47013",
+    "jzb2tt glow #b8db8111",
+  ],
+  "pop-art @0": [
+    "look1 gradelook[balance+posterize] #97b61e4b",
+    "ltccjk halftone #20ff97d9",
+  ],
+  "pop-art @0.5": [
+    "look1 gradelook[balance+posterize] #22290d8f",
+    "ltccjk halftone #97be144a",
+  ],
+  "pop-art @1": [
+    "look1 gradelook[balance+posterize] #5723fa21",
+    "ltccjk halftone #15874c0c",
+  ],
+  "riso-duotone @0": [
+    "look1 gradelook[balance+gradmap] #4926df6d",
+    "x31twv halftone #fe4c7f9a",
+    "look2 gradelook[grain] #13416047",
+  ],
+  "riso-duotone @0.5": [
+    "look1 gradelook[balance+gradmap] #d9998bad",
+    "x31twv halftone #5ce2ce31",
+    "look2 gradelook[grain] #198a9401",
+  ],
+  "riso-duotone @1": [
+    "look1 gradelook[balance+gradmap] #57514b43",
+    "x31twv halftone #1d59f7d0",
+    "look2 gradelook[grain] #1a5988ab",
+  ],
+  "sepia-punch @0": [
+    "look1 gradelook[gradmap+balance+vignette+grain] #fa656ed0",
+  ],
+  "sepia-punch @0.5": [
+    "look1 gradelook[gradmap+balance+vignette+grain] #3a7be9ae",
+  ],
+  "sepia-punch @1": [
+    "look1 gradelook[gradmap+balance+vignette+grain] #24aeefd9",
+  ],
+  "seventies-slide @0": [
+    "look1 gradelook[balance+curves+wheels] #ab089d5f",
+    "ndm7l2 halation #37726210",
+    "look2 gradelook[grain+vignette] #a5d1fa29",
+  ],
+  "seventies-slide @0.5": [
+    "look1 gradelook[balance+curves+wheels] #25498724",
+    "ndm7l2 halation #5e6ec6de",
+    "look2 gradelook[grain+vignette] #e5fe5530",
+  ],
+  "seventies-slide @1": [
+    "look1 gradelook[balance+curves+wheels] #a9c58c09",
+    "ndm7l2 halation #a9d40744",
+    "look2 gradelook[grain+vignette] #2467495e",
+  ],
+  "soft-pastel @0": [
+    "look1 gradelook[balance+curves+split] #ffa44131",
+    "9n9gzm glow #c5b02e19",
+  ],
+  "soft-pastel @0.5": [
+    "look1 gradelook[balance+curves+split] #a3f1c5e6",
+    "9n9gzm glow #48216453",
+  ],
+  "soft-pastel @1": [
+    "look1 gradelook[balance+curves+split] #d7414d87",
+    "9n9gzm glow #54cab110",
+  ],
+  "solar-flare @0": [
+    "look1 gradelook[balance+solarize] #16b6eb87",
+    "fzc16js gradelook stash #6e0a3f22",
+    "fzc16j glow #0432b5ea",
+    "fzc16jr gradelook[gate] restore #4a76aa05",
+    "fpcfhk chromatic #5f9e62d2",
+  ],
+  "solar-flare @0.5": [
+    "look1 gradelook[balance+solarize] #9c92b747",
+    "fzc16js gradelook stash #6e0a3f22",
+    "fzc16j glow #2229715e",
+    "fzc16jr gradelook[gate] restore #6badb542",
+    "fpcfhk chromatic #72bffaec",
+  ],
+  "solar-flare @1": [
+    "look1 gradelook[balance+solarize] #11282e0f",
+    "fzc16js gradelook stash #6e0a3f22",
+    "fzc16j glow #8f78734d",
+    "fzc16jr gradelook[gate] restore #7a28938f",
+    "fpcfhk chromatic #87995481",
+  ],
+  "teal-orange @0": [
+    "look1 gradelook[balance+split+hsl+vignette] #3c97f6d8",
+  ],
+  "teal-orange @0.5": [
+    "look1 gradelook[balance+split+hsl+vignette] #6cab64b0",
+  ],
+  "teal-orange @1": [
+    "look1 gradelook[balance+split+hsl+vignette] #2b7aa004",
+  ],
+  "thermal @0": [
+    "look1 gradelook[balance+gradmap] #faa43820",
+    "f7gfec glow #86b4d6c6",
+    "look2 gradelook[grain] #a8409dfa",
+  ],
+  "thermal @0.5": [
+    "look1 gradelook[balance+gradmap] #e3e77f15",
+    "f7gfec glow #314a2d7a",
+    "look2 gradelook[grain] #f3b27696",
+  ],
+  "thermal @1": [
+    "look1 gradelook[balance+gradmap] #0805d041",
+    "f7gfec glow #05d69149",
+    "look2 gradelook[grain] #f404c2dd",
+  ],
+  "toxic @0": [
+    "look1 gradelook[chanmix+balance+posterize] #685419b1",
+    "q7pvczs gradelook stash #4b109d0c",
+    "q7pvcz halation #78bf332f",
+    "q7pvczr gradelook[gate] restore #77971169",
+    "look2 gradelook[grain] #8e48ddc7",
+  ],
+  "toxic @0.5": [
+    "look1 gradelook[chanmix+balance+posterize] #8ca0d860",
+    "q7pvczs gradelook stash #4b109d0c",
+    "q7pvcz halation #49bf252c",
+    "q7pvczr gradelook[gate] restore #77971169",
+    "look2 gradelook[grain] #65220740",
+  ],
+  "toxic @1": [
+    "look1 gradelook[chanmix+balance+posterize] #dbb0d117",
+    "q7pvczs gradelook stash #4b109d0c",
+    "q7pvcz halation #2dfc9263",
+    "q7pvczr gradelook[gate] restore #77971169",
+    "look2 gradelook[grain] #d287bbbd",
+  ],
+  "vaporwave-mall @0": [
+    "look1 gradelook[balance+gradmap] #7de2a6ef",
+    "yo23gx vhs #6e4addd0",
+    "ye2hry halation #58d67936",
+    "look2 gradelook[grain+vignette] #5c0e63ec",
+  ],
+  "vaporwave-mall @0.5": [
+    "look1 gradelook[balance+gradmap] #4ca6909e",
+    "yo23gx vhs #5516c5f5",
+    "ye2hry halation #d528010b",
+    "look2 gradelook[grain+vignette] #fa92546f",
+  ],
+  "vaporwave-mall @1": [
+    "look1 gradelook[balance+gradmap] #4f694215",
+    "yo23gx vhs #29f2a32c",
+    "ye2hry halation #afe4915d",
+    "look2 gradelook[grain+vignette] #8f47d22f",
+  ],
+  "warm-film @0": [
+    "look1 gradelook[balance+split] #89e2d438",
+    "bsx42p halation #fe3fdd34",
+    "look2 gradelook[grain+vignette] #af15dca7",
+  ],
+  "warm-film @0.5": [
+    "look1 gradelook[balance+split] #53c40328",
+    "bsx42p halation #d147aab7",
+    "look2 gradelook[grain+vignette] #dc748447",
+  ],
+  "warm-film @1": [
+    "look1 gradelook[balance+split] #1de5f8d7",
+    "bsx42p halation #b6f7ae2f",
+    "look2 gradelook[grain+vignette] #3f949274",
+  ],
+  "x-ray @0": [
+    "look1 gradelook[invert+gradmap+balance] #9ad8ede5",
+    "aoxraps gradelook stash #ae137674",
+    "aoxrap edgeglow #99d8e11e",
+    "aoxrapr gradelook[gate] restore #ec331c3a",
+    "ayxczo glow #341245a9",
+  ],
+  "x-ray @0.5": [
+    "look1 gradelook[invert+gradmap+balance] #3655fe94",
+    "aoxraps gradelook stash #ae137674",
+    "aoxrap edgeglow #c7f9404d",
+    "aoxrapr gradelook[gate] restore #ec331c3a",
+    "ayxczo glow #1892e833",
+  ],
+  "x-ray @1": [
+    "look1 gradelook[invert+gradmap+balance] #9f164f93",
+    "aoxraps gradelook stash #ae137674",
+    "aoxrap edgeglow #e8fe9df2",
+    "aoxrapr gradelook[gate] restore #ec331c3a",
+    "ayxczo glow #1848b3c8",
+  ],
+}
+`;

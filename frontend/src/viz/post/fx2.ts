@@ -11,3 +11,8 @@ import "./lightleak";
 import "./speedlines";
 import "./sharpen";
 import "./outline";
+import "./gradelook";
+import "./halation";
+import "./edgeglow";
+import "./depthfog";
+import "./tiltshift";

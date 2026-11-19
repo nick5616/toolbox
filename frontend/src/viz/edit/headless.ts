@@ -105,9 +105,12 @@ export async function runSingle(run: SingleRun, planUrl: string, invoke: (msg: s
       reply.file(new TextEncoder().encode(JSON.stringify(project)));
       return;
     }
-    if (plan.kind === "edit" && plan.still) {
-      // Phase 21 §E3.5: G1 renders the frame with the EditEngine at full size (compileRecipe for plan.grade).
-      throw new RenderError("Still frames aren't ready yet", "");
+    if (plan.kind === "edit" && plan.still && plan.edit) {
+      // Phase 21 §E3.5: one frame of an edit at full size, with plan.grade compiled onto the first clip.
+      fallback = "The picture couldn't be drawn";
+      const { renderStill } = await import("./still");
+      await renderStill({ width: plan.width, height: plan.height, analysis: plan.analysis, edit: plan.edit, still: plan.still, grade: plan.grade }, reply, signal, { loadAnalysis: deps.loadAnalysis });
+      return;
     }
     throw new RenderError("Unknown render request", plan.kind);
   } catch (e) {

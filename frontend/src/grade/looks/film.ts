@@ -1,0 +1,145 @@
+/** Film (12): tasteful, the kind of grade a colourist would be happy to sign. Authored so the default Wildness (0.5) already reads. */
+import type { BuiltInLook } from "../types";
+import { look, op } from "./build";
+
+export const FILM_LOOKS: BuiltInLook[] = [
+  look({
+    id: "clean",
+    name: "Clean",
+    tier: "film",
+    blurb: "Just a little more contrast and colour. Nothing you'd notice, everything you'd miss.",
+    ops: [op("balance", { contrast: 1.1, saturation: 1.08, vibrance: 0.25, exposure: 0.05 }), op("sharpen", { gain: 0.4 }, { amount: 0.6 })],
+  }),
+  look({
+    id: "warm-film",
+    name: "Warm Film",
+    tier: "film",
+    blurb: "Amber highlights, plum shadows, a pinch of grain: a print from a shoebox.",
+    ops: [
+      op("balance", { temp: 0.35, tint: 0.05, contrast: 1.1, saturation: 1.05 }),
+      op("split", { shadow: "#3b2a4a", highlight: "#ffc78a", balance: 0.1 }, { amount: 0.8 }),
+      op("halation", { threshold: 0.7, radius: 0.4, tint: "#ff9a4d" }, { amount: 0.3 }),
+      op("grain", { size: 1.3, colored: 0.2 }, { amount: 0.5 }),
+      op("vignette", { size: 0.6, softness: 0.7, roundness: 0.5 }, { amount: 0.35 }),
+    ],
+  }),
+  look({
+    id: "cool-film",
+    name: "Cool Film",
+    tier: "film",
+    blurb: "Steel-blue shadows and lifted blacks, like a rainy-day negative.",
+    ops: [
+      op("balance", { temp: -0.35, tint: -0.05, contrast: 1.05, saturation: 0.95 }),
+      op("curves", { master: [0.04, 0.26, 0.5, 0.76, 0.97] }),
+      op("split", { shadow: "#1b3a5c", highlight: "#bfe0ff", balance: -0.1 }, { amount: 0.8 }),
+      op("grain", { size: 1.2, colored: 0.15 }, { amount: 0.4 }),
+    ],
+  }),
+  look({
+    id: "teal-orange",
+    name: "Teal & Orange",
+    tier: "film",
+    curve: "early",
+    blurb: "The blockbuster split: warm skin, teal everything else.",
+    ops: [
+      op("balance", { contrast: 1.12, saturation: 1.1 }),
+      op("split", { shadow: "#0e4a5a", highlight: "#ff9a4d", balance: 0 }, { amount: 0.9 }),
+      op("hsl", { hue: [0, 0, 0, -10, -30, 0], sat: [0.15, 0.1, -0.2, 0.2, 0.1, 0], lum: [0.05, 0, -0.1, 0, -0.1, 0] }),
+      op("vignette", { size: 0.6, softness: 0.7, roundness: 0.5 }, { amount: 0.25 }),
+    ],
+  }),
+  look({
+    id: "bleach-bypass",
+    name: "Bleach Bypass",
+    tier: "film",
+    blurb: "Silvery, gritty and contrasty, as if the lab skipped the bleach.",
+    ops: [op("bleach", { mix: 1 }), op("balance", { contrast: 1.2, saturation: 0.9 }), op("grain", { size: 1.4, colored: 0.1 }, { amount: 0.6 })],
+  }),
+  look({
+    id: "cross-process",
+    name: "Cross Process",
+    tier: "film",
+    blurb: "Slide film in the wrong chemistry: green shadows, yellow highlights, punchy colour.",
+    ops: [
+      op("curves", { r: [0, 0.16, 0.5, 0.84, 1], g: [0.04, 0.3, 0.56, 0.8, 0.96], b: [0.14, 0.34, 0.5, 0.66, 0.84] }),
+      op("balance", { saturation: 1.25, contrast: 1.05 }),
+      op("split", { shadow: "#0a4b3a", highlight: "#ffe28a" }, { amount: 0.6 }),
+    ],
+  }),
+  look({
+    id: "faded-matte",
+    name: "Faded Matte",
+    tier: "film",
+    blurb: "Blacks that never get black. A lazy, sun-bleached print.",
+    ops: [
+      op("curves", { master: [0.1, 0.3, 0.52, 0.74, 0.92] }),
+      op("balance", { saturation: 0.85, contrast: 0.97 }),
+      op("split", { shadow: "#2b3a55", highlight: "#f2d9b5", balance: 0 }, { amount: 0.7 }),
+      op("grain", { size: 1.3, colored: 0.1 }, { amount: 0.35 }),
+    ],
+  }),
+  look({
+    id: "seventies-slide",
+    name: "Seventies Slide",
+    tier: "film",
+    blurb: "Orange cast, soft glow, heavy grain: a projector in a dark living room.",
+    ops: [
+      op("balance", { temp: 0.45, contrast: 1.15, saturation: 1.15 }),
+      op("curves", { master: [0.06, 0.27, 0.5, 0.74, 0.95] }),
+      op("wheels", { lift: [0.06, 0.02, -0.04], gamma: [0.05, 0, -0.08], gain: [0.1, 0, -0.1] }, { amount: 0.8 }),
+      op("halation", { threshold: 0.55, radius: 0.5, tint: "#ff8a3d" }, { amount: 0.5 }),
+      op("grain", { size: 1.6, colored: 0.3 }, { amount: 0.6 }),
+      op("vignette", { size: 0.5, softness: 0.7, roundness: 0.5 }, { amount: 0.4 }),
+    ],
+  }),
+  look({
+    id: "golden-hour",
+    name: "Golden Hour",
+    tier: "film",
+    curve: "early",
+    blurb: "Low sun in everything: honey highlights and a warm bloom.",
+    ops: [
+      op("balance", { exposure: 0.1, temp: 0.6, tint: 0.1, contrast: 1.05, saturation: 1.15 }),
+      op("split", { shadow: "#4a2b3a", highlight: "#ffc27a", balance: 0.15 }, { amount: 0.8 }),
+      op("halation", { threshold: 0.5, radius: 0.6, tint: "#ffb060" }, { amount: 0.45 }),
+      op("vignette", { size: 0.6, softness: 0.7, roundness: 0.5 }, { amount: 0.3 }),
+    ],
+  }),
+  look({
+    id: "moonlight",
+    name: "Moonlight",
+    tier: "film",
+    blurb: "Day for night: blue shadows, quiet highlights, a dark frame.",
+    ops: [
+      op("balance", { exposure: -0.3, temp: -0.6, saturation: 0.8, contrast: 1.1 }),
+      op("split", { shadow: "#0b1f4a", highlight: "#9fc4ff", balance: -0.15 }, { amount: 0.9 }),
+      op("wheels", { gain: [-0.1, -0.02, 0.15] }, { amount: 0.8 }),
+      op("vignette", { size: 0.5, softness: 0.7, roundness: 0.5 }, { amount: 0.45 }),
+      op("grain", { size: 1.3, colored: 0.1 }, { amount: 0.35 }),
+    ],
+  }),
+  look({
+    id: "noir",
+    name: "Noir",
+    tier: "film",
+    blurb: "Black and white with deep blacks and a hard shoulder.",
+    ops: [
+      op("balance", { saturation: 0, contrast: 1.3 }),
+      op("curves", { master: [0, 0.18, 0.5, 0.83, 1] }),
+      op("grain", { size: 1.6, colored: 0 }, { amount: 0.6 }),
+      op("vignette", { size: 0.45, softness: 0.6, roundness: 0.5 }, { amount: 0.5 }),
+    ],
+  }),
+  look({
+    id: "soft-pastel",
+    name: "Soft Pastel",
+    tier: "film",
+    blurb: "Airy and low in contrast, lavender shadows, a dreamy bloom.",
+    ops: [
+      op("balance", { exposure: 0.2, contrast: 0.85, saturation: 0.8, vibrance: 0.3 }),
+      op("curves", { master: [0.12, 0.32, 0.55, 0.77, 0.95] }),
+      op("split", { shadow: "#b8a1d9", highlight: "#ffd9e6" }, { amount: 0.7 }),
+      op("glow", { threshold: 0.3, radius: 0.7, tint: "#ffe0f0", gain: 0.6 }, { amount: 0.7 }),
+    ],
+  }),
+];
