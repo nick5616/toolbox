@@ -784,3 +784,25 @@ Newest last. Format: date — decision — why.
     - Speech indexing (95 files) was still running when the app was stopped. It resumes at the next start.
     - When a speech match also wins on concept, the card shows no transcript snippet.
     - Caption Writer's own `captions.json`/`.csv` are indexed as documents, so they match file names.
+
+## Phase 21: Workspaces, editor parity, calm visuals, Color Grader and the demo (SPEC.md approved 2026-11-19)
+
+- **2026-11-19: Approval.** rev 1 was reviewed; the user then asked for Part E (Color Grader), put `demoAssets/` in place and said "go ahead and have at it". That's the approval of rev 2, which adds Part E, maps the demo media (§0) and adds the data audit asked for mid-turn ("make sure all application data is captured in the workspace … ai chat history, job runs …", §A6b).
+- **2026-11-19: Demo media privacy (§0, §F).** All 14 iPhone photos carry GPS (Bangkok). The Demo workspace strips location from its copies. It also excludes a selfie, a home floor plan and a personal "I've sketched…" text screenshot (`exclude`, which the user can undo). Missing roles (a talk video, a noisy recording, a PDF, an article, B-roll) are generated with Toolbox itself.
+- **2026-11-19: The depth model is Depth Anything V2 Small fp32** (99,060,839 B, sha256 `afb6a5c2…df10c`, HF commit `4472b736`). Spike (i7-11700K, CPU):
+  - Speed: a photo takes 0.82 s at 686×518. A 1080p frame takes 1.30 s at 924×518 with fp32 and 1.98 s with fp16, so fp16 is 1.5× slower for a mean difference of 0.004.
+  - Thread count: the default beats capping it.
+  - Memory: RSS is 0.63–0.76 GB.
+  - Video settings: inference at 266 px on the short side, every 2nd frame above 15 fps.
+  - Normalisation: the output is relative inverse depth (near = large), so maps get `log1p` before p2..p98. Without it, a balcony in the foreground crushed the city to black.
+- **2026-11-19: `ExportHeight` stays** (the export size, now also 2160). `ExportSettings` holds the rest. Every v2 document field is `omitempty`, so v1 documents load unchanged and the generated TS keeps old literals valid.
+- **2026-11-19: The colour-chain pass is `gradelook`**, not `grade`. `grade` was already the editor's simple colour grade.
+- **2026-11-19: `viz/edit/clipAux.ts`, not `aux.ts`.** `aux` is a reserved device name on Windows.
+- **2026-11-19: M isn't in the shared shortcut table.** Edit Studio's Lanes own M (an existing test enforces it). The Video Editor's ruler binds M itself.
+- **2026-11-19: Isolation fixes in Wave 0 (§A6b).**
+  - Post Builder no longer falls back to `~/Toolbox`.
+  - `core.NewJobs` refuses an empty tmp dir instead of using `%TEMP%`.
+  - `TMP`/`TEMP`/`TMPDIR` point at the workspace's tmp dir for the app and every subprocess (the engine gets them explicitly too).
+  - `deps-cache.json` moved to the tools folder.
+  - `workspace_isolation_test.go` fails on new code reaching global folders.
+- **2026-11-19: `RenderPlan` max single-file answer is 256 MB** (was 64 MB) for full-resolution stills.

@@ -30,3 +30,7 @@ Thumbs.db
 
 # QA screenshots taken at the repo root
 /shots/
+
+# Phase 21: demo media and workspaces (large, licensed)
+/demoAssets/
+/workspaces/

@@ -444,6 +444,40 @@ A tool may have **its own design language** when its spec says so. **Paint+ is t
 - **Store reads** use `d.ro` (read-only pool); writes and reads inside a write transaction use `d.sql`.
 - **Frontend:** thumbnails go through `lib/thumbs.ts` (bounded, visible-only); select narrowly from `useJobs` (progress ticks are batched per frame, but a selector over `byId` still re-renders on every tick).
 
+## Workspaces, editor parity, calm visuals, Color Grader and the demo (Phase 21)
+
+- **Workspaces** (`core/workspace`, `api/workspaces.go`, hidden module `workspace`). A workspace is `<root>/Library` plus `<root>/.toolbox` (its support dir).
+  - **Shared and fixed:** all workspaces share one tools folder. Personal is the old layout and never moves.
+  - **Boot order:** `main.go` opens what `workspace.Resolve` returns: `TOOLBOX_SUPPORT_DIR` > `TOOLBOX_WORKSPACE` > `--workspace` > `workspaces.json` > Personal.
+  - **Sandboxed runs:** env-launched runs get a Focus dry run, DevTools, their own lock, and never write the global support dir.
+- **Every piece of app data lives in the workspace** (SPEC §A6b): chat history, jobs and logs, pipelines, projects, settings, clipboard, Vault, search index, LAN identity, caches, tmp and WebView storage.
+  - Never use `os.UserHomeDir/UserConfigDir/UserCacheDir/TempDir`, `core.DefaultLibraryDir` or `%TEMP%`-style env vars in new code; `workspace_isolation_test.go` fails on them.
+  - `TMP`/`TEMP`/`TMPDIR` point at the workspace's tmp dir.
+  - **Hide personal details** (`Present`): show paths through `lib/displayPath.ts` (frontend) or `workspace.Presenter` (Go).
+- **Editor document v2** (`modules/editstudio/document.go`). The new fields are `omitempty`, so v1 loads unchanged:
+  - audio tracks and clips, `Gain` dB keys, fades, `Link`, `Depth`;
+  - `Export` settings;
+  - `Size` (in-memory renders only).
+- **Preview audio** (`editor/audio/`). The clock runs on `AudioContext` time and is registered as the `PlayerController`. A song is optional.
+- **Visualizer motion** (`viz/`):
+  - Anything that moves at a speed uses `f.integral(param)` / `f.beatIntegral(param)`, **never `param × time`**.
+  - Signal envelopes default by class (`SIGNAL_CLASS_DEFAULTS`).
+  - `f.intensity` (`show.reactivity`) scales every reaction.
+  - Presets follow the motion grammar (Breath / Groove / Accent), enforced by `presets/grammar.test.ts`.
+  - VizLab's motion mode writes `motion.json` (`viz/lab/motionTypes.ts`).
+- **Color Grader** (`modules/grade`, `frontend/src/grade/`, `tools/grade/`):
+  - **Looks:** a look is a `GradeRecipe` (frozen); Go and TS share `core/testdata/grade-recipes.json`. `compileRecipe` turns it into editor effects, with the colour ops in one `gradelook` pass.
+  - **Rendering:** it all renders on the editor's engine.
+    - Pictures go through a `RenderPlan.Still` (≤ 8192 px).
+    - Videos render as an in-memory edit; the host compiles `RenderPlan.Grade`.
+  - **Region maps:** `viz/edit/clipAux.ts` defines `u_depth`/`u_subject`/`u_people`.
+    - Depth comes from the `depth.*` handlers: Depth Anything V2 Small fp32 in `<models>/depth/`, from the Color pack.
+    - Maps are cached in `cache/grade/`.
+- **Demo** (`demo/`):
+  - **Capture:** a CDP screencast of the production binary in a sandboxed capture workspace (`.dev/workspaces/demo-capture`), with a cursor the harness injects. It records only the page, never the desktop, and never opens native dialogs.
+  - **Media:** from `demoAssets/` (git-ignored), mapped in `demo/roles.json`.
+  - **Output:** footage goes to `workspaces/demo/Library/Demo Footage/`.
+
 ## Polish rules (every screen)
 
 Full list in docs/specs/phase-12.md §13.1. In short:

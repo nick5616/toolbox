@@ -75,6 +75,14 @@ export function fifthsHue(root: number): number {
 export const DEFAULT_ATTACK_MS = 10;
 export const DEFAULT_RELEASE_MS = 180;
 
+/** Phase 21 (SPEC §C2.2): default envelopes by signal class; a mod's own attack/release still wins. */
+export type SignalClass = "pulse" | "level" | "slow";
+export const SIGNAL_CLASS_DEFAULTS: Record<SignalClass, { attackMs: number; releaseMs: number }> = {
+  pulse: { attackMs: 10, releaseMs: 180 },
+  level: { attackMs: 60, releaseMs: 400 },
+  slow: { attackMs: 600, releaseMs: 1500 },
+};
+
 export function shape(x: number, s: ModShape): number {
   switch (s) {
     case "ease":

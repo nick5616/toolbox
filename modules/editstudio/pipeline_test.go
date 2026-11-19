@@ -254,7 +254,7 @@ func TestAssembleDescribe(t *testing.T) {
 	for name, mut := range map[string]func(*AssembleRequest){
 		"transition": func(r *AssembleRequest) { r.Transition = "wipe" },
 		"aspect":     func(r *AssembleRequest) { r.Aspect = "2:1" },
-		"fps":        func(r *AssembleRequest) { r.FPS = 24 },
+		"fps":        func(r *AssembleRequest) { r.FPS = 48 },
 		"height":     func(r *AssembleRequest) { r.Height = 480 },
 		"template":   func(r *AssembleRequest) { r.TemplateID = "nope" },
 	} {

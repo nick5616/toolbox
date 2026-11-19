@@ -5,7 +5,7 @@
  */
 import type { PostType } from "@/viz/types";
 
-export const EFFECT_CATEGORIES = ["Camera & motion", "Blur & glow", "Distort", "Stylize", "Colour & light", "Glitch"] as const;
+export const EFFECT_CATEGORIES = ["Camera & motion", "Blur & glow", "Distort", "Stylize", "Colour & light", "Key", "Depth", "Glitch"] as const;
 export type EffectCategory = (typeof EFFECT_CATEGORIES)[number];
 
 export interface EffectInfo {
@@ -53,6 +53,15 @@ export const EFFECT_CATALOG: Record<PostType, EffectInfo> = {
   duotone: { label: "Duotone", description: "Maps the picture onto two colours.", category: "Colour & light" },
   colorpop: { label: "Colour pop", description: "Keeps one colour and greys the rest.", category: "Colour & light" },
   lightleak: { label: "Light leak", description: "Warm blobs of light drifting over the picture.", category: "Colour & light" },
+  halation: { label: "Halation", description: "A red-orange film glow around bright edges.", category: "Colour & light" },
+  gradelook: { label: "Color Grader look", description: "A whole Color Grader look: its colour chain in one pass.", category: "Colour & light" },
+  edgeglow: { label: "Edge glow", description: "Neon light along the edges.", category: "Stylize" },
+  // Key (Phase 21)
+  chromakey: { label: "Chroma key", description: "Makes a green or blue screen transparent.", category: "Key" },
+  lumakey: { label: "Luma key", description: "Makes dark (or bright) parts transparent.", category: "Key" },
+  // Depth (Phase 21; needs a depth map)
+  depthfog: { label: "Depth fog", description: "Coloured fog that thickens with distance.", category: "Depth" },
+  tiltshift: { label: "Depth blur", description: "Keeps one distance sharp and blurs the rest.", category: "Depth" },
   // Glitch
   chromatic: { label: "Chromatic aberration", description: "Splits the red, green and blue channels apart.", category: "Glitch" },
   glitch: { label: "Glitch", description: "Torn blocks, shifted lines and colour splits.", category: "Glitch" },

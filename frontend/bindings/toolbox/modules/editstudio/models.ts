@@ -227,7 +227,7 @@ export interface Clip {
     "id": string;
 
     /**
-     * "video" | "image" | "color" | "text" | "visual" (video tracks) | "adjust" (adjust tracks)
+     * "video" | "image" | "color" | "text" | "visual" (video tracks) | "adjust" (adjust tracks) | "audio" (audio tracks; Path = any audio or video file)
      */
     "kind": string;
 
@@ -267,9 +267,25 @@ export interface Clip {
     "slow": string;
 
     /**
-     * 0..2; video only; heard in exports only
+     * 0..2 base gain; video and audio clips
      */
     "volume": number;
+
+    /**
+     * EditParam JSON, keys only, dB −60..12; "" = 0 dB. Effective = Volume × dB(Gain(t))
+     */
+    "gain"?: string;
+
+    /**
+     * audio fade, 0..10,000 (0 = the 10 ms de-click)
+     */
+    "fadeInMs"?: number;
+    "fadeOutMs"?: number;
+
+    /**
+     * clips sharing a Link move/trim/split/delete together; "" = none
+     */
+    "link"?: string;
 
     /**
      * "fill" | "fit" | "fit-blur" | "fit-color" (video/image)
@@ -296,6 +312,11 @@ export interface Clip {
      * nil = none
      */
     "matte": Matte | null;
+
+    /**
+     * nil = none (Phase 21 Part E: a depth map for depth-aware effects)
+     */
+    "depth"?: DepthRef | null;
 
     /**
      * "clip" | "subject" | "background" (subject/background need a ready matte)
@@ -352,9 +373,24 @@ export interface CustomMarker {
     "label": string;
 }
 
+/**
+ * DepthRef names a clip's depth map. Stored projects: <project>/depth/<ID>-{preview,export}.h264
+ * (+ .idx.json), or <ID>.png for images; in-memory renders pass the files in
+ * the plan (EditFiles key "d:<ID>").
+ */
+export interface DepthRef {
+    "id": string;
+
+    /**
+     * source range covered (video)
+     */
+    "fromMs": number;
+    "toMs": number;
+}
+
 export interface EditProject {
     /**
-     * 1
+     * 2 (v1 documents load unchanged: every v2 field's zero value means v1 behaviour)
      */
     "version": number;
 
@@ -364,7 +400,7 @@ export interface EditProject {
     "aspect": string;
 
     /**
-     * 30 | 60
+     * 24 | 25 | 30 | 60
      */
     "fps": number;
 
@@ -385,7 +421,7 @@ export interface EditProject {
     "sources": Source[] | null;
 
     /**
-     * 1..8; index 0 = bottom
+     * 1..12 (≤ 8 video/adjust); index 0 = bottom
      */
     "tracks": Track[] | null;
 
@@ -420,9 +456,21 @@ export interface EditProject {
     "recipe": RecipeRun | null;
 
     /**
-     * short side: 720 | 1080 | 1440
+     * short side: 720 | 1080 | 1440 | 2160
      */
     "exportHeight": number;
+
+    /**
+     * nil = H.264, good, project fps, 192 kb/s, whole edit
+     */
+    "export"?: ExportSettings | null;
+
+    /**
+     * Size overrides Aspect/ExportHeight for in-memory renders (Color Grader,
+     * still plans): even, 64..8192 for stills, ≤ 3840 on the long side for video.
+     * Stored projects never set it.
+     */
+    "size"?: Size | null;
 }
 
 /**
@@ -438,6 +486,38 @@ export interface EditStream {
     "height": number;
     "fps": number;
     "frames": number;
+}
+
+/**
+ * ExportSettings are the Video Editor's export choices (Phase 21 SPEC §B6).
+ * The size stays in EditProject.ExportHeight.
+ */
+export interface ExportSettings {
+    /**
+     * 0 = project; else 24 | 25 | 30 | 60
+     */
+    "fps": number;
+
+    /**
+     * "h264" | "h265"
+     */
+    "codec": string;
+
+    /**
+     * "draft" | "good" | "best" → CRF 26 / 20 / 16 (h265: +4)
+     */
+    "quality": string;
+
+    /**
+     * 128 | 192 | 320
+     */
+    "audioKbps": number;
+
+    /**
+     * range (timeline ms); InMs == OutMs == 0 = whole edit
+     */
+    "inMs": number;
+    "outMs": number;
 }
 
 /**
@@ -746,6 +826,14 @@ export interface Result {
     "speed": number;
 }
 
+/**
+ * Size is an explicit output size in pixels.
+ */
+export interface Size {
+    "w": number;
+    "h": number;
+}
+
 export interface Song {
     "path": string;
 
@@ -814,6 +902,16 @@ export interface SourceState {
      * a prepare job for this path is queued/running
      */
     "preparing": boolean;
+
+    /**
+     * preview audio.m4a (AAC 48 kHz stereo); "" = none or not made yet (Phase 21 §B1)
+     */
+    "audio"?: string;
+
+    /**
+     * peaks.bin; "" = none or not made yet
+     */
+    "peaks"?: string;
     "error": string;
 }
 
@@ -881,7 +979,7 @@ export interface Track {
     "id": string;
 
     /**
-     * "video" | "adjust"
+     * "video" | "adjust" | "audio"
      */
     "kind": string;
 
@@ -899,6 +997,16 @@ export interface Track {
      * no edits; auto-fill skips it
      */
     "locked": boolean;
+
+    /**
+     * audio: when any track is solo, only solo tracks are heard
+     */
+    "solo"?: boolean;
+
+    /**
+     * "s" | "m" | "l"; "" = "m"
+     */
+    "height"?: string;
 
     /**
      * Matte (video tracks, Part B): "" | "alpha" | "alpha-inverted" | "luma" | "luma-inverted".

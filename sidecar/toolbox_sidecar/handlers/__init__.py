@@ -4,6 +4,7 @@ from . import (  # noqa: F401
     analysis,
     bgremove,
     denoise,
+    depth,
     eraser,
     image,
     matte,

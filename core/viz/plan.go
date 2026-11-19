@@ -27,6 +27,8 @@ type PlanForWorker struct {
 
 	Composition *CompositionPlan `json:"composition,omitempty"`
 	Recipe      *RecipePlan      `json:"recipe,omitempty"`
+	Still       *StillPlan       `json:"still,omitempty"` // Phase 21: with Edit (Kind "edit")
+	Grade       *GradePlan       `json:"grade,omitempty"`
 }
 
 type workerEdit struct {
@@ -111,6 +113,14 @@ func buildWorkerPlan(plan RenderPlan, urlFor func(string) (string, error)) (Plan
 			}
 		}
 		w.Edit = e
+		if plan.Still != nil {
+			s := *plan.Still
+			w.Still = &s
+		}
+		if plan.Grade != nil {
+			g := *plan.Grade
+			w.Grade = &g
+		}
 	}
 	return w, nil
 }

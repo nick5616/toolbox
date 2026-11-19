@@ -405,6 +405,9 @@ export type {
   StreamIndex as EditStreamIndex,
   TextRequest as EditTextRequest,
   Track as EditTrack,
+  DepthRef as EditDepthRef,
+  ExportSettings as EditExportSettings,
+  Size as EditSize,
 } from "@bindings/modules/editstudio/models";
 
 // --- Phase 14: step options of the tools that became pipeline steps ---
@@ -556,3 +559,24 @@ export type {
   Status as CaptionStatus,
   WriteOptions as CaptionWriteOptions,
 } from "@bindings/modules/captions/models";
+
+// --- Phase 21: workspaces and Color Grader ---
+export * as WorkspacesService from "@bindings/api/workspacesservice";
+export { Kind as WorkspaceKind } from "@bindings/core/workspace/models";
+export type {
+  CreateRequest as WorkspaceCreateRequest,
+  Info as WorkspaceInfo,
+  Presenter as WorkspacePresenter,
+  TidyPlan as WorkspaceTidyPlan,
+} from "@bindings/core/workspace/models";
+export * as GradeService from "@bindings/modules/grade/service";
+export { Tier as GradeServiceTier } from "@bindings/modules/grade/models";
+export type {
+  MapInfo as GradeMapInfo,
+  MapState as GradeMapState,
+  Options as GradeOptions,
+  Recipe as GradeServiceRecipe,
+  StepOptions as GradeStepOptions,
+  Suggestion as GradeSuggestion,
+  VibeRequest as GradeVibeRequest,
+} from "@bindings/modules/grade/models";

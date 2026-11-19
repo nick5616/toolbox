@@ -140,6 +140,10 @@ func (m *Manager) env() []string {
 		"TORCH_HOME=" + py,
 		"XDG_CACHE_HOME=" + py,
 		"NO_COLOR=1",
+		// Temp files stay in the workspace (Phase 21 §A6b).
+		"TMP=" + m.paths.TmpDir,
+		"TEMP=" + m.paths.TmpDir,
+		"TMPDIR=" + m.paths.TmpDir,
 	}
 	if m.ffmpeg != nil {
 		if exe, err := m.ffmpeg(); err == nil && exe != "" {

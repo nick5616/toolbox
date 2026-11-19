@@ -45,7 +45,7 @@ func LaneDefaults() map[string]LaneSettings {
 // NewProject is the document Create stores (SPEC.md §6.2).
 func NewProject(aspect string, fps int, seed int64) EditProject {
 	return EditProject{
-		Version: 1, Aspect: aspect, FPS: fps,
+		Version: 2, Aspect: aspect, FPS: fps,
 		Markers: MarkerState{
 			Lanes: LaneDefaults(), Hidden: []string{}, Moved: map[string]int64{},
 			Labels: map[string]string{}, Custom: []CustomMarker{},
@@ -64,7 +64,7 @@ func randomSeed() int64 {
 
 // normalize fills nil slices and maps so the frontend always gets arrays.
 func normalize(doc EditProject) EditProject {
-	doc.Version = 1
+	doc.Version = 2 // v1 loads unchanged (Phase 21 §B0)
 	if doc.Sources == nil {
 		doc.Sources = []Source{}
 	}

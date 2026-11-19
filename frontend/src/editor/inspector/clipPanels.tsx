@@ -39,14 +39,14 @@ import { TransitionField } from "./TransitionField";
 import { velocitySpeed, VELOCITY_PRESETS } from "./velocity";
 import styles from "./inspector.module.css";
 
-const TRANSFORM_LABELS: Record<Exclude<keyof ClipTransform, "edges">, { label: string; step: number; format(v: number): string }> = {
+const TRANSFORM_LABELS: Record<Exclude<keyof ClipTransform, "edges" | "crop">, { label: string; step: number; format(v: number): string }> = {
   x: { label: "Position x", step: 0.005, format: (v) => `${(v * 100).toFixed(1)}%` },
   y: { label: "Position y", step: 0.005, format: (v) => `${(v * 100).toFixed(1)}%` },
   scale: { label: "Scale", step: 0.01, format: (v) => `${v.toFixed(2)}×` },
   rotation: { label: "Rotation", step: 0.5, format: (v) => `${v.toFixed(1)}°` },
   opacity: { label: "Opacity", step: 0.01, format: (v) => `${Math.round(v * 100)}%` },
 };
-const TRANSFORM_ORDER: Array<Exclude<keyof ClipTransform, "edges">> = ["x", "y", "scale", "rotation", "opacity"];
+const TRANSFORM_ORDER: Array<Exclude<keyof ClipTransform, "edges" | "crop">> = ["x", "y", "scale", "rotation", "opacity"];
 
 const FX_TARGETS = [
   { value: "clip", label: "Whole clip" },

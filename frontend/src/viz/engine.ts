@@ -234,6 +234,10 @@ export class Engine {
       seed: this.opts.seed,
       quality: this.opts.quality,
       mode: this.opts.mode,
+      intensity: this.show?.reactivity ?? 1,
+      // Wave 0 placeholders with today's behaviour (param × time); V1 replaces them with true integrals.
+      integral: (name: string) => (typeof params[name] === "number" ? (params[name] as number) : 0) * (tMs / 1000) * (this.show?.speed ?? 1),
+      beatIntegral: (name: string) => (typeof params[name] === "number" ? (params[name] as number) : 0) * (tMs / 1000) * 2,
     };
   }
 

@@ -376,7 +376,7 @@ Everything in `frontend/src/editor/` serves both the Video Editor (`video-studio
 ## B0. Document v2 (`modules/editstudio/document.go`, frozen in Wave 0)
 - `EditProject.Version` = 2.
 - The reader migrates v1 on load:
-  - `ExportHeight` → `Export.Height`;
+  - `ExportHeight` stays the export size (now also 2160); every new field is optional (`omitempty`), and its zero value means v1 behaviour;
   - `Clip.Volume` stays the base gain;
   - nothing else changes.
 - Track changes:
@@ -392,7 +392,6 @@ Everything in `frontend/src/editor/` serves both the Video Editor (`video-studio
 - `EditProject.Export *ExportSettings`:
   ```go
   type ExportSettings struct {
-      Height    int    `json:"height"`    // 720 | 1080 | 1440 | 2160 (short side)
       FPS       int    `json:"fps"`       // 0 = project
       Codec     string `json:"codec"`     // "h264" | "h265"
       Quality   string `json:"quality"`   // "draft" | "good" | "best" → CRF 26 / 20 / 16 (h265: +4)
@@ -559,7 +558,7 @@ Everything in `frontend/src/editor/` serves both the Video Editor (`video-studio
   - Ctrl+C/X/V, Ctrl+Shift+V, Ctrl+L;
   - ↑ ↓, Shift+← →;
   - Alt+[ Alt+];
-  - M.
+  - M (Video Editor only: the ruler binds it like Edit Studio's Lanes do, so it isn't in the shared table).
 
   A test fails on a duplicate combo within the same scope.
 
@@ -1060,9 +1059,9 @@ type Region =
 | `tiltshift` | | focus depth, range, blur (needs depth) |
 | `grain`, `vignette`, `chromatic`, `halftone`, `glitch`, `vhs`, `sharpen`, `mirror` | | the existing `viz/post` passes and their params |
 
-   - **The colour pass.** All colour-only ops compile into **one** `grade` pass: a shader with a uniform block per op, run in recipe order. Each op blends as `mix(prev, op(prev), amount × regionWeight)`.
+   - **The colour pass.** All colour-only ops compile into **one** `gradelook` pass: a shader with a uniform block per op, run in recipe order. Each op blends as `mix(prev, op(prev), amount × regionWeight)`.
    - **Spatial passes.** The other ops are separate passes, gated by their region the same way.
-   - **New passes:** `viz/post/grade.ts` (the colour chain), `halation.ts`, `edgeglow.ts`, `depthfog.ts` and `tiltshift.ts`. Each one:
+   - **New passes:** `viz/post/gradelook.ts` (the colour chain; `grade` was already the editor's simple colour grade), `halation.ts`, `edgeglow.ts`, `depthfog.ts` and `tiltshift.ts`. Each one:
      - calls `registerPost`;
      - has its id in `POST_TYPES` and a catalog entry;
      - is an exact identity at amount 0;
@@ -1071,7 +1070,7 @@ type Region =
    - The preview is a one-clip `EditEngine` (a photo or video clip) at the input's aspect.
    - Video previews use the edit-stream preview tier: a prepare job runs when a video is opened, and "Preparing" shows as in the editor.
 3. **LUT bake:**
-   - A 33³ identity lattice (a 1089 × 33 texture) runs through the `grade` pass, using the colour-only ops at the current Wildness with region "all".
+   - A 33³ identity lattice (a 1089 × 33 texture) runs through the `gradelook` pass, using the colour-only ops at the current Wildness with region "all".
    - The pixels are read back, and `GradeService.SaveCube(name, 33, floats)` writes the `.cube` (`TITLE`, `LUT_3D_SIZE 33`, `DOMAIN_MIN`/`MAX`).
    - Ops with any other region are left out and listed.
 4. **Flash safety for animated ops:**
@@ -1119,18 +1118,18 @@ type Region =
   - The reply must be the JSON only: no other text, never people's names.
 
 ## E5. Depth and masks
-- **Model:** **Depth Anything V2 Small** (Apache-2.0), in the ONNX Community's fp16 export (~50 MB).
+- **Model:** **Depth Anything V2 Small** (Apache-2.0), in the ONNX Community's **fp32** export (99 MB). The Wave 0 spike found fp16 1.5× slower on the CPU for a 0.004 mean difference.
   - It's pinned `{file, url, sha256}` in `modules/grade/models.go`, measured in a Wave 0 spike.
   - It lives in `<models>/depth/` as pack component `depth-v2s` in a new **Color** pack (`color`) that holds only this model.
   - Color Grader works without it; near/far regions say "Install Color".
   - Handlers never download. `FetchModel` calls `depth.prefetch`.
 - **Engine handlers** (`sidecar/toolbox_sidecar/handlers/depth.py`):
   - **`depth.image {path, model, out}`:**
-    - inference at 518 px, keeping the aspect, at a multiple of 14;
+    - inference at 518 px on the short side, keeping the aspect, each side rounded to a multiple of 14 (about 0.8 s per photo on this PC);
     - upsampled to ≤ 2048 on the long side, with guided-filter edges against the picture;
-    - writes a 16-bit PNG: near = white, normalised p2..p98.
+    - writes a 16-bit PNG: near = white, `log1p` and then normalised p2..p98, so one very near object doesn't crush the background.
   - **`depth.video {path, model, outDir, fps}`:**
-    - **Sampling:** every frame at ≤ 30 fps; above that, every 2nd frame, interpolated.
+    - **Sampling:** inference at 266 px on the short side (about 0.3 s per frame). Above 15 fps only every 2nd frame is inferred, and the frames between are interpolated. A 30 s clip at 30 fps takes about 2–3 min.
     - **Smoothing:** a temporal EMA with α 0.6, reset on scene cuts (mean |Δ| of a 64 px thumbnail > 0.25).
     - **Normalisation:** per clip, p2..p98.
     - **Output:** two grey edit streams (preview and export tier: Annex-B H.264 + `.idx.json`, the same format as mattes), written by piping raw frames to FFmpeg.
@@ -1158,7 +1157,7 @@ type Region =
   - LUT lattice mapping;
   - flash safety over 200 seeds;
   - every look's ops are in the catalog, and the catalog matches `POST_TYPES`.
-- **CPU-backend reference:** the `grade` pass with Neon Noir's colour ops on a 64 × 64 fixture equals the reference functions within 2/255.
+- **CPU-backend reference:** the `gradelook` pass with Neon Noir's colour ops on a 64 × 64 fixture equals the reference functions within 2/255.
 - **Go:**
   - recipe validation and clamps;
   - prompt and parse with a fake `TextGenerator`: valid, invalid then retry, garbage;
@@ -1236,7 +1235,7 @@ type Region =
    - `modules/grade`: Descriptor, Options, `Chainable` stubs, `GradeService` stub, and the `recipe.go` types with the shared vectors.
    - The `color` pack with its `depth-v2s` component, and a `handlers/depth.py` stub.
    - `frontend/src/grade/types.ts` and the shape of the `ops.ts` catalog.
-   - `POST_TYPES` ids `grade`, `halation`, `edgeglow`, `depthfog`, `tiltshift`, as stubs.
+   - `POST_TYPES` ids `gradelook`, `halation`, `edgeglow`, `depthfog`, `tiltshift`, as stubs.
    - The `ClipAux` contract.
    - A stub `GradeView`, `StepUI` and `paramDefs`; the icon `palette`; keywords.
 
@@ -1271,7 +1270,7 @@ type Region =
 | **E5 Seeking** | §B5: paused read-ahead, back-step cache, reverse play, edit-point jumps (handlers via E3's command table), `setEdit` identity, Draft/Full, "Preparing" bar, last good frame | `frontend/src/viz/frames/**`, `frontend/src/viz/edit/EditCanvas.tsx`, `viz/edit/engine.ts` (`samplePre` + quality) | Wave 0 |
 | **V1 Calm engine** | §C2: integrals, layer rewrites, envelope classes, energy ramp, master intensity through drive/posts/events/transitions/palette, director hold/rate/morph/feedback, palette hysteresis, post changes; continuity tests | `frontend/src/viz/{signals,engine,director,palette,transitions,transitionsMath}.ts`, `viz/layers/**`, `viz/post/{shake,zoompulse,chromatic,glitch,px1math}.ts`, `viz/text/index.ts` (raw read) | Wave 0 |
 | **V2 Motion metric** | §C4 + the "before" run on Wave 0 main | `frontend/src/viz/lab/**`, `TOOLBOX_VIZLAB_MODE` in `main.go`'s VizLab URL lines | Wave 0 |
-| **G1 Grade engine** | §E3: op catalog + reference math, the `grade` colour pass and the new spatial passes, `compileRecipe`, the 40 looks, Chaos, LUT bake, the flash-safety clamp, aux binding (`viz/edit/aux.ts` `bindAux()`, which E4's clip renderer calls), the `Still` path in `RenderHost` | `frontend/src/grade/**`, `frontend/src/viz/post/{grade,halation,edgeglow,depthfog,tiltshift}.ts`, `frontend/src/viz/edit/aux.ts`, the still lines in `viz/RenderHost.tsx` | Wave 0 |
+| **G1 Grade engine** | §E3: op catalog + reference math, the `gradelook` colour pass and the new spatial passes, `compileRecipe`, the 40 looks, Chaos, LUT bake, the flash-safety clamp, aux binding (`viz/edit/clipAux.ts` `bindAux()`, which E4's clip renderer calls; `aux` is a reserved file name on Windows), the `Still` path in `RenderHost` | `frontend/src/grade/**`, `frontend/src/viz/post/{gradelook,halation,edgeglow,depthfog,tiltshift}.ts`, `frontend/src/viz/edit/clipAux.ts`, the still lines in `viz/RenderHost.tsx` | Wave 0 |
 | **G2 Grade backend** | §E4–E5: job, service, recipe validation, prompts (Vibe, Read), transfer, `.cube`, looks file, mask cache + prune, `Chainable`; `depth.*` handlers + tests; `RunMatte`/`RenderEdit` exports in editstudio | `modules/grade/**`, `sidecar/toolbox_sidecar/handlers/depth.py`, `sidecar/tests/test_depth.py`, `modules/editstudio/exports.go` | Wave 0 |
 | **G3 Grade UI** | §E1: the workspace tool, gallery, Wildness, rail panels, regions view, export, results, the step UI | `frontend/src/tools/grade/**`, `frontend/src/pipelines/steps/grade.tsx`, its `paramDefs` lines | Wave 0 |
 | **D1 Capture harness** | §D1 harness, `make-assets.mjs` (§0), a smoke scene (00 Tour) filmed on the sandbox, README | `demo/**` (except scenes 01–46) | Wave 0 |

@@ -96,6 +96,26 @@ type RenderPlan struct {
 	// Composition and Recipe itself with a single file, not a video stream.
 	Composition *CompositionPlan `json:"composition"` // render a Photo Composer document to a still
 	Recipe      *RecipePlan      `json:"recipe"`      // build an edit from an auto-fill recipe (JSON result)
+
+	// Phase 21 (SPEC §E3.5). Still, with Edit, renders one frame of the edit
+	// to a single file (up to 8192 px on the long side) instead of a stream.
+	// Grade, with Edit, asks the host to compile a Color Grader recipe into the
+	// first clip's effects (frontend/src/grade compileRecipe: one compiler).
+	Still *StillPlan `json:"still"`
+	Grade *GradePlan `json:"grade"`
+}
+
+// StillPlan renders one frame of the plan's Edit.
+type StillPlan struct {
+	AtMs    int64  `json:"atMs"`    // timeline ms
+	Format  string `json:"format"`  // "png" | "jpg" | "webp"
+	Quality int    `json:"quality"` // jpg/webp 1..100; 0 = 92
+}
+
+// GradePlan is a Color Grader look to compile into the edit's first clip.
+type GradePlan struct {
+	RecipeJSON string  `json:"recipeJson"` // frontend/src/grade/types.ts GradeRecipe
+	Wild       float64 `json:"wild"`       // 0..1
 }
 
 // CompositionPlan asks the host to render a Photo Composer document
@@ -163,7 +183,7 @@ type RenderStart struct {
 	Token   string `json:"token"`
 	PlanURL string `json:"planUrl"`
 	JobID   string `json:"jobId"`
-	Kind    string `json:"kind"` // "" (a video stream), "composition" or "recipe": the host answers those itself
+	Kind    string `json:"kind"` // "" (a video stream), "composition", "recipe" or "still": the host answers those itself
 }
 
 // RenderAck is the payload of the viz:render-ack event.

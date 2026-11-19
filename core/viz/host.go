@@ -21,6 +21,7 @@ const (
 	hostStream      hostKindT = iota // an elementary video stream
 	hostComposition                  // one PNG or JPEG
 	hostRecipe                       // one JSON document
+	hostStill                        // one PNG/JPEG/WebP frame of an edit (Phase 21)
 )
 
 func (p RenderPlan) hostKind() hostKindT {
@@ -29,6 +30,8 @@ func (p RenderPlan) hostKind() hostKindT {
 		return hostComposition
 	case p.Recipe != nil:
 		return hostRecipe
+	case p.Still != nil:
+		return hostStill
 	}
 	return hostStream
 }
@@ -40,6 +43,8 @@ func (k hostKindT) eventKind() string {
 		return "composition"
 	case hostRecipe:
 		return "recipe"
+	case hostStill:
+		return "still"
 	}
 	return ""
 }
@@ -54,12 +59,18 @@ func (p RenderPlan) singleEncoder() string {
 		return "jpg"
 	case hostRecipe:
 		return "json"
+	case hostStill:
+		switch p.Still.Format {
+		case "png", "webp":
+			return p.Still.Format
+		}
+		return "jpg"
 	}
 	return ""
 }
 
 // maxSingleBytes caps a still or a recipe result.
-const maxSingleBytes = 64 << 20
+const maxSingleBytes = 256 << 20 // Phase 21: full-resolution stills up to 8192 px
 
 // HostReady reports whether the main window's RenderHost has announced itself
 // (`vz1|host|up`). Steps that render headless wait while it is false.

@@ -44,6 +44,8 @@ export const POST_TYPES = [
   "zoomblur", "dirblur", "glow", "swing", "twirl", "wave", "bulge", "shockwave", "kaleido", "slice",
   // FX2: stylize.
   "pixelate", "halftone", "posterize", "duotone", "mono", "colorpop", "vhs", "letterbox", "lightleak", "speedlines", "sharpen", "outline",
+  // Phase 21: keys (E4) and Color Grader passes (G1): gradelook is the whole colour chain of a look.
+  "chromakey", "lumakey", "gradelook", "halation", "edgeglow", "depthfog", "tiltshift",
 ] as const;
 export type PostType = (typeof POST_TYPES)[number];
 

@@ -21,12 +21,17 @@ import { SingleReply } from "./hostReply";
 
 /** The plan Go writes for a headless request (core/viz.PlanForWorker). */
 export interface SinglePlan {
-  kind: "composition" | "recipe";
+  /** "edit" + still: one frame of an edit (Phase 21 §E3.5). */
+  kind: "composition" | "recipe" | "edit";
   width: number;
   height: number;
   analysis: { audioJsonUrl: string; featuresUrl: string; textJsonUrl: string };
   composition?: { documentJson: string; format: "png" | "jpg"; scale: number };
   recipe?: RecipeRequest;
+  /** Phase 21: with kind "edit". */
+  edit?: { projectJson: string; streams: Record<string, { url: string; indexUrl: string }>; images: Record<string, string> };
+  still?: { atMs: number; format: "png" | "jpg" | "webp"; quality: number };
+  grade?: { recipeJson: string; wild: number };
 }
 
 /** What a request needs from the outside (replaced in tests). */
@@ -99,6 +104,10 @@ export async function runSingle(run: SingleRun, planUrl: string, invoke: (msg: s
       const project = fillWithRecipe(plan.recipe, analysis);
       reply.file(new TextEncoder().encode(JSON.stringify(project)));
       return;
+    }
+    if (plan.kind === "edit" && plan.still) {
+      // Phase 21 §E3.5: G1 renders the frame with the EditEngine at full size (compileRecipe for plan.grade).
+      throw new RenderError("Still frames aren't ready yet", "");
     }
     throw new RenderError("Unknown render request", plan.kind);
   } catch (e) {

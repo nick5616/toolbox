@@ -11,6 +11,7 @@ import * as ModulesService from "./modulesservice.js";
 import * as PacksService from "./packsservice.js";
 import * as SearchService from "./searchservice.js";
 import * as SettingsService from "./settingsservice.js";
+import * as WorkspacesService from "./workspacesservice.js";
 export {
     DepsService,
     DesktopService,
@@ -21,7 +22,8 @@ export {
     ModulesService,
     PacksService,
     SearchService,
-    SettingsService
+    SettingsService,
+    WorkspacesService
 };
 
 export type {

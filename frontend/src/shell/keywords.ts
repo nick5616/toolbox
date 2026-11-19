@@ -16,6 +16,7 @@ export const TOOL_KEYWORDS: Record<string, string[]> = {
   "bg-remover": ["background", "cutout", "transparent", "remove", "png", "sticker"],
   upscaler: ["enlarge", "sharpen", "resolution", "bigger", "4x", "hd"],
   ocr: ["text", "scan", "extract", "read", "screenshot", "image to text"],
+  grade: ["color grade", "colour grade", "grading", "lut", "cube", "look", "filter", "film look", "teal and orange", "vaporwave", "thermal", "infrared", "depth", "psychedelic", "bonkers"],
   captions: ["caption", "alt text", "describe", "description", "hashtags", "instagram", "rename by content", "keywords", "accessibility", "seo", "title"],
   transcribe: ["speech", "captions", "subtitles", "dictation", "whisper", "speech to text", "meeting"],
   subtitles: ["captions", "srt", "burn", "karaoke", "lyrics"],

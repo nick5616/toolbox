@@ -792,6 +792,14 @@ const BASE: Readonly<Record<string, ParamOverrides>> = {
     "/write/keywords": { label: "Write keywords" },
     "/write/keepLocation": { label: "Keep location data" },
   },
+  // ── grade.tsx (Phase 21) ──
+  grade: {
+    "/look": { label: "Look", primary: true },
+    "/wild": { label: "Wildness", min: 0, max: 1, primary: true },
+    "/vibe": { label: "Vibe" },
+    "/seed": { label: "Chaos seed", min: 0, max: 4294967295 },
+    "/format": { label: "Format", type: "choice", choices: ch(["same", "Same as the input"], ["jpg", "JPEG"], ["png", "PNG"], ["webp", "WebP"]) },
+  },
 };
 
 /** The old Local Chat id shares Local Chat's parameters. */

@@ -38,6 +38,7 @@ import (
 	"toolbox/core/store"
 	"toolbox/core/trash"
 	"toolbox/core/viz"
+	"toolbox/core/workspace"
 	"toolbox/desktop"
 	"toolbox/modules/archiver"
 	"toolbox/modules/audiocleanup"
@@ -57,6 +58,7 @@ import (
 	"toolbox/modules/exif"
 	focusmod "toolbox/modules/focus"
 	"toolbox/modules/gif"
+	"toolbox/modules/grade"
 	"toolbox/modules/imagebatch"
 	"toolbox/modules/lanshare"
 	"toolbox/modules/lyricvideo"
@@ -81,6 +83,7 @@ import (
 	"toolbox/modules/vault"
 	"toolbox/modules/videoeditor"
 	"toolbox/modules/visualizer"
+	wsjobs "toolbox/modules/workspace"
 )
 
 //go:embed all:frontend/dist
@@ -93,12 +96,19 @@ func main() {
 }
 
 func run() error {
-	paths, err := core.ResolvePaths()
+	// Phase 21: which workspace to open (SPEC §A3).
+	boot, err := workspace.Resolve(os.Args[1:])
 	if err != nil {
 		return err
 	}
+	paths := boot.Paths
 	if err := paths.Ensure(); err != nil {
 		return err
+	}
+	// Every subprocess (and Go's os.TempDir) uses the workspace's tmp dir
+	// (Phase 21 §A6b), never the user's %TEMP%.
+	for _, k := range []string{"TMP", "TEMP", "TMPDIR"} {
+		_ = os.Setenv(k, paths.TmpDir)
 	}
 	closeLog := setupLogging(paths)
 	defer closeLog()
@@ -133,7 +143,7 @@ func run() error {
 	depSvc := deps.New(paths.BinDir, deps.Catalog(), reg, emitter)
 	// Detection results persist (path+size+mtime keyed), so the UI knows each
 	// tool's state at once and a start only re-checks what changed.
-	depSvc.SetCacheFile(filepath.Join(paths.SupportDir, "deps-cache.json"))
+	depSvc.SetCacheFile(depsCacheFile(paths))
 	jobs := core.NewJobs(db, db, reg, emitter, depSvc.Resolve, settings.Current, paths.TmpDir)
 	jobs.SetLineage(db)
 	go func() { // Phase 19: lineage for outputs made before it existed (cheap, idempotent)
@@ -436,6 +446,20 @@ func run() error {
 	}
 	// --- end Phase 20 ---
 
+	// --- Phase 21: Color Grader and workspaces (architect) ---
+	gradeMod := grade.New(grade.Config{
+		Caller: engine, Broker: vizBroker, Text: chatSvc, Vision: chatSvc, Analyzer: vizAnalyzer,
+		ModelsDir: paths.ModelsDir, CacheDir: filepath.Join(paths.CacheDir, "grade"),
+		LooksFile: filepath.Join(paths.SupportDir, "grade", "looks.json"),
+	})
+	if err := grade.Register(reg, gradeMod); err != nil {
+		return err
+	}
+	if err := wsjobs.Register(reg, wsjobs.New(wsjobs.Config{Boot: boot, Trash: trash.Default()})); err != nil {
+		return err
+	}
+	// --- end Phase 21 ---
+
 	settings.OnChange(func(old, new core.Settings) {
 		if old.Concurrency != new.Concurrency {
 			jobs.SetConcurrency(new.Concurrency)
@@ -521,6 +545,8 @@ func run() error {
 			application.NewServiceWithOptions(&api.SettingsService{Settings: settings, Paths: paths}, opts),
 			application.NewServiceWithOptions(&api.SearchService{Index: searchIdx, SaveDialog: paintSaveDialog}, opts),
 			application.NewServiceWithOptions(captions.NewService(jobs, captionsMod), opts),
+			application.NewServiceWithOptions(grade.NewService(jobs, gradeMod), opts),
+			application.NewServiceWithOptions(&api.WorkspacesService{Boot: boot, Jobs: jobs}, opts),
 			application.NewServiceWithOptions(&api.DepsService{Deps: depSvc, Jobs: jobs, Reg: reg, Engine: engine, Paths: paths, StopExiftool: exifMod.Close}, opts),
 			application.NewServiceWithOptions(&api.FilesService{Reg: reg, Settings: settings, Paths: paths}, opts),
 			application.NewServiceWithOptions(desktopSvc, opts),
@@ -698,6 +724,16 @@ func run() error {
 	})
 
 	return app.Run()
+}
+
+// depsCacheFile is the tools detection cache. It describes the shared tools
+// folder, so it lives there (Phase 21 §A6b), or in the support dir while the
+// tools folder is unavailable.
+func depsCacheFile(p core.Paths) string {
+	if p.ToolsAvailable() {
+		return filepath.Join(p.ToolsDir, "deps-cache.json")
+	}
+	return filepath.Join(p.SupportDir, "deps-cache.json")
 }
 
 // instanceID is the single-instance lock name. A sandbox support dir

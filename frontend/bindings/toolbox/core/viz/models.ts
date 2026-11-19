@@ -135,7 +135,7 @@ export interface RenderStart {
     "jobId": string;
 
     /**
-     * "" (a video stream), "composition" or "recipe": the host answers those itself
+     * "" (a video stream), "composition", "recipe" or "still": the host answers those itself
      */
     "kind": string;
 }

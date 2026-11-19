@@ -12,6 +12,7 @@ import { LAYER_TYPES, PALETTE_IDS, POST_TYPES, SECTION_LABELS, SIGNAL_IDS, type 
 import {
   MARKER_LANES,
   type ClipTransform,
+  type ClipCrop,
   type EditMod,
   type EditParam,
   type EditPost,
@@ -61,7 +62,7 @@ export const TRANSITION_KINDS: readonly TransitionKind[] = [
   "zoomout", "spin", "whip", "slide", "blur", "rgbsplit", "shake", "warp", "luma", "iris", "stripes", "flashblack",
 ];
 const SHAPES: readonly ModShape[] = ["linear", "ease", "exp", "gate"];
-const EASES: readonly Key["ease"][] = ["linear", "ease", "hold"];
+const EASES: readonly Key["ease"][] = ["linear", "ease", "hold", "in", "out", "inout", "bezier"];
 
 /** Post types Edit Studio offers on clips and adjustment clips (§9.1): passes, no stateful ones. */
 export const CLIP_POST_TYPES: readonly PostType[] = POST_TYPES.filter((t) => t !== "feedback" && t !== "bloom" && t !== "vignette" && t !== "grain");
@@ -113,8 +114,19 @@ export function parseEditParam(v: unknown, def: number, rules: ParamRules, where
           problems.push(`${where}: a keyframe is invalid`);
           continue;
         }
-        const ease = EASES.includes(k.ease as Key["ease"]) ? (k.ease as Key["ease"]) : "linear";
-        keys.push({ t: Math.round(k.t), v: clamp(k.v, min, max), ease });
+        let ease = EASES.includes(k.ease as Key["ease"]) ? (k.ease as Key["ease"]) : "linear";
+        const key: Key = { t: Math.round(k.t), v: clamp(k.v, min, max), ease };
+        if (ease === "bezier") {
+          const b = k.bez;
+          if (Array.isArray(b) && b.length === 4 && b.every(isNum)) {
+            key.bez = [clamp(b[0] as number, 0, 1), clamp(b[1] as number, -1, 2), clamp(b[2] as number, 0, 1), clamp(b[3] as number, -1, 2)];
+          } else {
+            problems.push(`${where}: a bezier keyframe needs bez [x1, y1, x2, y2]`);
+            ease = "ease";
+            key.ease = ease;
+          }
+        }
+        keys.push(key);
       }
       if (v.keys.length > MAX_KEYS) problems.push(`${where}: at most ${MAX_KEYS} keyframes`);
       keys.sort((a, b) => a.t - b.t);
@@ -170,7 +182,7 @@ export function baseOf(p: EditParam): number {
 
 // ---- transform ----
 
-export const TRANSFORM_RULES: Record<Exclude<keyof ClipTransform, "edges">, ParamRules & { def: number }> = {
+export const TRANSFORM_RULES: Record<Exclude<keyof ClipTransform, "edges" | "crop">, ParamRules & { def: number }> = {
   x: { min: -2, max: 2, def: 0 },
   y: { min: -2, max: 2, def: 0 },
   scale: { min: 0.05, max: 8, def: 1 },
@@ -192,11 +204,23 @@ export function parseTransform(raw: string): Parsed<ClipTransform> {
   }
   if (v.edges === "mirror") out.edges = "mirror";
   else if (v.edges !== undefined && v.edges !== "clear") problems.push("transform.edges: unknown");
+  if (v.crop !== undefined) {
+    if (!isObj(v.crop)) problems.push("transform.crop: not an object");
+    else {
+      const c = v.crop;
+      const crop: ClipCrop = { l: 0, r: 0, t: 0, b: 0 };
+      for (const k of ["l", "r", "t", "b"] as const) crop[k] = parseEditParam(c[k], 0, CROP_RULES, `transform.crop.${k}`, problems);
+      if (!(["l", "r", "t", "b"] as const).every((k) => crop[k] === 0)) out.crop = crop;
+    }
+  }
   return done(out, problems);
 }
 
+/** Crop edges (Phase 21 §B4): fraction of the source from each edge. */
+export const CROP_RULES: ParamRules & { def: number } = { min: 0, max: 0.45, def: 0 };
+
 export function serializeTransform(t: ClipTransform): string {
-  const identity = (Object.keys(IDENTITY_TRANSFORM) as Array<keyof ClipTransform>).every((k) => t[k] === IDENTITY_TRANSFORM[k]) && (t.edges ?? "clear") === "clear";
+  const identity = (Object.keys(IDENTITY_TRANSFORM) as Array<keyof ClipTransform>).every((k) => t[k] === IDENTITY_TRANSFORM[k]) && (t.edges ?? "clear") === "clear" && t.crop === undefined;
   return identity ? "" : JSON.stringify(t);
 }
 

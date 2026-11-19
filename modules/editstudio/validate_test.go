@@ -22,8 +22,8 @@ func TestValidateShapeRejects(t *testing.T) {
 		edit  func(d *EditProject)
 	}{
 		{"aspect", "aspect", func(d *EditProject) { d.Aspect = "2:1" }},
-		{"fps", "fps", func(d *EditProject) { d.FPS = 24 }},
-		{"export height", "exportHeight", func(d *EditProject) { d.ExportHeight = 2160 }},
+		{"fps", "fps", func(d *EditProject) { d.FPS = 48 }},
+		{"export height", "exportHeight", func(d *EditProject) { d.ExportHeight = 480 }},
 		{"background", "background", func(d *EditProject) { d.Background = "black" }},
 		{"cut offset", "cutOffsetFrames", func(d *EditProject) { d.CutOffsetFrames = 4 }},
 		{"song too short", "song.endMs", func(d *EditProject) { d.Song.EndMs = d.Song.StartMs + 500 }},
@@ -114,7 +114,7 @@ func TestValidateRequests(t *testing.T) {
 		validateAnalyze(AnalyzeRequest{Song: "/a.mp3", Words: "align"}),
 		validateAnalyze(AnalyzeRequest{Song: "/a.mp3", Words: "file"}),
 		validatePrepare(PrepareRequest{FPS: 30}),
-		validatePrepare(PrepareRequest{Paths: []string{"/a"}, FPS: 25}),
+		validatePrepare(PrepareRequest{Paths: []string{"/a"}, FPS: 48}),
 		validateInterp(InterpRequest{Path: "/a.mov", FromMs: 0, ToMs: 30_001, FPS: 30}),
 		validateMatte(MatteRequest{ClipID: "c1", MatteID: "m1", Mode: "select", Path: "/a.mov", FromMs: 0, ToMs: 1000}),
 		validateMatte(MatteRequest{ClipID: "c1", MatteID: "m1", Mode: "select", Path: "/a.mov", FromMs: 0, ToMs: 61_000,

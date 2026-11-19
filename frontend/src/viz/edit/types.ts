@@ -72,11 +72,14 @@ export interface EditMod extends Omit<Mod, "signal"> {
   sections?: SectionLabel[];
 }
 
-/** A keyframe; t is clip-relative ms. */
+/** A keyframe; t is clip-relative ms. ease is the curve from this key to the next. */
 export interface Key {
   t: number;
   v: number;
-  ease: "linear" | "ease" | "hold";
+  /** Phase 21 (SPEC §B3): "ease" = smoothstep (unchanged); in/out/inout are cubic; bezier uses bez. */
+  ease: "linear" | "ease" | "hold" | "in" | "out" | "inout" | "bezier";
+  /** ease "bezier": CSS-style cubic-bezier control points [x1, y1, x2, y2]; x in 0..1, y in −1..2. */
+  bez?: [number, number, number, number];
 }
 
 /** A number, or a base with keyframes (≤ 64) and signal mods (≤ 4). */
@@ -98,6 +101,15 @@ export interface ClipTransform {
   opacity: EditParam; // 0..1, 1
   /** Part B: what shows where a moved/zoomed clip leaves the frame: nothing (default) or the picture mirrored (motion tile). */
   edges?: "clear" | "mirror";
+  /** Phase 21 (SPEC §B4): crop from each edge, fraction of the source (0..0.45 each); applied before masks and the transform. */
+  crop?: ClipCrop;
+}
+
+export interface ClipCrop {
+  l: EditParam;
+  r: EditParam;
+  t: EditParam;
+  b: EditParam;
 }
 
 // ---- Part B: generated clips, blend modes, track mattes ----

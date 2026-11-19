@@ -30,7 +30,7 @@ func TestServiceCRUD(t *testing.T) {
 	if _, err := s.Create("x", "3:2", 30); err == nil {
 		t.Error("bad aspect accepted")
 	}
-	if _, err := s.Create("x", "9:16", 24); err == nil {
+	if _, err := s.Create("x", "9:16", 48); err == nil {
 		t.Error("bad fps accepted")
 	}
 	info, err := s.Create("My edit", "9:16", 30)

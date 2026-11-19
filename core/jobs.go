@@ -74,7 +74,9 @@ type activeJob struct {
 // parent of per-job temp dirs.
 func NewJobs(store JobStore, outputs OutputStore, reg *Registry, em Emitter, tools func(string) (string, error), settings func() Settings, supportTmp string) *Jobs {
 	if supportTmp == "" {
-		supportTmp = filepath.Join(os.TempDir(), "toolbox-tmp")
+		// Never the OS temp dir (Phase 21 §A6b): job temp files belong to the
+		// open workspace. Tests pass t.TempDir().
+		panic("core.NewJobs: supportTmp is required")
 	}
 	m := &Jobs{
 		store: store, outputs: outputs, reg: reg, em: em, tools: tools,

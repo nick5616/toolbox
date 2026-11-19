@@ -36,6 +36,16 @@ export interface FrameInput {
   seed: number;
   quality: "full" | "draft";
   mode: "opaque" | "overlay";
+  /** Phase 21 (SPEC §C2.4): the show's master intensity (`reactivity`, 0..2; Balanced = 1). Built-in reactions, posts and event layers scale by it. */
+  intensity: number;
+  /**
+   * Phase 21 (SPEC §C2.1): ∫₀ᵗ of number param `name`'s effective (modulated) value over motion time, in param·seconds.
+   * Use it for anything that moves at a speed (travel, spin, drift) instead of `param × time`, so a modulated speed
+   * never teleports the picture. Deterministic (a cached prefix sum at 1/120 s).
+   */
+  integral(name: string): number;
+  /** Like integral, but the rate is per beat: ∫₀ᵗ param × local beats per second dt (travel measured in beats). */
+  beatIntegral(name: string): number;
 }
 
 export interface LayerContext {

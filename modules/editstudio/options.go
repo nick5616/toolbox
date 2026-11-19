@@ -101,11 +101,13 @@ type EditStream struct {
 // SourceState is what exists for one source file (§7.6).
 type SourceState struct {
 	Path      string               `json:"path"`
-	Info      videoeditor.ClipInfo `json:"info"`      // kind, duration, size, fps, rotation, hasAudio, takenAt, error
-	Preview   *EditStream          `json:"preview"`   // video, at the project fps
-	Image     string               `json:"image"`     // photo: preview edit image
-	Shots     []int64              `json:"shots"`     // video; nil = not made
-	Preparing bool                 `json:"preparing"` // a prepare job for this path is queued/running
+	Info      videoeditor.ClipInfo `json:"info"`            // kind, duration, size, fps, rotation, hasAudio, takenAt, error
+	Preview   *EditStream          `json:"preview"`         // video, at the project fps
+	Image     string               `json:"image"`           // photo: preview edit image
+	Shots     []int64              `json:"shots"`           // video; nil = not made
+	Preparing bool                 `json:"preparing"`       // a prepare job for this path is queued/running
+	Audio     string               `json:"audio,omitempty"` // preview audio.m4a (AAC 48 kHz stereo); "" = none or not made yet (Phase 21 §B1)
+	Peaks     string               `json:"peaks,omitempty"` // peaks.bin; "" = none or not made yet
 	Error     string               `json:"error"`
 }
 

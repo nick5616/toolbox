@@ -18,8 +18,8 @@ import (
 
 var (
 	aspects       = []string{"9:16", "4:5", "1:1", "16:9"}
-	fpsValues     = []int{30, 60}
-	exportHeights = []int{720, 1080, 1440}
+	fpsValues     = []int{24, 25, 30, 60}
+	exportHeights = []int{720, 1080, 1440, 2160}
 	fits          = []string{"fill", "fit", "fit-blur", "fit-color"}
 	slows         = []string{"blend", "none", "interpolate"}
 	blends        = []string{"normal", "add", "screen", "multiply", "overlay", "softlight", "hardlight", "difference", "exclusion", "lighten", "darken", "colordodge"}

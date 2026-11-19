@@ -77,7 +77,7 @@ export function routeRender(
   forceJpeg = false,
   deps?: SingleDeps,
 ): void {
-  if (d.kind === "composition" || d.kind === "recipe") {
+  if (d.kind === "composition" || d.kind === "recipe" || d.kind === "still") {
     const run: SingleRun = { token: d.token, abort: new AbortController() };
     singles.set(d.token, run);
     void import("./edit/headless")

@@ -260,6 +260,10 @@ export class EditEngine {
       seed,
       quality: this.opts.quality,
       mode: "opaque",
+      intensity: 1,
+      // Wave 0 placeholders (param × time); V1 gives the edit engine true integrals too.
+      integral: (name: string) => (typeof params[name] === "number" ? (params[name] as number) : 0) * (songMs / 1000),
+      beatIntegral: (name: string) => (typeof params[name] === "number" ? (params[name] as number) : 0) * (songMs / 1000) * 2,
     };
   }
 

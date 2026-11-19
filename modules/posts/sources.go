@@ -37,11 +37,12 @@ func pathKey(p string) string {
 }
 
 func (m *Module) libraryDir() string {
+	// Always the open workspace's library (Phase 21 §A6b): never a default
+	// like ~/Toolbox, which would be Personal's library inside another workspace.
 	if m.cfg.LibraryDir != nil {
 		return m.cfg.LibraryDir()
 	}
-	d, _ := core.DefaultLibraryDir()
-	return d
+	return ""
 }
 
 // sourceKind returns "photo", "clip" or "" by extension.

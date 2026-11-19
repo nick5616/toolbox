@@ -26,6 +26,7 @@ import (
 	"toolbox/modules/exif"
 	focusmod "toolbox/modules/focus"
 	"toolbox/modules/gif"
+	"toolbox/modules/grade"
 	"toolbox/modules/imagebatch"
 	"toolbox/modules/lanshare"
 	"toolbox/modules/lyricvideo"
@@ -107,6 +108,7 @@ func TestEveryToolIsInOnePack(t *testing.T) {
 		func() error { return editstudio.Register(reg, editstudio.New(editstudio.Config{})) },
 		func() error { _, err := mediaindex.Register(reg, mediaindex.Deps{}); return err },
 		func() error { return captions.Register(reg, captions.New(captions.Config{})) },
+		func() error { return grade.Register(reg, grade.New(grade.Config{})) },
 	} {
 		if err := register(); err != nil {
 			t.Fatal(err)

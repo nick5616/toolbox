@@ -150,6 +150,11 @@ func Components() []ComponentSpec {
 			Sizes: map[string]Size{Windows: {Download: 127_535_388, Disk: 127_535_388}, MacARM: {Download: 127_493_916, Disk: 127_493_916}},
 		},
 		{
+			ID: "depth-v2s", Name: "Depth Anything V2 Small", Href: "https://huggingface.co/depth-anything/Depth-Anything-V2-Small", License: "Apache-2.0",
+			Kind: core.ComponentModel, Module: "grade", Preset: "depth-v2s",
+			Sizes: same(Size{Download: 99_060_839, Disk: 99_060_839}),
+		},
+		{
 			ID: "kokoro-voices", Name: "Kokoro voices", Href: "https://huggingface.co/hexgrad/Kokoro-82M", License: "Apache-2.0",
 			Kind: core.ComponentModel, Module: "tts", Preset: "kokoro",
 			Sizes: same(Size{Download: 120_575_669, Disk: 120_575_669}),
@@ -339,6 +344,12 @@ func Catalog() []PackSpec {
 			// It unlocks no sidebar tool: Smart search lives in the Library
 			// (its job modules and step are hidden; docs/DECISIONS.md).
 			Unlocks: []Unlock{},
+		},
+		{
+			ID: "color", Name: "Color", Icon: "palette",
+			Description: "Color Grader for pictures and videos, with a depth model for near and far grades",
+			Components:  []string{"ffmpeg", "engine", "depth-v2s"},
+			Unlocks:     []Unlock{{Module: "grade", Needs: []string{"ffmpeg"}}},
 		},
 		{
 			ID: "captions", Name: "Caption Writer", Icon: "message-square-quote",

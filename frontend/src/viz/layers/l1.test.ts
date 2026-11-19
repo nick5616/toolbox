@@ -27,6 +27,9 @@ function frameAt(tMs: number, params: ParamValues = {}): FrameInput {
     seed: 1,
     quality: "full",
     mode: "opaque",
+    intensity: 1,
+    integral: (name: string) => (typeof params[name] === "number" ? (params[name] as number) : 0) * (tMs / 1000),
+    beatIntegral: (name: string) => (typeof params[name] === "number" ? (params[name] as number) : 0) * (tMs / 1000) * 2,
   };
 }
 
