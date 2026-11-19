@@ -1,9 +1,9 @@
 /** Particle Storm (SPEC.md §6.10 #11): every instrument fires its own coloured particles, with trails. Shows what the stems hear. */
 import type { Preset } from "./types";
-import { BG, L, m, makeShow, P, S, X, director, globalPost, text } from "./kit";
+import { BG, L, drift, duck, groove, m, makeShow, P, S, X, director, globalPost, text } from "./kit";
 
 const bg = (bright: number) =>
-  BG("bg", "gradient", { speed: 0.4, intensity: 0.7, contrast: 0.5, brightness: P(bright, m("section.energy", 0.015)), drift: P(0.3, m("other.level", 0.3)) });
+  BG("bg", "gradient", { speed: 0.4, intensity: 0.7, contrast: 0.5, brightness: P(bright, m("section.energy", 0.015)), drift: P(0.3, drift(0.1)) });
 
 interface Sources {
   kick: boolean;
@@ -18,7 +18,7 @@ const storm = (src: Sources, count: number, speed: number, size: number, life: n
   L("storm", "bursts", {
     ...src,
     count: P(count, m("section.energy", 0.12)),
-    speed: P(speed, m("drums.level", 0.2)),
+    speed: P(speed, groove("drums.level", 0.08)),
     spread: 1,
     trail: P(0.6, m("section.energy", 0.1)),
     gravity: 0.3,
@@ -27,7 +27,7 @@ const storm = (src: Sources, count: number, speed: number, size: number, life: n
     glow: 0.65,
     brightness: 1.6,
     origin: "scatter",
-  });
+  }, { opacity: P(1, duck(0.2)) });
 
 export const particleStorm: Preset = {
   id: "particle-storm",
@@ -53,7 +53,7 @@ export const particleStorm: Preset = {
       ),
     ],
     // The feedback trails sit in the scenes' own post chains so the captions stay crisp.
-    post: globalPost({ bloom: P(0.55, m("drop.pulse", 0.15), m("snare", 0.05, "exp")), vignette: 0.4, grain: 0.08 }),
+    post: globalPost({ bloom: P(0.55, m("drop.pulse", 0.12), groove("bass.level", 0.05)), vignette: 0.4, grain: 0.08 }),
     controls: [
       { label: "Particles", target: "storm.count" },
       { label: "Particle size", target: "storm.size" },

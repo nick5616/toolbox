@@ -150,6 +150,7 @@ const CASES: Case[] = [
   { type: "ink", rates: ["speed"] },
   { type: "gradient", rates: ["speed"] },
   { type: "nebula", rates: ["speed", "drift"] },
+  { type: "terrain", rates: ["speed"], buffers: false, ignore: ["u_nrows"] },
   { type: "geometry", rates: ["spin"] },
   { type: "radial", rates: ["spin"] },
   { type: "wavering", rates: ["speed"] },

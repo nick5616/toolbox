@@ -1,15 +1,16 @@
 /** Warp Drive (SPEC.md §6.10 #8): a starfield that stretches with the drums, flashes on drops and shakes on the kick. */
 import type { Preset } from "./types";
-import { BG, L, m, makeShow, P, S, X, director, globalPost, text } from "./kit";
+import { BG, L, duck, groove, m, makeShow, P, S, director, globalPost, text } from "./kit";
 
 const bg = (bright: number) =>
-  BG("bg", "gradient", { speed: 0.5, intensity: 0.75, contrast: 0.5, brightness: P(bright, m("section.energy", 0.015), m("drop.pulse", 0.02, "exp")), drift: P(0.3, m("bass.level", 0.3)) });
+  BG("bg", "gradient", { speed: 0.5, intensity: 0.75, contrast: 0.5, brightness: P(bright, m("section.energy", 0.015), m("drop.pulse", 0.02, "exp")), drift: P(0.3, groove("bass.level", 0.1)) });
 
 const stars = (density: number, speed: number, warp: number, bright: number, size: number) =>
   L("stars", "starfield", {
     density,
-    speed: P(speed, m("drums.level", 0.7), m("section.energy", 0.3)),
-    warp: P(warp, m("kick", 0.2, "exp"), m("drop.pulse", 0.5), m("lift.pulse", 0.3)),
+    // the layer already speeds up with the drums and nudges on the kick; the preset only adds song form
+    speed: P(speed, m("section.energy", 0.1, "linear", 600, 1500)),
+    warp: P(warp, m("drop.pulse", 0.3), m("lift.pulse", 0.2)),
     brightness: bright,
     size,
   });
@@ -17,7 +18,7 @@ const stars = (density: number, speed: number, warp: number, bright: number, siz
 export const warpDrive: Preset = {
   id: "warp-drive",
   name: "Warp Drive",
-  description: "Stars streak past faster with every drum hit, flash white on drops and the whole frame shakes on the kick.",
+  description: "Stars streak past, surging gently with the drums and stretching into warp on the drops. The picture stays steady.",
   bestFor: "Drum & bass, energetic",
   show: makeShow({
     id: "warp-drive",
@@ -28,23 +29,22 @@ export const warpDrive: Preset = {
       S("main", "Main", [bg(0.05), stars(0.6, 0.9, 0.5, 0.7, 1)]),
       S("full", "Full", [
         bg(0.06),
-        stars(0.65, 1.5, 0.9, 0.62, 1),
-        L("shock", "shockwave", { trigger: "drop+downbeat", strength: 1, flash: 0.35, brightness: 1.8 }),
-        L("sparks", "bursts", { kick: false, snare: true, hats: false, bass: false, vocals: false, other: false, origin: "center", count: 24, speed: 1.4, trail: 0.7, gravity: 0.1, size: 0.8, brightness: 1.4 }, { opacity: 0.8 }),
+        stars(0.65, 1.3, 0.8, 0.62, 1),
+        L("shock", "shockwave", { trigger: "drop+downbeat", strength: 0.9, flash: 0.15, brightness: 1.4 }),
+        L("sparks", "bursts", { kick: false, snare: true, hats: false, bass: false, vocals: false, other: false, origin: "center", count: 16, speed: 1.2, trail: 0.7, gravity: 0.1, size: 0.8, brightness: 1.4 }, { opacity: P(0.8, duck()) }),
       ]),
     ],
     post: globalPost({
-      bloom: P(0.4, m("drop.pulse", 0.15), m("kick", 0.06, "exp")),
+      bloom: P(0.4, m("drop.pulse", 0.12), groove("bass.level", 0.05)),
       vignette: 0.4,
       grain: 0.08,
-      extra: [X("shake", "shake", { amount: P(0.2, m("section.energy", 0.45)) })],
     }),
     controls: [
       { label: "Warp speed", target: "stars.speed" },
       { label: "Warp stretch", target: "stars.warp" },
       { label: "Star density", target: "stars.density" },
       { label: "Drop flash", target: "shock.flash" },
-      { label: "Camera shake", target: "post.shake.amount" },
+      { label: "Star brightness", target: "stars.brightness" },
       { label: "Bloom", target: "post.bloom.intensity" },
     ],
     text: text("pop", { size: 6.5, position: "lower", glow: 0.6, uppercase: true }),

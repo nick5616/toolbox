@@ -17,6 +17,13 @@ export const FLASH_DARK_LIMIT = 0.8;
 export const HUE_MIN_SAT = 0.15;
 /** Correlation under this between consecutive frames is a teleport. */
 export const TELEPORT_CORR = 0.5;
+/**
+ * ... and only when the picture really changed: sparse frames (a burst of sparks on black) decorrelate from one
+ * frame to the next without the picture jumping, so a fifth of the picture must also change visibly (a pixel
+ * counts when its luminance moved by TELEPORT_PIXEL_DELTA).
+ */
+export const TELEPORT_MIN_AREA = 0.2;
+export const TELEPORT_PIXEL_DELTA = 0.02;
 
 const srgbLut = (() => {
   const t = new Float32Array(256);
@@ -244,33 +251,76 @@ function correlation(a: Float32Array, b: Float32Array): number {
   return sab / Math.sqrt(saa * sbb);
 }
 
-/** Dominant hue of a frame: the peak 10° bin's circular mean (with its neighbours); NaN when no pixel has a hue. */
-export function dominantHue(hue: Float32Array): number {
-  const bins = new Float64Array(36);
-  let any = false;
+/** Pixels darker than this (relative luminance) carry no hue vote: near-black tints flicker without being seen. */
+const HUE_MIN_LUM = 0.004;
+
+/** With smoothing on, a frame needs this share of its hued light in one 30 degree span to have a dominant hue. */
+const HUE_MIN_SHARE = 0.5;
+
+/** The hue votes of a frame: per 10 degree bin, the weight and the weighted unit vector sums. */
+interface HueVotes {
+  w: Float64Array;
+  x: Float64Array;
+  y: Float64Array;
+}
+
+const newVotes = (): HueVotes => ({ w: new Float64Array(36), x: new Float64Array(36), y: new Float64Array(36) });
+
+/** With `lum`, each pixel votes with its luminance (what the eye sees); without, every hued pixel counts once. */
+function votesOf(hue: Float32Array, lum?: Float32Array): HueVotes {
+  const v = newVotes();
   for (let i = 0; i < hue.length; i++) {
     const h = hue[i] as number;
     if (Number.isNaN(h)) continue;
-    any = true;
+    const w = lum ? ((lum[i] as number) >= HUE_MIN_LUM ? (lum[i] as number) : 0) : 1;
+    if (w <= 0) continue;
     const k = Math.min(35, Math.floor(h / 10));
-    bins[k] = (bins[k] as number) + 1;
+    v.w[k] = (v.w[k] as number) + w;
+    v.x[k] = (v.x[k] as number) + w * Math.cos((h * Math.PI) / 180);
+    v.y[k] = (v.y[k] as number) + w * Math.sin((h * Math.PI) / 180);
   }
-  if (!any) return NaN;
-  let peak = 0;
-  for (let k = 1; k < 36; k++) if ((bins[k] as number) > (bins[peak] as number)) peak = k;
+  return v;
+}
+
+/**
+ * The peak bin (smoothed over its neighbours so a tie between adjacent bins doesn't flip it) and its circular mean.
+ * With `minShare`, a picture whose peak (30 degrees wide) holds less than that share of all the hued light has no
+ * dominant hue (NaN): a rainbow doesn't "change colour" when a different one of its colours is brightest.
+ */
+function dominantOf(v: HueVotes, minShare = 0): number {
+  let peak = -1;
+  let best = 0;
+  for (let k = 0; k < 36; k++) {
+    const s = (v.w[(k + 35) % 36] as number) + (v.w[k] as number) + (v.w[(k + 1) % 36] as number);
+    if (s > best + 1e-12) {
+      best = s;
+      peak = k;
+    }
+  }
+  if (peak < 0) return NaN;
+  if (minShare > 0) {
+    let total = 0;
+    for (let k = 0; k < 36; k++) total += v.w[k] as number;
+    if (best < minShare * total) return NaN;
+  }
   let sx = 0;
   let sy = 0;
-  for (let i = 0; i < hue.length; i++) {
-    const h = hue[i] as number;
-    if (Number.isNaN(h)) continue;
-    const k = Math.min(35, Math.floor(h / 10));
-    const d = Math.min((k - peak + 36) % 36, (peak - k + 36) % 36);
-    if (d > 1) continue;
-    sx += Math.cos((h * Math.PI) / 180);
-    sy += Math.sin((h * Math.PI) / 180);
+  for (const d of [-1, 0, 1]) {
+    const k = (peak + d + 36) % 36;
+    sx += v.x[k] as number;
+    sy += v.y[k] as number;
   }
   const deg = (Math.atan2(sy, sx) * 180) / Math.PI;
   return deg < 0 ? deg + 360 : deg;
+}
+
+/**
+ * Dominant hue of a frame: the peak 10 degree bin's circular mean (with its neighbours); NaN when no pixel has a
+ * hue. With `lum`, each pixel votes with its luminance, so the colour the eye sees wins over a dim tinted
+ * background (dim near-grey frames used to flip the dominant hue between unrelated bins).
+ */
+export function dominantHue(hue: Float32Array, lum?: Float32Array): number {
+  return dominantOf(votesOf(hue, lum));
 }
 
 const BLOCK = 4;
@@ -280,7 +330,16 @@ const BUSY_FULL = 0.1;
 export const EMPTY_STATS: MotionStats = { flashMaxPerSec: 0, meanDelta: 0, p95Delta: 0, teleports: 0, hueChurn: 0, busyness: 0 };
 
 /** All the motion numbers for a run of frames at `fps`. */
-export function measureMotion(frames: MotionFrame[], fps: number): MotionStats {
+export interface MeasureOptions {
+  /**
+   * Smooth the hue votes over this many seconds before picking each frame's dominant hue (0 = raw, per frame).
+   * A picture of several colours has no single dominant one; its brightest colour flips from frame to frame
+   * without the picture changing colour. VizLab measures with 0.5.
+   */
+  hueSmoothSec?: number;
+}
+
+export function measureMotion(frames: MotionFrame[], fps: number, opts: MeasureOptions = {}): MotionStats {
   if (frames.length < 2) return { ...EMPTY_STATS };
   const first = frames[0] as MotionFrame;
   const { w, h } = first;
@@ -293,22 +352,37 @@ export function measureMotion(frames: MotionFrame[], fps: number): MotionStats {
   let blocks = 0;
   let hueSum = 0;
   let huePairs = 0;
-  let prevHue = dominantHue(first.hue);
+  const smooth = Math.max(0, opts.hueSmoothSec ?? 0);
+  const alpha = smooth > 0 ? Math.exp(-1 / (smooth * fps)) : 0;
+  const ema = votesOf(first.hue, first.lum);
+  const hueOfFrame = (f: MotionFrame): number => {
+    const v = votesOf(f.hue, f.lum);
+    if (alpha === 0) return dominantOf(v);
+    for (let k = 0; k < 36; k++) {
+      ema.w[k] = alpha * (ema.w[k] as number) + (1 - alpha) * (v.w[k] as number);
+      ema.x[k] = alpha * (ema.x[k] as number) + (1 - alpha) * (v.x[k] as number);
+      ema.y[k] = alpha * (ema.y[k] as number) + (1 - alpha) * (v.y[k] as number);
+    }
+    return dominantOf(ema, HUE_MIN_SHARE);
+  };
+  let prevHue = dominantOf(ema, alpha === 0 ? 0 : HUE_MIN_SHARE);
   const bw = Math.floor(w / BLOCK);
   const bh = Math.floor(h / BLOCK);
   for (let f = 1; f < frames.length; f++) {
     const a = frames[f - 1] as MotionFrame;
     const b = frames[f] as MotionFrame;
     let s = 0;
+    let changed = 0;
     for (let i = 0; i < n; i++) {
       const d = Math.abs((b.lum[i] as number) - (a.lum[i] as number));
       s += d;
+      if (d >= TELEPORT_PIXEL_DELTA) changed++;
       const k = Math.min(HIST_BINS - 1, Math.floor(d * HIST_BINS));
       hist[k] = (hist[k] as number) + 1;
     }
     sumDelta += s / n;
     pairs++;
-    if (!b.inTransition && correlation(a.lum, b.lum) < TELEPORT_CORR) teleports++;
+    if (!b.inTransition && changed / n >= TELEPORT_MIN_AREA && correlation(a.lum, b.lum) < TELEPORT_CORR) teleports++;
     for (let by = 0; by < bh; by++) {
       for (let bx = 0; bx < bw; bx++) {
         let sad = 0;
@@ -320,7 +394,7 @@ export function measureMotion(frames: MotionFrame[], fps: number): MotionStats {
         blocks++;
       }
     }
-    const hb = dominantHue(b.hue);
+    const hb = hueOfFrame(b);
     if (!Number.isNaN(hb) && !Number.isNaN(prevHue)) {
       const d = Math.abs(hb - prevHue);
       hueSum += Math.min(d, 360 - d);

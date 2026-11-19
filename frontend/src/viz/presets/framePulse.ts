@@ -1,17 +1,17 @@
 /** Frame Pulse (SPEC.md §6.10 #20, overlay): a glowing frame that pulses on the beat, sparks from the corners and karaoke captions. */
 import type { Preset } from "./types";
-import { BG, L, m, makeShow, P, S, director, globalPost, text } from "./kit";
+import { BG, L, groove, m, makeShow, P, S, director, globalPost, text } from "./kit";
 
-const backdrop = BG("backdrop", "gradient", { speed: 0.4, intensity: 0.7, contrast: 0.5, brightness: P(0.04, m("section.energy", 0.012)), drift: P(0.25, m("bass.level", 0.3)) });
+const backdrop = BG("backdrop", "gradient", { speed: 0.4, intensity: 0.7, contrast: 0.5, brightness: P(0.04, m("section.energy", 0.012)), drift: P(0.25, groove("bass.level", 0.1)) });
 
 const frame = (thickness: number, glow: number, corners: boolean, chase: number) =>
   L("frame", "frame", {
-    thickness: P(thickness, m("kick", 0.15, "exp")),
-    glow: P(glow, m("beat.pulse", 0.2)),
+    thickness: P(thickness, m("kick", 0.1, "exp")),
+    glow: P(glow, groove("beat.pulse", 0.04)),
     pulse: P(0.8, m("section.energy", 0.2)),
     cornersOnly: corners,
     cornerLength: 0.16,
-    chase,
+    chase: P(chase, m("drums.level", 0.15, "ease", 150, 700)),
     haze: 0.25,
     brightness: P(0.95, m("section.energy", 0.12)),
   });
@@ -30,16 +30,16 @@ export const framePulse: Preset = {
     name: "Frame Pulse",
     palette: { mode: "fixed", ids: ["neon"] },
     scenes: [
-      S("calm", "Calm", [backdrop, frame(4, 0.45, true, 0.4), sparks(10, 0.7)]),
-      S("main", "Main", [backdrop, frame(5, 0.55, false, 0.8), sparks(18, 0.85)]),
+      S("calm", "Calm", [backdrop, frame(4, 0.45, true, 0.2), sparks(10, 0.7)]),
+      S("main", "Main", [backdrop, frame(5, 0.55, false, 0.4), sparks(18, 0.85)]),
       S("full", "Full", [
         backdrop,
-        frame(7, 0.7, false, 1.4),
+        frame(7, 0.7, false, 0.7),
         sparks(28, 1),
         L("pulse", "shockwave", { trigger: "drop+downbeat", strength: 0.6, flash: 0.1, brightness: 1.2 }),
       ]),
     ],
-    post: globalPost({ bloom: P(0.5, m("kick", 0.1, "exp"), m("drop.pulse", 0.15)), vignette: 0.3, grain: 0.06 }),
+    post: globalPost({ bloom: P(0.5, groove("bass.level", 0.06), m("drop.pulse", 0.12)), vignette: 0.3, grain: 0.06 }),
     controls: [
       { label: "Frame glow", target: "frame.glow" },
       { label: "Frame thickness", target: "frame.thickness" },

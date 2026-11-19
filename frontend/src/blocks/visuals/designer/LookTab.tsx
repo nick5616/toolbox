@@ -1,6 +1,7 @@
 /** Look (SPEC.md §8.3): palette, the main sliders, the visual mix, motifs and (Visualizer only) the text. */
 import { useEffect, useState } from "react";
 import { Section, SegmentedControl, Slider, Switch, TextField, cx } from "@/components";
+import { IntensityStops } from "@/components/viz/IntensityStops";
 import { TextStyleEditor } from "@/components/viz/TextStyleEditor";
 import { VisualizerService } from "@/lib/api";
 import { PALETTES } from "@/viz/palette";
@@ -46,7 +47,7 @@ const MIX_LABEL: Record<string, string> = { drums: "Drums", bass: "Bass", vocals
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
 const KNOB_TIP: Record<string, string> = {
-  Reactivity: "How strongly the whole design responds to the music; 0% is still",
+  Reactivity: "How strongly the whole design responds to the music: Calm 50%, Balanced 100% (the default), Wild 150%; 0% is still",
   Speed: "How fast things move; ×1 is normal",
   Intensity: "Overall strength of shapes and brightness; above ×1 is bolder",
   Glow: "How much bright parts bloom into soft light",
@@ -149,6 +150,7 @@ export function LookTab({ show, onChange, engineText }: LookTabProps) {
       </Section>
 
       <Section label="Feel" tip="Overall character: how lively, fast, bold, glowy and grainy">
+        <IntensityStops value={show.reactivity} onChange={(v) => onChange(setReactivity(show, v))} />
         <Knob label="Reactivity" min={0} max={2} step={0.05} value={show.reactivity} onChange={(v) => onChange(setReactivity(show, v))} format={pct} />
         <Knob label="Speed" min={0.25} max={2} step={0.05} value={show.speed} onChange={(v) => onChange(setSpeed(show, v))} format={(v) => `×${v.toFixed(2)}`} />
         <Knob label="Intensity" min={0.5} max={1.8} step={0.05} value={getIntensity(show)} onChange={(v) => onChange(setIntensity(show, v))} format={(v) => `×${v.toFixed(2)}`} />

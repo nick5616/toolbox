@@ -5,8 +5,8 @@
  * metric. Writes motion.json (MotionReport) and motion-sheet-<preset>.png
  * (24 frames, one per 1.25 s, Balanced) through the VizLab sink.
  *
- * Query extras: `commit=<hash>` (recorded in the report), `secs=<n>` (shorter
- * runs for smoke tests), `only=<preset id>`.
+ * Words are left out of the measurement (`text=1` keeps them). Query extras: `commit=<hash>` (recorded in the report), `secs=<n>` (shorter
+ * runs for smoke tests), `only=<preset id>`, `drop=<layer or post ids>` and `nomotif=1` (to bisect a preset).
  */
 import type { Analysis } from "../analysis";
 import { Engine } from "../engine";
@@ -53,6 +53,7 @@ export async function runMotion(opts: {
 }): Promise<void> {
   const { analysis: a, canvas, q, say } = opts;
   const only = q.get("only");
+  const dropIds = (q.get("drop") ?? "").split(",").filter(Boolean);
   const secs = Math.max(2, Number(q.get("secs")) || MOTION_SECONDS);
   const presets: Preset[] = PRESETS.filter((p) => !only || p.id === only);
   const frameCount = Math.round(secs * MOTION_FPS);
@@ -68,6 +69,17 @@ export async function runMotion(opts: {
       if (opts.stopped()) return;
       const show = showFromPreset(p);
       show.reactivity = intensity;
+      // the words are the host tool's (Lyric Video, Subtitles draw their own) and a new line is a content change, not a jump of the visuals: measured without them unless `text=1`
+      if (q.get("text") !== "1") show.text = null;
+      if (q.get("nomotif") === "1") show.motifs = false;
+      if (dropIds.length) {
+        // bisecting a preset: leave out layers and posts by id (`drop=embers,ripples`)
+        for (const sc of show.scenes) {
+          sc.layers = sc.layers.filter((l) => !dropIds.includes(l.id));
+          sc.post = sc.post.filter((x) => !dropIds.includes(x.id));
+        }
+        show.post = show.post.filter((x) => !dropIds.includes(x.id));
+      }
       const engine = new Engine(canvas, { width: W, height: H, mode: "opaque", quality: "full", seed: 1, fps: MOTION_FPS, inWorker: false });
       engine.setAnalysis(a);
       engine.setShow(show);
@@ -99,7 +111,7 @@ export async function runMotion(opts: {
         }
       }
       engine.dispose();
-      const stats = measureMotion(frames, MOTION_FPS);
+      const stats = measureMotion(frames, MOTION_FPS, { hueSmoothSec: 0.5 });
       const entry: MotionEntry = { preset: p.id, source: opts.source, intensity, frames: frames.length, fps: MOTION_FPS, ...stats };
       report.entries.push(entry);
       say(`${p.id} ${name}: flash ${stats.flashMaxPerSec} tele ${stats.teleports} p95 ${stats.p95Delta.toFixed(3)} hue ${stats.hueChurn.toFixed(1)}`);

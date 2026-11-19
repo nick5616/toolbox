@@ -4,11 +4,11 @@ import { BG, L, m, makeShow, P, S, X, globalPost, text } from "./kit";
 
 const field = (bright: number) =>
   BG("field", "gradient", {
-    speed: P(0.4, m("mood.energy", 0.4)),
+    speed: P(0.4, m("mood.energy", 0.12, "linear", 600, 1500)),
     intensity: 0.8,
     contrast: 0.45,
     brightness: P(bright, m("mood.energy", 0.02), m("mood.valence", 0.015)),
-    drift: P(0.25, m("mood.energy", 0.4), m("vocals.level", 0.15)),
+    drift: P(0.25, m("mood.energy", 0.12, "linear", 600, 1500)),
   });
 
 const dust = (count: number) => L("dust", "fireflies", { count: P(count, m("vocals.level", 0.1)), size: 0.9, glow: P(0.5, m("vocals.level", 0.25)), bokeh: 0.4, brightness: 1.3 }, { opacity: 0.8 });
@@ -35,7 +35,7 @@ export const moodField: Preset = {
       ]),
     ],
     post: globalPost({
-      bloom: P(0.5, m("mood.energy", 0.1), m("drop.pulse", 0.1)),
+      bloom: P(0.5, m("mood.energy", 0.1), m("drop.pulse", 0.08)),
       vignette: 0.45,
       grain: 0.1,
       extra: [X("mood", "grade", { saturation: P(1, m("mood.energy", 0.4)), gain: P(1, m("mood.valence", 0.2)), gamma: 1, warmth: P(0, m("mood.valence", 0.35)) })],

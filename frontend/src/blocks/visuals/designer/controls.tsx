@@ -1,7 +1,7 @@
 /** Small controls the designer's tabs share: signal picker, live meter, parameter and mods editors. */
 import { useMemo, useState } from "react";
 import { ColorSwatchPicker, IconButton, Select, Slider, Stepper, Switch, cx } from "@/components";
-import { DEFAULT_ATTACK_MS, DEFAULT_RELEASE_MS, SIGNALS, SIGNAL_META, type SignalMeta } from "@/viz/signals";
+import { SIGNALS, SIGNAL_CLASS_DEFAULTS, SIGNAL_META, signalClass, type SignalMeta } from "@/viz/signals";
 import type { ParamSpec } from "@/viz/layers/registry";
 import type { Mod, ModShape, Param, SignalId } from "@/viz/types";
 import { useDesigner } from "./context";
@@ -100,11 +100,11 @@ export function ModsEditor({ mods, onChange, label }: { mods: Mod[]; onChange(mo
           <div className={styles.modTimes}>
             <label className={styles.inline}>
               <span data-tip="How quickly the effect rises when the driver goes up (milliseconds); lower is snappier">Attack</span>
-              <Stepper aria-label="Attack" unit="ms" min={1} max={2000} step={5} value={m.attackMs ?? DEFAULT_ATTACK_MS} onChange={(attackMs) => patch(i, { attackMs })} />
+              <Stepper aria-label="Attack" unit="ms" min={1} max={2000} step={5} value={m.attackMs ?? SIGNAL_CLASS_DEFAULTS[signalClass(m.signal)].attackMs} onChange={(attackMs) => patch(i, { attackMs })} />
             </label>
             <label className={styles.inline}>
               <span data-tip="How slowly the effect falls back when the driver drops (milliseconds); higher is smoother">Release</span>
-              <Stepper aria-label="Release" unit="ms" min={1} max={5000} step={10} value={m.releaseMs ?? DEFAULT_RELEASE_MS} onChange={(releaseMs) => patch(i, { releaseMs })} />
+              <Stepper aria-label="Release" unit="ms" min={1} max={5000} step={10} value={m.releaseMs ?? SIGNAL_CLASS_DEFAULTS[signalClass(m.signal)].releaseMs} onChange={(releaseMs) => patch(i, { releaseMs })} />
             </label>
           </div>
         </div>
