@@ -32,7 +32,7 @@ func allAudio(string) bool { return true }
 func TestMixGraphSongOnly(t *testing.T) {
 	inputs, graph := buildMixGraph(mixDoc(), allAudio)
 	wantGraph := "[0:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=-3dB,afade=t=in:st=0:d=0.5,afade=t=out:st=29.5:d=0.5[song];\n" +
-		"[song]alimiter=limit=0.97,apad=whole_dur=30,atrim=start=0:end=30[out]\n"
+		"[song]alimiter=limit=0.98,apad=whole_dur=30,atrim=start=0:end=30[out]\n"
 	if graph != wantGraph {
 		t.Fatalf("graph:\n%s\nwant:\n%s", graph, wantGraph)
 	}
@@ -112,7 +112,7 @@ func TestMixGraphClips(t *testing.T) {
 					t.Errorf("graph lacks %q:\n%s", f, graph)
 				}
 			}
-			if !strings.Contains(graph, "[song][c1]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.97,apad=whole_dur=30,atrim=start=0:end=30[out]") {
+			if !strings.Contains(graph, "[song][c1]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.98,apad=whole_dur=30,atrim=start=0:end=30[out]") {
 				t.Errorf("mix tail wrong:\n%s", graph)
 			}
 		})

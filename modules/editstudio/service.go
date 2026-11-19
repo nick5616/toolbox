@@ -113,7 +113,7 @@ func (s *Service) Create(name, aspect string, fps int) (core.ProjectInfo, error)
 		return core.ProjectInfo{}, vErr("aspect", "Pick 9:16, 4:5, 1:1 or 16:9")
 	}
 	if !slices.Contains(fpsValues, fps) {
-		return core.ProjectInfo{}, vErr("fps", "Pick 30 or 60 fps")
+		return core.ProjectInfo{}, vErr("fps", "Pick 24, 25, 30 or 60 fps")
 	}
 	return s.m.docs.Create(context.Background(), name, NewProject(aspect, fps, randomSeed()))
 }
@@ -303,6 +303,19 @@ func (s *Service) MatteModels() MatteModels { return s.m.matteModels() }
 // Render submits the export job.
 func (s *Service) Render(projectID string) (core.Job, error) {
 	return s.submit(Options{Action: ActionRender, ProjectID: projectID})
+}
+
+// RenderAudio submits the audio-only export: the edit's mix (song, the sound
+// of video clips, audio clips; the export range and audio rate) as an .m4a in
+// <library>/Edits.
+func (s *Service) RenderAudio(projectID string) (core.Job, error) {
+	return s.submit(Options{Action: ActionRenderAudio, ProjectID: projectID})
+}
+
+// RenderStill submits a still export: the frame at atMs (timeline ms) as a
+// .png in <library>/Edits, at the export size.
+func (s *Service) RenderStill(projectID string, atMs int64) (core.Job, error) {
+	return s.submit(Options{Action: ActionRenderStill, ProjectID: projectID, Still: &StillRequest{AtMs: atMs}})
 }
 
 // ExportText submits a markers or SRT file job.
