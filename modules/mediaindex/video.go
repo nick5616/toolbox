@@ -83,7 +83,10 @@ func extractFrames(ctx context.Context, ffmpeg, input, dir string, s frameSchedu
 		return nil, err
 	}
 	stepSec := strconv.FormatFloat(float64(s.StepMs)/1000, 'f', 3, 64)
-	graph := "[0:v:0]fps=1/" + stepSec + ",scale='min(" + strconv.Itoa(ocrLong) + ",iw)':'min(" + strconv.Itoa(ocrLong) + ",ih)':force_original_aspect_ratio=decrease[o]\n"
+	// select (the first frame, then each frame a step after the last kept
+	// one), not fps=1/step: fps writes nothing when less than half a step
+	// is left after the seek (short scene clips).
+	graph := "[0:v:0]select='isnan(prev_selected_t)+gte(t-prev_selected_t\\," + stepSec + ")',scale='min(" + strconv.Itoa(ocrLong) + ",iw)':'min(" + strconv.Itoa(ocrLong) + ",ih)':force_original_aspect_ratio=decrease[o]\n"
 	if err := os.WriteFile(filepath.Join(dir, "graph.txt"), []byte(graph), 0o644); err != nil {
 		return nil, err
 	}
@@ -91,7 +94,7 @@ func extractFrames(ctx context.Context, ffmpeg, input, dir string, s frameSchedu
 	if s.StartMs > 0 {
 		args = append(args, "-ss", strconv.FormatFloat(float64(s.StartMs)/1000, 'f', 3, 64))
 	}
-	args = append(args, "-i", input, "-an", "-sn", "-/filter_complex", "graph.txt", "-map", "[o]",
+	args = append(args, "-i", input, "-an", "-sn", "-/filter_complex", "graph.txt", "-map", "[o]", "-fps_mode", "vfr",
 		"-frames:v", strconv.Itoa(s.Count), "-q:v", "3", "f%03d.jpg")
 	var last string
 	_, err := proc.Run(ctx, proc.Spec{
