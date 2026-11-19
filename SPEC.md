@@ -1,6 +1,6 @@
-# Toolbox — Phase 21 Spec: Workspaces, a real Video Editor, a calmer Visualizer, and the demo
+# Toolbox — Phase 21 Spec: Workspaces, a real Video Editor, a calmer Visualizer, Color Grader, and the demo
 
-Status: **DRAFT rev 1, 2026-11-19. Waiting for your review.**
+Status: **APPROVED 2026-11-19** (rev 2: Part E Color Grader added and `demoAssets/` mapped, then "go ahead and have at it"). Building.
 
 Phase 20 (Smart search and Caption Writer) is archived in `docs/specs/phase-20.md`. Every earlier rule still holds:
 - **every tool stands on its own** (CLAUDE.md, 2026-11-06);
@@ -14,7 +14,7 @@ Phase 20 (Smart search and Caption Writer) is archived in `docs/specs/phase-20.m
 
 ## Overview
 
-You want to show Toolbox to people who don't know you, on a fixed set of media that isn't personal, and film a demo of everything it does. That needs four things, built in this order.
+You want to show Toolbox to people who don't know you, on a fixed set of media that isn't personal, and film a demo of everything it does. That needs five things.
 
 **Part A — Workspaces.** A workspace is a folder that holds its own library and its own app data (history, projects, settings, caches, search index). You switch between them from the sidebar or the tray.
 - **Personal** is what you have today. It's left exactly where it is; nothing moves.
@@ -46,6 +46,20 @@ This phase fixes the engine, retunes every preset to a **motion grammar** (big c
 - it films **one clip per tool or process**, plus **B-roll** (Visualizer renders, a Paint+ time-lapse, library scrolls and more) and stills.
 - everything goes into the Demo workspace under `Library/Demo Footage/`, with a shot list and a **rough-cut Video Editor project**, ready for you to edit.
 
+**Part E — Color Grader** (a new tool, `grade`). AI colour grading for pictures and videos, from tasteful film looks to **absolutely unhinged**:
+- **Looks:** a **Wildness** dial (Tasteful → Bold → Bonkers) and a gallery of 40 looks, previewed live on your own picture.
+- **Vibe:** type "haunted vaporwave mall at 3 am" and the local chat model writes a look.
+- **Read the picture:** the local vision model looks at it and suggests six looks that fit.
+- **Smart regions:** grade the subject, the background, people, or near and far differently (near and far use a new local depth model). That gives you a neon subject on a black-and-white city, or a rainbow by distance.
+- **Steal a look** from a reference picture.
+- **Chaos:** seeded random looks you can lock and reroll.
+- **Video:** animated looks (hue cycles, beat pulses) that stay under the flash limit.
+- **Outputs:**
+  - full-resolution exports;
+  - a `.cube` LUT of the colour part;
+  - saved looks;
+  - the same looks as Video Editor effects.
+
 ### Goals
 - **Isolation you can trust.**
   - Opening Demo shows nothing from Personal: no files, history, recents, clipboard, search results, projects, devices or paths.
@@ -59,6 +73,10 @@ This phase fixes the engine, retunes every preset to a **motion grammar** (big c
 - **Footage you can cut.**
   - Every tool appears in a clip that shows what it does, from input to result, on the demo media.
   - Clips are 1080p30, have handles at both ends, and are listed in the shot list.
+- **Grades that make people say "what".**
+  - Bonkers looks are genuinely wild but still read as the picture.
+  - Every look renders the same in the preview and the export.
+  - Animated looks never exceed 3 flashes per second.
 
 ### Non-goals (this phase)
 - Two workspaces open at the same time. Switching relaunches the app.
@@ -75,25 +93,40 @@ This phase fixes the engine, retunes every preset to a **motion grammar** (big c
 
 ---
 
-## 0. What I need from you before Wave 3
+## 0. The demo media (`demoAssets/`, 64 files, 185 MB, mapped 2026-11-19)
 
-The build (Waves 0–2) doesn't need anything. Filming (Wave 3) needs **`demoAssets/`** in the repo root. A scene whose assets are missing is skipped and reported, never faked.
-
-| Role | What | Used by |
+| Role | From `demoAssets/` | Used by |
 |---|---|---|
-| `song.main` | A song with vocals and clear sections/drops, 2–4 min (you must be allowed to show it) | Stems, BPM & key, MIDI, Visualizer, Lyric Video, Edit Studio, B-roll |
-| `song.alt` | A second song, a different feel (calmer) | Visualizer B-roll, the rough cut's music bed |
-| `video.talk` | Someone talking to camera, 1–3 min, clear speech with a few pauses | Transcribe, Subtitles, Silence Cutter, Caption Writer |
-| `video.green` | A green-screen clip (a person or object on green) | Video Editor chroma key |
-| `video.broll` | 4–8 landscape clips, 10–60 s, varied motion (outdoors, a street, nature) | Scene Splitter, Trimmer, GIF, Compress, Edit Studio, Video Editor |
-| `photo.*` | 20–40 photos: food, an animal, a beach or landscape, a product on a table, a street with a car (plate visible), people who agreed to be shown | Library, Smart search, Background Remover, Upscale, Eraser, Redact, Image Batch, Organizer, Composer, Post Builder, Caption Writer |
-| `photo.receipt` | A phone photo of a receipt or printed page | OCR, Smart search |
-| `doc.pdf` | A multi-page PDF (no personal data) | PDF Toolkit, Local Chat |
-| `doc.text` | A `.md` or `.docx` article | Document Converter, Text to Speech |
-| `audio.noisy` | A noisy voice recording (hum or room noise) | Audio Cleanup |
-| `links.txt` | Optional: 1–2 public URLs (e.g. a Creative Commons video) | Downloader, Web Archiver (the only scenes that use the network) |
+| `song.main` | `Arctic Monkeys - Do I Wanna Know.mp3` (4:32) | Stems, Visualizer, Lyric Video, B-roll |
+| `song.alt` | `yeule - dazies.mp3` (4:30) | Visualizer B-roll, the rough cut's music bed |
+| `song.short` | `tickle hehe (bubbes) song 43 suite 6.mp3` (1:40), `THE MOST INTENSE MINUTE…` (1:10) | Edit Studio, Color Grader beat sync |
+| `stems.*` | Paramore "Misery Business" and underscores "Lovefield", 4 stems each (FLAC) | BPM & key, Audio to MIDI (bass), Edit Studio (a mix made from the stems) |
+| `audio.meme` | `Mom get the camera!!.mp3`, `(COPY RIGHTED)SIKE…mp3` | Transcribe, TTS comparison, Library variety |
+| `video.green` | `Snoop Dog Dancing.mp4`, `Shitty Explosion.mp4`, `Quick Scoping.mp4`, `Round Winning Kill.wmv` (green); `Wally.mp4` (**blue** screen) | Video Editor chroma key, Converter (WMV), Color Grader video, GIF |
+| `photo.*` | 13 iPhone HEIC photos (Bangkok streets, rain, skyline, ferris wheel, a T-shirt, a plover drawing, a dessert, a flower ceiling) + `IMG_5171 Copy.JPG` (a perspective sketch) | Library, Smart search, Background Remover (T-shirt), Eraser, Redact (rainy street), Image Batch, Organizer, Composer, Post Builder, Caption Writer, Color Grader |
+| `image.small` | `rainbowfrog.gif` (129 × 111), `original-10073724-1.jpg` (drum chart, 248 × 350) | Upscale, OCR, GIF |
+| `image.screens` | 18 screenshots (games, the code editor, Toolbox's own UI, a beat editor) + `stitch stitch fix.png` | OCR (code), Smart search, Paint+ reference |
 
-Folder names inside `demoAssets/` are up to you. In Wave 3 I map files to roles in `demo/roles.json`, choosing by content, and record the mapping in DECISIONS. Both `demoAssets/` and `workspaces/` are git-ignored, because the media is large and licensed.
+**Missing roles, generated by `demo/make-assets.mjs`** into `.dev/demo-generated/`. Wave 3 makes them through Toolbox itself and copies them into the workspace as `Library/Extras/`, which is a `keep` folder:
+- **`doc.text`:** "Ten basic drum beats, explained", a short Markdown article I write (matches the drum chart).
+- **`doc.pdf`:** that article through Document Converter → a 4-page PDF.
+- **`video.talk`:** a 70 s narration of the article with Text to Speech (Kokoro, voice `am_michael`), with deliberate pauses, over a slow Ken Burns slideshow of 8 of the photos. It's 1080p30, made with FFmpeg.
+- **`audio.noisy`:** the narration with pink noise at −28 dB and a 60 Hz hum.
+- **`video.broll`:** 6 × 12 s Ken Burns clips of the night and rain photos (1080p30).
+- **`stems.mix`:** "Misery Business (from stems).flac", the 4 Paramore stems summed.
+
+**Links (Downloader, Web Archiver):** a public-domain video file and a Wikipedia article from Wikimedia, fixed in `demo/roles.json`. These are the only scenes that use the network.
+
+**Privacy** (see §F):
+- All 14 iPhone photos carry **GPS** (Bangkok). The Demo workspace's copies have location stripped (§A4); `demoAssets/` itself is never modified.
+- **Excluded from the Demo workspace by default** (`exclude` in `workspace.json`; remove the lines to bring them back):
+  - `Screenshot 2026-10-09 222739.png`: a selfie;
+  - `Screenshot 2026-11-10 224450.png`: a home floor plan;
+  - `Screenshot 2026-10-06 095221.png`: a personal "I've sketched…" text;
+  - `*.asd` (Ableton analysis files).
+- Several songs are commercial recordings. They're fine on your machine, but a published demo with them may get copyright claims.
+
+Both `demoAssets/` and `workspaces/` are git-ignored, because the media is large and licensed.
 
 ---
 
@@ -131,7 +164,7 @@ Folder names inside `demoAssets/` are up to you. In Wave 3 I map files to roles 
 |---|---|
 | Tools folder (`bin/`, `python/`, `sidecar/`, `models/`) and moving it | Library, job history, outputs, lineage, projects, pipelines and runs, watch folders, schedules |
 | The workspace list and the last active workspace | Settings (theme, concurrency, hotkeys, module state, chat settings, search settings) |
-| Start at login (it opens the last active workspace) | Clipboard history, Vault, Smart search index, Focus profiles and history |
+| Start at login (it always opens **Personal**); the tools detection cache (`<tools>/deps-cache.json`, moved from the support dir) | Clipboard history, Vault, Smart search index, Focus profiles and history |
 | | Local File Transfer identity, alias, paired devices and receive mode |
 | | Caches, logs, tmp, WebView storage (UI state, recents, pins) |
 
@@ -161,7 +194,9 @@ type Info struct {
 	Root     string `json:"root"`     // "" for personal
 	Baseline string `json:"baseline"` // absolute; "" = none
 	Present  bool   `json:"present"`  // hide personal details
-	Keep     []string `json:"keep"`   // library-relative folders Tidy never touches; default ["Demo Footage"]
+	Keep     []string `json:"keep"`   // library-relative folders Tidy never touches; default ["Demo Footage", "Extras"]
+	Exclude  []string `json:"exclude"` // baseline-relative globs the seed skips (path.Match, "/" separators, case-insensitive)
+	StripLocation bool `json:"stripLocation"` // seed/restore strip GPS from photo/video copies
 	Created  int64  `json:"created"`  // unix ms
 	Current  bool   `json:"current"`
 	Missing  bool   `json:"missing"`  // root not found (unplugged drive)
@@ -192,7 +227,14 @@ func Resolve(args []string) (Boot, error)
 **Tools folder.** `TOOLBOX_TOOLS_DIR`, else the global support dir's `tools-location` pointer, else the global support dir. Moving the tools folder from any workspace moves the global one.
 
 **Sandboxed.** Rules 1 and 2 count as sandboxed:
-- **Single instance:** each workspace has its own lock, `dev.toolbox.app.<sha6(supportDir)>`. Personal keeps `dev.toolbox.app`.
+- **Single instance:** sandboxed runs get their own lock (`dev.toolbox.app.<sha6(supportDir)>`), so they can run beside the real app as today.
+- **The global support dir:** sandboxed runs never write it (no `workspaces.json`). They read the tools pointer only when `TOOLBOX_TOOLS_DIR` is unset.
+
+**Not sandboxed** (rules 3–5): **one lock for all of them** (`dev.toolbox.app`), so only one real workspace runs at a time.
+- A second launch hands its arguments (dropped or "Open with" files) to the running instance, whatever workspace that is.
+- `--workspace X` while another workspace runs asks "Switch to X?" in the running window.
+
+**For every workspace:**
 - **WebView2 profile:** `<support>/webview2` for every non-personal workspace. This isolates localStorage.
 - **DevTools:** `TOOLBOX_DEVTOOLS_PORT` works only when sandboxed (as today).
 - **Focus:** a dry run unless `TOOLBOX_FOCUS_DRYRUN=0`. `core/focus/dryrun.go` reads the boot's `Sandboxed` instead of the env var.
@@ -207,8 +249,11 @@ func Resolve(args []string) (Boot, error)
 ## A4. Baseline, Restore, Tidy (hidden module `workspace`, jobs; `Descriptor.Hidden`)
 - **seed:**
   - Copies `<baseline>/**` into `Library/`, keeping the folder structure.
-  - Skips hidden files, symlinks and junctions. Copies with `core/par` at 6 workers.
-  - Writes `baseline-manifest.json` with sha256 of every file.
+  - Skips hidden files, symlinks, junctions and anything matching `exclude` (globs relative to the baseline, `workspace.json`). Copies with `core/par` at 6 workers.
+  - **Strip location** (`stripLocation`, on for Demo kind, on whenever Present is on at creation):
+    - Photos and videos are copied, then GPS, location and the camera serial are removed from the copy with ExifTool (`-gps:all= -xmp:geotag= -SerialNumber=`, the same tags the Metadata tool's "Strip location" removes).
+    - Without ExifTool, JPEG/PNG/WebP are stripped in pure Go (EXIF GPS IFD dropped). HEIC/MP4 copies are then flagged in the job log, and the seed job ends with a warning naming them.
+  - Writes `baseline-manifest.json` with, for every file: `rel`, `srcSha256`, `size` and `sha256` of the copy. Restore compares copies against `sha256` and re-derives them from the source the same way.
   - **Never writes to the baseline.**
   - Registers the files as library files the same way as an import, with no job outputs, so they appear in the Library and get indexed by Smart search if that pack is installed.
 - **restore:** re-copies baseline files that are missing or whose size or sha256 differ from the manifest. Deletes nothing. Reports "Restored 3 files".
@@ -256,6 +301,66 @@ Tidy() (core.Job, error)
   - An existing non-empty folder without `.toolbox/` gets a `ValidationError` with the hint "Pick an empty folder, or use Add existing".
   - The baseline must exist and must not be inside the new root.
 - **Events:** `workspace:changed` (Info).
+
+## A6b. Where every piece of app data lives (the isolation audit, 2026-11-19)
+
+Everything a user makes or the app remembers is in the workspace. In a non-personal workspace that means `<root>/.toolbox/` or `<root>/Library/`.
+
+| Data | Where (per workspace unless marked) |
+|---|---|
+| **Local Chat conversations and messages** | DB `chat_conversations` / `chat_messages` |
+| **Job history, job logs, the job tray and the log panel** (the two bottom panels) | DB `jobs`, `job_logs`; the live tray reads the same job manager |
+| Outputs, lineage, tags | DB `outputs`, `output_inputs`, tags |
+| Pipelines, runs, watch-folder state, schedules and their last fires | DB `pipelines`, `pipeline_runs`, `pipeline_watch_seen`, `pipeline_schedule_state` |
+| Projects (Composer, Video Editor / Edit Studio, Post Builder, Paint+) | DB `projects` + `<support>/projects/<id>/` (thumbs, renders, mattes, depth, Paint tiles) |
+| Settings, including module state, hotkeys, chat settings, search settings and focus settings | DB `settings` |
+| Clipboard history | DB `clip_items` + `<support>/clipboard/` |
+| Vault | `<library>/Vault…` (it follows the library), plus `tmp/vault-open` |
+| Smart search index, labels, query vectors | DB (migration 0011) |
+| Caption Writer batches | `<library>/Captions/` |
+| Focus profiles, sessions and history | DB (migration 0008) + `cache/focus-icons` |
+| Local File Transfer identity, settings, devices | `<support>/lanshare/` |
+| Visualizer designs, analyses | `<support>/visualizer/designs.json`, `cache/visualizer/` |
+| Color Grader looks, maps | `<support>/grade/looks.json`, `cache/grade/` (Part E) |
+| Paint+ imported brushes | `<support>/paint/…` (from `modules/paint`'s support dir) |
+| All caches (thumbs, heic, media, composer, editstudio, pdfium, yt-dlp, redact, …) | `<support>/cache/…` |
+| Temp files, job TempDirs, the chat key file | `<support>/tmp/…` |
+| Logs | `<support>/logs/toolbox.log` |
+| UI state: recents, pins, sidebar, panel sizes, view modes, the pipeline editor's mode | WebView `localStorage`, in the workspace's own WebView2 profile (`<support>/webview2`) |
+| **Shared on purpose:** tools (`bin`, `python`, `sidecar`, `models`), `deps-cache.json`, the workspace list | the global tools folder / global support dir |
+| **Machine-wide, out of our hands:** the OS clipboard, OS trash, OS notifications, Ollama's own data | — |
+
+**Edge cases, each with its answer:**
+- **Hard-coded global paths.**
+  - `modules/posts/sources.go` falls back to `core.DefaultLibraryDir()` (`~/Toolbox`), which would read Personal's library from Demo. Its config always gets the workspace's library, and the fallback is removed.
+  - `core/jobs.go`'s `os.TempDir()` fallback becomes an error (a missing tmp dir is a wiring bug).
+  - A Go test (`workspace_isolation_test.go`, at the root) fails on any non-test call to `os.UserConfigDir/UserHomeDir/UserCacheDir/TempDir`, `core.DefaultLibraryDir` or `Getenv("APPDATA"|"LOCALAPPDATA"|"USERPROFILE"|"HOME"|"TEMP"|"TMP")` outside an allowlist. The allowlist is read-only uses, each with a reason:
+    - `core/workspace` resolve;
+    - `core/deps/detect.go` (finding system tools);
+    - `core/focus/policy.go` and `modules/focus/apps.go` (OS folders and installed apps).
+- **The AI engine's temp files.** The sidecar and every subprocess get `TMP`/`TEMP`/`TMPDIR` = `<support>/tmp`, plus `<support>/cache/numba`. A test checks the env `core/proc` and `core/sidecar` build.
+- **Two instances sharing the tools folder** (Personal plus a sandbox without `TOOLBOX_TOOLS_DIR`):
+  - installs, updates, removes, `uv sync` and tools-folder moves take an OS file lock, `<tools>/.toolbox-tools.lock`;
+  - a second instance waits up to 2 s, then shows "Another Toolbox is changing the tools — try again in a moment";
+  - reading tools and models needs no lock.
+- **First-run setup.** A new workspace never shows the setup wizard. Its pack status comes from the shared tools folder.
+- **Pack status after an install elsewhere.** `deps-cache.json` moves to the tools folder, so Personal sees what Demo installed. Each launch re-checks stale entries as today.
+- **Focus during a switch.**
+  - Switching costs the quit friction (at Strict: Emergency unlock).
+  - Personal's session resumes when Personal opens again, and ends then if its time has passed (as after a restart).
+  - Demo never enforces Personal's session.
+- **Schedules and watch folders.** They belong to their workspace, so they don't fire while another workspace is open. On return they catch up under the existing rules (Phase 18).
+- **The clipboard recorder.** It runs only in the instance that's open, with that workspace's setting (off by default in a new workspace).
+  - **Capture:** the harness's clipboard scene refuses to run while another `toolbox.exe` that it didn't start is running, because a Personal recorder would store the test strings. It reports the skip.
+- **Overlapping folders.** A workspace root may not be inside, or contain, the global support dir, the tools folder, Personal's library or another workspace's root. Personal's library setting refuses a folder inside a workspace root.
+- **Names.** Workspace names are unique (case-insensitive). "Personal" is reserved.
+- **A missing workspace folder** (an unplugged drive, or deleted outside the app). Boot falls back to Personal with a notice ("Demo's folder isn't there"), and the entry is marked `Missing` (Reveal disabled, Remove still available).
+- **A corrupt `workspaces.json`.** It's kept as `.bak`, Personal opens, and a warning is logged and shown once.
+- **A corrupt or missing `.toolbox/workspace.json` in a listed root.** The entry is shown as Missing; Add existing repairs it.
+- **Seed and restore while files are locked** (Windows). Those files are skipped and named in the job result. Copies keep the source's modification time.
+- **Present mode and native paths.** Notifications, the tray and error toasts go through the `Presenter`. Logs keep real paths, because they stay on this machine.
+- **WebView storage under `wails3 dev`.** Each workspace still has its own profile directory, so origins can't share storage.
+- **Migrations.** A new workspace DB runs all migrations from 0001. Personal's DB is untouched by this phase except for new migrations, if any.
 
 ## A7. Dev and demo tasks
 - `wails3 task dev:sandbox` is unchanged, and it is the **Dev** workspace.
@@ -667,49 +772,49 @@ demo/
   - The clipboard scene writes only its own test strings, reads the previous text first and restores it.
   - Local File Transfer is filmed with **receiving off** (the send screen and the pairing explanation only).
   - Focus runs as a dry run, so the pill and countdown show but nothing is stopped.
-  - The two network scenes run only with `links.txt`.
+  - The two network scenes use only the fixed Wikimedia URLs in `roles.json`.
 
 ## D2. Scene list (A-roll: one process per clip, 8–40 s after compression, 1.5 s handles)
 
-| # | Clip | Shows |
+| # | Clip | Shows (on which media) |
 |---|---|---|
-| 00 | Tour | Sidebar categories, palette search ("stems"), drop a song → suggested tools |
-| 01 | Library | Folders, previews, lineage of a result, Things view |
-| 02 | Smart search | "dog", "receipt", a phrase from `video.talk`, Find similar |
-| 03 | Stems | song → 4 stems, solo vocals |
-| 04 | BPM & key | song → tempo/key, renamed copy |
-| 05 | Audio to MIDI | bass stem → MIDI, piano roll |
-| 06 | Visualizer | song → Balanced preset, Intensity stops, a design tweak, render |
-| 07 | Lyric Video | song → timed lyrics → render preview |
-| 08 | Edit Studio | B-roll + song → Cut to the beat → play |
-| 09 | Video Editor I | multitrack: razor, ripple, PiP keyframes with ease |
-| 10 | Video Editor II | green-screen key with the eyedropper, matte view → composite |
-| 11 | Video Editor III | audio: detach, volume dip, fades, export dialog |
-| 12 | Transcribe | talk → transcript, click a word to seek |
+| 00 | Tour | Sidebar categories, palette search ("stems"), drop `song.main` → suggested tools |
+| 01 | Library | Folders, HEIC previews, lineage of a result, Things view |
+| 02 | Smart search | "ferris wheel", "rain at night", "dessert", "code", a phrase from `video.talk`, Find similar on the skyline |
+| 03 | Stems | `song.main` → 4 stems, solo vocals |
+| 04 | BPM & key | the Paramore and underscores stems → tempo/key, renamed copies |
+| 05 | Audio to MIDI | Paramore bass stem → MIDI, piano roll |
+| 06 | Visualizer | `song.main` → Balanced preset, Intensity stops, a design tweak, render |
+| 07 | Lyric Video | `song.main` → timed lyrics → render preview |
+| 08 | Edit Studio | B-roll + `song.short` → Cut to the beat → play |
+| 09 | Video Editor I | multitrack: razor, ripple, `Wally` keyed (blue) as a keyframed PiP with ease |
+| 10 | Video Editor II | `Snoop Dog Dancing` keyed with the eyedropper over the rainy street, matte view → composite; `Shitty Explosion` with screen blend |
+| 11 | Video Editor III | audio: detach, volume dip under the narration, fades, export dialog |
+| 12 | Transcribe | `video.talk` → transcript, click a word to seek |
 | 13 | Subtitles | generate, style, burn in |
-| 14 | Silence Cutter | talk → pauses removed (before/after timeline) |
-| 15 | Audio Cleanup | noisy → clean (A/B toggle; the waveform shows the change) |
+| 14 | Silence Cutter | `video.talk` → pauses removed (before/after timeline) |
+| 15 | Audio Cleanup | `audio.noisy` → clean (A/B toggle; the waveform shows the change) |
 | 16 | Text to Speech | article paragraph → voice |
 | 17 | Local Chat | ask about `doc.pdf` |
 | 18 | Caption Writer | 6 photos → alt text, captions, hashtags; Write into copies |
-| 19 | OCR | receipt → text, copy |
+| 19 | OCR | drum chart and the code screenshot → text, copy |
 | 20 | PDF Toolkit | merge, reorder pages, compress |
 | 21 | Document Converter | `.md` → PDF and DOCX |
-| 22 | Converter | clip → WebM/MP3 |
+| 22 | Converter | `Round Winning Kill.wmv` → MP4, `song.alt` → MP3 |
 | 23 | Compress to Size | B-roll → "Discord" target |
 | 24 | Trimmer | trim with keyframe preview |
-| 25 | Scene Splitter | B-roll → shots |
-| 26 | GIF & Contact Sheet | clip → GIF + sheet |
-| 27 | Background Remover | product photo → cut-out |
-| 28 | Upscale | small photo → 4× (before/after slider) |
-| 29 | Object Eraser | brush an object away |
-| 30 | Redact | street photo → plate blurred |
-| 31 | Metadata | inspect GPS → strip |
+| 25 | Scene Splitter | the B-roll reel → shots |
+| 26 | GIF & Contact Sheet | `Snoop Dog Dancing` → GIF + sheet |
+| 27 | Background Remover | the T-shirt photo → cut-out |
+| 28 | Upscale | `rainbowfrog.gif` → 4× (before/after slider) |
+| 29 | Object Eraser | the alley photo: brush the parked car away |
+| 30 | Redact | the rainy street: plates and faces blurred |
+| 31 | Metadata | inspect a Demo copy: location already stripped; strip the rest |
 | 32 | Image Batch | 10 photos → web-sized WebP with a watermark |
 | 33 | Organizer | photos → folders by date, look-alikes aside |
 | 34 | Photo Composer | template → photos placed |
 | 35 | Post Builder | carousel with a caption from Caption Writer |
-| 36 | Paint+ | brush strokes (scripted), a Lab tool with its origin card |
+| 36 | Paint+ | brush strokes (scripted) over the plover drawing, a Lab tool with its origin card |
 | 37 | Pipelines | "Song to everything" graph runs, cells light up |
 | 38 | Clipboard | history popup with test strings |
 | 39 | Vault | add files, lock, unlock |
@@ -717,13 +822,15 @@ demo/
 | 41 | Focus Lock | Pomodoro profile, the pill counts down (dry run) |
 | 42 | Dev Utilities | JSON format, hash, colour |
 | 43 | Workspaces | the chip menu shows Demo and Dev; Settings → Workspaces |
-| 44 | Downloader* | URL → video (only with `links.txt`) |
-| 45 | Web Archiver* | URL → single HTML (only with `links.txt`) |
+| 44 | Downloader | a public-domain Wikimedia video URL → video |
+| 45 | Web Archiver | a Wikipedia article → single HTML |
+| 46 | Color Grader | the rainy street: Tasteful → Bonkers on the Wildness dial, Vibe "haunted vaporwave mall at 3 am", Neon Noir with subject regions, Depth Rainbow on the skyline, Chaos rerolls, export; then `Snoop` keyed + graded video |
 
 **B-roll** (kind `b`):
 - the app's own exports, 16:9:
   - every retuned Visualizer preset, 15 s on `song.main` / `song.alt` at 1080p60 with audio;
-  - Lyric Video and Edit Studio renders.
+  - Lyric Video and Edit Studio renders;
+  - **"Bonkers montage"**: 12 Color Grader looks on the photos and B-roll, 2 s each, made as a Video Editor export.
 - a 20 s Paint+ time-lapse;
 - a slow Library grid scroll;
 - a pipeline graph running;
@@ -746,7 +853,7 @@ demo/
   - a ruler marker per scene, named.
 
   It's built through `EditStudioService` (no UI scripting) after the footage is copied in.
-- `Demo Footage` is in the workspace's `keep` list, so **Tidy up** never removes it.
+- `Demo Footage` and `Extras` are in the workspace's `keep` list, so **Tidy up** never removes it.
 
 ## D4. Acceptance
 1. `node demo/run.mjs --list` lists all scenes with their roles and which assets are present.
@@ -761,7 +868,7 @@ demo/
 
 ---
 
-## E. Part A tests and acceptance
+## Part A tests and acceptance
 
 **Tests:**
 - `core/workspace`, table-tested:
@@ -794,13 +901,302 @@ demo/
 4. Run Stems in Demo and switch to Personal: no trace of it. Switch back: the stems are there.
 5. **Restore baseline** after deleting a baseline file brings it back. **Tidy** lists the stems and moves them to the trash; `Demo Footage` stays.
 6. Both workspaces use the same tools folder, with no downloads.
-7. Start at login opens the last active workspace.
+7. Start at login opens Personal, even when Demo was last used.
 8. Switching during a real (dry-run-checked) Focus session asks for the quit friction.
-9. Screens at 1180 × 720 and 960 × 600, light and dark.
+9. **Isolation fs-diff:** list every file (path, size, mtime) under `%AppData%\Toolbox`, `~/Toolbox`, `%LOCALAPPDATA%\Toolbox*` and `%TEMP%` (Toolbox-named entries) before and after a 10-minute Demo session that runs Chat, Stems, a pipeline, Clipboard (on), Vault, Paint+ and Color Grader. Only `workspaces.json` changes. Then Personal's Chat, job tray, log panel, Recent and pipelines show none of it.
+10. Screens at 1180 × 720 and 960 × 600, light and dark.
 
 ---
 
-## F. Decisions (mine, for you to edit)
+# Part E — Color Grader (`grade`)
+
+## E1. Product
+- **Sidebar:** category "Photo & image", icon `palette`, tagline "Film looks to absolutely unhinged".
+- **Accepts:** pictures (jpg, png, webp, gif (first frame), tiff, heic) and videos (anything FFmpeg reads, wmv included). Several files make a **batch**: the same look on each, one job per file.
+- **Layout** (a workspace tool: `defineWorkspace`, `StudioLayout`):
+  - **Centre:** the preview, with a before/after split you drag (`\` toggles it). Video gets a mini transport.
+  - **Bottom strip:** the **look gallery**, live thumbnails of *your* picture in every look (160 px, rendered on one shared GL context, visible ones only), with tabs **Film / Bold / Bonkers / Mine**.
+  - **Header:** the **Wildness** dial (Tasteful 0 → Bold 0.5 → Bonkers 1, default 0.5) and the primary **Export**.
+  - **Rail** (each a `ClickIn` with a one-line summary):
+    - **Look**: the op stack (per op: toggle, amount, region chip, drag to reorder, add an op);
+    - **Vibe**;
+    - **Read the picture**;
+    - **Regions**;
+    - **Steal a look**;
+    - **Chaos**;
+    - **Motion** (video);
+    - **Export**.
+- **Wildness:**
+  - It scales every op's `amount` through the look's own curve (`wildCurve`: how its ops grow from Tasteful to Bonkers).
+  - Above 0.66 it switches on the look's `chaos` ops, which are off below that. That's how Neon Noir gains edge glow and chromatic split only at Bonkers.
+- **The 40 built-in looks** (`frontend/src/grade/looks/`, one file per tier):
+  - **Film (12):** Clean, Warm Film, Cool Film, Teal & Orange, Bleach Bypass, Cross Process, Faded Matte, Seventies Slide, Golden Hour, Moonlight, Noir, Soft Pastel.
+  - **Bold (12):** Cyberpunk, Miami Neon, Desert Heat, Arctic, Sepia Punch, Hyperreal, Lomo, Candy, Moody Forest, Blockbuster, Riso Duotone, Night Vision.
+  - **Bonkers (16):**
+
+| Look | Recipe idea |
+|---|---|
+| Aerochrome | infrared false colour: foliage goes magenta (channel swap) |
+| Thermal | luma → ironbow gradient map; the subject runs hotter |
+| Inferno by Depth | thermal gradient by depth; near is white-hot |
+| Depth Rainbow | hue by depth |
+| Acid Bath | hue cycle by luma + solarize + bloom |
+| Oil Slick | iridescent hue by luma × depth + gloss |
+| Neon Noir | subject in colour, background mono teal; Bonkers adds magenta edge glow and a chromatic split |
+| Vaporwave Mall | pink/cyan gradient map, VHS, grain, pastel halation |
+| X-Ray | invert, blue gradient map, edge glow |
+| Toxic | green channel mix, halation, posterize |
+| Pop Art | posterize 4, halftone, saturation 1.8 |
+| Solar Flare | solarize, bloom, chromatic split |
+| Deep Fried | contrast ×3, saturation ×3, sharpen, posterize, red cast |
+| Dreamcore | lifted shadows, pastel gradient map, pink depth fog, glow |
+| Midas | gold gradient map on the subject; background black and white |
+| Glitch Prophet | glitch and channel shift on the background; the subject stays clean |
+
+- **Vibe** (needs Local Chat; otherwise the `DepsGate` names the chat model):
+  - A text box and **Write a look**. The chat model gets the op catalog (§E2) and the request, and returns a `GradeRecipe` constrained by `JSONSchema` (temperature 0.9, seed from the Chaos counter).
+  - Go validates and clamps it (§E4). The look takes the name the model gives it.
+  - **More like this** asks for 3 variations (seeds +1, +2, +3).
+  - A request takes about 2–6 s, with a spinner and Cancel. Results go to the Look rail and can be saved.
+- **Read the picture** (needs a vision model, as Caption Writer does):
+  - It sends a 768 px still (the current frame of a video) and asks for 6 looks that fit this picture.
+  - Each answer is `{name, why (≤ 90 chars), recipe}`, e.g. "Wet Neon — push the rain highlights magenta, sink the sky".
+  - They appear as 6 extra gallery cards marked ✦.
+- **Smart regions.** Any op can target one of these regions, with `feather` 0..1 and `invert`:
+
+| Region | Comes from | Needs |
+|---|---|---|
+| all | — | — |
+| highlights / shadows / midtones | luma (soft ranges) | — |
+| subject / background | photo: the Background Remover model's alpha; video: Edit Studio's "people" matte | that model |
+| people | the matte "people" mode (photo and video) | the matte model |
+| near / far | **the new depth map** (`depth >= split`, soft; `split` 0..1) | **Color** pack (§E5) |
+
+  - **Regions** shows each available map as a thumbnail. Clicking one shows it full size, and "View this map" puts it in the preview. Missing models show their install button in the `DepsGate`.
+  - Maps are computed once per input and cached (§E5).
+- **Steal a look:**
+  - Pick a reference picture, from the Library or a file.
+  - The `transfer` op matches the Lab mean and standard deviation per luma band (shadows, mids, highlights; Reinhard per band, with soft band weights).
+  - The stats are computed in Go (`modules/grade/transfer.go`) and stored in the op's params, so the reference isn't needed again.
+  - Its amount is 0..1.
+- **Chaos:**
+  - **Surprise me** builds a random recipe of 3–8 ops from the op catalog, weighted by Wildness (seeded mulberry32, `frontend/src/grade/chaos.ts`).
+  - **Again** uses the next seed.
+  - A 🔒 on an op keeps it across rerolls.
+  - The seed is shown (`#4821`), and typing one in reproduces that look exactly.
+- **Motion (videos):**
+  - Ops with `anim` move over time: `huecycle` speed, `gradmap` drift, and a `pulse` (amount × a 0..1 wave).
+  - **Beat sync** (optional): pulses land on beats or bars, using the Visualizer analysis of the video's own audio or of a chosen song (`viz.Analyzer`, which runs an analysis job).
+  - Flash safety holds by construction (§E3.4).
+- **Results** (the standalone rules, CLAUDE.md 2026-11-06):
+  - **Export:**
+    - Pictures go to `<library>/Graded/<name> (<look>).<ext>` in the same format at **full resolution**, oriented: JPEG q 92, PNG, or WebP q 90; HEIC becomes JPEG.
+    - Videos become `.mp4`: H.264 CRF 18 at the source size (≤ 3840 on the long side) and the source fps, with the audio re-encoded to AAC 192k.
+  - **Past exports:** the results list uses `ResultRow` (Reveal, Open, Save a copy, Send to).
+  - **Save look** adds it to **Mine** (`<support>/grade/looks.json`, ≤ 200, through `GradeService`).
+  - **Export .cube** writes a 33³ LUT of the look's **colour-only ops** (§E3.3) to `<library>/Graded/LUTs/<look>.cube`. The dialog lists what a LUT can't hold: regions, texture and motion.
+  - **Video Editor:** saved looks appear in its effects menu under **Looks ▸** and insert the compiled effect stack (§E3.2).
+- **Pipeline step "Grade with a look"** (`core.Chainable`):
+  - It takes pictures or videos and produces graded files (role `graded`).
+  - Options:
+    - `look`: a built-in or saved look id;
+    - `wild`: 0..1;
+    - `seed`;
+    - `vibe`: a template; when set, the LLM writes the look for each item;
+    - `format`: "same" | "jpg" | "png" | "webp".
+  - `Templates: ["/vibe"]`.
+  - It renders through the main window, like Photo Composer's step, and waits with `ErrWaiting("Open Toolbox to render")` when there is none.
+  - It has a `StepUI` and `paramDefs`.
+
+## E2. The recipe (frozen in Wave 0)
+`frontend/src/grade/types.ts`, mirrored by `modules/grade/recipe.go`. Both share the vectors in `core/testdata/grade-recipes.json`.
+```ts
+interface GradeRecipe {
+  v: 1;
+  name: string;             // ≤ 40 chars
+  tier: "film" | "bold" | "bonkers" | "mine" | "ai";
+  seed: number;             // u32
+  wildCurve: "linear" | "late" | "early";
+  ops: GradeOp[];           // ≤ 16
+}
+interface GradeOp {
+  id: string;               // 6 chars, unique in the recipe
+  kind: GradeOpKind;
+  on: boolean;
+  chaos?: boolean;          // active only at Wildness > 0.66
+  amount: number;           // 0..1: strength at Wildness 1
+  region: Region;
+  params: Record<string, number | string | boolean | number[]>;   // per-kind schema (E3.1), clamped
+  anim?: { speed: number; wave: "sine" | "saw" | "beat" | "bar" };  // video only; cycles per 10 s, 0.05..6
+}
+type Region =
+  | { kind: "all" }
+  | { kind: "highlights" | "shadows" | "midtones"; soft: number }
+  | { kind: "subject" | "background" | "people"; feather: number; invert?: boolean }
+  | { kind: "near" | "far"; split: number; feather: number };
+```
+
+## E3. Rendering (`frontend/src/grade/`, on the editor's engine)
+1. **The op catalog** (`grade/ops.ts`). Each kind has a label, a params schema (ranges and defaults), `colorOnly`, `animatable`, and a pure-TS **reference function** (`grade/math.ts`) that the GLSL mirrors.
+
+| Kind | colorOnly | Params (short) |
+|---|---|---|
+| `balance` | ✓ | exposure −3..3, temp ±1, tint ±1, contrast 0..3, pivot, saturation 0..3, vibrance ±1 |
+| `wheels` | ✓ | lift/gamma/gain RGB (±1), offset |
+| `curves` | ✓ | master + R/G/B, 5 points each (monotone cubic) |
+| `hsl` | ✓ | 6 hue vectors × (hue ±180°, sat ±1, lum ±1) |
+| `split` | ✓ | shadow colour, highlight colour, balance |
+| `gradmap` | ✓ | 2–8 stops (`#hex`@pos); source luma / depth / hue; blend; drift |
+| `chanmix` | ✓ | 3×3 matrix + bias; presets Aerochrome, BRG, GBR, mono-red |
+| `solarize` | ✓ | threshold, mix |
+| `posterize` | ✓ | levels 2..16 |
+| `invert` | ✓ | per channel |
+| `huecycle` | ✓ (static) | by luma/depth/radius, cycles 0..8, phase |
+| `transfer` | ✓ | Lab stats × 3 bands |
+| `bleach` | ✓ | mix |
+| `glow`, `halation` | | radius, threshold, tint |
+| `edgeglow` | | Sobel strength, colour, thickness |
+| `depthfog` | | colour, start, density (needs depth) |
+| `tiltshift` | | focus depth, range, blur (needs depth) |
+| `grain`, `vignette`, `chromatic`, `halftone`, `glitch`, `vhs`, `sharpen`, `mirror` | | the existing `viz/post` passes and their params |
+
+   - **The colour pass.** All colour-only ops compile into **one** `grade` pass: a shader with a uniform block per op, run in recipe order. Each op blends as `mix(prev, op(prev), amount × regionWeight)`.
+   - **Spatial passes.** The other ops are separate passes, gated by their region the same way.
+   - **New passes:** `viz/post/grade.ts` (the colour chain), `halation.ts`, `edgeglow.ts`, `depthfog.ts` and `tiltshift.ts`. Each one:
+     - calls `registerPost`;
+     - has its id in `POST_TYPES` and a catalog entry;
+     - is an exact identity at amount 0;
+     - is offered in the Video Editor's effects too.
+2. **`compileRecipe(recipe, wild, aux)` → `EditPost[]`.** It's pure and golden-tested. The preview, the exports, the pipeline step and the Video Editor's **Looks ▸** all use it.
+   - The preview is a one-clip `EditEngine` (a photo or video clip) at the input's aspect.
+   - Video previews use the edit-stream preview tier: a prepare job runs when a video is opened, and "Preparing" shows as in the editor.
+3. **LUT bake:**
+   - A 33³ identity lattice (a 1089 × 33 texture) runs through the `grade` pass, using the colour-only ops at the current Wildness with region "all".
+   - The pixels are read back, and `GradeService.SaveCube(name, 33, floats)` writes the `.cube` (`TITLE`, `LUT_3D_SIZE 33`, `DOMAIN_MIN`/`MAX`).
+   - Ops with any other region are left out and listed.
+4. **Flash safety for animated ops:**
+   - An animation may swing mean luminance by more than 10% per half-cycle **only** at ≤ 1.5 cycles/s. `compileRecipe` clamps the speed or the swing to keep that true.
+   - Beat waves use a 120 ms attack and 300 ms release, never a square wave.
+   - A test runs the C4 metric over every built-in look with motion and over 200 Chaos seeds: `flashMaxPerSec` ≤ 3.
+5. **Full-resolution stills.**
+   - `core/viz.RenderPlan` gets `Still *StillPlan {ProjectJSON, Streams, Images, AtMs, Format "png"|"jpg"|"webp", Quality}`.
+   - The host renders one frame with the `EditEngine` on an OffscreenCanvas at `Width × Height`, up to **8192** on the long side, and returns one file, as it does for Composition.
+   - That limit is checked against `MAX_TEXTURE_SIZE`. Above it, the job fails with a clear message.
+   - The Video Editor's "Still frame (.png)" (§B6) uses the same plan.
+6. **Source-size edits.**
+   - `EditProject.Size *Size {W, H int}`, added in Wave 0, overrides `Aspect`/`Export.Height` when set.
+   - Sizes are even: 64..8192 for stills, ≤ 3840 for video.
+   - Only in-memory renders set it: Color Grader and the still plan.
+
+## E4. Backend (`modules/grade/`, module `grade`, `OutputSubdir: "Graded"`)
+- **Job `Run`:**
+  1. Decode the options: `{recipe, wild, format, beat: {song, on}}`.
+  2. Make sure the maps that the recipe's regions use exist (§E5); they're cached.
+     - Subject and people mattes come from `modules/editstudio`'s matte runner, exported as `RunMatte`.
+     - Depth comes from `depth.*`.
+  3. Build the one-clip `EditProject` with `Size` = the source size (≤ 3840 for video). Its `Effects` is a placeholder; the plan carries `Grade {RecipeJSON, Wild}`. The host compiles it with the same `compileRecipe`, so there is **one compiler**.
+  4. **Pictures:** a `Still` plan, then write the file. Orientation is applied. Other metadata is copied except orientation, and location only if the input had it.
+  5. **Videos:** `editstudio.RenderEdit(ctx, job, name, doc)`, which is today's `renderDoc` exported with `projectID = ""`. The source audio is kept.
+  6. `job.Output`.
+- **`GradeService`:**
+  - `Defaults()`, `Enqueue(inputs, opts)`;
+  - `Looks()`, `SaveLook(r)`, `RenameLook`, `DeleteLook`;
+  - `Vibe(req {text, seed, n})` → `[]GradeRecipe`: an interactive call on `TextGenerator`, not a job;
+  - `Read(path, atMs)` → `[]Suggestion`, through `VisionGenerator`;
+  - `Transfer(refPath)` → the `transfer` op's params;
+  - `SaveCube(name, size, data)` → the output path;
+  - `Masks(path)` → `MaskState {depth, subject, people: {ready, preview, stream}, preparing}`;
+  - `PrepareMasks(path, kinds)` → a job;
+  - `StepShape()`.
+- **Recipe validation** (`recipe.go`, same vectors as TS):
+  - unknown kinds are dropped;
+  - params are clamped to the schema;
+  - ≤ 16 ops, unique ids, names ≤ 40 chars;
+  - an LLM reply that doesn't parse is retried once with the error appended, then fails with "The chat model couldn't write a look. Try again or rephrase".
+- **Prompts** (`prompt.go`):
+  - The system prompt lists the op catalog (kinds, params, ranges, a one-line effect each) and a palette vocabulary.
+  - It asks for 3–10 ops a colourist would recognise, and wild combinations are welcome.
+  - The reply must be the JSON only: no other text, never people's names.
+
+## E5. Depth and masks
+- **Model:** **Depth Anything V2 Small** (Apache-2.0), in the ONNX Community's fp16 export (~50 MB).
+  - It's pinned `{file, url, sha256}` in `modules/grade/models.go`, measured in a Wave 0 spike.
+  - It lives in `<models>/depth/` as pack component `depth-v2s` in a new **Color** pack (`color`) that holds only this model.
+  - Color Grader works without it; near/far regions say "Install Color".
+  - Handlers never download. `FetchModel` calls `depth.prefetch`.
+- **Engine handlers** (`sidecar/toolbox_sidecar/handlers/depth.py`):
+  - **`depth.image {path, model, out}`:**
+    - inference at 518 px, keeping the aspect, at a multiple of 14;
+    - upsampled to ≤ 2048 on the long side, with guided-filter edges against the picture;
+    - writes a 16-bit PNG: near = white, normalised p2..p98.
+  - **`depth.video {path, model, outDir, fps}`:**
+    - **Sampling:** every frame at ≤ 30 fps; above that, every 2nd frame, interpolated.
+    - **Smoothing:** a temporal EMA with α 0.6, reset on scene cuts (mean |Δ| of a 64 px thumbnail > 0.25).
+    - **Normalisation:** per clip, p2..p98.
+    - **Output:** two grey edit streams (preview and export tier: Annex-B H.264 + `.idx.json`, the same format as mattes), written by piping raw frames to FFmpeg.
+  - Both report progress and call `check_cancelled` between batches of 8 frames.
+- **Cache:** `cache/grade/<fileKey>/` (`depth.png` or the depth streams, `subject.png`, `people-*`), pruned at start after 30 days or above 5 GB.
+- **Engine aux maps** (a Wave 0 contract: `ClipAux`):
+  - `EditFiles` keys: `d:<id>` is a depth stream, `a:<path>` a still map PNG.
+  - The clip renderer binds `u_depth` and `u_subject` (0..1) for passes that declare `needs: ["depth" | "subject" | "people"]`.
+  - A missing map is a constant (depth 0.5, subject 1), and the tool shows that region as unavailable.
+
+## E6. Errors and limits
+- **Size caps:** a picture over 8192 px on the long side exports at 8192, with a notice saying why. A video over 3840 exports at 3840.
+- **A region's model is missing:**
+  - the op is greyed out with an install button;
+  - the job refuses with `CodeDependencyMissing`, naming the pack.
+- **No chat model:** Vibe and Read the picture show the `DepsGate`. Everything else works.
+- **Depth for video is slow on the CPU.** Wave 0 measures seconds per frame. Regions shows an estimate before it starts ("about 4 min for this 30 s clip").
+
+## E7. Tests
+- **TS:**
+  - every op's reference function on vectors;
+  - `compileRecipe` goldens for all 40 looks at Wildness 0, 0.5 and 1;
+  - Chaos determinism, and the lock;
+  - recipe validation on the shared vectors;
+  - LUT lattice mapping;
+  - flash safety over 200 seeds;
+  - every look's ops are in the catalog, and the catalog matches `POST_TYPES`.
+- **CPU-backend reference:** the `grade` pass with Neon Noir's colour ops on a 64 × 64 fixture equals the reference functions within 2/255.
+- **Go:**
+  - recipe validation and clamps;
+  - prompt and parse with a fake `TextGenerator`: valid, invalid then retry, garbage;
+  - transfer stats on synthetic images;
+  - the `.cube` writer;
+  - the job against a fake broker and `Caller`;
+  - the `Chainable`, including a vibe template;
+  - mask cache keys and prune.
+- **Python:**
+  - `depth.image`/`depth.video` with a tiny fixture model built in the test: shapes, normalisation, EMA and the scene-cut reset;
+  - the real model under `TOOLBOX_SLOW=1`.
+- **Architecture:** `src/grade/` is engine-level (like `composer/`), and it imports no tool.
+
+## E8. Acceptance (real build, the demo media)
+1. **Rainy-street photo (HEIC, 4032 × 3024):**
+   - Wildness 0 → 1 on Neon Noir: the subject regions come from the Background Remover model, and the edge glow appears only above 0.66.
+   - The export is a full-resolution, upright JPEG that matches the preview (mean diff of a 1080 render < 2/255).
+2. **Skyline:** Depth Rainbow and Inferno by Depth separate near from far, and Regions shows the depth thumbnail.
+3. **Vibe:**
+   - 10 prompts each give a valid, visibly different look within 8 s. They include "haunted vaporwave mall at 3 am", "wes anderson but cursed" and "toxic swamp rave".
+   - More like this gives 3 variations.
+4. **Read the picture** on the ferris wheel gives 6 named suggestions whose reasons mention what's in it.
+5. **Steal a look:** the dessert photo's colours land on the skyline.
+6. **Chaos:**
+   - seed `#4821` gives the same look after a restart;
+   - a locked op survives 5 rerolls.
+7. **Video:** `Snoop Dog Dancing` with Acid Bath, animated and beat-synced to `song.short`:
+   - the export plays, matches the preview and keeps its audio;
+   - the motion metric gives ≤ 3 flashes per second.
+8. **`.cube`:** FFmpeg `lut3d` on a picture matches the colour-only render within a mean ΔE of 2.
+9. **A saved look** appears in the Video Editor under Looks ▸ and gives the same picture on a clip.
+10. **Pipeline:** folder → "Grade with a look" (vibe `{name} as a fever dream`) → Image Batch.
+11. **Standalone:** all 5 points hold with no other tool open.
+12. **Screens:** 1180 × 720 and 960 × 600, light and dark.
+
+---
+
+## F. Decisions
 - **Personal stays in place.** No migration, so there's zero risk to your data. Other workspaces are `<root>/{Library, .toolbox}`.
 - **One tools folder for all workspaces.** Models are ~4–7 GB, so per-workspace copies would waste space. Capture uses the sandbox's tools (`.dev/support`), so filming never installs into your Personal tools. **When you demo live from your Personal app, Demo uses your tools folder.** Install any packs it lacks once from Settings → Packs.
 - **Switching relaunches** rather than hot-swapping. Every service holds DB handles and paths, so a relaunch is the only clean switch.
@@ -810,15 +1206,46 @@ demo/
 - **Overwrite on overlap** replaces today's "refuse the move".
 - **The Visualizer analysis is unchanged** (no re-analysis). All smoothing, ramps and rate limits are TS-side.
 - **Intensity** keeps its field (`reactivity`); Balanced = 1 after the retune. Saved designs keep their value, so they get the calmer engine automatically.
+- **Demo media privacy.**
+  - The selfie, the home floor plan and the personal sketch-blog text are excluded from the Demo workspace (`exclude`).
+  - Every photo copy has its location stripped (your iPhone photos all carry GPS).
+  - The Redact scene uses strangers in the rainy-street and ferris-wheel photos, never you.
+- **Missing media is generated with Toolbox itself:** a TTS narration, a Ken Burns B-roll reel, a noisy copy, and a PDF of a short article I write. Nothing is downloaded from stock sites.
+- **Color Grader renders on the editor's engine.** The preview equals the export, and it reuses mattes, streams and the RenderBroker. Its looks are effect stacks the Video Editor can use too.
+- **The depth model is Depth Anything V2 *Small*** (Apache-2.0); the larger versions are non-commercial. There is no text-to-image or artwork-trained model. The "AI" is the local chat/vision model writing recipes, plus segmentation and depth maps.
+- **One real workspace runs at a time** (one app lock), so files opened from Explorer always reach the open window. Start at login always opens Personal.
 
 ---
 
 ## G. Work packages
 
 ### Wave 0 — foundation (architect, sequential, on main)
-1. CLAUDE.md "Workspaces, editor parity, calm visuals and the demo (Phase 21)" section; DECISIONS; ROADMAP row; `.gitignore` gets `demoAssets/`, `workspaces/`.
+1. CLAUDE.md "Workspaces, editor parity, calm visuals, Color Grader and the demo (Phase 21)" section; DECISIONS; ROADMAP row; `.gitignore` gets `demoAssets/`, `workspaces/`.
+   - **Spikes** (results in DECISIONS):
+     - Depth Anything V2 Small ONNX pins, and its CPU speed on a picture and on 1080p video (seconds per frame);
+     - WebView2's `MAX_TEXTURE_SIZE` on this PC.
+
+     The motion metric's "before" run belongs to V2.
 2. `core/workspace` types, `Resolve` signature, `Presenter` and `WorkspacesService` stubs. The `workspace` hidden module skeleton. `main.go` boot through `Resolve`, still behaving as today. `dryrun.go` signature.
-3. Document v2 fields + `ExportSettings` + the v1 → v2 reader; `PrepareResult` fields; validate limits.
+3. **Go contracts:**
+   - Document v2: the new fields, `ExportSettings`, `Size`, the clip's `Depth` aux ref, and the v1 → v2 reader.
+   - `SourceState.Audio`/`Peaks`; `RenderPlan.Still` and `Grade`.
+   - Validation limits.
+
+   **Part E skeleton:**
+   - `modules/grade`: Descriptor, Options, `Chainable` stubs, `GradeService` stub, and the `recipe.go` types with the shared vectors.
+   - The `color` pack with its `depth-v2s` component, and a `handlers/depth.py` stub.
+   - `frontend/src/grade/types.ts` and the shape of the `ops.ts` catalog.
+   - `POST_TYPES` ids `grade`, `halation`, `edgeglow`, `depthfog`, `tiltshift`, as stubs.
+   - The `ClipAux` contract.
+   - A stub `GradeView`, `StepUI` and `paramDefs`; the icon `palette`; keywords.
+
+   **Isolation fixes (§A6b) in shared files:**
+   - the `modules/posts` library fallback;
+   - the `core/jobs.go` tmp fallback;
+   - `deps-cache.json` moves to the tools dir;
+   - the subprocess `TMP` env;
+   - the root `workspace_isolation_test.go` scan.
 4. Frontend contracts:
    - `editor/audio/types.ts` (`PlaybackClock`, `Mixer`, `PeaksSource`, `usePeaks`);
    - `Key.ease`/`bez` in `viz/edit/types.ts`;
@@ -827,14 +1254,15 @@ demo/
    - `FrameCtx.integral/beatIntegral` signatures (they throw until V1 lands);
    - `SIGNAL_CLASS_DEFAULTS`;
    - `EDIT_SHORTCUTS` entries for every new key (handlers no-op);
-   - the `motion.json` type.
+   - the `motion.json` type;
+   - a stub for handling `StillPlan` in `RenderHost`.
 5. Regenerate bindings; re-export from `lib/api.ts`. All checks green.
 
 ### Wave 1 — parallel builders
 
 | Package | Scope | Owns | Needs |
 |---|---|---|---|
-| **W1 Workspaces backend** | §A2–A4, A6 Go: resolve, registry, boot wiring, instance/webview/devtools/dry run/no-hotkeys, relaunch `--workspace`, tray submenu, seed/restore/tidy jobs, library lock, LAN alias default, Presenter, window title | `core/workspace/**`, `modules/workspace/**`, `api/workspaces.go`, `core/focus/dryrun.go`, `desktop/relaunch*.go`, `desktop/tray*.go` (workspace submenu), `desktop/hotkeys.go` (env), the boot lines in `main.go`, `core/settings.go` (library lock), `core/lan/runtime.go` (alias) | Wave 0 |
+| **W1 Workspaces backend** | §A2–A4, A6, A6b (tools lock, missing/corrupt handling, overlap checks, one app lock + arg hand-off) Go: resolve, registry, boot wiring, instance/webview/devtools/dry run/no-hotkeys, relaunch `--workspace`, tray submenu, seed/restore/tidy jobs, library lock, LAN alias default, Presenter, window title | `core/workspace/**`, `modules/workspace/**`, `api/workspaces.go`, `core/focus/dryrun.go`, `desktop/relaunch*.go`, `desktop/tray*.go` (workspace submenu), `desktop/hotkeys.go` (env), the boot lines in `main.go`, `core/settings.go` (library lock), `core/lan/runtime.go` (alias) | Wave 0 |
 | **W2 Workspaces UI** | §A1, A5 frontend: chip and menu, palette, Settings → Workspaces, New/Add dialogs, Tidy preview, `displayPath` adoption, errors rewrite | `frontend/src/views/SettingsWorkspaces*`, `frontend/src/state/workspace.ts`, `frontend/src/lib/displayPath.ts`, the chip in `shell/Sidebar.tsx`, `shell/useBuiltinCommands.ts` lines, `displayPath` call sites in `tools/_kit/**`, `views/library/**`, `views/Settings*.tsx`, `components/DepsGate*`, `shell/JobRow.tsx`, `shell/LogPanel.tsx`, `lib/errors.ts` | Wave 0 |
 | **E1 Editor backend** | §B0 validation, B1 prepare (`audio.m4a`, peaks), B1 export mix, B6 render settings (codec/quality/fps/range/audio-only/still) | `modules/editstudio/{sources,audio,render*,validate,service}.go` (+ tests) | Wave 0 |
 | **E2 Playback & audio** | §B1 frontend: clock, mixer, `wholeFile`, decoding LRU, scrub audio, song through the mixer; transport (timecode readout, quality toggle, J/K/L on the clock); §B6 dialog | `frontend/src/editor/audio/**`, `frontend/src/editor/transport/Transport.tsx`, `transport/logic.ts`, `frontend/src/lib/wholeFile.ts`, `frontend/src/editor/export/**`, playhead fields in `editor/store.ts` | Wave 0 |
@@ -843,7 +1271,10 @@ demo/
 | **E5 Seeking** | §B5: paused read-ahead, back-step cache, reverse play, edit-point jumps (handlers via E3's command table), `setEdit` identity, Draft/Full, "Preparing" bar, last good frame | `frontend/src/viz/frames/**`, `frontend/src/viz/edit/EditCanvas.tsx`, `viz/edit/engine.ts` (`samplePre` + quality) | Wave 0 |
 | **V1 Calm engine** | §C2: integrals, layer rewrites, envelope classes, energy ramp, master intensity through drive/posts/events/transitions/palette, director hold/rate/morph/feedback, palette hysteresis, post changes; continuity tests | `frontend/src/viz/{signals,engine,director,palette,transitions,transitionsMath}.ts`, `viz/layers/**`, `viz/post/{shake,zoompulse,chromatic,glitch,px1math}.ts`, `viz/text/index.ts` (raw read) | Wave 0 |
 | **V2 Motion metric** | §C4 + the "before" run on Wave 0 main | `frontend/src/viz/lab/**`, `TOOLBOX_VIZLAB_MODE` in `main.go`'s VizLab URL lines | Wave 0 |
-| **D1 Capture harness** | §D1 harness, a smoke scene (00 Tour) filmed on the sandbox, README | `demo/**` (except scenes 01–45) | Wave 0 |
+| **G1 Grade engine** | §E3: op catalog + reference math, the `grade` colour pass and the new spatial passes, `compileRecipe`, the 40 looks, Chaos, LUT bake, the flash-safety clamp, aux binding (`viz/edit/aux.ts` `bindAux()`, which E4's clip renderer calls), the `Still` path in `RenderHost` | `frontend/src/grade/**`, `frontend/src/viz/post/{grade,halation,edgeglow,depthfog,tiltshift}.ts`, `frontend/src/viz/edit/aux.ts`, the still lines in `viz/RenderHost.tsx` | Wave 0 |
+| **G2 Grade backend** | §E4–E5: job, service, recipe validation, prompts (Vibe, Read), transfer, `.cube`, looks file, mask cache + prune, `Chainable`; `depth.*` handlers + tests; `RunMatte`/`RenderEdit` exports in editstudio | `modules/grade/**`, `sidecar/toolbox_sidecar/handlers/depth.py`, `sidecar/tests/test_depth.py`, `modules/editstudio/exports.go` | Wave 0 |
+| **G3 Grade UI** | §E1: the workspace tool, gallery, Wildness, rail panels, regions view, export, results, the step UI | `frontend/src/tools/grade/**`, `frontend/src/pipelines/steps/grade.tsx`, its `paramDefs` lines | Wave 0 |
+| **D1 Capture harness** | §D1 harness, `make-assets.mjs` (§0), a smoke scene (00 Tour) filmed on the sandbox, README | `demo/**` (except scenes 01–46) | Wave 0 |
 
 ### Wave 2 — after Wave 1 merges
 - **V3 Preset retune** (builder): §C1, C3 on every preset, grammar lint, Intensity stops in `components/viz/VisualsPicker.tsx` and `blocks/visuals/designer/LookTab.tsx`. It iterates against `motion.json` until §C6 passes. Owns `viz/presets/**` and those two files.
@@ -851,14 +1282,17 @@ demo/
   - merge;
   - bindings;
   - Edit Studio regression;
+  - the Video Editor's **Looks ▸** menu (saved Color Grader looks);
+  - Part E acceptance with the real models;
+  - the isolation fs-diff (§A acceptance 9);
   - B10 measurements;
   - A and B acceptance;
   - QA shots (`.dev/p21-qa/`);
   - the CLAUDE.md final pass.
 
-### Wave 3 — the demo (after Wave 2 and once `demoAssets/` exists)
-1. **Architect:** map roles (`demo/roles.json`), build the production binary, seed the capture workspace.
-2. **D2a / D2b / D2c** (builders, in parallel) write scenes 01–15, 16–30 and 31–45 plus B-roll. Each verifies its scenes on its own capture workspace (`.dev/workspaces/capture-<pkg>`) and its own DevTools port (9231 / 9232 / 9233), one scene at a time.
+### Wave 3 — the demo (after Wave 2; `demoAssets/` is in place)
+1. **Architect:** `demo/roles.json` (from §0), the generated assets, the production binary, the seeded capture workspace.
+2. **D2a / D2b / D2c** (builders, in parallel) write scenes 01–15, 16–30 and 31–46 plus B-roll. Each verifies its scenes on its own capture workspace (`.dev/workspaces/capture-<pkg>`) and its own DevTools port (9231 / 9232 / 9233), one scene at a time.
 3. **Architect:**
    - the final full filming run, done sequentially;
    - the review (§D4.3) and re-shoots;
