@@ -3,9 +3,8 @@
 
 /**
  * SearchService is Smart search's Wails service (Phase 20, SPEC.md §3.7).
- * CONTRACT STUB (Wave 0): the method set is final. S4 owns this file:
- * argument checks, SaveText's dialog, label text rules, and anything else
- * the UI needs on top of core.MediaIndex.
+ * It checks arguments and adds the Save dialog and label text rules on top
+ * of core.MediaIndex.
  * @module
  */
 
@@ -25,7 +24,7 @@ export function DeleteIndex(): $CancellablePromise<void> {
 }
 
 /**
- * Failures lists files the index couldn't read.
+ * Failures lists files the index couldn't read (limit 1..500, 0 = 200).
  */
 export function Failures(limit: number): $CancellablePromise<core$0.SearchFailure[] | null> {
     return $Call.ByID(3055067691, limit);
@@ -39,7 +38,8 @@ export function Labels(path: string): $CancellablePromise<core$0.MediaLabel[] | 
 }
 
 /**
- * Query runs one Library search.
+ * Query runs one Library search. Limit is clamped to 1..500 (0 = 200);
+ * Similar, when set, must be an absolute path.
  */
 export function Query(q: core$0.SearchQuery): $CancellablePromise<core$0.SearchPage> {
     return $Call.ByID(378353628, q);
@@ -75,7 +75,7 @@ export function Retry(paths: string[] | null): $CancellablePromise<void> {
 
 /**
  * SaveText saves a file's text as "txt" or (speech) "srt" through a Save
- * dialog; returns the saved path ("" when cancelled). stub
+ * dialog; returns the saved path ("" when cancelled).
  */
 export function SaveText(path: string, format: string): $CancellablePromise<string> {
     return $Call.ByID(1727890734, path, format);
@@ -83,7 +83,7 @@ export function SaveText(path: string, format: string): $CancellablePromise<stri
 
 /**
  * SetLabel adds a user label (on), or hides an auto label / removes a user
- * label (off).
+ * label (off). The label is trimmed and lowercased (1-40 characters).
  */
 export function SetLabel(path: string, label: string, on: boolean): $CancellablePromise<void> {
     return $Call.ByID(3453161222, path, label, on);
