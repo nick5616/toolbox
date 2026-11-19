@@ -88,9 +88,16 @@ uniform int u_part;       // 0 whole, 1 subject only, 2 background only
 uniform float u_decor;    // stroke and glow wanted
 uniform int u_gen;        // 1: the source is a generated target (premultiplied, bottom-up)
 uniform int u_edges;      // 1: mirror the picture past its edges (motion tile)
+uniform vec4 u_crop;      // crop l, r, t, b as fractions of the picture (0 = none)
 ${GLSL_MASKS}
 vec2 mirrorUV(vec2 t) { return 1.0 - abs(mod(t, 2.0) - 1.0); }
 float edgeAA(vec2 pos, vec2 size) { vec2 m = min(pos, size - pos); return clamp(min(m.x, m.y) * u_scale + 0.5, 0.0, 1.0); }
+float cropCover(vec2 r) {
+  if (u_crop == vec4(0.0)) return 1.0;
+  vec2 lo = (r - u_crop.xz) * u_img * u_scale + 0.5;
+  vec2 hi = ((1.0 - u_crop.yw) - r) * u_img * u_scale + 0.5;
+  return clamp(min(min(lo.x, lo.y), min(hi.x, hi.y)), 0.0, 1.0);
+}
 float subj(vec2 st) {
   float m = mix(texture(u_matte, st).r, texture(u_matte2, st).r, u_mblend);
   return u_minv > 0.5 ? 1.0 - m : m;
@@ -119,6 +126,7 @@ void main() {
   vec2 ri = d / u_img + 0.5;
   float inImg = u_edges == 1 ? 1.0 : edgeAA(ri * u_img, u_img);
   if (u_edges == 1) ri = mirrorUV(ri);
+  inImg *= cropCover(ri);
   vec2 st = vec2(u_flip > 0.5 ? 1.0 - ri.x : ri.x, u_gen == 1 ? 1.0 - ri.y : ri.y);
   vec4 s = mix(texture(u_src, st), texture(u_src2, st), u_blend);
   if (u_gen == 0) s.rgb *= s.a;

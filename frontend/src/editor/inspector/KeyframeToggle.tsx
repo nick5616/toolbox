@@ -1,15 +1,14 @@
 /** The keyframe diamond with ◀ ▶ jumps and the ease of the key at the playhead (§14.8). */
+import { useState } from "react";
 import { IconButton, Select } from "@/components";
 import type { EditParam, Key } from "@/viz/edit/types";
-import { keyIndexAt, neighbourKey, paramKeys, removeKeyAt, setEaseAt, setKeyAt } from "./paramOps";
+import { curveOfEase, EASE_CHOICES } from "./easeCurve";
+import { EaseCurveEditor } from "./EaseCurveEditor";
+import { keyIndexAt, neighbourKey, paramKeys, removeKeyAt, setBezierAt, setEaseAt, setKeyAt } from "./paramOps";
 import { useEditStudio } from "@/editor/store";
 import styles from "./inspector.module.css";
 
-const EASES: Array<{ value: Key["ease"]; label: string }> = [
-  { value: "ease", label: "Smooth" },
-  { value: "linear", label: "Linear" },
-  { value: "hold", label: "Hold" },
-];
+const EASES = EASE_CHOICES.map((c) => ({ value: c.value, label: c.label }));
 
 export interface KeyframeToggleProps {
   name: string;
@@ -24,6 +23,19 @@ export function KeyframeToggle({ name, value, current, clipTimeMs, onChange }: K
   const keys = paramKeys(value);
   const at = keyIndexAt(keys, clipTimeMs);
   const onKey = at >= 0;
+  const key = onKey ? (keys[at] as Key) : null;
+  const custom = key?.ease === "bezier" && !!key.bez;
+  const [curveOpen, setCurveOpen] = useState(false);
+  const pickEase = (ease: Key["ease"]) => {
+    if (!key) return;
+    if (ease === "bezier") {
+      onChange(setBezierAt(value, clipTimeMs, curveOfEase(key.ease, key.bez)));
+      setCurveOpen(true);
+    } else {
+      onChange(setEaseAt(value, clipTimeMs, ease));
+      setCurveOpen(false);
+    }
+  };
   const jump = (dir: -1 | 1) => {
     const k = neighbourKey(keys, clipTimeMs, dir);
     if (!k) return;
@@ -31,18 +43,20 @@ export function KeyframeToggle({ name, value, current, clipTimeMs, onChange }: K
     st.setPlayhead(st.playheadMs - clipTimeMs + k.t);
   };
   return (
+    <span className={styles.toggleWrap}>
     <span className={styles.paramTools}>
       {onKey && (
         <Select
           size="sm"
           className={styles.easeSelect}
-          data-tip="How the value moves from this key to the next: smooth, straight line, or hold then jump"
+          data-tip="How the value moves from this key to the next: linear, hold then jump, ease in or out, smooth, or your own curve"
           aria-label={`Easing of ${name} key`}
-          value={(keys[at] as Key).ease}
-          onChange={(ease) => onChange(setEaseAt(value, clipTimeMs, ease))}
+          value={key?.ease ?? "ease"}
+          onChange={pickEase}
           options={EASES}
         />
       )}
+      {custom && <IconButton size="sm" icon="pencil" label={`Edit ${name} curve`} data-tip="Show or hide the curve editor for this key" pressed={curveOpen} onClick={() => setCurveOpen((o) => !o)} />}
       {keys.length > 0 && <IconButton size="sm" icon="chevron-left" label={`Previous ${name} key`} data-tip="Move the playhead to the previous keyframe" disabled={!neighbourKey(keys, clipTimeMs, -1)} onClick={() => jump(-1)} />}
       <button
         type="button"
@@ -56,6 +70,12 @@ export function KeyframeToggle({ name, value, current, clipTimeMs, onChange }: K
         <span className={styles.diamond} />
       </button>
       {keys.length > 0 && <IconButton size="sm" icon="chevron-right" label={`Next ${name} key`} data-tip="Move the playhead to the next keyframe" disabled={!neighbourKey(keys, clipTimeMs, 1)} onClick={() => jump(1)} />}
+    </span>
+    {custom && curveOpen && key?.bez && (
+      <div className={styles.curvePanel} data-testid="ease-curve-panel">
+        <EaseCurveEditor value={key.bez} onChange={(bez) => onChange(setBezierAt(value, clipTimeMs, bez))} />
+      </div>
+    )}
     </span>
   );
 }

@@ -10,7 +10,7 @@ import type { RGB } from "../palette";
 import type { FitMode } from "./compile";
 import { BLUR_FS, CLIP_FS, FITBG_FS } from "./shaders";
 import { evalEditParam, type ParamContext } from "./params";
-import { TRANSFORM_RULES } from "./schema";
+import { CROP_RULES, TRANSFORM_RULES } from "./schema";
 import type { ClipTransform, EditParam, Mask } from "./types";
 
 export const MAX_MASKS = 4;
@@ -53,12 +53,38 @@ export interface TransformValues {
   /** Radians, clockwise on screen. */
   rot: number;
   opacity: number;
+  /** Crop from the left, right, top and bottom edge as fractions of the picture (0 = none). */
+  crop: [number, number, number, number];
 }
 
 export function evalTransform(t: ClipTransform, W: number, H: number, clipMs: number, songMs: number, ctx: ParamContext | null): TransformValues {
   const r = TRANSFORM_RULES;
   const v = (k: keyof typeof TRANSFORM_RULES) => evalEditParam(t[k], r[k].min, r[k].max, clipMs, songMs, ctx);
-  return { offX: v("x") * W, offY: v("y") * H, scale: v("scale"), rot: (v("rotation") * Math.PI) / 180, opacity: v("opacity") };
+  const c = t.crop;
+  const cv = (p: EditParam) => evalEditParam(p, CROP_RULES.min, CROP_RULES.max, clipMs, songMs, ctx);
+  const crop: [number, number, number, number] = c ? [cv(c.l), cv(c.r), cv(c.t), cv(c.b)] : [0, 0, 0, 0];
+  return { offX: v("x") * W, offY: v("y") * H, scale: v("scale"), rot: (v("rotation") * Math.PI) / 180, opacity: v("opacity"), crop };
+}
+
+// ---- crop (Phase 21 SPEC §B4): applied to the picture before masks and the transform ----
+
+type CropV = readonly [number, number, number, number];
+
+/** The kept part of the picture in its own UV (0..1, y down). */
+export function cropRect(crop: CropV): { u0: number; v0: number; u1: number; v1: number } {
+  return { u0: crop[0], v0: crop[2], u1: 1 - crop[1], v1: 1 - crop[3] };
+}
+
+/**
+ * Coverage (0..1) of the crop at a picture point `ri` (0..1), anti-aliased over
+ * one output pixel: `imgPx` is the picture's drawn size and `scale` the clip's
+ * scale. Mirrors `cropCover` in shaders.ts; 1 everywhere when nothing is cropped.
+ */
+export function cropCoverage(ri: readonly [number, number], crop: CropV, imgPx: readonly [number, number], scale: number): number {
+  if (crop.every((c) => c === 0)) return 1;
+  const lo = [(ri[0] - crop[0]) * imgPx[0] * scale + 0.5, (ri[1] - crop[2]) * imgPx[1] * scale + 0.5];
+  const hi = [(1 - crop[1] - ri[0]) * imgPx[0] * scale + 0.5, (1 - crop[3] - ri[1]) * imgPx[1] * scale + 0.5];
+  return Math.max(0, Math.min(1, Math.min(...lo, ...hi)));
 }
 
 // ---- masks ----
@@ -291,7 +317,8 @@ export class ClipRenderer {
       .f1("u_minv", m?.invert ? 1 : 0)
       .f1("u_cutout", m?.cutout ? 1 : 0)
       .i1("u_gen", d.generated ? 1 : 0)
-      .i1("u_edges", d.edges === "mirror" ? 1 : 0);
+      .i1("u_edges", d.edges === "mirror" ? 1 : 0)
+      .f4("u_crop", tr.crop[0], tr.crop[1], tr.crop[2], tr.crop[3]);
     const uvr = (px: number): [number, number] => (px <= 0 ? [0, 0] : [px / (geo.img[0] * tr.scale), px / (geo.img[1] * tr.scale)]);
     const fe = uvr(m ? m.feather * 0.01 * short : 0);
     const sk = uvr(m ? m.strokePx * outScale : 0);

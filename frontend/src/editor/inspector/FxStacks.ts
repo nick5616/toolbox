@@ -113,6 +113,12 @@ export const FX_STACKS: readonly FxStack[] = [
     description: "Warm light drifting over the picture.",
     make: () => [post("lightleak", { amount: 0.55, speed: 0.5 })],
   },
+  {
+    id: "green-screen",
+    label: "Green screen",
+    description: "Keys out a green screen, trims the edge a little and removes green spill. Masks still work as garbage mattes.",
+    make: () => [post("chromakey", { color: "#00b140", similarity: 0.18, smoothness: 0.08, spill: 0.6, choke: 0.1, view: "composite", amount: 1 })],
+  },
 ];
 
 /** The stack with this ID. */

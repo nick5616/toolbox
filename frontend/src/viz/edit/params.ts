@@ -17,10 +17,67 @@ export interface ParamContext {
 
 const smooth = (x: number) => x * x * (3 - 2 * x);
 
+/** Cubic ease in / out / in-out (Phase 21 SPEC §B3). */
+export const easeIn = (x: number): number => x * x * x;
+export const easeOut = (x: number): number => 1 - (1 - x) ** 3;
+export const easeInOut = (x: number): number => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
+
+/**
+ * CSS cubic-bezier(x1, y1, x2, y2) at progress x in 0..1: the curve's x(s) is
+ * inverted by Newton's method (8 steps) with a bisection fallback when the
+ * slope is too flat or Newton leaves [0, 1]; the result is y(s). y may leave
+ * 0..1 (overshoot).
+ */
+export function cubicBezier(x1: number, y1: number, x2: number, y2: number, x: number): number {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const bx = (s: number) => ((1 - 3 * x2 + 3 * x1) * s + (3 * x2 - 6 * x1)) * s * s + 3 * x1 * s;
+  const by = (s: number) => ((1 - 3 * y2 + 3 * y1) * s + (3 * y2 - 6 * y1)) * s * s + 3 * y1 * s;
+  const dbx = (s: number) => (3 * (1 - 3 * x2 + 3 * x1) * s + 2 * (3 * x2 - 6 * x1)) * s + 3 * x1;
+  let s = x;
+  for (let i = 0; i < 8; i++) {
+    const err = bx(s) - x;
+    if (Math.abs(err) < 1e-7) return by(s);
+    const d = dbx(s);
+    if (Math.abs(d) < 1e-6) break;
+    s -= err / d;
+    if (s < 0 || s > 1) break;
+  }
+  let lo = 0;
+  let hi = 1;
+  s = x;
+  for (let i = 0; i < 60; i++) {
+    const v = bx(s);
+    if (Math.abs(v - x) < 1e-9) break;
+    if (v < x) lo = s;
+    else hi = s;
+    s = (lo + hi) / 2;
+  }
+  return by(s);
+}
+
+/** Progress through a segment after the starting key's ease (hold is handled by the caller). */
+export function easeProgress(k: Pick<Key, "ease" | "bez">, x: number): number {
+  switch (k.ease) {
+    case "ease":
+      return smooth(x);
+    case "in":
+      return easeIn(x);
+    case "out":
+      return easeOut(x);
+    case "inout":
+      return easeInOut(x);
+    case "bezier":
+      return k.bez ? cubicBezier(k.bez[0], k.bez[1], k.bez[2], k.bez[3], x) : smooth(x);
+    default:
+      return x;
+  }
+}
+
 /**
  * The keyframed value at clip time u (keys sorted by t). Holds the first/last
  * key outside the range; a segment uses its starting key's ease: linear,
- * ease (smoothstep) or hold (a step at the next key).
+ * ease (smoothstep), cubic in/out/inout, bezier, or hold (a step at the next key).
  */
 export function interpolateKeys(keys: readonly Key[], u: number): number {
   const n = keys.length;
@@ -40,7 +97,7 @@ export function interpolateKeys(keys: readonly Key[], u: number): number {
   const b = keys[hi] as Key;
   if (a.ease === "hold" || b.t <= a.t) return a.v;
   const x = (u - a.t) / (b.t - a.t);
-  return a.v + (b.v - a.v) * (a.ease === "ease" ? smooth(x) : x);
+  return a.v + (b.v - a.v) * easeProgress(a, x);
 }
 
 /** A mod's envelope at song ms, with the section gate applied (0..1). */
