@@ -7,6 +7,7 @@ import { NotFromJob, dragHandler, folderLine, type ItemHandlers } from "./ItemCa
 import { HitMeta, Snippet } from "./HitBits";
 import { itemIcon, type LibItem } from "./items";
 import { Icon } from "@/components";
+import { displayPath } from "@/lib/displayPath";
 import styles from "./Library.module.css";
 import searchStyles from "./Search.module.css";
 
@@ -28,7 +29,7 @@ const ListRow = memo(function ListRow({ item, selected, active, stop, moduleName
       <span className={styles.rowKind} data-tip="File type">
         <Icon name={itemIcon(item)} size={16} />
       </span>
-      <span className={cx(styles.rowName, item.hit && searchStyles.rowStack)} data-tip={item.path}>
+      <span className={cx(styles.rowName, item.hit && searchStyles.rowStack)} data-tip={displayPath(item.path)}>
         <span className={searchStyles.rowTitle}>
           {item.name}
           {!item.registered && !isProject ? <NotFromJob /> : null}

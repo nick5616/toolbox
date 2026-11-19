@@ -7,6 +7,7 @@
  */
 import type { ReactNode } from "react";
 import { Icon, IconButton } from "@/components";
+import { displayPath } from "@/lib/displayPath";
 import { startPathsDrag } from "@/lib/fileDrag";
 import { FileActions } from "@/tools/_kit";
 import styles from "./LastExport.module.css";
@@ -48,7 +49,7 @@ export function LastExport({ path, outputId, missing, moduleId, dragPaths, label
     >
       <Icon name={icon} size={14} />
       <span className={styles.label}>{label}</span>
-      <span className={styles.name} data-tip={path}>
+      <span className={styles.name} data-tip={displayPath(path)}>
         {name ?? baseName(path)}
       </span>
       {note ? <span className={styles.note}>{note}</span> : null}

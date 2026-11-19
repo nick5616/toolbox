@@ -20,6 +20,7 @@ import { useModules } from "./modules";
 import { usePipelines } from "./pipelines";
 import { useSettings } from "./settings";
 import { useUI } from "./ui";
+import { subscribeWorkspace, workspaceReady } from "./workspace";
 import { loadWindows, subscribeWindows } from "./windows";
 
 let unsubscribers: Array<() => void> = [];
@@ -63,6 +64,8 @@ export function subscribeAll(): void {
     ...subscribeDesktop(),
     // Local File Transfer (Phase 13): main and tool windows, not popups.
     subscribeLanShare({ main: isMain }),
+    // Workspaces (Phase 21): the presenter that rewrites paths, and the switch request.
+    subscribeWorkspace(),
   ];
 }
 
@@ -82,7 +85,7 @@ let popupUnsubscribers: Array<() => void> = [];
  */
 export async function bootstrapPopup(): Promise<void> {
   for (const u of popupUnsubscribers) u();
-  popupUnsubscribers = [on("settings:changed", (s) => useSettings.getState().set(s)), ...subscribeDesktop()];
+  popupUnsubscribers = [on("settings:changed", (s) => useSettings.getState().set(s)), ...subscribeDesktop(), subscribeWorkspace()];
   const [settings, modules, clip, hotkeys] = await Promise.all([
     SettingsService.Get(),
     ModulesService.List(),
@@ -93,6 +96,7 @@ export async function bootstrapPopup(): Promise<void> {
   useModules.getState().setAll(modules ?? []);
   useDesktop.getState().setClipboardState(clip);
   useDesktop.getState().setHotkeys(hotkeys ?? []);
+  await workspaceReady();
 }
 
 /**
@@ -130,6 +134,7 @@ export async function bootstrap(): Promise<void> {
   useLibrary.getState().setPage(recent.items ?? [], recent.nextCursor);
   useDesktop.getState().setClipboardState(clip);
   useDesktop.getState().setHotkeys(hotkeys ?? []);
+  await workspaceReady();
 
   // Fall back to the first ready module if the remembered view no longer exists.
   if (currentWindow().kind === "part") return;

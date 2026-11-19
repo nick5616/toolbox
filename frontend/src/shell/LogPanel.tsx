@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LogStream } from "@/lib/api";
+import { displayText } from "@/lib/displayPath";
 import { toAppError } from "@/lib/errors";
 import { Button, toast, cx } from "@/components";
 import { useJobs } from "@/state/jobs";
@@ -70,7 +71,7 @@ export function LogPanel({ jobId }: { jobId: string }) {
             key={l.seq}
             className={cx(styles.line, l.stream === LogStream.StreamStderr && styles.stderr, l.stream === LogStream.StreamSystem && styles.system)}
           >
-            {l.text}
+            {displayText(l.text)}
           </div>
         ))}
       </div>
