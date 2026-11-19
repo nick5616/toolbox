@@ -192,8 +192,26 @@ def _load_image(path: str) -> Any:
         return ImageOps.exif_transpose(im).convert("RGB")
 
 
+_ORT_INTS = {"tensor(int32)": np.int32, "tensor(int64)": np.int64}
+
+
 def _first_output(session: Any, feeds: dict[str, np.ndarray]) -> np.ndarray:
-    out = session.run([session.get_outputs()[0].name], feeds)
+    """Runs the session on a batch. Inputs are cast to the model's declared
+    integer type (the Immich SigLIP 2 text model takes int32), and a model
+    exported with a fixed batch of 1 (both Immich SigLIP 2 towers) is run one
+    row at a time."""
+    inputs = {i.name: i for i in session.get_inputs()}
+    cast: dict[str, np.ndarray] = {}
+    for name, arr in feeds.items():
+        want = _ORT_INTS.get(getattr(inputs.get(name), "type", ""))
+        cast[name] = arr.astype(want) if want is not None and arr.dtype != want else arr
+    out_name = session.get_outputs()[0].name
+    fixed = any(isinstance(getattr(i, "shape", [None])[0], int) and i.shape[0] == 1 for i in inputs.values())
+    rows = next(iter(cast.values())).shape[0] if cast else 0
+    if fixed and rows > 1:
+        parts = [np.asarray(session.run([out_name], {k: v[r : r + 1] for k, v in cast.items()})[0], dtype=np.float32) for r in range(rows)]
+        return np.concatenate(parts, axis=0)
+    out = session.run([out_name], cast)
     return np.asarray(out[0], dtype=np.float32)
 
 
