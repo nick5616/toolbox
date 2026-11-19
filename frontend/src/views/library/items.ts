@@ -1,5 +1,18 @@
 import { OutputKind, type LibraryEntry, type Output } from "@/lib/api";
 
+/** What a Smart search hit adds to an item (strength, snippet, position). */
+export interface HitInfo {
+  strength: string;
+  score: number;
+  via: string[];
+  snippet: string;
+  /** -1, ms (video/audio) or a 0-based page. */
+  pos: number;
+  moments: number[];
+  /** Set for a project hit ("" otherwise). */
+  projectId: string;
+}
+
 /** One file or folder the Library shows, whether a tool registered it or not. */
 export interface LibItem {
   /** Output id when registered, else `path:<path>`. */
@@ -18,6 +31,8 @@ export interface LibItem {
   isDir: boolean;
   /** Library-relative path (folders and plain entries). */
   rel: string;
+  /** Present when the item is a Smart search hit. */
+  hit?: HitInfo;
 }
 
 export function fromOutput(o: Output): LibItem {

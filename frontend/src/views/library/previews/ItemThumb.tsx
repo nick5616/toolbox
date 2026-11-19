@@ -33,7 +33,7 @@ function usePreview(item: LibItem): { data: PreviewData | undefined; failed: boo
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.path, item.at, item.sizeBytes, seen, wanted]);
+  }, [item.path, item.at, item.sizeBytes, item.hit?.pos, seen, wanted]);
   return { data, failed, ref };
 }
 

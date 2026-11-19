@@ -18,7 +18,7 @@ export function normalizeOutput(o: Output): OutputView {
   return { ...o, tags: o.tags ?? [] };
 }
 
-export type LibraryViewMode = "grid" | "list" | "folders" | "bytool";
+export type LibraryViewMode = "grid" | "list" | "folders" | "bytool" | "things";
 export type CardSize = "s" | "m" | "l";
 export type TypeChip = "all" | "audio" | "video" | "image" | "document" | "other";
 export type DateRange = "all" | "today" | "week" | "month";
@@ -85,7 +85,7 @@ function loadPrefs(): Prefs {
     const raw = localStorage.getItem(PREFS_KEY);
     if (!raw) return fallback;
     const p = JSON.parse(raw) as Partial<Prefs>;
-    const view = p.view === "grid" || p.view === "list" || p.view === "folders" || p.view === "bytool" ? p.view : fallback.view;
+    const view = p.view === "grid" || p.view === "list" || p.view === "folders" || p.view === "bytool" || p.view === "things" ? p.view : fallback.view;
     const size = p.size === "s" || p.size === "m" || p.size === "l" ? p.size : fallback.size;
     return { view, size };
   } catch {

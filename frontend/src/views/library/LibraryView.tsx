@@ -9,6 +9,7 @@ import { isMac, revealLabel } from "@/lib/platform";
 import { useShortcut } from "@/lib/shortcuts";
 import {
   DEFAULT_FILTERS,
+  buildQuery,
   isNotImplemented,
   useLibrary,
   type CardSize,
@@ -17,15 +18,23 @@ import {
   type TypeChip,
 } from "@/state/library";
 import { isReady, useModules } from "@/state/modules";
+import { useSearch, useSearchSync } from "@/state/search";
 import { useSettings } from "@/state/settings";
 import { ByToolView } from "./ByToolView";
 import { DetailPanel, type GoTarget, type TrashState } from "./DetailPanel";
 import { FolderView } from "./FolderView";
 import { GridView } from "./GridView";
 import { ListView } from "./ListView";
+import { openProject } from "./Places";
+import { ActiveChips, LabelChipRow } from "./SearchChips";
+import { SearchGate, SearchStatusLine } from "./SearchStatusLine";
+import { ThingsView } from "./ThingsView";
+import { hitToItem } from "./searchHits";
+import { useSearchCommands } from "./searchCommands";
 import { fromEntry, fromOutput, fromPath, type LibItem } from "./items";
 import { sendToItems } from "./sendTo";
 import styles from "./Library.module.css";
+import searchStyles from "./Search.module.css";
 
 /** Hidden (system) modules that still write library files: friendly names for them. */
 const HIDDEN_MODULE_NAMES: Record<string, string> = {
@@ -75,6 +84,7 @@ const VIEW_OPTIONS: { value: LibraryViewMode; label: string; tip: string }[] = [
   { value: "list", label: "List", tip: "Dense rows" },
   { value: "folders", label: "Folders", tip: "Your library folder as it is on disk" },
   { value: "bytool", label: "By tool", tip: "One section per tool" },
+  { value: "things", label: "Things", tip: "Everything Toolbox recognised in your pictures, by category" },
 ];
 
 const SIZE_OPTIONS: { value: CardSize; label: string; tip: string }[] = [
@@ -100,6 +110,15 @@ const SORT_OPTIONS: { value: LibrarySort; label: string }[] = [
 /** How long a forgotten entry can be brought back before it's really removed. */
 const FORGET_UNDO_MS = 6000;
 const SEARCH_DEBOUNCE_MS = 200;
+const HINT_KEY = "toolbox.library.searchHintSeen";
+
+function hintSeenBefore(): boolean {
+  try {
+    return localStorage.getItem(HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 const binName = isMac ? "Trash" : "Recycle Bin";
 
@@ -119,8 +138,21 @@ export function LibraryView() {
   const byId = useModules((s) => s.byId);
   const libraryDir = useSettings((s) => s.settings.libraryDir);
   const narrow = useMediaQuery(NARROW_QUERY);
+  const places = useLibrary((s) => s.places);
+  const searchLabels = useSearch((s) => s.labels);
+  const labelNames = useSearch((s) => s.labelNames);
+  const similar = useSearch((s) => s.similar);
+  const page = useSearch((s) => s.page);
+  const searchLoading = useSearch((s) => s.loading);
+  const smart = useSearch((s) => s.status);
+  const smartLoaded = useSearch((s) => s.statusLoaded);
+  const things = useSearch((s) => s.things);
 
   const [searchText, setSearchText] = useState(filters.search);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [hintSeen, setHintSeen] = useState(hintSeenBefore);
+  /** The index couldn't answer: the name search of the Library takes over. */
+  const [searchError, setSearchError] = useState(false);
   /** The selected items (click, Shift/Mod-click, Mod+A). */
   const [selection, setSelection] = useState<ReadonlySet<string>>(() => new Set());
   const [activeKey, setActiveKey] = useState("");
@@ -152,11 +184,55 @@ export function LibraryView() {
 
   // --- data ---
 
+  const queryText = filters.search.trim();
+  const searchActive = queryText !== "" || searchLabels.length > 0 || similar !== null;
+  const activeKeyRef = useRef("");
+  const onSearchReady = useCallback((text: string) => {
+    void useSearch.getState().onReady(text, activeKeyRef.current).catch(() => undefined);
+  }, []);
+  useSearchSync(onSearchReady);
+  useSearchCommands();
+
   useEffect(() => {
-    if (view === "folders") return;
-    void useLibrary.getState().query().catch(fail);
+    if (!searchActive) {
+      useSearch.getState().clearResults();
+      setSearchError(false);
+      if (view === "folders" || view === "things") return;
+      void useLibrary.getState().query().catch(fail);
+      return;
+    }
+    const filter = buildQuery({ ...filters, search: "" }, view === "folders" ? folder : "", 200);
+    useSearch
+      .getState()
+      .run(queryText, filter, activeKeyRef.current)
+      .then(() => setSearchError(false))
+      .catch(() => {
+        // The index isn't there (or failed): the plain name search still works.
+        setSearchError(true);
+        if (similar === null && searchLabels.length === 0) void useLibrary.getState().query().catch(fail);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, view === "bytool", view === "folders"]);
+  }, [filters, view === "bytool", view === "folders", view === "things", searchActive, searchLabels, similar, view === "folders" ? folder : ""]);
+
+  // A palette command asked for the search box.
+  const focusPending = useSearch((s) => s.focusPending);
+  useEffect(() => {
+    if (focusPending && useSearch.getState().consumeFocus()) searchRef.current?.focus();
+  }, [focusPending]);
+  useEffect(() => {
+    if (!searchActive || !page || hintSeen) return;
+    setHintSeen(true);
+    try {
+      localStorage.setItem(HINT_KEY, "1");
+    } catch {
+      /* not remembered */
+    }
+  }, [searchActive, page, hintSeen]);
+  // Project hits open their tool: the projects list names them.
+  const hasProjectHit = useSearch((s) => s.page?.hits.some((h) => h.source === "project") ?? false);
+  useEffect(() => {
+    if (hasProjectHit && places === null) void useLibrary.getState().loadPlaces().catch(() => undefined);
+  }, [hasProjectHit, places]);
 
   useEffect(() => {
     if (view === "folders" || view === "bytool") void useLibrary.getState().loadFolders().catch(fail);
@@ -254,7 +330,13 @@ export function LibraryView() {
 
   // --- what is on screen ---
 
-  const visibleList = useMemo(() => list.filter((o) => !hidden.has(o.id)).map(fromOutput), [list, hidden]);
+  const showHits = searchActive && !searchError;
+  const projects = places?.projects;
+  const hitItems = useMemo(() => (page ? page.hits.map((h) => hitToItem(h, projects ?? [])) : []), [page, projects]);
+  const visibleList = useMemo(
+    () => (showHits ? hitItems.filter((i) => !i.outputId || !hidden.has(i.outputId)) : list.filter((o) => !hidden.has(o.id)).map(fromOutput)),
+    [showHits, hitItems, list, hidden],
+  );
   const folderItems = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
     return dirItems.filter((i) => {
@@ -276,11 +358,15 @@ export function LibraryView() {
     return m;
   }, [extra, dirItems, visibleList]);
 
-  const shownItems = view === "folders" ? folderItems : visibleList;
+  const shownItems = view === "folders" && !showHits ? folderItems : visibleList;
   const active = byKey.get(activeKey);
+  activeKeyRef.current = activeKey && active ? activeKey : "";
   const targets: LibItem[] = selection.size > 0 ? [...selection].map((k) => byKey.get(k)).filter((i): i is LibItem => !!i && !i.isDir) : active && !active.isDir ? [active] : [];
   const bulk = selection.size > 1 ? targets : [];
-  const detailItem = detailOpen && selection.size <= 1 && active && !active.isDir ? active : null;
+  const detailItem = detailOpen && selection.size <= 1 && active && !active.isDir && !active.hit?.projectId ? active : null;
+  useEffect(() => {
+    useSearch.getState().setSelected(active && !active.isDir ? active.path : "", active?.hit?.pos ?? -1);
+  }, [active]);
 
   // Drop selection of items that are gone (filters, forgets, deletes).
   useEffect(() => {
@@ -379,7 +465,29 @@ export function LibraryView() {
       setActiveKey("");
       return;
     }
+    if (i.hit?.projectId) return openHitProject(i);
     return (i.outputId ? LibraryService.Open(i.outputId) : LibraryService.RevealPath(i.path)).catch(fail);
+  };
+
+  /** A project hit opens its tool, as in Places. */
+  const openHitProject = (i: LibItem) => {
+    const proj = useLibrary.getState().places?.projects?.find((x) => x.id === i.hit?.projectId);
+    if (proj) openProject(proj);
+    else if (i.moduleId) void openTool(i.moduleId);
+    else toast({ title: "Open this project from its tool", description: `"${i.name}" is in your projects.` });
+  };
+
+  const findSimilar = (item: LibItem, pos: number) => {
+    useSearch.getState().setSimilar({ path: item.path, pos, name: item.name });
+    setSearchText("");
+    useLibrary.getState().setFilters({ search: "" });
+    if (useLibrary.getState().view === "things") useLibrary.getState().setView("grid");
+  };
+  const clearSearch = () => {
+    setSearchText("");
+    useSearch.getState().clearLabels();
+    useSearch.getState().setSimilar(null);
+    useLibrary.getState().setFilters({ search: "" });
   };
 
   /** Hides the entries now and removes them for real after the Undo window. The files are never touched. */
@@ -467,7 +575,8 @@ export function LibraryView() {
 
   const refreshAll = () => {
     setRefreshNonce((n) => n + 1);
-    if (view !== "folders") void useLibrary.getState().query().catch(fail);
+    if (searchActive) void useSearch.getState().run(queryText, buildQuery({ ...filters, search: "" }, view === "folders" ? folder : "", 200), activeKeyRef.current).catch(() => undefined);
+    else if (view !== "folders" && view !== "things") void useLibrary.getState().query().catch(fail);
     void useLibrary.getState().loadPlaces().catch(() => undefined);
   };
 
@@ -519,7 +628,8 @@ export function LibraryView() {
       focusKey(next);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (!item.missing || item.isDir) void open(item);
+      // A project card opens its tool through its own Enter handler.
+      if ((!item.missing || item.isDir) && !item.hit?.projectId) void open(item);
     } else if (e.key === " ") {
       e.preventDefault();
       setSelection(new Set([key]));
@@ -545,6 +655,9 @@ export function LibraryView() {
   const stableClick = useCallback((e: MouseEvent, item: LibItem) => live.current.onItemClick(e, item), []);
   const stableOpen = useCallback((item: LibItem) => live.current.open(item), []);
   const stableForget = useCallback((item: LibItem) => live.current.forget([item]), []);
+  const liveOpen = useRef(openHitProject);
+  liveOpen.current = openHitProject;
+  const stableOpenProject = useCallback((item: LibItem) => liveOpen.current(item), []);
   const stableDragPaths = useCallback((i: LibItem) => {
     const { selection: sel, targets: tg } = live.current;
     return sel.has(i.key) && sel.size > 1 ? tg.filter((t) => !t.missing).map((t) => t.path) : [i.path];
@@ -557,17 +670,49 @@ export function LibraryView() {
     onEnterFolder: stableOpen,
     dragPaths: stableDragPaths,
     onForget: stableForget,
+    onOpenProject: stableOpenProject,
   };
 
   const filterSummary = [filters.moduleId ? moduleName(filters.moduleId) : "All tools", filters.range !== "all" ? (RANGE_OPTIONS.find((r) => r.value === filters.range)?.label ?? "") : "", filters.sort !== LibrarySort.SortNewest ? (SORT_OPTIONS.find((r) => r.value === filters.sort)?.label ?? "") : ""]
     .filter(Boolean)
     .join(" · ");
-  const filtersOn = filters.moduleId !== "" || filters.range !== "all" || filters.sort !== LibrarySort.SortNewest || filters.search !== "" || filters.type !== "all";
+  const filtersOn = searchActive || filters.moduleId !== "" || filters.range !== "all" || filters.sort !== LibrarySort.SortNewest || filters.search !== "" || filters.type !== "all";
   const libraryRoot = folders?.path || libraryDir;
   const empty = shownItems.length === 0;
   const cardSize = size;
 
+  const searchEmpty = (
+    <EmptyState
+      icon="search"
+      size="lg"
+      title={searchLoading || page === null ? "Searching…" : similar ? `Nothing looks like ${similar.name}` : queryText ? `No files match "${queryText}"` : "No files have these labels"}
+      action={
+        !searchLoading && page !== null ? (
+          <Button size="sm" variant="secondary" icon="x" data-tip="Clear the search and show everything again" onClick={clearSearch}>
+            Clear search
+          </Button>
+        ) : undefined
+      }
+    />
+  );
+  const labelDisplay = (id: string): string => labelNames[id] ?? page?.labels.find((l) => l.label === id)?.display ?? things?.find((l) => l.label === id)?.display ?? id;
+
   const body = (() => {
+    if (view === "things" && !searchActive) {
+      return (
+        <ThingsView
+          onOpen={(l) => {
+            useSearch.getState().addLabel(l.label, l.display);
+            useLibrary.getState().setView("grid");
+          }}
+        />
+      );
+    }
+    if (showHits && view === "folders") {
+      // Search results are one flat list in the Folders view, with each file's folder under its name.
+      if (visibleList.length === 0) return searchEmpty;
+      return <ListView items={visibleList} folderRoot={libraryRoot} {...handlers} />;
+    }
     if (view === "folders") {
       return (
         <FolderView
@@ -588,6 +733,7 @@ export function LibraryView() {
         />
       );
     }
+    if (showHits && empty) return searchEmpty;
     if (empty) {
       return (
         <EmptyState
@@ -638,20 +784,36 @@ export function LibraryView() {
             ref={searchRef}
             icon="search"
             size="sm"
-            placeholder="Search outputs"
-            aria-label="Search outputs"
-            data-tip="Search by file name. Press / to focus"
+            placeholder="Search names, what's in pictures and what files say"
+            aria-label="Search the library"
+            data-tip="Search by file name, by what is in pictures and videos, and by the text inside files. Press / to focus"
             value={searchText}
+            onFocus={() => {
+              setSearchFocused(true);
+              useSearch.getState().warm();
+            }}
+            onBlur={() => setSearchFocused(false)}
             onChange={(e) => setSearchText(e.target.value)}
             wrapperClassName={styles.search}
           />
           <SegmentedControl size="sm" aria-label="View" value={view} onChange={(v) => useLibrary.getState().setView(v)} options={VIEW_OPTIONS} />
-          {view !== "list" ? <SegmentedControl size="sm" aria-label="Card size" value={size} onChange={(v) => useLibrary.getState().setSize(v)} options={SIZE_OPTIONS} /> : null}
+          {view !== "list" && view !== "things" ? <SegmentedControl size="sm" aria-label="Card size" value={size} onChange={(v) => useLibrary.getState().setSize(v)} options={SIZE_OPTIONS} /> : null}
           <ClickIn icon="list-filter" title="Filters" summary={filterSummary} tip="Filter by tool and date, and choose the order" className={styles.filters} width={320}>
             <div className={styles.drawerBody}>
               <Select value={filters.moduleId} onChange={(moduleId) => useLibrary.getState().setFilters({ moduleId })} aria-label="Filter by tool" data-tip="Show only files made by one tool" options={moduleOptions} />
               <Select value={filters.range} onChange={(range) => useLibrary.getState().setFilters({ range })} aria-label="Filter by date" data-tip="Show only files made in this period" options={RANGE_OPTIONS} />
-              <Select value={filters.sort} onChange={(sort) => useLibrary.getState().setFilters({ sort })} aria-label="Sort by" data-tip="The order of the files" options={SORT_OPTIONS} />
+              {searchActive && !searchError ? (
+                <span aria-disabled="true" data-tip="While you search, files are ordered by best match" className={searchStyles.sortOff}>
+                  <Select value={filters.sort} onChange={() => undefined} aria-label="Sort by" disabled options={[{ value: filters.sort, label: "Best match" }]} />
+                </span>
+              ) : (
+                <Select value={filters.sort} onChange={(sort) => useLibrary.getState().setFilters({ sort })} aria-label="Sort by" data-tip="The order of the files" options={SORT_OPTIONS} />
+              )}
+              {narrow ? (
+                <div className={searchStyles.statusBlock}>
+                  <SearchStatusLine block />
+                </div>
+              ) : null}
               {filtersOn ? (
                 <Button size="sm" variant="secondary" icon="x" data-tip="Show files from every tool again" onClick={() => useLibrary.getState().setFilters({ ...DEFAULT_FILTERS })}>
                   Clear filters
@@ -667,6 +829,28 @@ export function LibraryView() {
             onClick={() => void LibraryService.OpenLibraryFolder("").catch(fail)}
           />
         </header>
+
+        {searchFocused && searchText === "" && smartLoaded ? (
+          smart.installed ? (
+            !hintSeen ? (
+              <div className={searchStyles.hint} data-testid="search-hint" onMouseDown={(e) => e.preventDefault()}>
+                <span>Try:</span>{" "}
+                {["apple", "dog on a beach", "receipt"].map((ex, i) => (
+                  <span key={ex}>
+                    {i > 0 ? ", " : ""}
+                    <button type="button" className={searchStyles.hintLink} data-tip={`Search for "${ex}"`} onClick={() => setSearchText(ex)}>
+                      {ex}
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null
+          ) : (
+            <div onMouseDown={(e) => e.preventDefault()}>
+              <SearchGate />
+            </div>
+          )
+        ) : null}
 
         <div className={styles.typeBar}>
           <SegmentedControl size="sm" aria-label="File type" value={filters.type} onChange={(type) => useLibrary.getState().setFilters({ type })} options={TYPE_OPTIONS} />
@@ -710,15 +894,24 @@ export function LibraryView() {
                 Delete
               </Button>
             </div>
+          ) : !narrow && smartLoaded ? (
+            <SearchStatusLine />
           ) : null}
         </div>
 
-        {unavailable && view !== "folders" ? <Banner tone="info">Showing your recent files only. Search by type, date and order will work once the library index is ready.</Banner> : null}
+        {showHits ? (
+          <>
+            <ActiveChips labels={searchLabels.map((l) => ({ label: l, display: labelDisplay(l) }))} onRemoveLabel={(l) => useSearch.getState().toggleLabel(l)} similar={similar} onClearSimilar={() => useSearch.getState().setSimilar(null)} />
+            {page ? <LabelChipRow labels={page.labels} active={searchLabels} onToggle={(l) => useSearch.getState().toggleLabel(l, page.labels.find((x) => x.label === l)?.display)} /> : null}
+          </>
+        ) : null}
+
+        {unavailable && view !== "folders" && !searchActive ? <Banner tone="info">Showing your recent files only. Search by type, date and order will work once the library index is ready.</Banner> : null}
 
         <div className={cx(styles.main, detailItem && !narrow && styles.withDetail)}>
           <div ref={bodyRef} className={styles.scroll} onKeyDown={onKeyDown}>
             {body}
-            {view !== "folders" && listNext ? (
+            {view !== "folders" && view !== "things" && listNext && !showHits ? (
               <div className={styles.more}>
                 <Button size="sm" variant="secondary" loading={listLoading} data-tip="Show older outputs" onClick={() => void useLibrary.getState().loadMoreList().catch(fail)}>
                   Load more
@@ -740,6 +933,10 @@ export function LibraryView() {
                 onForget={(i) => forget([i])}
                 onTrash={(i) => askTrash([i])}
                 onRenamed={onRenamed}
+                query={queryText}
+                smartSearch={smart.installed}
+                onFindSimilar={findSimilar}
+                onFilterLabel={(l) => useSearch.getState().addLabel(l)}
               />
             </div>
           ) : null}

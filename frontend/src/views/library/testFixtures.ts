@@ -7,11 +7,42 @@ import {
   type LibraryFolder,
   type Output,
   type OutputDetail,
+  type SearchHit,
+  type SearchPage,
+  type SearchStatus,
 } from "@/lib/api";
 import { DEFAULT_FILTERS, useLibrary } from "@/state/library";
-import { svc } from "./testSvc";
+import { EMPTY_STATUS, resetSearchMemory, useSearch } from "@/state/search";
+import { bus, search, svc } from "./testSvc";
 
-export { svc };
+export { svc, search };
+
+/** A Smart search status: installed and up to date unless overridden. */
+export function status(over: Partial<SearchStatus> = {}): SearchStatus {
+  return { ...EMPTY_STATUS, installed: true, enabled: true, total: 100, done: 100, ...over };
+}
+
+/** A search hit for a library output (a concept hit by default). */
+export function hit(output: Output | null, over: Partial<SearchHit> = {}): SearchHit {
+  return {
+    path: output?.path ?? "/lib/x.png",
+    source: "library",
+    projectId: "",
+    output,
+    kind: output?.kind ?? OutputKind.KindImage,
+    score: 0.4,
+    strength: "strong",
+    via: ["concept"],
+    pos: -1,
+    snippet: "",
+    moments: [],
+    ...over,
+  } as SearchHit;
+}
+
+export function page(hits: SearchHit[], over: Partial<SearchPage> = {}): SearchPage {
+  return { hits, labels: [], concept: true, warming: false, ...over };
+}
 
 export function out(id: string, over: Partial<Output> = {}): Output {
   return {
@@ -62,6 +93,41 @@ export const notImplemented = () => Object.assign(new Error("not implemented"), 
 
 export function resetMocks(): void {
   for (const f of Object.values(svc)) f.mockReset();
+  for (const f of Object.values(search)) f.mockReset();
+  bus.handlers.clear();
+  resetSearchMemory();
+  search.Status.mockResolvedValue({ ...EMPTY_STATUS });
+  search.Settings.mockResolvedValue({ enabled: true, paused: false, readText: true, speech: true, speechMaxMin: 60, skip: [] });
+  search.SetSettings.mockResolvedValue(undefined);
+  search.Query.mockResolvedValue({ hits: [], labels: [], concept: true, warming: false });
+  search.Things.mockResolvedValue([]);
+  search.Labels.mockResolvedValue([]);
+  search.Texts.mockResolvedValue([]);
+  search.SetLabel.mockResolvedValue(undefined);
+  search.SaveText.mockResolvedValue("");
+  search.Failures.mockResolvedValue([]);
+  for (const k of ["ReadAgain", "Retry", "Rescan", "Rebuild", "DeleteIndex", "Warm"] as const) search[k].mockResolvedValue(undefined);
+  search.Frame.mockResolvedValue("/media/t/frame.jpg");
+  search.PacksInstall.mockResolvedValue({ jobs: [], restart: false });
+  useSearch.setState({
+    status: { ...EMPTY_STATUS },
+    statusLoaded: false,
+    settings: null,
+    labels: [],
+    labelNames: {},
+    similar: null,
+    page: null,
+    loading: false,
+    answeredText: "",
+    things: null,
+    thingsLoading: false,
+    indexedVersion: 0,
+    labelCache: {},
+    textCache: {},
+    selectedPath: "",
+    selectedPos: -1,
+    focusPending: false,
+  });
   svc.Query.mockResolvedValue({ items: [], nextCursor: "" });
   svc.Recent.mockResolvedValue({ items: [], nextCursor: "" });
   svc.Folders.mockResolvedValue(folder("Toolbox", 0));
