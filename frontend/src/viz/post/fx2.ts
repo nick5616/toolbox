@@ -16,3 +16,5 @@ import "./halation";
 import "./edgeglow";
 import "./depthfog";
 import "./tiltshift";
+import "./chromakey";
+import "./lumakey";

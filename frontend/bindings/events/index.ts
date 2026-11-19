@@ -218,3 +218,13 @@ export const WindowsHandoff = "windows:handoff";
  */
 export const WindowsRelay = "windows:relay";
 
+/**
+ * Name of the custom event "workspace:changed".
+ */
+export const WorkspaceChanged = "workspace:changed";
+
+/**
+ * Name of the custom event "workspace:switch-request".
+ */
+export const WorkspaceSwitchRequest = "workspace:switch-request";
+

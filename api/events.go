@@ -7,6 +7,7 @@ import (
 	"toolbox/core/focus"
 	"toolbox/core/lan"
 	"toolbox/core/viz"
+	"toolbox/core/workspace"
 )
 
 // Typed event registration. The binding generator reads these calls and
@@ -60,6 +61,9 @@ func init() {
 	application.RegisterEvent[core.SearchStatus]("search:status")
 	application.RegisterEvent[core.SearchIndexed]("search:indexed")
 	application.RegisterEvent[core.SearchReady]("search:ready")
+
+	application.RegisterEvent[workspace.Info](workspace.EventChanged)
+	application.RegisterEvent[workspace.SwitchRequest](workspace.EventSwitchRequest)
 }
 
 // Emitter adapts the Wails event manager to core.Emitter.

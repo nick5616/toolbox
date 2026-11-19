@@ -191,6 +191,12 @@ import {
   Tablet,
   Wifi,
   UserPlus,
+  Dices,
+  LockOpen,
+  BookmarkPlus,
+  Users,
+  Pipette,
+  Save,
 } from "lucide-react";
 
 /** Static map: only these icons end up in the bundle. */
@@ -389,6 +395,13 @@ const icons = {
   tablet: Tablet,
   wifi: Wifi,
   "user-plus": UserPlus,
+  // Phase 21 (Color Grader)
+  dices: Dices,
+  "lock-open": LockOpen,
+  "bookmark-plus": BookmarkPlus,
+  users: Users,
+  pipette: Pipette,
+  save: Save,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;

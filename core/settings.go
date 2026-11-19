@@ -22,6 +22,8 @@ type SettingsService struct {
 	mu         sync.Mutex
 	current    Settings
 	supportDir string
+	lockedLib  bool // a workspace library is part of its folder
+	libGuard   func(dir string) string
 	hooks      []func(old, new Settings)
 	preHooks   []func(old, next Settings) error
 }
@@ -206,6 +208,30 @@ func (s *SettingsService) SetSupportDir(dir string) {
 	s.mu.Unlock()
 }
 
+// LockLibrary fixes the library folder to dir for a non-personal workspace
+// (Phase 21 A3): the setting reports dir and Update refuses to change it.
+func (s *SettingsService) LockLibrary(dir string) {
+	s.mu.Lock()
+	s.lockedLib = true
+	s.current.LibraryDir = filepath.Clean(dir)
+	s.mu.Unlock()
+}
+
+// SetLibraryGuard installs an extra check for a new library folder (Personal's
+// library may not sit inside a workspace folder). It returns a message, or "".
+func (s *SettingsService) SetLibraryGuard(fn func(dir string) string) {
+	s.mu.Lock()
+	s.libGuard = fn
+	s.mu.Unlock()
+}
+
+// LibraryLocked reports whether the library folder is fixed by a workspace.
+func (s *SettingsService) LibraryLocked() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lockedLib
+}
+
 // Current returns a snapshot of the settings. The Hotkeys map is a copy.
 func (s *SettingsService) Current() Settings {
 	s.mu.Lock()
@@ -354,7 +380,11 @@ func (s *SettingsService) Update(ctx context.Context, p SettingsPatch) (Settings
 	next := old
 	fields := map[string]string{}
 
-	if p.LibraryDir != nil {
+	if p.LibraryDir != nil && s.lockedLib {
+		if filepath.Clean(*p.LibraryDir) != filepath.Clean(old.LibraryDir) {
+			fields["libraryDir"] = "This workspace's library is part of the workspace folder"
+		}
+	} else if p.LibraryDir != nil {
 		if msg := s.checkLibraryDir(*p.LibraryDir); msg != "" {
 			fields["libraryDir"] = msg
 		} else {
@@ -483,6 +513,11 @@ func (s *SettingsService) checkLibraryDir(dir string) string {
 	}
 	if s.supportDir != "" && IsWithin(dir, s.supportDir) {
 		return "Can't be inside the app's own data folder"
+	}
+	if s.libGuard != nil {
+		if msg := s.libGuard(dir); msg != "" {
+			return msg
+		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "Couldn't create this folder"

@@ -83,6 +83,48 @@ export const SIGNAL_CLASS_DEFAULTS: Record<SignalClass, { attackMs: number; rele
   slow: { attackMs: 600, releaseMs: 1500 },
 };
 
+const SLOW_IDS = new Set<string>(["section.energy", "line.active", "vocals.presence"]);
+const LEVEL_IDS = new Set<string>(["vocals.pitch", "vocals.voiced", "vocals.held", "mix.balance", "mix.brightness"]);
+
+/** The envelope class of a signal (SPEC §C2.2): pulses stay snappy, levels breathe, slow signals glide. */
+export function signalClass(id: SignalId): SignalClass {
+  if (SLOW_IDS.has(id) || id.startsWith("mood.")) return "slow";
+  if (id.endsWith(".level") || LEVEL_IDS.has(id) || (id.startsWith("mix.") && id !== "mix.onset")) return "level";
+  return "pulse";
+}
+
+/** A drop closer than this (in bars) to the last counted drop is only a lift (SPEC section C2.5). */
+export const DROP_GAP_BARS = 8;
+
+export interface DropSplit {
+  /** Drops that count (at least DROP_GAP_BARS after the previous counted drop). */
+  drops: Event2[];
+  /** The analysis' lifts plus the drops that were too close to the last one. */
+  lifts: Event2[];
+}
+
+const dropSplits = new WeakMap<Analysis, DropSplit>();
+
+/** Splits the analysis' drops into counted drops and lifts; decided here, so no re-analysis is needed. */
+export function splitDrops(a: Analysis): DropSplit {
+  let s = dropSplits.get(a);
+  if (s) return s;
+  const barMs = a.audio.tempo > 0 ? (60000 / a.audio.tempo) * (a.audio.beatsPerBar || 4) : 2000;
+  const drops: Event2[] = [];
+  const lifts: Event2[] = [...a.events("lift")];
+  let last = -Infinity;
+  for (const e of a.events("drop")) {
+    if (e[0] - last >= DROP_GAP_BARS * barMs) {
+      drops.push(e);
+      last = e[0];
+    } else lifts.push(e);
+  }
+  lifts.sort((x, y) => x[0] - y[0]);
+  s = { drops, lifts };
+  dropSplits.set(a, s);
+  return s;
+}
+
 export function shape(x: number, s: ModShape): number {
   switch (s) {
     case "ease":
@@ -129,6 +171,30 @@ export class Signals {
     return out;
   }
 
+  /** Section energy, ramped linearly over one bar centred on each boundary (SPEC §C2.3). */
+  private energyAt(t: number): number {
+    const a = this.analysis;
+    const here = a.sectionAt(t);
+    if (!here) return 0.5;
+    const secs = a.audio.sections;
+    const barMs = a.audio.tempo > 0 ? (60000 / a.audio.tempo) * a.audio.beatsPerBar : 2000;
+    const cur = here.section;
+    const half = (other: typeof cur | undefined): number => (other ? Math.max(0, Math.min(barMs / 2, (cur.endMs - cur.startMs) / 2, (other.endMs - other.startMs) / 2)) : 0);
+    const prev = secs[here.index - 1];
+    const next = secs[here.index + 1];
+    const hp = half(prev);
+    if (prev && hp > 0 && t < cur.startMs + hp) {
+      const x = (t - (cur.startMs - hp)) / (2 * hp);
+      return prev.energy + (cur.energy - prev.energy) * x;
+    }
+    const hn = half(next);
+    if (next && hn > 0 && t > cur.endMs - hn) {
+      const x = (t - (cur.endMs - hn)) / (2 * hn);
+      return cur.energy + (next.energy - cur.energy) * x;
+    }
+    return cur.energy;
+  }
+
   private fromFn(fn: (tMs: number) => number): Float32Array {
     const out = new Float32Array(this.frames);
     for (let i = 0; i < this.frames; i++) out[i] = fn((i / this.fps) * 1000);
@@ -147,7 +213,7 @@ export class Signals {
       case "hats":
         return this.pulses(a.events("hats"), 60);
       case "drums.level":
-        return ch("drums.level", "mix.onset");
+        return ch("drums.level", "mix.bass");
       case "bass.level":
         return ch("bass.level", "mix.bass");
       case "vocals.level":
@@ -184,7 +250,7 @@ export class Signals {
       case "bar.phase":
         return this.fromFn((t) => a.barAt(t).phase);
       case "section.energy":
-        return this.fromFn((t) => a.sectionAt(t)?.section.energy ?? 0.5);
+        return this.fromFn((t) => this.energyAt(t));
       case "section.progress":
         return this.fromFn((t) => {
           const s = a.sectionAt(t)?.section;
@@ -193,7 +259,7 @@ export class Signals {
       case "song.progress":
         return this.fromFn((t) => Math.max(0, Math.min(1, t / Math.max(1, a.durationMs))));
       case "lift.pulse": {
-        const lifts = a.events("lift");
+        const lifts = splitDrops(a).lifts;
         const barMs = a.audio.tempo > 0 ? (60000 / a.audio.tempo) * a.audio.beatsPerBar : 2000;
         return this.fromFn((t) => {
           let v = 0;
@@ -206,7 +272,7 @@ export class Signals {
         });
       }
       case "drop.pulse":
-        return this.pulses(a.events("drop"), 1200);
+        return this.pulses(splitDrops(a).drops, 1200);
       case "break.pulse":
         return this.pulses(a.events("break"), 800);
       case "chord.change":
@@ -275,6 +341,12 @@ export class Signals {
     return e;
   }
 
+  /** The signal through its class's default envelope (SPEC §C2.2): for layers that read a signal themselves. */
+  smoothed(id: SignalId, tMs: number): number {
+    const c = SIGNAL_CLASS_DEFAULTS[signalClass(id)];
+    return this.value(id, tMs, c.attackMs, c.releaseMs);
+  }
+
   value(id: SignalId, tMs: number, attackMs?: number, releaseMs?: number): number {
     const arr = attackMs === undefined && releaseMs === undefined ? this.get(id) : this.envelope(id, attackMs, releaseMs);
     return Analysis.interp(arr, this.analysis.frameAt(tMs));
@@ -298,7 +370,8 @@ export function evalParam(p: Param, min: number, max: number, tMs: number, c: Mo
   for (const m of p.mods) {
     const meta = SIGNAL_META.get(m.signal);
     if (!meta) continue;
-    const x = c.signals.value(m.signal, tMs, m.attackMs ?? DEFAULT_ATTACK_MS, m.releaseMs ?? DEFAULT_RELEASE_MS);
+    const cls = SIGNAL_CLASS_DEFAULTS[signalClass(m.signal)];
+    const x = c.signals.value(m.signal, tMs, m.attackMs ?? cls.attackMs, m.releaseMs ?? cls.releaseMs);
     const gain = meta.mix ? (c.mix[meta.mix] ?? 1) : 1;
     v += m.amount * range * shape(Math.max(0, Math.min(1, x)), m.shape) * gain * c.reactivity;
   }

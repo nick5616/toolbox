@@ -164,12 +164,92 @@ export function shade(p: ResolvedPalette, lightness: number, chroma: number): Re
 
 const smooth = (x: number) => x * x * (3 - 2 * x);
 
-/** The palette at tMs for a show's palette settings (SPEC.md §6.6). */
-export function resolvePalette(cfg: { mode: PaletteMode; ids: PaletteId[] }, a: Analysis | null, tMs: number, override?: PaletteId): ResolvedPalette {
+// ---- Calm palette modes (SPEC section C2.6) ----
+
+/** The mood wheel: a mood may only move to a neighbour on it, never across it. */
+export const MOOD_WHEEL: readonly Emotion[] = ["joy", "hope", "love", "calm", "sadness", "fear", "anger", "awe"];
+/** A mood palette holds at least this many bars, and blends over MOOD_BLEND_MS. */
+export const MOOD_HOLD_BARS = 8;
+export const MOOD_BLEND_MS = 4000;
+/** Chord colours move accents only, at most this many turns (30 degrees) either way, over one bar. */
+export const CHORD_MAX_TURNS = 30 / 360;
+/** A chord must hold this many beats before it counts. */
+export const CHORD_HOLD_BEATS = 2;
+
+function barMsOf(a: Analysis): number {
+  return a.audio.tempo > 0 ? (60000 / a.audio.tempo) * (a.audio.beatsPerBar || 4) : 2000;
+}
+
+/** One step along the wheel from `from` towards `to` (the shorter way round). */
+export function wheelStep(from: Emotion, to: Emotion): Emotion {
+  const n = MOOD_WHEEL.length;
+  const i = MOOD_WHEEL.indexOf(from);
+  const j = MOOD_WHEEL.indexOf(to);
+  if (i < 0 || j < 0 || i === j) return to;
+  const fwd = (j - i + n) % n;
+  return MOOD_WHEEL[(i + (fwd <= n / 2 ? 1 : n - 1)) % n] as Emotion;
+}
+
+export interface MoodChange {
+  ms: number;
+  emotion: Emotion;
+}
+
+const moodCache = new WeakMap<Analysis, MoodChange[]>();
+
+/**
+ * The emotions the mood palette actually uses: the first key, then a change only after the current one has held
+ * MOOD_HOLD_BARS bars, and each change moves one neighbour along the wheel towards what the words ask for.
+ */
+export function moodPaletteChanges(a: Analysis): MoodChange[] {
+  const hit = moodCache.get(a);
+  if (hit) return hit;
+  const keys = a.text?.mood ?? [];
+  const hold = MOOD_HOLD_BARS * barMsOf(a);
+  const out: MoodChange[] = [];
+  const first = keys[0];
+  if (first) {
+    out.push({ ms: first.ms, emotion: first.emotion });
+    for (const k of keys.slice(1)) {
+      const cur = out[out.length - 1] as MoodChange;
+      if (k.emotion === cur.emotion || k.ms - cur.ms < hold) continue;
+      out.push({ ms: k.ms, emotion: wheelStep(cur.emotion, k.emotion) });
+    }
+  }
+  moodCache.set(a, out);
+  return out;
+}
+
+/** Accent hue offset (turns) a chord asks for: its circle-of-fifths position, mapped into +-CHORD_MAX_TURNS. */
+export function chordTurns(root: number): number {
+  return root < 0 ? 0 : (fifthsHue(root) - 0.5) * 2 * CHORD_MAX_TURNS;
+}
+
+/** The accent offset (turns) at tMs: chords count after CHORD_HOLD_BEATS beats, and the offset glides over one bar. */
+export function chordAccentTurns(a: Analysis, tMs: number): number {
+  const beat = a.audio.tempo > 0 ? 60000 / a.audio.tempo : 500;
+  const barMs = barMsOf(a);
+  const need = CHORD_HOLD_BEATS * beat;
+  let cur: { start: number; turns: number } | null = null;
+  let before = 0;
+  for (const c of a.audio.chords) {
+    if (c.root < 0 || c.endMs - c.startMs < need) continue;
+    const counts = c.startMs + need;
+    if (counts > tMs) break;
+    before = cur ? cur.turns : 0;
+    cur = { start: counts, turns: chordTurns(c.root) };
+  }
+  if (!cur) return 0;
+  return before + (cur.turns - before) * smooth(Math.min(1, (tMs - cur.start) / barMs));
+}
+
+/** The palette at tMs for a show's palette settings (SPEC.md section 6.6); `intensity` is the show's master intensity. */
+export function resolvePalette(cfg: { mode: PaletteMode; ids: PaletteId[] }, a: Analysis | null, tMs: number, override?: PaletteId, intensity = 1): ResolvedPalette {
   if (override) return paletteById(override);
   const ids = cfg.ids.length > 0 ? cfg.ids : (["cyber"] as PaletteId[]);
   const first = ids[0] as PaletteId;
   if (!a) return paletteById(first);
+  const churn = Math.max(0, Math.min(1.5, intensity));
   switch (cfg.mode) {
     case "journey": {
       if (ids.length === 1) return paletteById(first);
@@ -178,43 +258,22 @@ export function resolvePalette(cfg: { mode: PaletteMode; ids: PaletteId[] }, a: 
       return mixPalettes(paletteById(ids[i] as PaletteId), paletteById(ids[i + 1] as PaletteId), smooth(x - i));
     }
     case "mood": {
-      const keys = a.text?.mood ?? [];
+      const changes = moodPaletteChanges(a);
       let idx = -1;
-      for (let i = 0; i < keys.length && (keys[i]?.ms ?? Infinity) <= tMs; i++) idx = i;
-      const cur = keys[idx];
+      for (let i = 0; i < changes.length && (changes[i]?.ms ?? Infinity) <= tMs; i++) idx = i;
+      const cur = changes[idx];
       if (!cur) return paletteById(MOOD_PALETTE[a.moodAt(tMs).emotion]);
-      let prevEmotion = cur.emotion;
-      let changeAt = cur.ms;
-      for (let i = idx; i >= 0; i--) {
-        const k = keys[i];
-        if (k && k.emotion !== cur.emotion) {
-          prevEmotion = k.emotion;
-          changeAt = keys[i + 1]?.ms ?? cur.ms;
-          break;
-        }
-      }
-      const base = mixPalettes(paletteById(MOOD_PALETTE[prevEmotion]), paletteById(MOOD_PALETTE[cur.emotion]), smooth(Math.min(1, (tMs - changeAt) / 2000)));
+      const prev = changes[idx - 1];
+      const base = prev ? mixPalettes(paletteById(MOOD_PALETTE[prev.emotion]), paletteById(MOOD_PALETTE[cur.emotion]), smooth(Math.min(1, (tMs - cur.ms) / MOOD_BLEND_MS))) : paletteById(MOOD_PALETTE[cur.emotion]);
       const m = a.moodAt(tMs);
-      return shade(base, 1 + 0.08 * m.valence, 1 + 0.15 * (m.energy * 2 - 1));
+      return shade(base, 1 + 0.08 * m.valence * churn, 1 + 0.15 * (m.energy * 2 - 1) * churn);
     }
     case "chords": {
+      // only the accents rotate (never the background or the four colours), a little, and slowly
       const base = paletteById(first);
-      const chords = a.audio.chords;
-      let i = -1;
-      for (let k = 0; k < chords.length && (chords[k]?.startMs ?? Infinity) <= tMs; k++) i = k;
-      const cur = chords[i];
-      if (!cur || cur.root < 0) return base;
-      const prev = chords[i - 1];
-      const target = fifthsHue(cur.root);
-      const from = prev && prev.root >= 0 ? fifthsHue(prev.root) : target;
-      let d = target - from;
-      if (d > 0.5) d -= 1;
-      if (d < -0.5) d += 1;
-      const hue = from + d * smooth(Math.min(1, (tMs - cur.startMs) / 400));
-      const [L0, a0, b0] = linearToOklab(base.colors[0]);
-      const baseTurn = Math.atan2(b0, a0) / (Math.PI * 2);
-      void L0;
-      return mapPalette(base, (c) => rotateHue(c, hue - baseTurn));
+      const turns = chordAccentTurns(a, tMs) * churn;
+      if (turns === 0) return base;
+      return { ...base, accent: rotateHue(base.accent, turns), glow: rotateHue(base.glow, turns) };
     }
     case "sections": {
       const s = a.sectionAt(tMs)?.section;

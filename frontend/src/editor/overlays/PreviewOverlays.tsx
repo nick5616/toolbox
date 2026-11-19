@@ -9,7 +9,11 @@ import { parseMasks } from "@/viz/edit/schema";
 import { findClip } from "@/editor/doc";
 import { useMaskSelection } from "../inspector/inspectorState";
 import { useEditStudio, useProject } from "@/editor/store";
+import { IconButton } from "@/components";
+import { CropBox } from "./CropBox";
+import { EyedropperLayer } from "./EyedropperLayer";
 import { MaskHandles } from "./MaskHandles";
+import { useOverlayMode } from "./overlayMode";
 import { buildCtx } from "./overlayContext";
 import { SafeZones } from "./SafeZones";
 import { TransformBox } from "./TransformBox";
@@ -92,16 +96,41 @@ export function PreviewOverlays({ canvas, width, height }: PreviewOverlaysProps)
     return parseMasks(clip.masks).value.find((m) => m.id === maskSel.maskId) ?? null;
   }, [clip, maskSel.clipId, maskSel.maskId]);
 
-  const style = place && place.width > 0 && place.height > 0 ? { left: place.left, top: place.top, width: place.width, height: place.height } : { display: "none" };
+  const cropClipId = useOverlayMode((s) => s.cropClipId);
+  const setCrop = useOverlayMode((s) => s.setCrop);
+  const pick = useOverlayMode((s) => s.pick);
+  const cropOn = !!clip && cropClipId === clip.id;
+  const picking = !!ctx && !!clip && !!pick && pick.clipId === clip.id;
+  const canCrop = !!ctx && !!clip && (clip.kind === "video" || clip.kind === "image") && !mask;
+
+  const style = place &&place.width > 0 && place.height > 0 ? { left: place.left, top: place.top, width: place.width, height: place.height } : { display: "none" };
   const showZones = safeZones && !!project && (project.aspect === "9:16" || project.aspect === "4:5");
 
   return (
     <div ref={rootRef} className={styles.root} style={style} data-testid="preview-overlays">
       <svg className={styles.svg} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
         {showZones && project && <SafeZones aspect={project.aspect} width={width} height={height} k={k} />}
-        {ctx && clip && clip.kind !== "adjust" && !mask && <TransformBox ctx={ctx} />}
+        {ctx && clip && clip.kind !== "adjust" && !mask && !(cropOn && canCrop) && <TransformBox ctx={ctx} />}
+        {ctx && clip && cropOn && canCrop && <CropBox ctx={ctx} />}
         {ctx && mask && <MaskHandles ctx={ctx} mask={mask} />}
+        {ctx && picking && pick && <EyedropperLayer ctx={ctx} target={pick} />}
       </svg>
+      {(canCrop || picking) && (
+        <div className={styles.tools}>
+          {picking && <span className={styles.pickHint}>Click the colour to key out (Esc cancels)</span>}
+          {canCrop && clip && (
+            <IconButton
+              size="sm"
+              variant="secondary"
+              icon="crop"
+              label="Crop"
+              data-tip="Crop the picture: drag the edge handles on the preview (or hold Alt and drag a corner handle)"
+              pressed={cropOn}
+              onClick={() => setCrop(cropOn ? null : clip.id)}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

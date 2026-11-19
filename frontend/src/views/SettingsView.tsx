@@ -25,6 +25,7 @@ import { SettingsGeneral } from "./SettingsGeneral";
 import { ManagedDepActions, SettingsPacks, isManagedDep } from "./SettingsPacks";
 import { SettingsSearch } from "./SettingsSearch";
 import { SettingsVault } from "./SettingsVault";
+import { SettingsWorkspaces } from "./SettingsWorkspaces";
 import styles from "./SettingsView.module.css";
 
 const YTDLP_ID = "yt-dlp";
@@ -451,6 +452,8 @@ export function SettingsView() {
         <SettingsVault />
 
         <SettingsSearch />
+
+        <SettingsWorkspaces />
         </div>
         </div>
 

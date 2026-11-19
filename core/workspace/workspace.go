@@ -8,11 +8,7 @@
 // file names below, and the Resolve/Presenter signatures.
 package workspace
 
-import (
-	"os"
-
-	"toolbox/core"
-)
+import "toolbox/core"
 
 // Kind is a workspace's kind.
 type Kind string
@@ -107,24 +103,6 @@ type Manifest struct {
 	Files []ManifestEntry `json:"files"`
 }
 
-// Resolve picks the workspace to open from the environment, args and
-// workspaces.json (SPEC §A3). Wave 0: the pre-Phase-21 behaviour (sandbox
-// support dir or Personal); W1 implements the full order.
-func Resolve(args []string) (Boot, error) {
-	paths, err := core.ResolvePaths()
-	if err != nil {
-		return Boot{}, err
-	}
-	sandboxed := os.Getenv(core.EnvSupportDir) != ""
-	info := Info{ID: PersonalID, Name: "Personal", Kind: KindPersonal, Current: true}
-	global := paths.SupportDir
-	if sandboxed {
-		info = Info{ID: "sandbox", Name: "Dev sandbox", Kind: KindSandbox, Root: paths.SupportDir, Current: true}
-		global = ""
-	}
-	return Boot{Info: info, Paths: paths, GlobalDir: global, Sandboxed: sandboxed}, nil
-}
-
 // Presenter rewrites paths for display when Present is on (SPEC §A5): inside
 // the workspace root → "<Name>/…", inside home → "~/…".
 type Presenter struct {
@@ -133,9 +111,3 @@ type Presenter struct {
 	Name string `json:"name"`
 	Home string `json:"home"`
 }
-
-// Path returns p as the UI should show it. Wave 0: unchanged.
-func (pr Presenter) Path(p string) string { return p }
-
-// Text rewrites every occurrence of the root and home in s. Wave 0: unchanged.
-func (pr Presenter) Text(s string) string { return s }

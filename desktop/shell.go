@@ -11,6 +11,7 @@ import (
 
 	"toolbox/core"
 	"toolbox/core/lan"
+	"toolbox/core/workspace"
 	"toolbox/desktop/paste"
 )
 
@@ -56,6 +57,14 @@ type Options struct {
 	// Focus is optional; the tray shows the session and the quit gate asks for friction (Phase 18).
 	Focus FocusEngine
 	// --- end vault ---
+	// --- workspaces (Phase 21) ---
+	// WorkspaceName is the open workspace's name ("" = Personal).
+	WorkspaceName string
+	// Workspaces lists every workspace for the tray's Workspace submenu (nil = no submenu).
+	Workspaces func() []workspace.Info
+	// SwitchWorkspace switches to the workspace with this ID (relaunch).
+	SwitchWorkspace func(id string) error
+	// --- end workspaces ---
 	// DarkMode reports whether the effective UI theme is dark (popup background).
 	DarkMode func() bool
 	// --- pop-out windows (Phase 10) ---

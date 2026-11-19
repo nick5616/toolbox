@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { Button, IconButton, MenuButton, toast } from "@/components";
 import { FilesService, LibraryService } from "@/lib/api";
 import { useEmbed } from "@/lib/embed";
+import { displayPath } from "@/lib/displayPath";
 import { toAppError } from "@/lib/errors";
 import { revealLabel } from "@/lib/platform";
 import { useModules } from "@/state/modules";
@@ -20,7 +21,7 @@ async function run(p: Promise<unknown>) {
 async function saveCopy(outputId: string | undefined, path: string) {
   try {
     const dst = await LibraryService.SaveCopy(outputId ?? "", path);
-    if (dst) toast({ title: `Saved a copy to ${dst}`, tone: "success" });
+    if (dst) toast({ title: `Saved a copy to ${displayPath(dst)}`, tone: "success" });
   } catch (e) {
     toast({ title: toAppError(e).message, tone: "danger" });
   }

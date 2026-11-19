@@ -87,10 +87,10 @@ registerLayer({
         const laneColor = (i: number): readonly [number, number, number] => (i < 4 ? f.palette.colors[i as 0 | 1 | 2 | 3] : f.palette.accent);
         const posOf = (dt: number) => hyperDepth(reverse ? Math.max(-dt, 0) : Math.max(dt, 0), K);
 
-        const kickEnv = f.signals.value("kick", f.tMs);
-        const level = f.signals.value("mix.level", f.tMs);
-        const beatP = f.signals.value("beat.pulse", f.tMs);
-        const barP = f.signals.value("bar.pulse", f.tMs);
+        const kickEnv = f.signals.smoothed("kick", f.tMs);
+        const level = f.signals.smoothed("mix.level", f.tMs);
+        const beatP = f.signals.smoothed("beat.pulse", f.tMs);
+        const barP = f.signals.smoothed("bar.pulse", f.tMs);
 
         // notes per lane
         const t0 = reverse ? f.tMs - L * 1000 : f.tMs - LINGER * 1000 - 100;

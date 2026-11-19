@@ -50,7 +50,7 @@ registerLayer({
           const tt = t0 + (i / (N - 1)) * span;
           pitch[i] = havePitch ? f.analysis.sample("vocals.pitch", tt) : 0.5;
           voiced[i] = f.analysis.sample("vocals.voiced", tt);
-          level[i] = f.signals.value("vocals.level", tt);
+          level[i] = f.signals.smoothed("vocals.level", tt);
           let hv = 0;
           for (const h of heldNotes) hv = Math.max(hv, clamp(Math.min((tt - h[0] + 150) / 200, (h[1] + 150 - tt) / 200)));
           held[i] = hv;

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"toolbox/core"
+	"toolbox/core/workspace"
 )
 
 // MoveRestartMessage is the final message of a successful move job.
@@ -118,6 +119,11 @@ func scanTools(root string, names []string) (plan, error) {
 
 func (m *moveModule) Run(ctx context.Context, job *core.JobContext) error {
 	s := m.s
+	ctx, unlock, err := workspace.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	o, err := core.DecodeOptions[MoveOptions](job)
 	if err != nil {
 		return err

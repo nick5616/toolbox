@@ -4,7 +4,7 @@
  * the selected clip from the store (no props), so it renders the same in a
  * click-in drawer and in its own window.
  */
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { MenuButton, Section, Select, Switch } from "@/components";
 import type { EditClip } from "@/lib/api";
 import {
@@ -18,9 +18,13 @@ import {
   serializeSpeed,
   serializeTransform,
   serializeTransition,
+  CROP_RULES,
   TRANSFORM_RULES,
 } from "@/viz/edit/schema";
-import type { ClipTransform, EditParam } from "@/viz/edit/types";
+import type { ClipCrop, ClipTransform, EditParam } from "@/viz/edit/types";
+import { drawnSize } from "../overlays/overlayGeometry";
+import { sourceSize } from "../overlays/overlayContext";
+import { frameOfAspect, PIP_PRESETS, pipValues, type PipPresetId } from "./pip";
 import { findClip } from "@/editor/doc";
 import { useEditStudio, useMarkers } from "@/editor/store";
 import { CutoutSection } from "../matte/CutoutSection";
@@ -33,7 +37,7 @@ import { LANE_LABELS } from "./EditSignalSelect";
 import { patchClip, useClipTime } from "./inspectorState";
 import { kenBurns, markersInClip } from "./kenBurns";
 import { MasksSection } from "./MasksSection";
-import { isKeyed, paramKeys } from "./paramOps";
+import { isKeyed, paramKeys, writeValue } from "./paramOps";
 import { SourceSection } from "./SourceSection";
 import { TransitionField } from "./TransitionField";
 import { velocitySpeed, VELOCITY_PRESETS } from "./velocity";
@@ -47,6 +51,15 @@ const TRANSFORM_LABELS: Record<Exclude<keyof ClipTransform, "edges" | "crop">, {
   opacity: { label: "Opacity", step: 0.01, format: (v) => `${Math.round(v * 100)}%` },
 };
 const TRANSFORM_ORDER: Array<Exclude<keyof ClipTransform, "edges" | "crop">> = ["x", "y", "scale", "rotation", "opacity"];
+
+const CROP_EDGES: Array<{ key: keyof ClipCrop; label: string }> = [
+  { key: "l", label: "Crop left" },
+  { key: "r", label: "Crop right" },
+  { key: "t", label: "Crop top" },
+  { key: "b", label: "Crop bottom" },
+];
+const ZERO_CROP: ClipCrop = { l: 0, r: 0, t: 0, b: 0 };
+const cropIsEmpty = (c: ClipCrop | undefined): boolean => !c || CROP_EDGES.every((e) => c[e.key] === 0);
 
 const FX_TARGETS = [
   { value: "clip", label: "Whole clip" },
@@ -67,7 +80,8 @@ export function useSelectedClip(): EditClip | null {
 /** Whether any param of the clip has keys (then a panel follows the playhead). */
 export function anyKeys(clip: EditClip, transform: ClipTransform): boolean {
   if (isKeyed(parseSpeed(clip.speed).value)) return true;
-  if (Object.values(transform).some((p) => isKeyed(p))) return true;
+  if (([transform.x, transform.y, transform.scale, transform.rotation, transform.opacity] as EditParam[]).some((p) => isKeyed(p))) return true;
+  if (transform.crop && Object.values(transform.crop).some((p) => isKeyed(p))) return true;
   if (parseEffects(clip.effects).value.some((e) => Object.values(e.params).some((v) => typeof v === "object" && paramKeys(v).length > 0))) return true;
   return parseMasks(clip.masks).value.some((m) => [m.x, m.y, m.w, m.h, m.rotation].some((p) => isKeyed(p)));
 }
@@ -107,6 +121,25 @@ function TransformBody({ clip }: { clip: EditClip }) {
   const markers = useMarkers();
   const { transform, clipTimeMs, scoped, commit } = useClipEdit(clip);
   const setTransform = (k: keyof ClipTransform, next: EditParam, key: string) => commit({ transform: serializeTransform({ ...transform, [k]: next }) }, scoped(key));
+  const sources = useEditStudio((s) => s.sources);
+  const aspect = useEditStudio((s) => s.history?.present.aspect ?? "16:9");
+  const [cropOpen, setCropOpen] = useState(false);
+  const setCrop = (edge: keyof ClipCrop, next: EditParam, key: string) => {
+    const crop: ClipCrop = { ...(transform.crop ?? ZERO_CROP), [edge]: next };
+    commit({ transform: serializeTransform({ ...transform, crop: cropIsEmpty(crop) ? undefined : crop }) }, scoped(key));
+  };
+  // A preset sets x, y and scale: keys at the playhead where the property is keyed, else the base.
+  const applyPip = (id: PipPresetId) => {
+    const frame = frameOfAspect(aspect);
+    const img = drawnSize(clip.fit, sourceSize(clip, clip.path ? sources[clip.path] : undefined), frame);
+    const v = pipValues(id, frame, img);
+    const next: ClipTransform = { ...transform };
+    for (const k of ["x", "y", "scale"] as const) {
+      const r = TRANSFORM_RULES[k];
+      next[k] = writeValue(transform[k], v[k], r.min, r.max, clipTimeMs);
+    }
+    commit({ transform: serializeTransform(next) }, "");
+  };
 
   if (clip.kind === "adjust") {
     const r = TRANSFORM_RULES.opacity;
@@ -181,6 +214,41 @@ function TransformBody({ clip }: { clip: EditClip }) {
               />
             );
           })}
+          {hasSource(clip) && (
+            <MenuButton
+              data-tip="Put the clip in a corner, the centre or one half of the frame: sets position and scale (at the playhead where they are keyed)"
+              label="Picture-in-picture"
+              icon="layout-grid"
+              variant="ghost"
+              size="sm"
+              items={() => PIP_PRESETS.map((p) => ({ id: `pip:${p.id}`, label: p.label, onSelect: () => applyPip(p.id) }))}
+            />
+          )}
+          {hasSource(clip) && (
+            <button
+              type="button"
+              className={styles.linkBtn}
+              aria-expanded={cropOpen || !cropIsEmpty(transform.crop)}
+              data-tip="Cut off the edges of the picture before it is moved and scaled; drag the edges on the preview with the Crop button"
+              onClick={() => setCropOpen((o) => !o)}
+            >
+              {cropIsEmpty(transform.crop) ? "Crop…" : "Crop (on)"}
+            </button>
+          )}
+          {hasSource(clip) &&
+            (cropOpen || !cropIsEmpty(transform.crop)) &&
+            CROP_EDGES.map((e) => (
+              <EditParamEditor
+                key={e.key}
+                spec={{ min: CROP_RULES.min, max: CROP_RULES.max, step: 0.005, label: e.label }}
+                value={(transform.crop ?? ZERO_CROP)[e.key]}
+                clipTimeMs={clipTimeMs}
+                allowKeys
+                allowMods={false}
+                format={(v) => `${(v * 100).toFixed(1)}%`}
+                onChange={(next, key) => setCrop(e.key, next, key)}
+              />
+            ))}
           <Switch
             label="Mirror past the edges"
             tip="When the clip is moved or scaled down, mirror its edges instead of showing empty space"

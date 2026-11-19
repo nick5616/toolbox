@@ -20,6 +20,9 @@ const (
 	ActionRender  Action = "render"  // the export into <library>/Edits
 	ActionText    Action = "text"    // markers CSV/JSON or captions SRT into <library>/Edits
 
+	ActionRenderAudio Action = "render-audio" // the edit's mix as <library>/Edits/<name>.m4a, no picture (Phase 21 §B6)
+	ActionRenderStill Action = "render-still" // one frame as <library>/Edits/<name>.png (Phase 21 §B6, §E3.5)
+
 	// Pipeline steps (Phase 14 A2): both build an edit in memory and export it.
 	ActionAssemble Action = "assemble" // "Assemble a video" (Video Editor): the inputs laid end to end, or into a template
 	ActionBeat     Action = "beat"     // "Cut to the beat" (Edit Studio): a song plus clips, filled by a recipe
@@ -34,6 +37,7 @@ type Options struct {
 	Interp    *InterpRequest   `json:"interp"`
 	Matte     *MatteRequest    `json:"matte"`
 	Text      *TextRequest     `json:"text"`
+	Still     *StillRequest    `json:"still"`
 	Assemble  *AssembleRequest `json:"assemble"`
 	Beat      *BeatRequest     `json:"beat"`
 }
@@ -58,6 +62,11 @@ type InterpRequest struct {
 	FromMs int64  `json:"fromMs"`
 	ToMs   int64  `json:"toMs"`
 	FPS    int    `json:"fps"`
+}
+
+// StillRequest picks the frame of a still export (render-still).
+type StillRequest struct {
+	AtMs int64 `json:"atMs"` // timeline ms, 0 ≤ AtMs < the edit's length
 }
 
 // TextRequest writes a markers or captions file into the Library.

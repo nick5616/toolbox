@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "about": "Roles name the demo media. A role is `files` (paths relative to the workspace Library), `glob` (patterns over the Library listing, `*` and `?`, case-insensitive) or `of` (the union of other roles). The source files are copied from demoAssets/ into Library/ by the workspace seed; generated roles live under Library/Extras/ (demo/make-assets.mjs).",
+  "exclude": [
+    "Screenshot 2026-10-09 222739.png",
+    "Screenshot 2026-11-10 224450.png",
+    "Screenshot 2026-10-06 095221.png",
+    "*.asd"
+  ],
+  "roles": {
+    "song.main": { "files": ["Arctic Monkeys - Do I Wanna Know.mp3"] },
+    "song.alt": { "files": ["yeule - dazies.mp3"] },
+    "song.short.tickle": { "files": ["tickle hehe (bubbes) song 43 suite 6.mp3"] },
+    "song.short.intense": { "files": ["THE MOST INTENSE MINUTE OF YOUR LIFE (Inception_ _quot_Mind Heist_quot_ Trailer horn).mp3"] },
+    "song.short": { "of": ["song.short.tickle", "song.short.intense"] },
+
+    "stems.paramore.vocals": { "files": ["Paramore-Misery business (Lyrics) [4dvcXBNIwYU] - Vocals.flac"] },
+    "stems.paramore.drums": { "files": ["Paramore-Misery business (Lyrics) [4dvcXBNIwYU] - Drums.flac"] },
+    "stems.paramore.bass": { "files": ["Paramore-Misery business (Lyrics) [4dvcXBNIwYU] - Bass.flac"] },
+    "stems.paramore.other": { "files": ["Paramore-Misery business (Lyrics) [4dvcXBNIwYU] - Other.flac"] },
+    "stems.paramore": { "of": ["stems.paramore.vocals", "stems.paramore.drums", "stems.paramore.bass", "stems.paramore.other"] },
+    "stems.underscores.vocals": { "files": ["underscores — Lovefield  ‎ (♫) [2YgHXjF_3wU] - Vocals.flac"] },
+    "stems.underscores.drums": { "files": ["underscores — Lovefield  ‎ (♫) [2YgHXjF_3wU] - Drums.flac"] },
+    "stems.underscores.bass": { "files": ["underscores — Lovefield  ‎ (♫) [2YgHXjF_3wU] - Bass.flac"] },
+    "stems.underscores.other": { "files": ["underscores — Lovefield  ‎ (♫) [2YgHXjF_3wU] - Other.flac"] },
+    "stems.underscores": { "of": ["stems.underscores.vocals", "stems.underscores.drums", "stems.underscores.bass", "stems.underscores.other"] },
+    "stems.mix": { "files": ["Extras/Misery Business (from stems).flac"], "generated": true },
+
+    "audio.meme.mom": { "files": ["Mom get the camera!!.mp3"] },
+    "audio.meme.sike": { "files": ["(COPY RIGHTED)SIKE THATS THE WRONG NUMBER!.mp3"] },
+    "audio.meme": { "of": ["audio.meme.mom", "audio.meme.sike"] },
+
+    "video.green.snoop": { "files": ["Snoop Dog Dancing.mp4"] },
+    "video.green.explosion": { "files": ["Shitty Explosion.mp4"] },
+    "video.green.quick": { "files": ["Quick Scoping.mp4"] },
+    "video.green.kill": { "files": ["Round Winning Kill.wmv"] },
+    "video.green": { "of": ["video.green.snoop", "video.green.explosion", "video.green.quick", "video.green.kill"] },
+    "video.blue": { "files": ["Wally.mp4"] },
+
+    "photo.alley": { "files": ["IMG_3234.HEIC"], "note": "a narrow alley with a parked car (Object Eraser)" },
+    "photo.park": { "files": ["IMG_3249.HEIC"], "note": "steps and palms under a cloudy sky" },
+    "photo.tshirt": { "files": ["IMG_3305.HEIC"], "note": "a T-shirt on a rail (Background Remover)" },
+    "photo.rain": { "files": ["IMG_3409.HEIC"], "note": "a rainy street at night with cars and a scooter (Redact, Color Grader)" },
+    "photo.facade": { "files": ["IMG_3668.HEIC"], "note": "a glass facade with a crest" },
+    "photo.brick": { "files": ["IMG_3677.HEIC"], "note": "a brick building under trees" },
+    "photo.skyline": { "files": ["IMG_3771.HEIC"], "note": "a city skyline at dusk (Depth Rainbow)" },
+    "photo.painting": { "files": ["IMG_3935.HEIC"], "note": "a colourful painting on a gallery wall" },
+    "photo.plover": { "files": ["IMG_3946.HEIC"], "note": "a plover drawing (Paint+ reference)" },
+    "photo.dessert": { "files": ["IMG_4127.HEIC"], "note": "toast with ice cream" },
+    "photo.flowers": { "files": ["IMG_4160.HEIC"], "note": "a hanging flower ceiling" },
+    "photo.ferris": { "files": ["IMG_4227.HEIC"], "note": "a lit ferris wheel at night" },
+    "photo.bridge": { "files": ["IMG_4265.HEIC"], "note": "a wet road and railing at night" },
+    "photo.sketch": { "files": ["IMG_5171 Copy.JPG"], "note": "a perspective pencil sketch" },
+    "photo.heic": { "glob": ["IMG_*.HEIC"] },
+    "photo.night": { "of": ["photo.rain", "photo.bridge", "photo.skyline", "photo.ferris"] },
+    "photo.all": { "of": ["photo.heic", "photo.sketch"] },
+
+    "image.gif": { "files": ["rainbowfrog.gif"] },
+    "image.drumchart": { "files": ["original-10073724-1.jpg"] },
+    "image.small": { "of": ["image.gif", "image.drumchart"] },
+    "image.screens": { "glob": ["Screenshot *.png", "stitch stitch fix.png"] },
+
+    "doc.text": { "files": ["Extras/Ten basic drum beats, explained.md"], "generated": true },
+    "doc.pdf": { "files": ["Extras/Ten basic drum beats, explained.pdf"], "generated": true },
+    "video.talk": { "files": ["Extras/Ten basic drum beats - narration.mp4"], "generated": true },
+    "audio.noisy": { "files": ["Extras/Ten basic drum beats - narration (noisy).wav"], "generated": true },
+    "video.broll": {
+      "files": [
+        "Extras/B-roll 1 - Rain.mp4",
+        "Extras/B-roll 2 - Bridge.mp4",
+        "Extras/B-roll 3 - Skyline.mp4",
+        "Extras/B-roll 4 - Ferris wheel.mp4",
+        "Extras/B-roll 5 - Park.mp4",
+        "Extras/B-roll 6 - Painting.mp4"
+      ],
+      "generated": true
+    }
+  },
+  "links": {
+    "video": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/a4/Urmia_lake_drought.webm",
+      "page": "https://commons.wikimedia.org/wiki/File:Urmia_lake_drought.webm",
+      "license": "Public domain (Wikimedia Commons marks it so; NASA Earth Observatory imagery). A 1.6 MB WebM.",
+      "checked": "2026-11-19"
+    },
+    "article": {
+      "url": "https://en.wikipedia.org/wiki/Drum_kit",
+      "license": "Wikipedia text is CC BY-SA 4.0; the archive is a personal copy shown on screen only.",
+      "checked": "2026-11-19"
+    }
+  },
+  "generated": {
+    "photoStems": ["IMG_3409", "IMG_4265", "IMG_3771", "IMG_4227", "IMG_3249", "IMG_3935"]
+  }
+}

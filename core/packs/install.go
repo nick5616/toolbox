@@ -10,6 +10,7 @@ import (
 	"toolbox/core/deps"
 	"toolbox/core/par"
 	"toolbox/core/sidecar"
+	"toolbox/core/workspace"
 )
 
 // installerModules maps a dependency to the hidden module that installs it.
@@ -77,6 +78,11 @@ func (s *Service) pending(p PackSpec, only []string) []ComponentSpec {
 
 func (m *installModule) Run(ctx context.Context, job *core.JobContext) error {
 	s := m.s
+	ctx, unlock, err := workspace.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	o, err := core.DecodeOptions[InstallOptions](job)
 	if err != nil {
 		return err

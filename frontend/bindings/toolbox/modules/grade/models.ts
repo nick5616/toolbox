@@ -115,6 +115,23 @@ export interface Options {
      */
     "format": string;
     "beat": Beat;
+
+    /**
+     * Vibe, when set, makes the job ask the chat model for the look (a step's
+     * per-file vibe); Recipe is then ignored. VibeSeed seeds the request.
+     */
+    "vibe"?: string;
+    "vibeSeed"?: number;
+
+    /**
+     * Action "maps" prepares region maps instead of grading (G2).
+     */
+    "action"?: string;
+
+    /**
+     * "depth" | "subject" | "people"
+     */
+    "mapKinds"?: string[] | null;
 }
 
 /**
@@ -177,6 +194,13 @@ export interface StepOptions {
      * as Options.Format
      */
     "format": string;
+
+    /**
+     * Recipe is the resolved look. Built-in looks live in the frontend, so the
+     * step editor stores the recipe here when a look is picked; Go never needs
+     * a copy of the 40 built-ins. Hidden in paramDefs. Nil with a vibe.
+     */
+    "recipe"?: Recipe | null;
 }
 
 /**

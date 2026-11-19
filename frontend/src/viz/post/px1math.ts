@@ -24,12 +24,14 @@ export function noise1(x: number, seed: number): number {
   return a + (b - a) * u;
 }
 
-/** The hardest the camera may move: 2% of the short side. */
-export const SHAKE_MAX_FRACTION = 0.02;
+/** The hardest the camera may move: 1% of the short side (at Balanced intensity). */
+export const SHAKE_MAX_FRACTION = 0.01;
+/** How fast the shake direction drifts (SPEC section C2.7: 24 Hz was a buzz; 5 Hz is a sway). */
+export const SHAKE_HZ = 5;
 
 /**
- * Camera shake offset in pixels. Direction jitters at ~24 Hz with smooth
- * noise; magnitude follows the kick. Each axis is bounded by amount·2% of the
+ * Camera shake offset in pixels. Direction sways at SHAKE_HZ with smooth
+ * noise; magnitude follows the kick. Each axis is bounded by amount·1% of the
  * short side (amount 0..1).
  */
 export function shakeOffset(tMs: number, seed: number, kick: number, shortSide: number, amount: number): [number, number] {
@@ -37,7 +39,7 @@ export function shakeOffset(tMs: number, seed: number, kick: number, shortSide: 
   const k = clamp01(kick);
   const mag = a * k * SHAKE_MAX_FRACTION * shortSide;
   const t = tMs / 1000;
-  return [noise1(t * 24, seed) * mag, noise1(t * 24 + 91.7, seed + 17) * mag];
+  return [noise1(t * SHAKE_HZ, seed) * mag, noise1(t * SHAKE_HZ + 91.7, seed + 17) * mag];
 }
 
 /** Scale (>1 = zoom in) that hides the borders exposed by an offset in pixels. */
@@ -45,9 +47,12 @@ export function shakeCover(ox: number, oy: number, w: number, h: number): number
   return 1 + 2 * Math.max(Math.abs(ox) / w, Math.abs(oy) / h);
 }
 
-/** Zoom factor for the beat pulse (1 = none). Max extra scale is 6% × amount. */
+/** The most the zoom pulse may add (3% at amount 1). */
+export const ZOOM_PULSE_MAX = 0.03;
+
+/** Zoom factor for the bar pulse (1 = none). Max extra scale is 3% × amount. */
 export function zoomPulseScale(pulse: number, amount: number): number {
-  return 1 + 0.06 * Math.max(0, Math.min(1, amount)) * clamp01(pulse);
+  return 1 + ZOOM_PULSE_MAX * Math.max(0, Math.min(1, amount)) * clamp01(pulse);
 }
 
 /**
@@ -89,10 +94,13 @@ export function glitchBell(mix: number): number {
   return x * x * (3 - 2 * x);
 }
 
-/** White level added by the flash transition. */
-export function flashLevel(mix: number): number {
+/** The brightest the flash transition gets at Balanced intensity (was 1.6). */
+export const FLASH_PEAK = 1.0;
+
+/** White level added by the flash transition; `intensity` is the show's master intensity (0..2, Balanced = 1). */
+export function flashLevel(mix: number, intensity = 1): number {
   const m = clamp01(mix);
-  return Math.pow(1 - m, 2.5) * 1.6;
+  return Math.pow(1 - m, 2.5) * FLASH_PEAK * Math.max(0, Math.min(1.5, intensity));
 }
 
 /** x position (uv) of the sweep band centre; starts and ends fully off screen. */

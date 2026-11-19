@@ -109,3 +109,12 @@
   border-bottom-right-radius: var(--r-lg);
   background: var(--bg-raised);
 }
+
+.spacer {
+  flex: 1;
+}
+
+.footer {
+  flex-wrap: wrap;
+  align-items: center;
+}

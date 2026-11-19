@@ -9,7 +9,9 @@ import { parseTransform, serializeTransform, TRANSFORM_RULES } from "@/viz/edit/
 import type { ClipTransform } from "@/viz/edit/types";
 import { currentClip, patchClip } from "../inspector/inspectorState";
 import { writeValue } from "../inspector/paramOps";
-import { CORNERS, cornerPoint, rotateHandle, rotationFromDrag, scaleFromDrag, snapCentre, visibleBox, type Box, type Pt, type TransformValues } from "./overlayGeometry";
+import { CORNERS, cornerPoint, rotateHandle, rotationFromDrag, scaleFromDrag, snapCentre, visibleBox, type Box, type Corner, type Pt, type TransformValues } from "./overlayGeometry";
+import { CORNER_EDGES, cropEdgeFromPoint, type CropEdge, type CropValues } from "./cropGeometry";
+import { writeCrop } from "./CropBox";
 import type { OverlayCtx } from "./overlayContext";
 import styles from "./overlays.module.css";
 
@@ -18,7 +20,7 @@ export const CENTRE_SNAP = 0.012;
 const HANDLE_PX = 6;
 const ROTATE_STEM_PX = 26;
 
-type Kind = "move" | "scale" | "rotate";
+type Kind = "move" | "scale" | "rotate" | "crop";
 interface Drag {
   kind: Kind;
   pointerId: number;
@@ -27,6 +29,8 @@ interface Drag {
   box: Box;
   clipMs: number;
   key: string;
+  /** kind "crop": the edges of the corner that was dragged with Alt held. */
+  edges?: [CropEdge, CropEdge];
 }
 
 let dragSeq = 0;
@@ -36,17 +40,35 @@ export function TransformBox({ ctx }: { ctx: OverlayCtx }) {
   const drag = useRef<Drag | null>(null);
   const [guide, setGuide] = useState({ x: false, y: false });
 
-  const begin = (kind: Kind) => (e: RPointerEvent<SVGElement>) => {
+  const canCrop = clip.kind === "video" || clip.kind === "image";
+  const begin = (kind: Kind, corner?: Corner) => (e: RPointerEvent<SVGElement>) => {
     if (e.button !== 0) return;
     e.stopPropagation();
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    drag.current = { kind, pointerId: e.pointerId, start: ctx.toCanvas(e), values: ctx.values, box, clipMs: Math.round(ctx.clipMs), key: `ov:${clip.id}:${++dragSeq}` };
+    // Alt+drag on a corner handle crops its two edges instead of scaling (SPEC §B4).
+    const crop = kind === "scale" && corner && e.altKey && canCrop;
+    drag.current = {
+      kind: crop ? "crop" : kind,
+      pointerId: e.pointerId,
+      start: ctx.toCanvas(e),
+      values: ctx.values,
+      box,
+      clipMs: Math.round(ctx.clipMs),
+      key: `${crop ? "crop" : "ov"}:${clip.id}:${++dragSeq}`,
+      ...(crop && corner ? { edges: CORNER_EDGES[corner] } : {}),
+    };
   };
 
   const move = (e: RPointerEvent<SVGElement>) => {
     const d = drag.current;
     if (!d || d.pointerId !== e.pointerId) return;
     const p = ctx.toCanvas(e);
+    if (d.kind === "crop" && d.edges) {
+      const edges: Partial<CropValues> = {};
+      for (const edge of d.edges) edges[edge] = cropEdgeFromPoint(d.box, p, edge);
+      writeCrop(clip.id, edges, d.clipMs, d.key);
+      return;
+    }
     const next: Partial<TransformValues> = {};
     const g = { x: false, y: false };
     if (d.kind === "move") {
@@ -85,7 +107,7 @@ export function TransformBox({ ctx }: { ctx: OverlayCtx }) {
     setGuide({ x: false, y: false });
   };
 
-  const handlers = (kind: Kind) => ({ onPointerDown: begin(kind), onPointerMove: move, onPointerUp: end, onPointerCancel: end });
+  const handlers = (kind: Kind, corner?: Corner) => ({ onPointerDown: begin(kind, corner), onPointerMove: move, onPointerUp: end, onPointerCancel: end });
   // Handles sit on the part of the clip inside the frame; scaling and rotating
   // still pivot on the clip's own centre (the drag keeps the full box).
   const shown = visibleBox(box, frame);
@@ -102,7 +124,7 @@ export function TransformBox({ ctx }: { ctx: OverlayCtx }) {
       <line className={styles.stem} x1={rot.from.x} y1={rot.from.y} x2={rot.to.x} y2={rot.to.y} />
       <circle data-testid="handle-rotate" aria-label="Rotate" data-tip="Drag to rotate the clip; it snaps to steps (hold Alt for free rotation)" className={`${styles.handle} ${styles.rotateHandle}`} cx={rot.to.x} cy={rot.to.y} r={r} {...handlers("rotate")} />
       {corners.map((c) => (
-        <circle key={c.id} data-testid={`handle-${c.id}`} aria-label={`Scale from ${c.id} corner`} data-tip="Drag to scale the clip evenly around its centre" className={`${styles.handle} ${styles.cornerHandle}`} cx={c.p.x} cy={c.p.y} r={r} {...handlers("scale")} />
+        <circle key={c.id} data-testid={`handle-${c.id}`} aria-label={`Scale from ${c.id} corner`} data-tip={`Drag to scale the clip evenly around its centre${canCrop ? "; hold Alt and drag to crop this corner's edges" : ""}`} className={`${styles.handle} ${styles.cornerHandle}`} cx={c.p.x} cy={c.p.y} r={r} {...handlers("scale", c.id)} />
       ))}
     </g>
   );

@@ -471,7 +471,7 @@ func (m *Module) prepareOne(ctx context.Context, job *core.JobContext, ffprobe, 
 		st.Image = img
 		progress(1)
 	case "video":
-		es, err := m.EnsureStream(ctx, job, path, PreviewShort(st.Info.Width, st.Info.Height), fps, func(f float64) { progress(0.85 * f) })
+		es, err := m.EnsureStream(ctx, job, path, PreviewShort(st.Info.Width, st.Info.Height), fps, func(f float64) { progress(0.7 * f) })
 		if err != nil {
 			st.Error = errText(err)
 			return st
@@ -483,9 +483,28 @@ func (m *Module) prepareOne(ctx context.Context, job *core.JobContext, ffprobe, 
 			return st
 		}
 		st.Shots = shots
+		progress(0.8)
+		if st.Info.HasAudio {
+			// The picture is usable without its sound: a failure here is logged, not the source's error.
+			a, p, aerr := m.EnsureAudio(ctx, job, path, float64(st.Info.DurationMs)/1000, func(f float64) { progress(0.8 + 0.2*f) })
+			if aerr != nil {
+				if ctx.Err() == nil {
+					logf(job, "%s: couldn't prepare the sound: %s", filepath.Base(path), errText(aerr))
+				}
+			} else {
+				st.Audio, st.Peaks = a, p
+			}
+		}
 		progress(1)
+	case "audio":
+		a, p, err := m.EnsureAudio(ctx, job, path, float64(st.Info.DurationMs)/1000, progress)
+		if err != nil {
+			st.Error = errText(err)
+			return st
+		}
+		st.Audio, st.Peaks = a, p
 	default:
-		st.Error = "Only videos and photos can be used here"
+		st.Error = "Only videos, photos and audio files can be used here"
 	}
 	return st
 }
@@ -501,7 +520,7 @@ func fitSources(states []SourceState) []SourceState {
 	for _, strip := range []func(*SourceState){
 		func(s *SourceState) { s.Shots = nil },
 		func(s *SourceState) { s.Info = videoeditor.ClipInfo{} },
-		func(s *SourceState) { s.Preview, s.Image = nil, "" },
+		func(s *SourceState) { s.Preview, s.Image, s.Audio, s.Peaks = nil, "", "", "" },
 	} {
 		if size(states) <= core.MaxResultBytes {
 			return states
@@ -552,6 +571,9 @@ func (m *Module) sourceStates(ctx context.Context, paths []string, fps int) ([]S
 				st.Preview = m.anyPreview(p, fps)
 			}
 			st.Shots = m.ShotsFor(p)
+			st.Audio, st.Peaks = m.AudioFor(p)
+		case "audio":
+			st.Audio, st.Peaks = m.AudioFor(p)
 		}
 		out = append(out, st)
 	}
@@ -566,6 +588,8 @@ func kindByExt(path string) string {
 		return "image"
 	case slices.Contains(media.VideoExtensions(), ext):
 		return "video"
+	case slices.Contains(media.AudioExtensions(), ext):
+		return "audio"
 	}
 	return ""
 }

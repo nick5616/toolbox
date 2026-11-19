@@ -1,6 +1,7 @@
 /** What the overlay layers share: the selected clip, its drawn box at the playhead, and pointer conversion. */
 import type { EditClip, EditSourceState } from "@/lib/api";
-import { parseTransform, TRANSFORM_RULES } from "@/viz/edit/schema";
+import { CROP_RULES, parseTransform, TRANSFORM_RULES } from "@/viz/edit/schema";
+import type { EditParam } from "@/viz/edit/types";
 import { valueAt } from "../inspector/paramOps";
 import { boxFor, displaySize, drawnSize, type Box, type Pt, type Size, type TransformValues } from "./overlayGeometry";
 
@@ -33,6 +34,14 @@ export function transformAt(raw: string, clipMs: number): TransformValues {
   const t = parseTransform(raw).value;
   const v = (k: keyof typeof TRANSFORM_RULES) => valueAt(t[k], TRANSFORM_RULES[k].min, TRANSFORM_RULES[k].max, clipMs);
   return { x: v("x"), y: v("y"), scale: v("scale"), rotation: v("rotation") };
+}
+
+/** The crop (l, r, t, b) at the clip's playhead time (reactions ignored). */
+export function cropAt(raw: string, clipMs: number): [number, number, number, number] {
+  const c = parseTransform(raw).value.crop;
+  if (!c) return [0, 0, 0, 0];
+  const v = (p: EditParam) => valueAt(p, CROP_RULES.min, CROP_RULES.max, clipMs);
+  return [v(c.l), v(c.r), v(c.t), v(c.b)];
 }
 
 export function buildCtx(clip: EditClip, src: EditSourceState | undefined, frame: Size, k: number, playheadMs: number, toCanvas: OverlayCtx["toCanvas"]): OverlayCtx {

@@ -20,6 +20,12 @@ var (
 	aspects       = []string{"9:16", "4:5", "1:1", "16:9"}
 	fpsValues     = []int{24, 25, 30, 60}
 	exportHeights = []int{720, 1080, 1440, 2160}
+	exportFPS     = []int{0, 24, 25, 30, 60}
+	exportCodecs  = []string{"", CodecH264, CodecH265}
+	exportQuals   = []string{"", QualityDraft, QualityGood, QualityBest}
+	exportKbps    = []int{0, 128, 192, 320}
+	trackKinds    = []string{"video", "adjust", "audio"}
+	trackHeights  = []string{"", "s", "m", "l"}
 	fits          = []string{"fill", "fit", "fit-blur", "fit-color"}
 	slows         = []string{"blend", "none", "interpolate"}
 	blends        = []string{"normal", "add", "screen", "multiply", "overlay", "softlight", "hardlight", "difference", "exclusion", "lighten", "darken", "colordodge"}
@@ -66,10 +72,10 @@ func validateShape(doc EditProject) error {
 		return vErr("aspect", "Pick 9:16, 4:5, 1:1 or 16:9")
 	}
 	if !slices.Contains(fpsValues, doc.FPS) {
-		return vErr("fps", "Pick 30 or 60 fps")
+		return vErr("fps", "Pick 24, 25, 30 or 60 fps")
 	}
 	if !slices.Contains(exportHeights, doc.ExportHeight) {
-		return vErr("exportHeight", "Pick 720, 1080 or 1440")
+		return vErr("exportHeight", "Pick 720, 1080, 1440 or 2160")
 	}
 	if !colorRe.MatchString(doc.Background) {
 		return vErr("background", "Pick a colour")
@@ -102,8 +108,17 @@ func validateShape(doc EditProject) error {
 			}
 		}
 	}
-	if len(doc.Tracks) < 1 || len(doc.Tracks) > MaxTracks {
-		return vErr("tracks", fmt.Sprintf("An edit has 1–%d tracks", MaxTracks))
+	if len(doc.Tracks) < 1 || len(doc.Tracks) > MaxAllTracks {
+		return vErr("tracks", fmt.Sprintf("An edit has 1–%d tracks", MaxAllTracks))
+	}
+	visualTracks := 0
+	for _, t := range doc.Tracks {
+		if t.Kind == "video" || t.Kind == "adjust" {
+			visualTracks++
+		}
+	}
+	if visualTracks > MaxVisualTracks {
+		return vErr("tracks", fmt.Sprintf("At most %d video or adjustment tracks", MaxVisualTracks))
 	}
 	trackIDs := map[string]bool{}
 	clipIDs := map[string]bool{}
@@ -114,8 +129,11 @@ func validateShape(doc EditProject) error {
 			return vErr(f+".id", "Each track needs its own ID")
 		}
 		trackIDs[t.ID] = true
-		if t.Kind != "video" && t.Kind != "adjust" {
-			return vErr(f+".kind", "A track is a video or an adjustment track")
+		if !slices.Contains(trackKinds, t.Kind) {
+			return vErr(f+".kind", "A track is a video, adjustment or audio track")
+		}
+		if !slices.Contains(trackHeights, t.Height) {
+			return vErr(f+".height", "Track heights are small, medium or large")
 		}
 		if utf8.RuneCountInString(t.Name) > 40 {
 			return vErr(f+".name", "Track names are at most 40 characters")
@@ -156,6 +174,14 @@ func validateShape(doc EditProject) error {
 	}
 	if doc.Recipe != nil {
 		if err := jsonField("recipe.options", doc.Recipe.Options, MaxFieldBytes); err != nil {
+			return err
+		}
+	}
+	if err := validateExport(doc); err != nil {
+		return err
+	}
+	if doc.Size != nil {
+		if err := validateSize(*doc.Size); err != nil {
 			return err
 		}
 	}
@@ -235,17 +261,24 @@ func validateMarkers(m MarkerState) error {
 func validateClip(f, trackKind string, c Clip) error {
 	switch c.Kind {
 	case "video", "image", "color", "text", "visual":
-		if trackKind != "video" {
+		switch trackKind {
+		case "adjust":
 			return vErr(f+".kind", "Adjustment tracks only hold adjustment clips")
+		case "audio":
+			return vErr(f+".kind", "Audio tracks only hold audio clips")
 		}
 	case "adjust":
 		if trackKind != "adjust" {
 			return vErr(f+".kind", "Adjustment clips go on adjustment tracks")
 		}
+	case "audio":
+		if trackKind != "audio" {
+			return vErr(f+".kind", "Audio clips go on audio tracks")
+		}
 	default:
 		return vErr(f+".kind", "Unknown clip kind")
 	}
-	if (c.Kind == "video" || c.Kind == "image") && c.Path == "" {
+	if (c.Kind == "video" || c.Kind == "image" || c.Kind == "audio") && c.Path == "" {
 		return vErr(f+".path", "This clip has no file")
 	}
 	if c.Kind == "color" && !colorRe.MatchString(c.Color) {
@@ -265,6 +298,21 @@ func validateClip(f, trackKind string, c Clip) error {
 	}
 	if err := inRange(f+".volume", c.Volume, 0, 2); err != nil {
 		return err
+	}
+	if err := inRange(f+".fadeInMs", c.FadeInMs, 0, 10_000); err != nil {
+		return err
+	}
+	if err := inRange(f+".fadeOutMs", c.FadeOutMs, 0, 10_000); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(c.Link) > 40 {
+		return vErr(f+".link", "Links are at most 40 characters")
+	}
+	if err := validateGain(f+".gain", c.Gain); err != nil {
+		return err
+	}
+	if c.Depth != nil && (!idRe.MatchString(c.Depth.ID) || c.Depth.FromMs < 0 || c.Depth.ToMs < c.Depth.FromMs) {
+		return vErr(f+".depth", "This depth map is damaged")
 	}
 	enums := []struct {
 		field, v string
@@ -445,7 +493,7 @@ func validatePrepare(r PrepareRequest) error {
 		return vErr("paths", fmt.Sprintf("Prepare 1–%d files at a time", MaxSources))
 	}
 	if !slices.Contains(fpsValues, r.FPS) {
-		return vErr("fps", "Pick 30 or 60 fps")
+		return vErr("fps", "Pick 24, 25, 30 or 60 fps")
 	}
 	return nil
 }
@@ -455,7 +503,7 @@ func validateInterp(r InterpRequest) error {
 		return vErr("path", "Pick a clip")
 	}
 	if !slices.Contains(fpsValues, r.FPS) {
-		return vErr("fps", "Pick 30 or 60 fps")
+		return vErr("fps", "Pick 24, 25, 30 or 60 fps")
 	}
 	if r.FromMs < 0 || r.ToMs <= r.FromMs || r.ToMs-r.FromMs > MaxInterpMs {
 		return vErr("toMs", "Slow motion covers up to 30 seconds of a clip")

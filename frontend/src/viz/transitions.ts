@@ -287,7 +287,7 @@ export class Transitions {
   }
 
   /** Composites outgoing a and incoming b at progress mix (0..1) into out. */
-  render(kind: TransitionKind, a: Target, b: Target, mix: number, out: Target, tMs: number): void {
+  render(kind: TransitionKind, a: Target, b: Target, mix: number, out: Target, tMs: number, intensity = 1): void {
     const m = Math.max(0, Math.min(1, mix));
     const key = kind === "cut" ? "crossfade" : kind;
     out.bind();
@@ -295,7 +295,7 @@ export class Transitions {
     const p = this.program(key).use().tex("u_a", 0, a.tex).tex("u_b", 1, b.tex).f1("u_mix", m);
     switch (key) {
       case "flash":
-        p.f1("u_flash", flashLevel(m));
+        p.f1("u_flash", flashLevel(m, intensity));
         break;
       case "sweep":
         p.f1("u_centre", sweepCentre(m, SWEEP_HALF)).f1("u_half", SWEEP_HALF);

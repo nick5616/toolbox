@@ -39,13 +39,13 @@ registerLayer({
         const ns = Math.round(p.shapes as number);
         const sides = Math.round(p.sides as number);
         const ramp = buildRamp(f.palette, p.color as string);
-        const kick = f.signals.value("kick", f.tMs);
-        const level = f.signals.value("mix.level", f.tMs);
-        const bass = f.signals.value("bass.level", f.tMs);
+        const kick = f.signals.smoothed("kick", f.tMs);
+        const level = f.signals.smoothed("mix.level", f.tMs);
+        const bass = f.signals.smoothed("bass.level", f.tMs);
         const R = (p.size as number) * b.short * b.scale;
         const rough = p.roughness as number;
         const thick = (p.thickness as number) * b.short;
-        const spin = (p.spin as number) * (f.motionSec * 0.25 + f.analysis.cum("mix.level", f.tMs) * 0.6);
+        const spin = f.integral("spin") * 0.25 + f.integral("spin*intensity*mix.level") * 0.6;
         f.analysis.vector("spectrum", f.tMs, spec);
         batch.begin();
         lines.begin(b.glowPx, 0.5);

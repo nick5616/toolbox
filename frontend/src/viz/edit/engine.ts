@@ -9,6 +9,7 @@
  */
 import { createContext, Fullscreen, gpuName, Program, FULLSCREEN_VS, Target, type AnyCanvas } from "../gl/core";
 import type { ParamValues } from "../layers/registry";
+import { beatCount } from "../integral";
 import { resolvePalette, type ResolvedPalette } from "../palette";
 import "../post";
 import { postDef, type PostInstance } from "../post/registry";
@@ -261,9 +262,10 @@ export class EditEngine {
       quality: this.opts.quality,
       mode: "opaque",
       intensity: 1,
-      // Wave 0 placeholders (param × time); V1 gives the edit engine true integrals too.
+      // Effect params here are resolved per frame (keyframes and marker signals), so a rate is taken as constant over
+      // the song's time; beats are the real beat count. Preset layers use the full integrals of viz/integral.ts.
       integral: (name: string) => (typeof params[name] === "number" ? (params[name] as number) : 0) * (songMs / 1000),
-      beatIntegral: (name: string) => (typeof params[name] === "number" ? (params[name] as number) : 0) * (songMs / 1000) * 2,
+      beatIntegral: (name: string) => (typeof params[name] === "number" ? (params[name] as number) : 0) * beatCount(analysis ?? c.analysis, songMs),
     };
   }
 

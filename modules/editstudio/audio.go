@@ -174,10 +174,74 @@ func atempoStages(speed float64) []string {
 
 const stereoFormat = "aformat=sample_rates=48000:channel_layouts=stereo"
 
+// mixTrackAudible says whether a track's clips are heard: not muted, and when
+// any track is solo, only solo tracks (Phase 21 §B1; the preview follows the same rule).
+func mixTrackAudible(doc EditProject, t Track) bool {
+	if t.Muted {
+		return false
+	}
+	for _, o := range doc.Tracks {
+		if o.Solo {
+			return t.Solo
+		}
+	}
+	return true
+}
+
+// mixClip is a clip that contributes sound, and the track kind it sits on.
+type mixClip struct {
+	Clip
+	trackKind string
+}
+
+// audibleClips lists the clips the export may mix, in track order: video
+// clips on audible video tracks and audio clips on audible audio tracks, with
+// a gain above zero. Whether the source has sound is checked by the caller.
+func audibleClips(doc EditProject) []mixClip {
+	var out []mixClip
+	for _, t := range doc.Tracks {
+		if !mixTrackAudible(doc, t) {
+			continue
+		}
+		want := ""
+		switch t.Kind {
+		case "video":
+			want = "video"
+		case "audio":
+			want = "audio"
+		default:
+			continue
+		}
+		for _, c := range t.Clips {
+			if c.Kind == want && c.Volume > 0 && c.Path != "" {
+				out = append(out, mixClip{Clip: c, trackKind: t.Kind})
+			}
+		}
+	}
+	return out
+}
+
+// clipFades are the fade durations (ms) applied to a clip's audio when it is
+// outLen ms long: the clip's own fades, else the 10 ms de-click (not on
+// clips too short for it); each at most the clip's length.
+func clipFades(c Clip, outLen float64) (in, out float64) {
+	in, out = float64(c.FadeInMs), float64(c.FadeOutMs)
+	deClick := outLen >= 2*clipFadeMs
+	if in <= 0 && deClick {
+		in = clipFadeMs
+	}
+	if out <= 0 && deClick {
+		out = clipFadeMs
+	}
+	return math.Min(in, outLen), math.Min(out, outLen)
+}
+
 // buildMixGraph builds the mix's inputs and filter graph. hasAudio says which
-// source paths carry an audio stream. Input 0 is the song; each audible clip
-// has its own input, seeked to its source range (so a long source isn't
-// decoded from the start for every clip).
+// source paths carry an audio stream. Input 0 is the song (or silence); each
+// audible clip has its own input, seeked to its source range (so a long
+// source isn't decoded from the start for every clip). Per clip: aformat,
+// asetpts, the speed chain, volume (Volume × Gain keys), fades, adelay. Then
+// amix (no normalising) and a limiter at 0.98.
 func buildMixGraph(doc EditProject, hasAudio func(path string) bool) (inputs []mixInput, graph string) {
 	song := doc.Song
 	d := float64(editLen(doc))
@@ -203,51 +267,64 @@ func buildMixGraph(doc EditProject, hasAudio func(path string) bool) (inputs []m
 
 	off := float64(doc.CutOffsetFrames) * 1000 / float64(doc.FPS)
 	labels := []string{"[song]"}
-	for _, t := range doc.Tracks {
-		if t.Muted || t.Kind != "video" {
+	for _, mc := range audibleClips(doc) {
+		c := mc.Clip
+		if !hasAudio(c.Path) {
 			continue
 		}
-		for _, c := range t.Clips {
-			if c.Kind != "video" || c.Volume <= 0 || !hasAudio(c.Path) {
-				continue
-			}
-			sp := parseSpeedCurve(c.Speed)
-			speed, ok := sp.constant()
-			if !ok || speed <= 0 {
-				continue // the speed changes (or is frozen): the clip's audio is off
-			}
-			start, end := float64(c.StartMs)+off, float64(c.EndMs)+off
-			if start >= d || end <= 0 || end <= start {
-				continue
-			}
-			visStart, visEnd := math.Max(start, 0), math.Min(end, d)
-			srcFrom := float64(c.InMs) + (visStart-start)*speed
-			srcLen := (visEnd - visStart) * speed
-			n := len(inputs)
-			inputs = append(inputs, mixInput{Pre: []string{"-ss", mixMs(srcFrom), "-t", mixMs(srcLen)}, Path: c.Path})
-
-			ch := []string{stereoFormat, "asetpts=PTS-STARTPTS"}
-			if speed != 1 {
-				ch = append(ch, atempoStages(speed)...)
-			}
-			if c.Volume != 1 {
-				ch = append(ch, "volume="+mixSec(c.Volume))
-			}
-			if outLen := visEnd - visStart; outLen >= 2*clipFadeMs {
-				ch = append(ch,
-					"afade=t=in:st=0:d="+mixMs(clipFadeMs),
-					"afade=t=out:st="+mixMs(outLen-clipFadeMs)+":d="+mixMs(clipFadeMs))
-			}
-			if delay := int64(math.Round(visStart)); delay > 0 {
-				ch = append(ch, fmt.Sprintf("adelay=%d|%d", delay, delay))
-			}
-			label := fmt.Sprintf("[c%d]", n)
-			stmts = append(stmts, fmt.Sprintf("[%d:a]%s%s", n, strings.Join(ch, ","), label))
-			labels = append(labels, label)
+		sp := parseSpeedCurve(c.Speed)
+		speed, ok := sp.constant()
+		if !ok || speed <= 0 {
+			continue // the speed changes (or is frozen): the clip's audio is off
 		}
+		clipOff := 0.0
+		if mc.trackKind == "video" {
+			clipOff = off // the cut offset moves the picture's cuts, and their sound with them
+		}
+		start, end := float64(c.StartMs)+clipOff, float64(c.EndMs)+clipOff
+		if start >= d || end <= 0 || end <= start {
+			continue
+		}
+		visStart, visEnd := math.Max(start, 0), math.Min(end, d)
+		srcFrom := float64(c.InMs) + (visStart-start)*speed
+		srcLen := (visEnd - visStart) * speed
+		gain, _ := parseGain(c.Gain)
+		if len(gain.keys) == 0 && c.Volume*dbToGain(gain.base) <= 0 {
+			continue
+		}
+		n := len(inputs)
+		inputs = append(inputs, mixInput{Pre: []string{"-ss", mixMs(srcFrom), "-t", mixMs(srcLen)}, Path: c.Path})
+
+		ch := []string{stereoFormat, "asetpts=PTS-STARTPTS"}
+		if speed != 1 {
+			ch = append(ch, atempoStages(speed)...)
+		}
+		// Gain keys are in clip time; the filter's clock starts where the
+		// visible part does.
+		val, constant, lin := gainExpr(c.Volume, gain, visStart-start)
+		switch {
+		case !constant:
+			ch = append(ch, "volume="+val+":eval=frame")
+		case lin != 1:
+			ch = append(ch, "volume="+val)
+		}
+		outLen := visEnd - visStart
+		fin, fout := clipFades(c, outLen)
+		if fin > 0 {
+			ch = append(ch, "afade=t=in:st=0:d="+mixMs(fin))
+		}
+		if fout > 0 {
+			ch = append(ch, "afade=t=out:st="+mixMs(outLen-fout)+":d="+mixMs(fout))
+		}
+		if delay := int64(math.Round(visStart)); delay > 0 {
+			ch = append(ch, fmt.Sprintf("adelay=%d|%d", delay, delay))
+		}
+		label := fmt.Sprintf("[c%d]", n)
+		stmts = append(stmts, fmt.Sprintf("[%d:a]%s%s", n, strings.Join(ch, ","), label))
+		labels = append(labels, label)
 	}
 
-	tail := "alimiter=limit=0.97,apad=whole_dur=" + mixMs(d) + ",atrim=start=0:end=" + mixMs(d) + "[out]"
+	tail := "alimiter=limit=0.98,apad=whole_dur=" + mixMs(d) + ",atrim=start=0:end=" + mixMs(d) + "[out]"
 	if len(labels) == 1 {
 		stmts = append(stmts, labels[0]+tail)
 	} else {
@@ -280,15 +357,10 @@ func (m *Module) mixAudio(ctx context.Context, job *core.JobContext, doc EditPro
 	// Which sources have sound.
 	has := map[string]bool{}
 	var paths []string
-	for _, t := range doc.Tracks {
-		if t.Muted {
-			continue
-		}
-		for _, c := range t.Clips {
-			if c.Kind == "video" && c.Volume > 0 && c.Path != "" && !has[c.Path] {
-				has[c.Path] = false
-				paths = append(paths, c.Path)
-			}
+	for _, c := range audibleClips(doc) {
+		if _, seen := has[c.Path]; !seen {
+			has[c.Path] = false
+			paths = append(paths, c.Path)
 		}
 	}
 	if len(paths) > 0 {

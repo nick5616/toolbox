@@ -14,6 +14,7 @@ import { isRunActive, useNeedsYou, usePipelines } from "@/state/pipelines";
 import { PIPELINES_ITEM, RECENT_ITEM, SETTINGS_ITEM, useNavGroups, type NavItem } from "./nav";
 import logoUrl from "@/assets/logo.svg";
 import { FOCUS_MODULE_ID, isActive as focusIsActive, useFocus } from "@/state/focus";
+import { WorkspaceChip } from "./WorkspaceChip";
 import styles from "./Sidebar.module.css";
 
 interface ItemProps {
@@ -217,6 +218,7 @@ export function Sidebar() {
           onClick={toggleSidebar}
         />
       </div>
+      <WorkspaceChip collapsed={collapsed} />
       <div className={styles.scroll}>
         <Section label="" collapsed={collapsed}>
           {item(RECENT_ITEM)}

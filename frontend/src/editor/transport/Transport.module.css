@@ -8,12 +8,82 @@
   min-height: 36px;
 }
 
+.timeWrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
 .time {
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg);
+  cursor: text;
+}
+
+.time:hover {
+  background: var(--bg-hover);
+}
+
+.time:focus-visible,
+.timeInput:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.timeInput {
+  width: 11ch;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+
+.timeInput[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.total {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--fg-muted);
-  min-width: 128px;
+}
+
+.loading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
   white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    animation: none;
+  }
 }
 
 .spacer {
