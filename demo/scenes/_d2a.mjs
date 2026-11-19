@@ -50,6 +50,18 @@ export async function selectValue(t, label) {
   return t.eval(`(()=>{const s=document.querySelector('select[aria-label=${JSON.stringify(label)}]');return s?s.options[s.selectedIndex].text:null})()`);
 }
 
+/**
+ * Right-click on a target: the cursor goes there and the page gets the contextmenu event at that point
+ * (a CDP right button press does not open the timeline's menu).
+ */
+export async function rightClick(t, target) {
+  const b = await t.move(target);
+  const p = t.cursor;
+  await t.eval(`(()=>{const x=${p.x},y=${p.y};window.__demoCursor.ripple(x,y);const e=document.elementFromPoint(x,y);if(e)e.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:x,clientY:y,button:2}));return 1})()`);
+  await t.hold(500);
+  return b;
+}
+
 /** Changes a native <select> by keys (its popup is invisible to the screencast): click, arrows, Enter; checks the result. */
 export async function chooseOption(t, label, steps, expect) {
   await t.click({ css: `select[aria-label=${JSON.stringify(label)}]` });

@@ -212,12 +212,13 @@ export function createActions(ctx) {
     pos = to;
   }
 
-  async function pressAt(x, y, { right = false, count = 1 } = {}) {
+  async function pressAt(x, y, { right = false, count = 1, ctrl = false } = {}) {
+    const modifiers = ctrl ? MOD.Ctrl : 0;
     const button = right ? "right" : "left";
     for (let i = 1; i <= count; i++) {
-      await cdp.mouse("mousePressed", x, y, { button, clickCount: i, buttons: right ? 2 : 1 });
+      await cdp.mouse("mousePressed", x, y, { button, clickCount: i, buttons: right ? 2 : 1, modifiers });
       await sleep(60);
-      await cdp.mouse("mouseReleased", x, y, { button, clickCount: i, buttons: 0 });
+      await cdp.mouse("mouseReleased", x, y, { button, clickCount: i, buttons: 0, modifiers });
       if (i < count) await sleep(70);
     }
   }
@@ -312,12 +313,13 @@ export function createActions(ctx) {
       await t.move(target);
       await sleep(ms);
     },
-    async click(target, { double = false, right = false } = {}) {
+    async click(target, { double = false, right = false, ctrl = false } = {}) {
       const b = await find(target);
       const p = jitter(b);
       await glide(p.x, p.y);
       await sleep(110);
-      await pressAt(p.x, p.y, { right, count: double ? 2 : 1 });
+      if (ctrl) await page(`window.__demoCursor.chip("Ctrl+click")`);
+      await pressAt(p.x, p.y, { right, count: double ? 2 : 1, ctrl });
       await sleep(260);
       return b;
     },
