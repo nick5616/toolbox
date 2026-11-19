@@ -1,792 +1,461 @@
-# Toolbox — Phase 19 Spec: Paint+ and the Library browser
+# Toolbox — Phase 20 Spec: Smart search (find what's in your pictures and videos)
 
-Status: **APPROVED 2026-11-06, built the same day** (see docs/DECISIONS.md for every deviation).
+Status: **DRAFT 2026-11-18, waiting for your review.**
 
-Phase 18 (Focus Lock + pipeline timing) is archived in `docs/specs/phase-18.md`. Every earlier rule still holds unless §0 below changes it:
+Phase 19 (Paint+ and the Library browser) is archived in `docs/specs/phase-19.md`. Every earlier rule still holds:
 - **every tool stands on its own** (CLAUDE.md, 2026-11-06);
 - every sidebar tool is a pipeline step with a `StepUI`;
 - every file row is a draggable `ResultRow` with Send to, Reveal, Open and Save a copy;
-- accessibility (a tooltip on every control, `aria-disabled` with a reason, keyboard reachability) and the 960 × 600 minimum always apply.
-
----
-
-## 0. Rule amendment (needs your OK)
-
-**A tool may have its own design language.** Paint+ is the first. Today every screen follows one shared look: the polish rules, the shared components and the shared tokens. The amendment:
-- **What a bespoke tool may do:**
-  - define its own tokens, scoped to its root (`[data-design="paint"]` in `tools/paint/ui/tokens.css`);
-  - use its own components (`tools/paint/ui/**`);
-  - use its own layout and motion;
-  - take over the whole window in **Studio mode** (§1.6), hiding the Toolbox sidebar and top bar.
-- **What it still keeps:**
-  - accessibility: tooltips, `aria-*`, keyboard, visible focus;
-  - the 960 × 600 minimum, light/dark;
-  - "colours come from tokens" (its own tokens);
-  - the kit's file contract: `ResultRow`/`FileActions`/`LastExport`, restyled through its tokens, never replaced;
-  - Toolbox's global affordances: the job tray, toasts, palette (Ctrl+K) and "Show in Library".
-- **Recording it:** CLAUDE.md gets a "Bespoke tools" rule. A tool qualifies only when its spec says so.
+- accessibility (a tooltip on every control, `aria-disabled` with a reason, keyboard reachability) and the 960 × 600 minimum always apply;
+- the performance rules (2026-11-17): nothing slow before the window, fan-out through `core/par`, `d.ro` for reads.
 
 ---
 
 ## Overview
 
-This phase adds one tool and rebuilds one screen.
+You asked for an image model that sees an apple and labels it "apple", like Google Photos search, for all assets and media. This phase adds that to the **Library**, the screen that already shows everything Toolbox made. It doesn't add a sidebar tool.
 
-1. **Paint+** (module `paint`) is for an artist who loves Procreate.
-   - **The core** is a real painting app: layers, pen pressure, a deep brush engine and a brush library with character (leaves, grass, charcoal, gouache, ink). It has Procreate's directness, redesigned for a **desktop landscape (16:9) screen**, both full-screen and as a smaller window inside Toolbox. "Paint with layers, Procreate's feel, done well on a desktop" is the first deliverable on its own.
-   - **Right next to the core sits the Lab:** tools that use modern technology as an artistic medium. Each new tool is a new constraint with its own qualities to learn. Every Lab tool carries a **predictability** rating:
-     - **Exact:** same input, same result;
-     - **Seeded:** random, but repeatable when you lock its seed;
-     - **Wild:** you can't fully predict it.
+**What it does.** Once **Smart search** is installed, Toolbox looks at every picture, video and PDF in your library, in your projects and in any folder you add. It does this quietly in the background and on this machine only. Then:
+1. **Search by what's in it.** Typing `apple`, `dog on a beach`, `receipt`, `sunset over water` or `screenshot of code` in the Library's search box finds the files that show it, best match first. Names still match too. Videos match at the moment that shows it (`0:42`), and clicking opens the video there.
+2. **Labels.** Each file gets the few labels it clearly shows ("apple", "fruit", "table"), as chips in the detail panel. You can remove a wrong one and add your own. Clicking a chip shows everything with that label.
+3. **Things.** A new Library view, like Google Photos' Explore, shows the labels you have the most of as cards with a cover picture (Food, Animals, Places, Documents, …). Click one to see them all.
+4. **Find similar.** Any picture or video frame → "Find similar" shows the closest-looking files.
 
-     It also carries an **origin** card saying what it's built on.
-   - **Ethics:** no image-*generating* model trained on scraped art. Lab tools are either algorithmic (no training data at all) or *perception* models (fill, select, cut out, sharpen) trained on photo and segmentation datasets, with the training data named in the tool's origin card (§1.4.3).
-
-   **The inspiration** is `~/Toolbox/Erased/both (erased) (erased) … (erased).png`. It's Object Eraser run over its own output about 25 times: faces, hair and a figure dissolved into soft ghosts while the wall rebuilt itself around them. That loop is a medium, and Paint+ makes it a brush: **Dissolve**, with generations you can scroll back through.
-
-2. **Library** (the existing special view, rebuilt) is one place that shows **everything Toolbox made**:
-   - thumbnails, poster frames, waveforms and PDF pages;
-   - grouping by tool and by folder, as the files sit on disk;
-   - **lineage**: what each result was made from, and what was made from it. The 25-file erased series shows as one strip;
-   - files the DB doesn't know about: unregistered files in library folders, project renders and saved masks.
-
-   You asked for "an artifacts tool". This spec puts it in the **Library**, the screen that already exists for the job, rather than adding a second one (Q2).
+**How it works.**
+- One local **vision–language model** turns each picture into a vector (an "embedding"). It turns your search text into a vector in the same space.
+- Search compares the vectors, so it's **open-vocabulary**: it finds things nobody wrote a label for.
+- The labels come from the same vectors scored against a frozen vocabulary of about 1,500 everyday words (§2.4), so labels cost nothing extra.
+- **Model: SigLIP 2 ViT-B/16** (Google, Apache-2.0). It reads queries in many languages, and its scores are independent per label (a sigmoid), which makes "is there an apple?" a yes/no with a confidence rather than a ranking (Q1).
+- It runs on the AI engine with onnxruntime. Search scoring runs in Go.
 
 ### Goals
-- **Standalone painting.** Paint+ is a complete standalone painting app. You can start blank or from a photo, paint with a pen or mouse, use layers, save, reopen and export, all without another tool.
-- **Speed.** Inking at 120 Hz on a 4K canvas stays under 8 ms per frame, with no dropped coalesced points.
-- **Brushes.** Paint+ ships **at least 60 brushes** of our own (§1.3.1), and it imports the brushes you already own: Procreate `.brushset`/`.brush`, MyPaint `.myb` and Photoshop `.abr` sampled tips.
-- **The UI.** It feels like Procreate, on a desktop: canvas-first, gestures and keys, and panels that never cover the canvas on a wide screen. It works at 960 × 600 inside Toolbox and full-screen at 4K.
-- **The Lab.** Every Lab tool shows its predictability and origin. A perception tool works like a brush:
-  - when a stroke ends, the region shimmers and the result lands, typically in under 1.5 s (Fast) or under 4 s (Best) with a warm engine;
-  - you keep painting meanwhile;
-  - every result can be undone and is kept as a generation.
-- **The Library.** It finds any file Toolbox made in at most two clicks: open Library, then click the tool or search. It shows the file and its folder.
+- **It finds things.** In a library of a few thousand files, a typed concept (`apple`, `cat`, `whiteboard`, `birthday cake`) puts the right files at the top. Acceptance §6 checks it on real files.
+- **Fast search.** Label and name matches show **instantly**. Concept matches show in **under 300 ms** once the engine is warm, and under 10 s from cold (the engine starts). A search never waits for indexing.
+- **Unnoticeable indexing.** It runs one small batch at a time, only while no job of yours is running. It uses half the CPU cores, and you can pause it. Toolbox starts as fast as before.
+- **Everything stays local.** The model downloads once, sha-verified, through the pack. After that, indexing and search make no network calls. Nothing about your files leaves the machine.
+- **Always current.** New outputs are indexed within a minute of finishing. Renames, deletes and edits outside Toolbox are picked up at start and on rescan.
 
 ### Non-goals (this phase)
-- **Text-to-image or prompted generative fill.** See Q1 for the only candidates that would fit your ethics.
-- **Animation, vector layers.**
-- **PSD export.** OpenRaster instead (Q6).
-- **Timelapse video.** Later.
-- **A library file watcher.**
-- **Bundling brushes whose licence doesn't allow redistribution.** You import those yourself (§1.3.2).
+- **Faces and people** (grouping by person). That's a separate, opt-in privacy decision (Q4).
+- **Places on a map** (GPS → city names needs an offline geocoder); **dates** are already a Library filter.
+- **Searching speech or text inside files** (transcripts, OCR text). Later; the index is built so another source can be added (Q8).
+- **Audio files.** There's nothing to see in them.
+- **Clipboard history images and the Vault.** They're never indexed. Clipboard history stays private to its tool, and the Vault stays locked.
+- **Generating or editing images.** This model only *reads* pictures.
 
 ---
 
-## 1. Paint+ — product
+## 1. Product
 
 ### 1.1 What a user can do (the standalone checklist)
-1. **Start a canvas.**
-   - **New canvas** (16:9 presets first):
-     - **Screen 16:9:** 1920 × 1080, 2560 × 1440 or 3840 × 2160.
-     - **Square 2048.**
-     - **Portrait 9:16:** 2160 × 3840.
-     - **A4 300 dpi:** 2480 × 3508.
-     - **Custom:** up to 8192 per side and 40 MP.
-     - **Background:** paper white, transparent or a colour.
-     - **Paper texture** (optional): a grain baked into a locked bottom layer.
-   - **Open** a photo (any `media.ImageExtensions()`; HEIC through the engine, like Composer), an `.ora` file, or a Paint+ project.
-   - **Paste or drop** an image. It becomes a new layer, or a new canvas if none is open.
-2. **Paint.**
-   - Brushes (§1.3) respond to pressure, tilt and velocity.
-   - Colour: a disc and value square, classic sliders, harmony, swatches, palettes, recent colours, and an eyedropper (hold Alt, or a long press).
-   - **ColorDrop:** drag the colour onto the canvas to fill it, as in Procreate, with drag-to-threshold.
-3. **Erase.** The normal eraser works with **any** brush (it uses that brush's tip and grain), as in Procreate. The Lab adds the content-aware **Fill eraser** and **Dissolve** (§1.4).
-4. **Smudge** with any brush.
-5. **Layers** (64 max, no groups this phase).
-   - Add, duplicate, delete, reorder (drag), rename, hide and lock.
-   - Opacity, the 16 blend modes, clipping mask, alpha lock, reference layer (fill sees it) and mask layer.
-   - Merge down, flatten.
-6. **Select and transform.**
-   - **Selection:** rectangle, ellipse, lasso (freehand or polygon), magic wand (tolerance, contiguous), plus the Lab's Select object and Select subject. Invert, feather, grow/shrink, clear.
-   - **Transform** the layer or the selection: free, uniform, distort, warp (a 4 × 4 mesh), flip and rotate 90°, with bilinear or bicubic resampling.
-7. **Fill and shapes.**
-   - Paint bucket (tolerance; sample all layers or the current one).
-   - **QuickShape:** hold at the end of a stroke to snap it to a line, ellipse, rectangle or polygon, then edit it with handles.
-   - Straight lines with Shift.
-8. **Adjustments** on a layer or selection: Hue/Saturation/Brightness, Colour balance, Curves, Gradient map, Gaussian/Motion blur, Sharpen, Noise, Liquify (push, twirl, pinch, expand, crystals). Each is previewed live and can be drawn on with a brush ("Pencil" mode, as in Procreate).
-9. **Canvas view.**
-   - **Zoom:** pinch, Ctrl+wheel, or `+`/`-`.
-   - **Pan:** Space-drag, middle-drag, or two fingers.
-   - **Rotate the view:** R-drag or a two-finger twist.
-   - **Fit, 100%** and **flip the view**.
-10. **Canvas edits.** Canvas size, image size, crop to the selection, and **Extend canvas with fill** (Lab).
-11. **Guides.** Symmetry (vertical, horizontal, quadrant, radial 2–16), a 2D grid, perspective (1, 2 or 3 points) with drawing assist, and isometric.
-12. **Undo and history.**
-    - Undo/redo has no step limit within a 1.5 GB memory budget, after which the oldest steps drop.
-    - A History panel shows each step with a thumbnail.
-    - The **History brush** paints back pixels from any earlier step.
-13. **Save.** Autosave runs 2 s after the last change. You can also Save as, Duplicate, Rename or Delete. A start-screen gallery shows every project with its thumbnail.
-14. **Export.**
-    - **Formats:** PNG, JPG, WebP or `.ora` (layers kept), at 25–400%.
-    - **Default location:** `<library>/Paintings/<name>.<ext>`, registered and shown with `LastExport` (Reveal, Open, Save a copy, Send to).
-    - **Export as…** saves anywhere. **Copy image** puts the flattened canvas on the clipboard.
-15. **Find past work.**
-    - The gallery shows projects; Exports shows the Library filtered to `paint`.
-    - "Open in Paint+" works from Library rows, Send to, and Object Eraser's result.
-16. **Keys.**
-    - **Tools:** B brush, E eraser, S smudge, G fill, V transform, L lasso, M rectangle select, W wand, I eyedropper.
-    - **Size and opacity:** `[` `]` change size; Shift+`[` `]` change opacity.
-    - **History:** Ctrl+Z undo, Ctrl+Shift+Z redo.
-    - **Selection:** Ctrl+A select all, Ctrl+D deselect, Ctrl+Shift+I invert.
-    - **Layers:** Ctrl+J duplicate, Ctrl+E merge down.
-    - **View:** Tab hides the UI, F toggles Studio mode, `?` shows every shortcut.
-    - **On a touch screen:** a two-finger tap undoes and a three-finger tap redoes.
+- **Get it.** Library → the search box's hint row and Settings → Search both show "Search by what's in your pictures — install Smart search (≈ N GB)". The button installs the **Smart search** pack (AI engine + model, §2.7). Afterwards indexing starts by itself (Q2).
+- **See progress.** A one-line status sits at the bottom of the Library's filter column (or the toolbar's More on narrow windows):
+  - "Indexing 1,240 of 3,100 · Pause";
+  - "Paused · Resume";
+  - "Up to date · 3,100 files";
+  - "Waiting for your jobs to finish";
+  - "Indexing failed for 3 files · Show" (opens a list with each reason and Retry).
+- **Search.** The existing search box ("Search outputs" becomes "Search names and what's in them"). Results show in the current view as one list, **best match first**:
+  1. **Labels:** exact label or user-label matches, as a chip row above the results ("apple · 34", "apple pie · 2"). Clicking a chip filters by that label.
+  2. **Concept matches:** sorted by score, each with a small match badge ("Strong", "Good", or "Maybe" for the weakest results, which show only when fewer than 12 strong or good ones exist).
+  3. **Name matches:** files whose name contains the text, not already listed.
 
-### 1.2 Pen input
-- **Events:**
-  - `PointerEvent` with `getCoalescedEvents()` (every point) and `getPredictedEvents()` (a provisional tail, replaced on the next frame);
-  - `pointerrawupdate` where it exists;
-  - `touch-action: none` on the canvas.
-- **What drives the brush dynamics:**
-  - pressure;
-  - tilt (`tiltX/tiltY` or `altitudeAngle/azimuthAngle`);
-  - twist;
-  - velocity.
+  The type, tool, date and folder filters still apply. Concept results arrive after the name and label results, and the list doesn't jump: they're inserted above the name matches, with focus and selection kept.
+- **Video moments.** A video hit's card shows the matching frame with a time badge (`0:42`), not the poster. In the detail panel the player starts at that moment. "Other moments" lists up to 5 more matching frames of the same video.
+- **PDF pages.** A PDF hit shows the matching page ("p. 3"), and the detail panel opens on that page.
+- **Projects.** A project (painting, composition, edit, post) whose thumbnail matches shows with a "Project" badge. Opening it opens its tool, as in Places.
+- **Labels in the detail panel.** "In this picture": up to 8 chips, strongest first. Hovering a chip shows its confidence. A chip's × hides that label for this file (it never comes back on re-index). "+ Label" adds your own (free text, ≤ 40 chars, offered as completions from the vocabulary and your earlier labels). Your own labels are searchable like auto labels and marked with a dot.
+- **Things view.** A fifth Library view next to Grid / List / Folders / By tool:
+  - sections by category: **People & events, Animals, Food & drink, Nature & places, Things, Vehicles, Documents & screens, Art & design**;
+  - each label with ≥ 3 files is a card: a cover thumbnail (the file that scores highest) and a count;
+  - your own labels form a **Your labels** section at the top;
+  - click a card = Grid filtered by that label.
+- **Find similar.** In the detail panel and the card context menu, for images, videos (the current frame) and PDFs (the current page). It shows the 60 closest files in Grid with a "Similar to <name> · Clear" chip.
+- **Extra folders.** Settings → Search → "Also search these folders" → Add folder… (native folder picker; Q3).
+  - **Read-only:** Toolbox never writes, renames or moves anything in those folders.
+  - Their files show in search results and Things with a folder badge. Their cards have Open, Reveal, Save a copy and Send to. Rename and Delete are refused, as for any file outside the library.
+  - Remove a folder → its index rows are deleted.
+- **Exclude.** Settings → Search → "Skip these folders" (inside the library or an extra folder), e.g. `Received/` or a vault export folder.
+- **Control.** Settings → Search:
+  - "Index in the background" on/off (off = no new indexing; search still uses what's indexed);
+  - Pause/Resume;
+  - Rescan now;
+  - "Rebuild index" (re-embeds everything, e.g. after a model change);
+  - "Delete index" (removes every row and cached vector, keeps the model);
+  - the index size on disk.
+- **Search in pipelines.** A new step, **"Keep files that show…"** (§2.8). For example: watch Downloads → keep files showing "receipt" → Copy to `Receipts/`.
 
-  A mouse simulates pressure from velocity, which you can turn off. When a pen is detected, touch only navigates (palm rejection), and that can be turned off too.
-- **Smoothing (per brush):**
-  - **StreamLine** (0–100): a lagged spring;
-  - **Stabilisation** (0–100): a pulled-string average;
-  - **Motion filtering:** removes jitter at the extremes, as in Procreate.
-- **Pressure curve:** a global curve editor, plus a per-brush curve.
-- **Wave 0 spike:** confirm that pressure arrives in WebView2 from a Windows Ink or Wacom pen on this PC. If it doesn't, log it in DECISIONS and keep velocity pressure.
+### 1.2 What gets indexed
 
-### 1.3 Brushes
-
-#### 1.3.1 The engine and our own library
-**Engine parameters** (in the **Brush Studio**, with a live drawing pad):
-- **Tip:** shape (round, square, or a tip image), hardness, roundness, angle (fixed, follows the stroke, or follows tilt), and **tip rotation jitter**.
-- **Stroke:** spacing (% of size), **scatter**, **count per dab**, taper in/out (by pressure or length), and **dual tip** (a second tip masks the first, as in Photoshop's dual brush).
-- **Grain:** none or a texture, with scale, depth and contrast. *Moving* grain follows the stroke; *Texturised* grain stays fixed to the canvas.
-- **Dynamics:** pressure, tilt, velocity and stroke-progress each map to size, opacity, flow, scatter and hue, every one through its own curve.
-- **Colour dynamics:** hue/sat/brightness jitter per stroke or per dab, plus **secondary colour** mixing (foreground ↔ background by pressure).
-- **Wet:** wet mix (dilution, charge, pull and grade), wet edges and **bleed** (water spreading after the stroke, settled over 600 ms).
-- **Rendering:** light glaze, uniform glaze, intense blending, or **heavy paint** (impasto: per-dab height plus lighting).
-- **Blend:** the per-dab blend mode.
-
-Brushes are JSON (`paint/brushes/schema.ts`), and tips and grains are PNGs. Users can duplicate, edit, import, export and organise their own brushes into sets.
-
-**Bundled library:** at least 60 brushes, all **made by us**. Tips and grains are generated procedurally in a build script (`frontend/scripts/brushgen.ts`, committed outputs), so the licence is clean. The sets:
-- **Sketching:** HB, 6B, Mechanical, Charcoal stick, Willow charcoal, Conté, Chalk.
-- **Inking:** Fine liner, Technical pen, Brush pen, Dry ink, Calligraphy (tilt), Marker, Felt tip.
-- **Painting:** Soft round, Hard round, Gouache, Oil (wet mix), Acrylic flat, Impasto, Watercolour (wet edge + bleed), Wash, Glaze.
-- **Airbrush:** Soft, Hard, Grainy, Spray can (with drips).
-- **Nature:**
-  - Leaf scatter (oak, maple, round and willow tip variants, rotating along the stroke with hue jitter);
-  - Grass tufts, Fern, Pine needles, Branch, Bark, Moss, Petals;
-  - Cloud billow, Foam, Rain, Snow.
-- **Texture:** Stipple, Sponge, Splatter, Noise, Crosshatch, Halftone dots, Canvas weave, Paper fibre.
-- **Elements:** Fire, Smoke, Light flare, Glow, Stars.
-- **Pixel:** 1 px (aliased, nearest neighbour), Square, Dither.
-- **Erasers:** Soft, Hard, Textured. Every brush also works as an eraser.
-- **Smudge:** Soft blend, Rough blend, Bristle.
-
-#### 1.3.2 Importing brushes you have
-- **Free brushes online:** yes, there are lots. But most free Procreate and Photoshop packs are licensed *"free for personal use, don't redistribute"*. Paint+ therefore **imports** brushes you download and **never bundles** them.
-  - Bundling: only brushes under a licence that allows redistribution (CC0, CC-BY with credit, or GPL-compatible), credited on each brush's info card.
-  - Wave 0 checks the licence of each open set before anything is bundled (§7, item 7d).
-  - The candidates are MyPaint's brush packs and Krita's default bundle. David Revoy's packs are a further candidate, and their licences vary by pack.
-- **Importers** run in Go, in `modules/paint/brushimport/` (§2.4).
-  - **Procreate `.brushset` / `.brush`:**
-    - The file is a zip of `Brush.archive` (a binary-plist NSKeyedArchiver object), `Shape.png` and `Grain.png`.
-    - The format is undocumented. We map the known keys and approximate the rest: spacing, jitter, taper, grain scale, pressure response and wet mix. Unknown keys are kept, so a later version can map more.
-    - After an import, a **fidelity note** lists anything that was approximated.
-  - **MyPaint `.myb`:** JSON, documented. Its settings and input curves are mapped onto our dynamics. MyPaint's "smudge" and "dabs per radius" map directly.
-  - **Photoshop `.abr`:** v6+ *sampled* tips only, using the documented `samp` section. Tips become tip images with default dynamics. Computed brushes and presets aren't imported.
-  - **Krita `.bundle`:** a zip; its `brushes/` (gbr/png tips) and `patterns/` become tips and grains.
-- **How imported brushes are stored:** under `<support>/paint/brushes/<set>/`, as JSON plus PNGs. A set can be exported back as our own `.paintplus-brushes` zip (JSON + PNGs).
-
-### 1.4 The Lab
-The Lab sits **right next to the brushes**: its own tab in the brush library and a strip on the canvas edge (§1.6). Every Lab tool shows:
-- **Predictability:** Exact, Seeded or Wild, as a small badge and in its tooltip. Seeded and Wild tools show a seed with **lock** and **re-roll**.
-- **Origin:** a card. For algorithmic tools it shows the algorithm. For perception tools it shows the model, its licence, what it was trained on, and what it can't do.
-
-Lab tools come in two kinds: algorithmic tools (§1.4.1), which use no training data, and perception tools (§1.4.2), which use models.
-
-#### 1.4.0 Lab tools are devices (added 2026-11-06)
-Each Lab tool presents as a **device**, like the devices in an Ableton Live device chain.
-- **Header:** a title bar with an on/off toggle, the predictability badge and the origin card.
-- **Controls:** a row of compact knobs and sliders, one per param, with value readouts, units and double-click to reset. Choices are small segmented switches and toggles are pill switches.
-- **Rand:** the header's **Rand** button randomises every param not marked `rand: false` and not locked by the user (right-click a control → Lock from Rand), within its range.
-  - Rand has its own seed, and Rand states have back/forward, so a lucky roll can be found again.
-  - Rand sits beside the tool's **Seed** (lock and re-roll), which varies the tool's own randomness: the parameters stay the same, and the marks change.
-- **Saved devices:** a device's current settings can be saved as a named variant, kept with the user's brushes.
-
-
-These run on the GPU or CPU in the frontend, and are deterministic given a seed. The effects apply at dab rate with the brush's spacing, so stroke speed shapes the result.
-
-| Tool | What it does | Predictability |
+| Source | What | Picture used |
 |---|---|---|
-| **Flow field** | The brush follows a curl-noise field you can see as faint lines, so a straight stroke becomes a swirling bundle of hairs. Scale, turbulence and evolution are adjustable. | Seeded |
-| **Growth** | An L-system grows branches, twigs and leaves from your stroke as a spine (leaf shapes from the Nature tips). Branching angle, depth, leaf density and season colours are adjustable. | Seeded |
-| **Reaction–diffusion** | Paint "seed chemical". Gray-Scott patterns (coral, maze, spots, fingerprints) grow inside the painted area over a few seconds, and you stop them when you like. | Exact |
-| **Ink bleed** | Wet ink spreads along the paper's grain (a capillary simulation over the paper texture), then dries. | Exact |
-| **Particles** | Each dab emits particles with gravity, wind and lifetime, and they draw their trails (sparks, dust, rain streaks). | Seeded |
-| **Pixel sort** | Sorts pixels along the stroke direction by a luminance threshold. | Exact |
-| **Smear / Liquify brush** | Pushes pixels along the stroke; the displacement accumulates. | Exact |
-| **Feedback** | Each dab zooms or rotates the pixels under it slightly into themselves (a tunnel or echo). | Exact |
-| **Echo trail** | Repeats the stroke as fading offset copies. | Exact |
-| **Voronoi crackle** | Breaks the painted area into cells (glaze cracks, stained glass, dry mud). | Seeded |
-| **Kaleido, Mirror, Twirl, Bulge, Wave** | Distortions painted on, from `viz/post`. | Exact |
-| **Glitch slice, Chromatic, VHS, Pixelate, Halftone, Posterize, Duotone** | Image effects painted on, from `viz/post`. | Exact (Glitch: Seeded) |
+| Library (`<library>/**`, registered and unregistered files) | images (incl. HEIC), videos, GIFs, PDFs | image: the whole picture, EXIF-oriented, ≤ 512 px; video: frames (§2.3); PDF: pages 1–4 |
+| Projects (`projectdocs`, every kind) | the project's `thumb.jpg` / render | that file |
+| Extra folders (Q3) | same kinds as the library | same |
 
-Effects that work on existing pixels render from a snapshot of the layer taken when the stroke starts, through the stroke's soft mask, so overlapping passes compound.
-
-#### 1.4.2 Perception tools (models; need the AI engine)
-Each control that needs a missing model shows `aria-disabled` with the reason, and one gate banner carries the pack button. The engine warms up when Paint+ opens if it's installed (`PaintService.Warm`).
-
-| Tool | What it does | Predictability | Engine |
-|---|---|---|---|
-| **Fill eraser** | Paint a mask. When the stroke ends, the masked area of the current layer is filled in from its surroundings; with "sample all", the merged visible layers are used. | Exact | `paint.fill` (LaMa = Best, MI-GAN = Fast) |
-| **Dissolve** | Fill fed back into itself; each pass inpaints the previous pass's result. Live: painting over a region you just dissolved dissolves it again on each stroke end. The inspiration image as a brush. Its settings are below the table. | Seeded | `paint.fill` with `passes`, `ghost`, `drift`, `seed` |
-| **Melt** | Dissolve whose mask grows a few px each pass in a direction, so forms drip. | Seeded | `paint.fill` with `driftDir` |
-| **Echo fill** | Fills the stroke from a shifted copy of its surroundings, so the model reconstructs stuttered repeats. | Exact | `paint.fill` with `offset` |
-| **Edge erode** | Only the outer ring of the stroke is inpainted, so shapes lose their edges into the ground. | Exact | `paint.fill` (ring mask) |
-| **History brush** | Paints back from any earlier step or generation. Dissolve everything, then paint back the eyes. | Exact | none |
-| **Subject stamp** | Click a photo layer once to cut out its subject. The cut-out becomes a stamp tip, scattered along the stroke. | Exact | `paint.cutout` |
-| **Select subject** | Makes a selection from background removal. Also "Cut subject to new layer". | Exact | `paint.cutout` |
-| **Select object** | Click (positive) and Alt-click (negative) points; the mask previews live, and Enter makes it the selection. | Exact | `paint.segment` |
-| **Enhance brush** | Upscales the stroke area ×2/×4 and resamples it back. It invents crisp detail, including in dissolved areas. | Exact | `paint.enhance` |
-| **Extend canvas with fill** | Grows the canvas by N px on chosen sides and fills the new margins from the edges (512 px bands). | Exact | `paint.fill` |
-| **Upscale canvas** | Upscales the whole canvas ×2/×4, as a new project or in place. | Exact | `paint.enhance` |
-
-**Dissolve settings.**
-- **Passes:** 1–12.
-- **Ghost:** 0–100%, blends each pass over the last, so things fade instead of vanishing.
-- **Drift:** 0–100, a seeded jitter of the mask's dilation and offset and of the crop origin, so each pass reconstructs from slightly different context.
-
-**Generations.**
-- Every perception result is a *generation* of its region. The floating **Generations strip** shows the original, then pass 1…N, plus re-rolls. Click one to swap it in.
-- **Re-roll** changes the seed. The models themselves are deterministic, so only Drift and the crop origin vary; the UI says so when Drift is 0.
-- The strip keeps the last 8 operations, and History keeps older ones.
-
-**Async behaviour.**
-- Requests queue, one engine call at a time.
-- A pending region shimmers, with a cancel × on it.
-- You keep painting. A result that lands is applied as an undo step that replaces only that region's tiles, and later strokes are replayed above it.
-- Cancel goes through `$cancel`.
-
-**Crops.**
-- The frontend sends only the region: the mask bbox plus a margin of max(64 px, 50% of the bbox), squared and clamped, as source and mask PNGs.
-- Above 1536 px, the context is downscaled for Fast and passed through for Best (the engine crops at 512 again).
-- The result comes back at crop size and is composited under the mask with a 4 px feather.
-
-#### 1.4.3 Model origins (shown in each tool's origin card)
-Wave 0 confirms each row against the model's paper or model card and writes the confirmed text into `modules/paint/origins.go`, which feeds the card. Until then, the table is my understanding.
-
-| Model | Used by | Trained on (to confirm) | Generates new imagery? |
-|---|---|---|---|
-| LaMa (big-lama) | Fill, Dissolve, Melt, Echo, Edge erode, Extend | Places2 scene photographs | Fills holes from the surrounding image; no prompts and no style of any artist |
-| MI-GAN | the same tools (Fast) | Places2 (and CelebA-HQ for faces) | The same |
-| BiRefNet / IS-Net | Subject stamp, Select subject | Segmentation datasets (DIS5K, HRSOD, …) of photographs | No; outputs a mask |
-| SAM 2.1 tiny | Select object | SA-1B, which Meta describes as licensed images, plus SA-V video | No; outputs a mask |
-| Real-ESRGAN | Enhance, Upscale | Photo datasets (DIV2K, Flickr2K, OST), degraded synthetically | Adds detail at the pixel level only |
-
-None of these is a text-to-image model or a model trained on artworks to imitate styles. Prompted generation stays out unless Q1 says otherwise.
-
-### 1.5 Design language (Paint+ only, per §0)
-- **Canvas first.** The chrome is a quiet neutral, so the canvas's colours read true: a near-black UI in dark, warm grey in light.
-  - The controls are **floating translucent islands** with a backdrop blur, a 14 px radius and soft shadows.
-  - There are no hard dividers.
-  - Motion is quick (120–180 ms) and springy on the panels, and never on the canvas.
-- **Iconography.** A small custom icon set for painting (brush, smudge, eraser, layers, adjust, select, transform, colour puck, the Lab flask), drawn on our 24 px grid in `tools/paint/ui/icons/`. Lucide is still used for generic actions.
-- **Typography.** The app font, smaller and lighter (11–12 px labels), with numbers tabular.
-- **Every control has a tooltip and a keyboard path.** Gesture-only actions also have a key or a menu item.
-- **Tokens** live in `tools/paint/ui/tokens.css` under `[data-design="paint"]`: surfaces, ink, accent (the current colour), glass, the radius scale and the motion curves, each with light and dark variants. No raw colours appear outside that file.
-
-### 1.6 Layout (desktop, landscape 16:9 first)
-- **Two modes:**
-  - **In Toolbox:** the shell's sidebar is visible. Paint+ owns the main area, and its title bar shows through `ToolHeader`.
-  - **Studio mode** (F, or the expand button): the window becomes Paint+ only, with the Toolbox chrome hidden and a thin hover strip at the top to return. **Full screen** (F11) works in both modes.
-- **The canvas** is centred, edge to edge, and is never covered on wide windows.
-  - **Left edge:** the Procreate-style vertical **size** and **opacity** sliders, the **modify** button (eyedropper), and undo/redo.
-  - **Top-left island:** the gallery (back), the Actions menu (add image, canvas, share/export, guides, prefs), Adjustments, Select and Transform.
-  - **Top-right island:** brush, smudge, eraser, layers and the colour puck, as in Procreate.
-- **Panels**, opened from the top-right island:
-  - **Brush library:** sets list + brushes with stroke previews, with a "Lab" tab.
-  - **Layers:** big thumbnails and blend/opacity on tap.
-  - **Colour:** disc, classic, harmony, value, palettes.
-
-  **Above 1600 px** of window width they **dock** as columns on the right, so the canvas narrows and stays visible. Below that they're popovers anchored to their buttons. The choice is automatic and can be overridden.
-- **The Lab strip** is a slim vertical strip on the right edge of the canvas. It holds the last 6 Lab tools used, each with its predictability badge, and it opens the full Lab panel. Below it sits the **Generations strip**, shown when there are generations.
-- **The brush HUD** shows near the cursor while `[`/`]` are held: size, opacity and the brush name.
-- **At 960 × 600:**
-  - the islands compact to icons;
-  - the sliders shorten;
-  - panels are popovers, at most 360 px wide and 520 px tall, scrolling inside;
-  - the Lab strip shows 3 tools.
-- **At 4K full screen:** UI scale follows the OS scaling, and the panels dock.
-- **The start screen (gallery)** has big tiles:
-  - "New canvas" presets (16:9 first) and "Open image…";
-  - project cards with thumbnails, in a grid that fills 16:9 nicely;
-  - "Recent exports" `ResultRow`s, restyled;
-  - a drop zone over the whole gallery.
+- **Never indexed:**
+  - `<support>/**`, except project thumbs;
+  - Clipboard history (`clip_items`, `<support>/clipboard/`);
+  - the Vault and `tmp/vault-open`;
+  - hidden files and folders (`.*`, Windows hidden/system attribute);
+  - symlinks and junctions (never followed);
+  - skip-listed folders.
+- **Limits:**
+  - files over 2 GB (video) or 200 MB (image, PDF) are skipped with a reason;
+  - images over 100 MP are decoded with `imaging`'s reduce path;
+  - an extra folder stops at depth 12 and 200,000 files, and says so.
 
 ---
 
-## 2. Paint+ — architecture
+## 2. Architecture
 
 ### 2.1 Files
 ```
-modules/paint/
-  module.go       Module, ModuleID "paint", Descriptor (Name "Paint+", icon "brush", CategoryImage,
-                  OutputSubdir "Paintings", Requires none, Recommends sidecar.DepID)
-  options.go      ExportOptions, AIOptions, StepOptions (+ DefaultOptions)
-  document.go     PaintDoc (bindings-visible)
-  service.go      PaintService (Wails)
-  projects.go     project CRUD over core/projectdocs, tile files, thumbnails
-  export.go       flatten (pure Go compositor for normal/multiply/screen/add/overlay + opacity), PNG/JPG/WebP(FFmpeg)/ORA
-  ai.go           the hidden "paint-ai" job module: runs engine calls on crop files
-  origins.go      model origin cards (§1.4.3), confirmed in Wave 0
-  brushes.go      brush sets on disk (<support>/paint/brushes/), list/save/delete/export
-  brushimport/    brushset.go (zip + NSKeyedArchiver bplist), myb.go, abr.go (samp tips), krita.go; fidelity notes
-  pipeline.go     core.Chainable for the step (§2.7)
-  *_test.go
-sidecar/toolbox_sidecar/handlers/paint.py    paint.fill / paint.cutout / paint.segment / paint.enhance / paint.warm
-sidecar/tests/test_paint.py
-frontend/src/paint/               engine, no React, no tools/ imports (an architecture test enforces it)
-  engine/types.ts                 frozen in Wave 0 (§2.3)
-  engine/gl.ts compositor.ts tiles.ts layers.ts history.ts selection.ts transform.ts
-  input/pointer.ts smoothing.ts   coalesced/predicted, streamline, stabiliser, palm rejection
-  brushes/engine.ts dabs.ts dual.ts wet.ts bleed.ts impasto.ts schema.ts library/ (generated tips, grains, >= 60 presets)
-  lab/adapter.ts pixelsort.ts smear.ts flowfield.ts growth.ts reaction.ts inkbleed.ts particles.ts voronoi.ts echo.ts
-                                  (algorithmic Lab tools, §1.4.1; viz/post passes wrapped by adapter.ts)
-  guides/ symmetry.ts perspective.ts grid.ts
-  adjust/ hsb.ts curves.ts gradientmap.ts blur.ts liquify.ts noise.ts
-  ai/queue.ts crops.ts generations.ts           (frontend side of §1.4)
-  io/ora.ts                                     (OpenRaster read/write, also used by Go tests' fixtures)
-frontend/scripts/brushgen.ts      generates the bundled tips/grains (committed PNGs in paint/brushes/library/)
-frontend/src/tools/paint/         PaintView.tsx, Gallery.tsx, workspace.tsx, studio.ts (Studio mode), panels/*, islands/*, commands.ts
-  ui/                             the bespoke design language (§0, §1.5): tokens.css, icons/, Island, Popover, Slider, Puck, Badge…
-frontend/src/pipelines/steps/paint.tsx          StepUI
+core/search.go                     types (frozen in Wave 0, §2.5)
+core/mediaindex/                   the index: scan, queue, vector store, scoring, labels (no Wails, no modules)
+  index.go        Index: Open/Close, Enqueue, Query, Similar, Things, Labels, SetUserLabel, Status
+  vectors.go      fp16 codec, in-memory matrix, dot products (par over chunks)
+  scan.go         library / project / folder walkers, skip rules, reconcile
+  labels.go       vocabulary load, label scoring, thresholds
+  scheduler.go    idle detection → batch jobs; pause; events
+core/store/mediaindex.go           SQL for migration 0011
+core/store/migrations/0011_media_index.sql
+modules/mediaindex/                hidden Quiet job module "media-index" + the step module
+  module.go       Descriptor (Hidden, Quiet, Requires engine), Run = one batch
+  prepare.go      image → ≤512 px JPEG; video frames (FFmpeg); PDF pages (core/pdfium)
+  models.go       pinned model files, ModelProvider ("search-default")
+  vocabulary.tsv  frozen label vocabulary (§2.4)
+  pipeline.go     the "Keep files that show…" step (core.Chainable)
+sidecar/toolbox_sidecar/handlers/search.py   search.prefetch, search.embed_images, search.embed_text
+api/search.go                      SearchService (Wails)
+frontend/src/state/search.ts       status, query state, things
+frontend/src/views/library/        search results merge, Things view, label chips, Find similar, status line
+frontend/src/views/SettingsSearch.tsx
+frontend/src/pipelines/steps/search.tsx
 ```
 
-### 2.2 Document and storage
-A Paint+ project is a `projectdocs` document of a **new kind `paint`**:
-- migration `0009_paint_library.sql` adds the kind to the `projects` CHECK (copy the table, as 0007 did);
-- `core.ProjectPaint = "paint"`.
+### 2.2 Storage (migration `0011_media_index.sql`)
+```sql
+-- One row per file (or project) the index knows.
+CREATE TABLE media_items (
+  id          INTEGER PRIMARY KEY,
+  path        TEXT NOT NULL UNIQUE,     -- absolute; for projects the thumb path
+  source      TEXT NOT NULL,            -- 'library' | 'project' | 'folder'
+  source_ref  TEXT NOT NULL DEFAULT '', -- project id, or extra-folder id
+  kind        TEXT NOT NULL CHECK (kind IN ('image','video','document')),
+  size_bytes  INTEGER NOT NULL,
+  mod_ms      INTEGER NOT NULL,
+  state       TEXT NOT NULL CHECK (state IN ('pending','done','failed','skipped')),
+  reason      TEXT NOT NULL DEFAULT '', -- failed/skipped: one line for the user
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  model       TEXT NOT NULL DEFAULT '', -- model id the vectors belong to
+  indexed_at  INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX media_items_state ON media_items(state, id);
 
+-- One vector per picture: pos = -1 whole image, ms for video frames, page index for PDFs.
+CREATE TABLE media_vectors (
+  item_id INTEGER NOT NULL REFERENCES media_items(id) ON DELETE CASCADE,
+  pos     INTEGER NOT NULL,
+  vec     BLOB NOT NULL,                -- float16 LE, L2-normalised, len = dim*2
+  PRIMARY KEY (item_id, pos)
+);
+
+-- Labels: auto (from vectors), user (added), hidden (user removed an auto label).
+CREATE TABLE media_labels (
+  item_id INTEGER NOT NULL REFERENCES media_items(id) ON DELETE CASCADE,
+  label   TEXT NOT NULL,                -- vocabulary id, or the user's text (trimmed, lowercased)
+  source  TEXT NOT NULL CHECK (source IN ('auto','user','hidden')),
+  score   REAL NOT NULL DEFAULT 1,      -- auto: 0..1 probability; user: 1
+  pos     INTEGER NOT NULL DEFAULT -1,  -- the frame/page that scored best
+  PRIMARY KEY (item_id, label)
+);
+CREATE INDEX media_labels_label ON media_labels(label, source, score DESC);
+
+-- Text → vector cache (queries and vocabulary prompts), per model.
+CREATE TABLE media_text_vectors (
+  model   TEXT NOT NULL,
+  text    TEXT NOT NULL,
+  vec     BLOB NOT NULL,
+  used_at INTEGER NOT NULL,
+  PRIMARY KEY (model, text)
+);
+```
+- **Size:** 768 dims × 2 bytes ≈ 1.5 KB per vector. 10,000 photos plus 500 videos × 16 frames is about 27 MB.
+- **Settings key `search`:** `{ enabled: bool, paused: bool, folders: [{id, path}], skip: [path] }`. The default is `enabled: true`, which only does anything once the model is installed (Q2).
+- **Query cache:** query vectors are kept for the last 500 queries. The vocabulary's vectors are kept for as long as the model and vocabulary hash are the same.
+- **Bookkeeping:** `media_items.path` follows Library `Rename` (the store updates both in one transaction). `Trash` and Forget delete the row. Removing an extra folder deletes its rows.
+
+### 2.3 Indexing pipeline
+1. **Find work** (`core/mediaindex/scan.go`):
+   - **At start** (in main.go's deferred chores, 60 s after the window): reconcile the library, projects and extra folders. This is a stat walk only. A file is new if it has no row, and changed if its `size`/`mod_ms` differ (→ `pending`). Rows whose file is gone are deleted.
+   - **Live:**
+     - `library:added` → enqueue now;
+     - project saves (`projectdocs` update hook) → enqueue the thumb;
+     - Rename and Trash → update or delete.
+   - **Extra folders** are rescanned every 30 min while the app runs (no file watcher, as in Phase 19), and on "Rescan now".
+2. **Schedule** (`scheduler.go`):
+   - submits one `media-index` batch job (≤ 32 files, newest first, library before folders) **only when no other non-quiet job is queued or running** and indexing is enabled and not paused;
+   - it checks again on every `Jobs.Observe` change and every 15 s;
+   - a user job submitted mid-batch doesn't cancel the batch. Batches are small (≈ 10–20 s), so a user job waits at most one batch for the engine.
+3. **Prepare** (`modules/mediaindex/prepare.go`, inside the job, files in TempDir), with `core/par` (6 at a time):
+   - **Image:** `imaging.ToReadable` (HEIC) → `imaging.Orient` → shortest side resized to 224 (the model's size) → JPEG q90.
+   - **Animated GIF/WebP:** the first frame and the middle frame.
+   - **Video:** probe the duration (`core/media`). Take frames at `max(2 s, duration/16)` steps, at most 16, with FFmpeg run in the TempDir (`-ss` before `-i`, one `select` graph through `-/filter_complex`, as the Phase 15 rule says). Then drop a frame whose 64-bit dHash (shared from `organize` into `core/imaging/dhash.go`) is within 6 bits of the previous kept frame. A still shot gives one vector.
+   - **PDF:** pages 1–4 through `core/pdfium` at 224 px short side. Encrypted PDFs are skipped ("password protected").
+4. **Embed:** one `search.embed_images` call per batch with every prepared path. It returns float16 vectors (base64) in order.
+5. **Store:** in one write transaction per batch:
+   - vectors, `state = done`, `model`, `indexed_at`;
+   - auto labels (§2.4) recomputed in Go;
+   - `user` and `hidden` rows are left alone.
+6. **Failures:**
+   - a file that fails to prepare → `failed` with the reason, retried once on the next start;
+   - an engine crash → the batch is retried once, item by item; an item that crashes twice → `skipped` ("couldn't be read by the engine").
+7. **Events:** `search:status` (`core.SearchStatus`, throttled to 2/s) and `search:indexed` (`{paths}` per batch) let open views refresh their label chips.
+8. **Model change:** a new pinned model id marks every row `pending` (vectors are replaced batch by batch), and search keeps using the old vectors until each row is redone (a vector of the wrong model is skipped when scoring).
+
+### 2.4 Labels
+- **Vocabulary** (`modules/mediaindex/vocabulary.tsv`, embedded, frozen data):
+  - columns `id`, `category`, `display`, `prompts` (`|`-separated, `{}` = the display word), `threshold` (optional override);
+  - about 1,500 everyday concepts across the eight categories in §1.1;
+  - each has 1–3 prompts, e.g. `a photo of an apple|an apple`;
+  - Documents & screens has `screenshot`, `receipt`, `whiteboard`, `slide`, `code`, `chart`, `handwriting`, `map`, `poster` …;
+  - Art & design has `painting`, `sketch`, `illustration`, `logo`, …;
+  - **no identity labels**: no named people, no ethnicity or gender, and no "person's name". People & events has `person`, `group of people`, `selfie`, `wedding`, `birthday`, `concert`, ….
+  - Parent links (`apple` → `fruit` → `food`) are a fourth column `parent`. A child label always adds its parent.
+- **Scoring (Go):** `p = sigmoid(scale · (img · text) + bias)`.
+  - `scale` and `bias` are the model's own pinned constants, and `text` is the mean of the label's prompt vectors, re-normalised.
+  - A label is kept if `p ≥ threshold` (the default comes from the Wave 0 calibration, §7, about 0.1 for SigLIP).
+  - An item keeps at most 8 labels (plus their parents). Videos and PDFs take the max over their frames or pages and remember `pos`.
+- **Text search uses the same score.** "Strong" is p ≥ 0.3, "Good" is p ≥ 0.1, "Maybe" is p ≥ 0.03, all calibrated in Wave 0 and stored in `labels.go` as constants. Below "Maybe" nothing shows. So a query for something that isn't in the library shows **no concept results**, rather than the 50 least-bad ones.
+- **Changing the vocabulary** recomputes auto labels from stored vectors (no re-embedding), which takes seconds.
+
+### 2.5 Go contracts (frozen in Wave 0)
 ```go
-// modules/paint/document.go
-type PaintDoc struct {
-    Version    int          `json:"version"`    // 1
-    Width      int          `json:"width"`      // ≤ 8192
-    Height     int          `json:"height"`     // ≤ 8192, Width*Height ≤ 40e6
-    Background string       `json:"background"` // "#rrggbb" | "transparent"
-    Layers     []PaintLayer `json:"layers"`     // bottom → top, ≤ 64
-    Active     string       `json:"active"`     // layer id
-    Palette    []string     `json:"palette"`    // ≤ 64 "#rrggbb"
-    Symmetry   string       `json:"symmetry"`   // JSON (frontend schema), "" = off
-    TileSize   int          `json:"tileSize"`   // 512
-    Source     string       `json:"source"`     // original file opened from ("" for blank); never modified
+// core/search.go
+type SearchQuery struct {
+    Text     string       `json:"text"`     // free text; "" = labels/filters only
+    Labels   []string     `json:"labels"`   // all must match (auto or user, not hidden)
+    Similar  string       `json:"similar"`  // path; with SimilarPos for a frame/page
+    SimilarPos int64      `json:"similarPos"`
+    Filter   LibraryQuery `json:"filter"`   // kinds, module, since/until, folder (Search/Sort/Cursor ignored)
+    Sources  []string     `json:"sources"`  // empty = library+project+folder
+    Limit    int          `json:"limit"`    // default 200, max 500
 }
-type PaintLayer struct {
-    ID, Name  string
-    Hidden, Locked, AlphaLock, Clip bool
-    Opacity   float64 // 0..1
-    Blend     string  // normal|multiply|screen|overlay|add|darken|lighten|color-dodge|color-burn|soft-light|hard-light|difference|hue|saturation|color|luminosity
-    Tiles     []string // "tx_ty" keys that exist on disk (empty tiles are absent = transparent)
-    Rev       int      // bumps on every pixel save (cache key)
+type SearchHit struct {
+    Path      string  `json:"path"`
+    Source    string  `json:"source"`    // library | project | folder
+    ProjectID string  `json:"projectId"`
+    Output    *Output `json:"output"`    // when it's a library output
+    Kind      OutputKind `json:"kind"`
+    Score     float64 `json:"score"`     // 0..1 (label/user hits = 1)
+    Strength  string  `json:"strength"`  // strong | good | maybe | label | name
+    Pos       int64   `json:"pos"`       // -1, video ms, or PDF page
+    Moments   []int64 `json:"moments"`   // other matching positions (≤ 5)
+    Via       string  `json:"via"`       // "label:apple", "concept", "name"
 }
+type SearchPage struct {
+    Hits      []SearchHit  `json:"hits"`
+    Labels    []LabelCount `json:"labels"`    // labels matching Text (prefix), for the chip row
+    Concept   bool         `json:"concept"`   // concept scoring ran (false: engine/model missing or warming)
+    Warming   bool         `json:"warming"`   // the text vector is being computed; call again
+}
+type LabelCount struct { Label, Display, Category string; Count int; User bool; Cover string }
+type MediaLabel struct { Label, Display, Source string; Score float64; Pos int64 }
+type SearchStatus struct {
+    Installed, Enabled, Paused, Waiting bool
+    Total, Done, Pending, Failed, Skipped int
+    Current string; Model string; IndexBytes int64; LastError string
+}
+type SearchFolder struct { ID, Path string; Files int; Missing bool }
+type SearchFailure struct { Path, Reason, State string; Attempts int; At int64 }
 ```
-
-**Pixels are tiles.**
-- Each layer is a grid of 512 × 512 RGBA tiles, stored as PNGs at `<support>/projects/<id>/layers/<layerId>/<tx>_<ty>.png`. Empty tiles are not stored.
-- `thumb.jpg` (≤ 512 px) and `render.png` (flattened, ≤ 4096 px long side, used by the Library and the step) sit next to them.
-- Autosave sends **dirty tiles only**. A brush stroke typically touches 1–6 tiles, so each binding call stays small: base64, 2 MiB cap per tile.
-- A save is atomic per tile (temp file + rename). The document JSON is saved last, so a crash never references a missing tile: tiles listed but absent load as transparent and are logged.
-
-`PaintService` (all bound; errors are `*core.AppError`):
+`api/search.go`, `SearchService`:
 ```go
-Projects() ([]core.ProjectInfo, error)
-Create(name string, w, h int, background string) (string, error)              // id
-CreateFromImage(path string, name string) (string, error)                       // imports the image as layer 1 (oriented, HEIC via engine), never touches path
-Load(id string) (PaintDoc, error)
-Tiles(id, layerID string, keys []string) (map[string]string, error)             // key → PNG data URL (≤ 64 per call)
-SaveTiles(id, layerID string, tiles map[string]string, removed []string) error   // data URLs; "" removes
-SaveDoc(id, name string, doc PaintDoc) error                                    // validates; garbage-collects tiles of deleted layers
-SaveThumb(id, jpegDataURL, renderPNGDataURL string) error                       // render ≤ 40 MiB
-Rename(id, name string) error; Duplicate(id string) (string, error); Delete(id string) error
-Export(id string, opts ExportOptions) (core.Job, error)                          // job: flatten in Go → <library>/Paintings, registered output
-ExportAs(id string, opts ExportOptions) (string, error)                         // save dialog, writes directly, returns path ("" cancelled)
-ImportLayer(id, path string) (PaintLayer, error)                                // image file → new layer tiles (scaled to fit if larger)
-AI(id string, req AIRequest) (core.Job, error)                                  // §2.5
-AIResult(jobID string) (string, error)                                          // result PNG data URL (crop size)
-AIStatus() ([]AIModelInfo, error)                                               // per perception tool: ready? model sizes; drives the gates
-Warm() error                                                                    // starts the engine + loads the fast inpaint model if installed (no download)
+Status() core.SearchStatus
+Query(q core.SearchQuery) (core.SearchPage, error)  // names+labels synchronously; concept part via cache or Warming=true + search:ready event
+Things() ([]core.LabelCount, error)
+Labels(path string) ([]core.MediaLabel, error)
+SetLabel(path, label string, on bool) error         // user add / hide auto / remove user
+Failures(limit int) ([]core.SearchFailure, error); Retry(paths []string) error
+SetEnabled(on bool) error; SetPaused(on bool) error; Rescan() error; Rebuild() error; DeleteIndex() error
+Folders() ([]core.SearchFolder, error); AddFolder() (core.SearchFolder, error) /* dialog */; RemoveFolder(id string) error
+SetSkip(paths []string) error
+Warm()                                               // starts the engine + text model when the search box gets focus
 ```
-Projects open from `CreateFromImage` remember `Source`. **Never write to `Source`.**
+- **Concept scoring:**
+  - all vectors of the current model are loaded lazily into one `[]float32` matrix (fp16 → fp32) on the first query;
+  - they're kept current on writes and dropped after 10 idle minutes;
+  - scoring is a dot product per vector, fanned out with `par` over 4096-row chunks; 100k vectors take ≈ 20 ms;
+  - an item's score is the max over its vectors.
+- **The text vector** comes from the cache, or from `search.embed_text`. When it isn't cached, `Query` returns the names and labels at once with `Warming: true`, then emits `search:ready {text}` once the vector is in. The UI asks again, and that second answer comes from the cache.
+- **Filters** are applied after scoring via `outputs` joins (library hits) or `media_items` (others).
 
-### 2.3 Frontend engine contract (frozen in Wave 0: `frontend/src/paint/engine/types.ts`)
-```ts
-export interface PaintEngine {
-  readonly doc: Readonly<EngineDoc>;            // mirrors PaintDoc + live GPU state
-  attach(canvas: HTMLCanvasElement): void;      // WebGL2; throws PaintGLError if unavailable
-  detach(): void;
-  load(doc: PaintDocJSON, tiles: TileSource): Promise<void>;
-  // input
-  beginStroke(tool: ToolState, p: InputPoint): void;
-  extendStroke(points: InputPoint[], predicted: InputPoint[]): void;
-  endStroke(): StrokeResult;                    // dirty tiles + history entry id
-  cancelStroke(): void;
-  // layers
-  addLayer(opts?: Partial<LayerProps>): string; removeLayer(id: string): void;
-  moveLayer(id: string, toIndex: number): void; setLayer(id: string, p: Partial<LayerProps>): void;
-  mergeDown(id: string): void; flatten(): void; setActive(id: string): void;
-  // selection & transform
-  selection: SelectionAPI; transform: TransformAPI;
-  // pixels in/out (AI, effects, export)
-  readRegion(r: Rect, src: "layer" | "merged"): Promise<ImageData>;
-  writeRegion(layerId: string, r: Rect, img: ImageBitmap | ImageData, mask?: ImageData, feather?: number): HistoryId;
-  // history
-  undo(): boolean; redo(): boolean; history(): HistoryEntry[]; jumpTo(id: HistoryId): void;
-  snapshotAt(id: HistoryId, r: Rect): Promise<ImageData>;     // History brush / generations
-  // view
-  view: ViewAPI;                                 // zoom/pan/rotate/flip, screen↔canvas
-  render(): void;                                // compositor, called on rAF when dirty
-  dirtyTiles(): Map<string, Set<string>>;        // layerId → tile keys since last save
-  markSaved(layerId: string, keys: string[]): void;
-  flattenToBitmap(scale: number): Promise<ImageBitmap>;
-  on(ev: "change" | "history" | "layers" | "selection" | "view", cb: () => void): () => void;
-}
-export interface InputPoint { x: number; y: number; pressure: number; tiltX: number; tiltY: number; twist: number; t: number; pointer: "pen" | "mouse" | "touch" }
-```
-Rules:
-- **WebGL2 throughout.** Each layer tile is a texture; the compositor draws visible tiles with the layer blend shaders. Dabs are instanced quads (`QuadBatch`-style), written into a per-stroke scratch target that is merged into the layer at the stroke's opacity on end (so in-stroke overlap never exceeds opacity, as in Procreate).
-- **Undo** stores the *before* tiles that a step touched, as GPU textures, demoted to compressed `ImageBitmap`s in RAM when over budget. Budget 1.5 GB, oldest dropped.
-- **Determinism.** A stroke replayed with the same points, brush and seed gives the same pixels. Jitter uses a seeded RNG per stroke (`stroke.seed`). Tests rely on this.
-- **No `Math.random`, `Date` or `performance.now` inside brush/effect math.** Timestamps come in via `InputPoint.t`.
-- `frontend/src/paint/**` never imports `src/tools/**`. `src/architecture.test.ts` gets the rule.
+### 2.6 AI engine (`handlers/search.py`)
+- **`search.prefetch {model:{files:[{file,url,sha256}]}, modelDir}`** downloads and verifies the files with `download.ensure_model`, as bgremove does.
+- **`search.embed_images {modelDir, files, paths[], threads}`** → `{dim, vectors: [base64 fp16]}`, with progress per image.
+  - Preprocessing: RGB, resized to 224 × 224 bicubic (SigLIP squashes rather than crops), scaled to `[-1, 1]` (mean 0.5, std 0.5), batched by 16, L2-normalised.
+  - It keeps one resident visual session; `threads` = half the cores (`intra_op_num_threads`).
+- **`search.embed_text {modelDir, files, texts[]}`** → the same shape.
+  - The tokenizer comes from the model's `tokenizer.json` through `tokenizers` (already locked, via faster-whisper), with SigLIP's fixed length of 64 tokens, padded.
+  - The text session loads on the first call and is dropped after 5 minutes unused, which keeps RSS low while indexing.
+- The handler never downloads, and `ctx.check_cancelled()` runs between batches.
+- **Tests** run against a tiny generated ONNX model (random linear projection, dim 8) and a toy `tokenizer.json`, plus slow tests with the real model (`TOOLBOX_SLOW=1`): "a photo of an apple" scores higher on a generated red-apple image than on a generated blue square.
 
-### 2.4 Lab algorithmic tools and brush import
-- **The `LabTool` interface.** Every algorithmic tool implements `LabTool` (frozen in Wave 0 as `paint/lab/types.ts`):
-  - `{ id, label, predictability: "exact"|"seeded"|"wild", origin: {kind:"algorithm", text}, params, onStrokeBegin/Extend/End, step?(dt) }`;
-  - `step` is for tools that keep evolving after the stroke: Reaction–diffusion, Ink bleed and Particles. They run on a GPU ping-pong target clipped to the stroke's tiles, and settle or stop by user action. Their frames come from a fixed tick count, never from wall time, so the result is deterministic.
-- **Adapters and paint-only shaders:**
-  - `paint/lab/adapter.ts` wraps any `viz/post` `PostDef`: the post pass renders from the stroke-start snapshot into a scratch target, then mixes through the dab mask. Params map from the PostDef's `params`.
-  - Pixel sort, Smear, Flow field, Growth (L-system → dab paths), Reaction–diffusion (Gray-Scott), Ink bleed, Particles, Voronoi and Echo are paint-only.
-- **Brush import (Go, `modules/paint/brushimport/`):**
-  - `PaintService.ImportBrushes(paths []string) ([]BrushImportResult, error)`, where `BrushImportResult` is `{Set, Brushes []BrushInfo, Fidelity []string, Error}`.
-  - It writes `<support>/paint/brushes/<set-id>/{set.json, <brush-id>.json, tips/*.png, grains/*.png}`.
-  - It never executes or loads anything other than PNG and plist/JSON data. Zip entries are size-capped (64 MB total, 4096 px tips) and path-sanitised (no `..`, no absolute paths).
-  - The binary-plist reader is `howett.net/plist` (BSD-2); the NSKeyedArchiver object graph is resolved by hand.
-  - Golden tests use small **synthetic** fixtures made by our own test helpers, never third-party brush files committed to the repo.
-- **Other brush methods:** `Brushes()`, `SaveBrush(set, json)`, `DeleteBrush`, `ExportBrushSet(set) (path)`, `BrushAsset(set, file) (dataURL)`.
-- `viz/` stays unchanged: Paint+ imports from it and never the reverse.
+### 2.7 Model and pack
+- **The model:** SigLIP 2 ViT-B/16 at 224 px (`google/siglip2-base-patch16-224`, Apache-2.0, trained on WebLI). It comes as split ONNX visual and textual files plus `tokenizer.json`, from Immich's export (`immich-app/ViT-B-16-SigLIP2__webli`). Wave 0 confirms the file list, URLs, sha256, sizes, `scale`/`bias` and dim, and pins them in `modules/mediaindex/models.go`. The files go to `<models>/search/siglip2-b16/`.
+  - If that repo's files can't be pinned (missing, or no text tower), Wave 0 exports them once from the official checkpoint with the same script as Immich. It hosts nothing: it records the decision and falls back to Q1's alternative model, which has a known ONNX export.
+- **The component** `search-default`, "SigLIP 2 image understanding", Apache-2.0, sizes measured in Wave 0.
+- **A new pack, `search` "Smart search"** (icon `scan-search`): the components `engine` and `search-default`; it unlocks `media-index`. It is also listed as an optional extra in the **Image** pack's description. The packs test is extended for a pack whose unlock is a hidden module (DECISIONS).
+- **Model files** are never copied into a job and never leave `<models>`.
 
-### 2.5 AI path (Go and engine)
-- **Not job spam, still jobs.** Each AI operation is a job of a **hidden module `paint-ai`**: progress, cancel and persistence come for free.
-- **New `Descriptor.Quiet bool`** (Wave 0) keeps a module's jobs out of:
-  - the completion toasts;
-  - the job tray's "recent" list (they still show while running);
-  - the Library (they register no outputs).
-- `MaxConcurrent: 1`.
-
-```go
-type AIRequest struct {
-    Op       string  // "fill" | "cutout" | "segment" | "enhance"
-    Source   string  // PNG data URL of the crop (≤ 24 MiB)
-    Mask     string  // PNG data URL (fill), "" otherwise
-    Points   []AIPoint // segment: {x,y,positive} in crop px, ≤ 64
-    Model    string  // fill: "best"|"fast"; enhance: preset id; cutout: "fast"|"balanced"|"best"
-    Passes   int     // fill: 1..12
-    Ghost    float64 // 0..1
-    Drift    float64 // 0..1
-    DriftDir string  // ""|"down"|"up"|"left"|"right" (Melt)
-    Offset   [2]int  // Echo source offset in crop px
-    Seed     int64
-    Scale    int     // enhance: 2|4
-}
-```
-- `Run` writes the crop and mask into `<support>/tmp/paint/<jobID>/` (pruned at start and when the job ends).
-- It resolves models through the **existing** providers:
-  - inpaint: `modules/eraser` models (`<models>/eraser`);
-  - cut-out: `modules/bgremove` presets;
-  - segment: `modules/editstudio` `matte-select` (SAM 2.1 tiny, `<models>/matte`);
-  - enhance: the CPU upscaler presets in `modules/upscale`, or `upscayl-bin` when present.
-- It calls the engine, keeps the result PNG as the job result (`AIResult` reads it back once and then deletes it), and never downloads inside the handler.
-- **Fetching models.** A missing model is fetched only by the user clicking the gate's "Get" button. That runs the existing `ModelProvider.FetchModel` through the packs job, as elsewhere.
-
-**Engine handlers** (`handlers/paint.py`). They reuse `eraser.py`'s `inpaint_region`/session cache, `bgremove.py`'s session, and `upscale.py`'s tiler:
-- `paint.fill {src, mask, out, model, modelPath, passes, ghost, drift, driftDir, offset, seed}` → `{output, passes}`.
-  - Each pass: build the pass mask (dilate by a seeded ±drift amount, shift by `driftDir`), take the context from the previous pass's output (shifted by `offset` for Echo), inpaint, then `out = lerp(prev, pass, 1 − ghost)` inside the mask.
-  - `ctx.progress` per pass. **Intermediate passes are emitted as `output` events** (`pass-<n>.png`) so the Generations strip fills as it runs.
-- `paint.cutout {src, out, model…}` → `{output (RGBA), coverage}`.
-- `paint.segment {src, points, out, modelPath}` → `{output (mask PNG), score}`.
-  - Uses SAM 2.1's **image** predictor (`SAM2ImagePredictor`) from the pinned official repo already in `[tool.uv.sources]`.
-  - Embeddings are cached per `src` hash (LRU 4), so extra clicks only run the decoder (target < 150 ms).
-- `paint.enhance {src, out, model, modelDir, scale}` → `{output}`. Paint+ resamples back.
-- `paint.warm {modelPath}` loads the MI-GAN session (and LaMa if present).
-
-No new Python dependencies. Pin checks: `uv.lock` unchanged.
-
-### 2.6 Export
-- `Export` is a `paint` job. It flattens the tiles in Go (pure Go compositor), so a large export never goes through the webview.
-  - Blend modes beyond normal/multiply/screen/add/overlay/darken/lighten are flattened by the frontend instead: the job is submitted with `ExportOptions.Flattened` = a render PNG the frontend made with the same compositor. Go-side blend math is table-tested against the frontend's golden pixels.
-- **Formats:**
-  - PNG (default);
-  - JPG (quality 60–100, background required);
-  - WebP (FFmpeg, as `imagebatch`);
-  - `.ora`: zip of `mimetype`, `stack.xml`, `data/<layer>.png`, `Thumbnails/thumbnail.png` and `mergedimage.png`. Opacity, visibility and composite-op map to OpenRaster names. Krita and GIMP open it.
-- Output: `<library>/Paintings/<project name>.<ext>`, never overwriting (` (2)` suffix as elsewhere). It's registered with lineage inputs = `[Source]` when set (§3.3).
-
-### 2.7 Pipeline step (required: every tool is a step)
-`paint` implements `core.Chainable` with `StepOptions{Action, Project, Layer, Fit, Passes, Ghost, Drift, Seed, Model}`. There are two actions, both render-free (no webview):
-- **`overlay`** ("Draw a painting over"): for each input image, composite a saved Paint+ project's visible layers (flattened `render.png` at full res via tiles) over it. `Fit` is `contain|cover|stretch`, placed centred, and the output goes to `Paintings/`. Use cases: watermark, frame, signature, hand-drawn annotations on a batch.
-- **`dissolve`** ("Dissolve with a mask"): for each input image, use a mask from a saved Paint+ project's named layer (alpha > 0 = mask) or a saved Object Eraser mask, then run `paint.fill` with Passes/Ghost/Drift/Seed. This is the inspiration effect in batch, on a folder of photos.
-
-`Produces` role `image`; `Templates` none; `Vars`: `{passes}` echoed. The `StepUI` lives in `frontend/src/pipelines/steps/paint.tsx`, with `paramDefs` entries (project picker, layer picker).
-
-### 2.8 Packs
-Paint+ joins the **Image** pack with `Needs: []`. Drawing works with nothing installed, like `imagebatch`. The perception tools' needs are shown per tool:
-
-| Brush | Needs |
-|---|---|
-| Fill eraser / Dissolve / Melt / Echo / Edge erode / Extend canvas | `engine`, `inpaint` |
-| Subject stamp / Select subject | `engine`, `bg-default` |
-| Select object | `engine`, `matte-select` |
-| Enhance brush / Upscale canvas | `upscaler` or `engine` |
-
-The Image pack's components gain `matte-select`. Wave 0 confirms that a component can be listed by two packs: `core/packs` status counts it installed once. If it can't, Select object's gate points to the Music edits pack and DECISIONS records it.
+### 2.8 Pipeline step: "Keep files that show…" (`search-filter`)
+- **Options:** `query` (text, template), `strength` (`strong` | `good` | `maybe`, default `good`), `invert` (keep those that *don't*).
+- **Behaviour:** files pass through untouched. Each file's vector comes from the index if it's indexed and current; otherwise it's embedded inside the step's job, the same way (prepare + `search.embed_images`), and **not** added to the index unless it's in an indexed place.
+- **Outputs:** role `kept` (matching) and role `other` (the rest), plus the variables `matched` (count, number) and `best` (top label of the first file, text).
+- It's a hidden job module (`search-filter`, Requires the engine) with a `StepUI` in `pipelines/steps/search.tsx`, in the step picker under "Organise". The module is non-built-in and hidden, so it's in the `search` pack's unlocks.
 
 ---
 
-## 3. Library — product and architecture
-
-### 3.1 What a user can do
-- **Open it** from the sidebar ("Library", Mod+L), the palette, any tool's More → "Show in Library" (filtered to that tool), any toast's "Show in Library", and Paint+ → "Exports".
-- **Browse** in one of four views (remembered):
-  - **Grid** (default): thumbnail cards, sized S/M/L.
-  - **List:** today's dense rows, kept.
-  - **Folders:** the library folder tree as on disk. The left pane is a tree with item counts; the right pane shows that folder's contents as a grid. **Unregistered files appear too**, marked with a dim "not from a job" dot.
-  - **By tool:** one section per tool, newest first. Each section has a header with the tool icon and name, the folder name (full path on hover), "Open folder" and "Open tool", and shows its first 12 items with "Show all".
-- **Filter and sort:**
-  - search by name across everything (server-side);
-  - type chips (image, video, audio, document, other) moved to the server query;
-  - tool filter, a date range (Today, This week, This month, All);
-  - sort: newest, oldest, name, size.
-- **Previews:**
-
-  | File type | Preview |
-  |---|---|
-  | Images | `FilesService.ImageThumb` |
-  | Video | poster frame (`MediaService.Frame` at 10%), hover-scrub filmstrip (`Filmstrip`, 8 frames), duration badge |
-  | Audio | mini waveform (`Waveform`, 64 buckets), inline play |
-  | PDF | first page (`pdf.Service.Thumbnail`), page count badge |
-  | Text, srt, lrc, csv, json, md | first lines (`ReadText`, 2 KB) |
-  | Folders (Folders view) | a mosaic of up to 4 children |
-  | Missing files | greyed, with "Forget" |
-
-- **Detail panel.** Click a card to open it on the right (Enter or double-click = Open in the default app). It shows:
-  - a big preview: zoomable image (`wholeImageUrl`), video/audio player, PDF pages (scroll), or text (scroll, `TextActions`);
-  - name (rename), folder (click = Reveal), size, dimensions/duration, created, tool;
-  - the job's settings summary (from `jobs.options` through the module's `summarize`, or raw key/values);
-  - **Made from:** input thumbnails, clickable when they're library files, otherwise "Reveal input";
-  - **Made into:** outputs whose lineage includes this file;
-  - **Generations:** when a chain exists (A → A (erased) → A (erased) (erased) → …, i.e. single-input lineage repeated through the same tool), a horizontal strip with a scrubber across the whole chain. "Export strip as GIF/contact sheet" uses the `gif` module's job, and "Open in Paint+" is offered.
-  - **actions:** Open, Reveal, Save a copy, Copy path, Send to…, Open in <tool that made it>, Rename, Forget (DB only), **Delete** (to the Recycle Bin / Trash, undoable from the OS; Q3).
-- **Other places.** A section at the bottom of the tree/tool views for things the user made that live outside the library:
-  - **Projects** (posts, compositions, edits, video projects, paintings) with their thumbs. Clicking one opens it in its tool.
-  - **Saved masks** (Object Eraser). Open in Object Eraser.
-  - **Received** (Local File Transfer), which is in the library already but grouped by device.
-
-  Vault exports already live in the library. Clipboard images stay in Clipboard History (privacy: never surfaced elsewhere).
-- **Multi-select** (kept): bulk Send to, Reveal, Save copies to a folder…, Forget, Delete.
-- **Live.** `library:added` and `library:removed` update open views. A refresh button rescans the Folders view.
-
-### 3.2 Backend
-New `LibraryService` methods (Wave 0 signatures):
-```go
-Query(q core.LibraryQuery) (core.OutputPage, error)            // supersedes Recent: + Kinds []Kind, Since/Until ms, Sort, Folder (rel)
-Folders() ([]core.LibraryFolder, error)                        // tree of <library> dirs (depth ≤ 6), counts (registered + all files), newest mtime
-ListDir(rel string, limit int) ([]core.LibraryEntry, error)     // one folder's files+subdirs (≤ 5000), joined with outputs by path; rel must stay inside the library
-Detail(outputIDOrPath string) (core.OutputDetail, error)       // output + job options/title + MadeFrom + MadeInto + Chain
-Places() (core.LibraryPlaces, error)                           // projects (all kinds) + saved masks
-Rename(outputID, newName string) (core.Output, error)          // same folder, sanitized, never overwrites; MoveOutput
-Trash(outputIDs []string, paths []string) (core.TrashResult, error) // OS trash; library files only; removes rows
-SaveCopies(outputIDs []string) (string, error)                 // folder dialog, copies all (non-overwriting names)
-```
-- `ListDir`, `Rename` and `Trash` refuse anything outside `<library>` (`core.IsWithin`), and symlinks/junctions are not followed. `Trash` never touches the support dir.
-- **Trash backends:**
-  - Windows: `IFileOperation` with `FOFX_RECYCLEONDELETE`, or `SHFileOperationW` with `FOF_ALLOWUNDO|FOF_NOCONFIRMATION|FOF_SILENT`, via `golang.org/x/sys/windows` (no cgo).
-  - macOS: `NSFileManager trashItemAtURL` (cgo, `desktop/`-style file in `core/trash/trash_darwin.go`; a cgo-less build falls back to "not available on this build", and the button is disabled with that reason).
-- `core/trash` is a tiny package with a fake for tests.
-
-### 3.3 Lineage
-Migration `0009_paint_library.sql` (shared with §2.2) adds:
-```sql
-CREATE TABLE output_inputs (
-  output_id TEXT NOT NULL REFERENCES outputs(id) ON DELETE CASCADE,
-  input_path TEXT NOT NULL,
-  PRIMARY KEY (output_id, input_path)
-);
-CREATE INDEX output_inputs_path ON output_inputs(input_path);
-```
-- **Filling:**
-  - `JobContext.Output(path)` records the job's inputs for that output.
-  - With exactly one input, that's it.
-  - With several inputs, `JobContext.OutputFrom(path string, inputs ...string)` (new, additive) lets a module be precise. Without it, the default is the inputs whose file stem is a prefix of the output's stem, or else all inputs.
-  - Wave 1 updates the multi-input modules that matter: `imagebatch`, `converter`, `bgremove`, `upscale`, `compress`, `stems` (folder → stem files), `pdf` merge/split. Any module not updated keeps the default.
-  - Pipelines: built-in steps record their step inputs the same way.
-- **Backfill.** At first start after the migration, a one-time job-less pass inserts `(output.id, input)` for every output whose `job_id` is still set, from `jobs.inputs`. Outputs with no job (old chat exports) have no lineage. That's shown as "Origin unknown".
-- **Chains:** `Detail` follows single-input lineage backwards and forwards within the same `module_id` (≤ 200 steps) to build `Chain`. The erased series becomes one chain.
-
-### 3.4 Frontend
-- `frontend/src/views/library/` replaces `LibraryView.tsx`, split as `LibraryView.tsx` (shell + toolbar), `GridView.tsx`, `ListView.tsx`, `FolderView.tsx`, `ByToolView.tsx`, `DetailPanel.tsx`, `previews/*.tsx`, `Places.tsx`, and `state/library.ts` (extended).
-- Every card and row uses `useResultBehaviour` (draggable, double-click opens) and `FileActions`.
-- **Thumbnails** load lazily (IntersectionObserver), at most 6 concurrent, cached by `path+mtime` in memory (LRU 500).
-- **Deep links:** `openLibrary({ moduleId?, path?, outputId? })` in `lib/openLibrary.ts` sets the view, filter and selection.
-- `ToolHeader`'s More menu gets a standard "Show in Library" item for every tool, through `ToolHeader` itself, with the module id from context. The completion toast gains "Show in Library" next to Reveal.
-- The 960 × 600 layout: the detail panel becomes a drawer, and the tree in Folders view collapses to a breadcrumb.
+## 3. UI details
+- **Search box:**
+  - the placeholder is "Search names and what's in them";
+  - a hint row under it (the first time, or with the model missing) says "Try: apple, dog on a beach, receipt";
+  - focus calls `SearchService.Warm()` (at most once a minute).
+- **Results:** concept hits replace the normal page while a query is active, and sort is fixed to "Best match" (the sort menu shows that and is disabled with a reason). Paging is client-side over ≤ 500 hits. All four existing views render hits; Folders view shows them flat with the folder under the name.
+- **Card additions:** a strength dot (Strong/Good/Maybe, tooltip shows the %); a time badge for video moments; "p. N" for PDF pages; a folder badge for extra-folder files; a "Project" badge.
+- **Chips:**
+  - the chip row above results (labels) and the active-label chips in the filter bar use the existing `Chip` component;
+  - label chips are neutral, and user labels have a dot (not a colour: value colours are reserved for pipeline types);
+  - chips never wrap, and extra ones collapse to "+N".
+- **Detail panel:**
+  - "In this picture" sits under the metadata (chips, "+ Label", "Find similar");
+  - for video it also has "Moments" (a strip of matching frames when a query is active).
+- **The Things view** is a grid of label cards by category with sticky category headers, and it virtualises above 300 cards.
+- **The status line:**
+  - lives in the Library's filter column, or More → Search status at 960 px;
+  - clicking it opens Settings → Search;
+  - with the engine or model missing, a `DepsGate`-style one-liner shows instead, with the `search` pack button.
+- **Settings → Search** (`SettingsSearch.tsx`), a form page:
+  - status with Pause/Resume;
+  - Index in background;
+  - Also search these folders (list + Add/Remove);
+  - Skip these folders;
+  - Rescan now, Rebuild index, Delete index (confirm, which names the size);
+  - the model's origin line: "SigLIP 2 by Google, trained on WebLI (web images with alt text); Apache-2.0; runs on this computer."
+- **The palette:** "Search pictures for…" (opens the Library with the box focused), "Find similar to selected", and "Pause indexing" / "Resume indexing".
+- **Layout:** works at 960 × 600 (the chip row collapses, the status goes into More) and 1180 × 720.
 
 ---
 
 ## 4. Errors and limits
-- **Paint+ errors:**
-  - WebGL2 unavailable: "Paint+ needs WebGL 2, which this window doesn't have". This shows in the tool, with no crash.
-  - Tile load failure: the layer shows a red outline, plus a banner "Some of this layer couldn't be read (N tiles)" with "Clear those tiles".
-  - The engine crashes mid-AI: the region's shimmer turns red and says "That fill failed — try again". The canvas stays untouched.
-- **Size limits:**
-  - Canvas over 40 MP: refused at creation with the max shown. An image over 40 MP opened as a new canvas is offered "Scale down to fit" or "Cancel".
-  - AI crop: the context is clamped to 1536 px (Fast) or 3072 px (Best). Bigger strokes are split into overlapping tiles, run in sequence, and blended. **Extend canvas** max 2048 px per side per run.
-- **Library limits:** `ListDir` over 5000 entries shows the first 5000 and says so. `Trash` on a file in use reports which one and continues with the rest.
+- **Engine or model missing:** search works on names and user labels. `Concept: false`, and the gate line names the pack.
+- **Engine busy or crashed during a query:** names and labels still show, and concept results say "Couldn't search pictures right now · Try again". It never shows a blank page.
+- **An unreadable file:** `failed` with the reason (corrupt, unsupported codec, password protected, too large), listed under "Show" with Retry.
+- **An extra folder that went missing** (unplugged drive): shown as "Missing" in Settings. Its rows are kept for 30 days, and its hits are hidden until it returns.
+- **Index DB errors:** indexing stops and the status shows "Indexing stopped: <reason>". Search falls back to names. The app isn't affected.
+- **Memory:** the in-memory matrix is capped at 512 MB (≈ 170k vectors at fp32). Above that, scoring streams from SQLite in chunks (slower; the status says "Large index").
 
 ## 5. Tests
 - **Go:**
-  - `modules/paint`:
-    - document validation;
-    - tile save/load/GC;
-    - atomic saves;
-    - flatten golden pixels per blend mode;
-    - ORA round-trip;
-    - export naming;
-    - the AI job with a fake `Caller` (crop files written, cleaned up, result read once);
-    - `Chainable` (describe, prepare overlay/dissolve, outputs);
-    - `Source` never written (hash before/after).
-  - `core/store`: migration 0009 upgrade from a 0008 DB fixture, `output_inputs` insert/cascade, backfill.
-  - `api`: `ListDir`/`Rename`/`Trash` refuse outside the library (table), with the fake trash.
-  - `core`: `OutputFrom`, the default stem rule, and chain building.
-  - The root tests `TestEveryToolIsAPipelineStep` and the packs test include `paint`.
-- **Python:**
-  - `paint.fill` on generated images: pass count, ghost = 1 keeps the source, determinism for the same seed, drift changes the output, offset shifts.
-  - `paint.segment` with a fake predictor (the real one runs under `TOOLBOX_SLOW=1`).
-  - `paint.cutout` and `paint.enhance` wiring.
+  - `core/store`: migration 0011 from a 0010 fixture; cascades; rename and trash keep `media_items` in step; text cache LRU.
+  - `core/mediaindex`:
+    - the fp16 codec (round-trip within 1e-3);
+    - scoring top-k matches a naive reference;
+    - label thresholds, parents and `hidden` that survives re-index;
+    - the skip rules (table: hidden files, symlinks, support dir, clipboard dir, vault dir, skip-list);
+    - reconcile (new, changed, gone);
+    - the scheduler only submits when idle and respects pause;
+    - a model change marks rows pending;
+    - the 512 MB fallback.
+  - `modules/mediaindex`:
+    - prepare (image orientation, HEIC via a fake converter, GIF frames, video frame selection and dHash dedupe against a generated test video, PDF pages, an encrypted PDF skipped);
+    - `Run` against a fake `Caller`;
+    - `Chainable` (describe, prepare, outputs with roles, invert).
+  - `api`: `Query` merges label, concept and name hits in order without duplicates; `Warming`, then the cached result; filters; extra folders refused for Rename/Trash.
+  - Root: the packs test (the `search` pack), `pipeline_proof_test` (`search-filter`), and the vocabulary test (unique ids, valid categories, parents exist, no banned identity words, every prompt has a `{}` or is literal).
+- **Python:** the tiny-model tests (§2.6), tokenizer padding, batch order, cancel between batches; slow real-model tests.
 - **Frontend (vitest):**
-  - **Brushes:** importer mapping (Go, synthetic fixtures, zip path sanitising, size caps); every bundled preset renders non-empty on the CPU backend.
-  - **Lab:** each `LabTool` is deterministic for a fixed seed (CPU backend), and predictability labels match behaviour (Exact tools ignore the seed).
-  - **Brush engine:** dab spacing, dynamics curves, a seeded jitter replay that is identical twice, streamline output.
-  - **History:** undo/redo of tiles, budget drop.
-  - **Selection math:** lasso fill, wand tolerance.
-  - **AI queue:** ordering, cancel, replaying later strokes over a returned region.
-  - **Crops:** bbox and margin, clamping.
-  - **`ora.ts`:** round-trip.
-  - **Gallery and Editor:** render, gates, Studio mode, docked vs popover panels at 1600 px, origin cards and predictability badges, the 960 × 600 layout via the media-query mocks.
-  - **Library:** each view renders from fixtures, server filters, the detail panel lineage and chain, the trash flow with undo text, the deep links.
-  - **The every-tool tests** include `paint`. The architecture test adds the `paint/**` rule.
-- **GL.** jsdom has no WebGL, so engine GL code sits behind a `GLBackend` interface with a CPU reference backend used in tests. Golden comparisons run in the real app through a **PaintLab** (`TOOLBOX_PAINTLAB=1`, like VizLab): it replays recorded strokes per preset into `<support>/tmp/paintlab/*.png` + `hash.json`.
+  - results merge and the no-jump insertion;
+  - chips (add, hide, completion);
+  - the Things view from fixtures;
+  - Find similar flow;
+  - the status line in each state, and the gate when missing;
+  - `SettingsSearch` (folders, delete confirmation);
+  - the step `StepUI` and its params labels (`steps/params.test.ts`);
+  - 960 × 600 via media-query mocks.
 
 ## 6. Acceptance (on the Windows PC, a real build, sandbox env)
-1. A blank 4K canvas, with 2 minutes of continuous inking using a pen: pressure varies the width, there are no gaps, and the frame time stays under 8 ms (PaintLab's fps probe and the DevTools trace).
-1b. **Core-only check:** with no AI engine installed, every non-Lab feature in §1.1 works, and the Lab's perception tools are greyed with a reason.
-1c. **Brushes:**
-   - the 60 bundled brushes render in PaintLab (one stroke sheet per set);
-   - importing a Procreate `.brushset` you own lands as a set and shows a fidelity note;
-   - a MyPaint `.myb` imports.
-1d. **Layout:**
-   - Studio mode at 3840 × 2160 docks the panels and never covers the canvas;
-   - inside Toolbox at 960 × 600 every control is reachable;
-   - light and dark both follow the Paint+ tokens.
-2. Open the reference photo (the erased series' original `both.png` if still present, else any photo). Dissolve with Passes 6, Ghost 30%, Drift 50 over a face reproduces the look of `both (erased) … (erased).png`. The Generations strip shows passes 1–6, and the History brush paints back an eye.
-3. Select object with 2 clicks isolates a person, then copy to a new layer.
-4. Extend the canvas by 512 px right with fill. The seam isn't visible at 100%.
-5. Save, quit the app, reopen: the project is identical (pixel hash). Export PNG and ORA. The ORA opens in Krita/GIMP if installed (else validated by our reader).
-6. The pipeline: `dissolve` over a folder of 5 photos with a painted mask layer gives 5 outputs.
-7. Library:
-   - Folders view shows `Erased/` with all 27 files, and the detail panel shows the chain as one strip.
-   - "Show in Library" from Object Eraser lands filtered with the newest selected.
-   - Delete sends a file to the Recycle Bin, where it can be restored.
-8. Every screen is checked at 1180 × 720 and 960 × 600 (survey shots in `.dev/p19-qa/`).
+1. Install the **Smart search** pack from the Library's prompt. Indexing starts on its own, the status counts up, and the app stays responsive. A Converter job submitted mid-index starts within one batch.
+2. A sample set in the sandbox library (Wave 0 picks real photos from `.dev/` research inputs and the library, plus a few you add: an apple, a dog, a receipt, a screenshot, a sunset, a short video with a dog appearing after 20 s, a 3-page PDF with a chart on page 2):
+   - `apple` → the apple photo is in the top 3, with the label chip "apple · 1+";
+   - `dog` → the dog photo and the video, the video with a moment badge after 0:20; clicking plays from that moment;
+   - `receipt`, `screenshot`, `sunset`, `chart` (the PDF, "p. 2") are each in the top 3;
+   - `pomme` (French) → the apple photo;
+   - `giraffe` (none in the set) → no concept results, just "No pictures match 'giraffe'".
+3. The detail panel of the apple shows "apple" and "fruit". Hide "fruit", Rebuild index: it stays hidden. Add the label "lunch", then search `lunch`: found.
+4. The Things view shows Food & drink with an apple card. Find similar on the dog photo puts the dog video frame in the top 5.
+5. Add an extra folder with 20 photos: they're indexed and searchable, and nothing in that folder changed (hash before/after). Remove it, and its hits are gone.
+6. Restart the app: the index persists, and start-up time is unchanged (±5% vs before, measured as in the performance pass).
+7. Pull the network cable (or block outbound) after install: indexing and search still work.
+8. Clipboard history images and vault files never appear in search (checked by putting an apple picture into clipboard history).
+9. A pipeline: folder watch → "Keep files that show… receipt" → Copy to `Receipts/` copies only the receipts.
+10. Screens at 1180 × 720 and 960 × 600 (survey shots in `.dev/p20-qa/`), light and dark.
 
 ---
 
 ## 7. Work packages
 
 ### Wave 0 — foundation (architect, sequential, on main)
-1. The §0 rule in CLAUDE.md ("Bespoke tools"), plus sections "Paint+ (Phase 19)" and "Library (Phase 19)". DECISIONS entries for Q-defaults. A ROADMAP row.
-2. Migration `0009_paint_library.sql` (projects kind `paint` + `output_inputs`) and `core.ProjectPaint`. Store method stubs: `AddOutputInputs`, `OutputInputs`, `OutputsFromInput`, `BackfillLineage`.
-3. Frozen Go contracts:
-   - `Descriptor.Quiet` (+ toast/tray/library honouring it, done here, small);
-   - `JobContext.OutputFrom`;
-   - `core.LibraryQuery/LibraryFolder/LibraryEntry/OutputDetail/LibraryPlaces/TrashResult`;
-   - `LibraryService` method stubs;
-   - `core/trash` interface + fake;
-   - `modules/paint` skeleton (Descriptor, `PaintDoc`, `AIRequest`, `ExportOptions`, `StepOptions`, `PaintService` with every method stubbed `NotImplemented`, `Chainable` with real `StepDefaults`/`DescribeStep` + stub `PrepareStep`);
-   - the `paint-ai` hidden Quiet module.
-4. The `handlers/paint.py` stub (methods registered, `HandlerError("not_implemented")`), embedded.
-5. Wiring: `main.go`, packs (Image pack + `matte-select` check), `pipeline_proof_test.go`, `packs_test.go`, `catalogFixture.ts`, `shell/keywords.ts`, `tools/index.ts` (stub `PaintView` start screen), icons (`brush`, `palette`, `layers`, `eraser` exists, `sparkles`, `wand-sparkles` exists, `folder-tree`, `grid-3x3`), the stub `StepUI` + `paramDefs`, `lib/openLibrary.ts` stub.
-6. Frontend frozen types: `frontend/src/paint/engine/types.ts`, `paint/brushes/schema.ts` (BrushPreset JSON schema), `paint/lab/types.ts` (`LabTool`), `paint/ai/types.ts`. The `tools/paint/ui/tokens.css` skeleton (names only).
-7. **Spikes**, recorded in DECISIONS:
-   - (a) pen pressure in WebView2 on this PC;
-   - (b) a WebGL2 instanced dab throughput test, 10k dabs per frame;
-   - (c) a warm MI-GAN 768² crop timing and a LaMa 512 crop timing on this PC.
-   - (d) the licence of each candidate open brush set (MyPaint packs, Krita defaults, David Revoy packs). Bundle only those confirmed redistributable, with credits.
-   - (e) the origin cards: confirm the training data of LaMa, MI-GAN, BiRefNet/IS-Net, SAM 2.1 and Real-ESRGAN against their papers and model cards, and write them into `origins.go`.
-8. Regenerate bindings and re-export from `lib/api.ts`. All checks green. Builders branch from here.
+1. CLAUDE.md "Smart search (Phase 20)" section; DECISIONS entries for the Q defaults; ROADMAP row.
+2. **Spike: the model**, recorded in DECISIONS:
+   - confirm the Immich SigLIP 2 B/16 export (files, sha256, sizes, `dim`, `scale`/`bias`, tokenizer length) and pin it;
+   - time visual and text embedding on this PC (images/s at batch 16, half the cores; cold text-model load);
+   - measure RSS while indexing.
+   If the files aren't usable, apply the fallback in §2.7 and say so in DECISIONS.
+3. Migration 0011 and store stubs; `core/search.go` types; `core/mediaindex.Index` interface with stubs; `SearchService` stubs; the `media-index` and `search-filter` module skeletons (Descriptors, `Options`, `Chainable` with real `StepDefaults`/`DescribeStep`); `handlers/search.py` stub (methods registered, `not_implemented`); the pack and component in `core/packs`; wiring in `main.go`; events in `api/events.go`; icons (`scan-search`, `tags`); `SettingsSearch.tsx` placeholder in Settings; the stub `StepUI` and `paramDefs`.
+4. Move `dHashImage` from `modules/organize` to `core/imaging/dhash.go` (exported; organize uses it).
+5. **Vocabulary draft** (`vocabulary.tsv` format + about 300 labels, enough for tests) and the calibration harness: `go test -tags calibrate ./modules/mediaindex/` scores a labelled folder (`TOOLBOX_CALIBRATE_DIR`, a `labels.csv` of file → expected labels) and prints precision/recall per threshold.
+6. Regenerate bindings and re-export from `lib/api.ts`. All checks green.
 
 ### Wave 1 — parallel builders
 
 | Package | Scope | Owns | Needs |
 |---|---|---|---|
-| **P1 Paint engine** | WebGL2 compositor, tiles, layers + 16 blend shaders, brush engine (dual tip, grain modes, wet mix, bleed, impasto), pen input/smoothing/palm rejection, history + budget, selection, transform/warp, fill bucket, QuickShape, guides (symmetry, perspective, grid), adjustments, CPU reference backend, PaintLab | `frontend/src/paint/{engine,input,brushes,io,guides,adjust}/**` except `brushes/library/**` | Wave 0 |
-| **P2 Lab: algorithmic** | `LabTool`s of §1.4.1: adapter over `viz/post`, pixel sort, smear, flow field, growth, reaction–diffusion, ink bleed, particles, voronoi, echo | `frontend/src/paint/lab/**` | Wave 0 (engine + LabTool types) |
-| **B1 Brushes** | `brushgen.ts` + the ≥ 60 bundled presets (tips, grains, JSON), Go brush storage + importers (brushset, myb, abr, krita) + synthetic-fixture tests, the confirmed open-licence sets if Wave 0 cleared any | `frontend/scripts/brushgen.ts`, `frontend/src/paint/brushes/library/**`, `modules/paint/brushes.go`, `modules/paint/brushimport/**` | Wave 0 (brush schema) |
-| **P3 Paint backend** | `modules/paint/**` except the AI job (projects, tiles, export incl. ORA, Go compositor, pipeline step, service) | `modules/paint/**` (not `ai.go`) | Wave 0 |
-| **P4 AI engine + job** | `handlers/paint.py` + tests, `modules/paint/ai.go` (+ test), the SAM 2 image predictor, model resolution via the existing providers | `sidecar/toolbox_sidecar/handlers/paint.py`, `sidecar/tests/test_paint.py`, `modules/paint/ai.go` | Wave 0 |
-| **P5 Paint UI** | `tools/paint/**` in the bespoke design language (§0, §1.5, §1.6): `ui/` kit + tokens + icons, gallery, Studio mode, islands, docked/popover panels (Brush library + Lab tab, Brush Studio, Colour, Layers, History, Generations, origin cards), sliders, HUD, shortcuts, export/LastExport, gates, StepUI | `frontend/src/tools/paint/**`, `frontend/src/pipelines/steps/paint.tsx`, the Studio-mode hook in `shell/` (one `useUI` flag that hides sidebar + top bar) | Wave 0 (engine types; a fake engine until P1 merges) |
-| **P6 Lab: perception (frontend)** | `paint/ai/**`: queue, crops, generations, Dissolve/Melt/Echo/Edge-erode mask building, History brush, Subject stamp tip, Select object live preview | `frontend/src/paint/ai/**` | Wave 0 |
-| **L1 Library backend** | migration logic, lineage recording + backfill + `OutputFrom` in the listed modules, `LibraryService` methods, `core/trash` (Windows + macOS), chain building | `core/store/outputs*.go`, `core/jobs.go` (Output/OutputFrom only), `api/services.go` LibraryService, `api/library*.go`, `core/trash/**`, the `OutputFrom` lines in the listed modules | Wave 0 |
-| **L2 Library UI** | `views/library/**`, previews, detail panel, Places, deep links, "Show in Library" in ToolHeader + toasts | `frontend/src/views/library/**`, `frontend/src/state/library.ts`, `frontend/src/lib/openLibrary.ts`, `components/ToolHeader.tsx` (More item only), `shell/useJobToasts.ts` (action only) | Wave 0 |
-
-**Order of value.** The core (P1, P3, P5 and B1) is what makes "Paint with layers, Procreate's feel" real, and it's merged and checked first (acceptance 1–1d, 5). The Lab packages (P2, P4 and P6) run in parallel but integrate after it.
+| **S1 Engine** | `search.prefetch/embed_images/embed_text`, the tiny-model fixtures, slow tests, `ModelProvider` in `models.go` | `sidecar/toolbox_sidecar/handlers/search.py`, `sidecar/tests/test_search.py`, `sidecar/tests/fixtures/search/**`, `modules/mediaindex/models.go` | Wave 0 |
+| **S2 Index** | `core/mediaindex/**` (scan, reconcile, scheduler, vectors, scoring, labels), `core/store/mediaindex.go`, the rename/trash hooks, `modules/mediaindex` job (`module.go`, `prepare.go`), deferred-chores wiring | `core/mediaindex/**`, `core/store/mediaindex.go`, `modules/mediaindex/{module,prepare}.go` (+ tests), the hook lines in `api/library_actions.go` and `core/projectdocs` | Wave 0 (S1's engine is faked) |
+| **S3 Search API** | `SearchService`: query merge and ranking, warming and `search:ready`, things, labels, failures, folders (dialog), settings | `api/search.go` (+ tests) | Wave 0 (the `Index` interface; a fake until S2 merges) |
+| **S4 Library + Settings UI** | search results merge, chip row, card badges, the Things view, detail panel labels/moments/Find similar, the status line and gate, `SettingsSearch`, palette commands | `frontend/src/views/library/**`, `frontend/src/state/search.ts`, `frontend/src/state/library.ts` (search fields only), `frontend/src/views/SettingsSearch.tsx` (+ css/tests), `shell/keywords.ts` (entries only) | Wave 0 (bindings) |
+| **S5 Step** | the `search-filter` job and `Chainable`, `pipelines/steps/search.tsx`, `paramDefs` entries | `modules/mediaindex/pipeline.go` (+ test), `modules/mediaindex/filter.go`, `frontend/src/pipelines/steps/search.tsx`, its `paramDefs` lines | Wave 0 |
+| **V1 Vocabulary** | the full ≈ 1,500-label `vocabulary.tsv` (categories, prompts, parents, no identity labels), and the vocabulary test | `modules/mediaindex/vocabulary.tsv`, `modules/mediaindex/vocabulary_test.go` | Wave 0 (format) |
 
 ### Wave 2 — after Wave 1 merges
 - **I1 Integration** (architect):
-  - P5 + P1 + B1 on the real engine first, then P2/P6/P4;
-  - PaintLab goldens;
-  - the AI end-to-end on this PC;
+  - S1 + S2 + S3 end to end with the real model on this PC;
+  - calibration of the thresholds and the Strong/Good/Maybe cut-offs on the acceptance set (written into `labels.go` with the numbers in DECISIONS);
   - the acceptance run §6;
-  - QA shots at 960 × 600, 1180 × 720, 1920 × 1080 and 3840 × 2160 (Studio);
+  - start-up timing;
+  - QA shots;
   - the CLAUDE.md final pass.
 
 ---
 
 ## 8. Open questions (defaults chosen; change them before approving)
-- [ ] **Q1 Prompted generative fill.**
-  - **Default: no**, not this phase, and never with a model trained on scraped art (no Stable Diffusion, no SDXL and none of their fine-tunes).
-  - The only kind that fits your ethics is a model trained on public-domain or explicitly licensed and opt-in images. Candidates I know of:
-    - **CommonCanvas** (trained on Creative-Commons-licensed photos);
-    - **Mitsua Diffusion One** (public domain, CC0 and opt-in data).
-
-    I'd check each one's data claims before considering it. They're weaker than mainstream models and 2–4 GB.
-  - If you want one later, it becomes an optional "Generative (ethical data)" pack with its origin card front and centre.
-- [ ] **Q2 Library vs a separate "Artifacts" tool.** **Default: rebuild the Library** (same sidebar entry, name "Library") rather than a second screen showing the same files. Rename it to "Artifacts" if you prefer the word.
-- [ ] **Q3 Delete from the Library** sends files to the Recycle Bin / Trash. **Default: yes**, library files only, with a confirmation that names the count. Forget (DB only) stays.
-- [ ] **Q4 Max canvas.** **Default: 8192 per side, 40 MP.** This covers A3 at 300 dpi. Memory: 64 layers × 40 MP isn't possible, so layers are capped by a VRAM estimate shown in the Layers panel.
-- [ ] **Q5 Mouse pressure simulation** from velocity. **Default: on** for mouse, off when a pen was seen.
-- [ ] **Q6 Layered export format.** **Default: OpenRaster (.ora)**, open, simple, and read by Krita/GIMP/MyPaint. PSD is Later.
-- [ ] **Q7 Paint+ on macOS.** Same code, and Apple Pencil isn't a concern on Mac. **Default: Wacom pressure via WKWebView** is tested on the Mac at first use, with no extra work planned.
-- [ ] **Q9 The bespoke design language (§0).** **Default: approved, for Paint+ only.** Other tools stay on the shared look unless their own spec says otherwise.
-- [ ] **Q10 "16:9".** I read it as: the UI is designed for landscape desktop windows (16:9) rather than a tablet's 4:3, and the canvas presets lead with 16:9. **Default: both.** If you meant something else, for example the Paint+ window always holding 16:9, say so.
-- [ ] **Q11 Brush importers.** **Default: all four** (Procreate, MyPaint, ABR sampled tips, Krita bundles). Procreate's format is reverse-engineered, so imports are best effort, with a fidelity note.
-- [ ] **Q8 Open in Paint+ from Object Eraser.** **Default: yes**, an "Open in Paint+" action on its result (via Send to, plus a primary-looking button), because Paint+'s Dissolve is the evolved form of "Keep erasing on the result".
+- [ ] **Q1 Which model.**
+  - **Default: SigLIP 2 ViT-B/16** (Apache-2.0). It understands queries in many languages, its per-label confidence is real (sigmoid), and it's much more accurate than the original CLIP.
+  - Its cost is size: about **1.5 GB** on disk (≈ 0.4 GB picture side, ≈ 1.1 GB text side, because of its multilingual vocabulary), to be measured in Wave 0.
+  - **Alternative: OpenAI CLIP ViT-B/32** (MIT, ≈ 0.6 GB, English only, noticeably weaker on specific things).
+- [ ] **Q2 Index automatically once installed.** **Default: yes.** Installing the pack is the opt-in. Indexing runs only when idle, can be paused, and everything stays on this machine. The alternative is a "Start indexing" button after install.
+- [ ] **Q3 Folders outside the library** (e.g. your Pictures folder). **Default: yes, opt-in per folder, read-only.** Without it, search only covers what Toolbox made, which may be less than you meant by "all assets and media".
+- [ ] **Q4 Faces and people.** **Default: not this phase.** Grouping by person needs a face-recognition model and stores face prints, a privacy decision of its own. It would be a separate opt-in pack later. "person", "selfie" and "group of people" are labels now.
+- [ ] **Q5 Received files and vault exports.** **Default: indexed like the rest of the library.** "Skip these folders" excludes any of them.
+- [ ] **Q6 Where it lives.** **Default: inside the Library** (search box, Things view, detail panel), plus Settings → Search. No new sidebar tool.
+- [ ] **Q7 The pipeline step "Keep files that show…".** **Default: yes**, because it makes watch folders sort by content.
+- [ ] **Q8 Text inside files.** **Default: later.** Searching OCR text in screenshots and receipts, and transcripts of videos, would feed the same search box from the existing OCR and Transcribe engines. It would be a natural next phase.
 
 ### Later
-- Timelapse replay export (stroke log → MP4).
-- Layer groups and adjustment layers.
-- Exporting brushes back to Procreate's `.brushset`.
-- Brush *capture* (make a tip from any canvas selection: draw a leaf, select it, make it a brush). A small step after this phase, and very Procreate.
-- Reference window (an image pinned in a pop-out).
-- An audio-reactive brush (Visualizer analysis drives brush params while you paint along to a track).
-- Prompted fill (Q1).
-- A file watcher for the Library.
+- Faces/people (Q4), places from GPS, OCR text and transcripts in search (Q8).
+- "Memories"-style collections (on this day, trips).
+- GPU execution providers (DirectML on Windows, CoreML on Mac) for faster indexing.
+- Search inside Paint+'s reference picker and the Library picker (`pickFromLibrary`) with the same box.
+- Duplicate and near-duplicate finder in the Library using the stored vectors.
