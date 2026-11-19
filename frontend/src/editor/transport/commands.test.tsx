@@ -66,6 +66,8 @@ beforeEach(() => {
     rate() {
       return this._rate;
     },
+    reverse: () => calls.push("reverse"),
+    loop: (r) => calls.push(`loop:${r ? `${r.inMs}-${r.outMs}` : "off"}`),
   };
   unregister = registerPlayer(player);
 });

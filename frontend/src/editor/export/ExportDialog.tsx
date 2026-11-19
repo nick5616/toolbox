@@ -5,7 +5,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Banner, Button, Select, Spinner, toast } from "@/components";
-import { EditStudioService, type EditMatteRequest } from "@/lib/api";
+import { EditStudioService, type EditMatteRequest, type Job } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { announceWhenDone, isActive, useJobs } from "@/state/jobs";
 import { editLength } from "@/viz/edit/types";
@@ -16,7 +16,27 @@ import { ExportBanner } from "./ExportBanner";
 import { newId, withClip } from "@/editor/doc";
 import { followMatteJob } from "../matte/matteJobs";
 import { makeMatte, type MatteMode } from "../matte/matteUtil";
-import { baseName, exportChecks, formatLength, normalizeHeight, rebuildRequest, sizeLabel, withoutCutouts, EXPORT_HEIGHTS, type ExportHeight } from "./checks";
+import {
+  baseName,
+  estimateExportBytes,
+  exportChecks,
+  formatBytes,
+  formatLength,
+  normalizeExportSettings,
+  normalizeHeight,
+  rebuildRequest,
+  sizeLabel,
+  storeRange,
+  withoutCutouts,
+  EXPORT_AUDIO_KBPS,
+  EXPORT_CODECS,
+  EXPORT_FPS,
+  EXPORT_HEIGHTS,
+  EXPORT_QUALITIES,
+  type ExportCodec,
+  type ExportHeight,
+  type ExportQuality,
+} from "./checks";
 import styles from "./ExportDialog.module.css";
 
 export interface ExportDialogProps {
@@ -25,6 +45,21 @@ export interface ExportDialogProps {
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** The render calls E1 adds next to Render; until the bindings carry them they're looked up by name. */
+interface ExtraRenders {
+  RenderAudio?(projectID: string): Promise<Job>;
+  RenderStill?(projectID: string, atMs: number): Promise<Job>;
+}
+const extraRenders = (): ExtraRenders => EditStudioService as unknown as ExtraRenders;
+
+type Kind = "video" | "audio" | "still";
+const QUALITY_LABEL: Record<ExportQuality, string> = { draft: "Draft", good: "Good", best: "Best" };
+const QUALITY_TIP: Record<ExportQuality, string> = {
+  draft: "Fastest and smallest: fine for a quick look, with visible softness in busy scenes",
+  good: "A good balance of sharpness and file size for sharing",
+  best: "Sharpest, and the biggest file; takes the longest",
+};
 const FOCUSABLE = "button:not(:disabled), select:not(:disabled)";
 
 function Panel({ onClose }: { onClose(): void }) {
@@ -37,6 +72,15 @@ function Panel({ onClose }: { onClose(): void }) {
   const jobsById = useJobs((s) => s.byId);
 
   const [height, setHeight] = useState<ExportHeight>(normalizeHeight(project?.exportHeight ?? 1080));
+  const saved = useMemo(() => normalizeExportSettings(project?.export), []); // eslint-disable-line react-hooks/exhaustive-deps -- the dialog starts from what was saved
+  const rangeIn = useEditStudio((s) => (s as unknown as { rangeInMs?: number }).rangeInMs);
+  const rangeOut = useEditStudio((s) => (s as unknown as { rangeOutMs?: number }).rangeOutMs);
+  const range = useMemo(() => storeRange({ rangeInMs: rangeIn, rangeOutMs: rangeOut }), [rangeIn, rangeOut]);
+  const [fps, setFps] = useState<number>(saved.fps);
+  const [codec, setCodec] = useState<ExportCodec>(saved.codec as ExportCodec);
+  const [quality, setQuality] = useState<ExportQuality>(saved.quality as ExportQuality);
+  const [audioKbps, setAudioKbps] = useState<number>(saved.audioKbps);
+  const [useRange, setUseRange] = useState(saved.outMs > saved.inMs && range !== null);
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -70,8 +114,12 @@ function Panel({ onClose }: { onClose(): void }) {
   }, [rebuilding]);
 
   if (!project || !checks) return null;
-  const d = editLength(project);
-  const frames = Math.round((d / 1000) * project.fps);
+  const whole = editLength(project);
+  const ranged = useRange && range ? { inMs: Math.max(0, range.inMs), outMs: Math.min(whole, range.outMs) } : null;
+  const d = ranged ? Math.max(0, ranged.outMs - ranged.inMs) : whole;
+  const outFps = fps || project.fps;
+  const frames = Math.round((d / 1000) * outFps);
+  const estimate = estimateExportBytes({ aspect: project.aspect, height, fps: outFps, codec, quality, audioKbps, lengthMs: d });
   const waitingOnPrep = checks.preparing.length > 0;
   const blockers: string[] = [];
   // The song is optional (Video Editor); an edit that points at an analysis keeps it checked by the export itself.
@@ -115,13 +163,17 @@ function Panel({ onClose }: { onClose(): void }) {
     useEditStudio.getState().edit(withoutCutouts(project, ids));
   };
 
-  const start = async () => {
+  const submit = async (kind: Kind) => {
     setBusy(true);
     setError("");
     try {
       const st = useEditStudio.getState();
       const p = st.history?.present;
-      if (p && p.exportHeight !== height) st.edit({ ...p, exportHeight: height }, "exportHeight");
+      const settings = { fps, codec, quality, audioKbps, inMs: ranged?.inMs ?? 0, outMs: ranged?.outMs ?? 0 };
+      if (p) {
+        const next = { ...p, exportHeight: height, export: normalizeExportSettings(settings) };
+        if (p.exportHeight !== next.exportHeight || JSON.stringify(p.export ?? null) !== JSON.stringify(next.export)) st.edit(next, "export-settings");
+      }
       await flushEdit();
       const after = useEditStudio.getState();
       if (after.saveState === "error") {
@@ -129,7 +181,18 @@ function Panel({ onClose }: { onClose(): void }) {
         return;
       }
       if (!after.projectId) return;
-      const job = await EditStudioService.Render(after.projectId);
+      let job: Job;
+      if (kind === "audio") {
+        const call = extraRenders().RenderAudio;
+        if (!call) throw new Error("Audio-only export isn't available in this build yet");
+        job = await call.call(EditStudioService, after.projectId);
+      } else if (kind === "still") {
+        const call = extraRenders().RenderStill;
+        if (!call) throw new Error("Still-frame export isn't available in this build yet");
+        job = await call.call(EditStudioService, after.projectId, Math.round(after.playheadMs));
+      } else {
+        job = await EditStudioService.Render(after.projectId);
+      }
       useJobs.getState().upsert(job);
       announceWhenDone(job.id); // leaving the project list wipes jobs.render; the toast still says where it went
       useEditStudio.getState().setJob("render", job.id);
@@ -184,13 +247,73 @@ function Panel({ onClose }: { onClose(): void }) {
           </div>
           <div className={styles.field}>
             <span className={styles.label}>Frame rate</span>
-            <span className={styles.value} data-tip="Frames per second of the export, fixed when the edit was created">{project.fps} fps</span>
-            <span className={styles.hint}>Set in the edit's setup</span>
+            <Select
+              size="sm"
+              aria-label="Frame rate"
+              data-tip="Frames per second of the export. Project uses the edit's own rate"
+              value={String(fps)}
+              onChange={(v) => setFps(Number(v))}
+              options={EXPORT_FPS.map((f) => ({ value: String(f), label: f === 0 ? `Project (${project.fps} fps)` : `${f} fps` }))}
+            />
+          </div>
+          <div className={styles.field}>
+            <span className={styles.label}>Format</span>
+            <Select
+              size="sm"
+              aria-label="Format"
+              data-tip="MP4 with H.264 plays everywhere; H.265 makes smaller files but some apps can't open it"
+              value={codec}
+              onChange={(v) => setCodec(v)}
+              options={EXPORT_CODECS.map((c) => ({ value: c, label: c === "h264" ? "H.264 MP4" : "H.265 MP4" }))}
+            />
+          </div>
+          <div className={styles.field}>
+            <span className={styles.label}>Quality</span>
+            <Select
+              size="sm"
+              aria-label="Quality"
+              data-tip={QUALITY_TIP[quality]}
+              value={quality}
+              onChange={(v) => setQuality(v)}
+              options={EXPORT_QUALITIES.map((q) => ({ value: q, label: QUALITY_LABEL[q] }))}
+            />
+          </div>
+          <div className={styles.field}>
+            <span className={styles.label}>Audio</span>
+            <Select
+              size="sm"
+              aria-label="Audio"
+              data-tip="Audio quality in kilobits per second; higher sounds cleaner and adds a little size"
+              value={String(audioKbps)}
+              onChange={(v) => setAudioKbps(Number(v))}
+              options={EXPORT_AUDIO_KBPS.map((k) => ({ value: String(k), label: `${k} kb/s` }))}
+            />
+          </div>
+          <div className={styles.field}>
+            <span className={styles.label}>Range</span>
+            <Select
+              size="sm"
+              aria-label="Range"
+              data-tip={range ? "Export the whole edit, or only between the In and Out points" : "Set In and Out points on the timeline (I and O) to export just that part"}
+              value={useRange && range ? "range" : "whole"}
+              onChange={(v) => setUseRange(v === "range")}
+              options={[
+                { value: "whole", label: "Whole edit" },
+                { value: "range", label: range ? `In–Out (${formatLength(range.inMs)}–${formatLength(range.outMs)})` : "In–Out (set In and Out first)", disabled: !range },
+              ]}
+            />
+            {!range && <span className={styles.hint}>Set In and Out points first</span>}
           </div>
           <div className={styles.field}>
             <span className={styles.label}>Length</span>
-            <span className={styles.value} data-tip="Length of the edit and how many frames will be rendered">
+            <span className={styles.value} data-tip="Length of the export and how many frames will be rendered">
               {formatLength(d)} · {frames} frames
+            </span>
+          </div>
+          <div className={styles.field}>
+            <span className={styles.label}>Estimated size</span>
+            <span className={styles.value} data-tip="A rough guess from the size, quality and length; the real file can differ by a third either way">
+              ≈ {formatBytes(estimate)}
             </span>
           </div>
         </div>
@@ -258,7 +381,14 @@ function Panel({ onClose }: { onClose(): void }) {
           <Button variant="secondary" data-tip="Close without exporting" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" icon="download" data-tip={exportTip} disabled={blocked} onClick={() => void start()}>
+          <span className={styles.spacer} />
+          <Button variant="secondary" icon="music" data-tip={blocked ? exportTip : "Export only the sound of the edit as an .m4a file"} disabled={blocked} onClick={() => void submit("audio")}>
+            Audio only (.m4a)
+          </Button>
+          <Button variant="secondary" icon="image" data-tip={blocked ? exportTip : "Export the frame under the playhead as a .png picture"} disabled={blocked} onClick={() => void submit("still")}>
+            Still frame (.png)
+          </Button>
+          <Button variant="primary" icon="download" data-tip={exportTip} disabled={blocked} onClick={() => void submit("video")}>
             Export
           </Button>
         </div>
