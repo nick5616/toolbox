@@ -44,7 +44,7 @@ func TestValidateShapeRejects(t *testing.T) {
 			}
 		}},
 		{"dup track", "tracks[1].id", func(d *EditProject) { d.Tracks[1].ID = "t1" }},
-		{"track kind", "tracks[0].kind", func(d *EditProject) { d.Tracks[0].Kind = "audio" }},
+		{"track kind", "tracks[0].kind", func(d *EditProject) { d.Tracks[0].Kind = "music" }},
 		{"dup clip", "tracks[1].clips[0].id", func(d *EditProject) { d.Tracks[1].Clips[0].ID = "c1" }},
 		{"adjust on video", "tracks[0].clips[0].kind", func(d *EditProject) { d.Tracks[0].Clips[0].Kind = "adjust" }},
 		{"video on adjust", "tracks[1].clips[0].kind", func(d *EditProject) { d.Tracks[1].Clips[0].Kind = "color"; d.Tracks[1].Clips[0].Color = "#ffffff" }},

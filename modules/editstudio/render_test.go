@@ -89,6 +89,7 @@ type exportEnv struct {
 	// counters
 	streams, images, interps, renders, mixes, muxes int
 	muxArgs                                         []string
+	mux                                             muxSpec
 	renderErr                                       error
 }
 
@@ -173,11 +174,12 @@ func newExportEnv(t *testing.T) *exportEnv {
 		}
 		return os.WriteFile(dst, []byte("wav"), 0o644)
 	}
-	exportMuxFn = func(_ context.Context, ffmpeg string, out viz.RenderOutput, audio string, startMs, endMs int64, fps int, ass, dst string, on func(float64)) error {
+	exportMuxFn = func(_ context.Context, ffmpeg string, out viz.RenderOutput, audio string, s muxSpec, dst string, on func(float64)) error {
 		env.muxes++
-		env.muxArgs = []string{ffmpeg, out.Path, audio, ass}
-		if startMs != 0 || endMs != 0 || fps != 30 || out.Frames != 900 {
-			t.Errorf("mux range %d..%d fps %d frames %d", startMs, endMs, fps, out.Frames)
+		env.mux = s
+		env.muxArgs = []string{ffmpeg, out.Path, audio}
+		if s.FPS != 30 || out.Frames != 900 || s.Reencode || s.AudioStartMs != 0 || s.AudioLenMs != 0 {
+			t.Errorf("mux %+v frames %d", s, out.Frames)
 		}
 		on(1)
 		return os.WriteFile(dst, []byte("mp4"), 0o644)
@@ -388,7 +390,7 @@ func TestRunRenderFailureAndCancel(t *testing.T) {
 	t.Run("cancel during the mux leaves nothing in the library", func(t *testing.T) {
 		env := newExportEnv(t)
 		ctx, cancel := context.WithCancel(context.Background())
-		exportMuxFn = func(ctx context.Context, _ string, _ viz.RenderOutput, _ string, _, _ int64, _ int, _, dst string, _ func(float64)) error {
+		exportMuxFn = func(ctx context.Context, _ string, _ viz.RenderOutput, _ string, _ muxSpec, dst string, _ func(float64)) error {
 			_ = os.WriteFile(dst, []byte("partial"), 0o644)
 			cancel()
 			return ctx.Err()
