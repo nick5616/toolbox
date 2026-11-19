@@ -42,7 +42,7 @@ registerLayer({
       render(f) {
         prog
           .use()
-          .f1("u_t", f.motionSec * (f.params.speed as number))
+          .f1("u_t", f.integral("speed"))
           .f1("u_contrast", f.params.contrast as number)
           .f1("u_drift", f.params.drift as number)
           .f1("u_intensity", f.params.intensity as number)

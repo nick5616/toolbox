@@ -36,14 +36,14 @@ registerLayer({
         const p = f.params;
         const n = Math.round(p.count as number);
         const ramp = buildRamp(f.palette, p.color as string);
-        const kick = f.signals.value("kick", f.tMs);
-        const level = f.signals.value("mix.level", f.tMs);
-        const bass = f.signals.value("bass.level", f.tMs);
+        const kick = f.signals.smoothed("kick", f.tMs);
+        const level = f.signals.smoothed("mix.level", f.tMs);
+        const bass = f.signals.smoothed("bass.level", f.tMs);
         const inner = (p.innerR as number) * b.short * b.scale * (1 + 0.1 * kick + 0.04 * bass);
         const maxLen = (p.length as number) * b.short * b.scale * 1.2;
         const slot = (TAU * inner) / n;
         const thick = Math.max(1.6, slot * (p.thickness as number));
-        const angle0 = b.rot - Math.PI / 2 + (p.spin as number) * (f.motionSec * 0.1 + f.analysis.cum("mix.level", f.tMs) * 0.35);
+        const angle0 = b.rot - Math.PI / 2 + f.integral("spin") * 0.1 + f.integral("spin*intensity*mix.level") * 0.35;
         f.analysis.vector("spectrum", f.tMs, spec);
         const showPeaks = p.peaks as boolean;
         if (showPeaks) {

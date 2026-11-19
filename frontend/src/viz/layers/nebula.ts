@@ -3,7 +3,7 @@
  * deepens the warp, the kick breathes the exposure, hats make stars flare,
  * and the cloud flow speeds up with the loudness of the song.
  */
-import { bgShader, commonParams, cumSignal, drive, fullscreenLayer, speedScale } from "./_bg/util";
+import { bgShader, commonParams, drive, fullscreenLayer } from "./_bg/util";
 import { registerLayer } from "./registry";
 
 const FS = bgShader(`
@@ -80,8 +80,7 @@ registerLayer({
     return fullscreenLayer(ctx, FS, (p, f) => {
       const react = f.params.react as number;
       const d = drive(f, react);
-      const drift = (f.params.drift as number) * (f.params.speed as number);
-      const flow = f.motionSec * drift * 0.5 + cumSignal(f.signals, "mix.level", f.tMs) * speedScale(f) * drift * react * 0.9 + cumSignal(f.signals, "bass.level", f.tMs) * speedScale(f) * drift * react * 0.4;
+      const flow = f.integral("drift*speed") * 0.5 + f.integral("drift*speed*react*intensity*mix.level") * 0.9 + f.integral("drift*speed*react*intensity*bass.level") * 0.4;
       p.f1("u_warp", f.params.warp as number)
         .f1("u_detail", Math.round(f.params.detail as number))
         .f1("u_sparkle", f.params.sparkle as number)

@@ -6,7 +6,7 @@
  */
 import { FULLSCREEN_VS, Program } from "../gl/core";
 import { GLSL_COMMON } from "../gl/glsl";
-import { TRIGGER_OPTIONS, eventsIn, triggerList } from "./_triggers";
+import { TRIGGER_OPTIONS, eventsIn, FLASH_MIN_STRENGTH, triggerList } from "./_triggers";
 import { registerLayer } from "./registry";
 
 const FS = `#version 300 es
@@ -15,6 +15,7 @@ in vec2 uv; out vec4 o;
 ${GLSL_COMMON}
 uniform vec2 u_res;
 uniform vec4 u_w[4]; // origin px, age s, strength
+uniform float u_flashMin;
 uniform float u_reach, u_width, u_strength, u_flash, u_bright, u_life, u_opacity, u_short, u_diag;
 uniform vec3 u_ring, u_wake;
 float front(float d, float R, float w) {
@@ -41,7 +42,7 @@ void main() {
     col += mix(u_ring, vec3(1.0), 0.45) * pr * fade * s * u_strength;
     float inner = exp(-max(R - d, 0.0) / (wpx * 3.5)) * step(d, R) * (1.0 - q);
     col += u_wake * inner * 0.05 * s * u_strength;
-    float fl = exp(-w.z / 0.15) * s * s * u_flash;
+    float fl = exp(-w.z / 0.15) * s * s * u_flash * step(u_flashMin, s);
     float rad = 1.0 - clamp(d / (u_diag * 0.65), 0.0, 1.0);
     col += mix(u_ring, vec3(1.0), 0.55) * fl * (0.25 + 0.75 * rad * rad);
   }
@@ -91,8 +92,9 @@ registerLayer({
         prog
           .f1("u_reach", (f.params.reach as number) * Math.hypot(f.w, f.h) * 0.5)
           .f1("u_width", (f.params.width as number) * short)
-          .f1("u_strength", f.params.strength as number)
-          .f1("u_flash", f.params.flash as number)
+          .f1("u_strength", (f.params.strength as number) * Math.min(1.5, f.intensity))
+          .f1("u_flash", (f.params.flash as number) * Math.min(1.5, f.intensity))
+          .f1("u_flashMin", f.params.trigger === "drop+downbeat" ? FLASH_MIN_STRENGTH / 255 : 0)
           .f1("u_bright", f.params.brightness as number)
           .f1("u_life", life)
           .f1("u_opacity", f.opacity)

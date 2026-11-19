@@ -39,8 +39,8 @@ registerLayer({
         const mode = f.params.color as string;
         const draft = f.quality === "draft" ? 0.5 : 1;
         const bassCh = channelId(a, "bass.level", "mix.bass");
-        const energy = f.signals.value("mix.level", f.tMs);
-        const kick = f.signals.value("kick", f.tMs);
+        const energy = f.signals.smoothed("mix.level", f.tMs);
+        const kick = f.signals.smoothed("kick", f.tMs);
         const lit = lerp(1, 0.18 + 0.95 * energy, react) * draft;
         const flare = 1 + 0.9 * kick * react;
         const t = f.motionSec;

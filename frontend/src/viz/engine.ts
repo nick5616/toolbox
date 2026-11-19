@@ -4,7 +4,7 @@
  * OffscreenCanvas), so both produce the same pixels.
  */
 import type { Analysis } from "./analysis";
-import { activeAt, motifsAt, timelineFor } from "./director";
+import { activeAt, morphAt, motifsAt, timelineFor, type Morph } from "./director";
 import { createContext, Fullscreen, gpuName, Target, uploadImage, type AnyCanvas } from "./gl/core";
 import { Output, type OutputParams } from "./gl/output";
 import "./layers";
@@ -12,6 +12,7 @@ import { layerDef, makeRng, type FrameInput, type LayerContext, type LayerInstan
 import { resolvePalette, type ResolvedPalette } from "./palette";
 import "./post";
 import { postDef, type PostInstance } from "./post/registry";
+import { Integrator, type RateEnv } from "./integral";
 import { evalParam, Signals, type ModContext } from "./signals";
 import { createTextLayer, type TextLayer } from "./text";
 import { Transitions } from "./transitions";
@@ -34,6 +35,29 @@ interface SceneTargets {
 
 const WARMUP_MS = 1000;
 
+/** A scene that hasn't been drawn for this long counts as re-entered: its feedback buffers start clean (SPEC section C2.5). */
+const REENTRY_MS = 500;
+const REENTRY_FADE_MS = 500;
+
+type ParamSpecs = Record<string, import("./layers/registry").ParamSpec>;
+
+/** What an integral needs to know about the layer it is asked for: where its cache lives and how its params move over time. */
+interface InputSource {
+  key: string;
+  /** Everything the rates depend on besides time; a change restarts the cache. */
+  sig: string;
+  param(name: string, tMs: number): number | undefined;
+}
+
+const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+
+/** The n-th layer of a type in a scene. */
+function nthLayer(scene: Scene | undefined, type: string, n: number): LayerConfig | undefined {
+  let k = 0;
+  for (const l of scene?.layers ?? []) if (l.type === type && k++ === n) return l;
+  return undefined;
+}
+
 export class Engine {
   readonly gl: WebGL2RenderingContext;
   readonly gpu: string;
@@ -52,6 +76,10 @@ export class Engine {
   private frame: Target;
   private scratch: Target;
   private lastT: number | null = null;
+  private readonly integrator = new Integrator();
+  private sigCache: string | null = null;
+  private readonly sceneSeen = new Map<string, number>();
+  private readonly fadeStart = new Map<string, number>();
   private textures = { cover: null as WebGLTexture | null, image: null as WebGLTexture | null, coverAspect: 1, imageAspect: 1 };
   private currentScene: SceneTargets | null = null;
 
@@ -83,6 +111,8 @@ export class Engine {
   setAnalysis(a: Analysis): void {
     this.analysis = a;
     this.signals = new Signals(a);
+    this.integrator.clear();
+    this.sceneSeen.clear();
     this.refreshTimeline();
     this.lastT = null;
   }
@@ -99,6 +129,7 @@ export class Engine {
         this.instances.delete(k);
       }
     }
+    this.sigCache = null;
     this.lastT = null;
   }
 
@@ -144,6 +175,7 @@ export class Engine {
 
   private refreshTimeline(): void {
     this.entries = this.analysis && this.show ? timelineFor(this.analysis, this.show) : [];
+    this.sigCache = null;
   }
 
   /** The timeline in effect (for the Song Map and the Why readout). */
@@ -218,26 +250,85 @@ export class Engine {
     return out;
   }
 
-  private frameInput(tMs: number, params: ParamValues, opacity: number, palette: ResolvedPalette): FrameInput {
+  private frameInput(tMs: number, params: ParamValues, opacity: number, palette: ResolvedPalette, src?: InputSource): FrameInput {
     const a = this.analysis as Analysis;
+    const signals = this.signals as Signals;
+    const speed = this.show?.speed ?? 1;
+    const intensity = this.show?.reactivity ?? 1;
+    const env: RateEnv = { analysis: a, signals, intensity, speed, param: (name, t) => src?.param(name, t) };
+    const integ = (expr: string, perBeat: boolean): number => (src ? this.integrator.value(src.key, expr, perBeat, src.sig, env, tMs) : 0);
     return {
       tMs,
       dtMs: 1000 / this.opts.fps,
-      motionSec: (tMs / 1000) * (this.show?.speed ?? 1),
+      motionSec: (tMs / 1000) * speed,
       params,
       opacity,
       palette,
       analysis: a,
-      signals: this.signals as Signals,
+      signals,
       w: this.opts.width,
       h: this.opts.height,
       seed: this.opts.seed,
       quality: this.opts.quality,
       mode: this.opts.mode,
-      intensity: this.show?.reactivity ?? 1,
-      // Wave 0 placeholders with today's behaviour (param × time); V1 replaces them with true integrals.
-      integral: (name: string) => (typeof params[name] === "number" ? (params[name] as number) : 0) * (tMs / 1000) * (this.show?.speed ?? 1),
-      beatIntegral: (name: string) => (typeof params[name] === "number" ? (params[name] as number) : 0) * (tMs / 1000) * 2,
+      intensity,
+      integral: (name) => integ(name, false),
+      beatIntegral: (name) => integ(name, true),
+      paramAt: (name, t) => src?.param(name, t) ?? 0,
+    };
+  }
+
+  /** Hash of everything a layer's rates can depend on besides time (the show, its timeline and the master controls). */
+  private showSignature(): string {
+    if (this.sigCache === null) this.sigCache = JSON.stringify([this.show?.scenes, this.entries, this.show?.reactivity, this.show?.speed, this.show?.mix]);
+    return this.sigCache;
+  }
+
+  /** A source that reads one fixed config (posts, motifs): the params of that config at any time. */
+  private rawSource(key: string, specs: ParamSpecs, raw: Record<string, unknown>, mc: ModContext): InputSource {
+    return {
+      key,
+      sig: JSON.stringify([raw, this.show?.reactivity, this.show?.speed, this.show?.mix]),
+      param: (name, t) => {
+        const spec = specs[name];
+        if (!spec || spec.kind !== "number") return undefined;
+        return this.evalNumber(spec, raw[name], t, mc);
+      },
+    };
+  }
+
+  private evalNumber(spec: Extract<import("./layers/registry").ParamSpec, { kind: "number" }>, v: unknown, t: number, mc: ModContext): number {
+    const p = typeof v === "number" || (typeof v === "object" && v !== null) ? (v as import("./types").Param) : spec.default;
+    return evalParam(p, spec.min, spec.max, t, mc);
+  }
+
+  /**
+   * The source of a layer: one integral track per (layer type, n-th of that type), shared by every scene that has
+   * it, so the picture keeps its place when the director morphs or crossfades between scenes. The track's rate at any
+   * time comes from the scene (and morph) in effect then; a scene without the layer stops it.
+   */
+  private trackSource(type: string, ordinal: number, specs: ParamSpecs, mc: ModContext): InputSource {
+    const a = this.analysis as Analysis;
+    const show = this.show as Show;
+    return {
+      key: `trk:${type}#${ordinal}`,
+      sig: this.showSignature(),
+      param: (name, t) => {
+        const spec = specs[name];
+        if (!spec || spec.kind !== "number") return undefined;
+        const act = activeAt(this.entries, t);
+        if (!act) return 0;
+        const m = morphAt(a, show, this.entries, t);
+        const target = show.scenes.find((s) => s.id === (m ? m.to.sceneId : act.current.sceneId));
+        const layer = nthLayer(target, type, ordinal);
+        if (!layer?.enabled) return 0;
+        let v = this.evalNumber(spec, layer.params[name], t, mc);
+        if (m) {
+          const partner = nthLayer(show.scenes.find((s) => s.id === m.from.sceneId), type, ordinal);
+          if (partner) v = lerp(this.evalNumber(spec, partner.params[name], t, mc), v, m.amount);
+        }
+        return v;
+      },
     };
   }
 
@@ -268,22 +359,55 @@ export class Engine {
       }
       const dst = src === this.scratch ? target : this.scratch;
       this.gl.disable(this.gl.BLEND);
-      inst.render(src, dst, this.frameInput(tMs, this.resolveParams(def.params, pc.params, tMs, mc), 1, palette));
+      inst.render(src, dst, this.frameInput(tMs, this.resolveParams(def.params, pc.params, tMs, mc), 1, palette, this.rawSource(key, def.params, pc.params, mc)));
       src = dst;
     }
     return src;
   }
 
-  private renderScene(entry: TimelineEntry, tMs: number, mc: ModContext): Target {
+  /** Resolves a layer's params, morphing numbers towards this scene's values when a morph is in progress. */
+  private morphedParams(specs: ParamSpecs, own: Record<string, unknown>, partner: Record<string, unknown> | undefined, tMs: number, mc: ModContext, amount: number): ParamValues {
+    const now = this.resolveParams(specs, own, tMs, mc);
+    if (!partner) return now;
+    const was = this.resolveParams(specs, partner, tMs, mc);
+    for (const [k, spec] of Object.entries(specs)) {
+      if (spec.kind === "number") now[k] = lerp(was[k] as number, now[k] as number, amount);
+      else if (amount < 0.5) now[k] = was[k] as number | string | boolean;
+    }
+    return now;
+  }
+
+  private renderScene(entry: TimelineEntry, tMs: number, mc: ModContext, morph?: Morph): Target {
     const show = this.show as Show;
     const scene = show.scenes.find((s) => s.id === entry.sceneId) ?? (show.scenes[0] as Scene);
     const tg = this.targetsFor(scene.id);
+    const seen = this.sceneSeen.get(scene.id);
+    if (seen !== undefined && Math.abs(tMs - seen) > REENTRY_MS) {
+      // re-entered after a while: no stale frames from minutes ago in the feedback buffers
+      tg.cur.clear(0, 0, 0, 0);
+      tg.prev.clear(0, 0, 0, 0);
+      this.fadeStart.set(scene.id, tMs);
+      const prefix = `scene:${scene.id}/`;
+      for (const [k, p] of this.posts) {
+        if (k.startsWith(prefix)) {
+          p.dispose();
+          this.posts.delete(k);
+        }
+      }
+    }
+    this.sceneSeen.set(scene.id, tMs);
+    const fadeAge = tMs - (this.fadeStart.get(scene.id) ?? -Infinity);
+    const fadeIn = fadeAge >= 0 && fadeAge < REENTRY_FADE_MS ? fadeAge / REENTRY_FADE_MS : 1;
     [tg.cur, tg.prev] = [tg.prev, tg.cur];
     this.currentScene = tg;
-    const palette = resolvePalette(show.palette, this.analysis, tMs, entry.paletteId);
+    const palette = resolvePalette(show.palette, this.analysis, tMs, entry.paletteId, show.reactivity);
     if (this.opts.mode === "overlay") tg.cur.clear(0, 0, 0, 0);
     else tg.cur.clear(palette.bg[0], palette.bg[1], palette.bg[2], 1);
+    const from = morph ? show.scenes.find((s) => s.id === morph.from.sceneId) : undefined;
+    const counts = new Map<string, number>();
     for (const l of scene.layers) {
+      const ordinal = counts.get(l.type) ?? 0;
+      counts.set(l.type, ordinal + 1);
       if (!l.enabled) continue;
       const def = layerDef(l.type);
       if (!def) continue;
@@ -294,11 +418,15 @@ export class Engine {
         inst = def.create(this.layerContext());
         this.instances.set(key, inst);
       }
-      const opacity = evalParam(l.opacity, 0, 1, tMs, mc);
+      const partner = morph ? nthLayer(from, l.type, ordinal) : undefined;
+      let opacity = evalParam(l.opacity, 0, 1, tMs, mc);
+      if (morph && partner) opacity = lerp(evalParam(partner.opacity, 0, 1, tMs, mc), opacity, morph.amount);
+      if (def.stateful) opacity *= fadeIn;
       if (opacity <= 0.001) continue;
       tg.cur.bind();
       this.setBlend(l.blend);
-      inst.render(this.frameInput(tMs, this.resolveParams(def.params, l.params, tMs, mc), opacity, palette));
+      const params = this.morphedParams(def.params, l.params, partner?.params, tMs, mc, morph?.amount ?? 1);
+      inst.render(this.frameInput(tMs, params, opacity, palette, this.trackSource(l.type, ordinal, def.params, mc)));
     }
     if (this.analysis && show.motifs) {
       const mdef = layerDef("motif");
@@ -313,7 +441,7 @@ export class Engine {
           const opacity = evalParam(mo.layer.opacity, 0, 1, tMs, mc);
           tg.cur.bind();
           this.setBlend(mo.layer.blend);
-          inst.render(this.frameInput(tMs, this.resolveParams(mdef.params, mo.layer.params, tMs, mc), opacity, palette));
+          inst.render(this.frameInput(tMs, this.resolveParams(mdef.params, mo.layer.params, tMs, mc), opacity, palette, this.rawSource(key, mdef.params, mo.layer.params, mc)));
         }
       }
     }
@@ -329,14 +457,17 @@ export class Engine {
       this.frame.clear(0, 0, 0, this.opts.mode === "overlay" ? 0 : 1);
       return;
     }
-    const cur = this.renderScene(active.current, tMs, mc);
-    if (active.previous) {
+    const morph = morphAt(this.analysis, this.show, this.entries, tMs);
+    const cur = this.renderScene(active.current, tMs, mc, morph ?? undefined);
+    if (morph) {
+      this.transitions.render("cut", cur, cur, 1, this.frame, tMs);
+    } else if (active.previous) {
       const prevTarget = this.renderScene(active.previous, tMs, mc);
-      this.transitions.render(active.current.transition.kind, prevTarget, cur, active.mix, this.frame, tMs);
+      this.transitions.render(active.current.transition.kind, prevTarget, cur, active.mix, this.frame, tMs, this.show.reactivity);
     } else {
       this.transitions.render("cut", cur, cur, 1, this.frame, tMs);
     }
-    const palette = resolvePalette(this.show.palette, this.analysis, tMs, active.current.paletteId);
+    const palette = resolvePalette(this.show.palette, this.analysis, tMs, active.current.paletteId, this.show.reactivity);
     if (this.show.text) {
       this.frame.bind();
       gl.enable(gl.BLEND);

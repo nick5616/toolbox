@@ -35,7 +35,7 @@ registerLayer({
       render(f) {
         const n = Math.round(f.params.count as number);
         const layout = f.params.layout as string;
-        const kick = f.signals.value("kick", f.tMs);
+        const kick = f.signals.smoothed("kick", f.tMs);
         const maxH = (f.params.height as number) * f.h * (layout === "up" ? 0.9 : 0.45);
         const baseY = (1 - (f.params.y as number)) * f.h;
         const slot = f.w / n;

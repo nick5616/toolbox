@@ -3,7 +3,7 @@
  * the left channel and the right half the right one (from the stereo balance);
  * the outer edges tint blue on the left and red on the right with the level.
  */
-import { bgShader, commonParams, cumSignal, drive, fullscreenLayer, speedScale } from "./_bg/util";
+import { bgShader, commonParams, drive, fullscreenLayer } from "./_bg/util";
 import { registerLayer } from "./registry";
 
 const FS = bgShader(`
@@ -82,8 +82,7 @@ registerLayer({
     return fullscreenLayer(ctx, FS, (p, f) => {
       const react = f.params.react as number;
       const d = drive(f, react);
-      const sp = f.params.speed as number;
-      const flow = f.motionSec * sp * 0.6 + cumSignal(f.signals, "mix.mid", f.tMs) * speedScale(f) * sp * react * 0.5;
+      const flow = f.integral("speed") * 0.6 + f.integral("speed*react*intensity*mix.mid") * 0.5;
       const base = 0.3;
       const L = Math.max(0, Math.min(1.2, base + d.level * (1 - 0.9 * d.balance)));
       const R = Math.max(0, Math.min(1.2, base + d.level * (1 + 0.9 * d.balance)));

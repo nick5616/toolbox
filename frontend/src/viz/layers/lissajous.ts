@@ -33,14 +33,13 @@ registerLayer({
         const N = f.quality === "draft" ? 240 : 420;
         const ramp = buildRamp(f.palette, p.color as string);
         const pitch = f.analysis.has("vocals.pitch") ? f.signals.value("vocals.pitch", f.tMs, 60, 250) : f.signals.value("mix.brightness", f.tMs, 60, 250);
-        const level = f.signals.value("mix.level", f.tMs);
-        const kick = f.signals.value("kick", f.tMs);
+        const level = f.signals.smoothed("mix.level", f.tMs);
+        const kick = f.signals.smoothed("kick", f.tMs);
         const fx = Math.round(p.freq as number);
         const ratio = (p.ratio as number) + (pitch - 0.5) * (p.pitchMod as number) * 1.5;
-        const drift = p.phaseDrift as number;
         const half = (p.size as number) * b.short * b.scale * (1 + 0.07 * kick);
         const thick = (p.thickness as number) * b.short * 0.5 * (1 + 0.4 * kick);
-        const phase = drift * (f.motionSec * 0.22 + f.analysis.cum("mix.onset", f.tMs) * 1.3);
+        const phase = f.integral("phaseDrift") * 0.22 + f.integral("phaseDrift*intensity*mix.onset") * 1.3;
         const cr = Math.cos(b.rot);
         const sr = Math.sin(b.rot);
         lines.begin(b.glowPx, 0.5);
