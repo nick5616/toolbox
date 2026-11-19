@@ -244,30 +244,48 @@ function correlation(a: Float32Array, b: Float32Array): number {
   return sab / Math.sqrt(saa * sbb);
 }
 
-/** Dominant hue of a frame: the peak 10° bin's circular mean (with its neighbours); NaN when no pixel has a hue. */
-export function dominantHue(hue: Float32Array): number {
+/** Pixels darker than this (relative luminance) carry no hue vote: near-black tints flicker without being seen. */
+const HUE_MIN_LUM = 0.004;
+
+/**
+ * Dominant hue of a frame: the peak 10° bin's circular mean (with its neighbours); NaN when no pixel has a hue.
+ * With `lum`, each pixel votes with its luminance, so the colour the eye sees wins over a dim tinted background
+ * (Phase 21: dim near-grey frames used to flip the dominant hue between unrelated bins).
+ */
+export function dominantHue(hue: Float32Array, lum?: Float32Array): number {
   const bins = new Float64Array(36);
+  const weight = (i: number): number => (lum ? ((lum[i] as number) >= HUE_MIN_LUM ? (lum[i] as number) : 0) : 1);
   let any = false;
   for (let i = 0; i < hue.length; i++) {
     const h = hue[i] as number;
-    if (Number.isNaN(h)) continue;
+    const w = weight(i);
+    if (Number.isNaN(h) || w <= 0) continue;
     any = true;
     const k = Math.min(35, Math.floor(h / 10));
-    bins[k] = (bins[k] as number) + 1;
+    bins[k] = (bins[k] as number) + w;
   }
   if (!any) return NaN;
+  // smooth over the neighbouring bins so a tie between two adjacent bins doesn't flip the peak
   let peak = 0;
-  for (let k = 1; k < 36; k++) if ((bins[k] as number) > (bins[peak] as number)) peak = k;
+  let best = -1;
+  for (let k = 0; k < 36; k++) {
+    const v = (bins[(k + 35) % 36] as number) + (bins[k] as number) + (bins[(k + 1) % 36] as number);
+    if (v > best) {
+      best = v;
+      peak = k;
+    }
+  }
   let sx = 0;
   let sy = 0;
   for (let i = 0; i < hue.length; i++) {
     const h = hue[i] as number;
-    if (Number.isNaN(h)) continue;
+    const w = weight(i);
+    if (Number.isNaN(h) || w <= 0) continue;
     const k = Math.min(35, Math.floor(h / 10));
     const d = Math.min((k - peak + 36) % 36, (peak - k + 36) % 36);
     if (d > 1) continue;
-    sx += Math.cos((h * Math.PI) / 180);
-    sy += Math.sin((h * Math.PI) / 180);
+    sx += w * Math.cos((h * Math.PI) / 180);
+    sy += w * Math.sin((h * Math.PI) / 180);
   }
   const deg = (Math.atan2(sy, sx) * 180) / Math.PI;
   return deg < 0 ? deg + 360 : deg;
@@ -293,7 +311,7 @@ export function measureMotion(frames: MotionFrame[], fps: number): MotionStats {
   let blocks = 0;
   let hueSum = 0;
   let huePairs = 0;
-  let prevHue = dominantHue(first.hue);
+  let prevHue = dominantHue(first.hue, first.lum);
   const bw = Math.floor(w / BLOCK);
   const bh = Math.floor(h / BLOCK);
   for (let f = 1; f < frames.length; f++) {
@@ -320,7 +338,7 @@ export function measureMotion(frames: MotionFrame[], fps: number): MotionStats {
         blocks++;
       }
     }
-    const hb = dominantHue(b.hue);
+    const hb = dominantHue(b.hue, b.lum);
     if (!Number.isNaN(hb) && !Number.isNaN(prevHue)) {
       const d = Math.abs(hb - prevHue);
       hueSum += Math.min(d, 360 - d);

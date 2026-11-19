@@ -1,13 +1,13 @@
 /** Ink & Water (SPEC.md §6.10 #10): slow metaball ink and soft fireflies; the colour follows the mood of the words. */
 import type { Preset } from "./types";
-import { BG, L, m, makeShow, P, S, X, director, globalPost, text } from "./kit";
+import { BG, L, groove, m, makeShow, P, S, X, director, globalPost, text } from "./kit";
 
 const ink = (blobs: number, swell: number, bright: number, edge: number) =>
   BG("ink", "ink", {
     blobs,
     viscosity: 0.6,
-    swell: P(swell, m("vocals.level", 0.25), m("bass.level", 0.1)),
-    speed: P(0.7, m("section.energy", 0.3)),
+    swell: P(swell, m("vocals.level", 0.2, "ease", 300, 900), groove("bass.level", 0.06)),
+    speed: P(0.7, m("section.energy", 0.1, "linear", 600, 1500)),
     brightness: P(bright, m("section.energy", 0.03), m("vocals.level", 0.03)),
     size: P(0.85, m("section.energy", -0.1)),
     edge,

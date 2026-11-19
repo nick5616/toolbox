@@ -1,18 +1,18 @@
 /** Vortex (SPEC.md §6.10 #16): lines spiral out of the centre, twisting with the bass; polygon rays fire on the kick. */
 import type { Preset } from "./types";
-import { BG, L, m, makeShow, P, S, X, director, globalPost, text } from "./kit";
+import { BG, L, duck, groove, m, makeShow, P, S, X, director, globalPost, text } from "./kit";
 
 const bg = (bright: number) =>
-  BG("bg", "gradient", { speed: 0.4, intensity: 0.7, contrast: 0.5, brightness: P(bright, m("section.energy", 0.012), m("bass.level", 0.012)), drift: P(0.3, m("bass.level", 0.3)) });
+  BG("bg", "gradient", { speed: 0.4, intensity: 0.7, contrast: 0.5, brightness: P(bright, m("section.energy", 0.012), groove("bass.level", 0.012)), drift: P(0.3, groove("bass.level", 0.1)) });
 
 const vortex = (lines: number, twist: number, length: number, thick: number) =>
   L("vortex", "vortex", {
     lines,
-    twist: P(twist, m("bass.level", 0.3), m("kick", 0.1, "exp")),
-    length: P(length, m("drums.level", 0.08)),
+    twist: P(twist, groove("bass.level", 0.1)),
+    length: P(length, groove("drums.level", 0.05)),
     thickness: thick,
-    spin: P(0.4, m("section.energy", 0.4)),
-    glow: P(0.4, m("beat.pulse", 0.12)),
+    spin: P(0.4, m("section.energy", 0.12, "linear", 600, 1500)),
+    glow: P(0.4, groove("beat.pulse", 0.04)),
     color: "c0",
     brightness: 0.8,
   }, { opacity: 0.85 });
@@ -21,14 +21,14 @@ const geometry = (shapes: number, size: number, rays: number) =>
   L("geom", "geometry", {
     shapes,
     sides: 6,
-    size: P(size, m("kick", 0.06, "exp")),
-    roughness: P(0.4, m("snare", 0.3, "exp")),
-    rays: P(rays, m("kick", 0.3, "exp")),
+    size: P(size, m("kick", 0.04, "exp")),
+    roughness: P(0.4, m("snare", 0.15, "exp")),
+    rays: P(rays, m("kick", 0.2, "exp")),
     spin: 0.25,
     thickness: 0.004,
     glow: 0.55,
     brightness: 1.3,
-  }, { opacity: 0.85 });
+  }, { opacity: P(0.85, duck()) });
 
 export const vortexPreset: Preset = {
   id: "vortex",
@@ -50,10 +50,10 @@ export const vortexPreset: Preset = {
       ]),
     ],
     post: globalPost({
-      bloom: P(0.55, m("kick", 0.1, "exp"), m("drop.pulse", 0.15)),
+      bloom: P(0.55, groove("bass.level", 0.06), m("drop.pulse", 0.12)),
       vignette: 0.45,
       grain: 0.1,
-      extra: [X("chroma", "chromatic", { amount: P(3, m("section.energy", 0.2)), source: "kick" })],
+      extra: [X("chroma", "chromatic", { amount: P(3, m("section.energy", 0.2)), source: "drop" })],
     }),
     controls: [
       { label: "Twist", target: "vortex.twist" },

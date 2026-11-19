@@ -18,7 +18,7 @@ export const EFFECT_CATALOG: Record<PostType, EffectInfo> = {
   // Camera & motion
   punch: { label: "Zoom punch", description: "A quick zoom in that snaps back; made for kicks.", category: "Camera & motion" },
   shake: { label: "Camera shake", description: "Shakes the frame, harder on each hit.", category: "Camera & motion" },
-  zoompulse: { label: "Zoom pulse", description: "A gentle zoom that breathes with the beat.", category: "Camera & motion" },
+  zoompulse: { label: "Zoom pulse", description: "A gentle zoom that breathes with the bar.", category: "Camera & motion" },
   swing: { label: "3D swing", description: "Tilts the picture in 3D around its centre.", category: "Camera & motion" },
   // Blur & glow
   blurpulse: { label: "Blur pulse", description: "A soft blur that flares up and fades.", category: "Blur & glow" },

@@ -1,14 +1,14 @@
 /** Golden Hour (SPEC.md §6.10 #1): aurora, L/R wave rings, rising embers, kick ripples and a sweep on every new section. */
 import type { Preset } from "./types";
-import { BG, L, m, makeShow, P, S, X, director, globalPost, text } from "./kit";
+import { BG, L, drift, duck, groove, m, makeShow, P, S, X, director, globalPost, text } from "./kit";
 
 const aurora = (bright: number, height: number, bands: number) =>
   BG("aurora", "aurora", {
     bands,
     style: "curtains",
     tint: 0.4,
-    height: P(height, m("vocals.level", 0.25), m("section.energy", 0.3)),
-    brightness: P(bright, m("section.energy", 0.05), m("drop.pulse", 0.08, "exp"), m("other.level", 0.04)),
+    height: P(height, m("vocals.level", 0.15, "ease", 300, 900), m("section.energy", 0.2)),
+    brightness: P(bright, m("section.energy", 0.05), m("drop.pulse", 0.06), drift(0.04)),
   });
 
 const rings = (radius: number, thick: number, opacity: number) =>
@@ -18,10 +18,10 @@ const rings = (radius: number, thick: number, opacity: number) =>
     {
       pair: true,
       rings: 2,
-      radius: P(radius, m("section.energy", 0.06), m("kick", 0.035, "exp")),
-      wobble: P(0.4, m("bass.level", 0.3), m("snare", 0.12, "exp")),
+      radius: P(radius, m("section.energy", 0.06), groove("bass.level", 0.03)),
+      wobble: P(0.4, groove("bass.level", 0.12)),
       thickness: thick,
-      glow: P(0.55, m("beat.pulse", 0.2)),
+      glow: P(0.55, groove("beat.pulse", 0.04)),
       brightness: 1.35,
     },
     { opacity },
@@ -45,15 +45,15 @@ export const goldenHour: Preset = {
       S("main", "Main", [
         aurora(0.22, 1.0, 5),
         rings(0.25, 0.005, 0.9),
-        L("embers", "embers", { count: P(200, m("mix.level", 0.15), m("drums.level", 0.1)), rise: P(0.8, m("bass.level", 0.3)), brightness: 1.7 }),
-        L("ripples", "ripples", { trigger: "kick", every: 2, maxRadius: 0.7, rings: 2, width: 0.006, brightness: 1.3 }, { opacity: P(0.8, m("kick", 0.2, "exp")) }),
+        L("embers", "embers", { count: P(200, m("mix.level", 0.15), m("drums.level", 0.1)), rise: P(0.8, groove("bass.level", 0.1)), brightness: 1.7 }),
+        L("ripples", "ripples", { trigger: "kick", every: 2, maxRadius: 0.7, rings: 2, width: 0.006, brightness: 1.3 }, { opacity: P(0.8, m("kick", 0.1, "exp"), duck()) }),
         L("sweep", "sweep", { trigger: "section", width: 0.16, brightness: 1.5 }),
       ]),
       S("full", "Full", [
         aurora(0.22, 1.15, 6),
         rings(0.3, 0.006, 1),
-        L("embers", "embers", { count: P(300, m("mix.level", 0.12), m("drums.level", 0.08)), rise: P(1.0, m("bass.level", 0.3)), size: 1.05, brightness: 1.5 }),
-        L("ripples", "ripples", { trigger: "kick", every: 1, maxRadius: 0.95, rings: 3, width: 0.006, brightness: 0.8 }, { opacity: P(0.6, m("kick", 0.12, "exp")) }),
+        L("embers", "embers", { count: P(300, m("mix.level", 0.12), m("drums.level", 0.08)), rise: P(1.0, groove("bass.level", 0.1)), size: 1.05, brightness: 1.5 }),
+        L("ripples", "ripples", { trigger: "kick", every: 1, maxRadius: 0.95, rings: 3, width: 0.006, brightness: 0.8 }, { opacity: P(0.6, m("kick", 0.08, "exp"), duck()) }),
         L("sweep", "sweep", { trigger: "section", width: 0.2, brightness: 1.2 }),
         L("shock", "shockwave", { trigger: "drop+downbeat", strength: 0.8, flash: 0.15, brightness: 1.4 }),
       ]),
@@ -62,7 +62,7 @@ export const goldenHour: Preset = {
       bloom: P(0.45, m("drop.pulse", 0.15), m("section.energy", 0.05)),
       vignette: 0.45,
       grain: 0.1,
-      extra: [X("chroma", "chromatic", { amount: 3.5, source: "balance" })],
+      extra: [X("chroma", "chromatic", { amount: 3, source: "balance" })],
     }),
     controls: [
       { label: "Aurora glow", target: "aurora.brightness" },

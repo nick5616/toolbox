@@ -19,6 +19,16 @@ export function P(base: number, ...mods: Mod[]): Param {
   return mods.length === 0 ? base : { base, mods };
 }
 
+/**
+ * The motion grammar's stem roles (Phase 21 SPEC C1), as ready-made mods:
+ *  - `groove`: bass or the beat breathes a size or a glow, with a slow envelope (>= 250 ms release);
+ *  - `duck`: while vocals are present the busy things behind them fade by up to 30% (slow in, slower out);
+ *  - `drift`: the other instruments slowly push colour or texture.
+ */
+export const groove = (signal: SignalId, amount: number): Mod => m(signal, amount, "ease", 80, signal === "beat.pulse" ? 320 : 500);
+export const duck = (amount = -0.3): Mod => m("vocals.level", -Math.abs(amount), "linear", 600, 1500);
+export const drift = (amount: number): Mod => m("other.level", amount, "ease", 600, 1500);
+
 export interface LayerOptions {
   blend?: Blend;
   opacity?: Param;

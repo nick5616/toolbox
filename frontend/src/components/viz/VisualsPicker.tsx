@@ -14,6 +14,7 @@ import { Switch } from "@/components/Switch";
 import { cx } from "@/components/cx";
 import { VisualizerService, type TimedLine, type VisualsSpec } from "@/lib/api";
 import type { Show } from "@/viz/types";
+import { IntensityStops } from "./IntensityStops";
 import { PresetThumbs, type ThumbItem } from "./PresetThumbs";
 import {
   CUSTOM_ID,
@@ -150,7 +151,8 @@ export function VisualsPicker({ inputPath, lines, value, onChange, mode, aspect,
       />
 
       <div className={styles.controls}>
-        <Field label={<span data-tip="How strongly the visuals react to the music; 0 is still">Intensity</span>} htmlFor="viz-intensity">
+        <Field label={<span data-tip="How strongly the visuals react to the music: Calm, Balanced (the default) or Wild; 0 is still">Intensity</span>} htmlFor="viz-intensity">
+          <IntensityStops value={show?.reactivity ?? 1} disabled={!show} onChange={(v) => show && emit(withReactivity(show, v))} />
           <Slider id="viz-intensity" aria-label="Intensity" min={0} max={2} step={0.05} value={show?.reactivity ?? 1} disabled={!show} format={(v) => v.toFixed(2)} onChange={(v) => show && emit(withReactivity(show, v))} />
         </Field>
         <Field label={<span data-tip="Keep the design's own colours or use one palette throughout">Colours</span>}>

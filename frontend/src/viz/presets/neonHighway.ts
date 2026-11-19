@@ -1,14 +1,14 @@
 /** Neon Highway (SPEC.md §6.10 #2): a synthwave floor with a note highway whose lanes are the instruments. */
 import type { Preset } from "./types";
-import { BG, L, m, makeShow, P, S, director, globalPost, text } from "./kit";
+import { BG, L, duck, groove, m, makeShow, P, S, director, globalPost, text } from "./kit";
 
 // The grid's horizon (0.55 from the bottom) and the highway's vanishing point (0.45 from the top) meet.
 const grid = (bright: number, speed: number, sun: number, mountains: number) =>
   BG("grid", "synthgrid", {
-    brightness: P(bright, m("section.energy", 0.06), m("drop.pulse", 0.1, "exp")),
-    gridSpeed: P(speed, m("drums.level", 0.35)),
-    sunPulse: P(sun, m("kick", 0.2, "exp")),
-    mountains: P(mountains, m("other.level", 0.3)),
+    brightness: P(bright, m("section.energy", 0.06), m("drop.pulse", 0.08)),
+    gridSpeed: P(speed, m("section.energy", 0.1, "linear", 600, 1500)),
+    sunPulse: sun, // the shader swells the sun on the kick by itself
+    mountains: P(mountains, m("other.level", 0.25, "ease", 600, 1500)),
     sunSize: 0.24,
     horizon: 0.55,
   });
@@ -29,16 +29,16 @@ export const neonHighway: Preset = {
       ]),
       S("main", "Main", [
         grid(0.7, 0.9, 0.7, 1),
-        L("road", "highway", { lookahead: 2.6, width: 0.85, horizon: 0.45, glow: P(0.5, m("beat.pulse", 0.15)), brightness: 1.4 }),
+        L("road", "highway", { lookahead: 2.6, width: 0.85, horizon: 0.45, glow: P(0.5, groove("beat.pulse", 0.04)), brightness: 1.4 }),
       ]),
       S("full", "Full", [
-        grid(0.8, 1.6, 0.9, 1.3),
-        L("stars", "starfield", { density: 0.55, speed: P(1, m("drums.level", 0.4)), warp: P(0.5, m("drop.pulse", 0.5), m("kick", 0.15, "exp")), brightness: 0.45, size: 0.8 }, { opacity: 0.6 }),
-        L("road", "highway", { lookahead: 2.2, width: 1, horizon: 0.45, glow: P(0.55, m("beat.pulse", 0.2)), brightness: 1.45, noteSize: 1.15 }),
-        L("pulse", "ripples", { trigger: "downbeat", maxRadius: 1, rings: 1, width: 0.004, brightness: 0.8, color: "accent" }, { opacity: 0.6 }),
+        grid(0.8, 1.4, 0.9, 1.3),
+        L("stars", "starfield", { density: 0.55, speed: 1, warp: P(0.5, m("drop.pulse", 0.3)), brightness: 0.45, size: 0.8 }, { opacity: P(0.6, duck()) }),
+        L("road", "highway", { lookahead: 2.2, width: 1, horizon: 0.45, glow: P(0.55, groove("beat.pulse", 0.04)), brightness: 1.45, noteSize: 1.15 }),
+        L("pulse", "ripples", { trigger: "downbeat", maxRadius: 1, rings: 1, width: 0.004, brightness: 0.8, color: "accent" }, { opacity: 0.5 }),
       ]),
     ],
-    post: globalPost({ bloom: P(0.55, m("kick", 0.08, "exp"), m("drop.pulse", 0.15)), vignette: 0.4, grain: 0.1 }),
+    post: globalPost({ bloom: P(0.55, groove("bass.level", 0.06), m("drop.pulse", 0.12)), vignette: 0.4, grain: 0.1 }),
     controls: [
       { label: "Floor speed", target: "grid.gridSpeed" },
       { label: "Sun pulse", target: "grid.sunPulse" },

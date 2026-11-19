@@ -23,7 +23,7 @@ export const cleanCaptions: Preset = {
       S("main", "Main", [backdrop, sparks(12, 0.7, 0.85)]),
       S("full", "Full", [backdrop, sparks(18, 0.8, 1)]),
     ],
-    post: globalPost({ bloom: P(0.35, m("word.emphasis", 0.15)), vignette: 0.2, grain: 0.04 }),
+    post: globalPost({ bloom: P(0.35, m("mood.energy", 0.1)), vignette: 0.2, grain: 0.04 }),
     controls: [
       { label: "Spark size", target: "sparks.size" },
       { label: "Spark amount", target: "sparks.count" },

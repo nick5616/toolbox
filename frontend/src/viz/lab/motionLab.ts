@@ -5,7 +5,7 @@
  * metric. Writes motion.json (MotionReport) and motion-sheet-<preset>.png
  * (24 frames, one per 1.25 s, Balanced) through the VizLab sink.
  *
- * Query extras: `commit=<hash>` (recorded in the report), `secs=<n>` (shorter
+ * Words are left out of the measurement (`text=1` keeps them). Query extras: `commit=<hash>` (recorded in the report), `secs=<n>` (shorter
  * runs for smoke tests), `only=<preset id>`.
  */
 import type { Analysis } from "../analysis";
@@ -68,6 +68,8 @@ export async function runMotion(opts: {
       if (opts.stopped()) return;
       const show = showFromPreset(p);
       show.reactivity = intensity;
+      // the words are the host tool's (Lyric Video, Subtitles draw their own) and a new line is a content change, not a jump of the visuals: measured without them unless `text=1`
+      if (q.get("text") !== "1") show.text = null;
       const engine = new Engine(canvas, { width: W, height: H, mode: "opaque", quality: "full", seed: 1, fps: MOTION_FPS, inWorker: false });
       engine.setAnalysis(a);
       engine.setShow(show);

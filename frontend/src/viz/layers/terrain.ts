@@ -114,14 +114,17 @@ registerLayer({
         const react = f.params.react as number;
         const d = drive(f, react);
         const rows = Math.round(f.params.rows as number);
-        const rate = 6 * (f.params.speed as number); // rows per motion second
+        // rows scroll at 6 x speed rows per motion second: the distance is the integral of that rate, so a modulated
+        // speed changes how fast the rows glide, never where they are
         const sScale = speedScale(f);
-        const tau = f.motionSec * rate;
+        const tau = f.integral("speed*6");
         const base = Math.floor(tau);
         const frac = tau - base;
+        // row k was born when the integral reached k, i.e. at about k / (the average rate so far); pinned, so a row never changes while it glides
+        const avgRate = f.motionSec > 0.25 && tau > 1e-6 ? tau / f.motionSec : 6 * (f.params.speed as number);
         for (let j = 0; j < rows; j++) {
-          // content time of row j: the sampled time is pinned to the grid so the row never changes while it glides
-          const tj = Math.max(0, (((base - j) / rate) * 1000) / sScale);
+          // content time of row j (pinned to its birth, so the row never changes while it glides)
+          const tj = Math.max(0, (((base - j) / avgRate) * 1000) / sScale);
           f.analysis.vector("spectrum", tj, vec);
           for (let i = 0; i < COLS; i++) bytes[j * COLS + i] = Math.round(Math.min(1, (vec[i] ?? 0) * (0.35 + 0.65 * react + 0.0)) * 255);
         }
