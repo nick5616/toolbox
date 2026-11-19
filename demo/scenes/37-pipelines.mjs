@@ -12,7 +12,9 @@ export default {
       "Chain tools into a pipeline once, then run it on any song."
     );
     await t.click({ text: "Pipelines" });
-    await t.hold(1200);
+    await t.hold(800);
+    if (await t.exists({ css: "button", text: "Edit", exact: true })) await t.click({ css: "button", text: "Edit", exact: true });
+    await t.hold(600);
     await t.click({ css: '[aria-label="Pipelines"]' });
     await t.hold(500);
     await t.click({ text: "Song to everything" });
