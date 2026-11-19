@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"toolbox/core"
@@ -22,7 +23,8 @@ type Index struct {
 
 	rootCtx    context.Context // cancelled by Close
 	rootCancel context.CancelFunc
-	runCtx     context.Context // from Start's ctx (nil before Start)
+	run        atomic.Pointer[context.Context] // Start's ctx, cancelled by Close too (nil before Start)
+	runCancel  context.CancelFunc
 	wg         sync.WaitGroup
 
 	mu       sync.Mutex
@@ -100,10 +102,8 @@ func (ix *Index) matrixCapBytes() int64 { return ix.matrixLimit }
 
 // bg is the context background work runs in.
 func (ix *Index) bg() context.Context {
-	ix.mu.Lock()
-	defer ix.mu.Unlock()
-	if ix.runCtx != nil {
-		return ix.runCtx
+	if p := ix.run.Load(); p != nil {
+		return *p
 	}
 	return ix.rootCtx
 }
@@ -126,8 +126,11 @@ func (ix *Index) Start(ctx context.Context) error {
 		return nil
 	}
 	ix.started = true
-	ix.runCtx = ctx
+	run, cancel := context.WithCancel(ctx)
+	ix.runCancel = cancel
+	ix.run.Store(&run)
 	ix.mu.Unlock()
+	ctx = run
 
 	s := ix.loadSettings(ctx)
 	ix.mu.Lock()
@@ -166,6 +169,9 @@ func (ix *Index) Close() {
 		timer.Stop()
 	}
 	ix.rootCancel()
+	if ix.runCancel != nil {
+		ix.runCancel()
+	}
 	ix.wg.Wait()
 	ix.vec.drop()
 }

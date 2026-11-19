@@ -330,7 +330,6 @@ func (ix *Index) submit(ctx context.Context, w *work) {
 	if w.solo {
 		ix.removeSoloLocked(w.paths[0])
 	}
-	ix.lastError = ""
 	ix.mu.Unlock()
 	ix.emitStatus()
 	ix.signal() // the job may already have finished
@@ -403,6 +402,11 @@ func (ix *Index) handleFinished(ctx context.Context, inf *inflight, jobs []core.
 		}
 	}
 	if len(left) == 0 {
+		if !failed { // a job that finished its files clears the last error
+			ix.mu.Lock()
+			ix.lastError = ""
+			ix.mu.Unlock()
+		}
 		return
 	}
 	if cancelled && !failed {

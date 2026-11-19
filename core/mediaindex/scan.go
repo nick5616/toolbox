@@ -91,7 +91,8 @@ func newScanRules(root string, skip, exclude []string) scanRules {
 		}
 	}
 	for _, e := range exclude {
-		if e != "" {
+		// A folder that contains the library would exclude everything.
+		if e != "" && !core.IsWithin(pathKey(r.root), pathKey(e)) {
 			r.exclude = append(r.exclude, filepath.Clean(e))
 		}
 	}
