@@ -38,6 +38,17 @@ func LockTools(ctx context.Context) (unlock func(), err error) {
 	return unlock, err
 }
 
+// Acquire is AcquireTools on the folder given to SetToolsDir (no lock until
+// main.go has set it). It is what installers call:
+//
+//	ctx, unlock, err := workspace.Acquire(ctx)
+func Acquire(ctx context.Context) (context.Context, func(), error) {
+	toolsDirMu.Lock()
+	dir := toolsDir
+	toolsDirMu.Unlock()
+	return AcquireTools(ctx, dir)
+}
+
 // AcquireTools takes <dir>/.toolbox-tools.lock, an OS file lock shared by
 // every Toolbox process (SPEC §A6b), waiting up to ToolsLockWait. Installs,
 // updates, removes, `uv sync` and tools-folder moves hold it; reading tools

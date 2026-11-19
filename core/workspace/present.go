@@ -155,4 +155,3 @@ func replaceBounded(s, needle, repl string, fold bool) string {
 	b.WriteString(s[i:])
 	return b.String()
 }
-
