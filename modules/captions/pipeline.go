@@ -3,6 +3,7 @@ package captions
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 
 	"toolbox/core"
@@ -78,12 +79,85 @@ func (m *Module) visionModel() (string, error) {
 	return m.cfg.Vision.Vision()
 }
 
-// PrepareStep implements core.Chainable.
+// PrepareStep implements core.Chainable: one caption job per item (or one
+// for all merged items), with {vars} expanded in the context.
 func (m *Module) PrepareStep(ctx context.Context, req core.StepRequest) ([]core.StepJob, error) {
-	return nil, core.Errorf(core.CodeNotImplemented, "This step isn't ready yet")
+	o, err := core.DecodeOptionsJSON[Options](req.Options)
+	if err != nil {
+		return nil, err
+	}
+	if o.Model == "" {
+		if _, err := m.visionModel(); err != nil {
+			return nil, core.ErrWaiting("Install the Caption Writer pack", "Caption Writer needs a vision model; install the Caption Writer pack")
+		}
+	}
+	items := req.Items
+	if len(items) == 0 {
+		items = []core.StepItem{req.Item}
+	}
+	var files []string
+	var vars []map[string]string
+	for _, it := range items {
+		for _, f := range it.Files {
+			files = append(files, f.Path)
+		}
+		vars = append(vars, it.Vars)
+		if len(it.Files) > 0 {
+			vars = append(vars, core.FileVars(it.Files[0]))
+		}
+	}
+	if len(files) == 0 {
+		return []core.StepJob{}, nil
+	}
+	o.Action, o.Batch, o.Index = ActionCaption, "", -1
+	o.Context, _ = core.ExpandVars(o.Context, vars...)
+	if r := []rune(o.Context); len(r) > MaxContext {
+		o.Context = string(r[:MaxContext])
+	}
+	if o.Notes == nil {
+		o.Notes = map[string]string{}
+	}
+	var jobs []core.StepJob
+	for start := 0; start < len(files); start += MaxInputs {
+		jobs = append(jobs, core.StepJob{Inputs: files[start:min(start+MaxInputs, len(files))], Options: o})
+	}
+	return jobs, nil
 }
 
-// StepOutputs implements core.Chainable.
+// StepOutputs implements core.Chainable: captions.csv as the table, the
+// copies as "captioned", and the first file's texts as variables.
 func (m *Module) StepOutputs(job core.Job) (core.StepResult, error) {
-	return core.StepResult{}, core.Errorf(core.CodeNotImplemented, "This step isn't ready yet")
+	res := core.StepResult{Files: []core.RunFile{}, Vars: map[string]string{}}
+	for _, v := range StepVars() {
+		res.Vars[v.Name] = ""
+	}
+	label := "Copies with captions"
+	if o, err := core.DecodeOptionsJSON[Options](json.RawMessage(job.OptionsJSON)); err == nil && o.Then == ThenRenameCopies {
+		label = "Renamed copies"
+	}
+	var batchFile string
+	for _, out := range job.Outputs {
+		rf := core.RunFile{Path: out.Path, Name: out.Name, Kind: out.Kind, OutputID: out.ID}
+		switch {
+		case strings.EqualFold(filepath.Base(out.Path), CSVFile):
+			rf.Role, rf.RoleLabel = RoleTable, "Captions table"
+		case strings.EqualFold(filepath.Base(out.Path), BatchFile):
+			batchFile = out.Path
+			continue
+		default:
+			rf.Role, rf.RoleLabel = RoleCaptioned, label
+		}
+		res.Files = append(res.Files, rf)
+	}
+	if batchFile != "" {
+		if b, err := readBatchFile(filepath.Dir(batchFile)); err == nil && len(b.Items) > 0 {
+			f := b.Items[0].Fields
+			res.Vars["alt"], res.Vars["caption"] = f.Alt, f.Caption
+			res.Vars["hashtags"] = strings.Join(f.Hashtags, " ")
+			res.Vars["title"], res.Vars["description"] = f.Title, f.Description
+			res.Vars["keywords"] = strings.Join(f.Keywords, ", ")
+			res.Vars["name"] = f.Name
+		}
+	}
+	return res, nil
 }
