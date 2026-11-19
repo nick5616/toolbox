@@ -6,6 +6,11 @@ import (
 	"toolbox/core"
 )
 
+// Phase 21: the login item always starts Toolbox with no arguments, so a
+// start at login opens Personal (workspaces.json's "active" stays Personal; a
+// workspace is only ever opened by --workspace, TOOLBOX_WORKSPACE or a switch).
+// Never add a --workspace argument to the login item.
+
 // autostarter is the OS login-item API (Wails' AutostartManager); tests use a
 // fake so the real Run key is never touched.
 type autostarter interface {

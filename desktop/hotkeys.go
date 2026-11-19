@@ -1,10 +1,12 @@
 package desktop
 
 import (
+	"os"
 	"strings"
 	"sync"
 
 	"toolbox/core"
+	"toolbox/core/workspace"
 )
 
 // registrar is the part of Wails' GlobalShortcutManager the hotkey manager
@@ -33,6 +35,9 @@ func newHotkeyManager(reg registrar, em core.Emitter, actions map[string]func())
 // non-empty accelerator in core.HotkeyActions() order. Failures are reported
 // per action and never fatal. It emits hotkeys:status afterwards.
 func (m *hotkeyManager) Apply(hotkeys map[string]string) []core.HotkeyStatus {
+	if os.Getenv(workspace.EnvNoHotkeys) == "1" { // capture and tests: no global hotkeys
+		hotkeys = map[string]string{}
+	}
 	m.mu.Lock()
 	for _, a := range m.registered {
 		_ = m.reg.Unregister(a)

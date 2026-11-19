@@ -185,6 +185,9 @@ func (r *Runtime) Settings() Settings {
 }
 
 func (r *Runtime) hostname() string {
+	if a := strings.TrimSpace(r.cfg.DefaultAlias); a != "" {
+		return a
+	}
 	var h string
 	var err error
 	if r.cfg.Hostname != nil {

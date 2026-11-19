@@ -262,6 +262,7 @@ type Config struct {
 	FreeSpace     func(dir string) (free uint64, err error) // nil = no check
 	ReceiveDir    func() string                             // <library>/Received (for the free-space check)
 	Hostname      func() (string, error)                    // nil = os.Hostname
+	DefaultAlias  string                                    // when set (Demo workspaces), the alias used while none is saved; the hostname is never read or shown
 }
 
 // PacketConn is the multicast socket the runtime reads announcements from and writes them to.
