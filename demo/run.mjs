@@ -34,6 +34,7 @@ export function parseArgs(argv) {
     else if (a === "--legacy-env") o.mode = "legacy";
     else if (a === "--workspace-env") o.mode = "workspace";
     else if (a === "--keep-frames") o.keepFrames = true;
+    else if (a === "--final") o.final = true;
     else if (a === "--help" || a === "-h") o.help = true;
     else throw new Error(`unknown option ${a}`);
   }
@@ -112,6 +113,14 @@ async function main() {
   const paths = defaultPaths();
   if (args.tools) paths.toolsDir = args.tools;
   if (args.bin) paths.bin = args.bin;
+  if (args.final) {
+    // The real filming run: inside the user's Demo workspace (never deleted), footage into its Library.
+    if (args.fresh) throw new Error("--final never starts fresh: it films in the Demo workspace itself");
+    if (!fs.existsSync(path.join(paths.demoRoot, ".toolbox", "workspace.json"))) throw new Error(`no Demo workspace at ${paths.demoRoot}`);
+    paths.workspaceRoot = paths.demoRoot;
+    paths.generatedDir = path.join(paths.demoRoot, "Library", "Extras");
+    paths.outDir = path.join(paths.demoRoot, "Library", "Demo Footage");
+  }
   const outDir = args.out ?? paths.outDir;
   const doc = loadRoles(path.join(HERE, "roles.json"));
   const allScenes = await loadScenes();

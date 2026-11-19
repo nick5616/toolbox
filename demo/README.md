@@ -10,7 +10,8 @@ wails3 build                                   # the production binary, bin/tool
 node demo/make-assets.mjs                      # once: the generated roles (see "Assets")
 node demo/run.mjs --list                       # scenes, roles, which assets exist
 node demo/run.mjs --fresh --only 00            # film scene 00 from a fresh capture workspace
-node demo/run.mjs                              # every scene whose roles exist
+node demo/run.mjs                              # every scene whose roles exist (scratch capture workspace)
+node demo/run.mjs --final                      # the real run: films inside workspaces/demo, footage into its Library/Demo Footage
 node --test demo/test/                         # unit tests of the pure parts
 ```
 
@@ -119,3 +120,7 @@ are the only ones that use the network, and only these URLs.
   `Demo/...`; legacy mode does not, so avoid path-showing screens there). The first-run packs page shows the
   tools folder path, which is why the harness skips it before recording.
 - `demoAssets/` is read-only; the harness only copies from it.
+
+## Where artifacts go
+
+Every demo artifact stays inside the Demo workspace (`<repo>/workspaces/demo`): the generated roles in `Library/Extras/`, the footage, stills and shot list in `Library/Demo Footage/`, and the tools' own results (stems, grades, renders) wherever each tool saves in that Library. `--final` films there; plain runs use a scratch capture workspace under `.dev/` that is deleted afterwards.
