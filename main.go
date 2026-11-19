@@ -806,6 +806,9 @@ func startURL() string {
 		if p := os.Getenv("TOOLBOX_VIZLAB_ONLY"); p != "" {
 			q += "&only=" + url.QueryEscape(p)
 		}
+		if m := os.Getenv("TOOLBOX_VIZLAB_MODE"); m != "" {
+			q += "&mode=" + url.QueryEscape(m) // "motion" (Phase 21 §C4)
+		}
 		if l := os.Getenv("TOOLBOX_VIZLAB_LAYER"); l != "" {
 			q += "&layer=" + url.QueryEscape(l)
 		}
