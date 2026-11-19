@@ -16,7 +16,7 @@ import { useShortcut } from "@/lib/shortcuts";
 import type { ToolViewProps } from "@/lib/toolActions";
 import { Spacer, StudioLayout, WorkspacePreviewFrame, WorkspaceRail } from "@/workspace";
 import { DepsGate } from "../_kit/DepsGate";
-import { addPaths, exportAll, loadMine, openInput, pickFiles, pickLibraryFiles } from "./actions";
+import { addPaths, autoPrepareMaps, exportAll, loadMine, mapsNeeded, openInput, pickFiles, pickLibraryFiles } from "./actions";
 import { Gallery } from "./Gallery";
 import { disposeThumbs } from "./lookThumbs";
 import { GradePreview, useGradeClock } from "./Preview";
@@ -99,6 +99,9 @@ export default function GradeView({ moduleId }: ToolViewProps) {
   useEffect(() => {
     if (selected) void openInput(selected);
   }, [selected]);
+  // Pictures get the region maps their look needs without asking (Regions shows them).
+  const mapsKey = useGrade((s) => `${s.selected}|${mapsNeeded(s.recipe, s.wild).join(",")}|${s.maps ? "m" : ""}`);
+  useEffect(() => autoPrepareMaps(), [mapsKey]);
   useShortcut("Space", () => useGrade.getState().setPlaying(!useGrade.getState().playing), { when: !!video && !!selected });
 
   useCommands(

@@ -15,7 +15,8 @@ import { asAi, fromService, toService } from "./recipe";
 import { bakeLut } from "./seams";
 import { acceptsPath } from "../_kit/accepts";
 import { ALL_EXTS, IMAGE_EXTS, kindOfPath, useGrade, type Suggestion } from "./store";
-import type { GradeRecipe } from "@/grade/types";
+import { CHAOS_ABOVE, type GradeRecipe } from "@/grade/types";
+import { opDef } from "@/grade/ops";
 
 const PREVIEW_FPS = 30;
 
@@ -32,7 +33,10 @@ export async function addPaths(paths: string[]): Promise<void> {
   try {
     const infos = (await FilesService.Stat(ok)) ?? [];
     const good = infos.filter((i) => i.exists && !i.isDir).map((i) => i.path);
-    if (good.length > 0) st().addInputs(good);
+    if (good.length > 0) {
+      st().addInputs(good);
+      st().select(good[0] as string); // show what was just added
+    }
   } catch (e) {
     toast({ title: toAppError(e).message, tone: "danger" });
   }
@@ -295,4 +299,39 @@ export async function exportCube(): Promise<string> {
 export function openIsVideo(): boolean {
   const s = st();
   return s.src ? s.src.info.kind === "video" : !!s.selected && kindOfPath(s.selected) === "video";
+}
+
+/** The region maps a look uses at a Wildness ("depth" and/or "subject"; people share the subject map). */
+export function mapsNeeded(recipe: GradeRecipe, wild: number): string[] {
+  const out = new Set<string>();
+  for (const op of recipe.ops) {
+    if (!op.on || (op.chaos && wild <= CHAOS_ABOVE)) continue;
+    const r = op.region.kind;
+    if (r === "near" || r === "far") out.add("depth");
+    if (r === "subject" || r === "background" || r === "people") out.add("subject");
+    for (const n of opDef(op.kind)?.needs ?? []) out.add(n === "depth" ? "depth" : "subject");
+    if (op.params.source === "depth" || op.params.by === "depth") out.add("depth");
+  }
+  return [...out].sort();
+}
+
+const autoAsked = new Set<string>();
+
+/**
+ * Pictures: when the look uses a region map that isn't made yet and its model is
+ * installed, make it without asking (a few seconds). Videos take minutes, so the
+ * Regions panel offers it with an estimate instead. Once per (file, map).
+ */
+export function autoPrepareMaps(): void {
+  const s = st();
+  const path = s.selected;
+  const maps = s.maps;
+  if (!path || !maps || s.src?.info.kind === "video") return;
+  const want = mapsNeeded(s.recipe, s.wild).filter((k) => {
+    const m = k === "depth" ? maps.depth : maps.subject;
+    return !m.ready && !m.missing && !(maps.preparing ?? []).includes(k) && !autoAsked.has(`${path}|${k}`);
+  });
+  if (!want.length) return;
+  for (const k of want) autoAsked.add(`${path}|${k}`);
+  void prepareMaps(want);
 }
