@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"toolbox/core"
+	"toolbox/core/viz"
 )
 
 // Pipeline step "Grade with a look" (SPEC §E1): one job per file; a picture
@@ -57,8 +58,16 @@ func (m *Module) DescribeStep(options json.RawMessage) (core.StepInfo, error) {
 		return core.StepInfo{}, err
 	}
 	summary := "Look: " + o.Look
+	var warnings []string
 	if strings.TrimSpace(o.Vibe) != "" {
 		summary = "Vibe: " + o.Vibe
+		if m.cfg.Text == nil {
+			warnings = append(warnings, "Download a model in Local Chat first")
+		} else if _, err := m.cfg.Text.Ready(); err != nil {
+			if ae := core.AsAppError(err); ae != nil {
+				warnings = append(warnings, ae.Message)
+			}
+		}
 	}
 	return core.StepInfo{
 		Accepts: m.Descriptor().Accepts,
@@ -68,11 +77,16 @@ func (m *Module) DescribeStep(options json.RawMessage) (core.StepInfo, error) {
 		},
 		Vars:      []core.StepVar{},
 		Templates: []string{"/vibe"},
+		Warnings:  warnings,
 		Summary:   fmt.Sprintf("%s · wildness %.0f%%", summary, o.Wild*100),
 	}, nil
 }
 
-// PrepareStep implements core.Chainable. G2 completes it.
+// PrepareStep implements core.Chainable: one job per file. A look comes from
+// the recipe the step editor stored when a look was picked (built-in looks live
+// in the frontend); with a vibe the template is expanded per file and the job
+// asks the chat model for the look when it runs (the runner never waits on a
+// model). The step waits while no window can render.
 func (m *Module) PrepareStep(_ context.Context, req core.StepRequest) ([]core.StepJob, error) {
 	o, err := decodeStep(req.Options)
 	if err != nil {
@@ -81,7 +95,48 @@ func (m *Module) PrepareStep(_ context.Context, req core.StepRequest) ([]core.St
 	if err := checkStep(o); err != nil {
 		return nil, err
 	}
-	return nil, core.Errorf(core.CodeInternal, "Color Grader steps aren't ready yet")
+	vibe := strings.TrimSpace(o.Vibe) != ""
+	var recipe Recipe
+	switch {
+	case vibe:
+		if m.cfg.Text == nil {
+			return nil, core.ErrWaiting("Install a chat model", "Writing looks needs a model in Local Chat")
+		}
+		if _, err := m.cfg.Text.Ready(); err != nil {
+			return nil, core.ErrWaiting("Install a chat model", "Writing looks needs a model in Local Chat")
+		}
+	case o.Recipe != nil:
+		recipe, err = Normalize(*o.Recipe)
+		if err != nil {
+			return nil, core.ValidationError("This step's look isn't valid. Pick it again", map[string]string{"look": "Pick the look again"})
+		}
+	default:
+		return nil, core.ValidationError("This step has no look. Open it and pick one", map[string]string{"look": "Pick a look"})
+	}
+	if err := hostWaitFn(m.cfg.Broker); err != nil {
+		return nil, viz.ErrNoHost()
+	}
+	items := req.Items
+	if len(items) == 0 {
+		items = []core.StepItem{req.Item}
+	}
+	jobs := []core.StepJob{}
+	for _, it := range items {
+		for _, f := range it.Files {
+			opts := Options{Recipe: recipe, Wild: o.Wild, Format: o.Format}
+			if vibe {
+				opts.Recipe = DefaultOptions().Recipe
+				text, _ := core.ExpandVars(o.Vibe, it.Vars, core.FileVars(f))
+				text = cutRunes(strings.TrimSpace(text), MaxVibeChars)
+				if text == "" {
+					return nil, core.ValidationError("The vibe is empty after filling in its {variables}", map[string]string{"vibe": "Write a vibe"})
+				}
+				opts.Vibe, opts.VibeSeed = text, o.Seed
+			}
+			jobs = append(jobs, core.StepJob{Inputs: []string{f.Path}, Options: opts})
+		}
+	}
+	return jobs, nil
 }
 
 // StepOutputs implements core.Chainable.

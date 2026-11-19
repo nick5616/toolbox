@@ -474,6 +474,7 @@ func run() error {
 		Caller: engine, Broker: vizBroker, Text: chatSvc, Vision: chatSvc, Analyzer: vizAnalyzer,
 		ModelsDir: paths.ModelsDir, CacheDir: filepath.Join(paths.CacheDir, "grade"),
 		LooksFile: filepath.Join(paths.SupportDir, "grade", "looks.json"),
+		Edit:      editMod, Resolve: depSvc.Resolve, LibraryDir: libraryDir, Outputs: db, Jobs: jobs,
 	})
 	if err := grade.Register(reg, gradeMod); err != nil {
 		return err
@@ -582,6 +583,7 @@ func run() error {
 			composerMod.PruneCache, // cache/composer (30 days, 2 GB)
 			editMod.PruneCache,     // cache/editstudio (30 days, 10 GB)
 			paintMod.PruneTmp,      // tmp/paint (Lab crops and results)
+			gradeMod.PruneCache,    // cache/grade (30 days, 5 GB)
 		} {
 			if ctx.Err() != nil {
 				return
