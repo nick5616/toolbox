@@ -43,3 +43,17 @@
   text-align: center;
   pointer-events: none;
 }
+
+.chip {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-raised);
+  color: var(--fg-muted);
+  border: 1px solid var(--line);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  pointer-events: none;
+}

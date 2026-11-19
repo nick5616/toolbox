@@ -13,10 +13,10 @@ import { fetchAll } from "../analysis";
 import { RenderError } from "../worker/transport";
 import { frameKeyString, FrameLRU } from "./cache";
 import { StreamDecoder, REAL_ENV, hasVideoDecoder, type DecoderEnv } from "./decoder";
-import { clampFrame, parseStreamIndex } from "./gop";
+import { clampFrame, gopFrames, parseStreamIndex } from "./gop";
 import { StreamBytes } from "./source";
 import type { FrameImage, FrameKey, FrameProvider, StreamIndex, StreamRef } from "./types";
-import { getUploadMode, isVideoFrame } from "./upload";
+import { getUploadMode, imageSize, isVideoFrame } from "./upload";
 
 export interface ProviderFiles {
   streams: Record<string, StreamRef>;
@@ -36,8 +36,13 @@ export interface ProviderOptions {
   aheadFrames?: number;
 }
 
-export const PREVIEW_PER_STREAM = 24;
-export const PREVIEW_TOTAL = 120;
+/** Current + previous GOP (10 frames each) + +-0.5 s read-ahead fit one stream. */
+export const PREVIEW_PER_STREAM = 48;
+export const PREVIEW_TOTAL = 400;
+/** The back-step cache's memory cap (SPEC B5): decoded frames of all streams together. */
+export const PREVIEW_MAX_BYTES = 256 * 1024 * 1024;
+/** Paused read-ahead reaches this many frames each side of the playhead (+-0.5 s at 30 fps). */
+export const READ_AHEAD_FRAMES = 15;
 export const EXPORT_PER_STREAM = 8;
 /** Direct mode holds VideoFrames open, which stalls hardware decoders when many are held. */
 export const DIRECT_PER_STREAM = 12;
@@ -71,11 +76,26 @@ interface ExactDemand extends Demand {
   onAbort?: () => void;
 }
 
+function sameDemand(a: Demand | null, b: Demand): boolean {
+  if (!a || a.frames.size !== b.frames.size || a.images.size !== b.images.size) return false;
+  for (const [s, set] of b.frames) {
+    const o = a.frames.get(s);
+    if (!o || o.size !== set.size) return false;
+    for (const f of set) if (!o.has(f)) return false;
+  }
+  return true;
+}
+
 const defaultConvert = (f: VideoFrame): Promise<ImageBitmap> => createImageBitmap(f);
 const defaultDecodeImage = (b: Uint8Array): Promise<ImageBitmap> => createImageBitmap(new Blob([b as BlobPart]));
 
 function disposeImage(img: FrameImage): void {
   img.close();
+}
+
+function imageBytes(img: FrameImage): number {
+  const { w, h } = imageSize(img);
+  return w * h * 4;
 }
 
 export class EditFrameProvider implements FrameProvider {
@@ -91,6 +111,12 @@ export class EditFrameProvider implements FrameProvider {
   private readonly exacts = new Set<ExactDemand>();
   private current: Demand | null = null;
   private ahead: Demand | null = null;
+  /** Paused read-ahead (B5): low priority, dropped by the next prepare (a seek). */
+  private idle: Demand | null = null;
+  /** The current GOP and the one before are kept for back-stepping while paused. */
+  private historyOn = false;
+  private playing = false;
+  private reverse = false;
   private readonly bitmaps = new Map<string, { bmp: ImageBitmap; used: number }>();
   private readonly loading = new Map<string, Promise<void>>();
   private readonly imageErrors = new Map<string, string>();
@@ -111,6 +137,7 @@ export class EditFrameProvider implements FrameProvider {
     this.lru = new FrameLRU<FrameImage>({
       perStream: this.exactMode ? EXPORT_PER_STREAM : PREVIEW_PER_STREAM,
       total: this.exactMode ? 1000 : PREVIEW_TOTAL,
+      ...(this.exactMode ? {} : { maxBytes: PREVIEW_MAX_BYTES, bytesOf: imageBytes }),
       dispose: disposeImage,
     });
   }
@@ -236,7 +263,49 @@ export class EditFrameProvider implements FrameProvider {
     add(this.current);
     add(this.ahead);
     for (const e of this.exacts) add(e);
+    // Back-step history and idle read-ahead wait until what's on screen is decoded.
+    if (!this.exactMode && this.currentResident(rec)) {
+      if (this.historyOn && this.current) {
+        for (const f of this.current.frames.get(rec.key) ?? []) {
+          for (const h of this.historyFrames(rec, this.clamped(rec, f))) if (!this.lru.has(rec.key, h) && !rec.pending.has(h)) out.add(h);
+        }
+      }
+      add(this.idle);
+    }
+    if (this.reverse && this.ahead) {
+      for (const f of this.ahead.frames.get(rec.key) ?? []) {
+        for (const h of this.gopPrefix(rec, this.clamped(rec, f))) if (!this.lru.has(rec.key, h) && !rec.pending.has(h)) out.add(h);
+      }
+    }
     return out;
+  }
+
+  /** Frames first..n of n's GOP (decoded on the way to n anyway). */
+  private gopPrefix(rec: Rec, n: number): number[] {
+    if (!rec.index) return [n];
+    const { first } = gopFrames(rec.index, n);
+    const out: number[] = [];
+    for (let i = first; i <= n; i++) out.push(i);
+    return out;
+  }
+
+  /** The frames a back-step from n needs: its GOP up to n and the whole GOP before. */
+  private historyFrames(rec: Rec, n: number): number[] {
+    if (!rec.index) return [];
+    const { first } = gopFrames(rec.index, n);
+    const out: number[] = [];
+    if (first > 0) {
+      const prev = gopFrames(rec.index, first - 1);
+      for (let i = prev.first; i <= prev.last; i++) out.push(i);
+    }
+    for (let i = first; i <= n; i++) out.push(i);
+    return out;
+  }
+
+  /** True when every frame the on-screen demand needs of this stream is resident. */
+  private currentResident(rec: Rec): boolean {
+    for (const f of this.current?.frames.get(rec.key) ?? []) if (!this.lru.has(rec.key, this.clamped(rec, f))) return false;
+    return true;
   }
 
   private decoderFor(rec: Rec): StreamDecoder | null {
@@ -399,7 +468,9 @@ export class EditFrameProvider implements FrameProvider {
     for (const k of d.images) this.loadImage(k);
 
     if (!exact) {
+      if (!sameDemand(this.current, d)) this.idle = null; // any seek cancels read-ahead
       this.current = d;
+      this.historyOn = !this.playing;
       this.protectNow();
       return Promise.allSettled(loads).then(() => {
         if (this.current === d) {
@@ -457,7 +528,74 @@ export class EditFrameProvider implements FrameProvider {
     const hit = this.lru.get(key.stream, n);
     if (hit) return hit;
     if (this.exactMode) return null;
-    return this.lru.nearestBefore(key.stream, n)?.image ?? null;
+    return this.standIn(key.stream, n)?.image ?? null;
+  }
+
+  private standIn(stream: string, n: number): { frame: number; image: FrameImage } | undefined {
+    const before = this.lru.nearestBefore(stream, n);
+    if (!this.reverse) return before;
+    return this.lru.nearestAfter(stream, n) ?? before;
+  }
+
+  /** True when every stream key has its frame or a stand-in (so drawing won't leave a hole). */
+  hasStandIn(keys: readonly FrameKey[]): boolean {
+    for (const k of keys) {
+      if (k.stream in this.files.streams) {
+        const rec = this.recs.get(k.stream);
+        if (!rec?.index) return false;
+        const n = this.clamped(rec, Math.max(0, Math.floor(k.frame)));
+        if (!this.lru.has(k.stream, n) && !this.standIn(k.stream, n)) return false;
+      } else if (k.stream in this.files.images && !this.bitmaps.has(k.stream)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Paused read-ahead (SPEC B5): keys around the playhead for the visible
+   * clips, decoded after what's on screen. The next prepare (a seek) cancels it.
+   */
+  readAhead(keys: FrameKey[]): void {
+    if (this.disposed || this.exactMode || this.playing) return;
+    const d = this.group(keys, PREVIEW_PER_STREAM);
+    this.idle = d;
+    for (const s of d.frames.keys()) {
+      const rec = this.rec(s);
+      if (rec && !rec.index) void this.loadIndex(rec).then(() => this.refresh([s]), () => undefined);
+    }
+    this.refresh(d.frames.keys());
+  }
+
+  /** True while read-ahead frames are still to be decoded (tests). */
+  get readingAhead(): boolean {
+    if (!this.idle) return false;
+    for (const rec of this.recs.values()) {
+      for (const f of this.idle.frames.get(rec.key) ?? []) if (!this.lru.has(rec.key, this.clamped(rec, f))) return true;
+    }
+    return false;
+  }
+
+  /** Reverse play (J): stand-ins come from frames after the playhead, and each GOP behind it is decoded whole. */
+  setReverse(on: boolean): void {
+    this.reverse = on;
+  }
+
+  /** True when a frame is resident (exact), for tests and the back-step check. */
+  has(key: FrameKey): boolean {
+    const rec = this.recs.get(key.stream);
+    return !!rec?.index && this.lru.has(key.stream, this.clamped(rec, Math.max(0, Math.floor(key.frame))));
+  }
+
+  /** Bytes the decoded-frame cache holds. */
+  get residentBytes(): number {
+    return this.lru.bytes;
+  }
+
+  /** Releases every decoded frame now (project close); the provider stays usable. */
+  releaseFrames(): void {
+    this.lru.clear();
+    this.current = null;
+    this.ahead = null;
+    this.idle = null;
   }
 
   image(key: string): ImageBitmap | null {
@@ -506,6 +644,11 @@ export class EditFrameProvider implements FrameProvider {
 
   hint(ahead: FrameKey[], playing: boolean): void {
     if (this.disposed) return;
+    this.playing = playing;
+    if (playing) {
+      this.historyOn = false;
+      this.idle = null;
+    }
     this.ahead = playing ? this.group(ahead, getUploadMode() === "direct" ? Math.min(this.aheadN, DIRECT_AHEAD) : this.aheadN) : null;
     if (this.ahead) {
       for (const k of this.ahead.images) this.loadImage(k);
