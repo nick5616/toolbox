@@ -3,66 +3,1734 @@
 # - id: lowercase [a-z0-9-]; unique. category: people|animals|food|nature|things|vehicles|documents|art.
 # - prompts: "|"-separated; "{}" is replaced by display. parent: another id or empty. threshold: empty = default.
 # - No identity labels: no names, ethnicity, gender, age, religion or health.
-# Wave 0 starter set; V1 completes it to about 1,500 concepts.
-person	people	person	a photo of a person|a person	
-group	people	group of people	a photo of a group of people|a crowd of people	person
-selfie	people	selfie	a selfie|a close-up selfie photo	person
-wedding	people	wedding	a photo of a wedding|a wedding ceremony	
-birthday	people	birthday	a birthday party|a birthday cake with candles	
-concert	people	concert	a photo of a concert|a band playing on stage	
-animal	animals	animal	a photo of an animal	
-dog	animals	dog	a photo of a dog|a dog	animal
-cat	animals	cat	a photo of a cat|a cat	animal
-bird	animals	bird	a photo of a bird|a bird	animal
-horse	animals	horse	a photo of a horse	animal
-fish	animals	fish	a photo of a fish	animal
-food	food	food	a photo of food|a plate of food	
-fruit	food	fruit	a photo of fruit	food
-apple	food	apple	a photo of an apple|an apple	fruit
-banana	food	banana	a photo of a banana|a banana	fruit
-pizza	food	pizza	a photo of a pizza|a pizza	food
-cake	food	cake	a photo of a cake|a cake	food
-coffee	food	coffee	a cup of coffee|a photo of coffee	drink
-drink	food	drink	a photo of a drink|a glass with a drink	
-salad	food	salad	a photo of a salad	food
-bread	food	bread	a photo of bread	food
-beach	nature	beach	a photo of a beach|a sandy beach by the sea	
-sea	nature	sea	a photo of the sea|the ocean	
-mountain	nature	mountain	a photo of mountains|a mountain landscape	
-forest	nature	forest	a photo of a forest|trees in a forest	
-sunset	nature	sunset	a photo of a sunset|the sky at sunset	sky
-sky	nature	sky	a photo of the sky	
-snow	nature	snow	a photo of snow|a snowy landscape	
-flower	nature	flower	a photo of a flower|flowers	
-city	nature	city	a photo of a city|a city street	
-building	nature	building	a photo of a building	
-garden	nature	garden	a photo of a garden	
-table	things	table	a photo of a table	
-chair	things	chair	a photo of a chair	
-book	things	book	a photo of a book|a book	
-phone	things	phone	a photo of a smartphone|a mobile phone	
-laptop	things	laptop	a photo of a laptop	computer
-computer	things	computer	a photo of a computer	
-guitar	things	guitar	a photo of a guitar	instrument
-instrument	things	musical instrument	a photo of a musical instrument	
-camera	things	camera	a photo of a camera	
-cup	things	cup	a photo of a cup|a mug	
-car	vehicles	car	a photo of a car|a car	vehicle
-bicycle	vehicles	bicycle	a photo of a bicycle	vehicle
-train	vehicles	train	a photo of a train	vehicle
-airplane	vehicles	airplane	a photo of an airplane	vehicle
-boat	vehicles	boat	a photo of a boat	vehicle
-vehicle	vehicles	vehicle	a photo of a vehicle	
-document	documents	document	a photo of a document|a page of text	
-screenshot	documents	screenshot	a screenshot|a screenshot of a computer screen	
-receipt	documents	receipt	a photo of a receipt|a shop receipt	document
-whiteboard	documents	whiteboard	a photo of a whiteboard|writing on a whiteboard	
-slide	documents	slide	a presentation slide|a slide from a presentation	
-code	documents	code	a screenshot of source code|computer code on a screen	screenshot
-chart	documents	chart	a chart|a graph with data	
-map	documents	map	a map	
-handwriting	documents	handwriting	handwritten notes|handwriting on paper	
-painting	art	painting	a painting|an oil painting	
-sketch	art	sketch	a pencil sketch|a drawing	
-illustration	art	illustration	a digital illustration	
-logo	art	logo	a logo|a company logo	
+# Sorted by category, then by topic. Keep that order when adding labels.
+person	people	person	a photo of a person|a person		
+group	people	group of people	a photo of a group of people|a crowd of people	person	
+selfie	people	selfie	a selfie|a close-up selfie photo	person	
+portrait	people	portrait	a portrait of a person|a close-up portrait photo of a person	person	
+couple	people	couple	a photo of a couple together|two people posing together	person	
+friends	people	friends	a photo of friends together|friends hanging out and smiling	group	
+family	people	family	a family photo|a family posing together	group	
+family-gathering	people	family gathering	a family gathering around a table|relatives gathered together	family	
+baby	people	baby	a photo of a baby|a baby	person	
+toddler	people	toddler	a photo of a toddler|a toddler playing	person	
+child	people	child	a photo of a child|a child playing	person	
+children-playing	people	children playing	children playing together|kids running and playing outside	child	
+crowd	people	crowd	a large crowd of people|a crowd at an event	group	
+audience	people	audience	an audience watching a show|a seated audience in a hall	crowd	
+silhouette-of-a-person	people	silhouette of a person	a silhouette of a person against the light|a dark silhouette of a person	person	
+people-walking	people	people walking	people walking down a street|a group of people walking	group	
+team	people	team	a team posing together in matching clothes|a team photo	group	
+tourists	people	tourists	tourists sightseeing|tourists taking photos	group	
+wedding	people	wedding	a photo of a wedding|a wedding ceremony		
+wedding-reception	people	wedding reception	a wedding reception with tables and decorations|guests at a wedding reception	wedding	
+wedding-rings	people	wedding rings	a pair of wedding rings|wedding rings on a cushion	wedding	
+wedding-dress	people	wedding dress	a wedding dress|a white wedding dress on a hanger	wedding	
+engagement	people	engagement	an engagement ring|a couple celebrating an engagement	wedding	
+birthday	people	birthday	a birthday party|a birthday cake with candles		
+birthday-party	people	birthday party	a children's birthday party with balloons|people at a birthday party	birthday	
+birthday-candles	people	birthday candles	a cake with lit birthday candles|blowing out birthday candles	birthday	
+baby-shower	people	baby shower	a baby shower party with decorations|a baby shower		
+graduation	people	graduation	a graduation ceremony|graduates in caps and gowns		
+graduation-cap	people	graduation cap	a graduation cap|graduation caps thrown in the air	graduation	
+anniversary	people	anniversary	an anniversary celebration|a romantic anniversary dinner		
+reunion	people	reunion	a reunion of friends|people reuniting and hugging		
+party	people	party	a party|people celebrating at a party		
+house-party	people	house party	a house party with friends|people chatting at a house party	party	
+dinner-party	people	dinner party	a dinner party around a table|friends having dinner together	party	
+dance-party	people	dance party	people dancing at a party|a dance floor full of people	party	
+nightclub	people	nightclub	a nightclub with colorful lights|people in a nightclub	party	
+karaoke	people	karaoke	people singing karaoke|a karaoke night	party	
+concert	people	concert	a photo of a concert|a band playing on stage		
+music-festival	people	music festival	a music festival crowd|a festival stage at night	concert	
+festival	people	festival	a street festival|a festival with colorful decorations		
+parade	people	parade	a parade on a street|a marching parade	festival	
+carnival	people	carnival	a carnival with colorful costumes|a carnival fairground	festival	
+street-performance	people	street performance	a street performer entertaining a crowd|a street musician playing	festival	
+fireworks	people	fireworks	fireworks in the night sky|a fireworks display		
+new-year-celebration	people	new year celebration	a new year's eve celebration|confetti and sparklers at midnight	fireworks	
+christmas	people	christmas	a christmas scene|christmas decorations		
+christmas-dinner	people	christmas dinner	a christmas dinner table|a festive christmas meal	christmas	
+christmas-market	people	christmas market	a christmas market with lights|stalls at a christmas market	christmas	
+christmas-presents	people	christmas presents	presents under a christmas tree|wrapped christmas gifts	christmas	
+easter	people	easter	an easter scene|easter eggs and spring decorations		
+easter-eggs	people	easter eggs	painted easter eggs|an easter egg hunt	easter	
+halloween	people	halloween	a halloween scene|halloween decorations and costumes		
+halloween-costume	people	halloween costume	a halloween costume|children in halloween costumes	halloween	
+thanksgiving-dinner	people	thanksgiving dinner	a thanksgiving dinner table|a roast turkey dinner with family		
+valentines-day	people	valentines day	a valentine's day gift|hearts and roses for valentine's day		
+holiday-decorations	people	holiday decorations	holiday decorations|festive lights and decorations		
+ceremony	people	ceremony	a ceremony with guests|a formal ceremony		
+award-ceremony	people	award ceremony	an award ceremony on a stage|a person receiving an award	ceremony	
+conference	people	conference	a conference with speakers|a conference hall full of attendees		
+speech-on-stage	people	speech on stage	a person giving a speech on a stage|a speaker at a podium	conference	
+meeting	people	meeting	a business meeting|people sitting around a meeting table		
+presentation	people	presentation	a person giving a presentation|a presentation to a room of people	meeting	
+workshop	people	workshop	a workshop with people working in groups|a hands-on workshop	meeting	
+lecture	people	lecture	a lecture in a lecture hall|a lecturer teaching students	meeting	
+school-event	people	school event	a school event|a school play or school performance		
+sports-event	people	sports event	a sports event|spectators at a sports event		
+football-match	people	football match	a football match|soccer players on a pitch		
+basketball-game	people	basketball game	a basketball game|players on a basketball court	sports-event	
+baseball-game	people	baseball game	a baseball game|a baseball pitcher and batter	sports-event	
+tennis-match	people	tennis match	a tennis match|a tennis player serving	sports-event	
+golfing	people	golfing	a person playing golf|golfers on a golf course	sports-event	
+rugby-match	people	rugby match	a rugby match|players in a rugby scrum	sports-event	
+hockey-game	people	hockey game	an ice hockey game|players on an ice rink	sports-event	
+marathon	people	marathon	a marathon with runners|a road race	sports-event	
+race	people	race	a race with competitors|runners at the start line	sports-event	
+competition	people	competition	a competition|competitors in a contest	sports-event	
+running	people	running	a person running|a runner jogging outdoors		
+jogging	people	jogging	a person jogging in a park|a jogger on a trail	running	
+workout	people	workout	a person working out|a workout session at a gym		
+yoga	people	yoga	a person doing yoga|a yoga class		
+pilates	people	pilates	a pilates class|people doing pilates exercises	workout	
+stretching	people	stretching	a person stretching|stretching before exercise	workout	
+weightlifting	people	weightlifting	a person lifting weights|weightlifting in a gym	workout	
+swimming	people	swimming	a person swimming|swimmers in a pool		
+diving	people	diving	a person diving into water|scuba diving underwater	swimming	
+snorkeling	people	snorkeling	snorkeling in clear water|a snorkeler above a coral reef	swimming	
+surfing	people	surfing	a person surfing a wave|a surfer on a surfboard		
+sailing	people	sailing	people sailing a boat|a sailing trip		
+kayaking	people	kayaking	people kayaking on water|a kayaker paddling		
+fishing	people	fishing	a person fishing|fishing from a boat or a pier		
+skiing	people	skiing	a person skiing down a slope|skiers on a mountain		
+snowboarding	people	snowboarding	a person snowboarding|a snowboarder in the snow	skiing	
+ice-skating	people	ice skating	people ice skating|an ice skating rink		
+sledding	people	sledding	children sledding in the snow|a sled on a snowy hill	skiing	
+snowball-fight	people	snowball fight	a snowball fight|kids playing in the snow	skiing	
+cycling	people	cycling	a person cycling|cyclists riding on a road		
+mountain-biking	people	mountain biking	a person mountain biking on a trail|a mountain bike rider	cycling	
+skateboarding	people	skateboarding	a person skateboarding|a skateboarder doing a trick		
+rock-climbing	people	rock climbing	a person rock climbing|a climber on a cliff face		
+hiking	people	hiking	a photo of people hiking|hikers on a mountain trail		
+camping	people	camping	a camping trip|a tent at a campsite		
+campfire	people	campfire	a campfire at night|people sitting around a campfire	camping	
+walking	people	walking	a person walking|a walk outdoors		
+horseback-riding	people	horseback riding	a person riding a horse|horseback riding		
+dancing	people	dancing	people dancing|a dancer performing		
+ballet	people	ballet	ballet dancers|a ballet performance	dancing	
+martial-arts	people	martial arts	people practicing martial arts|a martial arts class		
+boxing	people	boxing	a boxing match|people boxing in a ring	martial-arts	
+gymnastics	people	gymnastics	a gymnast performing|gymnastics on a balance beam		
+paragliding	people	paragliding	a person paragliding|a paraglider flying over mountains		
+skydiving	people	skydiving	a person skydiving|a skydiver in the air		
+travel	people	travel	a travel photo|a traveler on a trip		
+road-trip	people	road trip	a road trip|a car driving along a scenic road	travel	
+vacation	people	vacation	a family vacation|a relaxing holiday	travel	
+sightseeing	people	sightseeing	tourists sightseeing in a city|sightseeing at a famous place	travel	
+airport-travel	people	airport travel	travelers at an airport|people with luggage at an airport	travel	
+cruise	people	cruise	a cruise holiday on a ship|people on a cruise ship deck	travel	
+beach-day	people	beach day	people relaxing on a beach|a fun day at the beach	vacation	
+pool-party	people	pool party	a pool party|people playing in a swimming pool	party	
+playing-music	people	playing music	a person playing music|a musician performing		
+singing	people	singing	a person singing|a singer with a microphone	playing-music	
+playing-guitar	people	playing guitar	a person playing guitar|a guitarist	playing-music	
+playing-piano	people	playing piano	a person playing piano|hands on piano keys	playing-music	
+dj-set	people	dj set	a dj playing music|a dj at a turntable	playing-music	
+playing-video-games	people	playing video games	a person playing video games|a gamer with a controller		
+reading	people	reading	a person reading a book|reading in a cozy spot		
+studying	people	studying	a person studying|a student studying with books		
+working-at-a-desk	people	working at a desk	a person working at a desk|someone typing at a computer		
+working-on-laptop	people	working on laptop	a person working on a laptop|a laptop on a cafe table	working-at-a-desk	
+cooking	people	cooking	a person cooking|cooking in a kitchen		
+baking	people	baking	a person baking|baking cookies in a kitchen	cooking	
+eating	people	eating	people eating a meal|a person eating		
+drinking-coffee	people	drinking coffee	a person drinking coffee|friends having coffee	eating	
+shopping	people	shopping	people shopping|a person shopping in a store		
+gardening	people	gardening	a person gardening|planting in a garden		
+crafting	people	crafting	a person doing crafts|a handmade craft project		
+diy-project	people	diy project	a do it yourself home project|a person building something with tools	crafting	
+cleaning	people	cleaning	a person cleaning|cleaning a house		
+moving-boxes	people	moving boxes	moving boxes|cardboard boxes packed for a move		
+dog-walking	people	dog walking	a person walking a dog|a dog on a leash during a walk		
+playing-with-a-dog	people	playing with a dog	a person playing with a dog|a dog fetching a ball		
+playing-with-children	people	playing with children	a person playing with children|children laughing and playing together		
+hugging	people	hugging	people hugging|a warm hug		
+laughing	people	laughing	people laughing|a group laughing together		
+animal	animals	animal	a photo of an animal		
+pet	animals	pet	a photo of a pet|a pet at home	animal	
+wild-animal	animals	wild animal	a wild animal in nature|a photo of wildlife	animal	
+farm-animal	animals	farm animal	a farm animal|animals on a farm	animal	
+dog	animals	dog	a photo of a dog|a dog	animal	
+cat	animals	cat	a photo of a cat|a cat	animal	
+bird	animals	bird	a photo of a bird|a bird	animal	
+horse	animals	horse	a photo of a horse	animal	
+fish	animals	fish	a photo of a fish	animal	
+insect	animals	insect	a photo of an insect|a close-up of an insect	animal	
+reptile	animals	reptile	a photo of a reptile|a close-up of a reptile	animal	
+amphibian	animals	amphibian	a photo of an amphibian|a close-up of an amphibian	animal	
+rodent	animals	rodent	a photo of a rodent|a close-up of a rodent	animal	
+bear	animals	bear	a photo of a bear|a close-up of a bear	animal	
+big-cat	animals	big cat	a photo of a big cat|a close-up of a big cat	animal	
+primate	animals	primate	a photo of a primate|a close-up of a primate	animal	
+sea-creature	animals	sea creature	a photo of a sea creature|a close-up of a sea creature	animal	
+puppy	animals	puppy	a photo of a puppy|a close-up of a puppy	dog	
+golden-retriever	animals	golden retriever	a photo of a golden retriever|a close-up of a golden retriever	dog	
+labrador	animals	labrador	a photo of a labrador|a close-up of a labrador	dog	
+shepherd-dog	animals	shepherd dog	a photo of a shepherd dog|a large shepherd dog	dog	
+poodle	animals	poodle	a photo of a poodle|a close-up of a poodle	dog	
+bulldog	animals	bulldog	a photo of a bulldog|a close-up of a bulldog	dog	
+beagle	animals	beagle	a photo of a beagle|a close-up of a beagle	dog	
+husky	animals	husky	a photo of a husky|a husky dog with thick fur	dog	
+corgi	animals	corgi	a photo of a corgi|a close-up of a corgi	dog	
+dachshund	animals	dachshund	a photo of a dachshund|a close-up of a dachshund	dog	
+chihuahua	animals	chihuahua	a photo of a chihuahua|a close-up of a chihuahua	dog	
+pug	animals	pug	a photo of a pug|a close-up of a pug	dog	
+border-collie	animals	border collie	a photo of a border collie|a close-up of a border collie	dog	
+boxer-dog	animals	boxer dog	a photo of a boxer dog|a close-up of a boxer dog	dog	
+pomeranian	animals	pomeranian	a photo of a pomeranian|a close-up of a pomeranian	dog	
+shih-tzu	animals	shih tzu	a photo of a shih tzu|a close-up of a shih tzu	dog	
+great-dane	animals	great dane	a photo of a great dane|a close-up of a great dane	dog	
+rottweiler	animals	rottweiler	a photo of a rottweiler|a close-up of a rottweiler	dog	
+doberman	animals	doberman	a photo of a doberman|a close-up of a doberman	dog	
+cocker-spaniel	animals	cocker spaniel	a photo of a cocker spaniel|a close-up of a cocker spaniel	dog	
+jack-russell-terrier	animals	jack russell terrier	a photo of a jack russell terrier|a close-up of a jack russell terrier	dog	
+dalmatian	animals	dalmatian	a photo of a dalmatian|a close-up of a dalmatian	dog	
+schnauzer	animals	schnauzer	a photo of a schnauzer|a close-up of a schnauzer	dog	
+labradoodle	animals	labradoodle	a photo of a labradoodle|a close-up of a labradoodle	dog	
+sheepdog	animals	sheepdog	a photo of a sheepdog|a close-up of a sheepdog	dog	
+greyhound	animals	greyhound	a photo of a greyhound|a close-up of a greyhound	dog	
+dog-in-snow	animals	dog in snow	a dog playing in the snow|a dog in a snowy field	dog	
+dog-on-a-leash	animals	dog on a leash	a dog on a leash|a dog being walked	dog	
+kitten	animals	kitten	a photo of a kitten|a close-up of a kitten	cat	
+tabby-cat	animals	tabby cat	a photo of a tabby cat|a close-up of a tabby cat	cat	
+black-cat	animals	black cat	a photo of a black cat|a close-up of a black cat	cat	
+orange-cat	animals	orange cat	an orange cat|a ginger tabby cat	cat	
+tuxedo-cat	animals	tuxedo cat	a photo of a tuxedo cat|a close-up of a tuxedo cat	cat	
+calico-cat	animals	calico cat	a photo of a calico cat|a close-up of a calico cat	cat	
+maine-coon	animals	maine coon	a photo of a maine coon|a close-up of a maine coon	cat	
+sphynx-cat	animals	sphynx cat	a hairless sphynx cat|a sphynx cat	cat	
+ragdoll-cat	animals	ragdoll cat	a photo of a ragdoll cat|a close-up of a ragdoll cat	cat	
+sleeping-cat	animals	sleeping cat	a cat sleeping|a cat curled up asleep	cat	
+sparrow	animals	sparrow	a photo of a sparrow|a close-up of a sparrow	bird	
+pigeon	animals	pigeon	a photo of a pigeon|a close-up of a pigeon	bird	
+crow	animals	crow	a photo of a crow|a close-up of a crow	bird	
+seagull	animals	seagull	a photo of a seagull|a close-up of a seagull	bird	
+duck	animals	duck	a photo of a duck|a close-up of a duck	bird	
+duckling	animals	duckling	a photo of a duckling|a close-up of a duckling	bird	
+goose	animals	goose	a photo of a goose|a close-up of a goose	bird	
+swan	animals	swan	a photo of a swan|a close-up of a swan	bird	
+chicken	animals	chicken	a photo of a chicken|a close-up of a chicken	bird	
+chick	animals	chick	a photo of a chick|a close-up of a chick	bird	
+rooster	animals	rooster	a photo of a rooster|a close-up of a rooster	bird	
+turkey	animals	turkey	a photo of a turkey bird|a turkey with feathers	bird	
+owl	animals	owl	a photo of an owl|a close-up of an owl	bird	
+eagle	animals	eagle	a photo of an eagle|a close-up of an eagle	bird	
+hawk	animals	hawk	a photo of a hawk|a close-up of a hawk	bird	
+falcon	animals	falcon	a photo of a falcon|a close-up of a falcon	bird	
+vulture	animals	vulture	a photo of a vulture|a close-up of a vulture	bird	
+parrot	animals	parrot	a photo of a parrot|a close-up of a parrot	bird	
+cockatoo	animals	cockatoo	a photo of a cockatoo|a close-up of a cockatoo	bird	
+toucan	animals	toucan	a photo of a toucan|a close-up of a toucan	bird	
+hummingbird	animals	hummingbird	a photo of a hummingbird|a close-up of a hummingbird	bird	
+peacock	animals	peacock	a photo of a peacock|a close-up of a peacock	bird	
+flamingo	animals	flamingo	a photo of a flamingo|a close-up of a flamingo	bird	
+penguin	animals	penguin	a photo of a penguin|a close-up of a penguin	bird	
+ostrich	animals	ostrich	a photo of an ostrich|a close-up of an ostrich	bird	
+heron	animals	heron	a photo of a heron|a close-up of a heron	bird	
+pelican	animals	pelican	a photo of a pelican|a close-up of a pelican	bird	
+stork	animals	stork	a photo of a stork|a close-up of a stork	bird	
+crane-bird	animals	crane	a crane bird standing in a marsh|a tall crane bird	bird	
+kingfisher	animals	kingfisher	a photo of a kingfisher|a close-up of a kingfisher	bird	
+woodpecker	animals	woodpecker	a photo of a woodpecker|a close-up of a woodpecker	bird	
+robin	animals	robin	a photo of a robin|a close-up of a robin	bird	
+blue-jay	animals	blue jay	a photo of a blue jay|a close-up of a blue jay	bird	
+cardinal	animals	cardinal	a red cardinal bird|a cardinal perched on a branch	bird	
+finch	animals	finch	a photo of a finch|a close-up of a finch	bird	
+swallow	animals	swallow	a photo of a swallow|a close-up of a swallow	bird	
+magpie	animals	magpie	a photo of a magpie|a close-up of a magpie	bird	
+dove	animals	dove	a photo of a dove|a close-up of a dove	bird	
+bird-of-prey	animals	bird of prey	a photo of a bird of prey|a close-up of a bird of prey	bird	
+seabird	animals	seabird	a photo of a seabird|a close-up of a seabird	bird	
+bird-at-feeder	animals	bird at a feeder	a bird at a bird feeder|small birds feeding	bird	
+pony	animals	pony	a photo of a pony|a close-up of a pony	horse	
+foal	animals	foal	a photo of a foal|a close-up of a foal	horse	
+white-horse	animals	white horse	a white horse|a horse with a white coat	horse	
+horse-jumping	animals	horse jumping	a horse jumping over a fence|a show jumping horse	horse	
+cow	animals	cow	a photo of a cow|a cow in a field	farm-animal	
+calf	animals	calf	a photo of a calf|a close-up of a calf	farm-animal	
+pig	animals	pig	a photo of a pig|a close-up of a pig	farm-animal	
+piglet	animals	piglet	a photo of a piglet|a close-up of a piglet	farm-animal	
+sheep	animals	sheep	a photo of a sheep|a close-up of a sheep	farm-animal	
+lamb	animals	lamb	a photo of a lamb|a close-up of a lamb	farm-animal	
+goat	animals	goat	a photo of a goat|a close-up of a goat	farm-animal	
+donkey	animals	donkey	a photo of a donkey|a close-up of a donkey	farm-animal	
+llama	animals	llama	a photo of a llama|a close-up of a llama	farm-animal	
+alpaca	animals	alpaca	a photo of an alpaca|a close-up of an alpaca	farm-animal	
+bull	animals	bull	a photo of a bull|a close-up of a bull	farm-animal	
+herd-of-cattle	animals	herd of cattle	a herd of cattle|cows grazing on pasture	farm-animal	
+deer	animals	deer	a photo of a deer|a close-up of a deer	wild-animal	
+moose	animals	moose	a photo of a moose|a close-up of a moose	wild-animal	
+reindeer	animals	reindeer	a photo of a reindeer|a close-up of a reindeer	wild-animal	
+fox	animals	fox	a photo of a fox|a close-up of a fox	wild-animal	
+wolf	animals	wolf	a photo of a wolf|a close-up of a wolf	wild-animal	
+lion	animals	lion	a photo of a lion|a lion in the wild	wild-animal	
+tiger	animals	tiger	a photo of a tiger|a close-up of a tiger	wild-animal	
+leopard	animals	leopard	a photo of a leopard|a close-up of a leopard	wild-animal	
+cheetah	animals	cheetah	a photo of a cheetah|a close-up of a cheetah	wild-animal	
+jaguar	animals	jaguar	a photo of a jaguar|a close-up of a jaguar	wild-animal	
+lynx	animals	lynx	a photo of a lynx|a close-up of a lynx	wild-animal	
+hyena	animals	hyena	a photo of a hyena|a close-up of a hyena	wild-animal	
+elephant	animals	elephant	a photo of an elephant|a close-up of an elephant	wild-animal	
+giraffe	animals	giraffe	a photo of a giraffe|a close-up of a giraffe	wild-animal	
+zebra	animals	zebra	a photo of a zebra|a close-up of a zebra	wild-animal	
+rhinoceros	animals	rhinoceros	a photo of a rhinoceros|a close-up of a rhinoceros	wild-animal	
+hippopotamus	animals	hippopotamus	a photo of a hippopotamus|a close-up of a hippopotamus	wild-animal	
+camel	animals	camel	a photo of a camel|a close-up of a camel	wild-animal	
+bison	animals	bison	a photo of a bison|a close-up of a bison	wild-animal	
+buffalo	animals	buffalo	a photo of a buffalo|a close-up of a buffalo	wild-animal	
+antelope	animals	antelope	a photo of an antelope|a close-up of an antelope	wild-animal	
+wild-boar	animals	wild boar	a photo of a wild boar|a close-up of a wild boar	wild-animal	
+kangaroo	animals	kangaroo	a photo of a kangaroo|a close-up of a kangaroo	wild-animal	
+koala	animals	koala	a photo of a koala|a close-up of a koala	wild-animal	
+sloth	animals	sloth	a photo of a sloth|a close-up of a sloth	wild-animal	
+armadillo	animals	armadillo	a photo of an armadillo|a close-up of an armadillo	wild-animal	
+lemur	animals	lemur	a photo of a lemur|a close-up of a lemur	wild-animal	
+meerkat	animals	meerkat	a photo of a meerkat|a close-up of a meerkat	wild-animal	
+badger	animals	badger	a photo of a badger|a close-up of a badger	wild-animal	
+skunk	animals	skunk	a photo of a skunk|a close-up of a skunk	wild-animal	
+raccoon	animals	raccoon	a photo of a raccoon|a close-up of a raccoon	wild-animal	
+otter	animals	otter	a photo of an otter|a close-up of an otter	wild-animal	
+beaver	animals	beaver	a photo of a beaver|a close-up of a beaver	wild-animal	
+hedgehog	animals	hedgehog	a photo of a hedgehog|a close-up of a hedgehog	wild-animal	
+squirrel	animals	squirrel	a photo of a squirrel|a close-up of a squirrel	wild-animal	
+chipmunk	animals	chipmunk	a photo of a chipmunk|a close-up of a chipmunk	wild-animal	
+bat	animals	bat	a bat flying at night|a bat hanging upside down	wild-animal	
+polar-bear	animals	polar bear	a photo of a polar bear|a close-up of a polar bear	bear	
+brown-bear	animals	brown bear	a photo of a brown bear|a close-up of a brown bear	bear	
+panda	animals	panda	a photo of a panda|a close-up of a panda	bear	
+red-panda	animals	red panda	a photo of a red panda|a close-up of a red panda	bear	
+monkey	animals	monkey	a photo of a monkey|a close-up of a monkey	primate	
+gorilla	animals	gorilla	a photo of a gorilla|a close-up of a gorilla	primate	
+chimpanzee	animals	chimpanzee	a photo of a chimpanzee|a close-up of a chimpanzee	primate	
+orangutan	animals	orangutan	a photo of an orangutan|a close-up of an orangutan	primate	
+rabbit	animals	rabbit	a photo of a rabbit|a close-up of a rabbit	rodent	
+hamster	animals	hamster	a photo of a hamster|a close-up of a hamster	rodent	
+guinea-pig	animals	guinea pig	a photo of a guinea pig|a close-up of a guinea pig	rodent	
+mouse	animals	mouse	a small mouse animal|a mouse with whiskers	rodent	
+rat	animals	rat	a photo of a rat|a close-up of a rat	rodent	
+ferret	animals	ferret	a pet ferret|a ferret	rodent	
+chinchilla	animals	chinchilla	a photo of a chinchilla|a close-up of a chinchilla	rodent	
+snake	animals	snake	a photo of a snake|a close-up of a snake	reptile	
+lizard	animals	lizard	a photo of a lizard|a close-up of a lizard	reptile	
+gecko	animals	gecko	a photo of a gecko|a close-up of a gecko	reptile	
+iguana	animals	iguana	a photo of an iguana|a close-up of an iguana	reptile	
+chameleon	animals	chameleon	a photo of a chameleon|a close-up of a chameleon	reptile	
+turtle	animals	turtle	a photo of a turtle|a close-up of a turtle	reptile	
+tortoise	animals	tortoise	a photo of a tortoise|a close-up of a tortoise	reptile	
+crocodile	animals	crocodile	a photo of a crocodile|a close-up of a crocodile	reptile	
+alligator	animals	alligator	a photo of an alligator|a close-up of an alligator	reptile	
+komodo-dragon	animals	komodo dragon	a photo of a komodo dragon|a close-up of a komodo dragon	reptile	
+frog	animals	frog	a photo of a frog|a close-up of a frog	amphibian	
+toad	animals	toad	a photo of a toad|a close-up of a toad	amphibian	
+salamander	animals	salamander	a photo of a salamander|a close-up of a salamander	amphibian	
+newt	animals	newt	a photo of a newt|a close-up of a newt	amphibian	
+butterfly	animals	butterfly	a photo of a butterfly|a close-up of a butterfly	insect	
+moth	animals	moth	a photo of a moth|a close-up of a moth	insect	
+bee	animals	bee	a photo of a bee|a close-up of a bee	insect	
+bumblebee	animals	bumblebee	a photo of a bumblebee|a close-up of a bumblebee	insect	
+wasp	animals	wasp	a photo of a wasp|a close-up of a wasp	insect	
+ant	animals	ant	a photo of an ant|a close-up of an ant	insect	
+ladybug	animals	ladybug	a photo of a ladybug|a close-up of a ladybug	insect	
+dragonfly	animals	dragonfly	a photo of a dragonfly|a close-up of a dragonfly	insect	
+grasshopper	animals	grasshopper	a photo of a grasshopper|a close-up of a grasshopper	insect	
+beetle	animals	beetle	a photo of a beetle|a close-up of a beetle	insect	
+cricket-insect	animals	cricket	a cricket insect|a chirping cricket on a leaf	insect	
+cicada	animals	cicada	a photo of a cicada|a close-up of a cicada	insect	
+praying-mantis	animals	praying mantis	a photo of a praying mantis|a close-up of a praying mantis	insect	
+firefly	animals	firefly	a photo of a firefly|a close-up of a firefly	insect	
+mosquito	animals	mosquito	a photo of a mosquito|a close-up of a mosquito	insect	
+fly	animals	fly	a fly insect|a fly on a surface	insect	
+caterpillar	animals	caterpillar	a photo of a caterpillar|a close-up of a caterpillar	insect	
+spider	animals	spider	a photo of a spider|a close-up of a spider	insect	
+spider-web	animals	spider web	a spider web with dew|a spider web	insect	
+scorpion	animals	scorpion	a photo of a scorpion|a close-up of a scorpion	insect	
+centipede	animals	centipede	a photo of a centipede|a close-up of a centipede	insect	
+snail	animals	snail	a photo of a snail|a close-up of a snail	insect	
+slug	animals	slug	a photo of a slug|a close-up of a slug	insect	
+worm	animals	worm	an earthworm|a worm crawling on soil	insect	
+beehive	animals	beehive	a beehive|bees on a honeycomb	insect	
+goldfish	animals	goldfish	a photo of a goldfish|a close-up of a goldfish	sea-creature	
+koi	animals	koi	a koi fish in a pond|a koi carp	sea-creature	
+clownfish	animals	clownfish	a photo of a clownfish|a close-up of a clownfish	sea-creature	
+salmon-fish	animals	salmon	a salmon swimming in a river|a salmon leaping upstream	sea-creature	
+trout	animals	trout	a photo of a trout|a close-up of a trout	sea-creature	
+tuna-fish	animals	tuna	a tuna fish swimming|a large tuna fish	sea-creature	
+eel	animals	eel	a photo of an eel|a close-up of an eel	sea-creature	
+seahorse	animals	seahorse	a photo of a seahorse|a close-up of a seahorse	sea-creature	
+shark	animals	shark	a photo of a shark|a close-up of a shark	sea-creature	
+stingray	animals	stingray	a photo of a stingray|a close-up of a stingray	sea-creature	
+jellyfish	animals	jellyfish	a photo of a jellyfish|a close-up of a jellyfish	sea-creature	
+octopus	animals	octopus	a photo of an octopus|a close-up of an octopus	sea-creature	
+squid	animals	squid	a photo of a squid|a close-up of a squid	sea-creature	
+crab	animals	crab	a photo of a crab|a close-up of a crab	sea-creature	
+lobster	animals	lobster	a photo of a lobster|a close-up of a lobster	sea-creature	
+shrimp-animal	animals	shrimp	a shrimp in the water|a small shrimp	sea-creature	
+starfish	animals	starfish	a photo of a starfish|a close-up of a starfish	sea-creature	
+sea-urchin	animals	sea urchin	a photo of a sea urchin|a close-up of a sea urchin	sea-creature	
+sea-turtle	animals	sea turtle	a photo of a sea turtle|a close-up of a sea turtle	sea-creature	
+seal	animals	seal	a seal on a rock|a seal in the water	sea-creature	
+sea-lion	animals	sea lion	a photo of a sea lion|a close-up of a sea lion	sea-creature	
+walrus	animals	walrus	a photo of a walrus|a close-up of a walrus	sea-creature	
+dolphin	animals	dolphin	a photo of a dolphin|a close-up of a dolphin	sea-creature	
+whale	animals	whale	a photo of a whale|a close-up of a whale	sea-creature	
+orca	animals	orca	an orca whale|an orca jumping	sea-creature	
+oyster-shell	animals	oyster	an oyster shell|oysters on a rocky shore	sea-creature	
+coral	animals	coral	a photo of a coral|a close-up of a coral	sea-creature	
+fish-tank	animals	fish tank	fish in an aquarium tank|an aquarium with colorful fish	sea-creature	
+underwater-fish	animals	underwater fish	fish swimming underwater|a school of fish	sea-creature	
+food	food	food	a photo of food|a plate of food		
+drink	food	drink	a photo of a drink|a glass with a drink		
+fruit	food	fruit	a photo of fruit	food	
+vegetable	food	vegetable	a photo of vegetables|fresh vegetables	food	
+meat-dish	food	meat dish	a meat dish on a plate|cooked meat	food	
+seafood	food	seafood	a seafood dish|cooked seafood on a plate	food	
+dessert	food	dessert	a dessert|a sweet dessert on a plate	food	
+baked-goods	food	baked goods	baked goods|freshly baked pastries and bread	food	
+dairy	food	dairy	dairy products|milk and cheese	food	
+snack	food	snack	a snack|a bowl of snacks	food	
+sandwich	food	sandwich	a sandwich|a sandwich cut in half	food	
+pasta	food	pasta	a plate of pasta|pasta with sauce	food	
+soup	food	soup	a bowl of soup|hot soup in a bowl	food	
+noodle-dish	food	noodle dish	a bowl of noodles|noodles with toppings	food	
+rice-dish	food	rice dish	a bowl of rice|a rice dish	food	
+breakfast	food	breakfast	a breakfast spread|breakfast on a table	food	
+meal	food	meal	a plated meal|a home-cooked meal	food	
+apple	food	apple	a photo of an apple|an apple	fruit	
+banana	food	banana	a photo of a banana|a banana	fruit	
+orange	food	orange fruit	an orange fruit|a juicy orange	fruit	
+lemon	food	lemon	a photo of a lemon|a lemon on a table	fruit	
+lime	food	lime	a photo of a lime|a lime on a table	fruit	
+grapes	food	grapes	a bunch of grapes|grapes	fruit	
+strawberry	food	strawberry	a photo of a strawberry|a strawberry on a table	fruit	
+blueberry	food	blueberry	blueberries|a bowl of blueberries	fruit	
+raspberry	food	raspberry	a photo of a raspberry|a raspberry on a table	fruit	
+blackberry	food	blackberry	a photo of a blackberry|a blackberry on a table	fruit	
+cherry	food	cherry	a photo of a cherry|a cherry on a table	fruit	
+peach	food	peach	a photo of a peach|a peach on a table	fruit	
+pear	food	pear	a photo of a pear|a pear on a table	fruit	
+plum	food	plum	a photo of a plum|a plum on a table	fruit	
+apricot	food	apricot	a photo of an apricot|an apricot on a table	fruit	
+mango	food	mango	a photo of a mango|a mango on a table	fruit	
+pineapple	food	pineapple	a photo of a pineapple|a pineapple on a table	fruit	
+watermelon	food	watermelon	a photo of a watermelon|a watermelon on a table	fruit	
+melon	food	melon	a photo of a melon|a melon on a table	fruit	
+kiwi	food	kiwi	a photo of a kiwi|a kiwi on a table	fruit	
+pomegranate	food	pomegranate	a photo of a pomegranate|a pomegranate on a table	fruit	
+coconut	food	coconut	a photo of a coconut|a coconut on a table	fruit	
+avocado	food	avocado	a photo of an avocado|an avocado on a table	fruit	
+fig	food	fig	a photo of a fig|a fig on a table	fruit	
+papaya	food	papaya	a photo of a papaya|a papaya on a table	fruit	
+grapefruit	food	grapefruit	a photo of a grapefruit|a grapefruit on a table	fruit	
+mandarin	food	mandarin	a photo of a mandarin|a mandarin on a table	fruit	
+passion-fruit	food	passion fruit	a photo of a passion fruit|a passion fruit on a table	fruit	
+dragon-fruit	food	dragon fruit	a photo of a dragon fruit|a dragon fruit on a table	fruit	
+lychee	food	lychee	a photo of a lychee|a lychee on a table	fruit	
+cranberry	food	cranberry	a photo of a cranberry|a cranberry on a table	fruit	
+persimmon	food	persimmon	a photo of a persimmon|a persimmon on a table	fruit	
+nectarine	food	nectarine	a photo of a nectarine|a nectarine on a table	fruit	
+dried-fruit	food	dried fruit	dried fruit|dried fruit in a bowl	fruit	
+fruit-salad	food	fruit salad	a photo of a fruit salad|a fruit salad on a table	fruit	
+fruit-basket	food	fruit basket	a basket of fruit|a fruit basket	fruit	
+berries	food	berries	berries|a handful of berries	fruit	
+tomato	food	tomato	a photo of a tomato|a tomato on a table	vegetable	
+potato	food	potato	a photo of a potato|a potato on a table	vegetable	
+carrot	food	carrot	a photo of a carrot|a carrot on a table	vegetable	
+onion	food	onion	a photo of an onion|an onion on a table	vegetable	
+garlic	food	garlic	a photo of garlic|garlic on a table	vegetable	
+broccoli	food	broccoli	a photo of broccoli|broccoli on a table	vegetable	
+cauliflower	food	cauliflower	a photo of cauliflower|cauliflower on a table	vegetable	
+cabbage	food	cabbage	a photo of a cabbage|a cabbage on a table	vegetable	
+lettuce	food	lettuce	a photo of lettuce|lettuce on a table	vegetable	
+spinach	food	spinach	a photo of spinach|spinach on a table	vegetable	
+cucumber	food	cucumber	a photo of a cucumber|a cucumber on a table	vegetable	
+bell-pepper	food	bell pepper	a photo of a bell pepper|a bell pepper on a table	vegetable	
+chili-pepper	food	chili pepper	a photo of a chili pepper|a chili pepper on a table	vegetable	
+eggplant	food	eggplant	a photo of an eggplant|an eggplant on a table	vegetable	
+zucchini	food	zucchini	a photo of a zucchini|a zucchini on a table	vegetable	
+pumpkin	food	pumpkin	a pumpkin|a pumpkin on the ground	vegetable	
+corn	food	corn	corn|corn on the cob	vegetable	
+mushroom	food	mushroom	a mushroom|an edible mushroom	vegetable	
+peas	food	peas	peas|green peas in a pod	vegetable	
+green-beans	food	green beans	a photo of green beans|green beans on a table	vegetable	
+celery	food	celery	a photo of celery|celery on a table	vegetable	
+radish	food	radish	a photo of a radish|a radish on a table	vegetable	
+beet	food	beet	a photo of a beet|a beet on a table	vegetable	
+asparagus	food	asparagus	a photo of asparagus|asparagus on a table	vegetable	
+kale	food	kale	a photo of kale|kale on a table	vegetable	
+leek	food	leek	a photo of a leek|a leek on a table	vegetable	
+sweet-potato	food	sweet potato	a photo of a sweet potato|a sweet potato on a table	vegetable	
+artichoke	food	artichoke	a photo of an artichoke|an artichoke on a table	vegetable	
+olive	food	olive	olives|a bowl of olives	vegetable	
+herbs	food	herbs	fresh herbs|a bunch of herbs	vegetable	
+ginger	food	ginger	a photo of ginger|ginger on a table	vegetable	
+salad	food	salad	a photo of a salad	food	
+roasted-vegetables	food	roasted vegetables	roasted vegetables|vegetables on a baking tray	vegetable	
+vegetable-stand	food	vegetable stand	a vegetable stand at a market|crates of fresh vegetables	vegetable	
+steak	food	steak	a photo of a steak|a steak on a table	meat-dish	
+burger	food	burger	a hamburger|a burger with fries	meat-dish	
+hot-dog	food	hot dog	a photo of a hot dog|a hot dog on a table	meat-dish	
+sausage	food	sausage	a photo of a sausage|a sausage on a table	meat-dish	
+bacon	food	bacon	a photo of a bacon|a bacon on a table	meat-dish	
+fried-chicken	food	fried chicken	fried chicken|a plate of fried chicken	meat-dish	
+roast-chicken	food	roast chicken	a photo of a roast chicken|a roast chicken on a table	meat-dish	
+ribs	food	ribs	ribs|barbecue ribs	meat-dish	
+meatballs	food	meatballs	a photo of meatballs|meatballs on a table	meat-dish	
+ham	food	ham	a photo of a ham|a ham on a table	meat-dish	
+kebab	food	kebab	a photo of a kebab|a kebab on a table	meat-dish	
+grilled-meat	food	grilled meat	grilled meat|meat on a grill	meat-dish	
+fried-egg	food	fried egg	a photo of a fried egg|a fried egg on a table	meat-dish	
+scrambled-eggs	food	scrambled eggs	a photo of scrambled eggs|scrambled eggs on a table	meat-dish	
+boiled-egg	food	boiled egg	a photo of a boiled egg|a boiled egg on a table	meat-dish	
+omelette	food	omelette	a photo of an omelette|an omelette on a table	meat-dish	
+tofu	food	tofu	tofu|a block of tofu	meat-dish	
+sushi	food	sushi	sushi|a sushi platter	seafood	
+sashimi	food	sashimi	a photo of a sashimi|a sashimi on a table	seafood	
+shrimp-dish	food	shrimp dish	a dish with shrimp|cooked shrimp	seafood	
+salmon-fillet	food	salmon fillet	a photo of a salmon fillet|a salmon fillet on a table	seafood	
+grilled-fish	food	grilled fish	a grilled fish|a whole fish on a plate	seafood	
+fish-and-chips	food	fish and chips	fish and chips|fried fish with chips	seafood	
+seafood-platter	food	seafood platter	a photo of a seafood platter|a seafood platter on a table	seafood	
+oysters-on-ice	food	oysters on ice	oysters on ice|fresh oysters on a plate	seafood	
+spaghetti	food	spaghetti	spaghetti|a plate of spaghetti	pasta	
+lasagna	food	lasagna	a photo of a lasagna|a lasagna on a table	pasta	
+macaroni-and-cheese	food	macaroni and cheese	macaroni and cheese|a bowl of macaroni and cheese	pasta	
+ravioli	food	ravioli	ravioli|ravioli on a plate	pasta	
+stew	food	stew	a bowl of stew|stew in a pot	soup	
+chili-con-carne	food	chili con carne	a bowl of chili con carne|chili with beans	soup	
+ramen	food	ramen	a bowl of ramen|ramen noodles	noodle-dish	
+pho	food	pho	a photo of a pho|a pho on a table	noodle-dish	
+pad-thai	food	pad thai	pad thai|a plate of pad thai	noodle-dish	
+fried-noodles	food	fried noodles	a photo of fried noodles|fried noodles on a table	noodle-dish	
+fried-rice	food	fried rice	fried rice|a plate of fried rice	rice-dish	
+curry	food	curry	a bowl of curry|curry with rice	rice-dish	
+paella	food	paella	a photo of a paella|a paella on a table	rice-dish	
+risotto	food	risotto	a photo of a risotto|a risotto on a table	rice-dish	
+bibimbap	food	bibimbap	a photo of a bibimbap|a bibimbap on a table	rice-dish	
+rice-bowl	food	rice bowl	a photo of a rice bowl|a rice bowl on a table	rice-dish	
+burrito	food	burrito	a photo of a burrito|a burrito on a table	rice-dish	
+tacos	food	tacos	tacos|tacos with fillings	rice-dish	
+quesadilla	food	quesadilla	a photo of a quesadilla|a quesadilla on a table	rice-dish	
+nachos	food	nachos	nachos|a plate of nachos	rice-dish	
+dumplings	food	dumplings	dumplings|steamed dumplings	rice-dish	
+spring-rolls	food	spring rolls	spring rolls|fried spring rolls	rice-dish	
+falafel	food	falafel	a photo of a falafel|a falafel on a table	rice-dish	
+hummus	food	hummus	hummus|a bowl of hummus	rice-dish	
+poutine	food	poutine	a photo of a poutine|a poutine on a table	rice-dish	
+pizza	food	pizza	a photo of a pizza|a pizza	rice-dish	
+pizza-slice	food	pizza slice	a slice of pizza	pizza	
+club-sandwich	food	club sandwich	a photo of a club sandwich|a club sandwich on a table	sandwich	
+wrap	food	wrap	a wrap sandwich|a tortilla wrap	sandwich	
+toasted-sandwich	food	toasted sandwich	a photo of a toasted sandwich|a toasted sandwich on a table	sandwich	
+bagel-with-cream-cheese	food	bagel with cream cheese	a photo of a bagel with cream cheese|a bagel with cream cheese on a table	sandwich	
+pancakes	food	pancakes	pancakes|a stack of pancakes	breakfast	
+waffles	food	waffles	waffles|waffles with syrup	breakfast	
+cereal	food	cereal	cereal|a bowl of cereal	breakfast	
+oatmeal	food	oatmeal	oatmeal|a bowl of oatmeal	breakfast	
+granola	food	granola	granola|granola with yogurt	breakfast	
+yogurt-bowl	food	yogurt bowl	a photo of a yogurt bowl|a yogurt bowl on a table	breakfast	
+smoothie-bowl	food	smoothie bowl	a photo of a smoothie bowl|a smoothie bowl on a table	breakfast	
+avocado-toast	food	avocado toast	avocado toast|toast topped with avocado	breakfast	
+brunch	food	brunch	a brunch table|brunch with friends	breakfast	
+lunch	food	lunch	a lunch plate|a quick lunch	breakfast	
+dinner	food	dinner	a dinner plate|a plated dinner	breakfast	
+picnic	food	picnic	a picnic|a picnic blanket with food	meal	
+barbecue	food	barbecue	a barbecue|a barbecue grill with food	meal	
+buffet	food	buffet	a buffet|a buffet table with many dishes	meal	
+street-food	food	street food	street food|a street food stall	meal	
+fast-food	food	fast food	fast food|a fast food meal	meal	
+takeaway-food	food	takeaway food	takeaway food|a takeaway container with food	meal	
+homemade-food	food	homemade food	homemade food|a homemade dish	meal	
+charcuterie-board	food	charcuterie board	a photo of a charcuterie board|a charcuterie board on a table	meal	
+cheese-platter	food	cheese platter	a photo of a cheese platter|a cheese platter on a table	meal	
+cooking-in-a-pan	food	cooking in a pan	food cooking in a frying pan|a pan with sizzling food	meal	
+grilling	food	grilling	food on a grill|grilling on a barbecue	meal	
+bread	food	bread	a photo of bread	baked-goods	
+baguette	food	baguette	a photo of a baguette|a baguette on a table	baked-goods	
+sourdough-loaf	food	sourdough loaf	a photo of a sourdough loaf|a sourdough loaf on a table	baked-goods	
+toast	food	toast	toast|slices of toast	baked-goods	
+croissant	food	croissant	a photo of a croissant|a croissant on a table	baked-goods	
+muffin	food	muffin	a photo of a muffin|a muffin on a table	baked-goods	
+cupcake	food	cupcake	a photo of a cupcake|a cupcake on a table	baked-goods	
+donut	food	donut	a photo of a donut|a donut on a table	baked-goods	
+cookie	food	cookie	a cookie|cookies on a tray	baked-goods	
+brownie	food	brownie	a photo of a brownie|a brownie on a table	baked-goods	
+pie	food	pie	a photo of a pie|a pie on a table	baked-goods	
+apple-pie	food	apple pie	a photo of an apple pie|an apple pie on a table	baked-goods	
+cheesecake	food	cheesecake	a photo of a cheesecake|a cheesecake on a table	baked-goods	
+tart	food	tart	a fruit tart|a tart	baked-goods	
+pastry	food	pastry	a photo of a pastry|a pastry on a table	baked-goods	
+cinnamon-roll	food	cinnamon roll	a photo of a cinnamon roll|a cinnamon roll on a table	baked-goods	
+pretzel	food	pretzel	a photo of a pretzel|a pretzel on a table	baked-goods	
+bagel	food	bagel	a photo of a bagel|a bagel on a table	baked-goods	
+pita	food	pita	a photo of a pita|a pita on a table	baked-goods	
+tortilla	food	tortilla	a photo of a tortilla|a tortilla on a table	baked-goods	
+flatbread	food	flatbread	a photo of a flatbread|a flatbread on a table	baked-goods	
+scone	food	scone	a photo of a scone|a scone on a table	baked-goods	
+macaron	food	macaron	a photo of a macaron|a macaron on a table	baked-goods	
+eclair	food	eclair	a photo of an eclair|an eclair on a table	baked-goods	
+crepe	food	crepe	a photo of a crepe|a crepe on a table	baked-goods	
+cake	food	cake	a photo of a cake|a cake	baked-goods	
+birthday-cake	food	birthday cake	a birthday cake|a cake with candles	cake	
+chocolate-cake	food	chocolate cake	a photo of a chocolate cake|a chocolate cake on a table	baked-goods	
+layer-cake	food	layer cake	a photo of a layer cake|a layer cake on a table	baked-goods	
+cake-slice	food	cake slice	a slice of cake|a piece of cake on a plate	baked-goods	
+bread-dough	food	bread dough	bread dough|dough being kneaded	baked-goods	
+ice-cream	food	ice cream	ice cream|a scoop of ice cream	dessert	
+gelato	food	gelato	a photo of a gelato|a gelato on a table	dessert	
+ice-cream-cone	food	ice cream cone	a photo of an ice cream cone|an ice cream cone on a table	dessert	
+popsicle	food	popsicle	a photo of a popsicle|a popsicle on a table	dessert	
+chocolate	food	chocolate	chocolate|a bar of chocolate	dessert	
+candy	food	candy	candy|colorful candy	dessert	
+lollipop	food	lollipop	a photo of a lollipop|a lollipop on a table	dessert	
+gummy-candy	food	gummy candy	gummy candy|colorful gummy candies	dessert	
+cotton-candy	food	cotton candy	cotton candy|pink cotton candy	dessert	
+marshmallow	food	marshmallow	marshmallows|toasted marshmallows	dessert	
+jelly-dessert	food	jelly dessert	a jelly dessert|a wobbly jelly	dessert	
+pudding	food	pudding	a photo of a pudding|a pudding on a table	dessert	
+tiramisu	food	tiramisu	a photo of a tiramisu|a tiramisu on a table	dessert	
+candy-bar	food	candy bar	a photo of a candy bar|a candy bar on a table	dessert	
+honey	food	honey	honey|a jar of honey	dessert	
+jam	food	jam	jam|a jar of jam	dessert	
+maple-syrup	food	maple syrup	syrup|syrup poured on food	dessert	
+peanut-butter	food	peanut butter	peanut butter|a jar of peanut butter	dessert	
+popcorn	food	popcorn	popcorn|a bowl of popcorn	snack	
+potato-chips	food	potato chips	potato chips|a bag of chips	snack	
+fries	food	fries	fries|a basket of fries	snack	
+onion-rings	food	onion rings	a photo of onion rings|onion rings on a table	snack	
+crackers	food	crackers	crackers|crackers on a plate	snack	
+nuts	food	nuts	nuts|a bowl of mixed nuts	snack	
+peanuts	food	peanuts	a photo of peanuts|peanuts on a table	snack	
+almonds	food	almonds	a photo of almonds|almonds on a table	snack	
+trail-mix	food	trail mix	trail mix|a bowl of trail mix	snack	
+granola-bar	food	granola bar	a photo of a granola bar|a granola bar on a table	snack	
+cheese	food	cheese	cheese|a block of cheese	dairy	
+butter	food	butter	butter|a dish of butter	dairy	
+milk	food	milk	milk|a glass of milk	dairy	
+eggs	food	eggs	eggs|a carton of eggs	dairy	
+yogurt	food	yogurt	yogurt|a cup of yogurt	dairy	
+cream	food	cream	cream|whipped cream	dairy	
+coffee	food	coffee	a cup of coffee|a photo of coffee	drink	
+espresso	food	espresso	a photo of an espresso|an espresso on a table	drink	
+cappuccino	food	cappuccino	a photo of a cappuccino|a cappuccino on a table	drink	
+latte-art	food	latte art	latte art in a cup|a latte with a foam design	drink	
+iced-coffee	food	iced coffee	a photo of an iced coffee|an iced coffee on a table	drink	
+tea	food	tea	a cup of tea|a teapot with tea	drink	
+iced-tea	food	iced tea	a photo of an iced tea|an iced tea on a table	drink	
+bubble-tea	food	bubble tea	a photo of a bubble tea|a bubble tea on a table	drink	
+matcha	food	matcha	a photo of a matcha|a matcha on a table	drink	
+hot-chocolate	food	hot chocolate	a photo of a hot chocolate|a hot chocolate on a table	drink	
+glass-of-water	food	glass of water	a glass of water|water in a glass	drink	
+juice	food	juice	a glass of juice|fruit juice	drink	
+orange-juice	food	orange juice	a photo of an orange juice|an orange juice on a table	drink	
+smoothie	food	smoothie	a photo of a smoothie|a smoothie on a table	drink	
+milkshake	food	milkshake	a photo of a milkshake|a milkshake on a table	drink	
+soda	food	soda	a glass of soda|a can of soda	drink	
+lemonade	food	lemonade	a photo of a lemonade|a lemonade on a table	drink	
+beer	food	beer	a glass of beer|beer	drink	
+beer-bottle	food	beer bottle	a photo of a beer bottle|a beer bottle on a table	drink	
+wine	food	wine	a glass of wine|wine	drink	
+red-wine	food	red wine	a photo of a red wine|a red wine on a table	drink	
+white-wine	food	white wine	a glass of white wine|white wine in a glass	drink	
+champagne	food	champagne	a champagne bottle|champagne glasses	drink	
+cocktail	food	cocktail	a photo of a cocktail|a cocktail on a table	drink	
+whiskey	food	whiskey	a photo of a whiskey|a whiskey on a table	drink	
+mojito	food	mojito	a photo of a mojito|a mojito on a table	drink	
+sparkling-water	food	sparkling water	a photo of a sparkling water|a sparkling water on a table	drink	
+energy-drink	food	energy drink	a photo of an energy drink|an energy drink on a table	drink	
+kombucha	food	kombucha	a photo of a kombucha|a kombucha on a table	drink	
+coconut-water	food	coconut water	a photo of a coconut water|a coconut water on a table	drink	
+cider	food	cider	a photo of a cider|a cider on a table	drink	
+wine-bottle	food	wine bottle	a photo of a wine bottle|a wine bottle on a table	drink	
+craft-beer-flight	food	craft beer flight	a flight of beer samples|a row of beer glasses	drink	
+landscape	nature	landscape	a landscape photo|a wide natural landscape		
+sky	nature	sky	a photo of the sky		
+weather	nature	weather	a photo of weather|a weather scene		
+plant	nature	plant	a photo of a plant|green plants		
+place	nature	place	a photo of a place|a view of a place		
+building	nature	building	a photo of a building		
+beach	nature	beach	a photo of a beach|a sandy beach by the sea	landscape	
+sea	nature	sea	a photo of the sea|the ocean	landscape	
+ocean-wave	nature	ocean wave	a breaking ocean wave|a big wave crashing	landscape	
+coast	nature	coast	a rocky coastline|a coast with cliffs	landscape	
+cliff	nature	cliff	a photo of a cliff|a picture showing a cliff	landscape	
+island	nature	island	an island in the sea|a small island seen from above	landscape	
+bay	nature	bay	a bay with calm water|a sheltered bay	landscape	
+harbor	nature	harbor	a harbor with boats|a small fishing harbor	landscape	
+lake	nature	lake	a photo of a lake|a calm lake with reflections	landscape	
+river	nature	river	a photo of a river|a river winding through a landscape	landscape	
+stream	nature	stream	a small stream|a creek running over rocks	landscape	
+waterfall	nature	waterfall	a photo of a waterfall|water cascading down a waterfall	landscape	
+pond	nature	pond	a pond|a pond with lily pads	landscape	
+swamp	nature	swamp	a photo of a swamp|a picture showing a swamp	landscape	
+wetland	nature	wetland	a photo of a wetland|a picture showing a wetland	landscape	
+glacier	nature	glacier	a photo of a glacier|a picture showing a glacier	landscape	
+iceberg	nature	iceberg	a photo of an iceberg|a picture showing an iceberg	landscape	
+volcano	nature	volcano	a photo of a volcano|a picture showing a volcano	landscape	
+canyon	nature	canyon	a photo of a canyon|a picture showing a canyon	landscape	
+valley	nature	valley	a photo of a valley|a picture showing a valley	landscape	
+hill	nature	hill	hills|rolling green hills	landscape	
+mountain	nature	mountain	a photo of mountains|a mountain landscape	landscape	
+mountain-peak	nature	mountain peak	a snowy mountain peak|a high mountain summit	landscape	
+meadow	nature	meadow	a photo of a meadow|a picture showing a meadow	landscape	
+field	nature	field	a field|an open field	landscape	
+farmland	nature	farmland	farmland from above|a farm field with crops	landscape	
+vineyard	nature	vineyard	a photo of a vineyard|a picture showing a vineyard	landscape	
+orchard	nature	orchard	a photo of an orchard|a picture showing an orchard	landscape	
+desert	nature	desert	a desert|a desert landscape	landscape	
+sand-dunes	nature	sand dunes	a photo of sand dunes|a picture showing sand dunes	landscape	
+sand	nature	sand	sand|sand texture up close	landscape	
+rock-formation	nature	rock formation	a rock formation|a large rock outcrop	landscape	
+rocks	nature	rocks	rocks|stones on the ground	landscape	
+pebbles	nature	pebbles	pebbles|smooth pebbles on a beach	landscape	
+cave	nature	cave	a photo of a cave|a picture showing a cave	landscape	
+forest	nature	forest	a photo of a forest|trees in a forest	landscape	
+jungle	nature	jungle	a jungle|a dense tropical jungle	landscape	
+rainforest	nature	rainforest	a photo of a rainforest|a picture showing a rainforest	landscape	
+savanna	nature	savanna	a photo of a savanna|a picture showing a savanna	landscape	
+tundra	nature	tundra	a photo of a tundra|a picture showing a tundra	landscape	
+woodland-path	nature	woodland path	a path through the woods|a forest trail	landscape	
+hiking-trail	nature	hiking trail	a hiking trail|a trail in the mountains	landscape	
+countryside	nature	countryside	the countryside|a rural landscape	landscape	
+tulip-field	nature	tulip field	a field of tulips|rows of colorful tulips	landscape	
+lavender-field	nature	lavender field	a photo of a lavender field|a picture showing a lavender field	landscape	
+sunflower-field	nature	sunflower field	a photo of a sunflower field|a picture showing a sunflower field	landscape	
+cornfield	nature	cornfield	a photo of a cornfield|a picture showing a cornfield	landscape	
+rice-terraces	nature	rice terraces	rice terraces on a hillside|terraced fields	landscape	
+coral-reef	nature	coral reef	a coral reef|an underwater coral reef	landscape	
+tide-pool	nature	tide pool	a photo of a tide pool|a picture showing a tide pool	landscape	
+beach-at-sunset	nature	beach at sunset	a beach at sunset|waves and a golden sunset sky	landscape	
+snowy-landscape	nature	snowy landscape	a snowy landscape|a field covered in snow	landscape	
+snow	nature	snow	a photo of snow|a snowy landscape	landscape	
+ice	nature	ice	ice|a frozen surface of ice	landscape	
+frozen-lake	nature	frozen lake	a photo of a frozen lake|a picture showing a frozen lake	landscape	
+campsite	nature	campsite	a campsite in nature|a campsite by a lake	landscape	
+clouds	nature	clouds	clouds|white clouds in the sky	sky	
+blue-sky	nature	blue sky	a clear blue sky|a bright blue sky	sky	
+cloudy-sky	nature	cloudy sky	a cloudy sky|a dramatic cloudy sky	sky	
+sunrise	nature	sunrise	a sunrise|the sky at sunrise	sky	
+sunset	nature	sunset	a photo of a sunset|the sky at sunset	sky	
+golden-hour	nature	golden hour	golden hour light|warm light just before sunset	sky	
+twilight	nature	twilight	the sky at twilight|a dusk sky with deep colors	sky	
+night-sky	nature	night sky	a dark night sky|the sky at night	sky	
+starry-sky	nature	starry sky	a sky full of stars|a starry night sky	sky	
+milky-way	nature	milky way	the milky way over a landscape|the milky way in the night sky	sky	
+moon	nature	moon	a photo of the moon|the moon in the night sky	sky	
+full-moon	nature	full moon	a full moon|a bright full moon over the horizon	sky	
+sun	nature	sun	the sun in the sky|a bright sun with rays	sky	
+sunbeams	nature	sunbeams	sunbeams through clouds|sun rays shining through trees	sky	
+aurora	nature	aurora	the northern lights|a green aurora in the night sky	sky	
+contrail	nature	contrail	contrails|a jet trail in the sky	sky	
+storm	nature	storm	a storm|dark storm clouds	weather	
+thunderstorm	nature	thunderstorm	a photo of a thunderstorm|a picture showing a thunderstorm	weather	
+lightning	nature	lightning	lightning in the sky|a lightning bolt	weather	
+rain	nature	rain	rain|raindrops falling	weather	
+rainy-street	nature	rainy street	a rainy street|a wet street with reflections	weather	
+rainbow	nature	rainbow	a rainbow|a rainbow in the sky	weather	
+fog	nature	fog	fog|a foggy landscape	weather	
+mist	nature	mist	mist|mist over water	weather	
+snowfall	nature	snowfall	snow falling|a snowfall in a town	weather	
+frost	nature	frost	frost|frost on leaves	weather	
+raindrops-on-glass	nature	raindrops on glass	raindrops on a window|water drops on glass	weather	
+puddle	nature	puddle	a puddle|a rain puddle with reflections	weather	
+smoke	nature	smoke	smoke|smoke rising	weather	
+flood	nature	flood	a flood|a flooded street	weather	
+flower	nature	flower	a photo of a flower|flowers	plant	
+rose	nature	rose	a photo of a rose|a picture showing a rose	plant	
+tulip	nature	tulip	a photo of a tulip|a picture showing a tulip	plant	
+sunflower	nature	sunflower	a photo of a sunflower|a picture showing a sunflower	plant	
+daisy	nature	daisy	a photo of a daisy|a picture showing a daisy	plant	
+lily	nature	lily	a photo of a lily|a picture showing a lily	plant	
+orchid	nature	orchid	a photo of an orchid|a picture showing an orchid	plant	
+lavender	nature	lavender	lavender|purple lavender flowers	plant	
+poppy	nature	poppy	a photo of a poppy|a picture showing a poppy	plant	
+daffodil	nature	daffodil	a photo of a daffodil|a picture showing a daffodil	plant	
+dandelion	nature	dandelion	a photo of a dandelion|a picture showing a dandelion	plant	
+peony	nature	peony	a photo of a peony|a picture showing a peony	plant	
+hydrangea	nature	hydrangea	a photo of a hydrangea|a picture showing a hydrangea	plant	
+cherry-blossom	nature	cherry blossom	cherry blossoms|a tree with pink blossoms	plant	
+magnolia	nature	magnolia	a photo of a magnolia|a picture showing a magnolia	plant	
+marigold	nature	marigold	a photo of a marigold|a picture showing a marigold	plant	
+lotus	nature	lotus	a lotus flower|a lotus on water	plant	
+wildflowers	nature	wildflowers	wildflowers|a meadow of wildflowers	plant	
+bouquet	nature	bouquet	a bouquet of flowers|a bunch of cut flowers	plant	
+flower-bed	nature	flower bed	a photo of a flower bed|a picture showing a flower bed	plant	
+cactus	nature	cactus	a cactus|a cactus in the desert	plant	
+succulent	nature	succulent	a photo of a succulent|a picture showing a succulent	plant	
+fern	nature	fern	a photo of a fern|a picture showing a fern	plant	
+moss	nature	moss	moss|moss on a rock	plant	
+ivy	nature	ivy	ivy|ivy climbing a wall	plant	
+bamboo	nature	bamboo	bamboo|a bamboo forest	plant	
+palm-tree	nature	palm tree	a photo of a palm tree|a picture showing a palm tree	plant	
+pine-tree	nature	pine tree	a photo of a pine tree|a picture showing a pine tree	plant	
+oak-tree	nature	oak tree	a photo of an oak tree|a picture showing an oak tree	plant	
+birch-tree	nature	birch tree	a photo of a birch tree|a picture showing a birch tree	plant	
+willow-tree	nature	willow tree	a photo of a willow tree|a picture showing a willow tree	plant	
+maple-tree	nature	maple tree	a photo of a maple tree|a picture showing a maple tree	plant	
+tree	nature	tree	a photo of a tree|a lone tree	plant	
+tree-trunk	nature	tree trunk	a photo of a tree trunk|a picture showing a tree trunk	plant	
+tree-branches	nature	tree branches	tree branches|bare branches against the sky	plant	
+leaves	nature	leaves	leaves|green leaves up close	plant	
+autumn-leaves	nature	autumn leaves	autumn leaves|colorful fallen leaves	plant	
+leaf	nature	leaf	a leaf|a single leaf	plant	
+grass	nature	grass	grass|green grass up close	plant	
+lawn	nature	lawn	a lawn|a mowed green lawn	plant	
+bush	nature	bush	a photo of a bush|a picture showing a bush	plant	
+hedge	nature	hedge	a photo of a hedge|a picture showing a hedge	plant	
+houseplant	nature	houseplant	a houseplant|a plant in a room	plant	
+potted-plant	nature	potted plant	a photo of a potted plant|a picture showing a potted plant	plant	
+wild-mushroom	nature	wild mushroom	a wild mushroom|mushrooms in a forest	plant	
+pine-cone	nature	pine cone	a photo of a pine cone|a picture showing a pine cone	plant	
+acorn	nature	acorn	a photo of an acorn|a picture showing an acorn	plant	
+bark	nature	bark	tree bark|rough bark texture	plant	
+roots	nature	roots	tree roots|roots in the ground	plant	
+seaweed	nature	seaweed	seaweed|seaweed on a beach	plant	
+vines	nature	vines	vines|grape vines	plant	
+garden	nature	garden	a photo of a garden	plant	
+vegetable-garden	nature	vegetable garden	a photo of a vegetable garden|a picture showing a vegetable garden	plant	
+greenhouse	nature	greenhouse	a greenhouse|plants in a greenhouse	plant	
+city	nature	city	a photo of a city|a city street	place	
+skyline	nature	skyline	a city skyline|skyscrapers on the horizon	place	
+skyscraper	nature	skyscraper	a photo of a skyscraper|a picture showing a skyscraper	place	
+downtown	nature	downtown	a downtown street|a busy city center	place	
+street	nature	street	a street|a street with buildings	place	
+alley	nature	alley	a narrow alley|a small lane between buildings	place	
+sidewalk	nature	sidewalk	a sidewalk|people on a pavement	place	
+crosswalk	nature	crosswalk	a pedestrian crossing|a zebra crossing	place	
+road	nature	road	a road|a road stretching into the distance	place	
+highway	nature	highway	a highway|a multi-lane highway	place	
+tunnel	nature	tunnel	a photo of a tunnel|a picture showing a tunnel	place	
+bridge	nature	bridge	a bridge|a bridge over water	place	
+village	nature	village	a small village|a village with old houses	place	
+suburb	nature	suburb	a suburban street|a neighborhood with houses	place	
+town-square	nature	town square	a town square|a plaza with people	place	
+park	nature	park	a park|a green city park	place	
+playground	nature	playground	a photo of a playground|a picture showing a playground	place	
+fountain	nature	fountain	a fountain|a water fountain in a plaza	place	
+statue	nature	statue	a statue|a stone statue in a park	place	
+monument	nature	monument	a monument|a large memorial monument	place	
+castle	nature	castle	a castle|a medieval castle on a hill	place	
+palace	nature	palace	a palace|a grand palace	place	
+lighthouse	nature	lighthouse	a lighthouse|a lighthouse on the coast	place	
+tower	nature	tower	a tower|a tall tower	place	
+windmill	nature	windmill	a photo of a windmill|a picture showing a windmill	place	
+wind-turbine	nature	wind turbine	wind turbines|wind turbines in a field	place	
+solar-panels	nature	solar panels	solar panels|rows of solar panels	place	
+dam	nature	dam	a photo of a dam|a picture showing a dam	place	
+ruins	nature	ruins	ruins|ancient ruins	place	
+arch	nature	arch	an arch|a stone arch	place	
+pier	nature	pier	a pier|a wooden pier over water	place	
+boardwalk	nature	boardwalk	a photo of a boardwalk|a picture showing a boardwalk	place	
+fence	nature	fence	a fence|a wooden fence	place	
+wall	nature	wall	a wall|a plain wall	place	
+brick-wall	nature	brick wall	a photo of a brick wall|a picture showing a brick wall	place	
+house	nature	house	a house|a house with a garden	place	
+apartment-building	nature	apartment building	a photo of an apartment building|a picture showing an apartment building	place	
+cabin	nature	cabin	a cabin|a log cabin in the woods	place	
+barn	nature	barn	a photo of a barn|a picture showing a barn	place	
+farm	nature	farm	a farm|a farm with fields	place	
+church	nature	church	a church|a church with a steeple	place	
+cathedral	nature	cathedral	a photo of a cathedral|a picture showing a cathedral	place	
+place-of-worship	nature	place of worship	a place of worship|a quiet place of worship	place	
+museum	nature	museum	a museum|a museum gallery with exhibits	place	
+art-gallery	nature	art gallery	an art gallery|paintings on a gallery wall	place	
+library	nature	library	a library|rows of books in a library	place	
+school-building	nature	school building	a school building|a school from outside	place	
+classroom	nature	classroom	a classroom|desks in a classroom	place	
+university-campus	nature	university campus	a photo of a university campus|a picture showing a university campus	place	
+office	nature	office	an office|an open plan office	place	
+meeting-room	nature	meeting room	a meeting room|an empty conference room	place	
+restaurant	nature	restaurant	a restaurant|the inside of a restaurant	place	
+cafe	nature	cafe	a cafe|a cozy cafe interior	place	
+bar	nature	bar	a bar|a bar counter with drinks	place	
+pub	nature	pub	a photo of a pub|a picture showing a pub	place	
+kitchen	nature	kitchen	a kitchen|the inside of a kitchen	place	
+living-room	nature	living room	a living room|a cozy living room	place	
+bedroom	nature	bedroom	a bedroom|a bedroom with a bed	place	
+bathroom	nature	bathroom	a bathroom|a bright bathroom	place	
+dining-room	nature	dining room	a photo of a dining room|a picture showing a dining room	place	
+balcony	nature	balcony	a photo of a balcony|a picture showing a balcony	place	
+backyard	nature	backyard	a backyard|a garden behind a house	place	
+garage	nature	garage	a photo of a garage|a picture showing a garage	place	
+attic	nature	attic	a photo of an attic|a picture showing an attic	place	
+basement	nature	basement	a photo of a basement|a picture showing a basement	place	
+hallway	nature	hallway	a photo of a hallway|a picture showing a hallway	place	
+staircase	nature	staircase	a staircase|stairs inside a building	place	
+door	nature	door	a door|a wooden front door	place	
+window	nature	window	a window|a window with a view	place	
+rooftop	nature	rooftop	a rooftop|a rooftop terrace	place	
+patio	nature	patio	a photo of a patio|a picture showing a patio	place	
+porch	nature	porch	a photo of a porch|a picture showing a porch	place	
+hotel-room	nature	hotel room	a hotel room|a hotel bed and furniture	place	
+hotel-lobby	nature	hotel lobby	a photo of a hotel lobby|a picture showing a hotel lobby	place	
+shop	nature	shop	a shop|a small shop front	place	
+store-interior	nature	store interior	the inside of a store|shelves in a store	place	
+supermarket	nature	supermarket	a supermarket|aisles in a grocery store	place	
+shopping-mall	nature	shopping mall	a photo of a shopping mall|a picture showing a shopping mall	place	
+market	nature	market	a market|a busy outdoor market	place	
+farmers-market	nature	farmers market	a photo of a farmers market|a picture showing a farmers market	place	
+bakery	nature	bakery	a bakery|a bakery counter with bread	place	
+bookstore	nature	bookstore	a photo of a bookstore|a picture showing a bookstore	place	
+gym	nature	gym	a gym|exercise machines in a gym	place	
+swimming-pool	nature	swimming pool	a swimming pool|a pool with blue water	place	
+stadium	nature	stadium	a stadium|a large stadium with seats	place	
+arena	nature	arena	a photo of an arena|a picture showing an arena	place	
+theater	nature	theater	a theater|a theater stage with seats	place	
+cinema	nature	cinema	a movie theater|rows of cinema seats	place	
+concert-hall	nature	concert hall	a photo of a concert hall|a picture showing a concert hall	place	
+airport	nature	airport	an airport|an airport terminal	place	
+train-station	nature	train station	a train station|a platform at a train station	place	
+bus-stop	nature	bus stop	a photo of a bus stop|a picture showing a bus stop	place	
+subway-station	nature	subway station	a photo of a subway station|a picture showing a subway station	place	
+port	nature	port	a port with cranes|a shipping port	place	
+dock	nature	dock	a dock|a wooden dock by water	place	
+parking-lot	nature	parking lot	a parking lot|cars in a parking lot	place	
+gas-station	nature	gas station	a photo of a gas station|a picture showing a gas station	place	
+factory	nature	factory	a factory|the inside of a factory	place	
+warehouse	nature	warehouse	a photo of a warehouse|a picture showing a warehouse	place	
+construction-site	nature	construction site	a construction site|a building under construction	place	
+zoo	nature	zoo	a zoo|an enclosure at a zoo	place	
+aquarium	nature	aquarium	an aquarium|a large aquarium with fish	place	
+amusement-park	nature	amusement park	an amusement park|rides at an amusement park	place	
+ski-slope	nature	ski slope	a ski slope|snowy slopes with ski lifts	place	
+ski-resort	nature	ski resort	a photo of a ski resort|a picture showing a ski resort	place	
+golf-course	nature	golf course	a golf course|a green golf fairway	place	
+tennis-court	nature	tennis court	a photo of a tennis court|a picture showing a tennis court	place	
+basketball-court	nature	basketball court	a photo of a basketball court|a picture showing a basketball court	place	
+football-field	nature	football field	a football pitch|a grass sports field	place	
+running-track	nature	running track	a running track|an athletics track	place	
+skatepark	nature	skatepark	a photo of a skatepark|a picture showing a skatepark	place	
+bike-path	nature	bike path	a bike path|a cycling lane	place	
+power-lines	nature	power lines	power lines|electricity pylons	place	
+street-lights	nature	street lights	street lights|a row of street lamps	place	
+neon-city	nature	neon city	neon signs in a city at night|a neon lit street at night	place	
+night-city	nature	city at night	a city at night|city lights after dark	place	
+aerial-city	nature	aerial view of a city	a city seen from above|an aerial view of a city	place	
+furniture	things	furniture	a photo of furniture|a piece of furniture		
+electronics	things	electronics	a photo of an electronic device|consumer electronics		
+appliance	things	appliance	a household appliance|a kitchen appliance		
+clothing	things	clothing	a photo of clothing|a piece of clothing		
+accessory	things	accessory	a fashion accessory		
+tool	things	tool	a photo of a tool|a hand tool		
+kitchenware	things	kitchenware	a photo of kitchenware|kitchen utensils		
+toy	things	toy	a photo of a toy|a toy		
+sports-equipment	things	sports equipment	sports equipment|gear for a sport		
+instrument	things	musical instrument	a photo of a musical instrument		
+decoration	things	decoration	a decoration|home or party decorations		
+stationery	things	stationery	stationery|office supplies on a desk		
+table	things	table	a photo of a table	furniture	
+chair	things	chair	a photo of a chair	furniture	
+sofa	things	sofa	a photo of a sofa|a close-up of a sofa	furniture	
+armchair	things	armchair	a photo of an armchair|a close-up of an armchair	furniture	
+bed	things	bed	a photo of a bed|a close-up of a bed	furniture	
+bunk-bed	things	bunk bed	a photo of a bunk bed|a close-up of a bunk bed	furniture	
+desk	things	desk	a photo of a desk|a close-up of a desk	furniture	
+bookshelf	things	bookshelf	a photo of a bookshelf|a close-up of a bookshelf	furniture	
+wardrobe	things	wardrobe	a photo of a wardrobe|a close-up of a wardrobe	furniture	
+dresser	things	dresser	a photo of a dresser|a close-up of a dresser	furniture	
+nightstand	things	nightstand	a photo of a nightstand|a close-up of a nightstand	furniture	
+stool	things	stool	a photo of a stool|a close-up of a stool	furniture	
+bench	things	bench	a bench|a park bench	furniture	
+rocking-chair	things	rocking chair	a photo of a rocking chair|a close-up of a rocking chair	furniture	
+coffee-table	things	coffee table	a photo of a coffee table|a close-up of a coffee table	furniture	
+dining-table	things	dining table	a photo of a dining table|a close-up of a dining table	furniture	
+office-chair	things	office chair	a photo of an office chair|a close-up of an office chair	furniture	
+shelf	things	shelf	a photo of a shelf|a close-up of a shelf	furniture	
+cabinet	things	cabinet	a photo of a cabinet|a close-up of a cabinet	furniture	
+tv-stand	things	tv stand	a photo of a tv stand|a close-up of a tv stand	furniture	
+fireplace	things	fireplace	a photo of a fireplace|a close-up of a fireplace	furniture	
+mirror	things	mirror	a photo of a mirror|a close-up of a mirror	furniture	
+rug	things	rug	a photo of a rug|a close-up of a rug	furniture	
+curtains	things	curtains	curtains|curtains hanging in a window	furniture	
+pillow	things	pillow	a photo of a pillow|a close-up of a pillow	furniture	
+blanket	things	blanket	a photo of a blanket|a close-up of a blanket	furniture	
+mattress	things	mattress	a photo of a mattress|a close-up of a mattress	furniture	
+lamp	things	lamp	a photo of a lamp|a close-up of a lamp	furniture	
+chandelier	things	chandelier	a photo of a chandelier|a close-up of a chandelier	furniture	
+candle	things	candle	a photo of a candle|a close-up of a candle	furniture	
+vase	things	vase	a photo of a vase|a close-up of a vase	furniture	
+picture-frame	things	picture frame	a photo of a picture frame|a close-up of a picture frame	furniture	
+wall-clock	things	wall clock	a photo of a wall clock|a close-up of a wall clock	furniture	
+alarm-clock	things	alarm clock	a photo of an alarm clock|a close-up of an alarm clock	furniture	
+hammock	things	hammock	a photo of a hammock|a close-up of a hammock	furniture	
+crib	things	crib	a photo of a crib|a close-up of a crib	furniture	
+bathtub	things	bathtub	a photo of a bathtub|a close-up of a bathtub	furniture	
+shower	things	shower	a photo of a shower|a close-up of a shower	furniture	
+toilet	things	toilet	a photo of a toilet|a close-up of a toilet	furniture	
+sink	things	sink	a photo of a sink|a close-up of a sink	furniture	
+towel	things	towel	a photo of a towel|a close-up of a towel	furniture	
+bathroom-mirror	things	bathroom mirror	a bathroom mirror|a mirror above a sink	furniture	
+phone	things	phone	a photo of a smartphone|a mobile phone	electronics	
+computer	things	computer	a photo of a computer	electronics	
+laptop	things	laptop	a photo of a laptop	computer	
+tablet	things	tablet	a tablet computer|a tablet on a table	electronics	
+smartwatch	things	smartwatch	a photo of a smartwatch|a close-up of a smartwatch	electronics	
+television	things	television	a photo of a television|a close-up of a television	electronics	
+monitor	things	monitor	a computer monitor|a screen on a desk	electronics	
+keyboard	things	keyboard	a computer keyboard|a keyboard up close	electronics	
+computer-mouse	things	computer mouse	a photo of a computer mouse|a close-up of a computer mouse	electronics	
+printer	things	printer	a photo of a printer|a close-up of a printer	electronics	
+router	things	router	a photo of a router|a close-up of a router	electronics	
+headphones	things	headphones	headphones|a pair of headphones	electronics	
+earbuds	things	earbuds	earbuds|wireless earbuds in a case	electronics	
+speaker	things	speaker	a speaker|a bluetooth speaker	electronics	
+smart-speaker	things	smart speaker	a photo of a smart speaker|a close-up of a smart speaker	electronics	
+microphone	things	microphone	a photo of a microphone|a close-up of a microphone	electronics	
+camera	things	camera	a photo of a camera	electronics	
+dslr-camera	things	dslr camera	a photo of a dslr camera|a close-up of a dslr camera	electronics	
+action-camera	things	action camera	a photo of an action camera|a close-up of an action camera	electronics	
+drone	things	drone	a drone|a quadcopter drone	electronics	
+tripod	things	tripod	a photo of a tripod|a close-up of a tripod	electronics	
+webcam	things	webcam	a photo of a webcam|a close-up of a webcam	electronics	
+game-console	things	game console	a photo of a game console|a close-up of a game console	electronics	
+game-controller	things	game controller	a photo of a game controller|a close-up of a game controller	electronics	
+vr-headset	things	vr headset	a photo of a vr headset|a close-up of a vr headset	electronics	
+e-reader	things	e-reader	a photo of an e-reader|a close-up of an e-reader	electronics	
+charger	things	charger	a photo of a charger|a close-up of a charger	electronics	
+cable	things	cable	a cable|cables tangled together	electronics	
+usb-drive	things	usb drive	a photo of an usb drive|a close-up of an usb drive	electronics	
+hard-drive	things	hard drive	a photo of a hard drive|a close-up of a hard drive	electronics	
+power-bank	things	power bank	a photo of a power bank|a close-up of a power bank	electronics	
+batteries	things	batteries	batteries|a pile of batteries	electronics	
+light-bulb	things	light bulb	a photo of a light bulb|a close-up of a light bulb	electronics	
+remote-control	things	remote control	a photo of a remote control|a close-up of a remote control	electronics	
+projector	things	projector	a photo of a projector|a close-up of a projector	electronics	
+radio	things	radio	a photo of a radio|a close-up of a radio	electronics	
+record-player	things	record player	a photo of a record player|a close-up of a record player	electronics	
+vinyl-record	things	vinyl record	a photo of a vinyl record|a close-up of a vinyl record	electronics	
+cassette-tape	things	cassette tape	a photo of a cassette tape|a close-up of a cassette tape	electronics	
+cd	things	cd	a cd|a compact disc	electronics	
+calculator	things	calculator	a photo of a calculator|a close-up of a calculator	electronics	
+circuit-board	things	circuit board	a photo of a circuit board|a close-up of a circuit board	electronics	
+server-rack	things	server rack	a photo of a server rack|a close-up of a server rack	electronics	
+flashlight	things	flashlight	a photo of a flashlight|a close-up of a flashlight	electronics	
+computer-desk-setup	things	computer desk setup	a computer desk setup|a desk with monitor and keyboard	electronics	
+gaming-pc	things	gaming pc	a photo of a gaming pc|a close-up of a gaming pc	electronics	
+power-outlet	things	power outlet	a photo of a power outlet|a close-up of a power outlet	electronics	
+extension-cord	things	extension cord	a photo of an extension cord|a close-up of an extension cord	electronics	
+washing-machine	things	washing machine	a photo of a washing machine|a close-up of a washing machine	appliance	
+refrigerator	things	refrigerator	a photo of a refrigerator|a close-up of a refrigerator	appliance	
+microwave	things	microwave	a photo of a microwave|a close-up of a microwave	appliance	
+oven	things	oven	a photo of an oven|a close-up of an oven	appliance	
+stove	things	stove	a photo of a stove|a close-up of a stove	appliance	
+dishwasher	things	dishwasher	a photo of a dishwasher|a close-up of a dishwasher	appliance	
+vacuum-cleaner	things	vacuum cleaner	a photo of a vacuum cleaner|a close-up of a vacuum cleaner	appliance	
+robot-vacuum	things	robot vacuum	a photo of a robot vacuum|a close-up of a robot vacuum	appliance	
+air-conditioner	things	air conditioner	a photo of an air conditioner|a close-up of an air conditioner	appliance	
+fan	things	fan	a photo of a fan|a close-up of a fan	appliance	
+heater	things	heater	a photo of a heater|a close-up of a heater	appliance	
+kettle	things	kettle	a photo of a kettle|a close-up of a kettle	appliance	
+toaster	things	toaster	a photo of a toaster|a close-up of a toaster	appliance	
+blender	things	blender	a photo of a blender|a close-up of a blender	appliance	
+coffee-machine	things	coffee machine	a photo of a coffee machine|a close-up of a coffee machine	appliance	
+rice-cooker	things	rice cooker	a photo of a rice cooker|a close-up of a rice cooker	appliance	
+air-fryer	things	air fryer	a photo of an air fryer|a close-up of an air fryer	appliance	
+iron	things	iron	a photo of an iron|a close-up of an iron	appliance	
+hair-dryer	things	hair dryer	a photo of a hair dryer|a close-up of a hair dryer	appliance	
+sewing-machine	things	sewing machine	a photo of a sewing machine|a close-up of a sewing machine	appliance	
+t-shirt	things	t-shirt	a photo of a t-shirt|a close-up of a t-shirt	clothing	
+shirt	things	shirt	a photo of a shirt|a close-up of a shirt	clothing	
+dress	things	dress	a photo of a dress|a close-up of a dress	clothing	
+jacket	things	jacket	a photo of a jacket|a close-up of a jacket	clothing	
+coat	things	coat	a photo of a coat|a close-up of a coat	clothing	
+raincoat	things	raincoat	a photo of a raincoat|a close-up of a raincoat	clothing	
+sweater	things	sweater	a photo of a sweater|a close-up of a sweater	clothing	
+hoodie	things	hoodie	a photo of a hoodie|a close-up of a hoodie	clothing	
+jeans	things	jeans	jeans|a pair of jeans	clothing	
+pants	things	pants	pants|a pair of trousers	clothing	
+shorts	things	shorts	shorts|a pair of shorts	clothing	
+skirt	things	skirt	a photo of a skirt|a close-up of a skirt	clothing	
+suit	things	suit	a photo of a suit|a close-up of a suit	clothing	
+tie	things	tie	a photo of a tie|a close-up of a tie	clothing	
+scarf	things	scarf	a photo of a scarf|a close-up of a scarf	clothing	
+hat	things	hat	a photo of a hat|a close-up of a hat	clothing	
+cap	things	cap	a cap|a baseball cap	clothing	
+beanie	things	beanie	a photo of a beanie|a close-up of a beanie	clothing	
+swimsuit	things	swimsuit	a photo of a swimsuit|a close-up of a swimsuit	clothing	
+pajamas	things	pajamas	pajamas|a set of pajamas	clothing	
+costume	things	costume	a photo of a costume|a close-up of a costume	clothing	
+mask	things	mask	a decorative mask|a carnival mask	clothing	
+helmet	things	helmet	a helmet|a protective helmet	clothing	
+apron	things	apron	a photo of an apron|a close-up of an apron	clothing	
+uniform	things	uniform	a photo of a uniform|a close-up of a uniform	clothing	
+socks	things	socks	socks|a pair of socks	clothing	
+gloves	things	gloves	gloves|a pair of gloves	clothing	
+shoes	things	shoes	shoes|a pair of shoes	clothing	
+sneakers	things	sneakers	sneakers|a pair of sneakers	clothing	
+boots	things	boots	boots|a pair of boots	clothing	
+sandals	things	sandals	sandals|a pair of sandals	clothing	
+high-heels	things	high heels	high heels|a pair of high heel shoes	clothing	
+sunglasses	things	sunglasses	sunglasses|a pair of sunglasses	accessory	
+glasses	things	glasses	eyeglasses|a pair of glasses	accessory	
+belt	things	belt	a photo of a belt|a close-up of a belt	accessory	
+backpack	things	backpack	a photo of a backpack|a close-up of a backpack	accessory	
+handbag	things	handbag	a photo of a handbag|a close-up of a handbag	accessory	
+tote-bag	things	tote bag	a photo of a tote bag|a close-up of a tote bag	accessory	
+suitcase	things	suitcase	a photo of a suitcase|a close-up of a suitcase	accessory	
+luggage	things	luggage	luggage|bags packed for travel	accessory	
+wallet	things	wallet	a photo of a wallet|a close-up of a wallet	accessory	
+watch	things	watch	a wristwatch|a watch on a wrist	accessory	
+ring	things	ring	a ring|a jewelry ring	accessory	
+necklace	things	necklace	a photo of a necklace|a close-up of a necklace	accessory	
+bracelet	things	bracelet	a photo of a bracelet|a close-up of a bracelet	accessory	
+earrings	things	earrings	earrings|a pair of earrings	accessory	
+jewelry	things	jewelry	jewelry|pieces of jewelry	accessory	
+umbrella	things	umbrella	a photo of an umbrella|a close-up of an umbrella	accessory	
+bow-tie	things	bow tie	a photo of a bow tie|a close-up of a bow tie	accessory	
+fabric	things	fabric	fabric|folded textile	accessory	
+yarn	things	yarn	yarn|balls of yarn	accessory	
+knitting	things	knitting	knitting|a knitted piece with needles	accessory	
+hammer	things	hammer	a photo of a hammer|a close-up of a hammer	tool	
+screwdriver	things	screwdriver	a photo of a screwdriver|a close-up of a screwdriver	tool	
+wrench	things	wrench	a photo of a wrench|a close-up of a wrench	tool	
+pliers	things	pliers	pliers|a pair of pliers	tool	
+saw	things	saw	a photo of a saw|a close-up of a saw	tool	
+drill	things	drill	a power drill|a cordless drill	tool	
+tape-measure	things	tape measure	a photo of a tape measure|a close-up of a tape measure	tool	
+ladder	things	ladder	a photo of a ladder|a close-up of a ladder	tool	
+toolbox	things	toolbox	a photo of a toolbox|a close-up of a toolbox	tool	
+nails	things	nails	nails|a pile of nails	tool	
+screws	things	screws	screws|a pile of screws	tool	
+paint-can	things	paint can	a photo of a paint can|a close-up of a paint can	tool	
+shovel	things	shovel	a photo of a shovel|a close-up of a shovel	tool	
+rake	things	rake	a photo of a rake|a close-up of a rake	tool	
+lawn-mower	things	lawn mower	a photo of a lawn mower|a close-up of a lawn mower	tool	
+wheelbarrow	things	wheelbarrow	a photo of a wheelbarrow|a close-up of a wheelbarrow	tool	
+garden-hose	things	garden hose	a photo of a garden hose|a close-up of a garden hose	tool	
+watering-can	things	watering can	a photo of a watering can|a close-up of a watering can	tool	
+flower-pot	things	flower pot	a photo of a flower pot|a close-up of a flower pot	tool	
+axe	things	axe	a photo of an axe|a close-up of an axe	tool	
+scissors	things	scissors	scissors|a pair of scissors	tool	
+rope	things	rope	rope|a coil of rope	tool	
+chain	things	chain	a chain|a metal chain	tool	
+padlock	things	padlock	a photo of a padlock|a close-up of a padlock	tool	
+key	things	key	a key|a metal key	tool	
+keys	things	keys	keys|a bunch of keys	tool	
+bucket	things	bucket	a photo of a bucket|a close-up of a bucket	tool	
+broom	things	broom	a photo of a broom|a close-up of a broom	tool	
+mop	things	mop	a photo of a mop|a close-up of a mop	tool	
+trash-can	things	trash can	a photo of a trash can|a close-up of a trash can	tool	
+recycling-bin	things	recycling bin	a photo of a recycling bin|a close-up of a recycling bin	tool	
+fire-extinguisher	things	fire extinguisher	a photo of a fire extinguisher|a close-up of a fire extinguisher	tool	
+duct-tape	things	duct tape	a photo of a duct tape|a close-up of a duct tape	tool	
+sandpaper	things	sandpaper	a photo of a sandpaper|a close-up of a sandpaper	tool	
+workbench	things	workbench	a photo of a workbench|a close-up of a workbench	tool	
+firewood	things	firewood	firewood|a stack of firewood	tool	
+lumber	things	lumber	lumber|stacked wooden planks	tool	
+bricks	things	bricks	bricks|a pile of bricks	tool	
+pipes	things	pipes	pipes|metal pipes	tool	
+plate	things	plate	a photo of a plate|a close-up of a plate	kitchenware	
+bowl	things	bowl	a photo of a bowl|a close-up of a bowl	kitchenware	
+cup	things	cup	a photo of a cup|a mug	kitchenware	
+mug	things	mug	a photo of a mug|a close-up of a mug	kitchenware	
+glass	things	glass	a drinking glass|an empty glass	kitchenware	
+wine-glass	things	wine glass	a photo of a wine glass|a close-up of a wine glass	kitchenware	
+bottle	things	bottle	a photo of a bottle|a close-up of a bottle	kitchenware	
+water-bottle	things	water bottle	a photo of a water bottle|a close-up of a water bottle	kitchenware	
+thermos	things	thermos	a photo of a thermos|a close-up of a thermos	kitchenware	
+teapot	things	teapot	a photo of a teapot|a close-up of a teapot	kitchenware	
+pitcher	things	pitcher	a photo of a pitcher|a close-up of a pitcher	kitchenware	
+fork	things	fork	a photo of a fork|a close-up of a fork	kitchenware	
+spoon	things	spoon	a photo of a spoon|a close-up of a spoon	kitchenware	
+cutlery	things	cutlery	cutlery|forks and knives on a table	kitchenware	
+kitchen-knife	things	kitchen knife	a photo of a kitchen knife|a close-up of a kitchen knife	kitchenware	
+chopsticks	things	chopsticks	chopsticks|a pair of chopsticks	kitchenware	
+cutting-board	things	cutting board	a photo of a cutting board|a close-up of a cutting board	kitchenware	
+frying-pan	things	frying pan	a photo of a frying pan|a close-up of a frying pan	kitchenware	
+pot	things	pot	a cooking pot|a pot on a stove	kitchenware	
+baking-tray	things	baking tray	a photo of a baking tray|a close-up of a baking tray	kitchenware	
+mixing-bowl	things	mixing bowl	a photo of a mixing bowl|a close-up of a mixing bowl	kitchenware	
+whisk	things	whisk	a photo of a whisk|a close-up of a whisk	kitchenware	
+rolling-pin	things	rolling pin	a photo of a rolling pin|a close-up of a rolling pin	kitchenware	
+colander	things	colander	a photo of a colander|a close-up of a colander	kitchenware	
+grater	things	grater	a photo of a grater|a close-up of a grater	kitchenware	
+spatula	things	spatula	a photo of a spatula|a close-up of a spatula	kitchenware	
+ladle	things	ladle	a photo of a ladle|a close-up of a ladle	kitchenware	
+measuring-cup	things	measuring cup	a photo of a measuring cup|a close-up of a measuring cup	kitchenware	
+jar	things	jar	a jar|a glass jar	kitchenware	
+lunch-box	things	lunch box	a photo of a lunch box|a close-up of a lunch box	kitchenware	
+straw	things	straw	a drinking straw|colorful straws	kitchenware	
+napkin	things	napkin	a photo of a napkin|a close-up of a napkin	kitchenware	
+tablecloth	things	tablecloth	a photo of a tablecloth|a close-up of a tablecloth	kitchenware	
+place-setting	things	place setting	a photo of a place setting|a close-up of a place setting	kitchenware	
+tray	things	tray	a photo of a tray|a close-up of a tray	kitchenware	
+oven-mitt	things	oven mitt	a photo of an oven mitt|a close-up of an oven mitt	kitchenware	
+coffee-grinder	things	coffee grinder	a photo of a coffee grinder|a close-up of a coffee grinder	kitchenware	
+teddy-bear	things	teddy bear	a photo of a teddy bear|a close-up of a teddy bear	toy	
+stuffed-animal	things	stuffed animal	a photo of a stuffed animal|a close-up of a stuffed animal	toy	
+doll	things	doll	a photo of a doll|a close-up of a doll	toy	
+toy-car	things	toy car	a photo of a toy car|a close-up of a toy car	toy	
+toy-bricks	things	toy bricks	toy bricks|colorful building bricks	toy	
+jigsaw-puzzle	things	jigsaw puzzle	a photo of a jigsaw puzzle|a close-up of a jigsaw puzzle	toy	
+board-game	things	board game	a photo of a board game|a close-up of a board game	toy	
+chess	things	chess	a chess set|a chess board with pieces	toy	
+playing-cards	things	playing cards	playing cards|a deck of playing cards	toy	
+dice	things	dice	dice|a pair of dice	toy	
+video-game	things	video game	a photo of a video game|a close-up of a video game	toy	
+balloon	things	balloon	a balloon|colorful balloons	toy	
+kite	things	kite	a photo of a kite|a close-up of a kite	toy	
+rubber-duck	things	rubber duck	a photo of a rubber duck|a close-up of a rubber duck	toy	
+toy-train	things	toy train	a photo of a toy train|a close-up of a toy train	toy	
+action-figure	things	action figure	a photo of an action figure|a close-up of an action figure	toy	
+rocking-horse	things	rocking horse	a photo of a rocking horse|a close-up of a rocking horse	toy	
+bubbles	things	bubbles	soap bubbles|a child blowing bubbles	toy	
+swing	things	swing	a swing|a playground swing	toy	
+playground-slide	things	playground slide	a photo of a playground slide|a close-up of a playground slide	toy	
+seesaw	things	seesaw	a photo of a seesaw|a close-up of a seesaw	toy	
+trampoline	things	trampoline	a photo of a trampoline|a close-up of a trampoline	toy	
+scooter	things	scooter	a kick scooter|a child's scooter	toy	
+hula-hoop	things	hula hoop	a photo of a hula hoop|a close-up of a hula hoop	toy	
+crayons	things	crayons	crayons|a box of crayons	toy	
+doll-house	things	doll house	a photo of a doll house|a close-up of a doll house	toy	
+toy-robot	things	toy robot	a photo of a toy robot|a close-up of a toy robot	toy	
+soccer-ball	things	soccer ball	a photo of a soccer ball|a close-up of a soccer ball	sports-equipment	
+basketball	things	basketball	a photo of a basketball|a close-up of a basketball	sports-equipment	
+tennis-racket	things	tennis racket	a photo of a tennis racket|a close-up of a tennis racket	sports-equipment	
+tennis-ball	things	tennis ball	a photo of a tennis ball|a close-up of a tennis ball	sports-equipment	
+baseball-bat	things	baseball bat	a photo of a baseball bat|a close-up of a baseball bat	sports-equipment	
+baseball-glove	things	baseball glove	a photo of a baseball glove|a close-up of a baseball glove	sports-equipment	
+golf-club	things	golf club	a photo of a golf club|a close-up of a golf club	sports-equipment	
+golf-ball	things	golf ball	a photo of a golf ball|a close-up of a golf ball	sports-equipment	
+hockey-stick	things	hockey stick	a photo of a hockey stick|a close-up of a hockey stick	sports-equipment	
+ice-skates	things	ice skates	ice skates|a pair of ice skates	sports-equipment	
+roller-skates	things	roller skates	roller skates|a pair of roller skates	sports-equipment	
+skis	things	skis	skis|a pair of skis	sports-equipment	
+snowboard	things	snowboard	a photo of a snowboard|a close-up of a snowboard	sports-equipment	
+surfboard	things	surfboard	a photo of a surfboard|a close-up of a surfboard	sports-equipment	
+skateboard	things	skateboard	a skateboard|a skateboard on the ground	sports-equipment	
+kayak-paddle	things	kayak paddle	a photo of a kayak paddle|a close-up of a kayak paddle	sports-equipment	
+bicycle-helmet	things	bicycle helmet	a photo of a bicycle helmet|a close-up of a bicycle helmet	sports-equipment	
+boxing-gloves	things	boxing gloves	boxing gloves|a pair of boxing gloves	sports-equipment	
+dumbbell	things	dumbbell	a photo of a dumbbell|a close-up of a dumbbell	sports-equipment	
+kettlebell	things	kettlebell	a photo of a kettlebell|a close-up of a kettlebell	sports-equipment	
+barbell	things	barbell	a photo of a barbell|a close-up of a barbell	sports-equipment	
+yoga-mat	things	yoga mat	a photo of a yoga mat|a close-up of a yoga mat	sports-equipment	
+treadmill	things	treadmill	a photo of a treadmill|a close-up of a treadmill	sports-equipment	
+exercise-bike	things	exercise bike	a photo of an exercise bike|a close-up of an exercise bike	sports-equipment	
+jump-rope	things	jump rope	a photo of a jump rope|a close-up of a jump rope	sports-equipment	
+bowling-ball	things	bowling ball	a photo of a bowling ball|a close-up of a bowling ball	sports-equipment	
+bowling-pins	things	bowling pins	bowling pins|bowling pins in a lane	sports-equipment	
+dartboard	things	dartboard	a photo of a dartboard|a close-up of a dartboard	sports-equipment	
+pool-table	things	pool table	a photo of a pool table|a close-up of a pool table	sports-equipment	
+ping-pong-table	things	ping pong table	a photo of a ping pong table|a close-up of a ping pong table	sports-equipment	
+badminton-racket	things	badminton racket	a photo of a badminton racket|a close-up of a badminton racket	sports-equipment	
+shuttlecock	things	shuttlecock	a photo of a shuttlecock|a close-up of a shuttlecock	sports-equipment	
+volleyball	things	volleyball	a photo of a volleyball|a close-up of a volleyball	sports-equipment	
+rugby-ball	things	rugby ball	a photo of a rugby ball|a close-up of a rugby ball	sports-equipment	
+cricket-bat	things	cricket bat	a photo of a cricket bat|a close-up of a cricket bat	sports-equipment	
+fishing-rod	things	fishing rod	a photo of a fishing rod|a close-up of a fishing rod	sports-equipment	
+bow-and-arrow	things	bow and arrow	a photo of a bow and arrow|a close-up of a bow and arrow	sports-equipment	
+climbing-gear	things	climbing gear	climbing gear|ropes and carabiners	sports-equipment	
+trophy	things	trophy	a photo of a trophy|a close-up of a trophy	sports-equipment	
+medal	things	medal	a photo of a medal|a close-up of a medal	sports-equipment	
+basketball-hoop	things	basketball hoop	a photo of a basketball hoop|a close-up of a basketball hoop	sports-equipment	
+scoreboard	things	scoreboard	a photo of a scoreboard|a close-up of a scoreboard	sports-equipment	
+swim-goggles	things	swim goggles	swim goggles|a pair of goggles	sports-equipment	
+life-jacket	things	life jacket	a photo of a life jacket|a close-up of a life jacket	sports-equipment	
+tent	things	tent	a tent|a camping tent	sports-equipment	
+sleeping-bag	things	sleeping bag	a photo of a sleeping bag|a close-up of a sleeping bag	sports-equipment	
+camping-stove	things	camping stove	a photo of a camping stove|a close-up of a camping stove	sports-equipment	
+compass	things	compass	a photo of a compass|a close-up of a compass	sports-equipment	
+binoculars	things	binoculars	binoculars|a pair of binoculars	sports-equipment	
+telescope	things	telescope	a photo of a telescope|a close-up of a telescope	sports-equipment	
+hiking-boots	things	hiking boots	hiking boots|a pair of hiking boots	sports-equipment	
+lantern	things	lantern	a lantern|a camping lantern	sports-equipment	
+guitar	things	guitar	a photo of a guitar	instrument	
+electric-guitar	things	electric guitar	a photo of an electric guitar|a close-up of an electric guitar	instrument	
+acoustic-guitar	things	acoustic guitar	a photo of an acoustic guitar|a close-up of an acoustic guitar	instrument	
+bass-guitar	things	bass guitar	a photo of a bass guitar|a close-up of a bass guitar	instrument	
+piano	things	piano	a photo of a piano|a close-up of a piano	instrument	
+grand-piano	things	grand piano	a photo of a grand piano|a close-up of a grand piano	instrument	
+synthesizer	things	synthesizer	a photo of a synthesizer|a close-up of a synthesizer	instrument	
+violin	things	violin	a photo of a violin|a close-up of a violin	instrument	
+cello	things	cello	a photo of a cello|a close-up of a cello	instrument	
+flute	things	flute	a photo of a flute|a close-up of a flute	instrument	
+saxophone	things	saxophone	a photo of a saxophone|a close-up of a saxophone	instrument	
+trumpet	things	trumpet	a photo of a trumpet|a close-up of a trumpet	instrument	
+trombone	things	trombone	a photo of a trombone|a close-up of a trombone	instrument	
+clarinet	things	clarinet	a photo of a clarinet|a close-up of a clarinet	instrument	
+drums	things	drums	drums|a drum set	instrument	
+drum-kit	things	drum kit	a photo of a drum kit|a close-up of a drum kit	instrument	
+ukulele	things	ukulele	a photo of a ukulele|a close-up of a ukulele	instrument	
+harp	things	harp	a photo of a harp|a close-up of a harp	instrument	
+accordion	things	accordion	a photo of an accordion|a close-up of an accordion	instrument	
+harmonica	things	harmonica	a photo of a harmonica|a close-up of a harmonica	instrument	
+banjo	things	banjo	a photo of a banjo|a close-up of a banjo	instrument	
+tambourine	things	tambourine	a photo of a tambourine|a close-up of a tambourine	instrument	
+xylophone	things	xylophone	a photo of a xylophone|a close-up of a xylophone	instrument	
+turntable	things	turntable	a dj turntable|a turntable with a record	instrument	
+music-stand	things	music stand	a photo of a music stand|a close-up of a music stand	instrument	
+amplifier	things	amplifier	a photo of an amplifier|a close-up of an amplifier	instrument	
+mixing-console	things	mixing console	a photo of a mixing console|a close-up of a mixing console	instrument	
+christmas-tree	things	christmas tree	a photo of a christmas tree|a close-up of a christmas tree	decoration	
+ornament	things	ornament	a christmas ornament|baubles on a tree	decoration	
+wreath	things	wreath	a photo of a wreath|a close-up of a wreath	decoration	
+gift	things	gift	a gift|a wrapped present	decoration	
+gift-box	things	gift box	a photo of a gift box|a close-up of a gift box	decoration	
+ribbon	things	ribbon	a photo of a ribbon|a close-up of a ribbon	decoration	
+string-lights	things	string lights	string lights|fairy lights	decoration	
+confetti	things	confetti	confetti|colorful confetti	decoration	
+party-hat	things	party hat	a photo of a party hat|a close-up of a party hat	decoration	
+banner	things	banner	a party banner|a bunting banner	decoration	
+jack-o-lantern	things	jack-o-lantern	a carved pumpkin|a jack-o-lantern	decoration	
+figurine	things	figurine	a photo of a figurine|a close-up of a figurine	decoration	
+souvenir	things	souvenir	a photo of a souvenir|a close-up of a souvenir	decoration	
+snow-globe	things	snow globe	a photo of a snow globe|a close-up of a snow globe	decoration	
+photo-album	things	photo album	a photo of a photo album|a close-up of a photo album	decoration	
+wind-chime	things	wind chime	a photo of a wind chime|a close-up of a wind chime	decoration	
+snowman	things	snowman	a snowman|a snowman in the snow	decoration	
+scarecrow	things	scarecrow	a photo of a scarecrow|a close-up of a scarecrow	decoration	
+flag	things	flag	a flag|a flag waving in the wind	decoration	
+bell	things	bell	a photo of a bell|a close-up of a bell	decoration	
+bokeh-lights	things	fairy lights bokeh	out of focus string lights|bokeh of colorful lights	decoration	
+notebook	things	notebook	a photo of a notebook|a close-up of a notebook	stationery	
+pen	things	pen	a photo of a pen|a close-up of a pen	stationery	
+pencil	things	pencil	a photo of a pencil|a close-up of a pencil	stationery	
+marker	things	marker	a photo of a marker|a close-up of a marker	stationery	
+highlighter	things	highlighter	a photo of a highlighter|a close-up of a highlighter	stationery	
+eraser	things	eraser	a photo of an eraser|a close-up of an eraser	stationery	
+ruler	things	ruler	a photo of a ruler|a close-up of a ruler	stationery	
+stapler	things	stapler	a photo of a stapler|a close-up of a stapler	stationery	
+paper-clip	things	paper clip	a photo of a paper clip|a close-up of a paper clip	stationery	
+sticky-notes	things	sticky notes	sticky notes|colorful sticky notes	stationery	
+envelope	things	envelope	a photo of an envelope|a close-up of an envelope	stationery	
+stamp	things	stamp	a postage stamp|a stamp on an envelope	stationery	
+folder	things	folder	a photo of a folder|a close-up of a folder	stationery	
+binder	things	binder	a photo of a binder|a close-up of a binder	stationery	
+globe	things	globe	a globe|a desk globe	stationery	
+paintbrush	things	paintbrush	a photo of a paintbrush|a close-up of a paintbrush	stationery	
+paint-palette	things	paint palette	a photo of a paint palette|a close-up of a paint palette	stationery	
+easel	things	easel	a photo of an easel|a close-up of an easel	stationery	
+book	things	book	a photo of a book|a book	stationery	
+stack-of-books	things	stack of books	a stack of books|books piled up	stationery	
+open-book	things	open book	an open book|an open book on a table	stationery	
+cork	things	cork	a cork|corks in a jar		
+cardboard-box	things	cardboard box	a photo of a cardboard box|a close-up of a cardboard box		
+box	things	box	a box|a closed box		
+bag	things	bag	a bag|a paper bag		
+shopping-bag	things	shopping bag	a photo of a shopping bag|a close-up of a shopping bag		
+plastic-bag	things	plastic bag	a photo of a plastic bag|a close-up of a plastic bag		
+basket	things	basket	a basket|a wicker basket		
+crate	things	crate	a photo of a crate|a close-up of a crate		
+barrel	things	barrel	a photo of a barrel|a close-up of a barrel		
+package	things	package	a package|a parcel with tape		
+shopping-cart	things	shopping cart	a photo of a shopping cart|a close-up of a shopping cart		
+coin	things	coin	a coin|coins		
+cash	things	cash	cash|banknotes and coins		
+credit-card	things	credit card	a photo of a credit card|a close-up of a credit card		
+piggy-bank	things	piggy bank	a photo of a piggy bank|a close-up of a piggy bank		
+matches	things	matches	matches|a box of matches		
+lighter	things	lighter	a photo of a lighter|a close-up of a lighter		
+soap	things	soap	soap|a bar of soap		
+toothbrush	things	toothbrush	a photo of a toothbrush|a close-up of a toothbrush		
+shampoo-bottle	things	shampoo bottle	a photo of a shampoo bottle|a close-up of a shampoo bottle		
+perfume	things	perfume	perfume|a perfume bottle		
+lipstick	things	lipstick	a photo of a lipstick|a close-up of a lipstick		
+makeup-palette	things	makeup palette	a photo of a makeup palette|a close-up of a makeup palette		
+hairbrush	things	hairbrush	a photo of a hairbrush|a close-up of a hairbrush		
+sunscreen	things	sunscreen	sunscreen|a bottle of sunscreen		
+leash	things	leash	a dog leash|a leash and collar		
+dog-bowl	things	dog bowl	a photo of a dog bowl|a close-up of a dog bowl		
+dog-bed	things	dog bed	a photo of a dog bed|a close-up of a dog bed		
+birdcage	things	birdcage	a photo of a birdcage|a close-up of a birdcage		
+cat-toy	things	cat toy	a photo of a cat toy|a close-up of a cat toy		
+pacifier	things	pacifier	a photo of a pacifier|a close-up of a pacifier		
+stroller	things	stroller	a baby stroller|a pram		
+baby-bottle	things	baby bottle	a photo of a baby bottle|a close-up of a baby bottle		
+rubber-boots	things	rubber boots	rubber boots|a pair of rain boots		
+vehicle	vehicles	vehicle	a photo of a vehicle		
+car	vehicles	car	a photo of a car|a car	vehicle	
+bicycle	vehicles	bicycle	a photo of a bicycle	vehicle	
+train	vehicles	train	a photo of a train	vehicle	
+airplane	vehicles	airplane	a photo of an airplane	vehicle	
+boat	vehicles	boat	a photo of a boat	vehicle	
+motorcycle	vehicles	motorcycle	a photo of a motorcycle|a picture of a motorcycle	vehicle	
+bus	vehicles	bus	a photo of a bus|a picture of a bus	vehicle	
+truck	vehicles	truck	a photo of a truck|a picture of a truck	vehicle	
+van	vehicles	van	a photo of a van|a picture of a van	vehicle	
+construction-vehicle	vehicles	construction vehicle	a photo of a construction vehicle|a picture of a construction vehicle	vehicle	
+emergency-vehicle	vehicles	emergency vehicle	a photo of an emergency vehicle|a picture of an emergency vehicle	vehicle	
+aircraft	vehicles	aircraft	a photo of an aircraft|a picture of an aircraft	vehicle	
+ship	vehicles	ship	a photo of a ship|a picture of a ship	vehicle	
+rail-vehicle	vehicles	rail vehicle	a photo of a rail vehicle|a picture of a rail vehicle	vehicle	
+taxi	vehicles	taxi	a photo of a taxi|a picture of a taxi	car	
+suv	vehicles	suv	a photo of a suv|a picture of a suv	car	
+sports-car	vehicles	sports car	a photo of a sports car|a picture of a sports car	car	
+convertible	vehicles	convertible	a photo of a convertible|a picture of a convertible	car	
+vintage-car	vehicles	vintage car	a photo of a vintage car|a picture of a vintage car	car	
+race-car	vehicles	race car	a photo of a race car|a picture of a race car	car	
+electric-car	vehicles	electric car	an electric car charging|an electric car plugged in	car	
+police-car	vehicles	police car	a photo of a police car|a picture of a police car	car	
+car-interior	vehicles	car interior	the inside of a car|a car dashboard and seats	car	
+steering-wheel	vehicles	steering wheel	a photo of a steering wheel|a picture of a steering wheel	car	
+dashboard	vehicles	dashboard	a car dashboard|the dashboard of a car	car	
+license-plate	vehicles	license plate	a photo of a license plate|a picture of a license plate	car	
+car-wheel	vehicles	car wheel	a car wheel|a close-up of a car tire	car	
+traffic-jam	vehicles	traffic jam	a traffic jam|cars stuck in traffic	car	
+parked-cars	vehicles	parked cars	parked cars|cars parked along a street	car	
+mountain-bike	vehicles	mountain bike	a photo of a mountain bike|a picture of a mountain bike	bicycle	
+road-bike	vehicles	road bike	a photo of a road bike|a picture of a road bike	bicycle	
+electric-bike	vehicles	electric bike	a photo of an electric bike|a picture of an electric bike	bicycle	
+tandem-bicycle	vehicles	tandem bicycle	a photo of a tandem bicycle|a picture of a tandem bicycle	bicycle	
+school-bus	vehicles	school bus	a photo of a school bus|a picture of a school bus	bus	
+double-decker-bus	vehicles	double decker bus	a photo of a double decker bus|a picture of a double decker bus	bus	
+pickup-truck	vehicles	pickup truck	a photo of a pickup truck|a picture of a pickup truck	truck	
+dump-truck	vehicles	dump truck	a photo of a dump truck|a picture of a dump truck	truck	
+garbage-truck	vehicles	garbage truck	a photo of a garbage truck|a picture of a garbage truck	truck	
+delivery-van	vehicles	delivery van	a photo of a delivery van|a picture of a delivery van	truck	
+fire-truck	vehicles	fire truck	a photo of a fire truck|a picture of a fire truck	truck	
+camper-van	vehicles	camper van	a photo of a camper van|a picture of a camper van	van	
+caravan	vehicles	caravan	a caravan|a trailer home	van	
+trailer	vehicles	trailer	a photo of a trailer|a picture of a trailer	van	
+tractor	vehicles	tractor	a photo of a tractor|a picture of a tractor	construction-vehicle	
+bulldozer	vehicles	bulldozer	a photo of a bulldozer|a picture of a bulldozer	construction-vehicle	
+excavator	vehicles	excavator	a photo of an excavator|a picture of an excavator	construction-vehicle	
+crane-vehicle	vehicles	construction crane	a construction crane|a tall crane at a building site	construction-vehicle	
+forklift	vehicles	forklift	a photo of a forklift|a picture of a forklift	construction-vehicle	
+ambulance	vehicles	ambulance	a photo of an ambulance|a picture of an ambulance	emergency-vehicle	
+moped	vehicles	moped	a moped|a motor scooter	motorcycle	
+electric-scooter	vehicles	electric scooter	a photo of an electric scooter|a picture of an electric scooter	motorcycle	
+snowmobile	vehicles	snowmobile	a photo of a snowmobile|a picture of a snowmobile	motorcycle	
+quad-bike	vehicles	quad bike	a photo of a quad bike|a picture of a quad bike	motorcycle	
+tram	vehicles	tram	a photo of a tram|a picture of a tram	rail-vehicle	
+subway-train	vehicles	subway train	a photo of a subway train|a picture of a subway train	rail-vehicle	
+high-speed-train	vehicles	high-speed train	a photo of a high-speed train|a picture of a high-speed train	rail-vehicle	
+steam-train	vehicles	steam train	a photo of a steam train|a picture of a steam train	rail-vehicle	
+locomotive	vehicles	locomotive	a photo of a locomotive|a picture of a locomotive	rail-vehicle	
+cable-car	vehicles	cable car	a photo of a cable car|a picture of a cable car	rail-vehicle	
+helicopter	vehicles	helicopter	a photo of a helicopter|a picture of a helicopter	aircraft	
+jet-airplane	vehicles	jet airplane	a photo of a jet airplane|a picture of a jet airplane	aircraft	
+propeller-plane	vehicles	propeller plane	a photo of a propeller plane|a picture of a propeller plane	aircraft	
+glider	vehicles	glider	a photo of a glider|a picture of a glider	aircraft	
+hot-air-balloon	vehicles	hot air balloon	a photo of a hot air balloon|a picture of a hot air balloon	aircraft	
+rocket	vehicles	rocket	a rocket|a rocket launching	aircraft	
+airplane-wing	vehicles	airplane wing	an airplane wing seen from a window|the view from an airplane window	aircraft	
+airplane-cabin	vehicles	airplane cabin	a photo of an airplane cabin|a picture of an airplane cabin	aircraft	
+sailboat	vehicles	sailboat	a photo of a sailboat|a picture of a sailboat	ship	
+yacht	vehicles	yacht	a photo of a yacht|a picture of a yacht	ship	
+ferry	vehicles	ferry	a photo of a ferry|a picture of a ferry	ship	
+cruise-ship	vehicles	cruise ship	a photo of a cruise ship|a picture of a cruise ship	ship	
+cargo-ship	vehicles	cargo ship	a photo of a cargo ship|a picture of a cargo ship	ship	
+container-ship	vehicles	container ship	a photo of a container ship|a picture of a container ship	ship	
+fishing-boat	vehicles	fishing boat	a photo of a fishing boat|a picture of a fishing boat	ship	
+rowboat	vehicles	rowboat	a photo of a rowboat|a picture of a rowboat	ship	
+canoe	vehicles	canoe	a photo of a canoe|a picture of a canoe	ship	
+speedboat	vehicles	speedboat	a photo of a speedboat|a picture of a speedboat	ship	
+jet-ski	vehicles	jet ski	a photo of a jet ski|a picture of a jet ski	ship	
+gondola	vehicles	gondola	a photo of a gondola|a picture of a gondola	ship	
+submarine	vehicles	submarine	a photo of a submarine|a picture of a submarine	ship	
+kayak	vehicles	kayak	a photo of a kayak|a picture of a kayak	ship	
+paddle-board	vehicles	paddle board	a photo of a paddle board|a picture of a paddle board	ship	
+rickshaw	vehicles	rickshaw	a photo of a rickshaw|a picture of a rickshaw		
+horse-carriage	vehicles	horse carriage	a photo of a horse carriage|a picture of a horse carriage		
+golf-cart	vehicles	golf cart	a photo of a golf cart|a picture of a golf cart		
+document	documents	document	a photo of a document|a page of text		
+screenshot	documents	screenshot	a screenshot|a screenshot of a computer screen		
+screen-photo	documents	screen photo	a photo of a computer screen|a picture of a screen taken with a phone		
+chat-conversation	documents	chat conversation	a screenshot of a chat conversation|a messaging app with speech bubbles	screenshot	
+text-message	documents	text message	a screenshot of text messages|a phone text message thread	screenshot	
+email-screenshot	documents	email screenshot	a screenshot of an email|an email inbox on a screen	screenshot	
+web-page	documents	web page	a screenshot of a web page|a website in a browser	screenshot	
+social-media-post	documents	social media post	a screenshot of a social media post|a social media feed on a phone	screenshot	
+meme	documents	meme	a meme with text over an image|a funny internet meme	screenshot	
+video-call-screenshot	documents	video call screenshot	a screenshot of a video call|a video meeting with several participants	screenshot	
+video-game-screenshot	documents	video game screenshot	a screenshot of a video game|a video game scene	screenshot	
+app-screenshot	documents	app screenshot	a screenshot of a mobile app|a phone app screen	screenshot	
+settings-screen	documents	settings screen	a screenshot of a settings screen|a settings menu with toggles	screenshot	
+desktop-screen	documents	desktop screen	a screenshot of a computer desktop|a desktop with windows and icons	screenshot	
+browser-window	documents	browser window	a screenshot of a web browser|a browser with several tabs	screenshot	
+map-screenshot	documents	map screenshot	a screenshot of a navigation map|a phone map with a route	screenshot	
+error-message	documents	error message	a screenshot of an error message|a dialog box with an error	screenshot	
+login-screen	documents	login screen	a login screen|a sign in form on a screen	screenshot	
+code	documents	code	a screenshot of source code|computer code on a screen	screenshot	
+terminal	documents	terminal	a terminal window with text|a command line on a dark screen	screenshot	
+code-editor	documents	code editor	a code editor with source code|a programming editor window	screenshot	
+spreadsheet	documents	spreadsheet	a spreadsheet|a table of numbers in a spreadsheet	screenshot	
+dashboard-screen	documents	dashboard screen	an analytics dashboard|a dashboard with charts	screenshot	
+online-shopping-page	documents	online shopping page	an online shopping page|a product page with a price	screenshot	
+news-article	documents	news article	a news article on a web page|an online news story	screenshot	
+blog-post	documents	blog post	a blog post on a web page|an article with a headline	screenshot	
+forum-post	documents	forum post	a forum thread|an online discussion post	screenshot	
+weather-app	documents	weather app	a weather app screen|a phone weather forecast	screenshot	
+calendar-app	documents	calendar app	a calendar app screenshot|a phone calendar view	screenshot	
+music-player	documents	music player	a music player app|a media player showing a song	screenshot	
+video-player	documents	video player	a video player screenshot|a paused video with controls	screenshot	
+slide	documents	slide	a presentation slide|a slide from a presentation	screenshot	
+presentation-slides	documents	presentation slides	a slide deck|a presentation with bullet points	screenshot	
+pdf-page	documents	pdf page	a page of a pdf document|a scanned pdf page	screenshot	
+document-on-screen	documents	document on screen	a document open on a screen|a word processor with text	screenshot	
+tv-screen	documents	tv screen	a photo of a television screen|a tv showing a program	screenshot	
+projector-screen	documents	projector screen	a presentation on a projector screen|a projected slide in a room	screenshot	
+chart	documents	chart	a chart|a graph with data	document	
+map	documents	map	a map	document	
+scanned-document	documents	scanned document	a scanned document|a flat scan of a paper page	document	
+printed-text	documents	printed text	a page of printed text|a printed paragraph	document	
+typed-text	documents	typed text	a page of typed text|a paragraph of text	document	
+handwriting	documents	handwriting	handwritten notes|handwriting on paper	document	
+handwritten-note	documents	handwritten note	a handwritten note|a note written by hand	document	
+sticky-note	documents	sticky note	a sticky note with writing|a yellow note on a wall	document	
+to-do-list	documents	to-do list	a to-do list|a checklist on paper	document	
+shopping-list	documents	shopping list	a shopping list|a handwritten grocery list	document	
+notebook-page	documents	notebook page	a page of a notebook|a notebook with notes	document	
+lecture-notes	documents	lecture notes	lecture notes|a page of study notes	document	
+textbook-page	documents	textbook page	a textbook page|a page with text and diagrams	document	
+book-page	documents	book page	a page of a book|an open book with text	document	
+book-cover	documents	book cover	a book cover|the front cover of a book	document	
+magazine	documents	magazine	a magazine|a magazine spread	document	
+newspaper	documents	newspaper	a newspaper|a newspaper page with headlines	document	
+poster	documents	poster	a poster|a poster on a wall	document	
+flyer	documents	flyer	a flyer|a promotional flyer	document	
+brochure	documents	brochure	a photo of a brochure|a scan or screenshot of a brochure	document	
+leaflet	documents	leaflet	a photo of a leaflet|a scan or screenshot of a leaflet	document	
+menu	documents	menu	a restaurant menu|a menu with dishes and prices	document	
+recipe	documents	recipe	a recipe|a recipe with ingredients and steps	document	
+recipe-card	documents	recipe card	a photo of a recipe card|a scan or screenshot of a recipe card	document	
+cookbook	documents	cookbook	a photo of a cookbook|a scan or screenshot of a cookbook	document	
+calendar	documents	calendar	a calendar|a wall calendar	document	
+planner	documents	planner	a planner page|a weekly planner	document	
+schedule	documents	schedule	a photo of a schedule|a scan or screenshot of a schedule	document	
+timetable	documents	timetable	a timetable|a train timetable	document	
+letter	documents	letter	a letter|a typed letter	document	
+form	documents	form	a form|a form with fields to fill in	document	
+application-form	documents	application form	a photo of an application form|a scan or screenshot of an application form	document	
+contract	documents	contract	a contract|a signed contract	document	
+certificate	documents	certificate	a certificate|a framed certificate	document	
+diploma	documents	diploma	a photo of a diploma|a scan or screenshot of a diploma	document	
+resume	documents	resume	a resume|a one page cv	document	
+exam-paper	documents	exam paper	an exam paper|a test sheet with questions	document	
+worksheet	documents	worksheet	a photo of a worksheet|a scan or screenshot of a worksheet	document	
+invoice	documents	invoice	an invoice|a bill with line items	document	
+receipt	documents	receipt	a photo of a receipt|a shop receipt	document	
+bill	documents	bill	a utility bill|a bill with an amount due	document	
+bank-statement	documents	bank statement	a photo of a bank statement|a scan or screenshot of a bank statement	document	
+tax-form	documents	tax form	a photo of a tax form|a scan or screenshot of a tax form	document	
+coupon	documents	coupon	a photo of a coupon|a scan or screenshot of a coupon	document	
+voucher	documents	voucher	a photo of a voucher|a scan or screenshot of a voucher	document	
+gift-card	documents	gift card	a photo of a gift card|a scan or screenshot of a gift card	document	
+ticket	documents	ticket	a ticket|an admission ticket	document	
+boarding-pass	documents	boarding pass	a boarding pass|an airline boarding pass	document	
+concert-ticket	documents	concert ticket	a photo of a concert ticket|a scan or screenshot of a concert ticket	document	
+ticket-stub	documents	ticket stub	a photo of a ticket stub|a scan or screenshot of a ticket stub	document	
+id-card	documents	id card	an id card|a plastic identity card	document	
+passport	documents	passport	a passport|a passport booklet	document	
+drivers-license	documents	drivers license	a driver's license card|a driving license	document	
+business-card	documents	business card	a business card|a business card on a table	document	
+name-tag	documents	name tag	a photo of a name tag|a scan or screenshot of a name tag	document	
+badge	documents	badge	a name badge|a lanyard badge	document	
+label	documents	label	a label|a product label	document	
+product-packaging	documents	product packaging	product packaging with text|a box with printed text	document	
+barcode	documents	barcode	a barcode|a barcode on a package	document	
+qr-code	documents	qr code	a qr code|a square qr code	document	
+sign	documents	sign	a sign|a sign with text	document	
+road-sign	documents	road sign	a road sign|a traffic sign	document	
+street-sign	documents	street sign	a street name sign|a street sign on a pole	document	
+shop-sign	documents	shop sign	a shop sign|a sign above a store	document	
+warning-sign	documents	warning sign	a warning sign|a yellow caution sign	document	
+billboard	documents	billboard	a billboard|a large advertisement billboard	document	
+sheet-music	documents	sheet music	sheet music|a page of musical notation	document	
+math-equations	documents	math equations	math equations|equations written on paper	document	
+chalkboard	documents	chalkboard	a chalkboard with writing|a classroom blackboard	document	
+whiteboard	documents	whiteboard	a photo of a whiteboard|writing on a whiteboard	document	
+whiteboard-notes	documents	whiteboard notes	a photo of whiteboard notes|a scan or screenshot of whiteboard notes	document	
+sticky-notes-wall	documents	sticky notes wall	a wall of sticky notes|a board covered in sticky notes	document	
+kanban-board	documents	kanban board	a photo of a kanban board|a scan or screenshot of a kanban board	document	
+album-cover	documents	album cover	an album cover|a music record sleeve	document	
+movie-poster	documents	movie poster	a movie poster|a film poster	document	
+graph-paper	documents	graph paper	a photo of a graph paper|a scan or screenshot of a graph paper	document	
+lined-paper	documents	lined paper	a photo of a lined paper|a scan or screenshot of a lined paper	document	
+blank-paper	documents	blank paper	a photo of a blank paper|a scan or screenshot of a blank paper	document	
+bar-chart	documents	bar chart	a bar chart|a chart with vertical bars	chart	
+line-graph	documents	line graph	a line graph|a line chart with a trend	chart	
+pie-chart	documents	pie chart	a pie chart|a circular chart with slices	chart	
+scatter-plot	documents	scatter plot	a scatter plot|a plot with many points	chart	
+histogram	documents	histogram	a photo of a histogram|a scan or screenshot of a histogram	chart	
+table-of-data	documents	table of data	a table of data|rows and columns of numbers	chart	
+flowchart	documents	flowchart	a flowchart|boxes connected by arrows	chart	
+diagram	documents	diagram	a diagram|a labeled diagram	chart	
+mind-map	documents	mind map	a mind map|a diagram with branches	chart	
+infographic	documents	infographic	an infographic|a colorful infographic with statistics	chart	
+org-chart	documents	org chart	a photo of an org chart|a scan or screenshot of an org chart	chart	
+timeline-graphic	documents	timeline graphic	a timeline graphic|a timeline with dates	chart	
+road-map	documents	road map	a road map|a paper road map	map	
+city-map	documents	city map	a city map|a street map	map	
+world-map	documents	world map	a world map|a map of continents	map	
+subway-map	documents	subway map	a subway map|a transit map with colored lines	map	
+floor-plan	documents	floor plan	a floor plan|a top-down plan of rooms	map	
+blueprint	documents	blueprint	a blueprint|an architectural blueprint	map	
+technical-drawing	documents	technical drawing	a technical drawing|an engineering drawing with dimensions	map	
+circuit-diagram	documents	circuit diagram	a circuit diagram|a schematic with electronic symbols	map	
+atlas	documents	atlas	a photo of an atlas|a scan or screenshot of an atlas	map	
+trail-map	documents	trail map	a photo of a trail map|a scan or screenshot of a trail map	map	
+artwork	art	artwork	a work of art|an artwork		
+photo-style	art	photo style	a photograph with a distinctive style|a stylized photograph		
+design	art	design	a graphic design|a piece of graphic design		
+painting	art	painting	a painting|an oil painting	artwork	
+oil-painting	art	oil painting	an oil painting|a picture of an oil painting	artwork	
+watercolor	art	watercolor	a watercolor painting|a watercolor with soft washes	artwork	
+acrylic-painting	art	acrylic painting	an acrylic painting|a picture of an acrylic painting	artwork	
+gouache	art	gouache	a gouache|a picture of a gouache	artwork	
+pastel-drawing	art	pastel drawing	a pastel drawing|a picture of a pastel drawing	artwork	
+charcoal-drawing	art	charcoal drawing	a charcoal drawing|a picture of a charcoal drawing	artwork	
+pencil-drawing	art	pencil drawing	a pencil drawing|a picture of a pencil drawing	artwork	
+ink-drawing	art	ink drawing	an ink drawing|a picture of an ink drawing	artwork	
+sketch	art	sketch	a pencil sketch|a drawing	artwork	
+pen-sketch	art	pen sketch	a pen sketch|a picture of a pen sketch	artwork	
+line-art	art	line art	a line art|a picture of a line art	artwork	
+drawing	art	drawing	a drawing|a hand drawing on paper	artwork	
+portrait-painting	art	portrait painting	a portrait painting|a painted portrait	artwork	
+landscape-painting	art	landscape painting	a landscape painting|a picture of a landscape painting	artwork	
+still-life-painting	art	still life painting	a still life painting|a picture of a still life painting	artwork	
+abstract-art	art	abstract art	an abstract art|a picture of an abstract art	artwork	
+abstract-painting	art	abstract painting	an abstract painting|a picture of an abstract painting	artwork	
+impressionist-painting	art	impressionist painting	an impressionist painting|a picture of an impressionist painting	artwork	
+surrealist-art	art	surrealist art	a surrealist art|a picture of a surrealist art	artwork	
+pop-art	art	pop art	a pop art|a picture of a pop art	artwork	
+minimalist-art	art	minimalist art	a minimalist art|a picture of a minimalist art	artwork	
+modern-art	art	modern art	a modern art|a picture of a modern art	artwork	
+classical-painting	art	classical painting	a classical painting|a picture of a classical painting	artwork	
+art-museum-painting	art	art museum painting	a framed painting in a museum|an old master painting on a gallery wall	artwork	
+illustration	art	illustration	a digital illustration	artwork	
+digital-art	art	digital art	a digital art|a picture of a digital art	artwork	
+digital-painting	art	digital painting	a digital painting|a picture of a digital painting	artwork	
+concept-art	art	concept art	a concept art|a picture of a concept art	artwork	
+fantasy-art	art	fantasy art	fantasy art|an illustration of a fantasy world	artwork	
+sci-fi-art	art	sci-fi art	science fiction art|a futuristic illustration	artwork	
+anime-style-art	art	anime-style art	anime style art|an anime style illustration	artwork	
+manga	art	manga	a manga page|black and white manga art	artwork	
+cartoon	art	cartoon	a cartoon|a cartoon drawing	artwork	
+comic	art	comic	a comic|a comic book panel	artwork	
+comic-strip	art	comic strip	a comic strip|a picture of a comic strip	artwork	
+comic-book-page	art	comic book page	a comic book page|a picture of a comic book page	artwork	
+caricature	art	caricature	a caricature|a picture of a caricature	artwork	
+cartoon-character	art	cartoon character	a cartoon character|a picture of a cartoon character	artwork	
+mascot	art	mascot	a mascot|a picture of a mascot	artwork	
+vector-illustration	art	vector illustration	a vector illustration|a picture of a vector illustration	artwork	
+flat-illustration	art	flat illustration	a flat illustration|a picture of a flat illustration	artwork	
+isometric-illustration	art	isometric illustration	an isometric illustration|a picture of an isometric illustration	artwork	
+childrens-illustration	art	childrens illustration	a children's book illustration|a colorful storybook picture	artwork	
+botanical-illustration	art	botanical illustration	a botanical illustration|a picture of a botanical illustration	artwork	
+technical-illustration	art	technical illustration	a technical illustration|a picture of a technical illustration	artwork	
+pixel-art	art	pixel art	pixel art|a low resolution pixel art scene	artwork	
+8-bit-art	art	8-bit art	a 8-bit art|a picture of a 8-bit art	artwork	
+voxel-art	art	voxel art	a voxel art|a picture of a voxel art	artwork	
+3d-render	art	3d render	a 3d render|a computer generated 3d image	artwork	
+3d-model	art	3d model	a 3d model|a picture of a 3d model	artwork	
+low-poly	art	low poly	a low poly|a picture of a low poly	artwork	
+wireframe	art	wireframe	a wireframe|a picture of a wireframe	artwork	
+cgi-scene	art	cgi scene	a cgi scene|a picture of a cgi scene	artwork	
+architectural-render	art	architectural render	an architectural render|a picture of an architectural render	artwork	
+glitch-art	art	glitch art	a glitch art|a picture of a glitch art	artwork	
+collage	art	collage	a collage|a collage of cut paper and images	artwork	
+photomontage	art	photomontage	a photomontage|a picture of a photomontage	artwork	
+mixed-media	art	mixed media	a mixed media|a picture of a mixed media	artwork	
+scrapbook	art	scrapbook	a scrapbook|a picture of a scrapbook	artwork	
+graffiti	art	graffiti	graffiti|spray painted graffiti on a wall	artwork	
+street-art	art	street art	a street art|a picture of a street art	artwork	
+mural	art	mural	a mural|a large painted mural on a building	artwork	
+stencil-art	art	stencil art	a stencil art|a picture of a stencil art	artwork	
+sculpture	art	sculpture	a sculpture|a carved sculpture	artwork	
+bust	art	bust	a bust sculpture|a stone bust	artwork	
+ceramic-sculpture	art	ceramic sculpture	a ceramic sculpture|a picture of a ceramic sculpture	artwork	
+pottery	art	pottery	pottery|handmade pottery on a wheel	artwork	
+ceramics	art	ceramics	ceramics|a picture of ceramics	artwork	
+mosaic	art	mosaic	a mosaic|a picture of a mosaic	artwork	
+stained-glass	art	stained glass	a stained glass|a picture of a stained glass	artwork	
+embroidery	art	embroidery	an embroidery|a picture of an embroidery	artwork	
+cross-stitch	art	cross-stitch	a cross-stitch|a picture of a cross-stitch	artwork	
+quilt	art	quilt	a quilt|a picture of a quilt	artwork	
+origami	art	origami	an origami|a picture of an origami	artwork	
+paper-craft	art	paper craft	a paper craft|a picture of a paper craft	artwork	
+papercut	art	papercut	a papercut|a picture of a papercut	artwork	
+woodcarving	art	woodcarving	a woodcarving|a picture of a woodcarving	artwork	
+ice-sculpture	art	ice sculpture	an ice sculpture|a picture of an ice sculpture	artwork	
+sand-art	art	sand art	a sand art|a picture of a sand art	artwork	
+clay-model	art	clay model	a clay model|a picture of a clay model	artwork	
+miniature	art	miniature	a miniature|a picture of a miniature	artwork	
+diorama	art	diorama	a diorama|a picture of a diorama	artwork	
+model-kit	art	model kit	a model kit|a picture of a model kit	artwork	
+mandala	art	mandala	a mandala|a picture of a mandala	artwork	
+fractal	art	fractal	a fractal|a picture of a fractal	artwork	
+kaleidoscope	art	kaleidoscope	a kaleidoscope|a picture of a kaleidoscope	artwork	
+abstract-shapes	art	abstract shapes	abstract shapes|a picture of abstract shapes	artwork	
+logo	art	logo	a logo|a company logo	design	
+logo-design	art	logo design	a logo design|a picture of a logo design	design	
+wordmark	art	wordmark	a wordmark|a picture of a wordmark	design	
+monogram	art	monogram	a monogram|a picture of a monogram	design	
+emblem	art	emblem	an emblem|a picture of an emblem	design	
+icon	art	icon	an icon|a flat app icon	design	
+app-icon	art	app icon	an app icon|a picture of an app icon	design	
+icon-set	art	icon set	an icon set|a picture of an icon set	design	
+emoji	art	emoji	an emoji|a picture of an emoji	design	
+sticker	art	sticker	a sticker|a picture of a sticker	design	
+symbol	art	symbol	a symbol|a picture of a symbol	design	
+typography	art	typography	typography|a poster made of big letters	design	
+lettering	art	lettering	a lettering|a picture of a lettering	design	
+calligraphy	art	calligraphy	calligraphy|elegant calligraphy on paper	design	
+hand-lettering	art	hand lettering	a hand lettering|a picture of a hand lettering	design	
+font-specimen	art	font specimen	a font specimen|a picture of a font specimen	design	
+poster-design	art	poster design	a poster design|a picture of a poster design	design	
+album-art	art	album art	an album art|a picture of an album art	design	
+book-cover-design	art	book cover design	a book cover design|a picture of a book cover design	design	
+web-design-mockup	art	web design mockup	a web design mockup|a picture of a web design mockup	design	
+ui-design	art	ui design	an ui design|a picture of an ui design	design	
+wireframe-sketch	art	wireframe sketch	a wireframe sketch|a picture of a wireframe sketch	design	
+color-palette	art	color palette	a color palette|swatches of colors	design	
+gradient	art	gradient	a color gradient|a smooth gradient background	design	
+wallpaper	art	wallpaper	a decorative wallpaper|a phone wallpaper image	design	
+background-texture	art	background texture	a background texture|a picture of a background texture	design	
+pattern	art	pattern	a repeating pattern|a seamless pattern	design	
+geometric-pattern	art	geometric pattern	a geometric pattern|a picture of a geometric pattern	design	
+floral-pattern	art	floral pattern	a floral pattern|a picture of a floral pattern	design	
+striped-pattern	art	striped pattern	a striped pattern|a picture of a striped pattern	design	
+checkered-pattern	art	checkered pattern	a checkered pattern|a picture of a checkered pattern	design	
+polka-dots	art	polka dots	polka dots|a polka dot pattern	design	
+tessellation	art	tessellation	a tessellation|a picture of a tessellation	design	
+infographic-design	art	infographic design	a designed layout with icons and text|a creative layout	design	
+neon-lights	art	neon lights	neon lights|a glowing neon sign	design	
+black-and-white-photo	art	black and white photo	a black and white photo|a monochrome photograph	photo-style	
+sepia-photo	art	sepia photo	a sepia photo|a picture of a sepia photo	photo-style	
+vintage-photo	art	vintage photo	a vintage photo|an old faded photograph	photo-style	
+film-photo	art	film photo	a film photograph with grain|an analog film photo	photo-style	
+polaroid	art	polaroid	a polaroid photo|an instant photo with a white border	photo-style	
+long-exposure	art	long exposure	a long exposure photo|a photo with light trails and smooth water	photo-style	
+macro-photo	art	macro photo	a macro photo|an extreme close-up of a tiny subject	photo-style	
+aerial-photo	art	aerial photo	an aerial photo|a photo taken from above	photo-style	
+drone-photo	art	drone photo	a drone photo|a picture of a drone photo	photo-style	
+night-photo	art	night photo	a night photo|a photo taken at night	photo-style	
+portrait-photo	art	portrait photo	a portrait photo|a photo with a blurred background	photo-style	
+panorama	art	panorama	a panorama|a very wide panoramic photo	photo-style	
+wide-angle-photo	art	wide-angle photo	a wide-angle photo|a picture of a wide-angle photo	photo-style	
+fisheye-photo	art	fisheye photo	a fisheye photo|a picture of a fisheye photo	photo-style	
+bokeh	art	bokeh	a photo with bokeh|soft blurred background lights	photo-style	
+silhouette-photo	art	silhouette photo	a silhouette photo|a dark shape against a bright sky	photo-style	
+double-exposure	art	double exposure	a double exposure|a picture of a double exposure	photo-style	
+tilt-shift	art	tilt-shift	a tilt-shift|a picture of a tilt-shift	photo-style	
+street-photography	art	street photography	a street photography|a picture of a street photography	photo-style	
+landscape-photography	art	landscape photography	a landscape photography|a picture of a landscape photography	photo-style	
+architecture-photography	art	architecture photography	an architecture photography|a picture of an architecture photography	photo-style	
+food-photography	art	food photography	a food photography|a picture of a food photography	photo-style	
+product-photo	art	product photo	a product photo|an item on a plain background	photo-style	
+studio-photo	art	studio photo	a studio photo|a subject lit in a studio	photo-style	
+flat-lay	art	flat lay	a flat lay photo|objects arranged on a surface seen from above	photo-style	
+close-up	art	close-up	a close-up photo|a tight close-up	photo-style	
+minimalist-photo	art	minimalist photo	a minimalist photo|a picture of a minimalist photo	photo-style	
+high-contrast-photo	art	high contrast photo	a high contrast photo|a picture of a high contrast photo	photo-style	
+blurry-photo	art	blurry photo	a blurry photo|an out of focus photo	photo-style	
+overexposed-photo	art	overexposed photo	an overexposed photo|a picture of an overexposed photo	photo-style	
+underexposed-photo	art	underexposed photo	an underexposed photo|a picture of an underexposed photo	photo-style	
+motion-blur	art	motion blur	a photo with motion blur|a blurred moving subject	photo-style	
+reflection-photo	art	reflection photo	a photo of a reflection|a reflection in water or glass	photo-style	
+symmetry-photo	art	symmetry photo	a symmetry photo|a picture of a symmetry photo	photo-style	
+abstract-photo	art	abstract photo	an abstract photo|a picture of an abstract photo	photo-style	
+texture-photo	art	texture photo	a photo of a texture|a close-up of a surface texture	photo-style	
+shadows	art	shadows	a photo of long shadows|strong shadows on a wall	photo-style	
+lens-flare	art	lens flare	a lens flare|a picture of a lens flare	photo-style	
+neon-night-photo	art	neon night photo	a neon lit night photo|colorful neon lights at night	photo-style	
+light-painting	art	light painting	a light painting|a picture of a light painting	photo-style	
+hdr-photo	art	hdr photo	a hdr photo|a picture of a hdr photo	photo-style	
+photo-collage	art	photo collage	a photo collage|several photos in one frame	photo-style	
+photo-booth-strip	art	photo booth strip	a photo booth strip|a picture of a photo booth strip	photo-style	
+film-strip	art	film strip	a film strip|a picture of a film strip	photo-style	
+contact-sheet	art	contact sheet	a contact sheet|a picture of a contact sheet	photo-style	
+split-screen	art	split screen	a split screen image|an image divided into two halves	photo-style	
