@@ -767,3 +767,20 @@ Newest last. Format: date — decision — why.
   - **Not finished at that point:** the first index batch, and the first caption (CPU-only llama-server; the first of four photos was still running after several minutes under memory pressure).
   - **So not verified:** acceptance §8 items 1–10 in the running app, Qwen3.5 4B's ≤ 8 s per image, and the 960 × 600 screenshots. Those need a run with more free memory.
   - **Fallback if the 4B model is too slow or heavy:** Qwen3.5 2B (1.9 GB with its projector) is already in the catalog with its projector pinned, and can be picked in Caption Writer's Advanced → model.
+- **2026-11-19: The acceptance run, finished.**
+  - **Index:** 267 sandbox files (pictures, videos, PDFs, documents and project thumbnails) indexed in about 20 minutes, with the vocabulary vectors computed first. Queries answer in 90–180 ms; a query whose text vector isn't cached yet comes back `warming` and fills in on `search:ready`.
+  - **Search results:**
+    - Concept: "two cats" (Strong), "people playing sports" (5 sports photos), "food on a plate", "stop sign" (Strong).
+    - Text in files: "invoice 4471" (the receipt's OCR, first), "Lisbon" (the .docx), "really long trunks" (Whisper transcript of *Me at the zoo*).
+    - Labels: "zebra", "kitchen", "receipt". Nothing for "pizza" (no pizza in the library).
+  - **Short videos failed to index (27 files).** Scene Splitter clips shorter than about 1.5 steps gave no frames: FFmpeg's `fps=1/step` writes nothing when less than half a step is left after the seek. Frames are now picked with `select` (the first frame, then each frame a step after the last kept one) and `-fps_mode vfr`. All 27 indexed on Retry.
+  - **Caption Writer was slow because Qwen3.5 thinks first, not because of the CPU.** The 2026-11-18 note was wrong: llama-server already runs with `-ngl 99` on the RTX 3070 (Vulkan). Background completions now send `chat_template_kwargs: {enable_thinking: false}`; templates without the switch ignore it.
+    - Before: 45 s for the first photo (model load included), then about 27 s per photo.
+    - After: 9.7 s for the first photo, then **about 3.6 s per photo** (target ≤ 8 s).
+    - llama-server's RSS is 4.6 GB (target ≤ 6 GB). The captions stayed as good or got better: specific alt text, receipt text read correctly, the zebra foal named, and the user's context used.
+  - **Things view:** a portrait cover made its card taller than the rest of the row. Covers are now cropped to 4:3.
+  - **Screens checked at 960 × 600 and 1180 × 720** (`.dev/p10-qa/shots/p20-*`): search results with strength dots, Things, Caption Writer, Settings → Search.
+  - **Still open:**
+    - Speech indexing (95 files) was still running when the app was stopped. It resumes at the next start.
+    - When a speech match also wins on concept, the card shows no transcript snippet.
+    - Caption Writer's own `captions.json`/`.csv` are indexed as documents, so they match file names.

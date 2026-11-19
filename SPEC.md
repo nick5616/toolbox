@@ -1,6 +1,6 @@
 # Toolbox — Phase 20 Spec: Smart search and Caption Writer
 
-Status: **APPROVED 2026-11-18, built the same day.** The in-app acceptance run (§8) was cut short by low memory; see docs/DECISIONS.md (Phase 20).
+Status: **APPROVED 2026-11-18, built the same day; acceptance run finished 2026-11-19** (see docs/DECISIONS.md, Phase 20).
 
 Phase 19 (Paint+ and the Library browser) is archived in `docs/specs/phase-19.md`. Every earlier rule still holds:
 - **every tool stands on its own** (CLAUDE.md, 2026-11-06);

@@ -18,7 +18,7 @@ Agreed on 2026-10-28; the Visualizer was cut in line as Phase 7 on 2026-10-29 an
 | 17 | **Built 2026-11-05.** Compress to Size: any file under a byte limit, with frozen targets (Discord, Gmail, …). `docs/specs/phase-17.md`. |
 | 18 | **Built 2026-11-05.** Focus Lock (stop everything but the chosen apps for a set time, Windows and macOS) and pipeline timing (wait-until, Wait step, schedules, runs without files, Open in app). `docs/specs/phase-18.md`. |
 | 19 | **Built 2026-11-06.** Paint+ (a Procreate-grade painting app with its own design language, a 60+ brush library and importers, and the Lab: algorithmic and perception tools with predictability and origin cards) and the Library browser (previews, folders, lineage, "Other places", delete to trash). `docs/specs/phase-19.md`. |
-| 20 | **Built 2026-11-18** (in-app acceptance run still to do). Smart search in the Library (SigLIP 2 labels and concept search, OCR, document text and speech transcripts, Things view, Find similar, "Keep files that show…" step) and Caption Writer (alt text, captions, hashtags, keywords and names from a local vision model, written into copies or used to rename them). See `SPEC.md`. |
+| 20 | **Built 2026-11-18, accepted 2026-11-19.** Smart search in the Library (SigLIP 2 labels and concept search, OCR, document text and speech transcripts, Things view, Find similar, "Keep files that show…" step) and Caption Writer (alt text, captions, hashtags, keywords and names from a local vision model, written into copies or used to rename them). See `SPEC.md`. |
 
 ## Pipelines (Phase 8) — intended model
 
