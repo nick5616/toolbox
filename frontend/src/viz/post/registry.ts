@@ -5,6 +5,7 @@
  */
 import type { Fullscreen, Target } from "../gl/core";
 import type { FrameInput, ParamSpec } from "../layers/registry";
+import type { AuxKind } from "../edit/clipAux";
 import type { PostType } from "../types";
 
 export interface PostContext {
@@ -27,6 +28,8 @@ export interface PostDef {
   label: string;
   kind: "output" | "pass";
   stateful?: boolean;
+  /** Phase 21: region maps the pass reads (it calls `auxUniforms` from viz/edit/clipAux.ts in `render`). */
+  needs?: AuxKind[];
   params: Record<string, ParamSpec>;
   create?(ctx: PostContext): PostInstance;
 }

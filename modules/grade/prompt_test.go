@@ -64,8 +64,8 @@ func TestParseVibeAssignsIDsClampsAndSetsTier(t *testing.T) {
 			t.Errorf("op %s is off", op.Kind)
 		}
 	}
-	if got := string(r.Ops[2].Params["strength"]); got != "2" {
-		t.Errorf("strength = %s, want clamped to 2", got)
+	if got := string(r.Ops[2].Params["strength"]); got != "3" {
+		t.Errorf("strength = %s, want clamped to 3", got)
 	}
 	if !r.Ops[2].Chaos || r.Ops[2].Region.Kind != "subject" {
 		t.Errorf("edge glow op = %+v", r.Ops[2])

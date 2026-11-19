@@ -9,7 +9,7 @@ import { RAW_PREFIX, toBase64 } from "../worker/transport";
 /** Bytes per `data` message (before base64). */
 export const CHUNK_BYTES = 1024 * 1024;
 
-export type SingleEncoder = "png" | "jpg" | "json";
+export type SingleEncoder = "png" | "jpg" | "webp" | "json";
 
 export class SingleReply {
   private seq = 0;

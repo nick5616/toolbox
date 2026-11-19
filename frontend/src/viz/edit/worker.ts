@@ -6,6 +6,7 @@
  * t = i·1000/fps, await prepare(needs(t)), render(t), encode. The same
  * EditEngine as the preview draws the frame, so the export matches it.
  */
+import { applyGradePlan, type GradePlanJson } from "@/grade/plan";
 import { loadAnalysis, type Analysis } from "../analysis";
 import { EditFrameProvider } from "../frames/provider";
 import { GLUnavailableError } from "../gl/core";
@@ -19,7 +20,7 @@ import { emptyAnalysis } from "./emptyAnalysis";
 import { deriveMarkers } from "./markers";
 import type { EditProject } from "./types";
 
-function parseProject(json: string): EditProject {
+export function parseProject(json: string): EditProject {
   let raw: unknown;
   try {
     raw = JSON.parse(json);
@@ -33,7 +34,17 @@ function parseProject(json: string): EditProject {
 export async function runEdit(plan: PlanForWorker, forceJpeg: boolean, io: LoopIO): Promise<void> {
   const edit = plan.edit;
   if (!edit) throw new RenderError("The edit couldn't be read", "the render plan has no edit");
-  const project = parseProject(edit.projectJson);
+  let project = parseProject(edit.projectJson);
+  // Phase 21 (§E3.5): a Color Grader render carries its look in the plan; compile it onto the first picture clip.
+  const grade = (plan as PlanForWorker & { grade?: GradePlanJson }).grade;
+  if (grade) {
+    try {
+      const applied = applyGradePlan(project, grade, { streams: edit.streams, images: edit.images });
+      project = applied.project as typeof project;
+    } catch (e) {
+      throw new RenderError("The look couldn't be applied", e instanceof Error ? e.message : String(e));
+    }
+  }
   // No analysis (a Video Editor project) renders against an empty one: curves read 0, no markers.
   const hasAnalysis = Boolean(plan.analysis.audioJsonUrl && plan.analysis.featuresUrl);
   const analysis: Analysis = hasAnalysis

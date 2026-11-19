@@ -16,6 +16,7 @@ import { hexToLinear, type RGB } from "../palette";
 import { postDef } from "../post/registry";
 import { Signals } from "../signals";
 import type { TextStyle } from "../types";
+import { auxRefs, clipAuxOf, type ClipAux } from "./clipAux";
 import { MarkerSignals } from "./markerSignals";
 import { evalEditParam } from "./params";
 import {
@@ -109,6 +110,8 @@ export interface CompiledClip {
   interpIdx: Int16Array | null;
   interps: InterpRef[];
   matte: CompiledMatte | null;
+  /** Phase 21: the clip's depth/subject/people maps (viz/edit/clipAux.ts); {} = none. */
+  aux: ClipAux;
   /** A matte is set but its files don't exist (yet). */
   matteMissing: boolean;
   /** The clip's speed is not a plain 1 (the UI may show badges). */
@@ -297,6 +300,10 @@ export function needsAt(c: CompiledEditFull, k: number): FrameKey[] {
     const plan = clipFramePlan(cl, k, c.fps);
     pushRefs(out, seen, plan.main);
     pushRefs(out, seen, plan.matte);
+    // Phase 21: depth/subject maps of a clip whose effects read them (a stream's frame, or the still image)
+    if (cl.effects.length > 0) {
+      for (const r of Object.values(auxRefs(cl.aux))) pushRefs(out, seen, { stream: r.key, f0: r.image ? 0 : k, f1: r.image ? 0 : k, w: 0, image: r.image });
+    }
   };
   for (const t of c.tracks) {
     if (t.muted || t.kind !== "video") continue;
@@ -461,6 +468,7 @@ export function compileEdit(inputs: EditInputs, opts: CompileOptions): CompiledE
         interpIdx: null,
         interps: slow === "interpolate" ? (interpsByPath.get(cl.path) ?? []) : [],
         matte,
+        aux: clipAuxOf(cl, files),
         matteMissing,
         speed: speed.value,
         text,
