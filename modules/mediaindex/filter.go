@@ -34,9 +34,9 @@ import (
 // the documented Smart search strengths (core/mediaindex labels.go: Strong
 // 0.3, Good 0.1, Maybe 0.03); the index and this step must agree.
 const (
-	probStrong = 0.30
-	probGood   = 0.10
-	probMaybe  = 0.03
+	probStrong = ix.StrongP
+	probGood   = ix.GoodP
+	probMaybe  = ix.MaybeP
 )
 
 // MaxQueryChars is the longest description the step takes.

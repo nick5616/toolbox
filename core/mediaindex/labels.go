@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,14 +20,21 @@ import (
 // Labels: the vocabulary, label scoring, the text gate and strengths
 // (SPEC.md §3.4). The calibration constants live here and nowhere else.
 const (
-	// LabelThreshold is the default p at which a label is kept.
-	LabelThreshold = 0.10
+	// Calibrated in Wave 2 on COCO val photos + library screenshots and scans
+	// (docs/DECISIONS.md, Phase 20). SigLIP 2's sigmoid probabilities are
+	// small for open-vocabulary prompts: right answers sit at 1e-3..0.6, wrong
+	// ones mostly below 3e-4.
+	//
+	// LabelThreshold is the default p at which a label is kept, and
+	// LabelRelative drops labels weaker than that share of the item's best one.
+	LabelThreshold = 0.001
+	LabelRelative  = 0.02
 	// Concept strengths (probabilities).
-	StrongP = 0.30
-	GoodP   = 0.10
-	MaybeP  = 0.03
+	StrongP = 0.01
+	GoodP   = 0.001
+	MaybeP  = 0.0003
 	// TextGateP is the gate prompts' p at which OCR runs.
-	TextGateP = 0.05
+	TextGateP = 0.0003
 	// MaxLabels is how many labels an item keeps (plus their parents).
 	MaxLabels = 8
 	// MaxUserLabel is the longest user label.
@@ -230,6 +238,16 @@ func (ls *labelSet) score(vecs []VectorAt) []LabelRow {
 		}
 		return cands[i].idx < cands[j].idx
 	})
+	if len(cands) > 0 {
+		floor := cands[0].p * LabelRelative
+		keep := cands[:0]
+		for _, c := range cands {
+			if c.p >= floor {
+				keep = append(keep, c)
+			}
+		}
+		cands = keep
+	}
 	if len(cands) > MaxLabels {
 		cands = cands[:MaxLabels]
 	}
@@ -300,7 +318,7 @@ func (ix *Index) vocabHash() string {
 		return ""
 	}
 	m := ix.Model()
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%g|%g|%d|%g|%g", v.hash, m.ID, m.Scale, m.Bias, MaxLabels, LabelThreshold, TextGateP)))
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%g|%g|%d|%g|%g|%g", v.hash, m.ID, m.Scale, m.Bias, MaxLabels, LabelThreshold, LabelRelative, TextGateP)))
 	return hex.EncodeToString(sum[:8])
 }
 
@@ -518,4 +536,15 @@ func (ix *Index) displayFor(label string) (display, category string, inVocab boo
 		}
 	}
 	return label, "", false
+}
+
+// ConceptScore maps a concept probability onto the 0..1 scale that label and
+// text hits use, so the three rank together: SigLIP's p spans decades
+// (MaybeP 3e-4 → ≈ 0, GoodP → 0.14, StrongP → 0.43, 0.1 → 0.71, 1 → 1).
+func ConceptScore(p float64) float64 {
+	if p <= 0 {
+		return 0
+	}
+	s := (math.Log10(p) + 3.5) / 3.5
+	return math.Max(0, math.Min(1, s))
 }

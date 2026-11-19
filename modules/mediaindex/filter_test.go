@@ -191,7 +191,7 @@ func TestFilterPictureStrengths(t *testing.T) {
 	c := writePic(t, e.dir, "c.png") // computed: maybe
 	d := writePic(t, e.dir, "d.png") // computed: nothing
 	e.w.current[a] = []ix.VectorAt{{Pos: -1, Vec: []float32{0.5, 0}}}
-	e.c.probs = map[int]float32{1: 0.2, 2: 0.05, 3: 0.01}
+	e.c.probs = map[int]float32{1: float32(ix.GoodP * 2), 2: float32(ix.MaybeP * 2), 3: float32(ix.MaybeP / 10)}
 	in := []string{a, b, c, d}
 
 	for _, tc := range []struct {

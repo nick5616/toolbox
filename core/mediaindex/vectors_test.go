@@ -53,7 +53,7 @@ func TestProbAndMinCos(t *testing.T) {
 			t.Errorf("p=%g round trip %g", p, got)
 		}
 	}
-	if StrengthForP(0.5) != "strong" || StrengthForP(0.2) != "good" || StrengthForP(0.05) != "maybe" || StrengthForP(0.01) != "" {
+	if StrengthForP(StrongP*2) != "strong" || StrengthForP(GoodP*2) != "good" || StrengthForP(MaybeP*2) != "maybe" || StrengthForP(MaybeP/10) != "" {
 		t.Error("strength cut-offs")
 	}
 }

@@ -36,6 +36,7 @@ type cand struct {
 
 	concept        bool
 	conceptP       float64
+	conceptScore   float64 // ranking/display score (ConceptScore(p); the cosine for Find similar)
 	conceptPos     int64
 	conceptMoments []int64
 
@@ -61,8 +62,8 @@ func (c *cand) resolve() (hit core.SearchHit, group int) {
 	if c.text != nil && c.text.score > score {
 		score, win = c.text.score, winText
 	}
-	if c.concept && c.conceptP > score {
-		score, win = c.conceptP, winConcept
+	if c.concept && c.conceptScore > score {
+		score, win = c.conceptScore, winConcept
 	}
 	hit = core.SearchHit{
 		Path: c.item.Path, Source: c.item.Source, ProjectID: c.item.SourceRef, Pos: -1,
@@ -302,7 +303,7 @@ func (ix *Index) conceptHits(ctx context.Context, text string, page *core.Search
 			continue
 		}
 		c := get(is.item)
-		c.concept, c.conceptP, c.conceptPos, c.conceptMoments = true, p, is.pos, is.moments
+		c.concept, c.conceptP, c.conceptScore, c.conceptPos, c.conceptMoments = true, p, ConceptScore(p), is.pos, is.moments
 	}
 }
 
@@ -604,7 +605,7 @@ func (ix *Index) similarQuery(ctx context.Context, q core.SearchQuery, limit int
 		if !ok {
 			continue
 		}
-		cands[f.item] = &cand{item: row, concept: true, conceptP: float64(clampCos(f.cos)), conceptPos: f.pos, conceptMoments: f.moments}
+		cands[f.item] = &cand{item: row, concept: true, conceptP: float64(clampCos(f.cos)), conceptScore: float64(clampCos(f.cos)), conceptPos: f.pos, conceptMoments: f.moments}
 	}
 	hits := ix.rank(ctx, cands, q.Filter, limit)
 	for i := range hits {

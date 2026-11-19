@@ -420,6 +420,7 @@ func run() error {
 		func() bool { return searchMod != nil && searchMod.ModelPresent(mediaindex.ModelPreset) },
 		func() bool { return modelPresent(reg, "transcribe", "small") })
 	emitter.attach(searchIdx)
+	searchIdx.SetExcluded(paths.SupportDir, paths.ToolsDir)
 	projectdocs.SetOnSaved(searchIdx.ProjectSaved)
 	searchMod, err = mediaindex.Register(reg, mediaindex.Deps{Writer: searchIdx, Caller: engine, PDF: pdfRenderer, ModelsDir: paths.ModelsDir})
 	if err != nil {
