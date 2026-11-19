@@ -523,6 +523,14 @@ export function createActions(ctx) {
     async reset() {
       for (let i = 0; i < 2; i++) await t.key("Escape", { chip: false });
     },
+    /** Where this run's clips go (for scenes that make a clip outside the screen recorder). */
+    get outDir() {
+      return outDir;
+    },
+    /** Lists a clip a scene made itself (FFmpeg) in the shot list: `rel` is relative to outDir. */
+    registerClip(rel, duration) {
+      state.clips.push({ file: rel.replace(/\\/g, "/"), duration, compressed: "", segments: [] });
+    },
     setListing(l) {
       listing = l;
     },
