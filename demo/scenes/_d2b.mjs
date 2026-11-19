@@ -53,6 +53,45 @@ export async function withClipboardRestored(fn) {
   return true;
 }
 
+/**
+ * Types a question into an open Local Chat (waits for the model to load, off camera), sends it and waits for the
+ * answer to finish. The wait is cut out of the clip after the answer has started streaming.
+ */
+export async function chatAsk(t, question, { loadTimeoutMs = 240000, answerTimeoutMs = 240000 } = {}) {
+  const box = 'textarea[aria-label="Message"]';
+  const ready = `(()=>{const e=document.querySelector('${box}');return !!e && !e.disabled})()`;
+  const t0 = Date.now();
+  let paused = false;
+  while (!(await t.eval(ready))) {
+    if (!paused && Date.now() - t0 > 2500) {
+      await t.rec.pause();
+      paused = true;
+    }
+    if (Date.now() - t0 > loadTimeoutMs) throw new Error("chat model did not load");
+    await t.hold(800);
+  }
+  if (paused) await t.rec.resume();
+  await t.type(box, question);
+  await t.hold(400);
+  await t.key("Enter", { chip: false });
+  const t1 = Date.now();
+  let sawStop = false;
+  paused = false;
+  for (;;) {
+    const stop = await t.exists({ css: "button", text: "Stop", exact: true });
+    if (stop) sawStop = true;
+    if ((sawStop && !stop) || Date.now() - t1 > answerTimeoutMs) break;
+    if (!sawStop && Date.now() - t1 > 15000) break;
+    if (sawStop && !paused && Date.now() - t1 > 6000) {
+      await t.rec.pause();
+      paused = true;
+    }
+    await t.hold(paused ? 1000 : 300);
+  }
+  if (paused) await t.rec.resume();
+  await t.hold(1200);
+}
+
 /** The role file whose name contains `part`. */
 export function pick(t, role, part) {
   const f = t.roles(role).find((p) => p.includes(part));
