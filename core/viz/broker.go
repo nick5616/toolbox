@@ -467,7 +467,7 @@ func (r *render) beginStream(b *RenderBroker, args string) bool {
 			r.failLocked(core.Errorf(core.CodeInternal, "The renderer is set up differently from the plan"))
 			return false
 		}
-		r.codec = map[string]string{"png": "png", "jpg": "jpeg", "json": "json"}[info.Encoder]
+		r.codec = map[string]string{"png": "png", "jpg": "jpeg", "json": "json", "webp": "webp"}[info.Encoder]
 	} else {
 		switch info.Encoder {
 		case "h264-hw", "h264-sw":
