@@ -35,7 +35,10 @@ export function defaultPaths(repo = REPO) {
     main,
     assetsDir: firstDir([path.join(repo, "demoAssets"), path.join(main, "demoAssets")]),
     toolsDir: firstDir([dev("support"), path.join(main, ".dev", "support")]),
-    generatedDir: dev("demo-generated"),
+    // The generated roles live in the Demo workspace (Library/Extras) once it exists (the user's rule:
+    // every demo artifact stays inside the Demo workspace); before that, in .dev/.
+    generatedDir: firstDir([path.join(main, "workspaces", "demo", "Library", "Extras"), dev("demo-generated")]),
+    demoRoot: path.join(main, "workspaces", "demo"),
     workspaceRoot: dev("workspaces", "demo-capture"),
     legacySupport: dev("demo-capture-support"),
     legacyLibrary: dev("demo-capture-library"),
