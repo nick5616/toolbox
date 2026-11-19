@@ -111,11 +111,11 @@ describe("Transport", () => {
   it("Draft / Full quality toggles in the store", async () => {
     openEdit();
     render(<Transport />);
-    expect(useEditStudio.getState().previewQuality).toBe("full");
-    await userEvent.click(screen.getByRole("button", { name: "Full" }));
     expect(useEditStudio.getState().previewQuality).toBe("draft");
     await userEvent.click(screen.getByRole("button", { name: "Draft" }));
     expect(useEditStudio.getState().previewQuality).toBe("full");
+    await userEvent.click(screen.getByRole("button", { name: "Full" }));
+    expect(useEditStudio.getState().previewQuality).toBe("draft");
   });
 
   it("scrub audio is a toggle in the More menu", async () => {

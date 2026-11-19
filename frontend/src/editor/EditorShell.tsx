@@ -132,6 +132,7 @@ function Editor({ moduleId, profile }: { moduleId: string; profile: EditorProfil
   const playheadMs = useEditStudio((s) => s.playheadMs);
   const playing = useEditStudio((s) => s.playing);
   const inputs = useEditInputs();
+  const previewQuality = useEditStudio((s) => s.previewQuality);
   const focus = useEffectiveFocus();
   const switchable = hasFocusSwitch(profile);
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
@@ -258,7 +259,7 @@ function Editor({ moduleId, profile }: { moduleId: string; profile: EditorProfil
         >
           <WorkspacePreviewFrame ws={ws}>
             <div className={styles.canvasBox}>
-              <EditCanvas inputs={setup ? null : inputs} width={size.width} height={size.height} timeMs={playheadMs} playing={playing} quality="draft" onStats={setStats} onCanvas={setCanvas} />
+              <EditCanvas inputs={setup ? null : inputs} width={size.width} height={size.height} timeMs={playheadMs} playing={playing} quality={previewQuality} onStats={setStats} onCanvas={setCanvas} />
               <ErrorBoundary label="The preview overlays" compact>
                 <PreviewOverlays canvas={canvas} width={size.width} height={size.height} />
               </ErrorBoundary>

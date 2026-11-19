@@ -91,6 +91,7 @@ export function useEditorReplica(): void {
 export function PreviewPart() {
   const project = useProject();
   const inputs = useEditInputs();
+  const previewQuality = useEditStudio((s) => s.previewQuality);
   const playing = useEditStudio((s) => s.playing);
   const playheadMs = useEditStudio((s) => s.playheadMs);
   const timeMs = useLocalClock();
@@ -101,7 +102,7 @@ export function PreviewPart() {
   return (
     <div className={styles.preview}>
       <section className={styles.stage}>
-        <EditCanvas inputs={inputs} width={size.width} height={size.height} timeMs={timeMs} playing={playing} quality="draft" onCanvas={setCanvas} />
+        <EditCanvas inputs={inputs} width={size.width} height={size.height} timeMs={timeMs} playing={playing} quality={previewQuality} onCanvas={setCanvas} />
         <ErrorBoundary label="The preview overlays" compact>
           <PreviewOverlays canvas={canvas} width={size.width} height={size.height} />
         </ErrorBoundary>

@@ -13,6 +13,7 @@ import { filesForQuality } from "../frames/tier";
 import { compileEdit, type CompiledEditFull } from "./compile";
 import { EditEngine } from "./engine";
 import type { EditFiles, EditInputs, FrameKey } from "./types";
+import { setPreSampler } from "./preSampler";
 import styles from "./EditCanvas.module.css";
 
 export interface EditCanvasStats {
@@ -174,6 +175,7 @@ export function EditCanvas({ inputs, width, height, timeMs, playing, quality, fu
       if (latest.current.compiled) e.setEdit(latest.current.compiled);
       const handle: EditCanvasHandle = { samplePre: (id, u, v) => e.samplePre(id, u, v) };
       activeHandle = handle;
+      setPreSampler(handle.samplePre); // the eyedropper (E4) reads through this
       cbRef.current.onHandle?.(handle);
       setUnavailable(null);
     } catch (err) {
@@ -185,6 +187,7 @@ export function EditCanvas({ inputs, width, height, timeMs, playing, quality, fu
       engineRef.current?.dispose();
       engineRef.current = null;
       activeHandle = null;
+      setPreSampler(null);
       cbRef.current.onHandle?.(null);
       cbRef.current.onCanvas?.(null);
     };

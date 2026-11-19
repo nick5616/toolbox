@@ -113,7 +113,7 @@ const initial = {
   selection: null,
   playheadMs: 0,
   playing: false,
-  previewQuality: "full" as "draft" | "full",
+  previewQuality: "draft" as "draft" | "full",
   scrubAudio: true,
   activeLane: "downbeat" as MarkerLane,
   snap: true,
