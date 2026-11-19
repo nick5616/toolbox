@@ -1,7 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { normalizeProject } from "@/viz/edit/defaults";
 import { fixtureProject } from "@/viz/edit/fixture";
-import { fitPps, keepsRange, nextRate, songVolume, visibleLanes } from "./logic";
+import { fitPps, formatTimecode, keepsRange, nextRate, parseTimecode, songVolume, visibleLanes } from "./logic";
+
+describe("timecode", () => {
+  it("formats HH:MM:SS:FF", () => {
+    expect(formatTimecode(0, 30)).toBe("00:00:00:00");
+    expect(formatTimecode(1000, 30)).toBe("00:00:01:00");
+    expect(formatTimecode(1034, 30)).toBe("00:00:01:01");
+    expect(formatTimecode(999, 30)).toBe("00:00:00:29");
+    expect(formatTimecode(3_723_500, 24)).toBe("01:02:03:12");
+    expect(formatTimecode(-5, 30)).toBe("00:00:00:00");
+  });
+  it("parses typed times and plain seconds", () => {
+    expect(parseTimecode("00:00:05:15", 30)).toBe(5500);
+    expect(parseTimecode("1:05:15", 30)).toBe(65_500);
+    expect(parseTimecode("5:15", 30)).toBe(5500);
+    expect(parseTimecode("12", 30)).toBe(12_000);
+    expect(parseTimecode("1:05.5", 30)).toBe(65_500);
+    expect(parseTimecode("2.25", 30)).toBe(2250);
+  });
+  it("refuses nonsense and frames past the rate", () => {
+    expect(parseTimecode("", 30)).toBeNull();
+    expect(parseTimecode("abc", 30)).toBeNull();
+    expect(parseTimecode("00:00:01:30", 30)).toBeNull();
+    expect(parseTimecode("00:75:00:00", 30)).toBeNull();
+    expect(parseTimecode("1:2:3:4:5", 30)).toBeNull();
+  });
+});
 
 const song = { gainDb: 0, fadeInMs: 1000, fadeOutMs: 500 };
 

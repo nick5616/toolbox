@@ -46,6 +46,10 @@ export interface EditStudioState {
   selection: Selection;
   playheadMs: number; // timeline ms
   playing: boolean;
+  /** Preview quality (Phase 21 §B1): "draft" renders the preview smaller and faster; the canvas honours it. */
+  previewQuality: "draft" | "full";
+  /** A short grain of sound while scrubbing or stepping (Phase 21 §B1). */
+  scrubAudio: boolean;
   activeLane: MarkerLane;
   snap: boolean;
   pps: number; // pixels per second, 6..800
@@ -78,6 +82,8 @@ export interface EditStudioState {
   select(s: Selection): void;
   setPlayhead(ms: number): void;
   setPlaying(p: boolean): void;
+  setPreviewQuality(q: "draft" | "full"): void;
+  setScrubAudio(on: boolean): void;
   setActiveLane(l: MarkerLane): void;
   setSnap(on: boolean): void;
   setView(pps: number, scrollMs: number): void;
@@ -107,6 +113,8 @@ const initial = {
   selection: null,
   playheadMs: 0,
   playing: false,
+  previewQuality: "full" as "draft" | "full",
+  scrubAudio: true,
   activeLane: "downbeat" as MarkerLane,
   snap: true,
   pps: 80,
@@ -137,10 +145,10 @@ export const useEditStudio = create<EditStudioState>((set, get) => ({
   ...initial,
 
   open: (id, name, doc) => {
-    set({ ...initial, urls: get().urls, projectId: id, name, history: newHistory(normalizeProject(doc)), saveState: "saved", setupOpen: normalizeProject(doc).tracks.every((t) => t.clips.length === 0) });
+    set({ ...initial, urls: get().urls, scrubAudio: get().scrubAudio, projectId: id, name, history: newHistory(normalizeProject(doc)), saveState: "saved", setupOpen: normalizeProject(doc).tracks.every((t) => t.clips.length === 0) });
     void adoptParkedHistory("editor", id);
   },
-  close: () => set({ ...initial, urls: get().urls }),
+  close: () => set({ ...initial, urls: get().urls, scrubAudio: get().scrubAudio }),
   setName: (name) => set({ name }),
   edit: (next, key = "") => {
     const h = get().history;
@@ -160,6 +168,8 @@ export const useEditStudio = create<EditStudioState>((set, get) => ({
   select: (selection) => set({ selection }),
   setPlayhead: (ms) => set({ playheadMs: Math.max(0, ms) }),
   setPlaying: (playing) => set({ playing }),
+  setPreviewQuality: (previewQuality) => set({ previewQuality }),
+  setScrubAudio: (scrubAudio) => set({ scrubAudio }),
   setActiveLane: (activeLane) => set({ activeLane }),
   setSnap: (snap) => set({ snap }),
   setView: (pps, scrollMs) => set({ pps: Math.max(6, Math.min(800, pps)), scrollMs: Math.max(0, scrollMs) }),

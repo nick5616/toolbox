@@ -45,3 +45,40 @@ export function frameMs(fps: number): number {
 export function keepsRange(newDurationMs: number, song: Pick<EditSong, "endMs">): boolean {
   return newDurationMs > 0 && newDurationMs >= song.endMs - 1000;
 }
+
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+
+/** "HH:MM:SS:FF" for a time in ms at an fps (frames are whole; the last frame of a second is fps−1). */
+export function formatTimecode(ms: number, fps: number): string {
+  const base = Math.max(1, Math.round(fps));
+  const total = Math.max(0, Math.floor((ms * base) / 1000 + 1e-6));
+  const ff = total % base;
+  const secs = Math.floor(total / base);
+  return `${pad2(Math.floor(secs / 3600))}:${pad2(Math.floor(secs / 60) % 60)}:${pad2(secs % 60)}:${pad2(ff)}`;
+}
+
+/**
+ * Time typed into the timecode: "HH:MM:SS:FF", "MM:SS:FF", "SS:FF", plain
+ * seconds ("12", "12.5") or "M:SS.s" (a decimal point means seconds, not
+ * frames). Null when it isn't a time or a frame number is out of range.
+ */
+export function parseTimecode(text: string, fps: number): number | null {
+  const t = text.trim().replace(/;/g, ":");
+  if (!t) return null;
+  const base = Math.max(1, Math.round(fps));
+  const parts = t.split(":");
+  if (parts.length > 4 || parts.some((p) => !/^\d+(\.\d+)?$/.test(p))) return null;
+  const nums = parts.map(Number);
+  if (t.includes(".")) {
+    // M:SS.s style: only the last part may have a decimal; the parts are h/m/s from the right
+    if (parts.slice(0, -1).some((p) => p.includes("."))) return null;
+    const [s = 0, m = 0, h = 0] = [...nums].reverse();
+    return Math.round(((h * 60 + m) * 60 + s) * 1000);
+  }
+  if (nums.length === 1) return Math.round((nums[0] as number) * 1000);
+  const ff = nums[nums.length - 1] as number;
+  if (ff >= base) return null;
+  const [s = 0, m = 0, h = 0] = nums.slice(0, -1).reverse();
+  if (s >= 60 || (nums.length > 2 && m >= 60)) return null;
+  return Math.round(((h * 3600 + m * 60 + s) * base + ff) * (1000 / base));
+}
