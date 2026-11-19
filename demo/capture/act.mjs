@@ -342,6 +342,31 @@ export function createActions(ctx) {
       pos = pb;
       await sleep(300);
     },
+    /**
+     * A freehand stroke with the real mouse: glides to the first point, presses, follows `points` ([{x, y}], page
+     * coordinates, linearly interpolated at `stepPx` per move) and releases. For painting / drawing scenes.
+     */
+    async stroke(points, { stepPx = 7, delay = 9 } = {}) {
+      if (points.length < 2) throw new Error("stroke needs at least two points");
+      await glide(points[0].x, points[0].y);
+      await sleep(80);
+      await cdp.mouse("mousePressed", points[0].x, points[0].y, { clickCount: 1, buttons: 1 });
+      let last = points[0];
+      for (let i = 1; i < points.length; i++) {
+        const b = points[i];
+        const n = Math.max(1, Math.ceil(Math.hypot(b.x - last.x, b.y - last.y) / stepPx));
+        for (let k = 1; k <= n; k++) {
+          const x = Math.round(last.x + ((b.x - last.x) * k) / n);
+          const y = Math.round(last.y + ((b.y - last.y) * k) / n);
+          await cdp.mouse("mouseMoved", x, y, { buttons: 1 });
+          await sleep(delay);
+        }
+        last = b;
+      }
+      await cdp.mouse("mouseReleased", last.x, last.y, { clickCount: 1, buttons: 0 });
+      pos = { x: last.x, y: last.y };
+      await sleep(250);
+    },
     /** Types at 12-18 characters per second. `target` (optional) is clicked first; null types where focus is. */
     async type(target, text) {
       if (target) await t.click(target);
