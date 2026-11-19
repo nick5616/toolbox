@@ -9,11 +9,19 @@ const modsOf = (p: EditParam | string | boolean | undefined): EditMod[] => (type
 const stack = (id: string): EditPost[] => (fxStack(id) as NonNullable<ReturnType<typeof fxStack>>).make();
 
 describe("FX stacks", () => {
-  it("ships the twelve stacks of §23.8", () => {
+  it("ships the twelve stacks of §23.8 and Phase 21's Green screen", () => {
     expect(FX_STACKS.map((s) => s.id)).toEqual([
       "anime-hit", "drop-impact", "velocity-punch", "glow-pump", "strobe-build", "manga",
       "vhs-intro", "speed-lines-drop", "swing-downbeats", "slice-hats", "duotone-pulse", "light-leak",
+      "green-screen",
     ]);
+  });
+
+  it("Green screen is a chroma key with choke 0.1 and spill 0.6", () => {
+    const [key, ...rest] = stack("green-screen");
+    expect(rest).toEqual([]);
+    expect(key?.type).toBe("chromakey");
+    expect(key?.params).toMatchObject({ color: "#00b140", spill: 0.6, choke: 0.1, view: "composite", amount: 1 });
   });
 
   it.each(FX_STACKS.map((s) => [s.id, s] as const))("%s is valid and uses clip effects only", (_id, s) => {

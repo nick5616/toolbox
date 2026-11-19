@@ -65,6 +65,34 @@
   cursor: grab;
 }
 
+.cropHandle {
+  cursor: crosshair;
+}
+
+.pickLayer {
+  fill: transparent;
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+.tools {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: flex;
+  gap: var(--space-1);
+  pointer-events: auto;
+}
+
+.pickHint {
+  padding: 2px var(--space-2);
+  border-radius: var(--r-sm);
+  background: var(--bg-raised);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  pointer-events: none;
+}
+
 .stem {
   stroke: var(--accent);
   stroke-width: 1.5;

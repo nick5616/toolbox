@@ -11,3 +11,5 @@ import "./lightleak";
 import "./speedlines";
 import "./sharpen";
 import "./outline";
+import "./chromakey";
+import "./lumakey";

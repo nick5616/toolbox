@@ -15,6 +15,7 @@ import { useEditorProfile } from "../profileContext";
 import { EditParamEditor } from "./EditParamEditor";
 import { EFFECT_CATALOG } from "./effectCatalog";
 import { EffectPicker } from "./EffectPicker";
+import { PickButton } from "./PickButton";
 import { moveItem, targetIndex } from "./reorder";
 import styles from "./inspector.module.css";
 
@@ -188,6 +189,7 @@ export function EffectsStack({ posts, onChange, types, clipTimeMs, allowKeys, te
                         <div key={name} className={styles.colorRow} data-tip={`${spec.label}: white, black or a #rrggbb colour`}>
                           <span className={styles.label}>{spec.label}</span>
                           <ColorSwatchPicker aria-label={spec.label} value={color} onChange={(c) => setParam(p.id, name, c, "ep:color")} />
+                          {p.type === "chromakey" && name === "color" && <PickButton postId={p.id} param={name} />}
                         </div>
                       );
                     })}
