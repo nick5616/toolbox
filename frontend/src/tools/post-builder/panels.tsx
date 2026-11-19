@@ -5,6 +5,7 @@
  */
 import { useCallback } from "react";
 import { PostsStrip } from "./PostsStrip";
+import { CaptionWriterClickIn } from "./CaptionWriterClickIn";
 import { AltPanel, CaptionPanel, ChecksPanel, ShapePanel } from "./SidePanel";
 import { ClipControls, FramingPanel } from "./SlideStage";
 import { SourcesPanel } from "./SourcesPanel";
@@ -80,6 +81,7 @@ export function CaptionPanelView() {
   return (
     <div className={styles.pad}>
       <CaptionPanel caption={doc.caption} limits={limits} onChange={(caption) => usePostBuilder.getState().setCaption(caption)} />
+      <CaptionWriterClickIn />
     </div>
   );
 }
