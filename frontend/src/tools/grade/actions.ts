@@ -7,11 +7,12 @@
  */
 import { pickFromLibrary } from "@/blocks/library-picker";
 import { toast } from "@/components";
-import { EditStudioService, FilesService, GradeService, MediaService, PacksService, type Job } from "@/lib/api";
+import { EditStudioService, FilesService, GradeService, MediaService, PacksService, type GradeMapState, type Job } from "@/lib/api";
 import { toAppError } from "@/lib/errors";
 import { isActive, announceWhenDone, useJobs } from "@/state/jobs";
 import { submitJobs } from "../_kit/enqueue";
 import { asAi, fromService, toService } from "./recipe";
+import { previewTier, streamIndex } from "./previewInputs";
 import { bakeLut } from "./seams";
 import { acceptsPath } from "../_kit/accepts";
 import { ALL_EXTS, IMAGE_EXTS, kindOfPath, useGrade, type Suggestion } from "./store";
@@ -98,10 +99,25 @@ export async function loadSource(path: string, prepareIfMissing = true): Promise
   }
 }
 
+/** Every file of the region maps the tool shows or draws: stills, Regions thumbnails, streams of both tiers and their indexes. */
+export function mapFiles(m: GradeMapState | null): string[] {
+  if (!m) return [];
+  const out: string[] = [];
+  for (const info of [m.depth, m.subject, m.people]) {
+    if (!info.ready) continue;
+    out.push(info.still, info.preview);
+    if (info.stream) for (const s of [info.stream, previewTier(info.stream)]) out.push(s, streamIndex(s));
+  }
+  return [...new Set(out.filter(Boolean))];
+}
+
 /** Reads which region maps exist for the open input. */
 export async function loadMaps(path: string): Promise<void> {
   try {
     const m = await GradeService.Maps(path);
+    if (st().selected !== path) return;
+    // The preview and the thumbnails read the maps through media URLs: get them before the maps count as there.
+    st().addUrls(await urlsFor(mapFiles(m)));
     if (st().selected === path) st().setMaps(m);
   } catch {
     // Stays "unknown": Regions offers to prepare them.

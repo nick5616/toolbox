@@ -29,9 +29,10 @@ import (
 // frontend/src/grade compileRecipe.
 //
 // How the host finds the region maps (the clip refers to them, the plan holds
-// the files): clip.Matte{ID "subject"} ↔ Images/Streams "m:subject" and
-// clip.Depth{ID "depth"} ↔ Images/Streams "d:depth"; for pictures the same PNGs
-// are also listed as "a:<path>" (ClipAux.still).
+// the files; the one convention of frontend/src/viz/edit/clipAux.ts, which the
+// Color Grader's preview uses too): clip.Matte{ID "subject"} ↔ "m:subject" and
+// clip.Depth{ID "depth"} ↔ "d:depth", in Images (the PNGs) for a picture and in
+// Streams (export-tier edit streams) for a video.
 
 // Seams for tests.
 var (
@@ -246,11 +247,11 @@ func (m *Module) runPicture(ctx context.Context, job *core.JobContext, o Options
 		case "subject":
 			p := filepath.Join(dir, "subject.png")
 			clip.Matte = &editstudio.Matte{Mode: editstudio.MatteImage, ID: "subject", Clicks: []editstudio.MatteClick{}, Stroke: editstudio.MatteStroke{Color: "#ffffff"}, Glow: editstudio.MatteGlow{Color: "#ffffff"}}
-			images["m:subject"], images["a:"+p] = p, p
+			images["m:subject"] = p
 		case "depth":
 			p := filepath.Join(dir, "depth.png")
 			clip.Depth = &editstudio.DepthRef{ID: "depth"}
-			images["d:depth"], images["a:"+p] = p, p
+			images["d:depth"] = p
 		}
 	}
 	touchDir(dir)

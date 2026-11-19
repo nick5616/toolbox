@@ -3,8 +3,12 @@ import type { GradeOp, GradeRecipe } from "@/grade/types";
 import { chaosSeed, mulberry32, surprise } from "./chaos";
 import { addOp, fromService, missingMaps, moveOp, patchParam, regionOfKind, removeOp, toService, wildLabel } from "./recipe";
 import { lutLeftOut } from "./seams";
-import { fitSize, sourceSize } from "./previewInputs";
-import type { EditSourceState } from "@/lib/api";
+import { buildInputs, fitSize, sourceSize } from "./previewInputs";
+import { mapFiles } from "./actions";
+import { mapReady } from "./recipe";
+import { applyGradePlan } from "@/grade/plan";
+import { clipAuxOf } from "@/viz/edit/clipAux";
+import type { EditSourceState, GradeMapState } from "@/lib/api";
 
 const op = (id: string, over: Partial<GradeOp> = {}): GradeOp => ({ id, kind: "balance", on: true, amount: 1, region: { kind: "all" }, params: {}, ...over });
 const recipe = (ops: GradeOp[]): GradeRecipe => ({ v: 1, name: "T", tier: "bold", seed: 1, wildCurve: "linear", ops });
@@ -103,5 +107,70 @@ describe("preview sizes", () => {
     const big = fitSize({ width: 8000, height: 6000 }, { width: 5000, height: 5000 }, 1600);
     expect(big.width).toBe(1600);
     expect(big.width % 2 === 0 && big.height % 2 === 0).toBe(true);
+  });
+});
+
+describe("region maps in the preview", () => {
+  const depthLook: GradeRecipe = { ...recipe([op("aaaaaa", { region: { kind: "subject", feather: 0.3 } }), op("bbbbbb", { kind: "gradmap", params: { source: "depth" } })]) };
+  const info = (over: Partial<GradeMapState["depth"]>): GradeMapState["depth"] => ({ ready: false, preview: "", still: "", stream: "", missing: "", ...over });
+  const pic = { path: "C:/a.heic", info: { path: "C:/a.heic", kind: "image", durationMs: 0, width: 400, height: 300, fps: 0, rotation: 0 }, preview: null, image: "C:/cache/a.png" } as unknown as EditSourceState;
+  const maps = (video: boolean): GradeMapState =>
+    ({
+      path: "C:/a.heic",
+      depth: info(video ? { ready: true, stream: "C:/g/depth-export.h264" } : { ready: true, still: "C:/g/depth.png" }),
+      subject: info(video ? { ready: true, stream: "C:/g/subject-export.h264" } : { ready: true, still: "C:/g/subject.png" }),
+      people: info(video ? { ready: true, stream: "C:/g/subject-export.h264" } : { ready: true, still: "C:/g/subject.png" }),
+      preparing: [],
+    }) as GradeMapState;
+  const urlsOf = (paths: string[]) => Object.fromEntries(paths.map((p) => [p, `/media/t/${p.split("/").pop()}`]));
+
+  it("lists every map file whose URL the preview needs (streams of both tiers with their indexes)", () => {
+    expect(mapFiles(maps(false))).toEqual(["C:/g/depth.png", "C:/g/subject.png"]);
+    expect(mapFiles(maps(true))).toEqual([
+      "C:/g/depth-export.h264",
+      "C:/g/depth-export.idx.json",
+      "C:/g/depth-preview.h264",
+      "C:/g/depth-preview.idx.json",
+      "C:/g/subject-export.h264",
+      "C:/g/subject-export.idx.json",
+      "C:/g/subject-preview.h264",
+      "C:/g/subject-preview.idx.json",
+    ]);
+  });
+
+  it("attaches a picture's maps the way the export does (d:depth, m:subject), so the effects read them", () => {
+    const m = maps(false);
+    const inputs = buildInputs({ path: pic.path, src: pic, urls: urlsOf(["C:/cache/a.png", ...mapFiles(m)]), recipe: depthLook, wild: 1, aux: mapReady(m), maps: m, size: { width: 400, height: 300 } });
+    expect(inputs).not.toBeNull();
+    const files = inputs!.files;
+    expect(files.images["d:depth"]).toBe("/media/t/depth.png");
+    expect(files.images["m:subject"]).toBe("/media/t/subject.png");
+    const clip = inputs!.project.tracks![0]!.clips![0]!;
+    expect(clip.matte?.cutout).toBe(false); // the clip still draws whole
+    const aux = clipAuxOf(clip, files);
+    expect(aux.depth).toEqual({ still: "d:depth" });
+    expect(aux.subject).toEqual({ still: "m:subject" });
+    // The export's host sees the same thing from the job's plan (modules/grade/run.go).
+    const exported = applyGradePlan({ ...inputs!.project, tracks: [{ ...inputs!.project.tracks![0]!, clips: [{ ...clip, effects: "" }] }] }, { recipeJson: JSON.stringify(depthLook), wild: 1 }, files);
+    expect(exported.aux).toEqual(aux);
+    expect(exported.project.tracks![0]!.clips![0]!.effects).toBe(clip.effects);
+  });
+
+  it("uses a video's preview-tier map streams", () => {
+    const m = maps(true);
+    const vid = { ...pic, info: { ...pic.info, kind: "video", durationMs: 2000, fps: 30 }, preview: { stream: "C:/v.h264", index: "C:/v.idx.json", fps: 30, width: 400, height: 300 }, image: "" } as unknown as EditSourceState;
+    const inputs = buildInputs({ path: pic.path, src: vid, urls: urlsOf(["C:/v.h264", "C:/v.idx.json", ...mapFiles(m)]), recipe: depthLook, wild: 1, aux: mapReady(m), maps: m, size: { width: 400, height: 300 } });
+    expect(inputs!.files.streams["d:depth"]).toEqual({ url: "/media/t/depth-preview.h264", indexUrl: "/media/t/depth-preview.idx.json" });
+    expect(inputs!.files.streams["m:subject"]).toEqual({ url: "/media/t/subject-preview.h264", indexUrl: "/media/t/subject-preview.idx.json" });
+    expect(clipAuxOf(inputs!.project.tracks![0]!.clips![0]!, inputs!.files)).toMatchObject({ depth: { stream: "depth" }, subject: { matte: "subject" } });
+  });
+
+  it("leaves the maps out (and the ops that need them compile as without) while their URLs aren't there", () => {
+    const m = maps(false);
+    const inputs = buildInputs({ path: pic.path, src: pic, urls: urlsOf(["C:/cache/a.png"]), recipe: depthLook, wild: 1, aux: mapReady(m), maps: m, size: { width: 400, height: 300 } });
+    const clip = inputs!.project.tracks![0]!.clips![0]!;
+    expect(clip.depth ?? null).toBeNull();
+    expect(clip.matte).toBeNull();
+    expect(Object.keys(inputs!.files.images)).toEqual(["p:C:/a.heic"]);
   });
 });

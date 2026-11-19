@@ -9,7 +9,7 @@ import { useMemo } from "react";
 import { newClip } from "@/editor/doc";
 import { compileRecipe } from "@/grade/compile";
 import type { GradeAuxState, GradeRecipe } from "@/grade/types";
-import type { EditProject, GradeMapState, EditSourceState } from "@/lib/api";
+import type { EditClip, EditMatte, EditProject, GradeMapState, EditSourceState } from "@/lib/api";
 import { emptyEditProject } from "@/viz/edit/defaults";
 import { emptyAnalysis } from "@/viz/edit/emptyAnalysis";
 import { serializeEffects } from "@/viz/edit/schema";
@@ -55,6 +55,31 @@ export interface BuildArgs {
 
 const DURATION_STILL_MS = 1000;
 
+/** The map ids of the one-clip edit (EditFiles `d:depth`, `m:subject`; the export job uses the same). */
+const DEPTH_ID = "depth";
+const SUBJECT_ID = "subject";
+
+/** The edit stream (index next to it, editstudio.IndexPath) of a video's map at the preview tier, or null. */
+export function mapStream(info: GradeMapState["depth"], url: (p: string | undefined) => string | undefined): { url: string; indexUrl: string } | null {
+  if (!info.ready || !info.stream) return null;
+  for (const stream of [previewTier(info.stream), info.stream]) {
+    const u = url(stream);
+    const i = url(streamIndex(stream));
+    if (u && i) return { url: u, indexUrl: i };
+  }
+  return null;
+}
+
+/** `<name>-export.h264` → `<name>-preview.h264` (modules/grade/maps.go). */
+export const previewTier = (stream: string): string => stream.replace(/-export\.h264$/, "-preview.h264");
+/** The index of an edit stream: `x.h264` → `x.idx.json` (editstudio.IndexPath). */
+export const streamIndex = (stream: string): string => stream.replace(/\.h264$/, "") + ".idx.json";
+
+/** A matte that only carries the subject map for the look's regions: the clip itself draws whole. */
+function auxMatte(mode: "image" | "people", toMs: number): EditMatte {
+  return { mode, id: SUBJECT_ID, fromMs: 0, toMs, clicks: [], cutout: false, invert: false, feather: 0, stroke: { px: 0, color: "#ffffff" }, glow: { amount: 0, color: "#ffffff" } };
+}
+
 /** Whether the open input's picture (or preview stream) has URLs yet. */
 export function previewReady(src: EditSourceState | null, urls: Readonly<Record<string, string>>): boolean {
   if (!src) return false;
@@ -95,27 +120,41 @@ export function buildInputs(a: BuildArgs): EditInputs | null {
   const fps = Math.max(1, Math.round(isVideo ? src.preview?.fps || src.info.fps || 30 : 30));
   const durationMs = isVideo ? Math.max(100, src.info.durationMs) : DURATION_STILL_MS;
   const showGrade = !view && !!a.recipe;
-  const effects = showGrade ? serializeEffects(compileRecipe(a.recipe as GradeRecipe, a.wild, a.aux)) : "";
 
-  // Region maps for the effects: stills by path, depth streams by id (ClipAux, SPEC §E5).
-  let depth: { id: string; fromMs: number; toMs: number } | null = null;
+  // Region maps for the effects, the same way the export job (modules/grade/run.go) passes them: the clip names
+  // them (depth {id: "depth"}, matte {id: "subject"}) and the files hold `d:depth` / `m:subject` — the PNG for a
+  // picture, the preview-tier edit stream for a video (viz/edit/clipAux.ts clipAuxOf).
+  let depth: EditClip["depth"] = null;
+  let matte: EditMatte | null = null;
   if (showGrade && a.maps) {
     const d = a.maps.depth;
-    if (isVideo && d.ready && d.stream && url(d.stream)) {
-      const dStream = d.stream;
-      const dIndex = `${dStream}.idx.json`;
-      if (url(dIndex)) {
-        files.streams[`d:${path}`] = { url: url(dStream) as string, indexUrl: url(dIndex) as string };
-        depth = { id: path, fromMs: 0, toMs: durationMs };
+    const s = a.maps.subject;
+    if (isVideo) {
+      const ds = mapStream(d, url);
+      if (ds) {
+        files.streams[`d:${DEPTH_ID}`] = ds;
+        depth = { id: DEPTH_ID, fromMs: 0, toMs: durationMs };
       }
-    } else if (!isVideo && d.ready && d.still && url(d.still)) {
-      files.images[`a:${d.still}`] = url(d.still) as string;
-    }
-    for (const m of ["subject", "people"] as const) {
-      const info = a.maps[m];
-      if (!isVideo && info.ready && info.still && url(info.still)) files.images[`a:${info.still}`] = url(info.still) as string;
+      const ss = mapStream(s, url);
+      if (ss) {
+        files.streams[`m:${SUBJECT_ID}`] = ss;
+        matte = auxMatte("people", durationMs);
+      }
+    } else {
+      if (d.ready && d.still && url(d.still)) {
+        files.images[`d:${DEPTH_ID}`] = url(d.still) as string;
+        depth = { id: DEPTH_ID, fromMs: 0, toMs: 0 };
+      }
+      if (s.ready && s.still && url(s.still)) {
+        files.images[`m:${SUBJECT_ID}`] = url(s.still) as string;
+        matte = auxMatte("image", 0);
+      }
     }
   }
+
+  // Ops on a map that isn't attached (yet) compile as the export would without it.
+  const aux: GradeAuxState = { depth: a.aux.depth && !!depth, subject: a.aux.subject && !!matte, people: a.aux.people && !!matte };
+  const effects = showGrade ? serializeEffects(compileRecipe(a.recipe as GradeRecipe, a.wild, aux)) : "";
 
   const project: EditProject = {
     ...emptyEditProject(`${a.size.width}:${a.size.height}`, fps, 1),
@@ -130,6 +169,7 @@ export function buildInputs(a: BuildArgs): EditInputs | null {
     fit: "fill",
     effects,
     depth,
+    matte,
   });
   project.tracks = [{ id: "t1", kind: "video", name: "Video 1", muted: false, locked: false, matte: "", clips: [clip] }];
   return { project, analysis: emptyAnalysis(), markers: [], files };

@@ -95,9 +95,9 @@ func TestPictureJobBuildsAStillPlanAndSavesTheFile(t *testing.T) {
 			t.Errorf("images lack %q: %v", key, plan.Edit.Images)
 		}
 	}
-	// The same maps are listed as "a:<path>" for ClipAux.still.
-	if plan.Edit.Images["a:"+plan.Edit.Images["m:subject"]] == "" || plan.Edit.Images["a:"+plan.Edit.Images["d:depth"]] == "" {
-		t.Errorf("no a: aliases: %v", plan.Edit.Images)
+	// One key convention (viz/edit/clipAux.ts): the clip's ids ↔ d:/m: keys, nothing else.
+	if len(plan.Edit.Images) != 3 {
+		t.Errorf("images = %v, want only the picture, m:subject and d:depth", plan.Edit.Images)
 	}
 
 	want := filepath.Join(job.OutputDir, "rain (Neon Noir).jpg")

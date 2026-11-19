@@ -4,8 +4,15 @@
  * since Wave 0; G1 implements the binding below it, and E4's clip renderer
  * calls it before running a clip's effects.
  *
- * - `EditFiles` keys: `d:<depthId>` is a depth edit stream (grey, near =
- *   white), `a:<path>` a still map PNG (depth or subject alpha).
+ * - `EditFiles` keys (ONE convention, used by every caller: the editor, the
+ *   Color Grader's preview and thumbnails, and its export job
+ *   modules/grade/run.go): a document clip names its maps (`clip.depth.id`,
+ *   `clip.matte.id`) and the files hold them under `d:<depthId>` and
+ *   `m:<matteId>` — in `streams` for a video (an edit stream: grey, near =
+ *   white; subject alpha), in `images` for a picture (the map PNG). The
+ *   Color Grader's one-clip edits use the ids "depth" and "subject".
+ *   `clipAuxOf` reads exactly that. `a:<path>` is only the key a hand-built
+ *   `ClipAux { still: <path> }` maps to (`auxRefs`); documents never use it.
  * - Passes that need a map declare `needs` in their PostDef; the clip renderer
  *   binds `u_depth` / `u_subject` (r channel 0..1, in the clip's source UV)
  *   and `u_hasDepth` / `u_hasSubject` (0/1).
@@ -19,7 +26,7 @@ export type AuxKind = "depth" | "subject" | "people";
 
 /** Where a clip's maps come from. */
 export interface ClipAux {
-  /** Depth: a stream id (EditFiles `d:<id>`) for videos, or a PNG path (`a:<path>`) for pictures. */
+  /** Depth: a stream id (EditFiles `d:<id>`) for videos, or an image key (`d:<id>`, or a PNG path → `a:<path>`) for pictures. */
   depth?: { stream: string } | { still: string };
   /** Subject alpha: a matte stream (the clip's Matte) or a PNG (Background Remover alpha). */
   subject?: { matte: string } | { still: string };
