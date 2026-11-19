@@ -26,7 +26,6 @@ import {
   normalizeHeight,
   rebuildRequest,
   sizeLabel,
-  storeRange,
   withoutCutouts,
   EXPORT_AUDIO_KBPS,
   EXPORT_CODECS,
@@ -38,6 +37,7 @@ import {
   type ExportQuality,
 } from "./checks";
 import styles from "./ExportDialog.module.css";
+import { useTimelineRange } from "@/editor/timeline/timelineStore";
 
 export interface ExportDialogProps {
   open: boolean;
@@ -73,9 +73,7 @@ function Panel({ onClose }: { onClose(): void }) {
 
   const [height, setHeight] = useState<ExportHeight>(normalizeHeight(project?.exportHeight ?? 1080));
   const saved = useMemo(() => normalizeExportSettings(project?.export), []); // eslint-disable-line react-hooks/exhaustive-deps -- the dialog starts from what was saved
-  const rangeIn = useEditStudio((s) => (s as unknown as { rangeInMs?: number }).rangeInMs);
-  const rangeOut = useEditStudio((s) => (s as unknown as { rangeOutMs?: number }).rangeOutMs);
-  const range = useMemo(() => storeRange({ rangeInMs: rangeIn, rangeOutMs: rangeOut }), [rangeIn, rangeOut]);
+  const range = useTimelineRange();
   const [fps, setFps] = useState<number>(saved.fps);
   const [codec, setCodec] = useState<ExportCodec>(saved.codec as ExportCodec);
   const [quality, setQuality] = useState<ExportQuality>(saved.quality as ExportQuality);

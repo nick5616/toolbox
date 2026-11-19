@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -42,6 +42,7 @@ import { emptyEditProject, normalizeProject, type NormalProject } from "@/viz/ed
 import { newClip } from "@/editor/doc";
 import { useEditStudio } from "@/editor/store";
 import { markOpened } from "@/editor/useEditAutosave";
+import { useTimelineStore } from "@/editor/timeline/timelineStore";
 import { ExportDialog } from "./ExportDialog";
 
 const matte = (id: string) => ({ mode: "people", id, fromMs: 0, toMs: 3000, clicks: [], cutout: true, invert: false, feather: 0, stroke: { px: 0, color: "#ffffff" }, glow: { amount: 0, color: "#ffffff" } });
@@ -163,8 +164,8 @@ describe("ExportDialog", () => {
 
   it("exports only the In-Out range when chosen", async () => {
     const user = userEvent.setup();
-    useEditStudio.setState({ rangeInMs: 2000, rangeOutMs: 12_000 } as never);
     open(makeProject(), [src("/a.mov"), src("/b.jpg")]);
+    act(() => useTimelineStore.setState({ rangeInMs: 2000, rangeOutMs: 12_000 }));
     const range = screen.getByLabelText("Range") as HTMLSelectElement;
     expect(Array.from(range.options).find((o) => o.value === "range")!.disabled).toBe(false);
     await user.selectOptions(range, "range");
@@ -174,7 +175,7 @@ describe("ExportDialog", () => {
     await user.click(btn);
     await waitFor(() => expect(h.render).toHaveBeenCalled());
     expect(useEditStudio.getState().history!.present.export).toMatchObject({ inMs: 2000, outMs: 12_000 });
-    useEditStudio.setState({ rangeInMs: undefined, rangeOutMs: undefined } as never);
+    useTimelineStore.setState({ rangeInMs: null, rangeOutMs: null });
   });
 
   it("shows an estimated size that follows the quality", async () => {
