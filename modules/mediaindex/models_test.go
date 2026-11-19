@@ -11,13 +11,13 @@ import (
 	"toolbox/core/sidecar"
 )
 
-type fakeCaller struct {
+type prefetchCaller struct {
 	method string
 	params map[string]any
 	calls  int
 }
 
-func (f *fakeCaller) Call(_ context.Context, method string, params any, on func(sidecar.Event)) (json.RawMessage, error) {
+func (f *prefetchCaller) Call(_ context.Context, method string, params any, on func(sidecar.Event)) (json.RawMessage, error) {
 	f.calls++
 	f.method = method
 	raw, _ := json.Marshal(params)
@@ -63,7 +63,7 @@ func writeModel(t *testing.T, dir string) {
 
 func TestFetchModelCallsPrefetch(t *testing.T) {
 	models := t.TempDir()
-	fc := &fakeCaller{}
+	fc := &prefetchCaller{}
 	m := &IndexModule{d: Deps{Caller: fc, ModelsDir: models}}
 	var s seen
 	if err := m.FetchModel(context.Background(), testJob(&s, nil), ModelPreset); err != nil {
@@ -94,7 +94,7 @@ func TestFetchModelCallsPrefetch(t *testing.T) {
 
 func TestFetchModelNoOpWhenPresentAndFailsFastWithoutEngine(t *testing.T) {
 	models := t.TempDir()
-	fc := &fakeCaller{}
+	fc := &prefetchCaller{}
 	m := &IndexModule{d: Deps{Caller: fc, ModelsDir: models}}
 	var s seen
 	if err := m.FetchModel(context.Background(), testJob(&s, core.ErrDependencyMissing(sidecar.DepID, "")), ModelPreset); err == nil || fc.calls != 0 {
