@@ -7,6 +7,7 @@ import (
 
 	"toolbox/core"
 	ix "toolbox/core/mediaindex"
+	"toolbox/core/sidecar"
 )
 
 // The pinned vision–language model (SPEC.md §3.8; pins from the Wave 0 spike,
@@ -81,9 +82,37 @@ func (m *IndexModule) ModelPresent(preset string) bool {
 }
 
 // FetchModel implements core.ModelProvider via the engine's search.prefetch.
-// CONTRACT STUB (Wave 0): S1 implements it.
+// It downloads and sha-verifies every pinned file into the model's folder.
 func (m *IndexModule) FetchModel(ctx context.Context, job *core.JobContext, preset string) error {
-	return core.Errorf(core.CodeNotImplemented, "The Smart search model can't be downloaded yet")
+	if preset != ModelPreset {
+		return core.ValidationError("Unknown search model", map[string]string{"preset": preset})
+	}
+	if m.ModelPresent(preset) {
+		return nil
+	}
+	if _, err := job.Tool(sidecar.DepID); err != nil {
+		return err
+	}
+	files := make([]map[string]any, 0, len(ModelFiles))
+	for _, f := range ModelFiles {
+		files = append(files, map[string]any{"path": f.Path, "url": f.URL(), "sha256": f.SHA256, "bytes": f.Bytes})
+	}
+	_, err := m.d.Caller.Call(ctx, "search.prefetch", map[string]any{
+		"files":    files,
+		"modelDir": ModelInfo(m.d.ModelsDir).Dir,
+	}, func(ev sidecar.Event) {
+		switch ev.Kind {
+		case "progress":
+			job.Progress(ev.Pct, ev.Msg)
+		case "log":
+			stream := core.StreamStdout
+			if ev.Level == "warning" || ev.Level == "error" {
+				stream = core.StreamStderr
+			}
+			job.Log(stream, ev.Line)
+		}
+	})
+	return err
 }
 
 // RemoveModel implements core.ModelProvider.
