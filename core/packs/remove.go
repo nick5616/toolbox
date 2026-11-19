@@ -6,6 +6,7 @@ import (
 
 	"toolbox/core"
 	"toolbox/core/sidecar"
+	"toolbox/core/workspace"
 )
 
 // packInstalled reports whether every component of the pack is present.
@@ -75,6 +76,11 @@ func (s *Service) Remove(id string) error {
 			return core.Errorf(core.CodeConflict, "Wait for running jobs to finish")
 		}
 	}
+	_, unlock, err := workspace.Acquire(context.Background())
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	remove, _, _, _ := s.removalPlan(id)
 	defer s.notify()
 	for _, c := range remove {

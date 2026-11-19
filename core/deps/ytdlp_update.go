@@ -21,6 +21,7 @@ import (
 
 	"toolbox/core"
 	"toolbox/core/proc"
+	"toolbox/core/workspace"
 )
 
 const (
@@ -165,6 +166,11 @@ func netErr(ctx context.Context, what string, err error) error {
 }
 
 func (u *updater) Run(ctx context.Context, job *core.JobContext) error {
+	ctx, unlock, err := workspace.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	return u.install(ctx, job, u.spec)
 }
 

@@ -126,6 +126,47 @@ func TestSettingsUpdateCreatesLibraryDir(t *testing.T) {
 	}
 }
 
+func TestSettingsLibraryLockedByWorkspace(t *testing.T) {
+	s, _ := NewSettingsService(newMemStore(), NopEmitter{}, t.TempDir())
+	ws := filepath.Join(t.TempDir(), "Library")
+	s.LockLibrary(ws)
+	if !s.LibraryLocked() || s.Current().LibraryDir != ws {
+		t.Fatalf("locked = %v dir = %q", s.LibraryLocked(), s.Current().LibraryDir)
+	}
+	other := filepath.Join(t.TempDir(), "elsewhere")
+	_, err := s.Update(context.Background(), SettingsPatch{LibraryDir: &other})
+	ae := AsAppError(err)
+	if ae == nil || ae.Fields["libraryDir"] != "This workspace's library is part of the workspace folder" {
+		t.Fatalf("err = %v", err)
+	}
+	if s.Current().LibraryDir != ws || dirExists(other) {
+		t.Fatal("library changed")
+	}
+	// the same value, and other settings, still go through
+	if _, err := s.Update(context.Background(), SettingsPatch{LibraryDir: &ws, Concurrency: ptr(2)}); err != nil {
+		t.Fatalf("same dir: %v", err)
+	}
+}
+
+func TestSettingsLibraryGuard(t *testing.T) {
+	s, _ := NewSettingsService(newMemStore(), NopEmitter{}, t.TempDir())
+	blocked := t.TempDir()
+	s.SetLibraryGuard(func(dir string) string {
+		if IsWithin(dir, blocked) {
+			return "Can't be inside a workspace folder"
+		}
+		return ""
+	})
+	bad := filepath.Join(blocked, "lib")
+	if _, err := s.Update(context.Background(), SettingsPatch{LibraryDir: &bad}); err == nil {
+		t.Fatal("guard ignored")
+	}
+	good := filepath.Join(t.TempDir(), "lib")
+	if _, err := s.Update(context.Background(), SettingsPatch{LibraryDir: &good}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSettingsEmitAndOnChange(t *testing.T) {
 	var events []any
 	var names []string

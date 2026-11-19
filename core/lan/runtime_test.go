@@ -1004,6 +1004,16 @@ func TestHostnameStripsDomain(t *testing.T) {
 	}
 }
 
+func TestDefaultAliasNeverReadsHostname(t *testing.T) {
+	h := newHarness(t, func(c *Config) {
+		c.DefaultAlias = "Toolbox Demo"
+		c.Hostname = func() (string, error) { t.Error("hostname was read"); return "secret-host", nil }
+	})
+	if got := h.rt.State().Alias; got != "Toolbox Demo" {
+		t.Errorf("alias = %q", got)
+	}
+}
+
 func TestDeviceStore(t *testing.T) {
 	h := newHarness(t)
 	rt := h.rt
