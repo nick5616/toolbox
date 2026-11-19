@@ -833,3 +833,9 @@ Newest last. Format: date — decision — why.
     - **Switching from a sandbox** is refused, because the env var would override the switch.
     - **A switch asks the Focus quit gate first.** If friction is later released, Toolbox quits instead of switching.
     - **The palette's "Switch workspace…"** opens Settings → Workspaces, plus one command per workspace.
+- **2026-11-19: Visualizer retune results (V3; `frontend/src/viz/lab/motion-after.json`).**
+  - **Hard targets met.** At Balanced and Wild, all 20 presets have ≤ 3 flashes/s, p95 ≤ 50% of before (or ≤ 0.04), and hue churn ≤ 6°/s. Teleports are 0 on 19 of them; Tunnel Run went from 405 to 0, and p95 roughly halved across the worst offenders.
+  - **Mood Field** keeps 1 teleport in 30 s: the storm motif's lightning, by design. It's engine-owned, so it's left as is.
+  - **Soft miss: Calm ≤ 60% of Wild busyness.** Spectrum Classic (0.71), Oscilloscope Lab (0.66), Vortex (0.76) and Mood Field (0.69) miss it. Their motion comes from spectrum/motif layers that Intensity doesn't scale. Later: scale spectrum amplitude by `0.5 + 0.5·intensity`.
+  - **Metric changes.** The lab measures without lyric words (a new line cut the whole frame and counted as a teleport). A teleport needs ≥ 20% of pixels to change. Hue churn is luminance-weighted and smoothed over 0.5 s.
+  - **fps** is within 5% everywhere.
