@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Generates the demo's missing media roles into <repo>/.dev/demo-generated/ (SPEC section 0).
+// Generates the demo's missing media roles into the Demo workspace's Library/Extras (or <repo>/.dev/demo-generated/ before it exists; SPEC section 0).
 //
 //   node demo/make-assets.mjs              both steps
 //   node demo/make-assets.mjs --offline    step 1 only: article, stems mix, B-roll (FFmpeg and Pillow, no app)
