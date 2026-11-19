@@ -713,7 +713,15 @@ func run() error {
 	})
 	appEmitter.App = app
 	packsAPI.RelaunchFn = func() error { return desktop.Relaunch(app.Quit) }
-	wsSvc.Relaunch = func(args []string) error { return desktop.RelaunchWith(args, app.Quit) }
+	// A switch is a quit: during a real Focus session the quit gate decides first
+	// (it opens Focus with the friction), so the new process is never spawned
+	// past it (Phase 21 §A6b).
+	wsSvc.Relaunch = func(args []string) error {
+		if quitGate != nil && !quitGate() {
+			return core.ValidationError("Focus Lock is on", nil).WithHint("End the Focus session (or finish its friction), then switch workspace")
+		}
+		return desktop.RelaunchWith(args, app.Quit)
+	}
 	api.ObservePacks(app, packsAPI)
 
 	setupMenu(app, emitter)
