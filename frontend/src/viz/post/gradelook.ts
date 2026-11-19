@@ -297,6 +297,9 @@ class GradeTableCache {
     if (json !== this.last) {
       const { data, count } = packTable(parseTable(json));
       const gl = this.gl;
+      // The upload binds on the ACTIVE unit, which at this point holds the pass's u_src: put that binding back
+      // afterwards, or u_src samples this 16 × 16 table (the picture turns black with the table's colours in a corner).
+      const prev = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
       gl.bindTexture(gl.TEXTURE_2D, this.tex);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -305,6 +308,7 @@ class GradeTableCache {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.bindTexture(gl.TEXTURE_2D, prev);
       this.last = json;
       this.count = count;
     }

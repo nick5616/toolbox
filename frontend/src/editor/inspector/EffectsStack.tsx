@@ -167,6 +167,8 @@ export function EffectsStack({ posts, onChange, types, clipTimeMs, allowKeys, te
                           />
                         );
                       }
+                      // Option-less enums carry compiled data (a Color Grader look): nothing to edit here.
+                      if (spec.kind === "enum" && spec.options.length === 0) return null;
                       if (spec.kind === "enum") {
                         return (
                           <div key={name} className={styles.row} data-tip={`${spec.label}: choose one of the options`}>

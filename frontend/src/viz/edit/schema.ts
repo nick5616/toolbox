@@ -327,6 +327,10 @@ function parsePosts(raw: string, what: string, allowed: readonly PostType[]): Pa
         else if (spec.kind === "bool") {
           if (typeof pv === "boolean") params[k] = pv;
           else problems.push(`${w}.${k}: not on/off`);
+        } else if (spec.kind === "enum" && spec.options.length === 0) {
+          // An enum without options is free text (Phase 21: gradelook's compiled look table, ≤ 64 KiB).
+          if (typeof pv === "string" && pv.length <= 65536) params[k] = pv;
+          else problems.push(`${w}.${k}: not text`);
         } else if (spec.kind === "enum") {
           if (typeof pv === "string" && spec.options.includes(pv)) params[k] = pv;
           else problems.push(`${w}.${k}: unknown option`);

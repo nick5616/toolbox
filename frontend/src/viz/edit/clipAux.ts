@@ -95,10 +95,13 @@ function dummy(gl: WebGL2RenderingContext): WebGLTexture {
   let t = dummies.get(gl);
   if (!t) {
     t = gl.createTexture() as WebGLTexture;
+    // Created on the active unit, which may hold a texture the pass already bound (e.g. gradelook's table): restore it.
+    const prev = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
     gl.bindTexture(gl.TEXTURE_2D, t);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.bindTexture(gl.TEXTURE_2D, prev);
     dummies.set(gl, t);
   }
   return t;
@@ -114,7 +117,7 @@ export function auxUniforms(gl: WebGL2RenderingContext, p: Program, firstUnit: n
   ];
   maps.forEach(([kind, t], i) => {
     p.tex(AUX_UNIFORMS[kind].tex, firstUnit + i, t ? t.tex : dummy(gl));
-    p.i1(AUX_UNIFORMS[kind].has, t ? 1 : 0);
+    p.f1(AUX_UNIFORMS[kind].has, t ? 1 : 0); // GLSL_AUX declares the flags as floats (uniform1i on them is an INVALID_OPERATION)
   });
   const uv = a?.uv ?? [1, 1, 0, 0];
   p.f4("u_auxUV", uv[0], uv[1], uv[2], uv[3]);
