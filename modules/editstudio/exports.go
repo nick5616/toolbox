@@ -257,7 +257,9 @@ func (m *Module) RenderEdit(ctx context.Context, job *core.JobContext, name stri
 	}
 	job.Progress(exportAudioTo, "Finishing the video…")
 	tmp := filepath.Join(job.TempDir, "edit.mp4")
-	err = exportMuxFn(ctx, ffmpeg, enc, mixPath, 0, 0, doc.FPS, "", tmp, func(p float64) {
+	// Color Grader videos: H.264 CRF 18, AAC 192k (Phase 21 §E1).
+	spec := muxSpec{FPS: doc.FPS, Codec: CodecH264, CRF: 18, Preset: "medium", AudioKbps: 192, Reencode: true}
+	err = exportMuxFn(ctx, ffmpeg, enc, mixPath, spec, tmp, func(p float64) {
 		job.Progress(exportAudioTo+p*(1-exportAudioTo), "Finishing the video…")
 	})
 	if err != nil {
