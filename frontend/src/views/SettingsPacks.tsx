@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Banner, Button, ConfirmDialog, PathText, Section, toast } from "@/components";
 import { DepSource, DepState, DepsService, JobStatus, PacksService, PackState, type DiskInfo, type Job, type PackRemovePreview } from "@/lib/api";
+import { displayText } from "@/lib/displayPath";
 import { toAppError } from "@/lib/errors";
 import { useDeps, type DepView } from "@/state/deps";
 import { isActive, useJobs } from "@/state/jobs";
@@ -150,7 +151,7 @@ function ToolsFolder() {
           </Button>
         )}
       </div>
-      {moving ? <p className={styles.note}>{moveJob?.message || "Moving the tools folder…"}</p> : null}
+      {moving ? <p className={styles.note}>{displayText(moveJob?.message || "Moving the tools folder…")}</p> : null}
       {moved ? (
         <Banner
           tone="info"

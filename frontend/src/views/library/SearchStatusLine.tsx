@@ -9,6 +9,7 @@ import { packSizes, formatSize } from "@/views/setup/packSizes";
 import { baseOf } from "./items";
 import { openSettingsSearch } from "./searchNav";
 import { statusLine } from "./searchHits";
+import { displayPath } from "@/lib/displayPath";
 import styles from "./Search.module.css";
 
 export const SEARCH_PACK_ID = "search";
@@ -83,7 +84,7 @@ function FailuresModal({ onClose }: { onClose: () => void }) {
           <ul className={styles.failures} aria-label="Failed files">
             {rows.map((r) => (
               <li key={r.path} className={styles.failure}>
-                <span className={styles.failName} data-tip={r.path}>
+                <span className={styles.failName} data-tip={displayPath(r.path)}>
                   {baseOf(r.path)}
                 </span>
                 <Button size="sm" variant="ghost" icon="rotate-cw" data-tip="Try this file again" onClick={() => void retry([r.path])}>

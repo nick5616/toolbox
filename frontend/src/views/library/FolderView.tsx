@@ -6,6 +6,7 @@ import { GridView } from "./GridView";
 import type { ItemHandlers } from "./ItemCard";
 import type { LibItem } from "./items";
 import { Places } from "./Places";
+import { displayPath } from "@/lib/displayPath";
 import styles from "./Library.module.css";
 
 /** Total files under a folder, itself included. */
@@ -40,7 +41,7 @@ function Node({ node, selected, onSelect, depth, open, toggle }: { node: Library
         ) : (
           <span className={styles.treeToggle} />
         )}
-        <button type="button" role="treeitem" aria-selected={selected === node.rel} className={styles.treeLabel} data-tip={node.path} onClick={() => onSelect(node.rel)}>
+        <button type="button" role="treeitem" aria-selected={selected === node.rel} className={styles.treeLabel} data-tip={displayPath(node.path)} onClick={() => onSelect(node.rel)}>
           <Icon name="folder" size={14} />
           <span className={styles.treeName}>{node.name}</span>
           <span className={styles.treeCount} data-tip={`${node.registered} made by tools of ${node.files} files`}>

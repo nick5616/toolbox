@@ -9,6 +9,7 @@ import { FolderMosaic } from "./previews/FolderMosaic";
 import { ItemThumb } from "./previews/ItemThumb";
 import { HitMeta, Snippet } from "./HitBits";
 import { dirOf, baseOf, type LibItem } from "./items";
+import { displayPath } from "@/lib/displayPath";
 import styles from "./Library.module.css";
 import searchStyles from "./Search.module.css";
 
@@ -103,11 +104,11 @@ export const ItemCard = memo(function ItemCard({ item, size, selected, active, s
         {!item.registered && !item.isDir ? <NotFromJob /> : null}
       </div>
       <div className={styles.cardBody}>
-        <span className={styles.cardName} data-tip={item.path}>
+        <span className={styles.cardName} data-tip={displayPath(item.path)}>
           {item.isDir ? <Icon name="folder" size={12} /> : null}
           {item.name}
         </span>
-        {folderRoot !== undefined ? <span className={searchStyles.folderLine} data-tip={item.path}>{folderLine(item, folderRoot)}</span> : null}
+        {folderRoot !== undefined ? <span className={searchStyles.folderLine} data-tip={displayPath(item.path)}>{folderLine(item, folderRoot)}</span> : null}
         {item.hit ? (
           <span className={searchStyles.hitLine}>
             <HitMeta item={item} />

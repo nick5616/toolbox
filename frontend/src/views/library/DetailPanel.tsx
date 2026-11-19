@@ -11,6 +11,7 @@ import { BigPreview, type SeekTo } from "./BigPreview";
 import { CaptionSection, InThisPicture, TextInFile } from "./DetailSearch";
 import { baseOf, dirOf, extOf, fromOutput, fromPath, isInside, previewKind, type LibItem } from "./items";
 import { ItemThumb } from "./previews/ItemThumb";
+import { displayPath } from "@/lib/displayPath";
 import styles from "./Library.module.css";
 import searchStyles from "./Search.module.css";
 import { formatMoment } from "./searchHits";
@@ -83,7 +84,7 @@ function Thumbs({ children }: { children: React.ReactNode }) {
 
 function LinkThumb({ item, label, onClick, current }: { item: LibItem; label: string; onClick: () => void; current?: boolean }) {
   return (
-    <button type="button" className={styles.linkThumb} aria-label={label} aria-current={current ? "true" : undefined} data-tip={item.path} onClick={onClick}>
+    <button type="button" className={styles.linkThumb} aria-label={label} aria-current={current ? "true" : undefined} data-tip={displayPath(item.path)} onClick={onClick}>
       <span className={styles.linkImg}>
         <ItemThumb item={item} />
       </span>
@@ -195,7 +196,7 @@ export function DetailPanel({ item, libraryRoot, moduleName, hasTool, trash, ren
             onBlur={() => void commitRename()}
           />
         ) : (
-          <h2 className={styles.detailName} data-tip={item.path}>
+          <h2 className={styles.detailName} data-tip={displayPath(item.path)}>
             {item.name}
           </h2>
         )}
@@ -237,7 +238,7 @@ export function DetailPanel({ item, libraryRoot, moduleName, hasTool, trash, ren
         <dl className={styles.meta}>
           <dt>Folder</dt>
           <dd>
-            <button type="button" className={styles.linkBtn} data-tip={`${folder}\nClick to show it in your file manager`} onClick={() => void LibraryService.RevealPath(item.path).catch(fail)}>
+            <button type="button" className={styles.linkBtn} data-tip={`${displayPath(folder)}\nClick to show it in your file manager`} onClick={() => void LibraryService.RevealPath(item.path).catch(fail)}>
               {baseOf(folder) || folder}
             </button>
           </dd>

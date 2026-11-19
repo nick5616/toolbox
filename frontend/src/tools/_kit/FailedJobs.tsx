@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { IconButton, Icon, toast } from "@/components";
 import { JobStatus } from "@/lib/api";
+import { displayText } from "@/lib/displayPath";
 import { toAppError } from "@/lib/errors";
 import { useJobs, type JobView } from "@/state/jobs";
 import { useModules } from "@/state/modules";
@@ -42,11 +43,11 @@ function FailedRow({ job }: { job: JobView }) {
     <div className={styles.failed} role="alert" data-status={job.status}>
       <Icon name={icon} size={16} />
       <div className={styles.failedBody}>
-        <div className={styles.failedTitle} title={title}>
-          {title}
+        <div className={styles.failedTitle} title={displayText(title)}>
+          {displayText(title)}
         </div>
-        <div className={styles.failedMsg}>{cancelled ? "Cancelled" : job.error || "Failed"}</div>
-        {!cancelled && job.errorHint && <div className={styles.failedHint}>{job.errorHint}</div>}
+        <div className={styles.failedMsg}>{cancelled ? "Cancelled" : displayText(job.error || "Failed")}</div>
+        {!cancelled && job.errorHint && <div className={styles.failedHint}>{displayText(job.errorHint)}</div>}
       </div>
       <IconButton
         size="sm"

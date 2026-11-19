@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useDisplayPath } from "@/lib/displayPath";
 import { IconButton } from "./IconButton";
 import { cx } from "./cx";
 import styles from "./PathText.module.css";
@@ -19,7 +20,9 @@ export function splitPath(path: string): [string, string] {
 
 /** Mono path with middle truncation (the head ellipsizes, the file name stays). */
 export function PathText({ path, copy = false, className }: PathTextProps) {
-  const [head, tail] = splitPath(path);
+  const show = useDisplayPath();
+  const shown = show(path);
+  const [head, tail] = splitPath(shown);
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -37,7 +40,7 @@ export function PathText({ path, copy = false, className }: PathTextProps) {
 
   return (
     <span className={cx(styles.root, className)}>
-      <span className={styles.path} title={path}>
+      <span className={styles.path} title={shown}>
         {head && <span className={styles.head}>{head}</span>}
         <span className={styles.tail}>{tail}</span>
       </span>

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { displayPath } from "@/lib/displayPath";
 import { formatBytes } from "@/lib/format";
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
@@ -36,7 +37,7 @@ export function FileList({ files, onRemove, empty, className, ...aria }: FileLis
       {files.map((f) => (
         <li key={f.path} className={styles.row}>
           <Icon name={f.icon ?? "file"} size={14} className={styles.icon} />
-          <span className={styles.path} data-tip={f.path}>
+          <span className={styles.path} data-tip={displayPath(f.path)}>
             {splitPath(f.path)[1]}
           </span>
           {f.size != null && <span className={styles.size}>{formatBytes(f.size)}</span>}

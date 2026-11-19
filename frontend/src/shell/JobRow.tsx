@@ -1,6 +1,7 @@
 // Used by the job tray and by tool views (e.g. the downloader's "Active" list).
 import { memo, useEffect, useState } from "react";
 import { JobStatus, LibraryService } from "@/lib/api";
+import { displayText } from "@/lib/displayPath";
 import { toAppError } from "@/lib/errors";
 import { formatElapsed, formatRelativeTime } from "@/lib/format";
 import { revealLabel } from "@/lib/platform";
@@ -48,11 +49,11 @@ export const JobRow = memo(function JobRow({ job, compact = false }: JobRowProps
   // --- end pipelines ---
 
   const status = job.status as ChipStatus;
-  const title = job.title || job.inputs[0] || job.id;
+  const title = displayText(job.title || job.inputs[0] || job.id);
   const firstOutput = job.outputs[0];
   const canRetry = job.status === JobStatus.JobFailed || job.status === JobStatus.JobCancelled;
 
-  let message = job.message;
+  let message = displayText(job.message);
   if (job.cancelRequested && active) message = "Cancelling…";
   else if (job.status === JobStatus.JobFailed) message = "";
 
@@ -145,8 +146,8 @@ export const JobRow = memo(function JobRow({ job, compact = false }: JobRowProps
       </div>
       {job.status === JobStatus.JobFailed && (job.error || job.errorHint) && (
         <div className={styles.error}>
-          {job.error && <div className={styles.errorMsg}>{job.error}</div>}
-          {job.errorHint && <div className={styles.errorHint}>{job.errorHint}</div>}
+          {job.error && <div className={styles.errorMsg}>{displayText(job.error)}</div>}
+          {job.errorHint && <div className={styles.errorHint}>{displayText(job.errorHint)}</div>}
         </div>
       )}
       {!compact && expanded && <LogPanel jobId={job.id} />}
