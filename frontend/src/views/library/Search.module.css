@@ -305,8 +305,15 @@
 }
 .thingCover {
   position: relative;
+  flex: none;
   aspect-ratio: 4 / 3;
+  overflow: hidden;
   background: var(--bg-inset);
+}
+/* The thumb fills the 4:3 cover (a portrait picture is cropped, not taller). */
+.thingCover > * {
+  position: absolute;
+  inset: 0;
 }
 .thingBody {
   display: flex;
