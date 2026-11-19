@@ -27,6 +27,9 @@ export async function textOf(t, selector) {
 }
 
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { findFfmpeg } from "../capture/record.mjs";
 
 function ps(cmd, env = {}) {
   return spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", cmd], { encoding: "utf8", windowsHide: true, env: { ...process.env, ...env } });
@@ -90,6 +93,50 @@ export async function chatAsk(t, question, { loadTimeoutMs = 240000, answerTimeo
   }
   if (paused) await t.rec.resume();
   await t.hold(1200);
+}
+
+/** Runs FFmpeg (PATH, else the managed copy) in untimed scene setup. Throws with its stderr on failure. */
+export function ffmpeg(args) {
+  const exe = findFfmpeg(process.env.TOOLBOX_TOOLS_DIR) ?? "ffmpeg";
+  const r = spawnSync(exe, ["-v", "error", "-y", ...args], { encoding: "utf8", windowsHide: true });
+  if (r.status !== 0) throw new Error(`ffmpeg ${args.join(" ")}: ${r.stderr}`);
+}
+
+/** The Extras folder of the capture Library (where generated demo files live). */
+export function extrasDir(t, role) {
+  return path.join(path.dirname(t.role(role)), "Extras");
+}
+
+/** Output file paths of the newest finished job of a module (e.g. to hand a result to the next step). */
+export async function latestOutputs(t, moduleId) {
+  const jobs = (await t.jobs()).filter((j) => j.moduleId === moduleId && j.status === "done");
+  jobs.sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0));
+  const j = jobs[0];
+  if (!j) throw new Error(`no finished ${moduleId} job`);
+  const outs = (j.outputs ?? []).map((o) => o.path);
+  if (outs.length === 0) throw new Error(`${moduleId} job has no outputs`);
+  return outs;
+}
+
+/**
+ * Some result headings print a raw source path (an app bug: they skip the Demo/ path display). Until that is
+ * fixed, this keeps any text node that starts with the capture Library's real folder showing `Demo/Library`
+ * instead (and any other `C:\Users\<name>` as `~`). Display only; nothing about the app's state changes.
+ */
+export async function scrubPaths(t) {
+  await t.eval(`(()=>{
+    if (window.__scrub) return;
+    const BS = String.fromCharCode(92);
+    const sep = "[" + BS + BS + "/]";
+    const libRe = new RegExp("[A-Za-z]:" + sep + "Users" + sep + ".*?" + sep + "demo-capture" + sep + "Library", "gi");
+    const userRe = new RegExp("[A-Za-z]:" + sep + "Users" + sep + "[^" + BS + BS + "/ ]+", "gi");
+    const fix = (n) => { const v = n.nodeValue; if (!v || !/[A-Za-z]:/.test(v)) return; const w = v.replace(libRe, "Demo/Library").replace(userRe, "~"); if (w !== v) n.nodeValue = w; };
+    const walk = (root) => { const it = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n; while ((n = it.nextNode())) fix(n); };
+    new MutationObserver((ms) => { for (const m of ms) { if (m.type === "characterData") fix(m.target); else m.addedNodes.forEach((a) => (a.nodeType === 3 ? fix(a) : a.nodeType === 1 && walk(a))); } })
+      .observe(document.body, { subtree: true, childList: true, characterData: true });
+    walk(document.body);
+    window.__scrub = true;
+  })()`);
 }
 
 /** The role file whose name contains `part`. */
