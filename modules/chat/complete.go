@@ -155,7 +155,11 @@ func (c *Chat) complete(ctx context.Context, model string, req core.CompletionRe
 	if err != nil {
 		return "", err
 	}
-	extra := map[string]any{"max_tokens": maxTokens}
+	// Background completions want the answer only: a hybrid thinking model
+	// (Qwen3.5) otherwise writes a long hidden reasoning block first, which
+	// made a caption take ~27 s instead of a few. Templates without the
+	// switch ignore it.
+	extra := map[string]any{"max_tokens": maxTokens, "chat_template_kwargs": map[string]any{"enable_thinking": false}}
 	if req.Seed != 0 {
 		extra["seed"] = req.Seed
 	}
