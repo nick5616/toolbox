@@ -20,29 +20,29 @@ import (
 	"toolbox/core/sidecar"
 )
 
-// fakeWriter implements ix.Writer (+ the optional Texts/Labels accessors).
-type fakeWriter struct {
+// filterWriter implements ix.Writer (+ the optional Texts/Labels accessors).
+type filterWriter struct {
 	model   ix.Model
 	current map[string][]ix.VectorAt
 	texts   map[string][]core.MediaText
 	labels  map[string][]core.MediaLabel
 }
 
-func (f *fakeWriter) Model() ix.Model                                    { return f.model }
-func (f *fakeWriter) NeedsOCR([]float32) bool                            { return false }
-func (f *fakeWriter) StoreBatch(context.Context, []ix.ItemResult) error  { return nil }
-func (f *fakeWriter) StoreSpeech(context.Context, ix.SpeechResult) error { return nil }
-func (f *fakeWriter) TextVector(context.Context, string) ([]float32, error) {
+func (f *filterWriter) Model() ix.Model                                    { return f.model }
+func (f *filterWriter) NeedsOCR([]float32) bool                            { return false }
+func (f *filterWriter) StoreBatch(context.Context, []ix.ItemResult) error  { return nil }
+func (f *filterWriter) StoreSpeech(context.Context, ix.SpeechResult) error { return nil }
+func (f *filterWriter) TextVector(context.Context, string) ([]float32, error) {
 	return []float32{1, 0}, nil
 }
-func (f *fakeWriter) TranscriptsFor(context.Context, string) ([]string, error) { return nil, nil }
-func (f *fakeWriter) SpeechMaxMin() int                                        { return 60 }
-func (f *fakeWriter) Current(_ context.Context, p string) ([]ix.VectorAt, bool) {
+func (f *filterWriter) TranscriptsFor(context.Context, string) ([]string, error) { return nil, nil }
+func (f *filterWriter) SpeechMaxMin() int                                        { return 60 }
+func (f *filterWriter) Current(_ context.Context, p string) ([]ix.VectorAt, bool) {
 	v, ok := f.current[p]
 	return v, ok
 }
-func (f *fakeWriter) Prob(t, v []float32) float64 { return float64(t[0]*v[0] + t[1]*v[1]) }
-func (f *fakeWriter) TextMatch(q string, texts []core.MediaText) string {
+func (f *filterWriter) Prob(t, v []float32) float64 { return float64(t[0]*v[0] + t[1]*v[1]) }
+func (f *filterWriter) TextMatch(q string, texts []core.MediaText) string {
 	for _, t := range texts {
 		if strings.Contains(strings.ToLower(t.Text), strings.ToLower(q)) {
 			if t.Source == core.TextSourceOCR {
@@ -53,16 +53,16 @@ func (f *fakeWriter) TextMatch(q string, texts []core.MediaText) string {
 	}
 	return ""
 }
-func (f *fakeWriter) Texts(_ context.Context, p string) ([]core.MediaText, error) {
+func (f *filterWriter) Texts(_ context.Context, p string) ([]core.MediaText, error) {
 	return f.texts[p], nil
 }
-func (f *fakeWriter) Labels(_ context.Context, p string) ([]core.MediaLabel, error) {
+func (f *filterWriter) Labels(_ context.Context, p string) ([]core.MediaLabel, error) {
 	return f.labels[p], nil
 }
 
-// fakeCaller answers search.embed_images with probs[owner] as vector [p, 0],
+// filterCaller answers search.embed_images with probs[owner] as vector [p, 0],
 // where owner is read from the prepared file name f<owner>.png.
-type fakeCaller struct {
+type filterCaller struct {
 	probs  map[int]float32
 	calls  int
 	params map[string]any
@@ -84,7 +84,7 @@ func vecB64(a, b float32) string {
 	return base64.StdEncoding.EncodeToString(buf)
 }
 
-func (c *fakeCaller) Call(_ context.Context, method string, params any, _ func(sidecar.Event)) (json.RawMessage, error) {
+func (c *filterCaller) Call(_ context.Context, method string, params any, _ func(sidecar.Event)) (json.RawMessage, error) {
 	if method != "search.embed_images" {
 		return nil, errors.New("unexpected " + method)
 	}
@@ -126,24 +126,24 @@ func writePic(t *testing.T, dir, name string) string {
 	return p
 }
 
-type env struct {
+type filterEnv struct {
 	m      *FilterModule
-	w      *fakeWriter
-	c      *fakeCaller
+	w      *filterWriter
+	c      *filterCaller
 	dir    string
 	result json.RawMessage
 }
 
-func newEnv(t *testing.T) *env {
+func newEnv(t *testing.T) *filterEnv {
 	t.Helper()
 	dir := t.TempDir()
-	w := &fakeWriter{model: ix.Model{Dim: 2, Dir: filepath.Join(dir, "model")}, current: map[string][]ix.VectorAt{},
+	w := &filterWriter{model: ix.Model{Dim: 2, Dir: filepath.Join(dir, "model")}, current: map[string][]ix.VectorAt{},
 		texts: map[string][]core.MediaText{}, labels: map[string][]core.MediaLabel{}}
-	c := &fakeCaller{probs: map[int]float32{}}
-	return &env{m: &FilterModule{d: Deps{Writer: w, Caller: c}}, w: w, c: c, dir: dir}
+	c := &filterCaller{probs: map[int]float32{}}
+	return &filterEnv{m: &FilterModule{d: Deps{Writer: w, Caller: c}}, w: w, c: c, dir: dir}
 }
 
-func (e *env) installModel(t *testing.T) {
+func (e *filterEnv) installModel(t *testing.T) {
 	t.Helper()
 	p := filepath.Join(e.w.model.Dir, "visual")
 	if err := os.MkdirAll(p, 0o755); err != nil {
@@ -154,7 +154,7 @@ func (e *env) installModel(t *testing.T) {
 	}
 }
 
-func (e *env) run(t *testing.T, o FilterOptions, inputs []string, toolErr error) (filterResult, error) {
+func (e *filterEnv) run(t *testing.T, o FilterOptions, inputs []string, toolErr error) (filterResult, error) {
 	t.Helper()
 	opts, _ := json.Marshal(o)
 	tmp := filepath.Join(e.dir, "tmp")

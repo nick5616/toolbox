@@ -275,7 +275,7 @@ func (m *FilterModule) pictureStrengths(ctx context.Context, job *core.JobContex
 
 	// Indexed and current files use their stored vectors; the rest are
 	// prepared and embedded here (nothing is stored).
-	var prep []prepared
+	var prep []filterPic
 	for i, p := range job.Inputs {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -313,16 +313,16 @@ func (m *FilterModule) pictureStrengths(ctx context.Context, job *core.JobContex
 	return out, nil
 }
 
-// prepared is one 224 px picture written to TempDir.
-type prepared struct {
+// filterPic is one 224 px picture written to TempDir.
+type filterPic struct {
 	owner int // index into job.Inputs
 	pos   int64
 	path  string
 }
 
-var videoExts = map[string]bool{".mp4": true, ".mov": true, ".m4v": true, ".mkv": true, ".webm": true, ".avi": true}
+var filterVideoExts = map[string]bool{".mp4": true, ".mov": true, ".m4v": true, ".mkv": true, ".webm": true, ".avi": true}
 
-func (m *FilterModule) preparePictures(ctx context.Context, job *core.JobContext, path string, owner int) ([]prepared, error) {
+func (m *FilterModule) preparePictures(ctx context.Context, job *core.JobContext, path string, owner int) ([]filterPic, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	dir := job.TempDir
 	if dir == "" {
@@ -331,7 +331,7 @@ func (m *FilterModule) preparePictures(ctx context.Context, job *core.JobContext
 	switch {
 	case ext == ".pdf":
 		return m.preparePDF(ctx, dir, path, owner)
-	case videoExts[ext]:
+	case filterVideoExts[ext]:
 		return m.prepareVideo(ctx, job, path, owner)
 	case imaging.Supported(path) || imaging.IsHEIC(path):
 		url, err := imaging.ThumbUncached(path, filterEdge)
@@ -342,7 +342,7 @@ func (m *FilterModule) preparePictures(ctx context.Context, job *core.JobContext
 		if err != nil {
 			return nil, err
 		}
-		return []prepared{{owner: owner, pos: -1, path: file}}, nil
+		return []filterPic{{owner: owner, pos: -1, path: file}}, nil
 	}
 	return nil, fmt.Errorf("not a picture")
 }
@@ -369,7 +369,7 @@ func writeDataURL(dir, stem, url string) (string, error) {
 
 // preparePDF renders page 1. Without a renderer (or for a locked PDF) the
 // file gets no picture score.
-func (m *FilterModule) preparePDF(ctx context.Context, dir, path string, owner int) ([]prepared, error) {
+func (m *FilterModule) preparePDF(ctx context.Context, dir, path string, owner int) ([]filterPic, error) {
 	if m.d.PDF == nil {
 		return nil, fmt.Errorf("no PDF renderer")
 	}
@@ -389,11 +389,11 @@ func (m *FilterModule) preparePDF(ctx context.Context, dir, path string, owner i
 	if err := writePNG(file, img); err != nil {
 		return nil, err
 	}
-	return []prepared{{owner: owner, pos: 0, path: file}}, nil
+	return []filterPic{{owner: owner, pos: 0, path: file}}, nil
 }
 
 // prepareVideo grabs up to 8 evenly spaced frames with FFmpeg run in TempDir.
-func (m *FilterModule) prepareVideo(ctx context.Context, job *core.JobContext, path string, owner int) ([]prepared, error) {
+func (m *FilterModule) prepareVideo(ctx context.Context, job *core.JobContext, path string, owner int) ([]filterPic, error) {
 	ffmpeg, err := job.Tool(deps.FFmpeg)
 	if err != nil {
 		return nil, err
@@ -411,7 +411,7 @@ func (m *FilterModule) prepareVideo(ctx context.Context, job *core.JobContext, p
 	if durMs <= 0 {
 		n = 1
 	}
-	var out []prepared
+	var out []filterPic
 	for k := range n {
 		var at int64
 		if durMs > 0 {
@@ -430,7 +430,7 @@ func (m *FilterModule) prepareVideo(ctx context.Context, job *core.JobContext, p
 		}
 		file := filepath.Join(job.TempDir, name)
 		if _, err := os.Stat(file); err == nil {
-			out = append(out, prepared{owner: owner, pos: at, path: file})
+			out = append(out, filterPic{owner: owner, pos: at, path: file})
 		}
 	}
 	if len(out) == 0 {
@@ -441,7 +441,7 @@ func (m *FilterModule) prepareVideo(ctx context.Context, job *core.JobContext, p
 
 // embed asks the engine for the vectors of every prepared picture (nil for
 // one it couldn't read).
-func (m *FilterModule) embed(ctx context.Context, w ix.Writer, prep []prepared) ([][]float32, error) {
+func (m *FilterModule) embed(ctx context.Context, w ix.Writer, prep []filterPic) ([][]float32, error) {
 	if m.d.Caller == nil {
 		return nil, core.Errorf(core.CodeNotImplemented, "The AI engine isn't available")
 	}
