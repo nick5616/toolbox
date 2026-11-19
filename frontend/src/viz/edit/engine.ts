@@ -28,6 +28,7 @@ import "./visualClip";
 import type { CompiledEdit, EditEngineOptions, EditPost, FrameKey, FrameProvider } from "./types";
 import { fallBackToBitmap, imageSize, initUploadMode, isClosed, isVideoFrame, uploadFrameImage } from "../frames/upload";
 import type { FrameImage } from "../frames/types";
+import { samplePixels } from "../frames/sample";
 
 const TEX_CACHE = 24;
 const FIT_BLUR_RADIUS = 0.03; // of the short side
@@ -67,6 +68,9 @@ export class EditEngine {
   private edit: CompiledEditFull | null = null;
   private frameT: Target;
   private uploadChecked = false;
+  /** The last rendered output frame and provider (samplePre reads the clip's own source frame there). */
+  private lastK = -1;
+  private lastFrames: FrameProvider | null = null;
   /** Uploads that failed (tests, Edit Lab). */
   uploadFailures = 0;
 
@@ -110,7 +114,9 @@ export class EditEngine {
   }
 
   setEdit(c: CompiledEdit): void {
-    this.edit = isCompiled(c) ? c : null;
+    const next = isCompiled(c) ? c : null;
+    if (next === this.edit && next !== null) return; // same compiled edit: nothing to rebuild (SPEC B5)
+    this.edit = next;
     // Drop the effect instances of clips and effects that are gone.
     const keep = new Set<string>();
     if (this.edit) {
@@ -146,6 +152,37 @@ export class EditEngine {
     const inst = make({ gl: this.gl, fullscreen: this.fs, w, h, seed: (this.opts.seed ^ fnv(`g:${cl.id}`)) >>> 0, inWorker }, cl);
     this.gens.set(cl.id, { key, inst });
     return inst;
+  }
+
+  /**
+   * The clip's own source pixel (before effects, transform and masks; after
+   * decode and orientation) at source UV (u, v from the top-left), averaged
+   * over 5 x 5 pixels, as sRGB-encoded 0..1. Reads the frame of the last
+   * render; null when the clip isn't on screen there or its frame isn't decoded.
+   */
+  samplePre(clipId: string, u: number, v: number): [number, number, number] | null {
+    const c = this.edit;
+    const frames = this.lastFrames;
+    if (!c || !frames || this.lastK < 0) return null;
+    let cl: CompiledClip | null = null;
+    for (const t of c.tracks) for (const x of t.clips) if (x.id === clipId) cl = x;
+    if (!cl || cl.kind === "color" || cl.kind === "text" || cl.kind === "visual") return null;
+    const plan = clipFramePlan(cl, this.lastK, c.fps);
+    const main = plan.main ? this.refTex(plan.main, frames, true) : null;
+    if (!main) return null;
+    return samplePixels(main.a.w, main.a.h, u, v, (x, y, w, h) => this.readTexBox(main.a.tex, x, y, w, h));
+  }
+
+  private readTexBox(tex: WebGLTexture, x: number, y: number, w: number, h: number): Uint8Array {
+    const gl = this.gl;
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    const out = new Uint8Array(w * h * 4);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE) gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, out);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteFramebuffer(fb);
+    return out;
   }
 
   /** The stream frames (and images) the frame at tMs (timeline ms) uses. */
@@ -514,6 +551,8 @@ export class EditEngine {
       return;
     }
     const k = frameAtTime(tMs, c.fps, c.frames);
+    this.lastK = k;
+    this.lastFrames = frames;
     const songMs = c.songStartMs + tMs;
     const bg = c.background;
     this.frameT.clear(bg[0], bg[1], bg[2], 1);
@@ -622,6 +661,7 @@ export class EditEngine {
     this.mix.dispose();
     this.fs.dispose();
     this.edit = null;
+    this.lastFrames = null;
   }
 }
 

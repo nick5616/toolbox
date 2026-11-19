@@ -364,14 +364,14 @@ describe("EditFrameProvider", () => {
     r.p.dispose();
   });
 
-  it("caps frames per stream (preview 24, export 8) and closes the evicted ones", async () => {
+  it("caps frames per stream (preview 48, export 8) and closes the evicted ones", async () => {
     setUploadMode("bitmap");
     const r = rig({ frames: 100 });
-    for (let i = 0; i < 40; i++) await r.p.prepare([key(i)], true);
-    expect(r.p.residentFrames("v:a").length).toBeLessThanOrEqual(24);
-    expect(r.p.frame(key(39))).not.toBeNull();
+    for (let i = 0; i < 70; i++) await r.p.prepare([key(i)], true);
+    expect(r.p.residentFrames("v:a").length).toBeLessThanOrEqual(48);
+    expect(r.p.frame(key(69))).not.toBeNull();
     const evicted = r.bitmaps.filter((b) => b.closed === 1).length;
-    expect(evicted).toBe(40 - r.p.residentFrames("v:a").length);
+    expect(evicted).toBe(70 - r.p.residentFrames("v:a").length);
     r.p.dispose();
 
     const x = rig({ frames: 100, mode: "export" });

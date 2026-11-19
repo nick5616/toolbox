@@ -87,11 +87,15 @@ export interface LRUOptions<T> {
   total: number;
   /** Called exactly once for every image that leaves the cache (close it). */
   dispose(image: T): void;
+  /** Size of an image in bytes (with maxBytes: the LRU also evicts past that total). */
+  bytesOf?(image: T): number;
+  maxBytes?: number;
 }
 
 interface Entry<T> {
   image: T;
   used: number;
+  bytes: number;
 }
 
 export const frameKeyString = (stream: string, frame: number): string => `${stream}#${frame}`;
@@ -101,6 +105,7 @@ export class FrameLRU<T> {
   private readonly streams = new Map<string, Map<number, Entry<T>>>();
   private tick = 0;
   private count = 0;
+  private totalBytes = 0;
   private keep: ReadonlySet<string> = new Set();
 
   constructor(private o: LRUOptions<T>) {}
@@ -109,9 +114,18 @@ export class FrameLRU<T> {
     return this.count;
   }
 
+  /** Bytes held (0 without a `bytesOf`). */
+  get bytes(): number {
+    return this.totalBytes;
+  }
+
+  private measure(image: T): number {
+    return this.o.bytesOf ? this.o.bytesOf(image) : 0;
+  }
+
   /** Changes the caps (taking effect on the next put). */
-  setCaps(perStream: number, total: number): void {
-    this.o = { ...this.o, perStream, total };
+  setCaps(perStream: number, total: number, maxBytes?: number): void {
+    this.o = { ...this.o, perStream, total, ...(maxBytes !== undefined ? { maxBytes } : {}) };
   }
 
   sizeOf(stream: string): number {
@@ -146,6 +160,18 @@ export class FrameLRU<T> {
     return { frame: best, image: e.image };
   }
 
+  /** The oldest resident frame after `frame` (reverse playback's stand-in). */
+  nearestAfter(stream: string, frame: number): { frame: number; image: T } | undefined {
+    const m = this.streams.get(stream);
+    if (!m) return undefined;
+    let best = -1;
+    for (const f of m.keys()) if (f > frame && (best < 0 || f < best)) best = f;
+    if (best < 0) return undefined;
+    const e = m.get(best) as Entry<T>;
+    e.used = ++this.tick;
+    return { frame: best, image: e.image };
+  }
+
   frames(stream: string): number[] {
     return [...(this.streams.get(stream)?.keys() ?? [])];
   }
@@ -161,9 +187,12 @@ export class FrameLRU<T> {
     if (old) {
       if (old.image !== image) this.o.dispose(old.image);
       this.count--;
+      this.totalBytes -= old.bytes;
     }
-    m.set(frame, { image, used: ++this.tick });
+    const bytes = this.measure(image);
+    m.set(frame, { image, used: ++this.tick, bytes });
     this.count++;
+    this.totalBytes += bytes;
     this.evict(stream, frame);
   }
 
@@ -171,6 +200,8 @@ export class FrameLRU<T> {
   replace(stream: string, frame: number, from: T, to: T): boolean {
     const e = this.streams.get(stream)?.get(frame);
     if (!e || e.image !== from) return false;
+    this.totalBytes += this.measure(to) - e.bytes;
+    e.bytes = this.measure(to);
     e.image = to;
     this.o.dispose(from);
     return true;
@@ -181,7 +212,7 @@ export class FrameLRU<T> {
     while (m && m.size > this.o.perStream) {
       if (!this.evictOldest(m, stream, justPut)) break;
     }
-    while (this.count > this.o.total) {
+    while (this.count > this.o.total || (this.o.maxBytes !== undefined && this.totalBytes > this.o.maxBytes)) {
       if (!this.evictOldest(null, stream, justPut)) break;
     }
   }
@@ -207,6 +238,7 @@ export class FrameLRU<T> {
     if (!m || !e) return false;
     m.delete(bf);
     this.count--;
+    this.totalBytes -= e.bytes;
     this.o.dispose(e.image);
     return true;
   }
@@ -214,7 +246,10 @@ export class FrameLRU<T> {
   deleteStream(stream: string): void {
     const m = this.streams.get(stream);
     if (!m) return;
-    for (const e of m.values()) this.o.dispose(e.image);
+    for (const e of m.values()) {
+      this.o.dispose(e.image);
+      this.totalBytes -= e.bytes;
+    }
     this.count -= m.size;
     this.streams.delete(stream);
   }
