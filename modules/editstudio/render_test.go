@@ -178,8 +178,8 @@ func newExportEnv(t *testing.T) *exportEnv {
 		env.muxes++
 		env.mux = s
 		env.muxArgs = []string{ffmpeg, out.Path, audio}
-		if s.FPS != 30 || out.Frames != 900 || s.Reencode || s.AudioStartMs != 0 || s.AudioLenMs != 0 {
-			t.Errorf("mux %+v frames %d", s, out.Frames)
+		if out.Frames != 900 {
+			t.Errorf("mux frames %d", out.Frames)
 		}
 		on(1)
 		return os.WriteFile(dst, []byte("mp4"), 0o644)
@@ -203,6 +203,10 @@ func TestRunRenderFlow(t *testing.T) {
 	}
 	if env.streams != 1 || env.images != 1 || env.interps != 0 || env.renders != 1 || env.mixes != 1 || env.muxes != 1 {
 		t.Fatalf("calls: streams %d images %d interps %d renders %d mixes %d muxes %d", env.streams, env.images, env.interps, env.renders, env.mixes, env.muxes)
+	}
+	// No ExportSettings: the original behaviour (H.264 copied, 192 kb/s, the whole edit at the project rate).
+	if want := (muxSpec{FPS: 30, Codec: CodecH264, CRF: 20, Preset: "fast", AudioKbps: 192}); env.mux != want {
+		t.Errorf("mux = %+v, want %+v", env.mux, want)
 	}
 	p := env.plan
 	if p.Width != 1080 || p.Height != 1920 || p.FPS != 30 || p.Mode != viz.ModeOpaque || p.StartMs != 10_000 || p.EndMs != 40_000 || p.Seed != env.doc.Seed {
