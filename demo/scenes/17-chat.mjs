@@ -1,5 +1,5 @@
 // 17 Local Chat: read the article PDF with OCR (text output), then ask Local Chat about it.
-import { chatAsk } from "./_d2b.mjs";
+import { chatAsk, openTool, scrubPaths } from "./_d2b.mjs";
 
 export default {
   id: "chat",
@@ -8,7 +8,8 @@ export default {
   kind: "a",
   roles: ["doc.pdf"],
   async run(t) {
-    await t.open("ocr");
+    await openTool(t, "ocr", "OCR");
+    await scrubPaths(t);
     await t.rec.start();
 
     t.note("The article PDF goes in as text, then Local Chat answers questions about it.", "Hand a document to the local chat model and ask it anything. It never leaves your computer.");

@@ -1,5 +1,5 @@
 // 25 Scene Splitter: the B-roll reel is cut back into its shots.
-import { makeReel, scrubPaths } from "./_d2b.mjs";
+import { makeReel, openTool, scrubPaths } from "./_d2b.mjs";
 
 export default {
   id: "scenes",
@@ -9,7 +9,7 @@ export default {
   roles: ["video.broll"],
   async run(t) {
     const reel = makeReel(t); // untimed: the six clips joined into one reel
-    await t.open("scenes");
+    await openTool(t, "scenes", "Scene Splitter");
     await scrubPaths(t);
     await t.waitFor({ css: "button", text: "Add files…" });
     await t.rec.start();

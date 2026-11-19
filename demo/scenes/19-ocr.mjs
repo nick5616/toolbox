@@ -1,5 +1,5 @@
 // 19 OCR: the drum chart and a code-editor screenshot become text; copy one.
-import { pick, withClipboardRestored } from "./_d2b.mjs";
+import { openTool, pick, withClipboardRestored, scrubPaths } from "./_d2b.mjs";
 
 export default {
   id: "ocr",
@@ -8,7 +8,8 @@ export default {
   kind: "a",
   roles: ["image.drumchart", "image.screens"],
   async run(t) {
-    await t.open("ocr");
+    await openTool(t, "ocr", "OCR");
+    await scrubPaths(t);
     await t.rec.start();
 
     t.note("Two images in, their text out: a drum chart and a screenshot of code.", "Drop a scan or a screenshot and Toolbox reads the text in it.");

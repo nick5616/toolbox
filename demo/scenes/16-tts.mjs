@@ -1,5 +1,5 @@
 // 16 Text to Speech: an article paragraph becomes a voice.
-import { ARTICLE_PARAGRAPH, paste, setValue } from "./_d2b.mjs";
+import { ARTICLE_PARAGRAPH, openTool, paste, setValue, scrubPaths } from "./_d2b.mjs";
 
 export default {
   id: "tts",
@@ -8,7 +8,8 @@ export default {
   kind: "a",
   roles: [],
   async run(t) {
-    await t.open("tts"); // before filming: the Library behind it lists files that must not be on screen
+    await openTool(t, "tts", "Text to Speech"); // before filming: the Library behind it lists files that must not be on screen
+    await scrubPaths(t);
     await t.rec.start();
 
     t.note("Paste a paragraph, pick a voice, and read it aloud.", "Paste any text, choose a voice, and Toolbox reads it to you, all on your computer.");

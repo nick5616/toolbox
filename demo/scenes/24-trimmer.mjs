@@ -1,5 +1,5 @@
 // 24 Trimmer: set a cut on the filmstrip, see where the fast (keyframe) cut would really start, switch to precise, export.
-import { scrubPaths } from "./_d2b.mjs";
+import { openTool, scrubPaths } from "./_d2b.mjs";
 
 export default {
   id: "trimmer",
@@ -9,7 +9,7 @@ export default {
   roles: ["video.broll"],
   async run(t) {
     const clip = t.roles("video.broll").find((p) => p.includes("Skyline"));
-    await t.open("trimmer");
+    await openTool(t, "trimmer", "Video Trimmer");
     await scrubPaths(t);
     await t.rec.start();
 

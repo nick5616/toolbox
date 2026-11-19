@@ -1,7 +1,7 @@
 // 20 PDF Toolkit: merge two PDFs, move a page to the front, compress.
 import fs from "node:fs";
 import path from "node:path";
-import { extrasDir, latestOutputs, scrubPaths, setValue } from "./_d2b.mjs";
+import { extrasDir, latestOutputs, openTool, scrubPaths, setValue } from "./_d2b.mjs";
 
 const TAB = (name) => ({ css: "button", text: name, exact: true });
 
@@ -31,13 +31,13 @@ export default {
         "",
       ].join("\n"),
     );
-    await t.open("documents");
+    await openTool(t, "documents", "Document Converter");
     await t.handOff("documents", md);
     await setValue(t, "select", "pdf");
     await t.click({ css: "button", textRe: "^Convert \\d+ document" });
     await t.waitJob({ moduleId: "documents" });
     const [second] = await latestOutputs(t, "documents");
-    await t.open("pdf");
+    await openTool(t, "pdf", "PDF Toolkit");
     await scrubPaths(t);
 
     await t.rec.start();

@@ -1,5 +1,5 @@
 // 23 Compress to Size: a long B-roll reel (about 45 MB) squeezed under Discord's limit.
-import { makeReel, scrubPaths } from "./_d2b.mjs";
+import { makeReel, openTool, scrubPaths } from "./_d2b.mjs";
 
 export default {
   id: "compress",
@@ -9,7 +9,7 @@ export default {
   roles: ["video.broll"],
   async run(t) {
     const reel = makeReel(t); // untimed: the six clips joined into one reel
-    await t.open("compress");
+    await openTool(t, "compress", "Compress to Size");
     await scrubPaths(t);
     await t.waitFor({ css: "button", text: "Add files…" });
     await t.rec.start();

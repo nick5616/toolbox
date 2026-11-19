@@ -1,5 +1,5 @@
 // 21 Document Converter: the article (Markdown) to PDF, then to Word.
-import { setValue } from "./_d2b.mjs";
+import { openTool, setValue, scrubPaths } from "./_d2b.mjs";
 
 export default {
   id: "documents",
@@ -8,7 +8,8 @@ export default {
   kind: "a",
   roles: ["doc.text"],
   async run(t) {
-    await t.open("documents");
+    await openTool(t, "documents", "Document Converter");
+    await scrubPaths(t);
     await t.rec.start();
 
     t.note("A Markdown article becomes a PDF, then a Word document.", "Turn a Markdown file into a PDF or a Word document.");

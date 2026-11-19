@@ -1,5 +1,5 @@
 // 18 Caption Writer: six photos get alt text, a caption and hashtags; the text is written into copies.
-import { scrubPaths } from "./_d2b.mjs";
+import { openTool, scrubPaths } from "./_d2b.mjs";
 
 export default {
   id: "captions",
@@ -8,7 +8,7 @@ export default {
   kind: "a",
   roles: ["photo.park", "photo.facade", "photo.painting", "photo.dessert", "photo.flowers", "photo.ferris"],
   async run(t) {
-    await t.open("captions");
+    await openTool(t, "captions", "Caption Writer");
     await scrubPaths(t);
     await t.rec.start();
 

@@ -3,7 +3,7 @@
 // into an AVI container next to it; the conversion on camera is the real thing.
 import fs from "node:fs";
 import path from "node:path";
-import { ffmpeg, extrasDir, setValue } from "./_d2b.mjs";
+import { extrasDir, ffmpeg, openTool, setValue, scrubPaths } from "./_d2b.mjs";
 
 export default {
   id: "converter",
@@ -19,7 +19,8 @@ export default {
       ffmpeg(["-i", t.role("video.green.kill"), "-c", "copy", clip]);
     }
 
-    await t.open("converter");
+    await openTool(t, "converter", "Converter");
+    await scrubPaths(t);
     await t.rec.start();
 
     t.note("A video clip converted to MP4.", "Pick a preset, drop a file, and Toolbox converts it.");
