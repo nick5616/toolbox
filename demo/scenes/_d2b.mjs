@@ -104,7 +104,8 @@ export function ffmpeg(args) {
 
 /** The Extras folder of the capture Library (where generated demo files live). */
 export function extrasDir(t, role) {
-  return path.join(path.dirname(t.role(role)), "Extras");
+  const dir = path.dirname(t.role(role));
+  return path.basename(dir) === "Extras" ? dir : path.join(dir, "Extras");
 }
 
 /** Joins the six generated B-roll clips into one reel (Extras/B-roll reel.mp4, no re-encode) and returns its path. */
