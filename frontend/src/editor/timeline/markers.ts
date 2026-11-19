@@ -13,7 +13,7 @@ export interface RulerMarker {
   label: string;
 }
 
-export const MAX_CUSTOM_MARKERS = 500;
+export const MAX_CUSTOM_MARKERS = 2000;
 const songStart = (doc: NormalProject): number => doc.song?.startMs ?? 0;
 
 /** The custom markers on the timeline, ascending. */

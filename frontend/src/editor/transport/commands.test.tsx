@@ -19,7 +19,8 @@ import { useEditCommands } from "./commands";
 import { EditorProfileProvider, PLAIN_PROFILE } from "../profileContext";
 import type { EditorProfile } from "../profile";
 import { registerPlayer, type PlayerController } from "./player";
-import { EDIT_SHORTCUTS } from "./shortcuts";
+import { EDIT_SHORTCUTS, SHORTCUT_SCOPES } from "./shortcuts";
+import { currentRange, useTimelineStore } from "../timeline/timelineStore";
 
 function Harness() {
   useEditCommands();
@@ -92,6 +93,254 @@ describe("shortcut table", () => {
     expect(new Set(all).size).toBe(all.length);
     expect(all.map((c) => c.toLowerCase())).not.toContain("t");
     expect(all.map((c) => c.toLowerCase())).not.toContain("m");
+  });
+
+  it("has no duplicate combo within any one scope (shared keys count in every scope), and unique ids", () => {
+    const norm = (c: string) => c.toLowerCase();
+    for (const scope of [undefined, ...SHORTCUT_SCOPES]) {
+      const active = EDIT_SHORTCUTS.filter((s) => s.scope === undefined || s.scope === scope);
+      const combos = active.flatMap((s) => s.combos.map(norm));
+      const dupes = combos.filter((c, i) => combos.indexOf(c) !== i);
+      expect(dupes, `scope ${scope ?? "shared"}`).toEqual([]);
+    }
+    const ids = EDIT_SHORTCUTS.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("every combo is well-formed for the key matcher (modifiers then one key)", () => {
+    for (const s of EDIT_SHORTCUTS) for (const c of s.combos) expect(c.split("+").every((p, i, a) => i === a.length - 1 || ["Mod", "Shift", "Alt", "Ctrl"].includes(p))).toBe(true);
+  });
+
+  it("the Phase 21 table has the keys the spec lists", () => {
+    const has = (id: string, combo: string) => expect(EDIT_SHORTCUTS.find((s) => s.id === id)?.combos).toContain(combo);
+    has("toolSelect", "V");
+    has("toolRazor", "C");
+    has("toolRipple", "B");
+    has("toolRoll", "N");
+    has("toolSlip", "Y");
+    has("zoomIn", "=");
+    has("zoomOut", "-");
+    has("zoomFit", "\\");
+    has("markIn", "I");
+    has("markOut", "O");
+    has("clearRange", "Alt+X");
+    has("loop", "Shift+L");
+    has("snapping", "Shift+N");
+    has("rippleDelete", "Shift+Delete");
+    has("copy", "Mod+C");
+    has("cut", "Mod+X");
+    has("paste", "Mod+V");
+    has("pasteInsert", "Mod+Shift+V");
+    has("link", "Mod+L");
+    has("prevEdit", "ArrowUp");
+    has("nextEdit", "ArrowDown");
+    has("back1s", "Shift+ArrowLeft");
+    has("fwd1s", "Shift+ArrowRight");
+    has("prevKey", "Alt+[");
+    has("nextKey", "Alt+]");
+  });
+});
+
+describe("Phase 21 editing keys", () => {
+  const clipIds = () => project().tracks.flatMap((t) => t.clips.map((c) => c.id));
+
+  it("V C B N Y switch the timeline tool", () => {
+    render(<Harness />);
+    for (const [k, tool] of [["c", "razor"], ["b", "ripple"], ["n", "roll"], ["y", "slip"], ["v", "select"]] as const) {
+      key(k);
+      expect(useTimelineStore.getState().tool).toBe(tool);
+    }
+  });
+
+  it("Shift+N toggles snapping", () => {
+    render(<Harness />);
+    const before = useEditStudio.getState().snap;
+    key("N", { shiftKey: true });
+    expect(useEditStudio.getState().snap).toBe(!before);
+    expect(useTimelineStore.getState().tool).toBe("select"); // not the Roll tool
+  });
+
+  it("= and - zoom around the playhead; \\ fits", () => {
+    render(<Harness />);
+    useEditStudio.getState().setView(100, 0);
+    useEditStudio.getState().setPlayhead(2000);
+    useTimelineStore.getState().setViewWidth(800);
+    const x = (ms: number, pps: number, scroll: number) => ((ms - scroll) * pps) / 1000;
+    key("=");
+    const z = useEditStudio.getState();
+    expect(z.pps).toBeGreaterThan(100);
+    expect(x(2000, z.pps, z.scrollMs)).toBeCloseTo(x(2000, 100, 0), 4);
+    key("-");
+    expect(useEditStudio.getState().pps).toBeCloseTo(100, 4);
+    key("\\");
+    const f = useEditStudio.getState();
+    expect(f.scrollMs).toBe(0);
+    expect(f.pps).toBeLessThan(200);
+  });
+
+  it("I and O set the range; the range is readable for export; Alt+X clears it", () => {
+    render(<Harness />);
+    useEditStudio.getState().setPlayhead(1000);
+    key("i");
+    useEditStudio.getState().setPlayhead(3000);
+    key("o");
+    expect(currentRange()).toEqual({ inMs: 1000, outMs: 3000 });
+    key("x", { altKey: true });
+    expect(currentRange()).toBeNull();
+    expect(useTimelineStore.getState().rangeInMs).toBeNull();
+  });
+
+  it("I alone ranges to the end of the edit; O alone from the start; crossing clears the other end", () => {
+    render(<Harness />);
+    useEditStudio.getState().setPlayhead(2000);
+    key("i");
+    expect(currentRange()).toEqual({ inMs: 2000, outMs: 20_000 });
+    useEditStudio.getState().setPlayhead(1000);
+    key("o");
+    expect(currentRange()).toEqual({ inMs: 0, outMs: 1000 });
+  });
+
+  it("Shift+L loops the range through the player; without a range it asks for one", () => {
+    const loops: Array<unknown> = [];
+    unregister();
+    unregister = registerPlayer({ ...player, loop: (r: unknown) => loops.push(r) } as PlayerController);
+    render(<Harness />);
+    key("L", { shiftKey: true });
+    expect(loops).toEqual([]);
+    useTimelineStore.getState().setRange(1000, 3000);
+    key("L", { shiftKey: true });
+    expect(loops.at(-1)).toEqual({ inMs: 1000, outMs: 3000 });
+    expect(useTimelineStore.getState().loop).toBe(true);
+    key("L", { shiftKey: true });
+    expect(loops.at(-1)).toBeNull();
+    expect(useTimelineStore.getState().loop).toBe(false);
+  });
+
+  it("J plays in reverse when the clock offers it", () => {
+    const calls: string[] = [];
+    unregister();
+    unregister = registerPlayer({ ...player, reverse: () => calls.push("reverse") } as PlayerController);
+    render(<Harness />);
+    key("j");
+    expect(calls).toEqual(["reverse"]);
+  });
+
+  it("Shift+Delete ripple-deletes the selection", () => {
+    render(<Harness />);
+    useEditStudio.getState().select({ kind: "clips", ids: ["a"] });
+    key("Delete", { shiftKey: true });
+    expect(spans()).toEqual([[1000, 2000]]);
+  });
+
+  it("Delete leaves a gap; selecting the gap and pressing Delete closes it", () => {
+    render(<Harness />);
+    useEditStudio.getState().select({ kind: "clips", ids: ["a"] });
+    key("Delete");
+    expect(spans()).toEqual([[5000, 6000]]);
+    useTimelineStore.getState().selectGap({ trackId: "t1", fromMs: 0, toMs: 5000 });
+    useEditStudio.getState().select({ kind: "track", id: "t1" });
+    key("Delete");
+    expect(spans()).toEqual([[0, 1000]]);
+  });
+
+  it("Ctrl+C then Ctrl+V pastes at the playhead (overwrite); Ctrl+Shift+V inserts; Ctrl+X cuts", () => {
+    render(<Harness />);
+    useEditStudio.getState().select({ kind: "clips", ids: ["b"] });
+    key("c", { ctrlKey: true });
+    useEditStudio.getState().setPlayhead(1000);
+    key("v", { ctrlKey: true });
+    expect(spans()).toEqual([[0, 1000], [1000, 2000], [2000, 4000], [5000, 6000]]);
+    useEditStudio.getState().setPlayhead(0);
+    key("V", { ctrlKey: true, shiftKey: true });
+    expect(spans()).toEqual([[0, 1000], [1000, 2000], [2000, 3000], [3000, 5000], [6000, 7000]]);
+    useEditStudio.getState().select({ kind: "clips", ids: [clipIds()[0] as string] });
+    key("x", { ctrlKey: true });
+    expect(useTimelineStore.getState().clipboard?.entries).toHaveLength(1);
+    expect(clipIds()).toHaveLength(4);
+  });
+
+  it("paste does nothing without a clipboard, and a locked target is refused", () => {
+    render(<Harness />);
+    useTimelineStore.getState().setClipboard(null);
+    useEditStudio.getState().setPlayhead(1000);
+    key("v", { ctrlKey: true });
+    expect(spans()).toEqual([[0, 4000], [5000, 6000]]);
+    useEditStudio.getState().select({ kind: "clips", ids: ["b"] });
+    key("c", { ctrlKey: true });
+    const doc = project();
+    useEditStudio.getState().edit({ ...doc, tracks: doc.tracks.map((t) => (t.id === "t1" ? { ...t, locked: true } : t)) });
+    key("v", { ctrlKey: true });
+    expect(spans()).toEqual([[0, 4000], [5000, 6000]]);
+  });
+
+  it("Ctrl+L links the selection and again unlinks it", () => {
+    render(<Harness />);
+    useEditStudio.getState().select({ kind: "clips", ids: ["a", "b"] });
+    key("l", { ctrlKey: true });
+    expect(project().tracks[0]?.clips.every((c) => !!c.link)).toBe(true);
+    key("l", { ctrlKey: true });
+    expect(project().tracks[0]?.clips.every((c) => !c.link)).toBe(true);
+  });
+
+  it("Up and Down jump between edit points of every track; Shift+Left and Right move a second", () => {
+    render(<Harness />);
+    useEditStudio.getState().setPlayhead(4500);
+    key("ArrowDown");
+    expect(useEditStudio.getState().playheadMs).toBe(5000);
+    key("ArrowUp");
+    expect(useEditStudio.getState().playheadMs).toBe(4000);
+    key("ArrowRight", { shiftKey: true });
+    expect(useEditStudio.getState().playheadMs).toBe(5000);
+    key("ArrowLeft", { shiftKey: true });
+    key("ArrowLeft", { shiftKey: true });
+    expect(useEditStudio.getState().playheadMs).toBe(3000);
+    useEditStudio.getState().setPlayhead(500);
+    key("ArrowLeft", { shiftKey: true });
+    expect(useEditStudio.getState().playheadMs).toBe(0);
+  });
+
+  it("Alt+[ and Alt+] jump between the selected clip's keyframes", () => {
+    render(<Harness />);
+    const doc = project();
+    const keyed = JSON.stringify({ x: { base: 0, keys: [{ t: 500, v: 0, ease: "linear" }, { t: 1500, v: 1, ease: "linear" }] } });
+    useEditStudio.getState().edit({ ...doc, tracks: doc.tracks.map((t) => (t.id === "t1" ? { ...t, clips: t.clips.map((c) => (c.id === "a" ? { ...c, transform: keyed } : c)) } : t)) });
+    useEditStudio.getState().select({ kind: "clips", ids: ["a"] });
+    useEditStudio.getState().setPlayhead(0);
+    key("]", { altKey: true });
+    expect(useEditStudio.getState().playheadMs).toBe(500);
+    key("]", { altKey: true });
+    expect(useEditStudio.getState().playheadMs).toBe(1500);
+    key("[", { altKey: true });
+    expect(useEditStudio.getState().playheadMs).toBe(500);
+  });
+
+  it("M adds a marker flag at the playhead in the Video Editor only", () => {
+    const { unmount } = render(<Harness />);
+    useEditStudio.getState().setPlayhead(2500);
+    key("m");
+    expect(project().markers.custom.map((m) => m.ms)).toEqual([2500]);
+    unmount();
+    render(<StudioHarness />);
+    useEditStudio.getState().setPlayhead(3000);
+    key("m");
+    expect(project().markers.custom.map((m) => m.ms)).toEqual([2500]);
+  });
+
+  it("[ and ] jump between the Video Editor's marker flags; Delete removes the selected flag", () => {
+    render(<Harness />);
+    for (const ms of [1000, 2000, 3000]) {
+      useEditStudio.getState().setPlayhead(ms);
+      key("m");
+    }
+    useEditStudio.getState().setPlayhead(1500);
+    key("]");
+    expect(useEditStudio.getState().playheadMs).toBe(2000);
+    key("[");
+    key("[");
+    expect(useEditStudio.getState().playheadMs).toBe(1000);
+    useEditStudio.getState().select({ kind: "markers", ids: [project().markers.custom[0]?.id as string] });
+    key("Delete");
+    expect(project().markers.custom).toHaveLength(2);
   });
 });
 
