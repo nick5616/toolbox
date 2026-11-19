@@ -123,6 +123,22 @@ export async function openTool(t, id, title, opts) {
   throw new Error(`could not open ${title}`);
 }
 
+/**
+ * Pointer drags between page coordinates (the harness' drag() wants elements): drops invisible, click-through
+ * markers at the two points, drags between them, removes them. `strokes` is [[x0, y0, x1, y1], ...].
+ */
+export async function dragStrokes(t, strokes) {
+  const put = (id, x, y) =>
+    t.eval(`(()=>{let e=document.getElementById(${JSON.stringify(id)});if(!e){e=document.createElement("div");e.id=${JSON.stringify(id)};document.body.appendChild(e)}
+      e.style.cssText="position:fixed;width:6px;height:6px;pointer-events:none;opacity:0.01;z-index:2147483000;left:${x - 3}px;top:${y - 3}px";})()`);
+  for (const [x0, y0, x1, y1] of strokes) {
+    await put("__dm_a", x0, y0);
+    await put("__dm_b", x1, y1);
+    await t.drag({ css: "#__dm_a" }, { css: "#__dm_b" }, { steps: 18 });
+  }
+  await t.eval(`document.querySelectorAll("#__dm_a,#__dm_b").forEach((e)=>e.remove())`);
+}
+
 /** Joins the six generated B-roll clips into one reel (Extras/B-roll reel.mp4, no re-encode) and returns its path. */
 export function makeReel(t) {
   const clips = t.roles("video.broll");
