@@ -1563,7 +1563,7 @@ circuit-diagram	documents	circuit diagram	a circuit diagram|a schematic with ele
 atlas	documents	atlas	a photo of an atlas|a scan or screenshot of an atlas	map	
 trail-map	documents	trail map	a photo of a trail map|a scan or screenshot of a trail map	map	
 artwork	art	artwork	a work of art|an artwork		
-photo-style	art	photo style	a photograph with a distinctive style|a stylized photograph		
+photo-style	art	photo style	a photograph with a distinctive style|a stylized photograph		0.05
 design	art	design	a graphic design|a piece of graphic design		
 painting	art	painting	a painting|an oil painting	artwork	
 oil-painting	art	oil painting	an oil painting|a picture of an oil painting	artwork	
@@ -1618,11 +1618,11 @@ voxel-art	art	voxel art	a voxel art|a picture of a voxel art	artwork
 3d-model	art	3d model	a 3d model|a picture of a 3d model	artwork	
 low-poly	art	low poly	a low poly|a picture of a low poly	artwork	
 wireframe	art	wireframe	a wireframe|a picture of a wireframe	artwork	
-cgi-scene	art	cgi scene	a cgi scene|a picture of a cgi scene	artwork	
+cgi-scene	art	cgi scene	a cgi scene|a picture of a cgi scene	artwork	0.05
 architectural-render	art	architectural render	an architectural render|a picture of an architectural render	artwork	
 glitch-art	art	glitch art	a glitch art|a picture of a glitch art	artwork	
 collage	art	collage	a collage|a collage of cut paper and images	artwork	
-photomontage	art	photomontage	a photomontage|a picture of a photomontage	artwork	
+photomontage	art	photomontage	a photomontage|a picture of a photomontage	artwork	0.05
 mixed-media	art	mixed media	a mixed media|a picture of a mixed media	artwork	
 scrapbook	art	scrapbook	a scrapbook|a picture of a scrapbook	artwork	
 graffiti	art	graffiti	graffiti|spray painted graffiti on a wall	artwork	
@@ -1688,49 +1688,49 @@ polka-dots	art	polka dots	polka dots|a polka dot pattern	design
 tessellation	art	tessellation	a tessellation|a picture of a tessellation	design	
 infographic-design	art	infographic design	a designed layout with icons and text|a creative layout	design	
 neon-lights	art	neon lights	neon lights|a glowing neon sign	design	
-black-and-white-photo	art	black and white photo	a black and white photo|a monochrome photograph	photo-style	
-sepia-photo	art	sepia photo	a sepia photo|a picture of a sepia photo	photo-style	
-vintage-photo	art	vintage photo	a vintage photo|an old faded photograph	photo-style	
-film-photo	art	film photo	a film photograph with grain|an analog film photo	photo-style	
+black-and-white-photo	art	black and white photo	a black and white photo|a monochrome photograph	photo-style	0.05
+sepia-photo	art	sepia photo	a sepia photo|a picture of a sepia photo	photo-style	0.05
+vintage-photo	art	vintage photo	a vintage photo|an old faded photograph	photo-style	0.05
+film-photo	art	film photo	a film photograph with grain|an analog film photo	photo-style	0.05
 polaroid	art	polaroid	a polaroid photo|an instant photo with a white border	photo-style	
-long-exposure	art	long exposure	a long exposure photo|a photo with light trails and smooth water	photo-style	
-macro-photo	art	macro photo	a macro photo|an extreme close-up of a tiny subject	photo-style	
-aerial-photo	art	aerial photo	an aerial photo|a photo taken from above	photo-style	
-drone-photo	art	drone photo	a drone photo|a picture of a drone photo	photo-style	
-night-photo	art	night photo	a night photo|a photo taken at night	photo-style	
-portrait-photo	art	portrait photo	a portrait photo|a photo with a blurred background	photo-style	
-panorama	art	panorama	a panorama|a very wide panoramic photo	photo-style	
-wide-angle-photo	art	wide-angle photo	a wide-angle photo|a picture of a wide-angle photo	photo-style	
-fisheye-photo	art	fisheye photo	a fisheye photo|a picture of a fisheye photo	photo-style	
-bokeh	art	bokeh	a photo with bokeh|soft blurred background lights	photo-style	
-silhouette-photo	art	silhouette photo	a silhouette photo|a dark shape against a bright sky	photo-style	
-double-exposure	art	double exposure	a double exposure|a picture of a double exposure	photo-style	
-tilt-shift	art	tilt-shift	a tilt-shift|a picture of a tilt-shift	photo-style	
-street-photography	art	street photography	a street photography|a picture of a street photography	photo-style	
-landscape-photography	art	landscape photography	a landscape photography|a picture of a landscape photography	photo-style	
-architecture-photography	art	architecture photography	an architecture photography|a picture of an architecture photography	photo-style	
-food-photography	art	food photography	a food photography|a picture of a food photography	photo-style	
-product-photo	art	product photo	a product photo|an item on a plain background	photo-style	
-studio-photo	art	studio photo	a studio photo|a subject lit in a studio	photo-style	
-flat-lay	art	flat lay	a flat lay photo|objects arranged on a surface seen from above	photo-style	
-close-up	art	close-up	a close-up photo|a tight close-up	photo-style	
-minimalist-photo	art	minimalist photo	a minimalist photo|a picture of a minimalist photo	photo-style	
-high-contrast-photo	art	high contrast photo	a high contrast photo|a picture of a high contrast photo	photo-style	
-blurry-photo	art	blurry photo	a blurry photo|an out of focus photo	photo-style	
-overexposed-photo	art	overexposed photo	an overexposed photo|a picture of an overexposed photo	photo-style	
-underexposed-photo	art	underexposed photo	an underexposed photo|a picture of an underexposed photo	photo-style	
-motion-blur	art	motion blur	a photo with motion blur|a blurred moving subject	photo-style	
-reflection-photo	art	reflection photo	a photo of a reflection|a reflection in water or glass	photo-style	
-symmetry-photo	art	symmetry photo	a symmetry photo|a picture of a symmetry photo	photo-style	
-abstract-photo	art	abstract photo	an abstract photo|a picture of an abstract photo	photo-style	
-texture-photo	art	texture photo	a photo of a texture|a close-up of a surface texture	photo-style	
-shadows	art	shadows	a photo of long shadows|strong shadows on a wall	photo-style	
-lens-flare	art	lens flare	a lens flare|a picture of a lens flare	photo-style	
-neon-night-photo	art	neon night photo	a neon lit night photo|colorful neon lights at night	photo-style	
+long-exposure	art	long exposure	a long exposure photo|a photo with light trails and smooth water	photo-style	0.05
+macro-photo	art	macro photo	a macro photo|an extreme close-up of a tiny subject	photo-style	0.05
+aerial-photo	art	aerial photo	an aerial photo|a photo taken from above	photo-style	0.05
+drone-photo	art	drone photo	a drone photo|a picture of a drone photo	photo-style	0.05
+night-photo	art	night photo	a night photo|a photo taken at night	photo-style	0.05
+portrait-photo	art	portrait photo	a portrait photo|a photo with a blurred background	photo-style	0.05
+panorama	art	panorama	a panorama|a very wide panoramic photo	photo-style	0.05
+wide-angle-photo	art	wide-angle photo	a wide-angle photo|a picture of a wide-angle photo	photo-style	0.05
+fisheye-photo	art	fisheye photo	a fisheye photo|a picture of a fisheye photo	photo-style	0.05
+bokeh	art	bokeh	a photo with bokeh|soft blurred background lights	photo-style	0.05
+silhouette-photo	art	silhouette photo	a silhouette photo|a dark shape against a bright sky	photo-style	0.05
+double-exposure	art	double exposure	a double exposure|a picture of a double exposure	photo-style	0.05
+tilt-shift	art	tilt-shift	a tilt-shift|a picture of a tilt-shift	photo-style	0.05
+street-photography	art	street photography	a street photography|a picture of a street photography	photo-style	0.05
+landscape-photography	art	landscape photography	a landscape photography|a picture of a landscape photography	photo-style	0.05
+architecture-photography	art	architecture photography	an architecture photography|a picture of an architecture photography	photo-style	0.05
+food-photography	art	food photography	a food photography|a picture of a food photography	photo-style	0.05
+product-photo	art	product photo	a product photo|an item on a plain background	photo-style	0.05
+studio-photo	art	studio photo	a studio photo|a subject lit in a studio	photo-style	0.05
+flat-lay	art	flat lay	a flat lay photo|objects arranged on a surface seen from above	photo-style	0.05
+close-up	art	close-up	a close-up photo|a tight close-up	photo-style	0.05
+minimalist-photo	art	minimalist photo	a minimalist photo|a picture of a minimalist photo	photo-style	0.05
+high-contrast-photo	art	high contrast photo	a high contrast photo|a picture of a high contrast photo	photo-style	0.05
+blurry-photo	art	blurry photo	a blurry photo|an out of focus photo	photo-style	0.05
+overexposed-photo	art	overexposed photo	an overexposed photo|a picture of an overexposed photo	photo-style	0.05
+underexposed-photo	art	underexposed photo	an underexposed photo|a picture of an underexposed photo	photo-style	0.05
+motion-blur	art	motion blur	a photo with motion blur|a blurred moving subject	photo-style	0.05
+reflection-photo	art	reflection photo	a photo of a reflection|a reflection in water or glass	photo-style	0.05
+symmetry-photo	art	symmetry photo	a symmetry photo|a picture of a symmetry photo	photo-style	0.05
+abstract-photo	art	abstract photo	an abstract photo|a picture of an abstract photo	photo-style	0.05
+texture-photo	art	texture photo	a photo of a texture|a close-up of a surface texture	photo-style	0.05
+shadows	art	shadows	a photo of long shadows|strong shadows on a wall	photo-style	0.05
+lens-flare	art	lens flare	a lens flare|a picture of a lens flare	photo-style	0.05
+neon-night-photo	art	neon night photo	a neon lit night photo|colorful neon lights at night	photo-style	0.05
 light-painting	art	light painting	a light painting|a picture of a light painting	photo-style	
-hdr-photo	art	hdr photo	a hdr photo|a picture of a hdr photo	photo-style	
+hdr-photo	art	hdr photo	a hdr photo|a picture of a hdr photo	photo-style	0.05
 photo-collage	art	photo collage	a photo collage|several photos in one frame	photo-style	
 photo-booth-strip	art	photo booth strip	a photo booth strip|a picture of a photo booth strip	photo-style	
 film-strip	art	film strip	a film strip|a picture of a film strip	photo-style	
 contact-sheet	art	contact sheet	a contact sheet|a picture of a contact sheet	photo-style	
-split-screen	art	split screen	a split screen image|an image divided into two halves	photo-style	
+split-screen	art	split screen	a split screen image|an image divided into two halves	photo-style	0.05
