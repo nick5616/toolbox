@@ -32,7 +32,8 @@ registerLayer({
     return {
       render(f) {
         const life = f.params.life as number;
-        const rings = Math.round(f.params.rings as number);
+        const rings = Math.max(1, Math.round((f.params.rings as number) * Math.max(0.5, Math.min(1.5, f.intensity))));
+        const amount = Math.min(1.5, f.intensity);
         const stagger = 0.13;
         const short = Math.min(f.w, f.h);
         const reach = (f.params.maxRadius as number) * short;
@@ -64,7 +65,7 @@ registerLayer({
             const ease = 1 - Math.pow(1 - q, 2.6);
             const radius = Math.max(2, reach * ease * (1 - 0.1 * j));
             const th = Math.max(1.2, widthPx * (1.5 - 1.0 * q) * (1 - 0.18 * j));
-            const alpha = Math.pow(1 - q, 1.6) * smoothstep(0, 0.03, age) * strength * f.opacity * (1 - 0.22 * j);
+            const alpha = Math.pow(1 - q, 1.6) * smoothstep(0, 0.03, age) * strength * amount * f.opacity * (1 - 0.22 * j);
             batch.push(cx, cy, radius, radius, col[0] * bright, col[1] * bright, col[2] * bright, alpha, 0, th);
           }
         }

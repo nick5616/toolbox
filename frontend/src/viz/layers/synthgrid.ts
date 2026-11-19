@@ -3,7 +3,7 @@
  * grid floor that surges forward on every beat, and mountains shaped by the
  * live spectrum. The sun swells with the kick.
  */
-import { bgShader, beatPosition, commonParams, drive, fullscreenLayer } from "./_bg/util";
+import { bgShader, commonParams, drive, fullscreenLayer } from "./_bg/util";
 import { registerLayer } from "./registry";
 
 const FS = bgShader(`
@@ -135,8 +135,7 @@ registerLayer({
         smoothed[i] = (a * 0.25 + b * 0.5 + c * 0.25) * react;
       }
       p.fv("u_spec", smoothed);
-      const sp = f.params.speed as number;
-      const scroll = beatPosition(f, 0.8) * 0.5 * (f.params.gridSpeed as number) * sp;
+      const scroll = f.beatIntegral("gridSpeed*speed") * 0.5;
       p.f1("u_horizon", f.params.horizon as number)
         .f1("u_sunR", f.params.sunSize as number)
         .f1("u_sunPulse", f.params.sunPulse as number)

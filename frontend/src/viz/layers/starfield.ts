@@ -6,7 +6,7 @@
  */
 import { FULLSCREEN_VS, Program } from "../gl/core";
 import { QuadBatch } from "../gl/quads";
-import { bgShader, cumSignal, drive, speedScale } from "./_bg/util";
+import { bgShader, drive } from "./_bg/util";
 import { registerLayer, setPaletteUniforms } from "./registry";
 
 const MAX_STARS = 1600;
@@ -78,9 +78,8 @@ registerLayer({
         const sp = f.params.speed as number;
         const warp = f.params.warp as number;
         const bright = f.params.brightness as number;
-        const sScale = speedScale(f);
-        // travel in whole fly-throughs; the instantaneous speed sets the streak length
-        const cyc = 0.035 * sp * f.motionSec + 0.11 * sp * react * cumSignal(f.signals, "drums.level", f.tMs) * sScale + 0.5 * warp * react * sp * cumSignal(f.signals, "drop.pulse", f.tMs) * sScale + 0.04 * sp * react * cumSignal(f.signals, "kick", f.tMs) * sScale;
+        // travel in whole fly-throughs (integrals of the rates); the instantaneous speed sets the streak length
+        const cyc = 0.035 * f.integral("speed") + 0.11 * f.integral("speed*react*intensity*drums.level") + 0.5 * f.integral("warp*react*intensity*speed*drop.pulse") + 0.04 * f.integral("speed*react*intensity*kick");
         const vNow = 0.035 * sp + 0.11 * sp * d.drums + 0.5 * warp * sp * d.drop + 0.35 * sp * d.kick * 0.2 + 0.25 * warp * sp * d.lift;
         const streakCyc = vNow * 0.09 * (0.6 + warp * 0.8);
 

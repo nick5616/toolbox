@@ -4,7 +4,7 @@
  * Burns drift and a breathing zoom that follows the bass. With no picture it
  * falls back to a soft palette gradient so a design never looks broken.
  */
-import { bgShader, commonParams, cumSignal, drive, fullscreenLayer, speedScale } from "./_bg/util";
+import { bgShader, commonParams, drive, fullscreenLayer } from "./_bg/util";
 import { registerLayer } from "./registry";
 
 const FS = bgShader(`
@@ -123,10 +123,10 @@ registerLayer({
             break;
           }
         }
-        const sp = f.params.speed as number;
+        const travel = f.integral("speed");
         const kb = f.params.kenBurns as number;
         // Ken Burns: a slow triangle-wave zoom and a lissajous pan (about 50 s per cycle)
-        const ph = (f.motionSec * sp) / 50;
+        const ph = travel / 50;
         const tri = 1 - Math.abs(2 * (ph - Math.floor(ph)) - 1);
         const ease = tri * tri * (3 - 2 * tri);
         const breath = 1 + (f.params.breathe as number) * (0.65 * d.bass + 0.35 * d.kick);
@@ -137,7 +137,7 @@ registerLayer({
           .f1("u_texAspect", aspect)
           .f1("u_contain", f.params.fit === "contain" ? 1 : 0)
           .f1("u_zoom", zoom)
-          .f2("u_pan", Math.sin(f.motionSec * sp * 0.063) * pan, Math.cos(f.motionSec * sp * 0.047) * pan)
+          .f2("u_pan", Math.sin(travel * 0.063) * pan, Math.cos(travel * 0.047) * pan)
           .f1("u_blur", f.params.blur as number)
           .f1("u_dark", f.params.darken as number)
           .f1("u_bright", f.params.brightness as number)
@@ -146,7 +146,7 @@ registerLayer({
           .f1("u_shift", f.params.colorShift as number)
           .f1("u_kick", d.kick)
           .f1("u_flash", d.drop)
-          .f1("u_flow", f.motionSec * sp * 0.5 + cumSignal(f.signals, "mix.level", f.tMs) * speedScale(f) * sp * react * 0.3);
+          .f1("u_flow", travel * 0.5 + f.integral("speed*react*intensity*mix.level") * 0.3);
       },
       () => gl.deleteTexture(dummy),
     );

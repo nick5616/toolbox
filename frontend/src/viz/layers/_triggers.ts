@@ -7,6 +7,10 @@ import type { Analysis, Event2 } from "../analysis";
 
 export const TRIGGER_OPTIONS = ["kick", "snare", "hats", "beat", "downbeat", "drop", "word", "section", "bass", "vocals", "other"] as const;
 
+/** Strength of the barline events in the merged drop+downbeat source; below FLASH_MIN_STRENGTH, so they never flash. */
+export const DOWNBEAT_STRENGTH = 110;
+export const FLASH_MIN_STRENGTH = 200;
+
 const cache = new WeakMap<Analysis, Map<string, readonly Event2[]>>();
 
 function build(a: Analysis, src: string): Event2[] {
@@ -25,7 +29,8 @@ function build(a: Analysis, src: string): Event2[] {
       return [...(k.length > 0 ? k : a.events("mix"))];
     }
     case "drop+downbeat": {
-      const out = [...a.events("drop"), ...a.audio.downbeats.map((t) => [t, 110] as Event2)];
+      // a quiet ring every 4 bars (never a flash) plus the drops (SPEC section C2.7)
+      const out = [...a.events("drop"), ...a.audio.downbeats.filter((_, i) => i % 4 === 0).map((t) => [t, DOWNBEAT_STRENGTH] as Event2)];
       return out.sort((x, y) => x[0] - y[0]);
     }
     default:

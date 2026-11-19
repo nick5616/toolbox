@@ -99,7 +99,8 @@ export interface Drive {
   balance: number;
 }
 
-export function drive(f: FrameInput, react: number): Drive {
+export function drive(f: FrameInput, reactParam: number): Drive {
+  const react = reactParam * f.intensity; // the show's master intensity scales every built-in reaction (SPEC §C2.4)
   const s = f.signals;
   const t = f.tMs;
   const contrast = (x: number) => sat((x - 0.12) / 0.8);

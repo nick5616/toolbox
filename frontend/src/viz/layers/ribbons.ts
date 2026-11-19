@@ -38,7 +38,7 @@ registerLayer({
         const N = f.quality === "draft" ? 96 : 180;
         const ramp = buildRamp(f.palette, p.color as string);
         const useWave = p.source === "wave";
-        const kick = f.signals.value("kick", f.tMs);
+        const kick = f.signals.smoothed("kick", f.tMs);
         const amp = (p.amplitude as number) * f.h * 0.42 * bs.scale;
         const wPx = f.w * (p.span as number);
         
@@ -48,14 +48,14 @@ registerLayer({
         const cosR = Math.cos(bs.rot);
         const sinR = Math.sin(bs.rot);
         lines.begin(bs.glowPx, 0.55);
-        const phaseBase = f.motionSec * flow + f.analysis.cum("mix.level", f.tMs) * flow * 1.6;
+        const phaseBase = f.integral("speed") + f.integral("speed*intensity*mix.level") * 1.6;
         for (let tr = TRAILS; tr >= 0; tr--) {
           if (tr > 0 && trail <= 0.02) continue;
           const tt = f.tMs - tr * TRAIL_MS;
           if (useWave) f.analysis.vector("wave", tt, wave);
           else f.analysis.vector("spectrum", tt, spec);
           const phaseT = phaseBase - tr * (TRAIL_MS / 1000) * flow;
-          const lv = f.signals.value("mix.level", tt);
+          const lv = f.signals.smoothed("mix.level", tt);
           const fade = tr === 0 ? 1 : trail * 0.5 * (1 - tr / (TRAILS + 1));
           for (let k = 0; k < nl; k++) {
             const fk = 1.3 + k * 0.85;

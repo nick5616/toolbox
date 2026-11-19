@@ -3,7 +3,8 @@
  * calls `registerLayer(def)`; `layers/index.ts` imports them all.
  *
  * Determinism (SPEC.md §6.1): no Math.random, Date or performance.now. Use
- * `ctx.rng(key)`, `f.analysis.cum(...)` for accumulated motion, and events in
+ * `ctx.rng(key)`, `f.integral(...)`/`f.beatIntegral(...)` for anything that moves
+ * at a speed (never `speed x time`; see integral.ts for the expression syntax), and events in
  * a lookback window ≤ 8 s for spawned things. A layer that reads the previous
  * frame sets `stateful: true`.
  */
@@ -46,6 +47,8 @@ export interface FrameInput {
   integral(name: string): number;
   /** Like integral, but the rate is per beat: ∫₀ᵗ param × local beats per second dt (travel measured in beats). */
   beatIntegral(name: string): number;
+  /** Phase 21: the effective value of a number param at another time (e.g. a particle's birth), when the engine can resolve it. */
+  paramAt?(name: string, tMs: number): number;
 }
 
 export interface LayerContext {

@@ -4,7 +4,7 @@
  * and the whole thing speeds up with the drums. Cells in the walls light up on
  * hi-hats.
  */
-import { bgShader, beatPosition, commonParams, cumSignal, drive, fullscreenLayer, speedScale } from "./_bg/util";
+import { bgShader, commonParams, drive, fullscreenLayer } from "./_bg/util";
 import { registerLayer } from "./registry";
 
 const FS = bgShader(`
@@ -71,15 +71,14 @@ registerLayer({
     return fullscreenLayer(ctx, FS, (p, f) => {
       const react = f.params.react as number;
       const d = drive(f, react);
-      const sp = f.params.speed as number;
-      const rpb = f.params.ringsPerBeat as number;
-      const travel = beatPosition(f, 0.65) * rpb * sp + cumSignal(f.signals, "drums.level", f.tMs) * speedScale(f) * react * sp * 1.4 + cumSignal(f.signals, "drop.pulse", f.tMs) * speedScale(f) * react * 2.5;
+      // distances are integrals of their rates: a modulated speed changes how fast it flies, never where it is
+      const travel = f.beatIntegral("speed*ringsPerBeat") + f.integral("speed*react*intensity*drums.level") * 1.4 + f.integral("react*intensity*drop.pulse") * 2.5;
       const sway = f.motionSec * 0.25;
       p.f1("u_travel", travel)
         .f1("u_dens", f.params.density as number)
         .f1("u_segs", Math.round(f.params.segments as number))
         .f1("u_twist", f.params.twist as number)
-        .f1("u_spin", f.motionSec * 0.08 * sp + cumSignal(f.signals, "bass.level", f.tMs) * speedScale(f) * react * 0.12)
+        .f1("u_spin", f.integral("speed") * 0.08 + f.integral("react*intensity*bass.level") * 0.12)
         .f1("u_bright", f.params.brightness as number)
         .f1("u_shift", f.params.colorShift as number)
         .f1("u_kick", d.kick)

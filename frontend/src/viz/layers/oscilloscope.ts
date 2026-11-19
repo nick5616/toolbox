@@ -38,7 +38,7 @@ registerLayer({
         const gain = p.gain as number;
         const pers = p.persistence as number;
         const ghosts = Math.round(pers * 7);
-        const level = f.signals.value("mix.level", f.tMs);
+        const level = f.signals.smoothed("mix.level", f.tMs);
         const balance = f.signals.value("mix.balance", f.tMs, 80, 250);
         const thick = (p.thickness as number) * b.short * 0.5;
         const wPx = f.w * (p.width as number);

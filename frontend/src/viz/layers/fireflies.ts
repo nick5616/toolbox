@@ -39,7 +39,7 @@ registerLayer({
         const react = f.params.react as number;
         const mode = f.params.color as string;
         const voice = f.signals.value("vocals.level", f.tMs, 30, 400);
-        const word = f.signals.value("word.pulse", f.tMs);
+        const word = f.signals.smoothed("word.pulse", f.tMs);
         const lift = lerp(0.55, 0.55 + 0.9 * voice, react) * (0.6 + 0.8 * glow);
         const T = f.motionSec * drift * 0.45 + a.cum("mix.level", f.tMs) * 0.5 * drift;
         const seed = f.seed;

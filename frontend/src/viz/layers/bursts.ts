@@ -57,7 +57,8 @@ registerLayer({
       render(f) {
         const a = f.analysis;
         const life = f.params.life as number;
-        const speed = f.params.speed as number;
+        const speedNow = f.params.speed as number;
+        const amount = Math.max(0, Math.min(1.5, f.intensity));
         const spread = f.params.spread as number;
         const trail = f.params.trail as number;
         const grav = f.params.gravity as number;
@@ -75,7 +76,7 @@ registerLayer({
         });
         pending.sort((p, q) => q.t - p.t);
         batch.begin(f.opacity);
-        let budget = PARTICLE_CAP;
+        let budget = amount < 0.02 ? 0 : PARTICLE_CAP;
         for (const ev of pending) {
           if (budget < 8) break;
           const src = SOURCES[ev.src] as (typeof SOURCES)[number];
@@ -100,7 +101,9 @@ registerLayer({
             baseAng = left ? -Math.PI / 4 : (-3 * Math.PI) / 4;
           }
           const full = spread > 0.97 && origin !== "bottom" && origin !== "sides";
-          const n = Math.min(budget, Math.max(4, Math.round(perBurst * src.scale * (0.45 + 0.55 * ev.strength) * draft)));
+          // particles keep the speed their burst was born with: a speed mod never drags sparks that are already flying
+          const speed = f.paramAt ? f.paramAt("speed", ev.t) : speedNow;
+          const n = Math.min(budget, Math.max(4, Math.round(perBurst * src.scale * (0.45 + 0.55 * ev.strength) * draft * amount)));
           budget -= n;
           const v0Base = short * 0.62 * speed * (0.65 + 0.55 * ev.strength);
           const k = 1.5;
@@ -135,9 +138,9 @@ registerLayer({
             const q = age / 0.4;
             const ease = 1 - Math.pow(1 - q, 3);
             const rad = short * 0.07 * (0.5 + speed * 0.5) * (0.4 + ease);
-            batch.add(Sprite.ring, ox, oy, rad, rad, col, Math.pow(1 - q, 2) * 1.1 * ev.strength, 0, 0.05, 0, bright);
+            batch.add(Sprite.ring, ox, oy, rad, rad, col, Math.pow(1 - q, 2) * 1.1 * ev.strength * amount, 0, 0.05, 0, bright);
             const fl = 1 - smoothstep(0, 0.14, age);
-            batch.add(Sprite.ember, ox, oy, short * 0.03, short * 0.03, col, fl * 0.9 * ev.strength, 0, 0, 1, bright * 1.4);
+            batch.add(Sprite.ember, ox, oy, short * 0.03, short * 0.03, col, fl * 0.9 * ev.strength * amount, 0, 0, 1, bright * 1.4);
           }
         }
         batch.draw(f.w, f.h, (f.params.glow as number) * 0.8);
