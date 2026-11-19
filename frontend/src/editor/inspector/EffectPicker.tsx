@@ -10,6 +10,7 @@ import type { PostType } from "@/viz/types";
 import { EFFECT_CATALOG, EFFECT_CATEGORIES } from "./effectCatalog";
 import { FX_STACKS } from "./FxStacks";
 import { EFFECT_TEMPLATES } from "./templates";
+import { builtInLookEntries, loadSavedLooks, lookEffects, savedLookEntries } from "./looks";
 import styles from "./EffectPicker.module.css";
 
 export const STACKS_GROUP = "Stacks";
@@ -30,6 +31,10 @@ export function buildEntries(types: readonly PostType[], withStacks: boolean, la
   if (withStacks) {
     for (const s of FX_STACKS) out.push({ id: `stack:${s.id}`, label: s.label, description: s.description, group: STACKS_GROUP, make: s.make, count: s.make().length });
     for (const t of EFFECT_TEMPLATES) out.push({ id: `tpl:${t.id}`, label: t.label, description: "One effect that reacts to the markers.", group: STACKS_GROUP, make: () => [t.make()], count: 1 });
+    // Phase 21: Color Grader looks (built-in and saved) as effect stacks.
+    for (const l of [...savedLookEntries(), ...builtInLookEntries()]) {
+      out.push({ id: l.id, label: l.label, description: l.description, group: l.group, make: () => lookEffects(l.recipe), count: lookEffects(l.recipe).length });
+    }
   }
   for (const cat of EFFECT_CATEGORIES) {
     for (const t of types) {
@@ -72,7 +77,17 @@ export function EffectPicker({ types, stacks, room, label, makeEffect, onAdd }: 
   const popRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const entries = useMemo(() => (open ? buildEntries(types, stacks, label, makeEffect) : []), [open, types, stacks, label, makeEffect]);
+  const [looksTick, setLooksTick] = useState(0);
+  useEffect(() => {
+    if (!open || !stacks) return;
+    let live = true;
+    void loadSavedLooks().then(() => live && setLooksTick((n) => n + 1));
+    return () => {
+      live = false;
+    };
+  }, [open, stacks]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- looksTick re-reads the saved looks once they load
+  const entries = useMemo(() => (open ? buildEntries(types, stacks, label, makeEffect) : []), [open, types, stacks, label, makeEffect, looksTick]);
   const shown = useMemo(() => filterEntries(entries, query), [entries, query]);
   const cur = Math.min(active, Math.max(0, shown.length - 1));
 

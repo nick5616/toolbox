@@ -807,3 +807,29 @@ Newest last. Format: date — decision — why.
   - `workspace_isolation_test.go` fails on new code reaching global folders.
 - **2026-11-19: `RenderPlan` max single-file answer is 256 MB** (was 64 MB) for full-resolution stills.
 - **2026-11-19: Capture-harness incident (D1).** The first smoke launch ran before W1's `TOOLBOX_WORKSPACE` support existed (the Wave 0 `Resolve` stub ignored it), so the app opened the real Personal support folder for a few seconds before the harness stopped it — a normal start, nothing written beyond what any start writes. The harness now refuses to continue unless the app's "starting Toolbox support=…" log line names a capture folder, and W1's real `Resolve` honours the env var.
+- **2026-11-19: Wave 1 integration notes.**
+  - **Timeline (E3).** The plain wheel now scrolls tracks; Ctrl+wheel/pinch zooms (as other editors). Drops and moves overwrite, and Ctrl inserts (Ctrl must be pressed after the drag starts, because Ctrl at pointer-down still toggles selection). Other decisions:
+    - **No track volume fader.** It would need a document field; clip volume, the volume line, mute and solo cover it.
+    - **Audio tracks** go at the bottom of the stack, so A1 sits next to the video.
+    - **Linked clips** move sideways together, but change tracks only when they're on one track.
+    - **Shortcuts** got an optional `scope`.
+    - **Edit Studio's two rulers.** It now shows the new ruler as well as its Lanes ruler row; the visual pass decides whether to merge them.
+  - **Preview (E2/E5).**
+    - **Draft and Full.** Draft is the default. Full renders at full engine quality, and uses export-tier streams only when they exist (they're made at export time), so Full mostly sharpens effects and text rather than footage.
+    - **Song and solo.** The song ignores track solo and mute.
+    - **J** now plays backwards (−1×, −2×, −4×).
+  - **Keys (E4).** Key distance and spill work on gamma-encoded values. Crop makes the cut area transparent and doesn't rescale. The eyedropper reads the live engine through `viz/edit/preSampler.ts`, which `EditCanvas` registers.
+  - **Color Grader (G1/G2/G3):**
+    - **How a look reaches the shader.** The recipe goes in as a JSON `table` param, packed into a 16 × 16 float texture.
+    - **Effects outside the colour chain** that use a region or a pulse are wrapped in a `gradelook` stash/restore pair.
+    - **At most 8 posts:** the weakest spatial ops are dropped first when a look would exceed that.
+    - **Region maps.** Subject and people are one map (the Background Remover alpha for pictures, the people matte for videos). Video depth is made from the 540 px preview stream.
+    - **Vibe in a pipeline step** runs inside the job, so the runner never waits on the model.
+    - **Saved looks in steps** are referenced as `saved:<name>`; Go's typed validator refuses unknown tiers or curves that TS repairs (`tsOnly` vectors).
+    - **Saved and built-in looks in the Video Editor** appear in its effect picker under "My looks" and "Looks", compiled at Bold (0.5) with no region maps.
+    - **Chaos.** The tool keeps its own Chaos generator (`tools/grade/chaos.ts`, with motion for videos), alongside the engine's `grade/chaos.ts`.
+  - **Workspaces (W1/W2).**
+    - **Which workspace a plain launch opens.** `workspaces.json`'s `active` is never written on a switch. A switch relaunches with `--workspace`, so a plain launch (start at login) opens Personal. The last-used workspace is recorded as `lastUsed`.
+    - **Switching from a sandbox** is refused, because the env var would override the switch.
+    - **A switch asks the Focus quit gate first.** If friction is later released, Toolbox quits instead of switching.
+    - **The palette's "Switch workspace…"** opens Settings → Workspaces, plus one command per workspace.
