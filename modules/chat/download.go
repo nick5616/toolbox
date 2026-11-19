@@ -31,23 +31,71 @@ var downloadClient = &http.Client{Transport: &http.Transport{
 
 var errCorrupt = "The download was corrupted — try again"
 
-// downloadModel fetches e into <ModelsDir>/llm: streamed to <file>.part with
-// HTTP Range resume, sha256-verified, then renamed. A no-op when present.
+// dlFile is one file a model needs: the GGUF or its projector.
+type dlFile struct {
+	name   string // for logs
+	url    string
+	final  string
+	bytes  int64
+	sha256 string
+}
+
+// files lists what e needs that isn't on disk yet (GGUF first).
+func (c *Chat) missingFiles(e catalogEntry) []dlFile {
+	var out []dlFile
+	if !c.modelPresent(e.ID) {
+		out = append(out, dlFile{name: e.File, url: c.modelURL(e), final: c.modelPath(e), bytes: e.Bytes, sha256: e.SHA256})
+	}
+	if e.MMProj != nil && !c.projectorPresent(e) {
+		url := e.MMProjURL()
+		if c.mmprojURL != nil {
+			url = c.mmprojURL(e)
+		}
+		out = append(out, dlFile{name: e.MMProj.File, url: url, final: c.mmprojPath(e), bytes: e.MMProj.Bytes, sha256: e.MMProj.SHA256})
+	}
+	return out
+}
+
+// downloadModel fetches e (its GGUF and, for a model that can see, its
+// projector) into <ModelsDir>/llm: each streamed to <file>.part with HTTP
+// Range resume, sha256-verified, then renamed. One progress bar covers both.
+// A no-op when everything is present.
 func (c *Chat) downloadModel(ctx context.Context, job *core.JobContext, e catalogEntry) error {
 	c.dlMu.Lock() // only one download at a time
 	defer c.dlMu.Unlock()
-	if c.modelPresent(e.ID) {
+	files := c.missingFiles(e)
+	if len(files) == 0 {
 		job.Progress(1, "Already downloaded")
 		return nil
 	}
-	final := c.modelPath(e)
-	part := final + ".part"
-	if err := os.MkdirAll(filepath.Dir(final), 0o755); err != nil {
+	var total int64
+	for _, f := range files {
+		total += f.bytes
+	}
+	var done int64
+	for _, f := range files {
+		base, size := done, f.bytes
+		prog := func(frac float64, msg string) {
+			job.Progress((float64(base)+frac*float64(size))/float64(total)*0.99, msg)
+		}
+		if err := c.downloadFile(ctx, job, f, prog); err != nil {
+			return err
+		}
+		done += f.bytes
+	}
+	job.Progress(1, "Downloaded "+e.Label)
+	return nil
+}
+
+// downloadFile fetches one file; prog gets fractions of that file in 0..1.
+func (c *Chat) downloadFile(ctx context.Context, job *core.JobContext, f dlFile, prog func(float64, string)) error {
+	part := f.final + ".part"
+	if err := os.MkdirAll(filepath.Dir(f.final), 0o755); err != nil {
 		return core.Errorf(core.CodeInternal, "Couldn't create the models folder").WithCause(err)
 	}
 
 	for attempt := 0; ; attempt++ {
-		err := c.fetchPart(ctx, job, e, part)
+		err := c.fetchPart(ctx, job, f, part, prog)
 		if errors.Is(err, errRangeInvalid) && attempt == 0 {
 			_ = os.Remove(part) // the partial file no longer matches: start over
 			continue
@@ -58,7 +106,7 @@ func (c *Chat) downloadModel(ctx context.Context, job *core.JobContext, e catalo
 		break
 	}
 
-	job.Progress(0.99, "Verifying")
+	prog(1, "Verifying")
 	got, err := hashFile(ctx, part)
 	if err != nil {
 		if cerr := ctx.Err(); cerr != nil {
@@ -66,43 +114,42 @@ func (c *Chat) downloadModel(ctx context.Context, job *core.JobContext, e catalo
 		}
 		return core.Errorf(core.CodeInternal, "Couldn't verify the download").WithCause(err)
 	}
-	if !strings.EqualFold(got, e.SHA256) {
+	if !strings.EqualFold(got, f.sha256) {
 		_ = os.Remove(part)
-		job.Logf("Checksum mismatch for %s: expected %s, got %s", e.File, e.SHA256, got)
+		job.Logf("Checksum mismatch for %s: expected %s, got %s", f.name, f.sha256, got)
 		return core.Errorf(core.CodeToolFailed, "%s", errCorrupt)
 	}
-	_ = os.Remove(final)
-	if err := os.Rename(part, final); err != nil {
+	_ = os.Remove(f.final)
+	if err := os.Rename(part, f.final); err != nil {
 		return core.Errorf(core.CodeInternal, "Couldn't save the model").WithCause(err)
 	}
-	job.Progress(1, "Downloaded "+e.Label)
 	return nil
 }
 
 var errRangeInvalid = errors.New("range not satisfiable")
 
-// fetchPart appends to part until it holds e.Bytes bytes.
-func (c *Chat) fetchPart(ctx context.Context, job *core.JobContext, e catalogEntry, part string) error {
+// fetchPart appends to part until it holds f.bytes bytes.
+func (c *Chat) fetchPart(ctx context.Context, job *core.JobContext, f dlFile, part string, prog func(float64, string)) error {
 	var have int64
 	if fi, err := os.Stat(part); err == nil {
 		have = fi.Size()
-		if have > e.Bytes {
+		if have > f.bytes {
 			_ = os.Remove(part)
 			have = 0
 		}
 	}
-	if have == e.Bytes {
+	if have == f.bytes {
 		return nil
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.modelURL(e), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.url, nil)
 	if err != nil {
 		return core.Errorf(core.CodeInternal, "Couldn't start the download").WithCause(err)
 	}
 	if have > 0 {
 		req.Header.Set("Range", "bytes="+strconv.FormatInt(have, 10)+"-")
-		job.Logf("Resuming %s at %s", e.File, formatBytes(have))
+		job.Logf("Resuming %s at %s", f.name, formatBytes(have))
 	} else {
-		job.Logf("Downloading %s", e.File)
+		job.Logf("Downloading %s", f.name)
 	}
 	resp, err := downloadClient.Do(req)
 	if err != nil {
@@ -142,8 +189,8 @@ func (c *Chat) fetchPart(ctx context.Context, job *core.JobContext, e catalogEnt
 			if time.Since(lastReport) >= 250*time.Millisecond {
 				lastReport = time.Now()
 				rate := float64(received-startBytes) / max(time.Since(start).Seconds(), 0.001)
-				job.Progress(0.98*float64(received)/float64(e.Bytes),
-					fmt.Sprintf("%s of %s · %s/s", formatBytes(received), formatBytes(e.Bytes), formatBytes(int64(rate))))
+				prog(0.98*float64(received)/float64(f.bytes),
+					fmt.Sprintf("%s of %s · %s/s", formatBytes(received), formatBytes(f.bytes), formatBytes(int64(rate))))
 			}
 		}
 		if rerr == io.EOF {
@@ -153,7 +200,7 @@ func (c *Chat) fetchPart(ctx context.Context, job *core.JobContext, e catalogEnt
 			return downloadErr(ctx, "The download was interrupted", rerr)
 		}
 	}
-	if received != e.Bytes {
+	if received != f.bytes {
 		return core.Errorf(core.CodeToolFailed, "The download ended early").WithHint("Try again; it will continue where it stopped")
 	}
 	return out.Close()
@@ -218,7 +265,10 @@ func (c *Chat) deleteModel(id string) error {
 	c.stopGenerationFor(func(g *generation) bool { return g.model == id })
 	c.stopServerIf(func(s *server) bool { return s.model == id })
 	final := c.modelPath(e)
-	for _, p := range []string{final, final + ".part"} {
+	for _, p := range []string{final, final + ".part", c.mmprojPath(e), c.mmprojPath(e) + ".part"} {
+		if p == "" || p == ".part" {
+			continue
+		}
 		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
 			return core.Errorf(core.CodeInternal, "Couldn't delete the model").WithCause(err)
 		}

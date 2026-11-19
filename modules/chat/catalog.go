@@ -117,3 +117,38 @@ func (c *Chat) modelPresent(id string) bool {
 	fi, err := os.Stat(c.modelPath(e))
 	return err == nil && fi.Mode().IsRegular() && fi.Size() == e.Bytes
 }
+
+// mmprojPath is where e's projector lives, next to the GGUF and named per
+// model (every upstream repo calls its file mmproj-F16.gguf):
+// <ModelsDir>/llm/<GGUF stem>.<projector file>.
+func (c *Chat) mmprojPath(e catalogEntry) string {
+	if e.MMProj == nil {
+		return ""
+	}
+	stem := strings.TrimSuffix(e.File, filepath.Ext(e.File))
+	return filepath.Join(c.cfg.ModelsDir, "llm", stem+"."+e.MMProj.File)
+}
+
+// projectorPresent is a cheap check: e has a projector and its file exists
+// with the pinned size.
+func (c *Chat) projectorPresent(e catalogEntry) bool {
+	if e.MMProj == nil {
+		return false
+	}
+	fi, err := os.Stat(c.mmprojPath(e))
+	return err == nil && fi.Mode().IsRegular() && fi.Size() == e.MMProj.Bytes
+}
+
+// fullyPresent: the GGUF and, for a model that can see, its projector.
+func (c *Chat) fullyPresent(id string) bool {
+	e, ok := c.lookup(id)
+	if !ok || !c.modelPresent(id) {
+		return false
+	}
+	return e.MMProj == nil || c.projectorPresent(e)
+}
+
+// visionReady: both the model and its projector are on disk.
+func (c *Chat) visionReady(e catalogEntry) bool {
+	return c.projectorPresent(e) && c.modelPresent(e.ID)
+}

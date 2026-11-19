@@ -61,6 +61,7 @@ type Chat struct {
 	// Test seams.
 	serverEnv []string                    // extra environment for llama-server
 	modelURL  func(e catalogEntry) string // model download URL
+	mmprojURL func(e catalogEntry) string // projector download URL (nil = the pinned one)
 	entries   func() []catalogEntry       // the catalog
 	dlMu      sync.Mutex                  // one model download at a time
 
@@ -134,7 +135,7 @@ func (m *Module) Validate([]string, json.RawMessage) error { return core.ErrJobL
 func (m *Module) Run(context.Context, *core.JobContext) error { return core.ErrJobLess }
 
 // ModelPresent implements core.ModelProvider.
-func (m *Module) ModelPresent(preset string) bool { return m.c.modelPresent(preset) }
+func (m *Module) ModelPresent(preset string) bool { return m.c.fullyPresent(preset) }
 
 // FetchModel implements core.ModelProvider: a no-op when the model is
 // present, else the same Range-resuming, sha-verified download as the model job.

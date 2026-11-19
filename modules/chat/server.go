@@ -64,6 +64,7 @@ type server struct {
 	// Settings the server was started with; a change restarts it.
 	ctxSize int
 	gpu     bool
+	vision  bool // started with --mmproj
 	logs    *logRing
 
 	stopping bool // guarded by Chat.mu
@@ -127,10 +128,13 @@ func looksLikeGPUFailure(lines []string) bool {
 }
 
 // serverArgs builds the llama-server command line.
-func serverArgs(modelPath, keyFile string, ctxSize int, gpu bool) []string {
+func serverArgs(modelPath, mmproj, keyFile string, ctxSize int, gpu bool) []string {
 	args := []string{
 		"-m", modelPath, "--host", "127.0.0.1", "--port", "0", "--api-key-file", keyFile,
 		"--jinja", "-c", strconv.Itoa(ctxSize), "--no-webui", "--sleep-idle-seconds", "300",
+	}
+	if mmproj != "" {
+		args = append(args, "--mmproj", mmproj)
 	}
 	if gpu {
 		return append(args, "-ngl", "99")
@@ -161,9 +165,13 @@ func (c *Chat) launch(ctx context.Context, exe string, e catalogEntry, ctxSize i
 		return nil, &launchError{cause: err}
 	}
 
+	mmprojArg := ""
+	if c.projectorPresent(e) {
+		mmprojArg = c.mmprojPath(e)
+	}
 	pctx, cancel := context.WithCancel(context.Background())
 	s := &server{
-		cancel: cancel, key: key, keyFile: keyFile, model: e.ID, ctxSize: ctxSize, gpu: gpu,
+		cancel: cancel, key: key, keyFile: keyFile, model: e.ID, ctxSize: ctxSize, gpu: gpu, vision: mmprojArg != "",
 		backend: core.ChatBackendCPU, logs: &logRing{n: 200},
 	}
 	if gpu {
@@ -184,7 +192,7 @@ func (c *Chat) launch(ctx context.Context, exe string, e catalogEntry, ctxSize i
 		}
 	}
 	p, err := proc.Start(pctx, proc.Spec{
-		Path: exe, Args: serverArgs(c.modelPath(e), keyFile, ctxSize, gpu), Env: c.serverEnv,
+		Path: exe, Args: serverArgs(c.modelPath(e), mmprojArg, keyFile, ctxSize, gpu), Env: c.serverEnv,
 		OnStdout: onLine, OnStderr: onLine,
 	})
 	if err != nil {
@@ -270,7 +278,8 @@ func (c *Chat) ensureServer(ctx context.Context, e catalogEntry) (*server, error
 	if cur != nil {
 		// Reuse it unless the model or context size changed, or GPU was turned
 		// off. A server that fell back to CPU keeps serving while GPU is on.
-		if cur.alive() && cur.model == e.ID && cur.ctxSize == st.ContextSize && (st.GPU || !cur.gpu) {
+		if cur.alive() && cur.model == e.ID && cur.ctxSize == st.ContextSize && (st.GPU || !cur.gpu) &&
+			cur.vision == c.projectorPresent(e) {
 			return cur, nil
 		}
 		c.stopServerLocked(cur)

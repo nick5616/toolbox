@@ -14,15 +14,16 @@ import (
 
 // completeOllama POSTs a non-streaming /api/chat (stream:false) and returns
 // the reply. format, when set, is a JSON schema constraining it.
-func completeOllama(ctx context.Context, rawURL, model string, msgs []wireMsg, temp float64, numCtx, maxTokens int, format json.RawMessage) (string, error) {
+func completeOllama(ctx context.Context, rawURL, model string, msgs []wireMsg, temp float64, numCtx, maxTokens int, format json.RawMessage, seed int64) (string, error) {
 	base, err := ollamaBase(rawURL)
 	if err != nil {
 		return "", err
 	}
-	payload := map[string]any{
-		"model": model, "messages": msgs, "stream": false,
-		"options": map[string]any{"temperature": temp, "num_ctx": numCtx, "num_predict": maxTokens},
+	opts := map[string]any{"temperature": temp, "num_ctx": numCtx, "num_predict": maxTokens}
+	if seed != 0 {
+		opts["seed"] = seed
 	}
+	payload := map[string]any{"model": model, "messages": msgs, "stream": false, "options": opts}
 	if len(format) > 0 {
 		payload["format"] = format
 	}
