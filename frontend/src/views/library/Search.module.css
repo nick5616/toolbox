@@ -1,0 +1,536 @@
+/* Smart search in the Library (Phase 20). Colours from tokens only. */
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--fg-faint);
+}
+.dot_strong {
+  background: var(--ok);
+}
+.dot_good {
+  background: var(--accent);
+}
+.dot_maybe {
+  background: var(--warn);
+}
+
+.sources {
+  display: inline-flex;
+  gap: var(--space-1);
+  color: var(--fg-muted);
+}
+.source {
+  display: inline-flex;
+}
+
+.snippet {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+.mark {
+  background: none;
+  color: var(--fg);
+  font-weight: 700;
+}
+
+.pos {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 0 var(--space-1);
+  border-radius: var(--r-sm);
+  background: var(--bg-inset);
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.hitLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.folderLine {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- the chip rows --- */
+
+.chipRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  overflow-x: auto;
+  min-width: 0;
+  scrollbar-width: none;
+}
+.chipRow::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-panel);
+  color: var(--fg);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  cursor: pointer;
+}
+.chip:hover {
+  background: var(--bg-hover);
+}
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.chipOn {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.chipCount {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+.chipDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.chipX {
+  display: inline-flex;
+  color: var(--fg-muted);
+}
+
+.hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.hintLink {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+}
+.hintLink:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* --- status line and gate --- */
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.statusBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0 var(--space-1);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.statusBtn:hover {
+  color: var(--fg);
+}
+.statusBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--fg-faint);
+}
+.tone_busy .statusDot {
+  background: var(--accent);
+}
+.tone_idle .statusDot {
+  background: var(--ok);
+}
+.tone_problem .statusDot {
+  background: var(--warn);
+}
+.tone_paused .statusDot,
+.tone_waiting .statusDot {
+  background: var(--fg-muted);
+}
+
+.statusBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.gate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+.gateText {
+  flex: 1;
+  min-width: 0;
+}
+
+.failures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 260px;
+  overflow: auto;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.failure {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  align-items: center;
+}
+.failName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.failWhy {
+  grid-column: 1 / -1;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+/* --- Things --- */
+
+.things {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--space-3) var(--space-4);
+}
+.thingsHead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: var(--space-2) 0;
+  background: var(--bg-app);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--line);
+}
+.thingsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+.thing {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-panel);
+  color: var(--fg);
+  font: inherit;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+}
+.thing:hover {
+  background: var(--bg-hover);
+}
+.thing:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.thingCover {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--bg-inset);
+}
+.thingBody {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  min-width: 0;
+}
+.thingName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-md);
+}
+.thingCount {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+/* --- detail panel sections --- */
+
+.chipWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+.labelChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  padding: 0 2px 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--bg-panel);
+  font-size: var(--text-sm);
+}
+.labelBtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--fg);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.labelBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--r-sm);
+}
+.labelX {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--fg-muted);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.labelX:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.labelX:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.addLabel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+}
+.completions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.textBox {
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-inset);
+  font-size: var(--text-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.line {
+  display: block;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+button.line {
+  cursor: pointer;
+}
+button.line:hover {
+  background: var(--bg-hover);
+}
+button.line:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.stamp {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  margin-right: var(--space-1);
+}
+.srcLabel {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  margin: var(--space-1) 0 0;
+}
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.caption {
+  margin: 0;
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+}
+
+.settingsStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+.skipList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: 100%;
+}
+.skipRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+.skipName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+.inlineRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.originLine {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+/* A list row that carries a hit: name line, folder line and snippet stack in the name cell. */
+.rowStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+}
+.rowTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowHit {
+  height: auto;
+  min-height: var(--row-h);
+  padding-block: var(--space-1);
+}
+
+.chipSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.sectTitleLocal {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+.sortOff {
+  display: block;
+  opacity: 0.6;
+}

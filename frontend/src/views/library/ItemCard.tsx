@@ -1,14 +1,16 @@
 import { memo, type DragEvent, type MouseEvent } from "react";
 import { startPathsDrag } from "@/lib/fileDrag";
-import { Badge, Icon, IconButton, cx } from "@/components";
+import { Badge, Button, Icon, IconButton, cx } from "@/components";
 import { formatBytes, formatRelativeTime } from "@/lib/format";
 import { FileActions } from "@/tools/_kit/FileActions";
 import { useResultBehaviour } from "@/tools/_kit/ResultRow";
 import type { CardSize } from "@/state/library";
 import { FolderMosaic } from "./previews/FolderMosaic";
 import { ItemThumb } from "./previews/ItemThumb";
-import type { LibItem } from "./items";
+import { HitMeta, Snippet } from "./HitBits";
+import { dirOf, baseOf, type LibItem } from "./items";
 import styles from "./Library.module.css";
+import searchStyles from "./Search.module.css";
 
 /** What every card and row needs from the view that lists it. */
 export interface ItemHandlers {
@@ -20,6 +22,10 @@ export interface ItemHandlers {
   /** Double-click / Enter on a folder. */
   onEnterFolder?: (item: LibItem) => void;
   onForget: (item: LibItem) => void;
+  /** A project hit: open its tool (it has no file to open). */
+  onOpenProject?: (item: LibItem) => void;
+  /** Flat search results in the Folders view: the library folder shows under the name (the root path, "" when unknown). */
+  folderRoot?: string;
   /** The files a drag of this item carries (the whole selection when it is part of one). */
   dragPaths: (item: LibItem) => string[];
 }
@@ -43,6 +49,14 @@ export interface ItemCardProps extends Omit<ItemHandlers, "selection" | "activeK
   stop: boolean;
 }
 
+/** The folder a search result lives in, relative to the library root when it is known. */
+export function folderLine(item: LibItem, root: string): string {
+  const dir = dirOf(item.path).replaceAll("\\", "/");
+  const r = root.replaceAll("\\", "/").replace(/\/+$/, "");
+  if (r && dir.toLowerCase().startsWith(r.toLowerCase())) return dir.slice(r.length).replace(/^\//, "") || baseOf(r);
+  return dir;
+}
+
 /** The "not from a job" dot of a file no tool made. */
 export function NotFromJob() {
   return <span className={styles.notJob} role="img" aria-label="Not from a job" data-tip="Not from a job: this file is in your library folder, but no tool made it" />;
@@ -52,8 +66,14 @@ export function NotFromJob() {
  * One file or folder as a thumbnail card: draggable, double-click or Enter
  * opens it (a folder opens in place), Send to and the file actions below.
  */
-export const ItemCard = memo(function ItemCard({ item, size, selected, active, stop, moduleName, onClick, onEnterFolder, onForget, dragPaths }: ItemCardProps) {
-  const behaviour = useResultBehaviour({ path: item.path, outputId: item.outputId || undefined, missing: item.missing || item.isDir });
+export const ItemCard = memo(function ItemCard({ item, size, selected, active, stop, moduleName, onClick, onEnterFolder, onForget, onOpenProject, folderRoot, dragPaths }: ItemCardProps) {
+  const isProject = !!item.hit?.projectId;
+  const behaviour = useResultBehaviour({
+    path: item.path,
+    outputId: item.outputId || undefined,
+    missing: item.missing || item.isDir,
+    onOpen: isProject ? () => onOpenProject?.(item) : undefined,
+  });
   const props = item.isDir
     ? {
         ...behaviour,
@@ -87,12 +107,20 @@ export const ItemCard = memo(function ItemCard({ item, size, selected, active, s
           {item.isDir ? <Icon name="folder" size={12} /> : null}
           {item.name}
         </span>
+        {folderRoot !== undefined ? <span className={searchStyles.folderLine} data-tip={item.path}>{folderLine(item, folderRoot)}</span> : null}
+        {item.hit ? (
+          <span className={searchStyles.hitLine}>
+            <HitMeta item={item} />
+            {item.moduleId ? <span className={styles.cardMeta}>{moduleName(item.moduleId)}</span> : null}
+          </span>
+        ) : null}
+        {item.hit?.snippet ? <Snippet text={item.hit.snippet} /> : null}
         <span className={styles.cardMeta}>
           {item.missing ? (
             <Badge tone="warn" tip="This file was moved or deleted outside the app">
               MISSING
             </Badge>
-          ) : item.isDir ? null : (
+          ) : item.hit || item.isDir ? null : (
             <>
               {item.moduleId ? <span data-tip="The tool that made this file">{moduleName(item.moduleId)}</span> : null}
               <span data-tip="File size">{formatBytes(item.sizeBytes)}</span>
@@ -101,7 +129,13 @@ export const ItemCard = memo(function ItemCard({ item, size, selected, active, s
           )}
         </span>
       </div>
-      {item.isDir ? null : (
+      {item.isDir ? null : isProject ? (
+        <div className={styles.cardActions}>
+          <Button size="sm" variant="ghost" icon="external-link" data-tip="Open this project in its tool" onClick={() => onOpenProject?.(item)}>
+            Open project
+          </Button>
+        </div>
+      ) : (
         <div className={styles.cardActions}>
           <FileActions outputId={item.outputId || undefined} path={item.path} disabled={item.missing} moduleId="library" />
           {item.registered ? (

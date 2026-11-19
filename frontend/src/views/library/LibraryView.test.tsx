@@ -15,7 +15,7 @@ import { useLibrary } from "@/state/library";
 import { useModules } from "@/state/modules";
 import { useUI } from "@/state/ui";
 import { LibraryView } from "./LibraryView";
-import { entry, folder, img, notImplemented, out, project, resetMocks, svc } from "./testFixtures";
+import { entry, folder, img, notImplemented, out, project, resetMocks, search, svc } from "./testFixtures";
 
 function mod(id: string, name = `Mod ${id}`): Descriptor {
   return { id, name, icon: "box", status: ModuleStatus.StatusReady, accepts: { extensions: [], urls: false } } as unknown as Descriptor;
@@ -183,17 +183,27 @@ describe("LibraryView", () => {
       expect(screen.getByRole("button", { name: /Filters/ }).textContent).toContain("Stems");
     });
 
-    it("debounces search into one query", async () => {
+    it("debounces search into one query (the index answers; names still count)", async () => {
       await show();
       vi.useFakeTimers();
-      const before = svc.Query.mock.calls.length;
-      fireEvent.change(screen.getByLabelText("Search outputs"), { target: { value: "cat" } });
-      expect(svc.Query.mock.calls.length).toBe(before);
+      const before = search.Query.mock.calls.length;
+      fireEvent.change(screen.getByLabelText("Search the library"), { target: { value: "cat" } });
+      expect(search.Query.mock.calls.length).toBe(before);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(250);
       });
+      const q = search.Query.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+      expect(q.text).toBe("cat");
+      expect(search.Query.mock.calls.length).toBe(before + 1);
+    });
+
+    it("falls back to the name search when the index can't answer", async () => {
+      await show();
+      search.Query.mockRejectedValue(notImplemented());
+      svc.Query.mockResolvedValue({ items: [out("cat1")], nextCursor: "" });
+      fireEvent.change(screen.getByLabelText("Search the library"), { target: { value: "cat" } });
+      await screen.findByText("cat1.mp3");
       expect(lastQuery().search).toBe("cat");
-      expect(svc.Query.mock.calls.length).toBe(before + 1);
     });
 
     it("pages with Load more", async () => {

@@ -7,10 +7,14 @@ import { formatBytes } from "@/lib/format";
 import { openTool } from "@/lib/openTool";
 import { isNotImplemented } from "@/state/library";
 import { FileActions } from "@/tools/_kit/FileActions";
-import { BigPreview } from "./BigPreview";
-import { baseOf, dirOf, fromOutput, fromPath, isInside, type LibItem } from "./items";
+import { BigPreview, type SeekTo } from "./BigPreview";
+import { CaptionSection, InThisPicture, TextInFile } from "./DetailSearch";
+import { baseOf, dirOf, extOf, fromOutput, fromPath, isInside, previewKind, type LibItem } from "./items";
 import { ItemThumb } from "./previews/ItemThumb";
 import styles from "./Library.module.css";
+
+/** Documents the index reads text from that have no preview here. */
+const DOC_EXT = ["docx", "pptx", "xlsx", "odt", "odp", "ods", "epub", "html", "htm"];
 
 export interface TrashState {
   available: boolean;
@@ -39,6 +43,11 @@ export interface DetailPanelProps {
   onForget: (item: LibItem) => void;
   onTrash: (item: LibItem) => void;
   onRenamed: (o: Output) => void;
+  /** Smart search (Phase 20): the current search text (for highlighting), the index state and the actions. */
+  query?: string;
+  smartSearch?: boolean;
+  onFindSimilar?: (item: LibItem, pos: number) => void;
+  onFilterLabel?: (label: string) => void;
 }
 
 const MAX_OPTION_ROWS = 12;
@@ -82,7 +91,7 @@ function LinkThumb({ item, label, onClick, current }: { item: LibItem; label: st
 }
 
 /** Everything about one file: big preview, details, lineage, generations and actions. */
-export function DetailPanel({ item, libraryRoot, moduleName, hasTool, trash, renameNonce, onClose, onGo, onForget, onTrash, onRenamed }: DetailPanelProps) {
+export function DetailPanel({ item, libraryRoot, moduleName, hasTool, trash, renameNonce, onClose, onGo, onForget, onTrash, onRenamed, query = "", smartSearch = false, onFindSimilar, onFilterLabel }: DetailPanelProps) {
   const [detail, setDetail] = useState<OutputDetail | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "unavailable" | "error">("loading");
   const [editing, setEditing] = useState(false);
@@ -112,6 +121,14 @@ export function DetailPanel({ item, libraryRoot, moduleName, hasTool, trash, ren
   useEffect(() => {
     setEditing(false);
   }, [item.key]);
+
+  // A hit with a position opens the player there (or a PDF on that page); a text line's click jumps again.
+  const kindOfPreview = previewKind(item);
+  const seekable = kindOfPreview === "video" || kindOfPreview === "audio" || kindOfPreview === "pdf";
+  const [seek, setSeek] = useState<SeekTo | undefined>(undefined);
+  useEffect(() => {
+    setSeek(seekable && item.hit && item.hit.pos >= 0 ? { pos: item.hit.pos, nonce: 1 } : undefined);
+  }, [item.key, item.hit?.pos, seekable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const canRename = item.registered && !item.missing && item.outputId !== "";
   useEffect(() => {
@@ -199,7 +216,7 @@ export function DetailPanel({ item, libraryRoot, moduleName, hasTool, trash, ren
 
       <div className={styles.detailBody}>
         <div className={styles.bigBox}>
-          <BigPreview item={item} />
+          <BigPreview item={item} seek={seek} />
         </div>
 
         <dl className={styles.meta}>
@@ -228,6 +245,23 @@ export function DetailPanel({ item, libraryRoot, moduleName, hasTool, trash, ren
           <dt>Tool</dt>
           <dd>{tool ? moduleName(tool) : "Not from a job"}</dd>
         </dl>
+
+        {smartSearch && !item.missing && (kindOfPreview === "image" || kindOfPreview === "video" || kindOfPreview === "pdf") ? (
+          <>
+            <InThisPicture item={item} onFilter={(l) => onFilterLabel?.(l)} />
+            <div className={styles.chainActions}>
+              <Button size="sm" variant="secondary" icon="scan-search" data-tip="Show the 60 files that look most like this one" onClick={() => onFindSimilar?.(item, kindOfPreview === "image" ? -1 : (item.hit?.pos ?? -1))}>
+                Find similar
+              </Button>
+            </div>
+          </>
+        ) : null}
+        {smartSearch && !item.missing && (kindOfPreview !== "none" || DOC_EXT.includes(extOf(item.path))) ? (
+          <>
+            <TextInFile item={item} query={query} onSeek={(pos) => seekable && setSeek((c) => ({ pos, nonce: (c?.nonce ?? 0) + 1 }))} />
+            <CaptionSection item={item} />
+          </>
+        ) : null}
 
         {state === "loading" ? (
           <div className={styles.loadingLine}>
@@ -345,6 +379,11 @@ export function DetailPanel({ item, libraryRoot, moduleName, hasTool, trash, ren
           disabled={item.missing}
           onClick={() => void copyText(item.path, { what: "path" })}
         />
+        {!item.missing && (kindOfPreview === "image" || kindOfPreview === "video") && hasTool("captions") ? (
+          <Button size="sm" variant="ghost" icon="captions" data-tip="Write alt text and a caption for this file with Caption Writer" onClick={() => void openTool("captions", [item.path])}>
+            Write caption…
+          </Button>
+        ) : null}
         {tool && hasTool(tool) ? (
           <Button size="sm" variant="ghost" icon="external-link" data-tip={`Open this file in ${moduleName(tool)}`} onClick={() => void openTool(tool, [item.path])}>
             Open in {moduleName(tool)}
