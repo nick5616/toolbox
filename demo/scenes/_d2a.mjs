@@ -50,6 +50,17 @@ export async function selectValue(t, label) {
   return t.eval(`(()=>{const s=document.querySelector('select[aria-label=${JSON.stringify(label)}]');return s?s.options[s.selectedIndex].text:null})()`);
 }
 
+/** Changes a native <select> by keys (its popup is invisible to the screencast): click, arrows, Enter; checks the result. */
+export async function chooseOption(t, label, steps, expect) {
+  await t.click({ css: `select[aria-label=${JSON.stringify(label)}]` });
+  const key = steps < 0 ? "ArrowUp" : "ArrowDown";
+  for (let i = 0; i < Math.abs(steps); i++) await t.key(key, { chip: false });
+  await t.key("Enter", { chip: false });
+  await t.hold(300);
+  const now = await selectValue(t, label);
+  if (expect && !new RegExp(expect, "i").test(now ?? "")) throw new Error(`${label}: wanted ${expect}, got ${now}`);
+}
+
 /**
  * Starts a new 16:9 30 fps video in the Video Editor from `paths` (absolute) through the UI, untimed:
  * back to the projects page if a video is open, drop the files, pick the shape, Create, wait for the clips to prepare.
