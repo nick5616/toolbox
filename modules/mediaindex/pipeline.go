@@ -3,6 +3,12 @@ package mediaindex
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
 
 	"toolbox/core"
 	ix "toolbox/core/mediaindex"
@@ -107,12 +113,81 @@ func (m *FilterModule) DescribeStep(options json.RawMessage) (core.StepInfo, err
 	}, nil
 }
 
-// PrepareStep implements core.Chainable.
-func (m *FilterModule) PrepareStep(ctx context.Context, req core.StepRequest) ([]core.StepJob, error) {
-	return nil, core.Errorf(core.CodeNotImplemented, "This step isn't ready yet")
+// modelReady reports whether the vision model's files are installed.
+func (m *FilterModule) modelReady() bool {
+	if m.d.Writer == nil {
+		return false
+	}
+	dir := m.d.Writer.Model().Dir
+	if dir == "" {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(dir, "visual", "model.onnx"))
+	return err == nil
 }
 
-// StepOutputs implements core.Chainable.
+// PrepareStep implements core.Chainable: one job with all the item's files.
+func (m *FilterModule) PrepareStep(_ context.Context, req core.StepRequest) ([]core.StepJob, error) {
+	o, err := filterOptions(req.Options)
+	if err != nil {
+		return nil, err
+	}
+	query, missing := core.ExpandVars(o.Query, req.Item.Vars)
+	if len(missing) > 0 {
+		msg := "The description uses {" + strings.Join(missing, "}, {") + "}, which no earlier step makes"
+		return nil, core.ValidationError(msg, map[string]string{"query": msg})
+	}
+	o.Query = strings.TrimSpace(query)
+	var inputs []string
+	for _, f := range req.Item.Files {
+		if !slices.Contains(inputs, f.Path) {
+			inputs = append(inputs, f.Path)
+		}
+	}
+	if len(inputs) == 0 {
+		return nil, nil
+	}
+	raw, err := json.Marshal(o)
+	if err != nil {
+		return nil, fmt.Errorf("marshal filter options: %w", err)
+	}
+	if err := m.validate(inputs, raw); err != nil {
+		return nil, err
+	}
+	if o.Match != MatchText && !m.modelReady() {
+		return nil, core.ErrWaiting("Install Smart search to sort by content", "Open Settings, then Tool packs, and install Smart search")
+	}
+	return []core.StepJob{{Inputs: inputs, Options: o}}, nil
+}
+
+// StepOutputs implements core.Chainable: the job's result as kept/other files.
 func (m *FilterModule) StepOutputs(job core.Job) (core.StepResult, error) {
-	return core.StepResult{}, core.Errorf(core.CodeNotImplemented, "This step isn't ready yet")
+	var res filterResult
+	if err := json.Unmarshal([]byte(job.ResultJSON), &res); err != nil {
+		return core.StepResult{}, fmt.Errorf("reading the filter result: %w", err)
+	}
+	other := res.Other
+	if other == nil { // dropped to fit the result size: everything not kept
+		kept := make(map[string]bool, len(res.Kept))
+		for _, p := range res.Kept {
+			kept[p] = true
+		}
+		for _, p := range job.Inputs {
+			if !kept[p] {
+				other = append(other, p)
+			}
+		}
+	}
+	out := core.StepResult{Files: []core.RunFile{}, Vars: map[string]string{
+		VarMatched: strconv.Itoa(res.Matched),
+		VarBest:    res.Best,
+	}}
+	add := func(paths []string, role, label string) {
+		for _, p := range paths {
+			out.Files = append(out.Files, core.RunFile{Path: p, Name: filepath.Base(p), Role: role, RoleLabel: label})
+		}
+	}
+	add(res.Kept, RoleKept, "Matching files")
+	add(other, RoleOther, "Other files")
+	return out, nil
 }
