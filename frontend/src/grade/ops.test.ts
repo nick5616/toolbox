@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { POST_TYPES } from "@/viz/types";
 import "@/viz/post";
 import { postDef } from "@/viz/post/registry";
-import { BUILT_IN_LOOKS } from "./looks";
+import { BUILT_IN_LOOKS } from "./builtins";
 import { CHANMIX_PRESETS, defaultParams, isGradeLookKind, OP_DEFS, opParams } from "./ops";
 import { GRADE_OP_KINDS } from "./types";
 import { clampParam } from "./validate";

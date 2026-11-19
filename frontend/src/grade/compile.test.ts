@@ -4,8 +4,8 @@ import { postDef } from "@/viz/post/registry";
 import { resolvePostParams } from "@/viz/edit/clip";
 import { evalEditParam } from "@/viz/edit/params";
 import type { EditParam, EditPost } from "@/viz/edit/types";
-import { compileRecipe, flashSafe, opAmount, wildCurve, wildGain } from "./compile";
-import { BUILT_IN_LOOKS, builtInLook } from "./looks";
+import { compileRecipe, flashSafe, MAX_POSTS, opAmount, wildCurve, wildGain } from "./compile";
+import { BUILT_IN_LOOKS, builtInLook } from "./builtins";
 import { parseTable } from "./pack";
 import { CHAOS_ABOVE, type GradeAuxState, type GradeOp, type GradeRecipe } from "./types";
 
@@ -139,6 +139,23 @@ describe("compileRecipe structure", () => {
     expect(parseTable(both[0]?.params.table as string).ops[0]?.region.kind).toBe("people");
     expect(both.map((p) => p.type)).toEqual(["gradelook", "depthfog", "tiltshift"]);
     expect(compileRecipe(r, 1, NONE).map((p) => p.type)).toEqual(["gradelook"]);
+  });
+
+  it("never returns more than 8 effects: the weakest spatial ops are dropped first", () => {
+    for (const l of BUILT_IN_LOOKS) for (const w of [0, 0.5, 1]) expect(compileRecipe(l.recipe, w, ALL).length, `${l.id} @${w}`).toBeLessThanOrEqual(MAX_POSTS);
+    const kinds = ["vhs", "glitch", "halftone", "chromatic", "sharpen", "mirror", "halation", "edgeglow"] as const;
+    const ops = kinds.map((kind, i) => op({ id: `s0000${i}`, kind, amount: 1 - i * 0.1, region: { kind: "background", feather: 0.2 } }));
+    const posts = compileRecipe(recipe([op({ id: "c00000", kind: "balance" }), ...ops]), 1, ALL);
+    expect(posts.length).toBeLessThanOrEqual(MAX_POSTS);
+    expect(posts[0]?.type).toBe("gradelook");
+    const kept = posts.filter((p) => p.type !== "gradelook").map((p) => p.type);
+    expect(kept).toContain("vhs"); // the strongest stay
+    expect(kept).not.toContain("edgeglow"); // the weakest go
+    // gates stay whole: every restore has its stash
+    const stashes = posts.filter((p) => p.params.stash).length;
+    expect(posts.filter((p) => p.params.restore).length).toBe(stashes);
+    // a clean recipe is untouched
+    expect(compileRecipe(recipe([op({ kind: "vhs" })]), 1, ALL)).toHaveLength(1);
   });
 
   it("is deterministic", () => {

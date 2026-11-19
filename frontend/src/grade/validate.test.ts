@@ -23,6 +23,23 @@ describe("recipe validation: the shared vectors", () => {
   });
 });
 
+describe("recipe validation: TS-only vectors (defaults Go can't express)", () => {
+  it.each(vectors.tsOnly.map((v) => [v.why, v.in, v.out] as const))("%s", (_why, input, out) => {
+    const r = validateRecipe(input);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.recipe).toEqual(out);
+  });
+
+  it("fixes tier, curve and seed", () => {
+    const r = validateRecipe({ v: 1, name: "x", tier: "weird", seed: 12.9, wildCurve: "sideways", ops: [] });
+    expect(r.ok && r.recipe).toMatchObject({ tier: "ai", wildCurve: "linear", seed: 12 });
+    const neg = validateRecipe({ v: 1, name: "x", tier: "ai", seed: -3, wildCurve: "linear", ops: [] });
+    expect(neg.ok && neg.recipe.seed).toBe(0);
+    const big = validateRecipe({ v: 1, name: "x", tier: "ai", seed: 99999999999, wildCurve: "linear", ops: [] });
+    expect(big.ok && big.recipe.seed).toBe(4294967295);
+  });
+});
+
 describe("recipe validation: limits", () => {
   const op = (i: number) => ({ id: `o${i}`, kind: "bleach", on: true, amount: 1, region: { kind: "all" }, params: {} });
   const base = { v: 1, name: "x", tier: "film", seed: 0, wildCurve: "linear" };

@@ -38,7 +38,7 @@ export function parseStops(s: unknown): Stop[] | null {
 }
 
 export function formatStops(stops: readonly Stop[]): string {
-  return stops.map((s) => `${s.hex.toLowerCase()}@${s.pos.toFixed(2)}`).join(",");
+  return stops.map((s) => `${s.hex.toLowerCase()}@${s.pos}`).join(",");
 }
 
 /** A gradient from evenly spaced colours: evenStops("#000000", "#ffffff"). */

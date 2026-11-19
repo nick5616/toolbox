@@ -14,7 +14,7 @@
  *   `chanmix` is a 12 matrix: three output rows of (r, g, b) weights, then the three biases;
  *   `transfer.stats` is 18 numbers (Lab mean L, a, b then standard deviation L, a, b for the shadows,
  *   mids and highlights bands), as GradeService.Transfer returns them;
- * - stops: "#rrggbb@0.00,#rrggbb@1.00" (2..8 stops, positions 0..1; unparseable = the default).
+ * - stops: "#rrggbb@0,#rrggbb@1" (2..8 stops, positions 0..1; unparseable = the default).
  */
 import { GRADE_OP_KINDS, type GradeOpKind, type GradeParam, type OpDef, type OpParamSpec } from "./types";
 
@@ -114,7 +114,7 @@ export const OP_DEFS: Record<GradeOpKind, OpDef> = {
     colorOnly: true,
     animatable: true,
     params: {
-      stops: stops("Gradient", "#0b0b3b@0.00,#ff3d81@0.50,#fff3b0@1.00"),
+      stops: stops("Gradient", "#0b0b3b@0,#ff3d81@0.5,#fff3b0@1"),
       source: enm("Driven by", ["luma", "depth", "hue"], "luma"),
       blend: enm("Blend", ["replace", "color", "soft"], "replace"),
       drift: num("Drift", -1, 1, 0),

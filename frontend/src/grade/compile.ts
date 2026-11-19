@@ -188,6 +188,27 @@ function lookPost(id: string, ops: TableOp[], drives: Array<EditParam | undefine
  * `aux` says which maps exist for the input (see the notes above).
  */
 export function compileRecipe(recipe: GradeRecipe, wild: number, aux: GradeAuxState): EditPost[] {
+  const skip = new Set<string>();
+  let posts = build(recipe, wild, aux, skip);
+  // A clip holds at most MAX_POSTS effects (the edit schema's MAX_EFFECTS). Colour ops share gradelook posts, so
+  // only spatial ops cost extra (1 post, or 3 with a region or pulse): drop the weakest one (lowest effective
+  // amount; on a tie the later one) until the stack fits.
+  while (posts.length > MAX_POSTS) {
+    const spatial = recipe.ops
+      .map((op, i) => ({ op, i, a: opAmount(op, wild, recipe.wildCurve) }))
+      .filter((x) => !isGradeLookKind(x.op.kind) && !skip.has(x.op.id) && x.a >= MIN_AMOUNT);
+    if (spatial.length === 0) break;
+    const weakest = spatial.reduce((m, x) => (x.a < m.a || (x.a === m.a && x.i > m.i) ? x : m));
+    skip.add(weakest.op.id);
+    posts = build(recipe, wild, aux, skip);
+  }
+  return posts;
+}
+
+/** The most effects a clip can hold (viz/edit/schema.ts MAX_EFFECTS). */
+export const MAX_POSTS = 8;
+
+function build(recipe: GradeRecipe, wild: number, aux: GradeAuxState, skip: ReadonlySet<string>): EditPost[] {
   const beatScale = beatBudgetScale(recipe, wild, aux);
   const out: EditPost[] = [];
   let run: TableOp[] = [];
@@ -198,10 +219,20 @@ export function compileRecipe(recipe: GradeRecipe, wild: number, aux: GradeAuxSt
     run = [];
     drives = [];
   };
+  let gate: { id: string; region: Region; regionJson: string; anim: Anim | undefined; posts: EditPost[] } | null = null;
+  const closeGate = () => {
+    if (!gate) return;
+    const key = `g${gate.id}`;
+    out.push(post(`${gate.id}s`, "gradelook", { stash: key }), ...gate.posts);
+    const row: TableOp = { kind: "gate", amount: 1, region: gate.region, anim: gate.anim?.table, params: {} };
+    const restore = lookPost(`${gate.id}r`, [row], [gate.anim?.drive]);
+    out.push({ ...restore, params: { ...restore.params, restore: key } });
+    gate = null;
+  };
 
   for (const op of recipe.ops) {
     const def = OP_DEFS[op.kind];
-    if (!def) continue;
+    if (!def || skip.has(op.id)) continue;
     const amount = opAmount(op, wild, recipe.wildCurve);
     if (amount < MIN_AMOUNT) continue;
     if (def.needs?.includes("depth") && !aux.depth) continue;
@@ -209,6 +240,7 @@ export function compileRecipe(recipe: GradeRecipe, wild: number, aux: GradeAuxSt
     const anim = animOf(op, amount, beatScale);
 
     if (isGradeLookKind(op.kind)) {
+      closeGate();
       if (run.length >= TABLE_OPS) flush();
       run.push({ kind: op.kind as TableOp["kind"], amount, region, anim: anim?.table, params: paramsOf(op) });
       drives.push(anim?.drive);
@@ -220,16 +252,21 @@ export function compileRecipe(recipe: GradeRecipe, wild: number, aux: GradeAuxSt
     if (!sp) continue;
     const gated = region.kind !== "all" || anim !== undefined;
     if (!gated) {
+      closeGate();
       out.push(post(op.id, sp.type, sp.params));
       continue;
     }
-    const key = `g${op.id}`;
-    out.push(post(`${op.id}s`, "gradelook", { stash: key }));
-    out.push(post(op.id, sp.type, sp.params));
-    const gate: TableOp = { kind: "gate", amount: 1, region, anim: anim?.table, params: {} };
-    const restore = lookPost(`${op.id}r`, [gate], [anim?.drive]);
-    out.push({ ...restore, params: { ...restore.params, restore: key } });
+    // Consecutive gated ops with the same region and no pulse share one stash/restore pair.
+    const regionJson = JSON.stringify(region);
+    if (anim === undefined && gate && gate.regionJson === regionJson && !gate.anim) {
+      gate.posts.push(post(op.id, sp.type, sp.params));
+      continue;
+    }
+    closeGate();
+    gate = { id: op.id, region, regionJson, anim, posts: [post(op.id, sp.type, sp.params)] };
+    if (anim !== undefined) closeGate(); // a pulsing op is gated alone
   }
+  closeGate();
   flush();
   return out;
 }

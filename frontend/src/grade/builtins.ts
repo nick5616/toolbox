@@ -1,8 +1,8 @@
 /** The 40 built-in looks, in gallery order (Film, Bold, Bonkers). */
-import type { BuiltInLook } from "../types";
-import { BOLD_LOOKS } from "./bold";
-import { BONKERS_LOOKS } from "./bonkers";
-import { FILM_LOOKS } from "./film";
+import type { BuiltInLook } from "./types";
+import { BOLD_LOOKS } from "./looks/bold";
+import { BONKERS_LOOKS } from "./looks/bonkers";
+import { FILM_LOOKS } from "./looks/film";
 
 export const BUILT_IN_LOOKS: readonly BuiltInLook[] = [...FILM_LOOKS, ...BOLD_LOOKS, ...BONKERS_LOOKS];
 

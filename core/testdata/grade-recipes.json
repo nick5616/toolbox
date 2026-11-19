@@ -1,110 +1,31 @@
 {
-  "comment": "Shared Color Grader recipe vectors (Phase 21 SPEC §E2): Go (modules/grade) and TS (frontend/src/grade) validate each one the same way. valid: output equals input. invalid: refused. clamped: output equals `out`. Rules (frontend/src/grade/validate.ts): unknown kinds dropped; ops > 16 keep the first 16; name trimmed and cut to 40 code points, empty = Untitled; tier not in the list = ai; wildCurve not in the list = linear; seed floored and clamped to 0..4294967295 (non-number = 0); op: on defaults true, amount clamped 0..1 (non-number = 1), chaos kept only when true, anim speed clamped 0.05..6 and wave defaults to sine, anim non-object dropped; region: unknown = all, soft default 0.5, feather default 0.2, split default 0.5, all clamped 0..1, invert only for subject/background/people and only when true; params: only the kind's known keys, each clamped by its spec, invalid values dropped (not replaced); an op id must be 1..6 of [A-Za-z0-9_-] and unique.",
+  "comment": "Shared Color Grader recipe vectors (Phase 21 SPEC §E2): Go (modules/grade) and TS (frontend/src/grade) validate each one the same way. valid: output equals input. invalid: refused. clamped: output equals `out`. tsOnly: like clamped but only the TS validator runs them (Go's typed struct can't tell a missing field from zero, and the TS side also fills defaults). Rules (frontend/src/grade/validate.ts): unknown kinds dropped; ops > 16 keep the first 16; name trimmed and cut to 40 code points, empty = Untitled; (TS only: tier not in the list = ai, wildCurve not in the list = linear; Go refuses them); seed is a u32 (TS also floors and clamps non-integers; not shared); op: on defaults true, amount clamped 0..1 (non-number = 1), chaos kept only when true, anim speed clamped 0.05..6 and wave defaults to sine, anim non-object dropped; region: unknown = all, soft default 0.5, feather default 0.2, split default 0.5, all clamped 0..1, invert only for subject/background/people and only when true; params: only the kind's known keys, each clamped by its spec, invalid values dropped (not replaced); an op id must be 1..6 of [A-Za-z0-9_-] and unique.",
   "valid": [
-    {"v": 1, "name": "Clean", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": []},
-    {"v": 1, "name": "Warm", "tier": "film", "seed": 7, "wildCurve": "late", "ops": [
-      {"id": "a1b2c3", "kind": "balance", "on": true, "amount": 0.6, "region": {"kind": "all"}, "params": {"temp": 0.4, "saturation": 1.1}}
-    ]},
-    {"v": 1, "name": "Everything", "tier": "bonkers", "seed": 4294967295, "wildCurve": "early", "ops": [
-      {"id": "c00001", "kind": "gradmap", "on": true, "chaos": true, "amount": 0.5, "region": {"kind": "subject", "feather": 0.4, "invert": true}, "params": {"stops": "#000000@0.00,#ff0000@0.50,#ffffff@1.00", "source": "depth", "blend": "color", "drift": 0.25}, "anim": {"speed": 0.5, "wave": "sine"}},
-      {"id": "c00002", "kind": "curves", "on": false, "amount": 1, "region": {"kind": "highlights", "soft": 0.3}, "params": {"master": [0, 0.2, 0.5, 0.8, 1]}},
-      {"id": "c00003", "kind": "depthfog", "on": true, "amount": 0.7, "region": {"kind": "near", "split": 0.6, "feather": 0.1}, "params": {"color": "#aabbcc", "start": 0.3, "density": 0.5}, "anim": {"speed": 6, "wave": "beat"}},
-      {"id": "c00004", "kind": "chanmix", "on": true, "amount": 1, "region": {"kind": "background", "feather": 0.2}, "params": {"matrix": [0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0]}}
-    ]}
+    {"v":1,"name":"Clean","tier":"film","seed":0,"wildCurve":"linear","ops":[]},
+    {"v":1,"name":"Warm","tier":"film","seed":7,"wildCurve":"late","ops":[{"id":"a1b2c3","kind":"balance","on":true,"amount":0.6,"region":{"kind":"all"},"params":{"temp":0.4,"saturation":1.1}}]},
+    {"v":1,"name":"Everything","tier":"bonkers","seed":4294967295,"wildCurve":"early","ops":[{"id":"c00001","kind":"gradmap","on":true,"chaos":true,"amount":0.5,"region":{"kind":"subject","feather":0.4,"invert":true},"params":{"stops":"#000000@0,#ff0000@0.5,#ffffff@1","source":"depth","blend":"color","drift":0.25},"anim":{"speed":0.5,"wave":"sine"}},{"id":"c00002","kind":"curves","on":false,"amount":1,"region":{"kind":"highlights","soft":0.3},"params":{"master":[0,0.2,0.5,0.8,1]}},{"id":"c00003","kind":"depthfog","on":true,"amount":0.7,"region":{"kind":"near","split":0.6,"feather":0.1},"params":{"color":"#aabbcc","start":0.3,"density":0.5},"anim":{"speed":6,"wave":"beat"}},{"id":"c00004","kind":"chanmix","on":true,"amount":1,"region":{"kind":"background","feather":0.2},"params":{"matrix":[0,1,0,0,0,1,1,0,0,0,0,0]}}]}
   ],
   "invalid": [
-    {"why": "version", "recipe": {"v": 2, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": []}},
-    {"why": "duplicate op id", "recipe": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "aaaaaa", "kind": "invert", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}},
-      {"id": "aaaaaa", "kind": "invert", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}}
-    ]}},
-    {"why": "no version", "recipe": {"name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": []}},
-    {"why": "ops is not a list", "recipe": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": "none"}},
-    {"why": "not an object", "recipe": [1, 2, 3]},
-    {"why": "op id too long", "recipe": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "toolongid", "kind": "invert", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}}
-    ]}},
-    {"why": "op id empty", "recipe": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "", "kind": "invert", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}}
-    ]}}
+    {"why":"version","recipe":{"v":2,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[]}},
+    {"why":"duplicate op id","recipe":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"aaaaaa","kind":"invert","on":true,"amount":1,"region":{"kind":"all"},"params":{}},{"id":"aaaaaa","kind":"invert","on":true,"amount":1,"region":{"kind":"all"},"params":{}}]}},
+    {"why":"no version","recipe":{"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[]}},
+    {"why":"ops is not a list","recipe":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":"none"}},
+    {"why":"not an object","recipe":[1,2,3]},
+    {"why":"op id too long","recipe":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"toolongid","kind":"invert","on":true,"amount":1,"region":{"kind":"all"},"params":{}}]}},
+    {"why":"op id empty","recipe":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"","kind":"invert","on":true,"amount":1,"region":{"kind":"all"},"params":{}}]}}
   ],
   "clamped": [
-    {"why": "amount and unknown kind", "in": {"v": 1, "name": "x", "tier": "ai", "seed": 1, "wildCurve": "linear", "ops": [
-      {"id": "b00001", "kind": "balance", "on": true, "amount": 3, "region": {"kind": "all"}, "params": {"exposure": 9}},
-      {"id": "b00002", "kind": "teleport", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}}
-    ]}, "out": {"v": 1, "name": "x", "tier": "ai", "seed": 1, "wildCurve": "linear", "ops": [
-      {"id": "b00001", "kind": "balance", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"exposure": 3}}
-    ]}},
-    {"why": "name cut to 40, tier and curve defaults, seed floored", "in": {"v": 1, "name": "  aaaaaaaaaabbbbbbbbbbccccccccccdddddddddd-extra  ", "tier": "weird", "seed": 12.9, "wildCurve": "sideways", "ops": []},
-     "out": {"v": 1, "name": "aaaaaaaaaabbbbbbbbbbccccccccccdddddddddd", "tier": "ai", "seed": 12, "wildCurve": "linear", "ops": []}},
-    {"why": "empty name and negative seed", "in": {"v": 1, "name": "   ", "tier": "mine", "seed": -3, "wildCurve": "late", "ops": []},
-     "out": {"v": 1, "name": "Untitled", "tier": "mine", "seed": 0, "wildCurve": "late", "ops": []}},
-    {"why": "seed above u32", "in": {"v": 1, "name": "x", "tier": "mine", "seed": 99999999999, "wildCurve": "late", "ops": []},
-     "out": {"v": 1, "name": "x", "tier": "mine", "seed": 4294967295, "wildCurve": "late", "ops": []}},
-    {"why": "op defaults: on, amount, chaos false, no params", "in": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "d00001", "kind": "bleach", "chaos": false, "region": {"kind": "all"}}
-    ]}, "out": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "d00001", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}}
-    ]}},
-    {"why": "negative amount, chaos kept", "in": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "d00002", "kind": "glow", "on": false, "chaos": true, "amount": -1, "region": {"kind": "all"}, "params": {}}
-    ]}, "out": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "d00002", "kind": "glow", "on": false, "chaos": true, "amount": 0, "region": {"kind": "all"}, "params": {}}
-    ]}},
-    {"why": "region defaults and clamps", "in": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "e00001", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "subject"}, "params": {}},
-      {"id": "e00002", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "near", "split": 2, "feather": -1}, "params": {}},
-      {"id": "e00003", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "highlights", "soft": -4, "invert": true}, "params": {}},
-      {"id": "e00004", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "sky"}, "params": {}},
-      {"id": "e00005", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "people", "feather": 0.5, "invert": false}, "params": {}},
-      {"id": "e00006", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "far"}, "params": {}},
-      {"id": "e00007", "kind": "bleach", "on": true, "amount": 1, "params": {}}
-    ]}, "out": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "e00001", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "subject", "feather": 0.2}, "params": {}},
-      {"id": "e00002", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "near", "split": 1, "feather": 0}, "params": {}},
-      {"id": "e00003", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "highlights", "soft": 0}, "params": {}},
-      {"id": "e00004", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}},
-      {"id": "e00005", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "people", "feather": 0.5}, "params": {}},
-      {"id": "e00006", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "far", "split": 0.5, "feather": 0.2}, "params": {}},
-      {"id": "e00007", "kind": "bleach", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}}
-    ]}},
-    {"why": "anim clamps", "in": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "f00001", "kind": "huecycle", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}, "anim": {"speed": 100, "wave": "zigzag"}},
-      {"id": "f00002", "kind": "huecycle", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}, "anim": {"speed": 0, "wave": "bar"}},
-      {"id": "f00003", "kind": "huecycle", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}, "anim": "fast"}
-    ]}, "out": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "f00001", "kind": "huecycle", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}, "anim": {"speed": 6, "wave": "sine"}},
-      {"id": "f00002", "kind": "huecycle", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}, "anim": {"speed": 0.05, "wave": "bar"}},
-      {"id": "f00003", "kind": "huecycle", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}}
-    ]}},
-    {"why": "params: number ranges, bad types, unknown keys", "in": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "g00001", "kind": "balance", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"exposure": -9, "contrast": 7, "saturation": "lots", "pivot": 0, "banana": 1, "vibrance": null}}
-    ]}, "out": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "g00001", "kind": "balance", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"exposure": -3, "contrast": 3, "pivot": 0.05}}
-    ]}},
-    {"why": "params: colours, enums, bools", "in": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "h00001", "kind": "split", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"shadow": "#ABCDEF", "highlight": "red", "balance": 5}},
-      {"id": "h00002", "kind": "gradmap", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"source": "sound", "blend": "soft"}},
-      {"id": "h00003", "kind": "invert", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"r": false, "g": "yes", "b": true}}
-    ]}, "out": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "h00001", "kind": "split", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"shadow": "#abcdef", "balance": 1}},
-      {"id": "h00002", "kind": "gradmap", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"blend": "soft"}},
-      {"id": "h00003", "kind": "invert", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"r": false, "b": true}}
-    ]}},
-    {"why": "params: arrays (length fixed, elements clamped) and stops", "in": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "i00001", "kind": "curves", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"master": [-1, 0.2, 0.5, 0.8, 2], "r": [0, 1, 2], "g": [0, 0.25, 0.5, 0.75, "x"]}},
-      {"id": "i00002", "kind": "gradmap", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"stops": "#FFFFFF@1,#000000@0"}},
-      {"id": "i00003", "kind": "gradmap", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"stops": "#ffffff@1"}},
-      {"id": "i00004", "kind": "gradmap", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"stops": "#ffffff@2,#000000@-1"}},
-      {"id": "i00005", "kind": "hsl", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"hue": [200, -200, 0, 0, 0, 0], "sat": [2, 0, 0, 0, 0, 0], "lum": [0, 0, 0, 0, 0]}},
-      {"id": "i00006", "kind": "wheels", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"lift": [2, 0, -2], "offset": 0.5}}
-    ]}, "out": {"v": 1, "name": "x", "tier": "film", "seed": 0, "wildCurve": "linear", "ops": [
-      {"id": "i00001", "kind": "curves", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"master": [0, 0.2, 0.5, 0.8, 1]}},
-      {"id": "i00002", "kind": "gradmap", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"stops": "#000000@0.00,#ffffff@1.00"}},
-      {"id": "i00003", "kind": "gradmap", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {}},
-      {"id": "i00004", "kind": "gradmap", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"stops": "#000000@0.00,#ffffff@1.00"}},
-      {"id": "i00005", "kind": "hsl", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"hue": [180, -180, 0, 0, 0, 0], "sat": [1, 0, 0, 0, 0, 0]}},
-      {"id": "i00006", "kind": "wheels", "on": true, "amount": 1, "region": {"kind": "all"}, "params": {"lift": [1, 0, -1], "offset": 0.5}}
-    ]}}
+    {"why":"amount and unknown kind","in":{"v":1,"name":"x","tier":"ai","seed":1,"wildCurve":"linear","ops":[{"id":"b00001","kind":"balance","on":true,"amount":3,"region":{"kind":"all"},"params":{"exposure":9}},{"id":"b00002","kind":"teleport","on":true,"amount":1,"region":{"kind":"all"},"params":{}}]},"out":{"v":1,"name":"x","tier":"ai","seed":1,"wildCurve":"linear","ops":[{"id":"b00001","kind":"balance","on":true,"amount":1,"region":{"kind":"all"},"params":{"exposure":3}}]}},
+    {"why":"name cut to 40, trimmed","in":{"v":1,"name":"  aaaaaaaaaabbbbbbbbbbccccccccccdddddddddd-extra  ","tier":"mine","seed":12,"wildCurve":"late","ops":[]},"out":{"v":1,"name":"aaaaaaaaaabbbbbbbbbbccccccccccdddddddddd","tier":"mine","seed":12,"wildCurve":"late","ops":[]}},
+    {"why":"negative amount, chaos kept","in":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"d00002","kind":"glow","on":false,"chaos":true,"amount":-1,"region":{"kind":"all"},"params":{}}]},"out":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"d00002","kind":"glow","on":false,"chaos":true,"amount":0,"region":{"kind":"all"},"params":{}}]}},
+    {"why":"params: number ranges, bad types, unknown keys","in":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"g00001","kind":"balance","on":true,"amount":1,"region":{"kind":"all"},"params":{"exposure":-9,"contrast":7,"saturation":"lots","pivot":0,"banana":1}}]},"out":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"g00001","kind":"balance","on":true,"amount":1,"region":{"kind":"all"},"params":{"exposure":-3,"contrast":3,"pivot":0.05}}]}},
+    {"why":"params: colours, enums, bools","in":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"h00001","kind":"split","on":true,"amount":1,"region":{"kind":"all"},"params":{"shadow":"#ABCDEF","highlight":"red","balance":5}},{"id":"h00002","kind":"gradmap","on":true,"amount":1,"region":{"kind":"all"},"params":{"source":"sound","blend":"soft"}},{"id":"h00003","kind":"invert","on":true,"amount":1,"region":{"kind":"all"},"params":{"r":false,"g":"yes","b":true}}]},"out":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"h00001","kind":"split","on":true,"amount":1,"region":{"kind":"all"},"params":{"shadow":"#abcdef","balance":1}},{"id":"h00002","kind":"gradmap","on":true,"amount":1,"region":{"kind":"all"},"params":{"blend":"soft"}},{"id":"h00003","kind":"invert","on":true,"amount":1,"region":{"kind":"all"},"params":{"r":false,"b":true}}]}},
+    {"why":"params: arrays (length fixed, elements clamped) and stops","in":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"i00001","kind":"curves","on":true,"amount":1,"region":{"kind":"all"},"params":{"master":[-1,0.2,0.5,0.8,2],"r":[0,1,2],"g":[0,0.25,0.5,0.75,"x"]}},{"id":"i00002","kind":"gradmap","on":true,"amount":1,"region":{"kind":"all"},"params":{"stops":"#000000@0,#FFFFFF@1"}},{"id":"i00003","kind":"gradmap","on":true,"amount":1,"region":{"kind":"all"},"params":{"stops":"#ffffff@1"}},{"id":"i00004","kind":"gradmap","on":true,"amount":1,"region":{"kind":"all"},"params":{"stops":"#000000@-1,#ffffff@2"}},{"id":"i00005","kind":"hsl","on":true,"amount":1,"region":{"kind":"all"},"params":{"hue":[200,-200,0,0,0,0],"sat":[2,0,0,0,0,0],"lum":[0,0,0,0,0]}},{"id":"i00006","kind":"wheels","on":true,"amount":1,"region":{"kind":"all"},"params":{"lift":[2,0,-2],"offset":0.5}}]},"out":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"i00001","kind":"curves","on":true,"amount":1,"region":{"kind":"all"},"params":{"master":[0,0.2,0.5,0.8,1]}},{"id":"i00002","kind":"gradmap","on":true,"amount":1,"region":{"kind":"all"},"params":{"stops":"#000000@0,#ffffff@1"}},{"id":"i00003","kind":"gradmap","on":true,"amount":1,"region":{"kind":"all"},"params":{}},{"id":"i00004","kind":"gradmap","on":true,"amount":1,"region":{"kind":"all"},"params":{"stops":"#000000@0,#ffffff@1"}},{"id":"i00005","kind":"hsl","on":true,"amount":1,"region":{"kind":"all"},"params":{"hue":[180,-180,0,0,0,0],"sat":[1,0,0,0,0,0]}},{"id":"i00006","kind":"wheels","on":true,"amount":1,"region":{"kind":"all"},"params":{"lift":[1,0,-1],"offset":0.5}}]}}
+  ],
+  "tsOnly": [
+    {"why":"empty name","in":{"v":1,"name":"   ","tier":"mine","seed":0,"wildCurve":"late","ops":[]},"out":{"v":1,"name":"Untitled","tier":"mine","seed":0,"wildCurve":"late","ops":[]}},
+    {"why":"op defaults: on, amount, chaos false, no params","in":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"d00001","kind":"bleach","chaos":false,"region":{"kind":"all"}}]},"out":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"d00001","kind":"bleach","on":true,"amount":1,"region":{"kind":"all"},"params":{}}]}},
+    {"why":"region defaults and clamps","in":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"e00001","kind":"bleach","on":true,"amount":1,"region":{"kind":"subject"},"params":{}},{"id":"e00002","kind":"bleach","on":true,"amount":1,"region":{"kind":"near","split":2,"feather":-1},"params":{}},{"id":"e00003","kind":"bleach","on":true,"amount":1,"region":{"kind":"highlights","soft":-4,"invert":true},"params":{}},{"id":"e00004","kind":"bleach","on":true,"amount":1,"region":{"kind":"sky"},"params":{}},{"id":"e00005","kind":"bleach","on":true,"amount":1,"region":{"kind":"people","feather":0.5,"invert":false},"params":{}},{"id":"e00006","kind":"bleach","on":true,"amount":1,"region":{"kind":"far"},"params":{}},{"id":"e00007","kind":"bleach","on":true,"amount":1,"params":{}}]},"out":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"e00001","kind":"bleach","on":true,"amount":1,"region":{"kind":"subject","feather":0.2},"params":{}},{"id":"e00002","kind":"bleach","on":true,"amount":1,"region":{"kind":"near","split":1,"feather":0},"params":{}},{"id":"e00003","kind":"bleach","on":true,"amount":1,"region":{"kind":"highlights","soft":0},"params":{}},{"id":"e00004","kind":"bleach","on":true,"amount":1,"region":{"kind":"all"},"params":{}},{"id":"e00005","kind":"bleach","on":true,"amount":1,"region":{"kind":"people","feather":0.5},"params":{}},{"id":"e00006","kind":"bleach","on":true,"amount":1,"region":{"kind":"far","split":0.5,"feather":0.2},"params":{}},{"id":"e00007","kind":"bleach","on":true,"amount":1,"region":{"kind":"all"},"params":{}}]}},
+    {"why":"anim clamps","in":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"f00001","kind":"huecycle","on":true,"amount":1,"region":{"kind":"all"},"params":{},"anim":{"speed":100,"wave":"zigzag"}},{"id":"f00002","kind":"huecycle","on":true,"amount":1,"region":{"kind":"all"},"params":{},"anim":{"speed":0,"wave":"bar"}},{"id":"f00003","kind":"huecycle","on":true,"amount":1,"region":{"kind":"all"},"params":{},"anim":"fast"}]},"out":{"v":1,"name":"x","tier":"film","seed":0,"wildCurve":"linear","ops":[{"id":"f00001","kind":"huecycle","on":true,"amount":1,"region":{"kind":"all"},"params":{},"anim":{"speed":6,"wave":"sine"}},{"id":"f00002","kind":"huecycle","on":true,"amount":1,"region":{"kind":"all"},"params":{},"anim":{"speed":0.05,"wave":"bar"}},{"id":"f00003","kind":"huecycle","on":true,"amount":1,"region":{"kind":"all"},"params":{}}]}}
   ]
 }

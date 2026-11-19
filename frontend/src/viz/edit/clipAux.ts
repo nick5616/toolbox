@@ -170,7 +170,7 @@ export function auxNeeds(aux: ClipAux | undefined, frame: number): FrameKey[] {
 
 /**
  * The ClipAux of a document clip: `depth` (a DepthRef id; a stream when EditFiles has `d:<id>` as one, else a
- * still PNG under that key) and `matte` (a people matte also fills "people"). `files` are EditFiles' key sets.
+ * still PNG under that key) and `matte` (it fills both "subject" and "people": one map). `files` are EditFiles' key sets.
  * Matte keys are `m:<id>` (a stream or an image).
  */
 export function clipAuxOf(
@@ -188,7 +188,7 @@ export function clipAuxOf(
     const ref = key in files.streams ? { matte: clip.matte.id } : key in files.images ? { still: key } : null;
     if (ref) {
       aux.subject = ref;
-      if (clip.matte.mode === "people") aux.people = ref;
+      aux.people = ref; // one map: "people" regions read the same matte as "subject"
     }
   }
   return aux;

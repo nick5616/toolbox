@@ -17,6 +17,7 @@ import { createTextLayer, type TextLayer } from "../text";
 import { Transitions } from "../transitions";
 import type { FrameInput } from "../layers/registry";
 import type { Analysis } from "../analysis";
+import { AuxTextureCache, bindAux, resolveAux } from "./clipAux";
 import { ClipRenderer, buildMaskUniforms, evalTransform, fitGeometry, resolvePostParams, type ClipDraw, type MatteDraw, type TexEntry } from "./clip";
 import { clipAt, clipFramePlan, frameAtTime, isCompiled, needsAt, outgoingOf, transitionMix, type BlendMode, type CompiledClip, type CompiledEditFull, type CompiledTrack, type PlanRef } from "./compile";
 import { EditOutput, NO_OUTPUT, type EditOutputParams } from "./output";
@@ -413,7 +414,11 @@ export class EditEngine {
     };
     if (!split) {
       this.clipR.draw(into, draw);
-      if (this.hasEffects(cl.effects)) this.runChain(cl.effects, `c:${cl.id}`, into, clipMs, songMs);
+      if (this.hasEffects(cl.effects)) {
+        this.bindClipAux(cl, k, frames);
+        this.runChain(cl.effects, `c:${cl.id}`, into, clipMs, songMs);
+        bindAux(this.gl, null);
+      }
     } else {
       const back = this.pool.acquire(W, H);
       const subj = this.pool.acquire(W, H);
@@ -421,7 +426,9 @@ export class EditEngine {
       subj.clear(0, 0, 0, 0);
       this.clipR.draw(back, { ...draw, part: 2 });
       this.clipR.draw(subj, { ...draw, part: 1 });
+      this.bindClipAux(cl, k, frames);
       this.runChain(cl.effects, `c:${cl.id}`, cl.fxTarget === "subject" ? subj : back, clipMs, songMs);
+      bindAux(this.gl, null);
       this.composite(back, into, "normal");
       this.composite(subj, into, "normal");
       this.pool.release(back);
@@ -605,7 +612,21 @@ export class EditEngine {
     for (const g of this.gens.values()) g.inst.resize?.(width, height);
   }
 
+  private auxCache: AuxTextureCache | null = null;
+
+  /**
+   * Phase 21 (SPEC §E5): binds the clip's depth/subject/people maps for the passes of its effects (those with
+   * `needs`, viz/post/registry.ts). The maps are sampled over the whole frame, which is right for a clip that
+   * fills it (Color Grader); pass a uv mapping to bindAux for a transformed clip when that's needed.
+   */
+  private bindClipAux(cl: CompiledClip, k: number, frames: FrameProvider): void {
+    if (Object.keys(cl.aux).length === 0) return;
+    this.auxCache ??= new AuxTextureCache(this.gl);
+    bindAux(this.gl, resolveAux(this.auxCache, cl.aux, k, frames));
+  }
+
   dispose(): void {
+    this.auxCache?.dispose();
     for (const e of this.posts.values()) e.inst.dispose();
     this.posts.clear();
     for (const g of this.gens.values()) g.inst.dispose();

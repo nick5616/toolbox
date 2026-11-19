@@ -6,7 +6,6 @@
  * Grader pictures, the Video Editor's "Still frame" and the pipeline step.
  */
 import { applyGradePlan, type GradePlanJson } from "@/grade/plan";
-import { AuxTextureCache, auxNeeds, bindAux, resolveAux } from "./clipAux";
 import { loadAnalysis, type Analysis } from "../analysis";
 import { EditFrameProvider } from "../frames/provider";
 import { GLUnavailableError } from "../gl/core";
@@ -62,12 +61,10 @@ export async function renderStill(req: StillRequest, reply: SingleReply, signal:
 
   let project = parseProject(req.edit.projectJson);
   const files = { streams: req.edit.streams, images: req.edit.images };
-  let aux = {};
   if (req.grade) {
     try {
       const applied = applyGradePlan(project, req.grade, files);
       project = applied.project as typeof project;
-      aux = applied.aux;
     } catch (e) {
       throw new RenderError("The look couldn't be applied", e instanceof Error ? e.message : String(e));
     }
@@ -80,7 +77,6 @@ export async function renderStill(req: StillRequest, reply: SingleReply, signal:
   const fps = project.fps > 0 ? project.fps : 30;
   const provider = new EditFrameProvider({ files, mode: "export" });
   let engine: EditEngine | null = null;
-  let auxCache: AuxTextureCache | null = null;
   try {
     const streamFrames = await provider.loadIndexes(Object.keys(files.streams));
     const compiled = compileEdit({ project, analysis, markers: [], files }, { width: req.width, height: req.height, fps, streamFrames });
@@ -93,27 +89,17 @@ export async function renderStill(req: StillRequest, reply: SingleReply, signal:
     }
     engine.setEdit(compiled);
     const at = Math.max(0, req.still.atMs);
-    const frame = Math.max(0, Math.round((at * fps) / 1000));
     reply.progress(0, 2);
-    await provider.prepare([...engine.needs(at), ...auxNeeds(aux, frame)], true, signal);
+    await provider.prepare(engine.needs(at), true, signal);
     if (signal.aborted) return reply.cancelled();
-    // The maps of the graded clip (the engine binds per-clip maps itself once its renderer does; until then this
-    // binds them for the whole one-clip frame, which is what Color Grader renders).
-    const gl = canvas.getContext("webgl2") as WebGL2RenderingContext | null;
-    if (gl && Object.keys(aux).length > 0) {
-      auxCache = new AuxTextureCache(gl);
-      bindAux(gl, resolveAux(auxCache, aux, frame, provider));
-    }
     engine.render(at, provider);
     // Snapshot the canvas now: convertToBlob copies it at the call, before the buffer can be cleared.
     const blob = await canvas.convertToBlob({ type: stillMime(req.still.format), quality: stillQuality(req.still.quality) });
-    if (gl) bindAux(gl, null);
     if (signal.aborted) return reply.cancelled();
     if (blob.type !== stillMime(req.still.format)) throw new RenderError("This computer can't save the picture in that format", blob.type || "unknown type");
     reply.progress(1, 2);
     reply.file(new Uint8Array(await blob.arrayBuffer()));
   } finally {
-    auxCache?.dispose();
     engine?.dispose();
     provider.dispose();
   }

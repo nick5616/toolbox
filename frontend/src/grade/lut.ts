@@ -91,6 +91,26 @@ export function bakeLutCPU(table: GradeTable, size = LUT_SIZE): Float32Array {
   return lutFromPixels(px, size);
 }
 
+export interface LutBake {
+  size: number;
+  /** size³ RGB triples, 0..1, red fastest: what GradeService.SaveCube(name, size, data) takes. */
+  data: number[];
+  /** What the .cube can't hold (regions, texture, motion, spatial passes), for the export dialog. */
+  left: string[];
+}
+
+/** Bakes a look's colour-only ops at a wildness into a 33³ LUT: the real gradelook pass when WebGL2 is available, the reference maths otherwise. */
+export function bakeLut(recipe: GradeRecipe, wild: number): LutBake {
+  const { table, left } = lutPlan(recipe, wild);
+  let floats: Float32Array;
+  try {
+    floats = bakeLutGL(table);
+  } catch {
+    floats = bakeLutCPU(table);
+  }
+  return { size: LUT_SIZE, data: Array.from(floats), left };
+}
+
 /** The real bake: the lattice through the gradelook pass on an offscreen WebGL2 context. Throws where WebGL2 isn't available. */
 export function bakeLutGL(table: GradeTable, size = LUT_SIZE): Float32Array {
   const { w, h } = latticeSize(size);

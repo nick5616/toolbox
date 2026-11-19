@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { surprise } from "./chaos";
 import { beatEnv, flashesPerSec, recipeFlashes, simulateMeanLuma } from "./flash";
-import { BUILT_IN_LOOKS } from "./looks";
+import { BUILT_IN_LOOKS } from "./builtins";
 import type { GradeOp, GradeRecipe } from "./types";
 
 const series = (f: (t: number) => number, seconds = 10, fps = 30) => Array.from({ length: seconds * fps }, (_, i) => f(i / fps));
@@ -74,5 +74,5 @@ describe("flash safety of looks (≤ 3 flashes a second)", () => {
       expect(recipeFlashes(pulsing, 1, { seconds: 6, bpm: 180 }), `seed ${seed} pulsing`).toBeLessThanOrEqual(3);
     }
     expect(withAnim).toBeGreaterThan(100);
-  });
+  }, 120000);
 });

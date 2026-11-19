@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CHANMIX_PRESETS } from "./ops";
 import { bakeLutCPU, latticeColor, latticeSize, LUT_SIZE, lutFromPixels, lutPlan } from "./lut";
-import { builtInLook } from "./looks";
+import { builtInLook } from "./builtins";
 import { TEST_COLORS } from "./flash";
 import { evalRows } from "./math";
 import { packTable } from "./pack";
