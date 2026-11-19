@@ -6,7 +6,7 @@ const grid = (bright: number, speed: number, sunSize: number, sun: number, mount
   BG("grid", "synthgrid", {
     brightness: P(bright, m("section.energy", 0.05), m("drop.pulse", 0.08)),
     // the shader swells the sun on the kick by itself (scaled by sunPulse), so the preset adds nothing on top
-    gridSpeed: P(speed, m("section.energy", 0.1, "linear", 600, 1500)),
+    gridSpeed: P(speed * 0.5, m("section.energy", 0.1, "linear", 600, 1500), m("drums.level", 0.15, "ease", 150, 700)),
     sunSize,
     sunPulse: sun,
     mountains: P(mountains, m("other.level", 0.25, "ease", 600, 1500)),

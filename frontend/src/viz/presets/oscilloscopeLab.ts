@@ -8,11 +8,11 @@ const bg = (bright: number) =>
 const scope = (mode: "line" | "xy", gain: number, persistence: number, scale: number) =>
   L("scope", "oscilloscope", {
     mode,
-    gain: P(gain, m("mix.level", 0.1, "ease", 80, 500)),
+    gain: P(gain * 0.6, m("mix.level", 0.2, "ease", 80, 500)),
     persistence,
-    thickness: 0.0045,
+    thickness: 0.0035,
     glow: P(0.65, groove("beat.pulse", 0.04)),
-    brightness: 1.5,
+    brightness: 0.95,
     scale,
     grid: true,
     color: "c0",
@@ -23,7 +23,7 @@ const lissa = (layers: number, size: number) =>
     layers,
     freq: P(3, m("vocals.pitch", 0.1, "ease", 400, 1200)),
     pitchMod: 0.7,
-    phaseDrift: P(0.5, drift(0.1)),
+    phaseDrift: P(0.2, drift(0.15)),
     size: P(size, groove("bass.level", 0.05)),
     thickness: 0.004,
     glow: 0.6,
@@ -44,9 +44,9 @@ export const oscilloscopeLab: Preset = {
     name: "Oscilloscope Lab",
     palette: { mode: "fixed", ids: ["matrix"] },
     scenes: [
-      S("calm", "Calm", [bg(0.03), scope("line", 0.8, 0.7, 1)]),
-      S("main", "Main", [bg(0.035), scope("xy", 0.8, 0.75, 0.9), lissa(2, 0.3)]),
-      S("full", "Full", [bg(0.04), scope("xy", 0.9, 0.82, 1), lissa(3, 0.3), helix(0.22)]),
+      S("calm", "Calm", [bg(0.03), scope("line", 0.7, 0.8, 1)]),
+      S("main", "Main", [bg(0.035), scope("xy", 0.65, 0.85, 0.9), lissa(2, 0.3)]),
+      S("full", "Full", [bg(0.04), scope("xy", 0.7, 0.9, 1), lissa(3, 0.3), helix(0.22)]),
     ],
     post: globalPost({ bloom: P(0.6, groove("bass.level", 0.06), m("drop.pulse", 0.12)), vignette: 0.5, grain: 0.12 }),
     controls: [

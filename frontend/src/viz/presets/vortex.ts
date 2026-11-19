@@ -3,18 +3,18 @@ import type { Preset } from "./types";
 import { BG, L, duck, groove, m, makeShow, P, S, X, director, globalPost, text } from "./kit";
 
 const bg = (bright: number) =>
-  BG("bg", "gradient", { speed: 0.4, intensity: 0.7, contrast: 0.5, brightness: P(bright, m("section.energy", 0.012), groove("bass.level", 0.012)), drift: P(0.3, groove("bass.level", 0.1)) });
+  BG("bg", "gradient", { speed: 0.2, intensity: 0.7, contrast: 0.5, brightness: P(bright, m("section.energy", 0.012), groove("bass.level", 0.012)), drift: P(0.3, groove("bass.level", 0.1)) });
 
 const vortex = (lines: number, twist: number, length: number, thick: number) =>
   L("vortex", "vortex", {
     lines,
     twist: P(twist, groove("bass.level", 0.1)),
-    length: P(length, groove("drums.level", 0.05)),
+    length: P(length * 0.7, m("mix.level", 0.2, "ease", 80, 500)),
     thickness: thick,
-    spin: P(0.4, m("section.energy", 0.12, "linear", 600, 1500)),
+    spin: P(0.12, m("section.energy", 0.1, "linear", 600, 1500), m("bass.level", 0.15, "ease", 150, 700)),
     glow: P(0.4, groove("beat.pulse", 0.04)),
     color: "c0",
-    brightness: 0.8,
+    brightness: 0.65,
   }, { opacity: 0.85 });
 
 const geometry = (shapes: number, size: number, rays: number) =>
@@ -22,9 +22,9 @@ const geometry = (shapes: number, size: number, rays: number) =>
     shapes,
     sides: 6,
     size: P(size, m("kick", 0.04, "exp")),
-    roughness: P(0.4, m("snare", 0.15, "exp")),
+    roughness: P(0.25, m("snare", 0.1, "exp"), m("mix.level", 0.2, "ease", 80, 500)),
     rays: P(rays, m("kick", 0.2, "exp")),
-    spin: 0.25,
+    spin: P(0.06, m("other.level", 0.1, "ease", 400, 1200)),
     thickness: 0.004,
     glow: 0.55,
     brightness: 1.3,
@@ -41,10 +41,10 @@ export const vortexPreset: Preset = {
     palette: { mode: "fixed", ids: ["toxic"] },
     scenes: [
       S("calm", "Calm", [bg(0.04), vortex(44, 0.5, 0.3, 0.0025)]),
-      S("main", "Main", [bg(0.05), vortex(64, 0.9, 0.36, 0.003), geometry(3, 0.22, 0.4)]),
+      S("main", "Main", [bg(0.05), vortex(56, 0.9, 0.36, 0.003), geometry(3, 0.22, 0.4)]),
       S("full", "Full", [
         bg(0.06),
-        vortex(96, 1.4, 0.44, 0.0032),
+        vortex(72, 1.2, 0.42, 0.0032),
         geometry(5, 0.3, 0.8),
         L("shock", "shockwave", { trigger: "drop+downbeat", strength: 0.9, flash: 0.2, brightness: 1.5 }),
       ]),

@@ -38,12 +38,12 @@ export const radialPulse: Preset = {
       S("main", "Main", [
         bg(0.05),
         radial(144, 0.2, 0.11, 0.08, 0.95, 0.55),
-        L("ripples", "ripples", { trigger: "kick", every: 2, maxRadius: 0.8, rings: 1, width: 0.005, brightness: 1.0, color: "accent" }, { opacity: P(0.7, duck()) }),
+        L("ripples", "ripples", { trigger: "kick", every: 4, maxRadius: 0.8, rings: 1, width: 0.005, life: 2.4, brightness: 0.9, color: "accent" }, { opacity: P(0.7, duck()) }),
       ]),
       S("full", "Full", [
         bg(0.06),
         radial(200, 0.22, 0.13, 0.12, 1, 0.6),
-        L("ripples", "ripples", { trigger: "kick", every: 1, maxRadius: 1, rings: 2, width: 0.006, brightness: 1.2, color: "accent" }, { opacity: P(0.7, m("kick", 0.1, "exp"), duck()) }),
+        L("ripples", "ripples", { trigger: "kick", every: 2, maxRadius: 1, rings: 2, width: 0.006, life: 2.4, brightness: 1, color: "accent" }, { opacity: P(0.7, m("kick", 0.1, "exp"), duck()) }),
         L("shock", "shockwave", { trigger: "drop+downbeat", strength: 0.9, flash: 0.15, brightness: 1.5 }),
       ]),
     ],

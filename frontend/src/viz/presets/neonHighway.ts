@@ -6,7 +6,7 @@ import { BG, L, duck, groove, m, makeShow, P, S, director, globalPost, text } fr
 const grid = (bright: number, speed: number, sun: number, mountains: number) =>
   BG("grid", "synthgrid", {
     brightness: P(bright, m("section.energy", 0.06), m("drop.pulse", 0.08)),
-    gridSpeed: P(speed, m("section.energy", 0.1, "linear", 600, 1500)),
+    gridSpeed: P(speed * 0.5, m("section.energy", 0.1, "linear", 600, 1500), m("drums.level", 0.15, "ease", 150, 700)),
     sunPulse: sun, // the shader swells the sun on the kick by itself
     mountains: P(mountains, m("other.level", 0.25, "ease", 600, 1500)),
     sunSize: 0.24,
@@ -25,16 +25,16 @@ export const neonHighway: Preset = {
     scenes: [
       S("calm", "Calm", [
         grid(0.6, 0.45, 0.5, 0.7),
-        L("road", "highway", { lookahead: 3.4, width: 0.7, horizon: 0.45, glow: 0.45, brightness: 1.1, noteSize: 0.9 }, { opacity: 0.8 }),
+        L("road", "highway", { lookahead: 4, width: 0.5, horizon: 0.45, glow: 0.4, brightness: 0.7, noteSize: 0.6 }, { opacity: 0.8 }),
       ]),
       S("main", "Main", [
-        grid(0.7, 0.9, 0.7, 1),
-        L("road", "highway", { lookahead: 2.6, width: 0.85, horizon: 0.45, glow: P(0.5, groove("beat.pulse", 0.04)), brightness: 1.4 }),
+        grid(0.7, 0.8, 0.7, 1),
+        L("road", "highway", { lookahead: 4, width: 0.55, horizon: 0.45, glow: P(0.45, groove("beat.pulse", 0.04)), brightness: 0.75, noteSize: 0.6 }),
       ]),
       S("full", "Full", [
-        grid(0.8, 1.4, 0.9, 1.3),
+        grid(0.8, 1.1, 0.9, 1.3),
         L("stars", "starfield", { density: 0.55, speed: 1, warp: P(0.5, m("drop.pulse", 0.3)), brightness: 0.45, size: 0.8 }, { opacity: P(0.6, duck()) }),
-        L("road", "highway", { lookahead: 2.2, width: 1, horizon: 0.45, glow: P(0.55, groove("beat.pulse", 0.04)), brightness: 1.45, noteSize: 1.15 }),
+        L("road", "highway", { lookahead: 4, width: 0.6, horizon: 0.45, glow: P(0.5, groove("beat.pulse", 0.04)), brightness: 0.8, noteSize: 0.6 }),
         L("pulse", "ripples", { trigger: "downbeat", maxRadius: 1, rings: 1, width: 0.004, brightness: 0.8, color: "accent" }, { opacity: 0.5 }),
       ]),
     ],

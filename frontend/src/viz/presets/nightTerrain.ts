@@ -9,7 +9,7 @@ const terrain = (rows: number, height: number, bright: number, speed: number) =>
   L("land", "terrain", {
     rows,
     height: P(height, groove("bass.level", 0.12)),
-    speed,
+    speed: P(Math.max(0.2, speed * 0.6), groove("bass.level", 0.15)),
     horizon: 0.58,
     fill: 1,
     brightness: P(bright, m("section.energy", 0.1)),
@@ -31,9 +31,9 @@ export const nightTerrain: Preset = {
     name: "Night Terrain",
     palette: { mode: "fixed", ids: ["galaxy"] },
     scenes: [
-      S("calm", "Calm", [sky(0.035), stars(0.3, 0.2), moon(0.6), terrain(30, 0.55, 0.7, 0.5)]),
-      S("main", "Main", [sky(0.04), stars(0.45, 0.4), moon(0.7), terrain(40, 0.8, 0.85, 0.9)]),
-      S("full", "Full", [sky(0.05), stars(0.6, 0.7), moon(0.9), terrain(56, 1.1, 1, 1.4)]),
+      S("calm", "Calm", [sky(0.035), stars(0.3, 0.2), moon(0.6), terrain(30, 0.55, 0.6, 0.3)]),
+      S("main", "Main", [sky(0.04), stars(0.45, 0.4), moon(0.7), terrain(40, 0.8, 0.7, 0.45)]),
+      S("full", "Full", [sky(0.05), stars(0.6, 0.7), moon(0.9), terrain(56, 1.1, 0.8, 0.65)]),
     ],
     post: globalPost({ bloom: P(0.55, m("section.energy", 0.05), m("drop.pulse", 0.08)), vignette: 0.5, grain: 0.14 }),
     controls: [

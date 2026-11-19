@@ -11,7 +11,7 @@ const frame = (thickness: number, glow: number, corners: boolean, chase: number)
     pulse: P(0.8, m("section.energy", 0.2)),
     cornersOnly: corners,
     cornerLength: 0.16,
-    chase,
+    chase: P(chase, m("drums.level", 0.15, "ease", 150, 700)),
     haze: 0.25,
     brightness: P(0.95, m("section.energy", 0.12)),
   });
@@ -30,11 +30,11 @@ export const framePulse: Preset = {
     name: "Frame Pulse",
     palette: { mode: "fixed", ids: ["neon"] },
     scenes: [
-      S("calm", "Calm", [backdrop, frame(4, 0.45, true, 0.4), sparks(10, 0.7)]),
-      S("main", "Main", [backdrop, frame(5, 0.55, false, 0.8), sparks(18, 0.85)]),
+      S("calm", "Calm", [backdrop, frame(4, 0.45, true, 0.2), sparks(10, 0.7)]),
+      S("main", "Main", [backdrop, frame(5, 0.55, false, 0.4), sparks(18, 0.85)]),
       S("full", "Full", [
         backdrop,
-        frame(7, 0.7, false, 1.4),
+        frame(7, 0.7, false, 0.7),
         sparks(28, 1),
         L("pulse", "shockwave", { trigger: "drop+downbeat", strength: 0.6, flash: 0.1, brightness: 1.2 }),
       ]),

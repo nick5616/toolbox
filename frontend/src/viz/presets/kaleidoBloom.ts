@@ -34,7 +34,7 @@ export const kaleidoBloom: Preset = {
       S(
         "full",
         "Full",
-        [neb(0.5, 0.9), feed(0.22), kaleido(12, 0.7, 0.4, 0.85), L("ripples", "ripples", { trigger: "kick", every: 2, maxRadius: 0.9, rings: 2, width: 0.005, brightness: 1.1, color: "accent" }, { opacity: P(0.7, duck()) })],
+        [neb(0.5, 0.9), feed(0.22), kaleido(12, 0.7, 0.4, 0.85), L("ripples", "ripples", { trigger: "kick", every: 4, maxRadius: 0.9, rings: 2, width: 0.005, life: 2.4, brightness: 0.9, color: "accent" }, { opacity: P(0.7, duck()) })],
         [X("mir", "mirror", { segments: 6, spin: 0.1, zoom: 1, mix: 0.45 })],
       ),
     ],

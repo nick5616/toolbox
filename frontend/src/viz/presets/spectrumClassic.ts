@@ -17,7 +17,7 @@ export const spectrumClassic: Preset = {
         name: "Calm",
         layers: [
           { id: "bg", type: "gradient", enabled: true, blend: "normal", opacity: 1, params: { speed: 0.3, intensity: 0.8, brightness: 0.04, contrast: 0.3, drift: { base: 0.2, mods: [{ signal: "mood.energy", amount: 0.1, shape: "ease" }] } } },
-          { id: "bars", type: "bars", enabled: true, blend: "add", opacity: 0.8, params: { count: 48, height: { base: 0.35, mods: [{ signal: "mix.level", amount: 0.3, shape: "linear" }] }, glow: 0.4, layout: "mirror" } },
+          { id: "bars", type: "bars", enabled: true, blend: "add", opacity: 0.8, params: { count: 48, height: { base: 0.2, mods: [{ signal: "mix.level", amount: 0.3, shape: "linear", attackMs: 80, releaseMs: 500 }] }, glow: 0.4, layout: "mirror", brightness: 1 } },
         ],
         post: [],
       },
@@ -26,7 +26,7 @@ export const spectrumClassic: Preset = {
         name: "Main",
         layers: [
           { id: "bg", type: "gradient", enabled: true, blend: "normal", opacity: 1, params: { speed: 0.5, intensity: 0.85, brightness: { base: 0.05, mods: [{ signal: "section.energy", amount: 0.02, shape: "linear" }] }, contrast: 0.4, drift: { base: 0.3, mods: [{ signal: "bass.level", amount: 0.1, shape: "ease", attackMs: 80, releaseMs: 500 }] } } },
-          { id: "bars", type: "bars", enabled: true, blend: "add", opacity: 1, params: { count: 64, height: { base: 0.5, mods: [{ signal: "bass.level", amount: 0.1, shape: "ease", attackMs: 80, releaseMs: 500 }] }, glow: { base: 0.45, mods: [{ signal: "beat.pulse", amount: 0.04, shape: "ease", attackMs: 80, releaseMs: 320 }] }, layout: "mirror" } },
+          { id: "bars", type: "bars", enabled: true, blend: "add", opacity: 1, params: { count: 64, height: { base: 0.3, mods: [{ signal: "mix.level", amount: 0.25, shape: "linear", attackMs: 80, releaseMs: 500 }, { signal: "bass.level", amount: 0.1, shape: "ease", attackMs: 80, releaseMs: 500 }] }, glow: { base: 0.45, mods: [{ signal: "beat.pulse", amount: 0.04, shape: "ease", attackMs: 80, releaseMs: 320 }] }, layout: "mirror", brightness: 1.05 } },
         ],
         post: [],
       },
@@ -35,7 +35,7 @@ export const spectrumClassic: Preset = {
         name: "Full",
         layers: [
           { id: "bg", type: "gradient", enabled: true, blend: "normal", opacity: 1, params: { speed: 0.8, intensity: 0.9, brightness: { base: 0.07, mods: [{ signal: "bar.pulse", amount: 0.02, shape: "exp" }] }, contrast: 0.5, drift: { base: 0.5, mods: [{ signal: "bass.level", amount: 0.1, shape: "ease", attackMs: 80, releaseMs: 500 }] } } },
-          { id: "bars", type: "bars", enabled: true, blend: "add", opacity: 1, params: { count: 96, height: { base: 0.6, mods: [{ signal: "bass.level", amount: 0.12, shape: "ease", attackMs: 80, releaseMs: 500 }] }, glow: { base: 0.6, mods: [{ signal: "beat.pulse", amount: 0.04, shape: "ease", attackMs: 80, releaseMs: 320 }] }, brightness: 1.8, layout: "reflect", y: 0.3 } },
+          { id: "bars", type: "bars", enabled: true, blend: "add", opacity: 1, params: { count: 96, height: { base: 0.35, mods: [{ signal: "mix.level", amount: 0.25, shape: "linear", attackMs: 80, releaseMs: 500 }, { signal: "bass.level", amount: 0.12, shape: "ease", attackMs: 80, releaseMs: 500 }] }, glow: { base: 0.6, mods: [{ signal: "beat.pulse", amount: 0.04, shape: "ease", attackMs: 80, releaseMs: 320 }] }, brightness: 1, layout: "reflect", y: 0.3 } },
         ],
         post: [],
       },

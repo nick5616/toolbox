@@ -26,3 +26,18 @@ describe("dominant hue is weighted by what the eye sees", () => {
     expect(measureMotion(frames, 60).hueChurn).toBe(0);
   });
 });
+
+describe("smoothed hue churn", () => {
+  it("a colour that flips every frame between two hues is not a colour change when smoothed", () => {
+    const frames = Array.from({ length: 120 }, (_, k) => frameFrom(() => 0.3, () => (k % 2 ? 330 : 190)));
+    expect(measureMotion(frames, 60).hueChurn).toBeGreaterThan(5000); // raw: 140 degrees per frame
+    expect(measureMotion(frames, 60, { hueSmoothSec: 0.5 }).hueChurn).toBeLessThan(30);
+  });
+
+  it("a steady rotation still reads its rate when smoothed", () => {
+    const frames = Array.from({ length: 480 }, (_, k) => frameFrom(() => 0.3, () => (k / 3) % 360)); // 20 degrees per second at 60 fps
+    const churn = measureMotion(frames, 60, { hueSmoothSec: 0.5 }).hueChurn;
+    expect(churn).toBeGreaterThan(14);
+    expect(churn).toBeLessThan(26);
+  });
+});

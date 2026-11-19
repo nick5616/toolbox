@@ -23,10 +23,10 @@ export const tunnelRun: Preset = {
     name: "Tunnel Run",
     palette: { mode: "fixed", ids: ["lava"] },
     scenes: [
-      S("calm", "Calm", [tunnel(0.5, 0.5, 0.4, 0.5, 1.2)]),
-      S("main", "Main", [tunnel(0.65, 1, 0.9, 0.9, 1.6)]),
+      S("calm", "Calm", [tunnel(0.45, 0.5, 0.4, 0.45, 1.2)]),
+      S("main", "Main", [tunnel(0.55, 0.75, 0.8, 0.7, 1.5)]),
       S("full", "Full", [
-        tunnel(0.72, 1, 1.3, 1.3, 2),
+        tunnel(0.6, 0.75, 1.1, 0.95, 1.8),
         L("shock", "shockwave", { trigger: "drop+downbeat", strength: 0.8, flash: 0.2, brightness: 1.5 }),
         L("embers", "embers", { count: 120, rise: 1, size: 0.8, sparks: 0.6, brightness: 1.4 }, { opacity: P(0.8, duck()) }),
       ]),
