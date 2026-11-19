@@ -9,5 +9,6 @@ export type {
     CreateRequest,
     Info,
     Presenter,
+    SwitchRequest,
     TidyPlan
 } from "./models.js";

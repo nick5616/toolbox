@@ -51,6 +51,16 @@ export enum Action {
     ActionText = "text",
 
     /**
+     * the edit's mix as <library>/Edits/<name>.m4a, no picture (Phase 21 §B6)
+     */
+    ActionRenderAudio = "render-audio",
+
+    /**
+     * one frame as <library>/Edits/<name>.png (Phase 21 §B6, §E3.5)
+     */
+    ActionRenderStill = "render-still",
+
+    /**
      * Pipeline steps (Phase 14 A2): both build an edit in memory and export it.
      * "Assemble a video" (Video Editor): the inputs laid end to end, or into a template
      */

@@ -18,7 +18,8 @@ import styles from "./phase14.module.css";
  * The step's options with the hidden resolved look. (G2 adds `recipe` to
  * `StepOptions`; until the bindings carry it this extends them locally.)
  */
-export type GradeStep = GradeStepOptions & { recipe?: GradeServiceRecipe };
+// Bindings now carry `recipe` (G2); kept as an alias so callers stay stable.
+export type GradeStep = GradeStepOptions;
 
 /** Mirrors modules/grade DefaultStepOptions(). */
 export const DEFAULT_GRADE_STEP: GradeStepOptions = { look: "teal-orange", wild: 0.5, seed: 0, vibe: "", format: "same" };

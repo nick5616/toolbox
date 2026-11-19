@@ -108,6 +108,26 @@ export interface Presenter {
 }
 
 /**
+ * SwitchRequest is the payload of EventSwitchRequest.
+ */
+export interface SwitchRequest {
+    /**
+     * the folder (or workspace ID) that was asked for
+     */
+    "root": string;
+
+    /**
+     * its name when it is in the list, else ""
+     */
+    "name": string;
+
+    /**
+     * its ID when it is in the list, else ""
+     */
+    "id": string;
+}
+
+/**
  * TidyPlan is WorkspacesService.TidyPreview's answer.
  */
 export interface TidyPlan {
