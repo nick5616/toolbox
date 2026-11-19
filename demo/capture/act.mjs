@@ -71,6 +71,7 @@ const NAMED = {
   ".": [".", "Period", 190],
   "-": ["-", "Minus", 189],
   "=": ["=", "Equal", 187],
+  "\\": ["\\", "Backslash", 220],
   "[": ["[", "BracketLeft", 219],
   "]": ["]", "BracketRight", 221],
 };
