@@ -327,7 +327,7 @@ func (p *planner) findSimilar(ctx context.Context, pl *plan) error {
 		e := pl.Entries[i]
 		match := -1
 		for _, k := range keepers {
-			if pl.Entries[k].Photo.alike(e.Photo, dist) {
+			if pl.Entries[k].Photo.Alike(e.Photo, dist) {
 				match = k
 				break
 			}

@@ -197,10 +197,10 @@ func TestDHashSimilarity(t *testing.T) {
 	ha, hs, ho := dHashImage(a), dHashImage(smaller), dHashImage(other)
 	dist := func(x, y photoHash) int { return bits.OnesCount64(x.Bits ^ y.Bits) }
 	limit := maxDistance(90)
-	if d := dist(ha, hs); d > limit || !ha.alike(hs, limit) {
+	if d := dist(ha, hs); d > limit || !ha.Alike(hs, limit) {
 		t.Errorf("resized copy is %d bits away (limit %d)", d, limit)
 	}
-	if d := dist(ha, ho); d <= limit || ha.alike(ho, limit) {
+	if d := dist(ha, ho); d <= limit || ha.Alike(ho, limit) {
 		t.Errorf("a different picture is only %d bits away (limit %d)", d, limit)
 	}
 	// Flat pictures hash alike but differ in brightness.
@@ -209,7 +209,7 @@ func TestDHashSimilarity(t *testing.T) {
 		draw.Draw(img, img.Bounds(), &image.Uniform{color.NRGBA{v, v, v, 255}}, image.Point{}, draw.Src)
 		return dHashImage(img)
 	}
-	if flat(20).alike(flat(230), maxDistance(90)) {
+	if flat(20).Alike(flat(230), maxDistance(90)) {
 		t.Error("a black and a white picture must not match")
 	}
 }
