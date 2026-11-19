@@ -48,9 +48,6 @@ func (ix *Index) onJob(j core.Job) {
 	}
 	ix.mu.Unlock()
 	ix.signal()
-	if ours {
-		ix.emitStatus()
-	}
 }
 
 // loop is the scheduler goroutine.
@@ -137,6 +134,7 @@ func (ix *Index) tick(ctx context.Context) {
 		ix.vec.drop()
 	}
 	ix.schedule(ctx)
+	ix.emitStatus() // throttled; carries the running job's stage and file
 }
 
 // takeFinished returns the terminal snapshots of the inflight jobs when every

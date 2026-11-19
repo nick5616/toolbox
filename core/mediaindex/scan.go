@@ -307,6 +307,25 @@ func (ix *Index) excludedDirs(projects []Project) []string {
 	return ex
 }
 
+// clean normalises a path from outside the index: cleaned and, inside the
+// library, written with the library folder's own spelling, so a difference in
+// case (Windows, macOS) never makes a second row for one file.
+func (ix *Index) clean(p string) string {
+	p = filepath.Clean(p)
+	if ix.cfg.LibraryDir == nil {
+		return p
+	}
+	lib := filepath.Clean(ix.cfg.LibraryDir())
+	if lib == "." {
+		return p
+	}
+	rel, err := filepath.Rel(lib, p)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return p
+	}
+	return filepath.Join(lib, rel)
+}
+
 // SetExcluded adds folders that are never indexed (the app's support dir).
 func (ix *Index) SetExcluded(dirs ...string) {
 	ix.mu.Lock()
@@ -424,7 +443,7 @@ func (ix *Index) syncPaths(ctx context.Context, paths []string) error {
 	rules := newScanRules(lib, s.Skip, ix.excludedDirs(nil))
 	var cs []candidate
 	for _, p := range paths {
-		p = filepath.Clean(p)
+		p = ix.clean(p)
 		if !filepath.IsAbs(p) || rules.skipPath(p) {
 			continue
 		}

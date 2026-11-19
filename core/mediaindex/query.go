@@ -546,7 +546,7 @@ func passesOutput(h core.SearchHit, modMs int64, o *core.Output, f core.LibraryQ
 // one frame's / page's).
 func (ix *Index) similarQuery(ctx context.Context, q core.SearchQuery, limit int) (core.SearchPage, error) {
 	page := core.SearchPage{Hits: []core.SearchHit{}, Labels: []core.LabelCount{}}
-	it, ok, err := ix.cfg.Store.GetItem(ctx, filepath.Clean(q.Similar))
+	it, ok, err := ix.cfg.Store.GetItem(ctx, ix.clean(q.Similar))
 	if err != nil || !ok || !ix.conceptReady() {
 		return page, err
 	}

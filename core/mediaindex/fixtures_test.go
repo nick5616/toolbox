@@ -18,9 +18,9 @@ import (
 	"toolbox/core/store"
 )
 
-// The toy model: 5 dimensions. Axes: 0 apple, 1 dog, 2 documents/screens
-// (the text gate), 3 "other things", 4 reserved for words nothing looks like.
-const toyDim = 5
+// The toy model: 6 dimensions. Axes: 0 apple, 1 dog, 2 documents/screens
+// (the text gate), 3 "other things" (no label), 4 pear, 5 words nothing looks like.
+const toyDim = 6
 
 const toyVocab = `# test vocabulary
 food	food	food	a photo of food
@@ -45,16 +45,14 @@ func toyAxis(text string) int {
 	case strings.Contains(l, "dog"):
 		return 1
 	case strings.Contains(l, "pear"):
-		return 3
-	case strings.Contains(l, "fruit") || strings.Contains(l, "food"):
-		return 3
+		return 4
 	}
 	for _, g := range mi.GatePrompts {
 		if l == g {
 			return 2
 		}
 	}
-	return 4
+	return 5 // fruit, food and anything else: no picture looks like it
 }
 
 type fakeCaller struct {

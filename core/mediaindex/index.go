@@ -321,7 +321,7 @@ func (ix *Index) Removed(paths ...string) {
 	var gone []string
 	for _, p := range paths {
 		if _, err := os.Lstat(p); err != nil && os.IsNotExist(err) {
-			gone = append(gone, filepath.Clean(p))
+			gone = append(gone, ix.clean(p))
 		}
 	}
 	if len(gone) == 0 {
@@ -337,7 +337,7 @@ func (ix *Index) Removed(paths ...string) {
 // Renamed moves a row to its new path (Library Rename). A file the index
 // didn't know is queued like a new one.
 func (ix *Index) Renamed(from, to string) {
-	ok, err := ix.cfg.Store.RenameItem(ix.bg(), filepath.Clean(from), filepath.Clean(to))
+	ok, err := ix.cfg.Store.RenameItem(ix.bg(), ix.clean(from), ix.clean(to))
 	if err == nil && !ok {
 		ix.Added(to)
 	}
@@ -407,7 +407,7 @@ func (ix *Index) DeleteIndex(ctx context.Context) error {
 // ReadAgain implements core.MediaIndex: redo a file's OCR / transcription
 // (the speech cap doesn't apply).
 func (ix *Index) ReadAgain(ctx context.Context, path string) error {
-	path = filepath.Clean(path)
+	path = ix.clean(path)
 	it, ok, err := ix.cfg.Store.GetItem(ctx, path)
 	if err != nil {
 		return err
@@ -436,7 +436,7 @@ func (ix *Index) ReadAgain(ctx context.Context, path string) error {
 // Retry implements core.MediaIndex: failed or skipped files are tried again.
 func (ix *Index) Retry(ctx context.Context, paths []string) error {
 	for _, p := range paths {
-		p = filepath.Clean(p)
+		p = ix.clean(p)
 		it, ok, err := ix.cfg.Store.GetItem(ctx, p)
 		if err != nil {
 			return err
@@ -606,7 +606,7 @@ func (ix *Index) StoreBatch(ctx context.Context, results []ItemResult) error {
 	batch := make([]BatchItem, 0, len(results))
 	vecs := make([][]VectorAt, len(results))
 	for i, r := range results {
-		b := BatchItem{Path: filepath.Clean(r.Path), Size: r.Size, ModMs: r.ModMs}
+		b := BatchItem{Path: ix.clean(r.Path), Size: r.Size, ModMs: r.ModMs}
 		switch {
 		case r.Failed != "":
 			b.State, b.Reason = StateFailed, r.Failed
@@ -662,7 +662,7 @@ func (ix *Index) StoreBatch(ctx context.Context, results []ItemResult) error {
 
 // StoreSpeech implements Writer.
 func (ix *Index) StoreSpeech(ctx context.Context, res SpeechResult) error {
-	w := SpeechWrite{Path: filepath.Clean(res.Path), Size: res.Size, ModMs: res.ModMs}
+	w := SpeechWrite{Path: ix.clean(res.Path), Size: res.Size, ModMs: res.ModMs}
 	switch {
 	case res.Failed != "":
 		w.State, w.Reason = SpeechFailed, res.Failed
@@ -691,7 +691,7 @@ func (ix *Index) StoreSpeech(ctx context.Context, res SpeechResult) error {
 
 // Current implements Writer.
 func (ix *Index) Current(ctx context.Context, path string) ([]VectorAt, bool) {
-	path = filepath.Clean(path)
+	path = ix.clean(path)
 	m := ix.Model()
 	it, ok, err := ix.cfg.Store.GetItem(ctx, path)
 	if err != nil || !ok || it.State != StateDone || it.Model != m.ID || m.ID == "" {
@@ -785,7 +785,7 @@ func (ix *Index) conceptReadyLocked() bool {
 // ---- text and labels of one file ------------------------------------------
 
 func (ix *Index) itemFor(ctx context.Context, path string) (Item, error) {
-	it, ok, err := ix.cfg.Store.GetItem(ctx, filepath.Clean(path))
+	it, ok, err := ix.cfg.Store.GetItem(ctx, ix.clean(path))
 	if err != nil {
 		return it, err
 	}
@@ -797,7 +797,7 @@ func (ix *Index) itemFor(ctx context.Context, path string) (Item, error) {
 
 // Labels implements core.MediaIndex.
 func (ix *Index) Labels(ctx context.Context, path string) ([]core.MediaLabel, error) {
-	it, ok, err := ix.cfg.Store.GetItem(ctx, filepath.Clean(path))
+	it, ok, err := ix.cfg.Store.GetItem(ctx, ix.clean(path))
 	if err != nil || !ok {
 		return []core.MediaLabel{}, err
 	}
@@ -856,7 +856,7 @@ func (ix *Index) SetUserLabel(ctx context.Context, path, label string, on bool) 
 
 // Texts implements core.MediaIndex.
 func (ix *Index) Texts(ctx context.Context, path string) ([]core.MediaText, error) {
-	it, ok, err := ix.cfg.Store.GetItem(ctx, filepath.Clean(path))
+	it, ok, err := ix.cfg.Store.GetItem(ctx, ix.clean(path))
 	if err != nil || !ok {
 		return []core.MediaText{}, err
 	}
@@ -866,7 +866,7 @@ func (ix *Index) Texts(ctx context.Context, path string) ([]core.MediaText, erro
 // PutText implements core.MediaTextSink: it replaces the file's chunks of that
 // source. A library file the index hasn't seen yet gets its row (pending).
 func (ix *Index) PutText(ctx context.Context, path, source string, chunks []core.MediaText) error {
-	path = filepath.Clean(path)
+	path = ix.clean(path)
 	it, ok, err := ix.cfg.Store.GetItem(ctx, path)
 	if err != nil {
 		return err
@@ -913,7 +913,7 @@ func (ix *Index) emitIndexed(paths ...string) {
 // Hints implements core.MediaHints: the file's labels (display text,
 // strongest first) and an excerpt of its text.
 func (ix *Index) Hints(ctx context.Context, path string, maxChars int) ([]string, string, bool) {
-	it, ok, err := ix.cfg.Store.GetItem(ctx, filepath.Clean(path))
+	it, ok, err := ix.cfg.Store.GetItem(ctx, ix.clean(path))
 	if err != nil || !ok || it.State != StateDone {
 		return nil, "", false
 	}
