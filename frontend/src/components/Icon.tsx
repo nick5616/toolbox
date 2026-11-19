@@ -191,6 +191,10 @@ import {
   Tablet,
   Wifi,
   UserPlus,
+  Magnet,
+  Flag,
+  Unlink,
+  MoveHorizontal,
 } from "lucide-react";
 
 /** Static map: only these icons end up in the bundle. */
@@ -389,6 +393,11 @@ const icons = {
   tablet: Tablet,
   wifi: Wifi,
   "user-plus": UserPlus,
+  // Phase 21 (timeline)
+  magnet: Magnet,
+  flag: Flag,
+  unlink: Unlink,
+  "move-horizontal": MoveHorizontal,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;

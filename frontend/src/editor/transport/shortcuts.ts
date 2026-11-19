@@ -7,7 +7,17 @@ export interface EditShortcut {
   id: string;
   combos: string[];
   label: string;
+  /**
+   * Where the key applies: both editors (the default), or one of them. Two
+   * entries may share a combo only when their scopes can't be active together
+   * (a test enforces this). M is bound by the Video Editor's ruler and by Edit
+   * Studio's Lanes, so it is in neither table.
+   */
+  scope?: "video-editor" | "edit-studio";
 }
+
+/** The scopes a shortcut can have besides "both". */
+export const SHORTCUT_SCOPES = ["video-editor", "edit-studio"] as const;
 
 export const EDIT_SHORTCUTS: readonly EditShortcut[] = [
   { id: "play", combos: [" "], label: "Play / pause" },

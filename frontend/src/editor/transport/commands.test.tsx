@@ -16,12 +16,24 @@ import { newClip } from "@/editor/doc";
 import { useNewEditRequest } from "../home/newEditRequest";
 import { useEditStudio } from "@/editor/store";
 import { useEditCommands } from "./commands";
+import { EditorProfileProvider, PLAIN_PROFILE } from "../profileContext";
+import type { EditorProfile } from "../profile";
 import { registerPlayer, type PlayerController } from "./player";
 import { EDIT_SHORTCUTS } from "./shortcuts";
 
 function Harness() {
   useEditCommands();
   return null;
+}
+
+/** Edit Studio's profile: markers come from the song's lanes; [ ] M and marker Delete belong to the Lanes. */
+const STUDIO: EditorProfile = { ...PLAIN_PROFILE, moduleId: "edit-studio", title: "Edit Studio", song: "analyzed", markerSignals: true };
+function StudioHarness() {
+  return (
+    <EditorProfileProvider profile={STUDIO}>
+      <Harness />
+    </EditorProfileProvider>
+  );
 }
 
 const key = (k: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(window, { key: k, ...init });
@@ -126,7 +138,7 @@ describe("transport keys", () => {
   });
 
   it("[ and ] jump to the previous and next marker on the active lane", () => {
-    render(<Harness />);
+    render(<StudioHarness />);
     useEditStudio.getState().setPlayhead(2500);
     key("]");
     expect(useEditStudio.getState().playheadMs).toBe(3000);
@@ -197,8 +209,8 @@ describe("editing keys", () => {
     expect(spans()).toEqual([]);
   });
 
-  it("Delete leaves selected markers to the lanes' own handler", () => {
-    render(<Harness />);
+  it("Delete leaves selected markers to the lanes' own handler (Edit Studio)", () => {
+    render(<StudioHarness />);
     const before = project().markers;
     useEditStudio.getState().select({ kind: "markers", ids: ["kick:1000"] });
     key("Delete");
@@ -236,7 +248,7 @@ describe("palette commands", () => {
       .filter((k) => k.startsWith("video-studio."))
       .sort();
     expect(ids).toEqual(
-      ["add-adjust-track", "add-track", "export", "new", "safe-zones", "snap", "split-subject"].map((s) => `video-studio.${s}`).sort(),
+      ["add-adjust-track", "add-audio-track", "add-track", "export", "new", "safe-zones", "snap", "split-subject", "zoom-fit"].map((s) => `video-studio.${s}`).sort(),
     );
     expect(cmd("export")?.section).toBe("Video Editor");
     expect(cmd("new")?.title).toBe("New video");

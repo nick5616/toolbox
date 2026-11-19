@@ -107,14 +107,14 @@ describe("TracksPanel layout", () => {
       await userEvent.click(screen.getByRole("button", { name: "Add" }));
       await userEvent.click(await screen.findByRole("menuitem", { name }));
     };
-    await add("Track");
+    await add("Video track");
     expect(project().tracks.map((t) => t.name)).toEqual(["Video 1", "Adjust 1", "Video 2"]);
     await add("Adjustment track");
     expect(project().tracks).toHaveLength(4);
-    for (let i = 0; i < 4; i++) await add("Track");
+    for (let i = 0; i < 4; i++) await add("Video track");
     expect(project().tracks).toHaveLength(8);
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
-    const item = await screen.findByRole("menuitem", { name: "Track" });
+    const item = await screen.findByRole("menuitem", { name: "Video track" });
     expect(item.getAttribute("aria-disabled") === "true" || (item as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByRole("menuitem", { name: "Visual" })).toBeNull(); // visuals need the music layer
   });
@@ -225,15 +225,15 @@ describe("dragging", () => {
     }
   });
 
-  it("does not move before a 4 px threshold, and is blocked by overlaps", () => {
+  it("does not move before a 4 px threshold, and overwrites what it lands on", () => {
     open([vid("a", 0, 1000), vid("b", 2000, 3000)]);
     render(<TracksPanel />);
     fireEvent.pointerDown(clipEl("a"), { button: 0, clientX: 10, clientY: 60 });
     fireEvent.pointerMove(window, { clientX: 12, clientY: 60 });
     expect(spans()[0]).toEqual([0, 1000]);
-    fireEvent.pointerMove(window, { clientX: 10 + 150, clientY: 60 }); // +1.5 s: overlaps b
+    fireEvent.pointerMove(window, { clientX: 10 + 150, clientY: 60 }); // +1.5 s: lands on b
     fireEvent.pointerUp(window);
-    expect(spans()).toEqual([[0, 1000], [2000, 3000]]);
+    expect(spans()).toEqual([[1500, 2500], [2500, 3000]]);
   });
 
   it("snaps the dragged clip to another clip's edge and names the target", () => {
@@ -322,7 +322,7 @@ describe("context menu", () => {
     fireEvent.contextMenu(clipEl("a"), { clientX: 50, clientY: 50 });
     const menu = await screen.findByRole("menu");
     const labels = within(menu).getAllByRole("menuitem").map((i) => i.textContent);
-    expect(labels).toEqual(["Split at playhead", "Split subject", "Pin", "Duplicate", "Delete", "Reveal source"]);
+    expect(labels).toEqual(["Split at playhead", "Split subject", "Detach audio", "Link", "Pin", "Copy", "Cut", "Paste at playhead", "Duplicate", "Delete", "Ripple delete", "Reveal source"]);
     expect((within(menu).getByRole("menuitem", { name: "Split at playhead" }) as HTMLButtonElement).disabled).toBe(true); // playhead at 0, the clip starts there
     expect((within(menu).getByRole("menuitem", { name: "Split subject" }) as HTMLButtonElement).disabled).toBe(true);
     await userEvent.click(within(menu).getByRole("menuitem", { name: "Delete" }));
@@ -415,12 +415,30 @@ describe("drops from Sources", () => {
     expect(clipsOf()).toHaveLength(0);
   });
 
-  it("never overlaps: a drop on a clip lands after it", () => {
+  it("never overlaps: a drop on a clip overwrites what is under it", () => {
     open([vid("a", 0, 3000)]);
     useEditStudio.getState().setSources([sourceState("/c/b.mp4", 2000)]);
     render(<TracksPanel />);
     act(() => h.drop?.({ paths: ["/c/b.mp4"], x: 168 + 100, y: 60 }));
-    expect(spans()).toEqual([[0, 3000], [3000, 5000]]);
+    expect(spans()).toEqual([[0, 1000], [1000, 3000]]);
+  });
+
+  it("holding Ctrl while dropping inserts: the later clips move right", () => {
+    open([vid("a", 0, 3000)]);
+    useEditStudio.getState().setSources([sourceState("/c/b.mp4", 2000)]);
+    render(<TracksPanel />);
+    fireEvent.keyDown(window, { key: "Control", ctrlKey: true });
+    act(() => h.drop?.({ paths: ["/c/b.mp4"], x: 168 + 100, y: 60 }));
+    expect(spans()).toEqual([[0, 1000], [1000, 3000], [3000, 5000]]);
+  });
+
+  it("a drop below the last track makes a new video track", () => {
+    open([]);
+    useEditStudio.getState().setSources([sourceState("/c/b.mp4", 2000)]);
+    render(<TracksPanel />);
+    act(() => h.drop?.({ paths: ["/c/b.mp4"], x: 168 + 100, y: 500 }));
+    expect(project().tracks).toHaveLength(3);
+    expect(project().tracks[2]?.clips).toHaveLength(1);
   });
 });
 

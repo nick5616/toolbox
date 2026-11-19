@@ -120,7 +120,7 @@ describe("music commands (registered through the profile)", () => {
       .filter((k) => k.startsWith("edit-studio."))
       .sort();
     expect(ids).toEqual(
-      ["add-adjust-track", "add-track", "autofill", "export", "markers-csv", "markers-json", "new", "safe-zones", "slice", "slice-cycle", "snap", "split-subject", "srt"].map((s) => `edit-studio.${s}`).sort(),
+      ["add-adjust-track", "add-audio-track", "add-track", "autofill", "export", "markers-csv", "markers-json", "new", "safe-zones", "slice", "slice-cycle", "snap", "split-subject", "srt", "zoom-fit"].map((s) => `edit-studio.${s}`).sort(),
     );
     expect(cmd("autofill")?.section).toBe("Edit Studio");
     expect(cmd("new")?.title).toBe("New edit");

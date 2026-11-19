@@ -19,6 +19,7 @@ import {
 } from "@/viz/edit/schema";
 import { editLength, type EditParam, type Key, type Marker, type MarkerLane } from "@/viz/edit/types";
 import { clipSourceSpan, findClip, newClip, newId, newTrack, speedAt } from "@/editor/doc";
+import { parseGain, serializeGain } from "./gain";
 
 /** Length of a photo, a colour clip or an adjustment clip when nothing else decides it. */
 export const DEFAULT_CLIP_MS = 2000;
@@ -33,12 +34,9 @@ const overlaps = (a: Pick<EditClip, "startMs" | "endMs">, b: Pick<EditClip, "sta
 const byStart = (a: EditClip, b: EditClip): number => a.startMs - b.startMs || a.endMs - b.endMs;
 const sortedClips = (t: NormalTrack): EditClip[] => t.clips.slice().sort(byStart);
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+/** Clips that play a stretch of a file (their InMs moves with the start edge). */
+export const usesSource = (c: Pick<EditClip, "kind">): boolean => c.kind === "video" || c.kind === "audio";
 
-function hasOverlap(clips: readonly EditClip[]): boolean {
-  const s = clips.slice().sort(byStart);
-  for (let i = 1; i < s.length; i++) if (overlaps(s[i - 1] as EditClip, s[i] as EditClip)) return true;
-  return false;
-}
 
 /** The lane's markers as ascending timeline ms. */
 export function laneMarkersMs(markers: readonly Marker[], lane: MarkerLane): number[] {
@@ -77,13 +75,16 @@ export function rebaseKeys(c: EditClip, shift: number): Partial<EditClip> {
   if (c.transform.includes('"keys"')) {
     const t = parseTransform(c.transform).value;
     patch.transform = serializeTransform({
+      ...t,
       x: shiftParam(t.x, shift),
       y: shiftParam(t.y, shift),
       scale: shiftParam(t.scale, shift),
       rotation: shiftParam(t.rotation, shift),
       opacity: shiftParam(t.opacity, shift),
+      ...(t.crop ? { crop: { l: shiftParam(t.crop.l, shift), r: shiftParam(t.crop.r, shift), t: shiftParam(t.crop.t, shift), b: shiftParam(t.crop.b, shift) } } : {}),
     });
   }
+  if (c.gain?.includes('"keys"')) patch.gain = serializeGain(shiftParam(parseGain(c.gain), shift));
   if (c.speed.includes('"keys"')) patch.speed = serializeSpeed(shiftParam(parseSpeed(c.speed).value, shift));
   if (c.masks.includes('"keys"')) {
     patch.masks = serializeMasks(
@@ -125,6 +126,8 @@ export interface InsertSource {
 export interface InsertOptions {
   /** Ascending timeline ms of the active lane's markers (fill-next). */
   markersMs?: readonly number[];
+  /** A drop: land exactly at the pointer and overwrite what is there ("overwrite") or push later clips right ("insert"), instead of fitting into the gap. */
+  drop?: DropMode;
 }
 
 /** How far clips may be placed: the song range, unbounded without a song (the length follows the clips). */
@@ -152,9 +155,9 @@ export function insertClipAt(doc: NormalProject, trackId: string, source: Insert
   const min = minClipMs(doc.fps);
   const clips = sortedClips(track);
   let at = Math.max(0, Math.round(atMs));
-  for (const c of clips) if (c.startMs <= at && at < c.endMs) at = c.endMs;
+  if (!opts.drop) for (const c of clips) if (c.startMs <= at && at < c.endMs) at = c.endMs;
   if (at >= D) return null;
-  const next = clips.find((c) => c.startMs >= at);
+  const next = opts.drop ? undefined : clips.find((c) => c.startMs >= at);
   const gapEnd = Math.min(next ? next.startMs : Number.POSITIVE_INFINITY, D);
   const srcLen = source.kind === "video" && (source.durationMs ?? 0) > 0 ? (source.durationMs as number) : 0;
   const natural = srcLen || DEFAULT_CLIP_MS;
@@ -173,6 +176,7 @@ export function insertClipAt(doc: NormalProject, trackId: string, source: Insert
     startMs: at,
     endMs: Math.round(end),
   });
+  if (opts.drop) return { project: applyPlacement(doc, new Set(), [{ clip, trackIndex: ti }], opts.drop), clip };
   return { project: setClips(doc, ti, [...track.clips, clip]), clip };
 }
 
@@ -208,9 +212,112 @@ function setClips(doc: NormalProject, trackIndex: number, clips: EditClip[]): No
   return { ...doc, tracks };
 }
 
-// ---- move / duplicate ----
+// ---- edge primitives, overwrite and insert (Phase 21 SPEC §B2) ----
 
-const compatible = (clip: EditClip, t: NormalTrack): boolean => (clip.kind === "adjust") === (t.kind === "adjust");
+/** Whether a clip may live on this track: video-like clips on video tracks, adjustment clips on adjustment tracks, audio clips on audio tracks. */
+export const clipFitsTrack = (clip: Pick<EditClip, "kind">, t: Pick<NormalTrack, "kind">): boolean =>
+  clip.kind === "adjust" ? t.kind === "adjust" : clip.kind === "audio" ? t.kind === "audio" : t.kind === "video";
+
+/** The clip with its start edge moved later to `start` (InMs and keys follow); null when under a frame would be left. */
+export function clipFromStart(c: EditClip, start: number, fps: number): EditClip | null {
+  if (c.endMs - start < minClipMs(fps)) return null;
+  if (start <= c.startMs) return c;
+  const inMs = usesSource(c) ? Math.round(clipSourceSpan({ ...c, endMs: start }, fps).toMs) : c.inMs;
+  return { ...c, startMs: start, inMs, auto: false, ...rebaseKeys(c, start - c.startMs) };
+}
+
+/** The clip with its end edge moved earlier to `end` (a fade-out is dropped); null when under a frame would be left. */
+export function clipToEnd(c: EditClip, end: number, fps: number): EditClip | null {
+  if (end - c.startMs < minClipMs(fps)) return null;
+  if (end >= c.endMs) return c;
+  return { ...c, endMs: end, auto: false, ...(c.fadeOutMs ? { fadeOutMs: 0 } : {}) };
+}
+
+/** The link ID a split's right-hand pieces share, one per old link (a fresh one the first time). */
+function rightLink(links: Map<string, string>, link: string | undefined): string | undefined {
+  if (!link) return undefined;
+  let n = links.get(link);
+  if (!n) {
+    n = newId("l");
+    links.set(link, n);
+  }
+  return n;
+}
+
+/** The right half of a clip cut in two: a new ID, its own link, no fade-in. */
+function rightPiece(c: EditClip, links: Map<string, string>): EditClip {
+  const link = rightLink(links, c.link);
+  const { link: _drop, ...rest } = c;
+  void _drop;
+  return { ...rest, id: newId("c"), ...(link ? { link } : {}), ...(c.fadeInMs ? { fadeInMs: 0 } : {}) };
+}
+
+export interface RangeCut {
+  clips: EditClip[];
+  /** The clips (as they were) that lost something. */
+  touched: EditClip[];
+}
+
+/**
+ * Takes [from, to) out of a track's clips: covered clips go, the clips at the
+ * edges are trimmed, a clip around the range is split in two (the right piece
+ * has its own ID and link). `only` limits the cut to some clips.
+ */
+export function cutRange(clips: readonly EditClip[], from: number, to: number, fps: number, links: Map<string, string>, only?: (c: EditClip) => boolean): RangeCut {
+  const out: EditClip[] = [];
+  const touched: EditClip[] = [];
+  for (const c of clips) {
+    if (c.endMs <= from || c.startMs >= to || (only && !only(c))) {
+      out.push(c);
+      continue;
+    }
+    touched.push(c);
+    const left = c.startMs < from ? clipToEnd(c, from, fps) : null;
+    const right = c.endMs > to ? clipFromStart(c.startMs < from ? rightPiece(c, links) : c, to, fps) : null;
+    if (left) out.push(left);
+    if (right) out.push(right);
+  }
+  return { clips: out, touched };
+}
+
+/** Opens a gap of `len` at `at` on a track: later clips shift right, a clip around `at` is split. */
+export function openGap(clips: readonly EditClip[], at: number, len: number, fps: number, links: Map<string, string>): EditClip[] {
+  const out: EditClip[] = [];
+  for (const c of clips) {
+    if (c.endMs <= at) out.push(c);
+    else if (c.startMs >= at) out.push({ ...c, startMs: c.startMs + len, endMs: c.endMs + len });
+    else {
+      const left = clipToEnd(c, at, fps);
+      const right = clipFromStart(rightPiece(c, links), at, fps);
+      if (!left) out.push({ ...c, startMs: c.startMs + len, endMs: c.endMs + len });
+      else if (!right) out.push(c);
+      else out.push(left, { ...right, startMs: right.startMs + len, endMs: right.endMs + len });
+    }
+  }
+  return out;
+}
+
+/**
+ * Cuts [from, to) out of one track; the partners of every linked clip that lost
+ * something lose the same time on their own (unlocked) tracks, so a split
+ * linked clip splits both sides.
+ */
+export function overwriteRange(doc: NormalProject, trackIndex: number, from: number, to: number): NormalProject {
+  const track = doc.tracks[trackIndex];
+  if (!track || to <= from) return doc;
+  const links = new Map<string, string>();
+  const res = cutRange(track.clips, from, to, doc.fps, links);
+  const groups = new Set(res.touched.map((c) => c.link).filter((l): l is string => !!l));
+  const tracks = doc.tracks.map((t, i) => {
+    if (i === trackIndex) return res.clips.length === t.clips.length && !res.touched.length ? t : { ...t, clips: res.clips.slice().sort(byStart) };
+    if (!groups.size || t.locked) return t;
+    const cut = cutRange(t.clips, from, to, doc.fps, links, (c) => !!c.link && groups.has(c.link));
+    return cut.touched.length ? { ...t, clips: cut.clips.slice().sort(byStart) } : t;
+  });
+  return { ...doc, tracks };
+}
+
+export type DropMode = "overwrite" | "insert";
 
 interface Placement {
   clip: EditClip;
@@ -231,49 +338,78 @@ function place(doc: NormalProject, ids: readonly string[], deltaMs: number, toTr
     trackDelta = to - (refs[0] as NonNullable<typeof refs[0]>).trackIndex;
   }
   if (d === 0 && trackDelta === 0 && !copy) return null;
+  const links = new Map<string, string>();
   const placed: Placement[] = [];
   for (const r of refs) {
     const ti = r.trackIndex + trackDelta;
     const t = doc.tracks[ti];
-    if (!t || t.locked || !compatible(r.clip, t)) return null;
+    if (!t || t.locked || !clipFitsTrack(r.clip, t)) return null;
     const c: EditClip = { ...r.clip, startMs: r.clip.startMs + d, endMs: r.clip.endMs + d, auto: false };
-    if (copy) c.id = newId("c");
+    if (copy) {
+      c.id = newId("c");
+      // Copies of linked clips stay linked to each other, not to the originals.
+      const link = r.clip.link ? rightLink(links, r.clip.link) : undefined;
+      if (link) c.link = link;
+      else delete c.link;
+    }
     placed.push({ clip: c, trackIndex: ti });
   }
   return { remove: copy ? new Set() : new Set(refs.map((r) => r.clip.id)), placed };
 }
 
-function apply(doc: NormalProject, remove: Set<string>, placed: Placement[]): NormalProject | null {
-  const tracks = doc.tracks.map((t, i) => {
-    const add = placed.filter((p) => p.trackIndex === i).map((p) => p.clip);
-    const keep = remove.size ? t.clips.filter((c) => !remove.has(c.id)) : t.clips;
-    if (!add.length && keep === t.clips) return t;
-    return { ...t, clips: [...keep, ...add].sort(byStart) };
+/** Takes `remove` off the tracks, makes room for `placed` (overwrite cuts what's under them; insert pushes later clips right), then adds them. */
+export function applyPlacement(doc: NormalProject, remove: ReadonlySet<string>, placed: readonly Placement[], mode: DropMode): NormalProject {
+  let work: NormalProject = remove.size
+    ? { ...doc, tracks: doc.tracks.map((t) => (t.clips.some((c) => remove.has(c.id)) ? { ...t, clips: t.clips.filter((c) => !remove.has(c.id)) } : t)) }
+    : doc;
+  const byTrack = new Map<number, Placement[]>();
+  for (const p of placed) byTrack.set(p.trackIndex, [...(byTrack.get(p.trackIndex) ?? []), p]);
+  for (const [ti, ps] of byTrack) {
+    if (mode === "insert") {
+      const from = Math.min(...ps.map((p) => p.clip.startMs));
+      const to = Math.max(...ps.map((p) => p.clip.endMs));
+      const t = work.tracks[ti] as NormalTrack;
+      const tracks = work.tracks.slice();
+      tracks[ti] = { ...t, clips: openGap(t.clips, from, to - from, work.fps, new Map()) };
+      work = { ...work, tracks };
+    } else {
+      for (const p of ps) work = overwriteRange(work, ti, p.clip.startMs, p.clip.endMs);
+    }
+  }
+  const tracks = work.tracks.map((t, i) => {
+    const add = byTrack.get(i);
+    return add ? { ...t, clips: [...t.clips, ...add.map((p) => p.clip)].sort(byStart) } : t;
   });
-  for (const t of tracks) if (hasOverlap(t.clips)) return null;
-  return { ...doc, tracks };
+  return { ...work, tracks };
 }
 
 /**
  * Moves clips by deltaMs, keeping their relative timing; with toTrackId the
  * group moves to that track (the first id's track becomes it; the others keep
- * their track offset). Blocked (null) when any clip would overlap another, land
- * on a locked track, or change between video and adjustment tracks. The group
- * never moves before 0.
+ * their track offset). Dropping onto clips overwrites them (the clip underneath
+ * is trimmed or split); mode "insert" pushes the later clips right instead.
+ * Null when a clip would land on a locked track or the wrong kind of track, or
+ * nothing moved. The group never moves before 0.
  */
-export function moveClips(doc: NormalProject, ids: readonly string[], deltaMs: number, toTrackId?: string): NormalProject | null {
+export function moveClips(doc: NormalProject, ids: readonly string[], deltaMs: number, toTrackId?: string, mode: DropMode = "overwrite"): NormalProject | null {
   const pl = place(doc, ids, deltaMs, toTrackId, false);
-  return pl ? apply(doc, pl.remove, pl.placed) : null;
+  return pl ? applyPlacement(doc, pl.remove, pl.placed, mode) : null;
+}
+
+/** True when a placed clip would land on a clip that stays. */
+function collides(doc: NormalProject, placed: readonly Placement[]): boolean {
+  return placed.some((p) => (doc.tracks[p.trackIndex] as NormalTrack).clips.some((c) => overlaps(c, p.clip)));
 }
 
 /**
- * Copies clips (new IDs) by deltaMs, or, without it, to the right of the
- * selection (further right while something is in the way). Alt-drag passes deltaMs.
+ * Copies clips (new IDs) by deltaMs (overwriting what's under them), or,
+ * without it, to the right of the selection (further right while something is
+ * in the way). Alt-drag passes deltaMs.
  */
-export function duplicateClips(doc: NormalProject, ids: readonly string[], deltaMs?: number, toTrackId?: string): NormalProject | null {
+export function duplicateClips(doc: NormalProject, ids: readonly string[], deltaMs?: number, toTrackId?: string, mode: DropMode = "overwrite"): NormalProject | null {
   if (deltaMs !== undefined) {
     const pl = place(doc, ids, deltaMs, toTrackId, true);
-    return pl ? apply(doc, pl.remove, pl.placed) : null;
+    return pl ? applyPlacement(doc, pl.remove, pl.placed, mode) : null;
   }
   const refs = ids.map((id) => findClip(doc, id)).filter((r): r is NonNullable<typeof r> => r !== null);
   if (!refs.length) return null;
@@ -282,8 +418,7 @@ export function duplicateClips(doc: NormalProject, ids: readonly string[], delta
   for (let i = 0; i < 60; i++) {
     const pl = place(doc, ids, d, undefined, true);
     if (!pl) return null;
-    const out = apply(doc, pl.remove, pl.placed);
-    if (out) return out;
+    if (!collides(doc, pl.placed)) return applyPlacement(doc, pl.remove, pl.placed, "overwrite");
     // Jump past the clip in the way, on the first track that collides.
     let jump = 0;
     for (const p of pl.placed) {
@@ -329,7 +464,7 @@ export function trimClip(doc: NormalProject, id: string, edge: "start" | "end", 
     const next = others.filter((x) => x.startMs >= c.endMs).sort(byStart)[0];
     let end = clamp(target, c.startMs + min, next ? next.startMs : Number.POSITIVE_INFINITY);
     const srcMs = opts.sourceMs ?? 0;
-    if (c.kind === "video" && srcMs > 0 && end > c.endMs) {
+    if (usesSource(c) && srcMs > 0 && end > c.endMs) {
       // Largest end within [old end, wanted end] that still plays inside the source.
       let lo = c.endMs;
       let hi = end;
@@ -346,7 +481,7 @@ export function trimClip(doc: NormalProject, id: string, edge: "start" | "end", 
   const prev = others.filter((x) => x.endMs <= c.startMs).sort(byStart).pop();
   let start = clamp(target, prev ? prev.endMs : 0, c.endMs - min);
   let inMs = c.inMs;
-  if (c.kind === "video") {
+  if (usesSource(c)) {
     if (start > c.startMs) {
       inMs = c.inMs + (clipSourceSpan({ ...c, endMs: start }, doc.fps).toMs - c.inMs);
       // clipSourceSpan integrates from startMs for (endMs − startMs); here we want [startMs, start).
@@ -369,16 +504,43 @@ export function trimClip(doc: NormalProject, id: string, edge: "start" | "end", 
 export function splitClip(c: EditClip, t: number, fps: number): [EditClip, EditClip] | null {
   const min = minClipMs(fps);
   if (t - c.startMs < min || c.endMs - t < min) return null;
-  const inMs = c.kind === "video" ? Math.round(clipSourceSpan({ ...c, endMs: t }, fps).toMs) : c.inMs;
-  const left: EditClip = { ...c, endMs: t, auto: false };
-  const right: EditClip = { ...c, id: newId("c"), startMs: t, inMs, in: "", auto: false, ...rebaseKeys(c, t - c.startMs) };
+  const inMs = usesSource(c) ? Math.round(clipSourceSpan({ ...c, endMs: t }, fps).toMs) : c.inMs;
+  const left: EditClip = { ...c, endMs: t, auto: false, ...(c.fadeOutMs ? { fadeOutMs: 0 } : {}) };
+  const right: EditClip = { ...c, id: newId("c"), startMs: t, inMs, in: "", auto: false, ...(c.fadeInMs ? { fadeInMs: 0 } : {}), ...rebaseKeys(c, t - c.startMs) };
   return [left, right];
 }
 
-/** Splits every listed clip that spans tMs (≥ 1 frame each side). The right half gets a new ID; a matte is shared. */
-export function splitAt(doc: NormalProject, ids: readonly string[], tMs: number): NormalProject | null {
+/** The clips sharing a link with any of `ids`, plus `ids` themselves. */
+export function withLinked(doc: NormalProject, ids: readonly string[]): string[] {
   const set = new Set(ids);
+  const links = new Set<string>();
+  for (const t of doc.tracks) for (const c of t.clips) if (set.has(c.id) && c.link) links.add(c.link);
+  if (!links.size) return [...set];
+  for (const t of doc.tracks) for (const c of t.clips) if (c.link && links.has(c.link)) set.add(c.id);
+  return [...set];
+}
+
+/**
+ * Splits every listed clip that spans tMs (≥ 1 frame each side), with the
+ * clips linked to them when `linked` is set (the razor does; a selection already holds both sides). The right half gets a new ID; a
+ * matte is shared. Linked right halves share a new link of their own; a right
+ * half whose partner couldn't be split is unlinked.
+ */
+export function splitAt(doc: NormalProject, ids: readonly string[], tMs: number, opts: { linked?: boolean } = {}): NormalProject | null {
+  const set = new Set(opts.linked ? withLinked(doc, ids) : ids);
   const t = Math.round(tMs);
+  // Which links have every member split (all of them live on unlocked tracks and span t)?
+  const members = new Map<string, { total: number; split: number }>();
+  for (const tr of doc.tracks) {
+    for (const c of tr.clips) {
+      if (!c.link) continue;
+      const m = members.get(c.link) ?? { total: 0, split: 0 };
+      m.total++;
+      if (!tr.locked && set.has(c.id) && splitClip(c, t, doc.fps)) m.split++;
+      members.set(c.link, m);
+    }
+  }
+  const fresh = new Map<string, string>();
   let changed = false;
   const tracks = doc.tracks.map((tr) => {
     if (tr.locked) return tr;
@@ -386,7 +548,19 @@ export function splitAt(doc: NormalProject, ids: readonly string[], tMs: number)
     for (const c of tr.clips) {
       const halves = set.has(c.id) ? splitClip(c, t, doc.fps) : null;
       if (halves) {
-        clips.push(...halves);
+        const [left, right] = halves;
+        if (c.link) {
+          const m = members.get(c.link);
+          if (m && m.split === m.total) {
+            let n = fresh.get(c.link);
+            if (!n) {
+              n = newId("l");
+              fresh.set(c.link, n);
+            }
+            right.link = n;
+          } else delete right.link;
+        }
+        clips.push(left, right);
         changed = true;
       } else clips.push(c);
     }
@@ -495,14 +669,27 @@ export function sliceAtMarkers(
 
 // ---- tracks ----
 
-/** Adds a track on top (≤ 8). Names count up per kind ("Video 2", "Adjust 1"). */
-export function addTrack(doc: NormalProject, kind: "video" | "adjust", name?: string): NormalProject | null {
+/** Adds a track (≤ 8): video and adjustment tracks on top, audio tracks at the bottom. Names count up per kind ("Video 2", "Adjust 1", "Audio 1"). */
+export function addTrack(doc: NormalProject, kind: "video" | "adjust" | "audio", name?: string): NormalProject | null {
   if (doc.tracks.length >= MAX_TRACKS) return null;
   let n = doc.tracks.filter((t) => t.kind === kind).length + 1;
-  const label = kind === "video" ? "Video" : "Adjust";
+  const label = kind === "video" ? "Video" : kind === "audio" ? "Audio" : "Adjust";
   const names = new Set(doc.tracks.map((t) => t.name));
   while (!name && names.has(`${label} ${n}`)) n++;
-  return { ...doc, tracks: [...doc.tracks, { ...newTrack(kind, name?.trim() || `${label} ${n}`), clips: [] }] };
+  const track: NormalTrack = { ...newTrack(kind === "audio" ? "video" : kind, name?.trim() || `${label} ${n}`), kind, clips: [] };
+  return { ...doc, tracks: kind === "audio" ? [track, ...doc.tracks] : [...doc.tracks, track] };
+}
+
+/** A track's height setting (the document's `Height`: "s" | "m" | "l", "" = medium). */
+export type TrackHeight = "s" | "m" | "l";
+export const trackHeightOf = (t: Pick<NormalTrack, "height">): TrackHeight => (t.height === "s" || t.height === "l" ? t.height : "m");
+export function setTrackHeight(doc: NormalProject, id: string, height: TrackHeight): NormalProject | null {
+  const t = doc.tracks.find((x) => x.id === id);
+  return !t || trackHeightOf(t) === height ? null : patchTrack(doc, id, { height: height === "m" ? "" : height });
+}
+export function setTrackSolo(doc: NormalProject, id: string, solo: boolean): NormalProject | null {
+  const t = doc.tracks.find((x) => x.id === id);
+  return !t || !!t.solo === solo ? null : patchTrack(doc, id, { solo });
 }
 
 /** Removes a track and its clips; at least one track stays. */

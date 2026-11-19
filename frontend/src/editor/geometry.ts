@@ -30,13 +30,69 @@ export function visibleRange(widthPx: number, pps: number, scrollMs: number): { 
   return { startMs: scrollMs, endMs: scrollMs + (Math.max(0, widthPx) * 1000) / pps };
 }
 
+/** Zoom range in pixels per second (Phase 21 SPEC §B2): 6 px/s fits long edits, 2000 px/s shows single frames at 60 fps. */
+export const MIN_PPS = 6;
+export const MAX_PPS = 2000;
+/** One zoom key press (= / −) multiplies or divides the scale by this. */
+export const ZOOM_STEP = 1.5;
+
+export interface View {
+  pps: number;
+  scrollMs: number;
+}
+
+const clampNum = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+
+/** The widest view's scroll limit: the left edge never passes the last moment that still fills the window. */
+export function maxScrollMs(durationMs: number, widthPx: number, pps: number): number {
+  return Math.max(0, durationMs - (Math.max(1, widthPx) * 1000) / pps);
+}
+
+/**
+ * Zooms by `factor` keeping the moment `anchorMs` at the same x on screen
+ * (the playhead for the keys, the pointer for Ctrl+wheel and a pinch). Never
+ * further out than the whole edit nor outside 6–2000 px/s.
+ */
+export function zoomAround(view: View, factor: number, anchorMs: number, widthPx: number, durationMs: number): View {
+  const fit = fitPps(durationMs, widthPx);
+  const pps = clampNum(view.pps * factor, Math.min(MAX_PPS, Math.max(MIN_PPS, Math.min(fit, view.pps))), MAX_PPS);
+  const x = msToX(anchorMs, view.pps, view.scrollMs);
+  return { pps, scrollMs: clampNum(anchorMs - (x * 1000) / pps, 0, maxScrollMs(durationMs, widthPx, pps)) };
+}
+
+/** The zoom slider's 0..1000 position of a scale (logarithmic: each step is the same factor). */
+export function ppsToSlider(pps: number): number {
+  return Math.round((Math.log(clampNum(pps, MIN_PPS, MAX_PPS) / MIN_PPS) / Math.log(MAX_PPS / MIN_PPS)) * 1000);
+}
+
+/** The scale at a zoom slider position. */
+export function sliderToPps(v: number): number {
+  return MIN_PPS * Math.pow(MAX_PPS / MIN_PPS, clampNum(v, 0, 1000) / 1000);
+}
+
+/** The scale at which the whole edit fits the width (never below the minimum zoom). */
+export function fitPps(durationMs: number, widthPx: number): number {
+  return clampNum((Math.max(1, widthPx) * 1000) / Math.max(1, durationMs), MIN_PPS, MAX_PPS);
+}
+
+/** `\` : the whole edit in view, with a little room at the right. */
+export function fitView(durationMs: number, widthPx: number): View {
+  return { pps: fitPps(durationMs * 1.02, widthPx), scrollMs: 0 };
+}
+
+/** Pans by `deltaPx` of the time area, within the edit. */
+export function panBy(view: View, deltaPx: number, widthPx: number, durationMs: number): View {
+  return { pps: view.pps, scrollMs: clampNum(view.scrollMs + (deltaPx * 1000) / view.pps, 0, maxScrollMs(durationMs, widthPx, view.pps)) };
+}
+
 /**
  * Wheel handling for any timeline row container (attach to the element that
- * spans header + time area):
- * - the wheel (and a trackpad pinch) zooms the time around the pointer;
+ * spans header + time area), as in Premiere:
+ * - Ctrl+wheel (and a trackpad pinch, which arrives as Ctrl+wheel) zooms the
+ *   time around the pointer;
  * - Shift+wheel and sideways trackpad scrolling pan along the time (as do the
  *   scrollbar and a middle-button drag);
- * - over the row names, or with Alt, the wheel scrolls the rows up and down.
+ * - the plain wheel scrolls the rows up and down.
  * Clamped to [0, durationMs].
  */
 export function useTimelineWheel(el: HTMLElement | null, durationMs: number): void {
@@ -47,28 +103,24 @@ export function useTimelineWheel(el: HTMLElement | null, durationMs: number): vo
       const rect = el.getBoundingClientRect();
       const x = Math.max(0, e.clientX - rect.left - HEADER_PX);
       const timeWidth = Math.max(1, rect.width - HEADER_PX);
-      const maxScroll = Math.max(0, durationMs - (timeWidth * 1000) / pps);
       const sideways = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-      const overHeaders = e.clientX - rect.left < HEADER_PX;
-      if (!sideways && (e.altKey || overHeaders)) {
-        const rows = rowsScroller(el);
-        if (!rows) return;
+      if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        rows.scrollTop += wheelPx(e, rows.clientHeight);
+        const next = zoomAround({ pps, scrollMs }, Math.exp(-wheelPx(e, 300) * 0.0015), xToMs(x, pps, scrollMs), timeWidth, durationMs);
+        setView(next.pps, next.scrollMs);
         return;
       }
-      e.preventDefault();
       if (sideways || e.shiftKey) {
+        e.preventDefault();
         const d = wheelPx(e, timeWidth, sideways ? e.deltaX : e.deltaY || e.deltaX);
-        setView(pps, Math.min(maxScroll, Math.max(0, scrollMs + (d * 1000) / pps)));
+        const next = panBy({ pps, scrollMs }, d, timeWidth, durationMs);
+        setView(next.pps, next.scrollMs);
         return;
       }
-      // Zoom around the pointer; never further out than the whole edit.
-      const fitPps = Math.max(6, (timeWidth * 1000) / Math.max(1, durationMs));
-      const at = xToMs(x, pps, scrollMs);
-      const next = Math.max(Math.min(fitPps, pps), Math.min(800, pps * Math.exp(-wheelPx(e, 300) * 0.0015)));
-      const nextMax = Math.max(0, durationMs - (timeWidth * 1000) / next);
-      setView(next, Math.min(nextMax, Math.max(0, at - (x * 1000) / next)));
+      const rows = rowsScroller(el);
+      if (!rows) return;
+      e.preventDefault();
+      rows.scrollTop += wheelPx(e, rows.clientHeight);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
