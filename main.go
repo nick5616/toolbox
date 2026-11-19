@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -105,6 +106,7 @@ func run() error {
 	if err := paths.Ensure(); err != nil {
 		return err
 	}
+	workspace.SetToolsDir(paths.ToolsDir) // the tools lock (SPEC A6b)
 	// Every subprocess (and Go's os.TempDir) uses the workspace's tmp dir
 	// (Phase 21 §A6b), never the user's %TEMP%.
 	for _, k := range []string{"TMP", "TEMP", "TMPDIR"} {
@@ -112,7 +114,11 @@ func run() error {
 	}
 	closeLog := setupLogging(paths)
 	defer closeLog()
-	slog.Info("starting Toolbox", "version", core.Version, "support", paths.SupportDir)
+	slog.Info("starting Toolbox", "version", core.Version, "support", paths.SupportDir,
+		"workspace", boot.Info.Name, "kind", boot.Info.Kind, "sandboxed", boot.Sandboxed)
+	if boot.Notice != "" {
+		slog.Warn("workspace", "notice", boot.Notice)
+	}
 
 	db, err := store.Open(paths.DBPath)
 	if err != nil {
@@ -126,15 +132,31 @@ func run() error {
 	// Phase 20: library:added also reaches Smart search's index.
 	emitter := &searchTee{inner: appEmitter}
 
-	defaultLib, err := core.DefaultLibraryDir()
-	if err != nil {
-		return err
+	defaultLib := boot.LibraryDir // a workspace's library is <root>/Library
+	if defaultLib == "" {
+		if defaultLib, err = core.DefaultLibraryDir(); err != nil {
+			return err
+		}
 	}
 	settings, err := core.NewSettingsService(db, emitter, defaultLib)
 	if err != nil {
 		return err
 	}
 	settings.SetSupportDir(paths.SupportDir)
+	wsStore := workspace.Store{Dir: boot.GlobalDir}
+	if boot.LibraryDir != "" {
+		settings.LockLibrary(boot.LibraryDir)
+	} else {
+		settings.SetLibraryGuard(func(dir string) string { // Personal's library never sits inside a workspace
+			list, _ := wsStore.List("")
+			for _, w := range list {
+				if w.Root != "" && core.IsWithin(dir, w.Root) {
+					return "Can't be inside the workspace folder " + w.Name
+				}
+			}
+			return ""
+		})
+	}
 	if err := os.MkdirAll(settings.Current().LibraryDir, 0o755); err != nil {
 		slog.Warn("library folder unavailable", "dir", settings.Current().LibraryDir, "err", err)
 	}
@@ -168,9 +190,10 @@ func run() error {
 	// Local File Transfer (Phase 13): the only code that may listen on the
 	// local network, and only while receiving is on.
 	lanRT, err := lan.New(lan.Config{
-		Dir:        filepath.Join(paths.SupportDir, "lanshare"),
-		Emit:       func(name string, data any) { emitter.Emit(name, data) }, // not emitter.Emit: that copies the Emitter before App is set
-		ReceiveDir: func() string { return filepath.Join(settings.Current().LibraryDir, "Received") },
+		Dir:          filepath.Join(paths.SupportDir, "lanshare"),
+		DefaultAlias: demoAlias(boot),
+		Emit:         func(name string, data any) { emitter.Emit(name, data) }, // not emitter.Emit: that copies the Emitter before App is set
+		ReceiveDir:   func() string { return filepath.Join(settings.Current().LibraryDir, "Received") },
 		FreeSpace: func(dir string) (uint64, error) {
 			free, _, err := disk.Free(dir)
 			return free, err
@@ -334,7 +357,7 @@ func run() error {
 
 	// --- Phase 18: Focus Lock engine (architect) ---
 	focusEng := focus.New(focus.Options{
-		Platform: focus.NewPlatform(), Store: db.FocusStore(), DryRun: focus.DryRunFromEnv(),
+		Platform: focus.NewPlatform(), Store: db.FocusStore(), DryRun: focus.DryRun(boot.Sandboxed),
 		Emit: func(name string, data any) { emitter.Emit(name, data) },
 	})
 	defer focusEng.Stop()
@@ -455,7 +478,48 @@ func run() error {
 	if err := grade.Register(reg, gradeMod); err != nil {
 		return err
 	}
-	if err := wsjobs.Register(reg, wsjobs.New(wsjobs.Config{Boot: boot, Trash: trash.Default()})); err != nil {
+	if err := wsjobs.Register(reg, wsjobs.New(wsjobs.Config{
+		Boot: boot, Trash: trash.Default(),
+		Register: func(path string) error { // baseline copies appear in the Library like an import
+			o, err := core.NewOutput(path, "", wsjobs.ModuleID)
+			if err != nil {
+				return err
+			}
+			if o, err = db.UpsertOutput(context.Background(), o); err != nil {
+				return err
+			}
+			emitter.Emit(core.EventLibraryAdded, o)
+			return nil
+		},
+		Forget: func(paths []string) { // tidy: the trashed files leave the Library
+			var ids []string
+			for _, p := range paths {
+				if o, ok, err := db.OutputByPath(context.Background(), p); err == nil && ok {
+					if db.DeleteOutput(context.Background(), o.ID) == nil {
+						ids = append(ids, o.ID)
+					}
+				}
+			}
+			if len(ids) > 0 {
+				emitter.Emit(core.EventLibraryRemoved, core.OutputsRemoved{IDs: ids})
+			}
+			searchIdx.Removed(paths...)
+		},
+		ClearHistory: jobs.ClearFinished,
+		ActiveJobs: func(ctx context.Context, except string) int {
+			busy, err := jobs.List(ctx, core.JobFilter{Statuses: []core.JobStatus{core.JobQueued, core.JobRunning}, Limit: 500})
+			if err != nil {
+				return 0
+			}
+			n := 0
+			for _, j := range busy {
+				if j.ID != except {
+					n++
+				}
+			}
+			return n
+		},
+	})); err != nil {
 		return err
 	}
 	// --- end Phase 21 ---
@@ -492,6 +556,12 @@ func run() error {
 		case <-ctx.Done():
 			return
 		}
+		if boot.SeedPending { // a new workspace with a baseline: copy its starting files
+			opts, _ := json.Marshal(wsjobs.Options{Action: wsjobs.ActionSeed})
+			if _, err := jobs.Submit(ctx, wsjobs.ModuleID, []string{}, string(opts)); err != nil {
+				slog.Warn("workspace seed", "err", err)
+			}
+		}
 		go depSvc.Refresh(ctx)
 		// Phase 20: Smart search returns at once (it reconciles 60 s later, then
 		// runs idle-only batches), so it starts before the slow cache prunes.
@@ -527,6 +597,12 @@ func run() error {
 		}
 	}
 
+	wsSvc := &api.WorkspacesService{Boot: boot, Jobs: jobs, Em: emitter, PersonalLibrary: func() string {
+		if boot.LibraryDir == "" {
+			return settings.Current().LibraryDir
+		}
+		return ""
+	}}
 	desktopSvc := &api.DesktopService{} // Shell is set once the app exists
 	var quitGate func() bool            // the desktop shell's ShouldQuit, once it exists
 	packsAPI := &api.PacksService{Packs: packSvc}
@@ -546,7 +622,7 @@ func run() error {
 			application.NewServiceWithOptions(&api.SearchService{Index: searchIdx, SaveDialog: paintSaveDialog}, opts),
 			application.NewServiceWithOptions(captions.NewService(jobs, captionsMod), opts),
 			application.NewServiceWithOptions(grade.NewService(jobs, gradeMod), opts),
-			application.NewServiceWithOptions(&api.WorkspacesService{Boot: boot, Jobs: jobs}, opts),
+			application.NewServiceWithOptions(wsSvc, opts),
 			application.NewServiceWithOptions(&api.DepsService{Deps: depSvc, Jobs: jobs, Reg: reg, Engine: engine, Paths: paths, StopExiftool: exifMod.Close}, opts),
 			application.NewServiceWithOptions(&api.FilesService{Reg: reg, Settings: settings, Paths: paths}, opts),
 			application.NewServiceWithOptions(desktopSvc, opts),
@@ -602,7 +678,7 @@ func run() error {
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
-		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true, WebviewUserDataPath: sandboxWebviewDir(paths), AdditionalBrowserArgs: browserArgs()},
+		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true, WebviewUserDataPath: webviewDir(boot), AdditionalBrowserArgs: browserArgs(boot.Sandboxed)},
 		// The Visualizer streams rendered video over raw messages: no socket
 		// (SPEC.md §4.4). The broker checks the token and the origin.
 		RawMessageHandler: func(_ application.Window, msg string, origin *application.OriginInfo) {
@@ -622,23 +698,28 @@ func run() error {
 			return quitGate()
 		},
 		SingleInstance: &application.SingleInstanceOptions{
-			UniqueID: instanceID(paths),
-			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+			UniqueID: instanceID(boot),
+			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
 				if w := application.Get().Window.Current(); w != nil {
 					w.Restore()
 					w.Focus()
+				}
+				// `toolbox --workspace X` while another workspace runs: ask first.
+				if req, ok := switchRequest(wsSvc, data.Args); ok {
+					emitter.Emit(workspace.EventSwitchRequest, req)
 				}
 			},
 		},
 	})
 	appEmitter.App = app
 	packsAPI.RelaunchFn = func() error { return desktop.Relaunch(app.Quit) }
+	wsSvc.Relaunch = func(args []string) error { return desktop.RelaunchWith(args, app.Quit) }
 	api.ObservePacks(app, packsAPI)
 
 	setupMenu(app, emitter)
 
 	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:          "Toolbox",
+		Title:          windowTitle(boot),
 		Width:          1180,
 		Height:         760,
 		MinWidth:       960,
@@ -673,6 +754,9 @@ func run() error {
 	shell := desktop.New(desktop.Options{
 		App: app, Main: win, Settings: settings, Jobs: jobs, Outputs: db, Emitter: emitter,
 		Clipboard: clipHistory, Vault: vaultAPI, Lan: lanRT, Focus: focusEng,
+		WorkspaceName:   tooltipWorkspace(boot),
+		Workspaces:      func() []workspace.Info { l, _ := wsSvc.List(); return l },
+		SwitchWorkspace: wsSvc.Switch,
 		DarkMode: func() bool {
 			t := settings.Current().Theme
 			return t == core.ThemeDark || (t == core.ThemeSystem && app.Env.IsDarkMode())
@@ -739,24 +823,75 @@ func depsCacheFile(p core.Paths) string {
 // instanceID is the single-instance lock name. A sandbox support dir
 // ($TOOLBOX_SUPPORT_DIR) gets its own lock, so a sandbox instance can run
 // next to the real app instead of focusing it.
-func instanceID(p core.Paths) string {
-	if os.Getenv(core.EnvSupportDir) == "" {
-		return "dev.toolbox.app"
+func instanceID(b workspace.Boot) string {
+	if !b.Sandboxed {
+		return "dev.toolbox.app" // one real workspace at a time (SPEC A3)
 	}
-	sum := sha256.Sum256([]byte(strings.ToLower(filepath.Clean(p.SupportDir))))
+	sum := sha256.Sum256([]byte(strings.ToLower(filepath.Clean(b.Paths.SupportDir))))
 	return "dev.toolbox.app." + hex.EncodeToString(sum[:6])
+}
+
+// windowTitle is "Toolbox" for Personal and "Toolbox — <Name>" otherwise.
+func windowTitle(b workspace.Boot) string {
+	if b.Info.Kind == workspace.KindPersonal || b.Info.Name == "" {
+		return "Toolbox"
+	}
+	return "Toolbox — " + b.Info.Name
+}
+
+// tooltipWorkspace is the tray tooltip's workspace suffix ("" for Personal).
+func tooltipWorkspace(b workspace.Boot) string {
+	if b.Info.Kind == workspace.KindPersonal {
+		return ""
+	}
+	return b.Info.Name
+}
+
+// demoAlias is Local File Transfer's default name in a Demo workspace, so the
+// computer's host name is never shown or sent.
+func demoAlias(b workspace.Boot) string {
+	if b.Info.Kind == workspace.KindDemo {
+		return "Toolbox Demo"
+	}
+	return ""
+}
+
+// switchRequest turns a second launch's --workspace argument into a
+// "Switch to X?" request, unless it names the open workspace.
+func switchRequest(s *api.WorkspacesService, args []string) (workspace.SwitchRequest, bool) {
+	want := workspace.ArgValue(args)
+	if want == "" {
+		return workspace.SwitchRequest{}, false
+	}
+	req := workspace.SwitchRequest{Root: want}
+	cur := s.Current()
+	list, _ := s.List()
+	for _, w := range list {
+		if w.ID == want || (w.Root != "" && strings.EqualFold(filepath.Clean(w.Root), filepath.Clean(want))) {
+			if w.ID == cur.ID {
+				return workspace.SwitchRequest{}, false
+			}
+			req.ID, req.Name = w.ID, w.Name
+			if w.Root != "" {
+				req.Root = w.Root
+			}
+			break
+		}
+	}
+	return req, true
 }
 
 // startURL honours $TOOLBOX_VIEW (dev aid: open on a given view, e.g.
 // "settings" or a module ID) via the frontend's ?view= parameter.
-// sandboxWebviewDir keeps WebView2's profile inside a sandbox support dir
-// (TOOLBOX_SUPPORT_DIR) so dev and test runs never share or create profiles
-// in %APPDATA%. "" = Wails' default for the real app.
-func sandboxWebviewDir(p core.Paths) string {
-	if os.Getenv(core.EnvSupportDir) == "" {
+// webviewDir keeps WebView2's profile inside the support dir of every
+// non-personal workspace and dev sandbox, so localStorage (recents, pins, UI
+// state) is per workspace and dev runs never create profiles in %APPDATA%.
+// "" = Wails' default for Personal.
+func webviewDir(b workspace.Boot) string {
+	if b.Info.Kind == workspace.KindPersonal {
 		return ""
 	}
-	return filepath.Join(p.SupportDir, "webview2")
+	return filepath.Join(b.Paths.SupportDir, "webview2")
 }
 
 // appOrigins are the origins the render broker accepts raw messages from: the
@@ -779,13 +914,13 @@ func appOrigins() []string {
 // the main window is often covered by a pop-out while it plays the edit, so
 // Chromium must not throttle occluded windows (their clock and audio drive the
 // pop-out preview).
-func browserArgs() []string {
-	return append([]string{"--disable-backgrounding-occluded-windows"}, devtoolsArgs()...)
+func browserArgs(sandboxed bool) []string {
+	return append([]string{"--disable-backgrounding-occluded-windows"}, devtoolsArgs(sandboxed)...)
 }
 
-func devtoolsArgs() []string {
+func devtoolsArgs(sandboxed bool) []string {
 	port := os.Getenv("TOOLBOX_DEVTOOLS_PORT")
-	if port == "" || os.Getenv(core.EnvSupportDir) == "" {
+	if port == "" || !sandboxed {
 		return nil
 	}
 	if n, err := strconv.Atoi(port); err != nil || n < 1024 || n > 65535 {

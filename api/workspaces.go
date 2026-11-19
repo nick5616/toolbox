@@ -25,8 +25,21 @@ type WorkspacesService struct {
 	// not overlap (nil = the default ~/Toolbox).
 	PersonalLibrary func() string
 
-	mu  sync.Mutex
-	cur *workspace.Info // the open workspace as it is now (Present changes)
+	mu         sync.Mutex
+	cur        *workspace.Info // the open workspace as it is now (Present changes)
+	noticeSent bool
+}
+
+// Notice returns the start-up notice once ("Demo's folder isn't there", a
+// corrupt workspace list); later calls return "".
+func (s *WorkspacesService) Notice() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.noticeSent {
+		return ""
+	}
+	s.noticeSent = true
+	return s.Boot.Notice
 }
 
 func (s *WorkspacesService) store() workspace.Store { return workspace.Store{Dir: s.Boot.GlobalDir} }
