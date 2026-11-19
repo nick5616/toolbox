@@ -87,6 +87,13 @@ type LibraryService struct {
 	Trasher  trash.Trasher
 	// SavedMasks lists Object Eraser's saved masks (nil = none).
 	SavedMasks func() ([]core.LibrarySavedMask, error)
+
+	// Search is Smart search's index (Phase 20; nil = none): told about
+	// renames and trashed files so its rows follow.
+	Search interface {
+		Renamed(from, to string)
+		Removed(paths ...string)
+	}
 }
 
 // Recent pages through outputs, newest first.

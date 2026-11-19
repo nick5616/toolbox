@@ -121,6 +121,9 @@ func (s *LibraryService) Rename(outputID, newName string) (core.Output, error) {
 		_ = os.Rename(target, o.Path)
 		return o, err
 	}
+	if s.Search != nil {
+		s.Search.Renamed(o.Path, target)
+	}
 	if s.Em != nil {
 		s.Em.Emit(core.EventLibraryAdded, moved)
 	}
@@ -222,6 +225,9 @@ func (s *LibraryService) Trash(outputIDs []string, paths []string) (core.TrashRe
 	}
 	if len(removed) > 0 && s.Em != nil {
 		s.Em.Emit(core.EventLibraryRemoved, core.OutputsRemoved{IDs: removed})
+	}
+	if s.Search != nil && len(res.Trashed) > 0 {
+		s.Search.Removed(res.Trashed...)
 	}
 	return res, nil
 }
