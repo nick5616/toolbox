@@ -422,7 +422,7 @@ A tool may have **its own design language** when its spec says so. **Paint+ is t
   - The hidden quiet modules do the work: `media-index` (one batch, ≤ 32 files: pictures, OCR, PDF/document text) and `media-speech` (one file).
   - The scheduler submits a batch **only when no other non-quiet job is queued or running**.
   - It covers the library and project thumbnails only. It **never** covers the support dir, clipboard history, the Vault, hidden files or symlinks.
-- **Scoring:** `p = sigmoid(scale·cos + bias)` with the model's pinned constants (`modules/mediaindex/models.go`). Labels and Strong/Good/Maybe cut-offs are probabilities, so a query with nothing like it returns nothing. User labels and hidden labels survive re-indexing.
+- **Scoring:** `p = sigmoid(scale·cos + bias)` with the model's pinned constants (`modules/mediaindex/models.go`). The calibrated cut-offs live only in `core/mediaindex/labels.go` (Strong 0.01, Good 0.001, Maybe 0.0003, labels 0.001 and ≥ 2 % of the best, text gate 0.0003; photo-style labels 0.05 via the vocabulary's threshold column). Concept hits rank on `ConceptScore(p)` (log-scaled). Labels and Strong/Good/Maybe cut-offs are probabilities, so a query with nothing like it returns nothing. User labels and hidden labels survive re-indexing.
 - **Text in files:**
   - OCR runs only on pictures that pass the text gate.
   - PDF text layers and `core/doctext` (pure Go) run first.

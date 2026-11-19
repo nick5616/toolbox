@@ -740,3 +740,30 @@ Newest last. Format: date — decision — why.
   - The OCR/Whisper timing (spike d) goes to I1.
 - **2026-11-18: The mmproj files share one name** (`mmproj-F16.gguf`) across repos. C1 stores each one under its model's own name, so two vision models never overwrite each other's projector.
 - **2026-11-18: The dHash moved** from `modules/organize` to `core/imaging/dhash.go` (`DHash`, `DHashImage`, `Alike`, `Distance`). Organizer uses an alias, with no behaviour change.
+- **2026-11-18: Wave 1 merge notes.**
+  - Every builder worktree started at a commit before Wave 0, and each fast-forwarded to Wave 0 itself before building.
+  - Parallel test files in `modules/mediaindex` collided (`fakeCaller`, `fakeWriter`, `env`, `prepared`, `videoExts`). S6's were renamed (`filterWriter`, `filterCaller`, `filterEnv`, `filterPic`, `filterVideoExts`).
+  - S3's `media-speech` asks `transcribe.run` for SRT, not JSON (JSON turns word timestamps on).
+  - S2 added `Index.SetExcluded`. main.go excludes the support and tools dirs.
+  - Forget doesn't remove an index row: the file is still there, so it stays searchable.
+  - C3's Use payload is one string, `captions:{json}`, because the embed contract carries `string[]`. Post Builder parses it with its own copy, so neither tool imports the other.
+- **2026-11-18: The Immich SigLIP 2 ONNX files have a fixed batch of 1, and the text tower takes int32.**
+  - The handlers now run row by row when an input's batch dim is fixed, and cast ids to the declared int type.
+  - The slow real-model test (an apple beats a blue square) passes on this PC.
+  - The text model costs about 50 ms per prompt on CPU at batch 1. The vocabulary's ≈ 3,100 prompts take a few minutes once, then they're cached in `media_text_vectors`.
+- **2026-11-18: Calibration (I1)**, measured on 28 COCO val2017 photos, library screenshots, an IRS form page, a GIF contact sheet and logos (`.dev/p20-qa/`).
+  - **Raw scale:** SigLIP 2's sigmoid probabilities for open-vocabulary prompts are small. Right answers fall between 1e-3 and 0.7, wrong ones almost always below 3e-4: "giraffe" scores 1.3e-4 on a zebra, "pizza" 2.3e-4 on a sandwich, "dog" ≤ 1.4e-5 when there's none. The query is embedded as typed; a "a photo of …" template made no consistent difference.
+  - **Strengths:** Strong p ≥ 0.01, Good ≥ 0.001, Maybe ≥ 0.0003 (the spec's guesses, 0.3/0.1/0.03, would have found almost nothing).
+  - **Labels:** p ≥ 0.001 **and** ≥ 2 % of the item's best label (drops "polar bear" next to a 0.47 "brown bear"), at most 8.
+  - **Photo-style labels** ("overexposed photo", "motion blur", "cgi scene", … 43 of them) fired as noise everywhere. They now need p ≥ 0.05 (the vocabulary's threshold column).
+  - **Text gate:** 0.0003 catches screenshots (0.03–0.04), documents (0.007), a stop sign (0.0045), a contact sheet with timecodes (0.0017) and a logo with text (0.0009). It skips almost every plain photo (≤ 0.0003).
+  - **Ranking:** concept hits rank on `ConceptScore(p) = clamp((log10 p + 3.5)/3.5)`, so they interleave sensibly with text (0.15–0.45) and label (1) hits. The "% sure" shown is that score.
+  - The `search-filter` step uses the same constants (`ix.StrongP/GoodP/MaybeP`).
+- **2026-11-18: An outdated AI engine doesn't count as installed for Smart search** (its files predate `search.*`). The status shows "Not installed" until the engine is updated (the pack button updates it). Without this, batches would fail and burn attempts.
+- **2026-11-18: `searchIdx.Start` moved ahead of the start-up cache prunes.** In the sandbox they took minutes, which delayed the first reconcile by as long.
+- **2026-11-18: The end-to-end run was cut short.**
+  - **Verified in the app:** engine update, migration, the 60 s reconcile (250 sandbox files incl. `QA Samples/`), and query → `search:ready` → concept results with the real engine. Also the Caption Writer pack install, after which `CaptionService.Status` reports `qwen3.5-4b` ready, plus ExifTool and FFmpeg.
+  - **Stopped:** the machine ran critically low on memory (≈ 4.7 GB free of 32 GB with the user's other dev servers running; llama-server with Qwen3.5 4B took 3.5 GB, the engine with SigLIP 1.4 GB). The harness stopped the dev app's shell, and I stopped the rest of its tree.
+  - **Not finished at that point:** the first index batch, and the first caption (CPU-only llama-server; the first of four photos was still running after several minutes under memory pressure).
+  - **So not verified:** acceptance §8 items 1–10 in the running app, Qwen3.5 4B's ≤ 8 s per image, and the 960 × 600 screenshots. Those need a run with more free memory.
+  - **Fallback if the 4B model is too slow or heavy:** Qwen3.5 2B (1.9 GB with its projector) is already in the catalog with its projector pinned, and can be picked in Caption Writer's Advanced → model.
