@@ -834,7 +834,7 @@ export function LibraryView() {
           smart.installed ? (
             !hintSeen ? (
               <div className={searchStyles.hint} data-testid="search-hint" onMouseDown={(e) => e.preventDefault()}>
-                <span>Try:</span>
+                <span>Try:</span>{" "}
                 {["apple", "dog on a beach", "receipt"].map((ex, i) => (
                   <span key={ex}>
                     {i > 0 ? ", " : ""}

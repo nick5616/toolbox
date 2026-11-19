@@ -12,6 +12,8 @@ import { CaptionSection, InThisPicture, TextInFile } from "./DetailSearch";
 import { baseOf, dirOf, extOf, fromOutput, fromPath, isInside, previewKind, type LibItem } from "./items";
 import { ItemThumb } from "./previews/ItemThumb";
 import styles from "./Library.module.css";
+import searchStyles from "./Search.module.css";
+import { formatMoment } from "./searchHits";
 
 /** Documents the index reads text from that have no preview here. */
 const DOC_EXT = ["docx", "pptx", "xlsx", "odt", "odp", "ods", "epub", "html", "htm"];
@@ -218,6 +220,19 @@ export function DetailPanel({ item, libraryRoot, moduleName, hasTool, trash, ren
         <div className={styles.bigBox}>
           <BigPreview item={item} seek={seek} />
         </div>
+
+        {item.hit && item.hit.moments.length > 0 && seekable ? (
+          <section className={styles.sect} aria-label="Other moments">
+            <h3 className={styles.sectTitle}>Other moments</h3>
+            <div className={searchStyles.chipWrap}>
+              {item.hit.moments.slice(0, 5).map((m) => (
+                <button key={m} type="button" className={searchStyles.chip} data-tip="Jump to this match" onClick={() => setSeek((c) => ({ pos: m, nonce: (c?.nonce ?? 0) + 1 }))}>
+                  {kindOfPreview === "pdf" ? `p. ${m + 1}` : formatMoment(m)}
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <dl className={styles.meta}>
           <dt>Folder</dt>
