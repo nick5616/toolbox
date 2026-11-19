@@ -9,7 +9,13 @@ import type { NormalProject } from "@/viz/edit/defaults";
 import type { Marker } from "@/viz/edit/types";
 import { splitSubject } from "../matte/split";
 import { useEditStudio, type Selection } from "@/editor/store";
-import { deleteClips, duplicateClips, insertClipAt, laneMarkersMs, sliceAtMarkers, splitAt, type InsertMode, type SourceFacts } from "./ops";
+import { editLength } from "@/viz/edit/types";
+import { addTrack, deleteClips, duplicateClips, insertClipAt, laneMarkersMs, sliceAtMarkers, splitAt, withLinked, type DropMode, type InsertMode, type SourceFacts } from "./ops";
+import { canDetachAudio, closeGap, copyClips, detachAudio, editPoints, insertAudioClipAt, pasteClips, rippleDelete, toggleLink } from "./edit";
+import { addRulerMarker, rulerMarkers } from "./markers";
+import { neighbourKey } from "./keyframes";
+import { useTimelineStore } from "./timelineStore";
+import { seekTo } from "../transport/player";
 
 export function currentDoc(): NormalProject | null {
   return useEditStudio.getState().history?.present ?? null;
@@ -62,7 +68,8 @@ export function splitAtPlayhead(): boolean {
   const doc = currentDoc();
   if (!doc) return false;
   const { selection, playheadMs } = useEditStudio.getState();
-  return commit(splitAt(doc, splitTargets(doc, selection, playheadMs), playheadMs));
+  // With nothing selected the clips under the playhead split together with their links.
+  return commit(splitAt(doc, splitTargets(doc, selection, playheadMs), playheadMs, { linked: selectedClipIds(selection).length === 0 }));
 }
 
 /** Slices the selected clips (or the selected range) at the active lane's markers. */
@@ -91,8 +98,175 @@ export function deleteSelection(): boolean {
     if (ok) useEditStudio.getState().select(null);
     return ok;
   }
+  // A selected gap closes (Delete on the empty stretch between clips).
+  const gap = useTimelineStore.getState().gap;
+  if (gap && sel?.kind !== "markers") return closeSelectedGap();
   // Markers: the lanes' own Delete handler (lanes/LanesPanel.tsx) removes or hides them.
   return false;
+}
+
+/** Closes the selected gap (the clips after it on the track move left). */
+export function closeSelectedGap(): boolean {
+  const doc = currentDoc();
+  const gap = useTimelineStore.getState().gap;
+  if (!doc || !gap) return false;
+  const ok = commit(closeGap(doc, gap));
+  if (ok) useTimelineStore.getState().selectGap(null);
+  else toast({ title: "Nothing to close there", description: "The track is locked, or no clips come after the gap.", tone: "warn" });
+  return ok;
+}
+
+/** Shift+Delete: deletes the selected clips and closes the space they leave. */
+export function rippleDeleteSelection(): boolean {
+  const doc = currentDoc();
+  const sel = useEditStudio.getState().selection;
+  if (!doc || sel?.kind !== "clips") return false;
+  const ok = commit(rippleDelete(doc, sel.ids));
+  if (ok) useEditStudio.getState().select(null);
+  return ok;
+}
+
+/** Ctrl+C / Ctrl+X: the selected clips go on the clipboard (cut also deletes them). */
+export function copySelection(cut: boolean): boolean {
+  const doc = currentDoc();
+  const sel = useEditStudio.getState().selection;
+  if (!doc || sel?.kind !== "clips") return false;
+  const data = copyClips(doc, sel.ids);
+  if (!data) return false;
+  useTimelineStore.getState().setClipboard(data);
+  if (cut) return deleteSelection();
+  return true;
+}
+
+/** Ctrl+V / Ctrl+Shift+V: pastes at the playhead on the selected track (else where the clips came from). */
+export function pasteAtPlayhead(mode: DropMode): boolean {
+  const doc = currentDoc();
+  const data = useTimelineStore.getState().clipboard;
+  if (!doc || !data) {
+    toast({ title: "Nothing to paste", description: "Copy clips first (Ctrl+C).", tone: "warn" });
+    return false;
+  }
+  const st = useEditStudio.getState();
+  const target = st.selection?.kind === "track" ? st.selection.id : undefined;
+  const res = pasteClips(doc, data, st.playheadMs, target, mode);
+  if (!res.ok) {
+    const why = res.reason === "locked" ? "That track is locked. Unlock it to paste there." : "Those clips don't fit that track (video clips go on video tracks, audio on audio tracks).";
+    toast({ title: "Couldn't paste", description: why, tone: "warn" });
+    return false;
+  }
+  commit(res.project);
+  st.select({ kind: "clips", ids: res.ids });
+  return true;
+}
+
+/** Ctrl+L: links the selected clips, or unlinks them when any is linked. */
+export function toggleLinkSelection(): boolean {
+  const doc = currentDoc();
+  const sel = useEditStudio.getState().selection;
+  if (!doc || sel?.kind !== "clips") return false;
+  const out = toggleLink(doc, sel.ids);
+  if (!out) toast({ title: "Select two or more clips to link", description: "They must be on unlocked tracks.", tone: "warn" });
+  return commit(out);
+}
+
+/** Detach audio of the selected video clips: each gets an audio clip on the first free audio track. */
+export function detachAudioOfSelection(): boolean {
+  const doc = currentDoc();
+  const st = useEditStudio.getState();
+  if (!doc || st.selection?.kind !== "clips") return false;
+  let next = doc;
+  const audioIds: string[] = [];
+  let silent = 0;
+  for (const id of st.selection.ids) {
+    const path = next.tracks.flatMap((t) => t.clips).find((c) => c.id === id)?.path ?? "";
+    if (st.sources[path] && !st.sources[path]?.info.hasAudio) {
+      silent++;
+      continue;
+    }
+    if (!canDetachAudio(next, id)) continue;
+    const r = detachAudio(next, id);
+    if (r) {
+      next = r.project;
+      audioIds.push(r.audioId);
+    }
+  }
+  if (!audioIds.length) {
+    toast({ title: silent ? "That clip has no sound" : "Nothing to detach", description: silent ? undefined : "Pick a video clip that isn't linked yet and make sure an audio track can take it.", tone: "warn" });
+    return false;
+  }
+  commit(next);
+  // Both sides are linked: selecting the video clip alone leaves the audio clip ready to move.
+  return true;
+}
+
+/** The selection a click on `clipId` makes: the clip with its linked partners (Alt: only that clip). */
+export function clickSelection(doc: NormalProject, clipId: string, alt: boolean): string[] {
+  return alt ? [clipId] : withLinked(doc, [clipId]);
+}
+
+/** M in the Video Editor: a marker at the playhead. */
+export function addMarkerAtPlayhead(): boolean {
+  const doc = currentDoc();
+  if (!doc) return false;
+  const r = addRulerMarker(doc, useEditStudio.getState().playheadMs);
+  if (!r) return false;
+  commit(r.project);
+  useEditStudio.getState().select({ kind: "markers", ids: [r.id] });
+  return true;
+}
+
+/** [ and ] in the Video Editor: the custom markers' timeline times. */
+export function customMarkerTimes(doc: NormalProject): number[] {
+  return rulerMarkers(doc).map((m) => m.ms);
+}
+
+/** Alt+[ / Alt+]: the playhead jumps to the previous or next keyframe of the selected clip. */
+export function jumpToKeyframe(dir: -1 | 1): boolean {
+  const doc = currentDoc();
+  const st = useEditStudio.getState();
+  if (!doc || st.selection?.kind !== "clips") return false;
+  const sel = new Set(st.selection.ids);
+  let best: number | null = null;
+  for (const c of doc.tracks.flatMap((t) => t.clips)) {
+    if (!sel.has(c.id)) continue;
+    const k = neighbourKey(c, st.playheadMs, dir);
+    if (k === null) continue;
+    if (best === null || (dir > 0 ? k < best : k > best)) best = k;
+  }
+  if (best === null) return false;
+  seekTo(best);
+  return true;
+}
+
+/** ↑ / ↓: the previous or next edit point of any track. */
+export function jumpToEditPoint(dir: -1 | 1): boolean {
+  const doc = currentDoc();
+  if (!doc) return false;
+  const t = useEditStudio.getState().playheadMs;
+  const points = editPoints(doc);
+  const to = dir > 0 ? points.find((p) => p > t + 0.5) : points.slice().reverse().find((p) => p < t - 0.5);
+  if (to === undefined) return false;
+  seekTo(to);
+  return true;
+}
+
+/** Razor: cuts the clip (and its links) at ms; `allTracks` cuts every unlocked track there. */
+export function razorCut(clipId: string | null, ms: number, allTracks: boolean): boolean {
+  const doc = currentDoc();
+  if (!doc) return false;
+  const t = Math.round(ms);
+  const ids = allTracks
+    ? doc.tracks.filter((tr) => !tr.locked).flatMap((tr) => tr.clips.filter((c) => c.startMs < t && t < c.endMs).map((c) => c.id))
+    : clipId
+      ? [clipId]
+      : [];
+  return commit(splitAt(doc, ids, t, { linked: true }));
+}
+
+/** The end of the edit, for I (the range's default end). */
+export function editEndMs(): number {
+  const doc = currentDoc();
+  return doc ? editLength(doc) : 0;
 }
 
 /** Removes custom markers; hides derived ones. */
@@ -117,31 +291,75 @@ export function duplicateSelection(): boolean {
  * and videos only; each lands after the previous). Selects what it added.
  * Returns the number of clips added.
  */
-export function insertSources(paths: readonly string[], trackId: string, atMs: number, mode: InsertMode, markers: readonly Marker[]): number {
+export function insertSources(paths: readonly string[], trackId: string, atMs: number, mode: InsertMode, markers: readonly Marker[], drop?: DropMode): number {
+  const doc = currentDoc();
+  if (!doc) return 0;
+  const r = insertInto(doc, paths, trackId, atMs, mode, markers, drop);
+  if (!r.ids.length) {
+    const audio = doc.tracks.find((t) => t.id === trackId)?.kind === "audio";
+    toast({ title: "No room there", description: audio ? "Pick a gap on an unlocked audio track, and drop sound files or videos with sound." : "Pick a gap on an unlocked video track, inside the edit.", tone: "warn" });
+    return 0;
+  }
+  commit(r.project);
+  useEditStudio.getState().select({ kind: "clips", ids: r.ids });
+  return r.ids.length;
+}
+
+/** The sources one after the other from atMs on a track (video/photo on video tracks; sound on audio tracks). Pure over `doc`. */
+function insertInto(doc: NormalProject, paths: readonly string[], trackId: string, atMs: number, mode: InsertMode, markers: readonly Marker[], drop?: DropMode): { project: NormalProject; ids: string[] } {
+  const st = useEditStudio.getState();
+  const markersMs = laneMarkersMs(markers, st.activeLane);
+  const audioTrack = doc.tracks.find((t) => t.id === trackId)?.kind === "audio";
+  let next = doc;
+  let at = atMs;
+  const ids: string[] = [];
+  for (const path of paths) {
+    const info = st.sources[path]?.info;
+    if (audioTrack) {
+      // Sound files, and videos (their own sound).
+      if (!info || (info.kind !== "audio" && !(info.kind === "video" && info.hasAudio))) continue;
+      const ins = insertAudioClipAt(next, trackId, { path, durationMs: info.durationMs }, at, drop);
+      if (!ins) break;
+      next = ins.project;
+      ids.push(ins.clip.id);
+      at = ins.clip.endMs;
+      continue;
+    }
+    const kind = info?.kind === "image" ? "image" : info?.kind === "video" ? "video" : null;
+    if (!kind) continue;
+    const ins = insertClipAt(next, trackId, { kind, path, durationMs: info?.durationMs ?? 0 }, at, mode, { markersMs, ...(drop ? { drop } : {}) });
+    if (!ins) break;
+    next = ins.project;
+    ids.push(ins.clip.id);
+    at = ins.clip.endMs;
+  }
+  return { project: next, ids };
+}
+
+/**
+ * A drop outside every track row makes a track for the sources: audio files get
+ * an audio track (at the bottom), anything else a video track (on top). One undo step.
+ */
+export function dropOnNewTrack(paths: readonly string[], atMs: number, mode: InsertMode, markers: readonly Marker[], drop?: DropMode): number {
   const doc = currentDoc();
   if (!doc) return 0;
   const st = useEditStudio.getState();
-  const markersMs = laneMarkersMs(markers, st.activeLane);
-  let next = doc;
-  let at = atMs;
-  const added: string[] = [];
-  for (const path of paths) {
-    const info = st.sources[path]?.info;
-    const kind = info?.kind === "image" ? "image" : info?.kind === "video" ? "video" : null;
-    if (!kind) continue;
-    const ins = insertClipAt(next, trackId, { kind, path, durationMs: info?.durationMs ?? 0 }, at, mode, { markersMs });
-    if (!ins) break;
-    next = ins.project;
-    added.push(ins.clip.id);
-    at = ins.clip.endMs;
-  }
-  if (!added.length) {
-    toast({ title: "No room there", description: "Pick a gap on an unlocked video track, inside the edit.", tone: "warn" });
+  const audioOnly = paths.length > 0 && paths.every((p) => st.sources[p]?.info.kind === "audio");
+  const withTrack = addTrack(doc, audioOnly ? "audio" : "video");
+  if (!withTrack) {
+    toast({ title: "An edit can have at most 8 tracks", tone: "warn" });
     return 0;
   }
-  commit(next);
-  st.select({ kind: "clips", ids: added });
-  return added.length;
+  const created = audioOnly ? withTrack.tracks[0] : withTrack.tracks[withTrack.tracks.length - 1];
+  if (!created) return 0;
+  const r = insertInto(withTrack, paths, created.id, atMs, mode, markers, drop);
+  if (!r.ids.length) {
+    toast({ title: "Couldn't place those files", description: "Drop video, photos or sound files.", tone: "warn" });
+    return 0;
+  }
+  commit(r.project);
+  st.select({ kind: "clips", ids: r.ids });
+  return r.ids.length;
 }
 
 /** The track a double-click inserts into: the selected video track, else the first unlocked one. */

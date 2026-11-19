@@ -326,3 +326,31 @@
   align-items: center;
   padding-left: var(--space-3);
 }
+
+/* Phase 21: tool cursors. */
+.toolRazor .clip,
+.toolRazor .timeArea {
+  cursor: crosshair;
+}
+
+.toolSlip .clip {
+  cursor: col-resize;
+}
+
+.toolRipple .trim,
+.toolRoll .trim {
+  background: var(--accent-soft);
+}
+
+.chain {
+  display: inline-flex;
+}
+
+.kind_audio {
+  background: color-mix(in srgb, var(--lane-bass, var(--accent)) 18%, var(--bg-raised));
+  border-color: color-mix(in srgb, var(--lane-bass, var(--accent)) 60%, transparent);
+}
+
+.audioArea {
+  background: color-mix(in srgb, var(--bg-inset) 92%, var(--lane-bass, var(--accent)));
+}

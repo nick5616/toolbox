@@ -110,11 +110,14 @@ describe("moveClips", () => {
   it("moves a group keeping relative timing", () => {
     expect(spans(moveClips(base(), ["a", "b"], 500))).toEqual([[500, 1500], [2500, 3500], [5000, 6000]]);
   });
-  it("is blocked by an overlap", () => {
-    expect(moveClips(base(), ["a"], 1500)).toBeNull();
+  it("overwrites the clip it lands on (trims it)", () => {
+    expect(spans(moveClips(base(), ["a"], 1500))).toEqual([[1500, 2500], [2500, 3000], [5000, 6000]]);
   });
-  it("is blocked when a group member would overlap an unmoved clip", () => {
-    expect(moveClips(base(), ["a", "b"], 2500)).toBeNull();
+  it("overwrites an unmoved clip under a group member", () => {
+    expect(spans(moveClips(base(), ["a", "b"], 2500))).toEqual([[2500, 3500], [4500, 5500], [5500, 6000]]);
+  });
+  it("insert mode pushes the later clips right instead", () => {
+    expect(spans(moveClips(base(), ["a"], 1500, undefined, "insert"))).toEqual([[1500, 2500], [3000, 4000], [6000, 7000]]);
   });
   it("clamps at 0", () => {
     expect(spans(moveClips(doc([vid("b", 2000, 3000)]), ["b"], -5000))).toEqual([[0, 1000]]);
@@ -298,7 +301,7 @@ describe("delete and duplicate", () => {
   it("alt-drag copies by a delta", () => {
     const d = doc([vid("a", 0, 1000)]);
     expect(spans(duplicateClips(d, ["a"], 5000))).toEqual([[0, 1000], [5000, 6000]]);
-    expect(duplicateClips(d, ["a"], 500)).toBeNull();
+    expect(spans(duplicateClips(d, ["a"], 500))).toEqual([[0, 500], [500, 1500]]);
   });
 });
 

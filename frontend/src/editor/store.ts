@@ -52,7 +52,7 @@ export interface EditStudioState {
   scrubAudio: boolean;
   activeLane: MarkerLane;
   snap: boolean;
-  pps: number; // pixels per second, 6..800
+  pps: number; // pixels per second, 6..2000
   scrollMs: number; // left edge of the timeline view
   rightPanel: "inspector" | "captions";
   safeZones: boolean;
@@ -172,7 +172,7 @@ export const useEditStudio = create<EditStudioState>((set, get) => ({
   setScrubAudio: (scrubAudio) => set({ scrubAudio }),
   setActiveLane: (activeLane) => set({ activeLane }),
   setSnap: (snap) => set({ snap }),
-  setView: (pps, scrollMs) => set({ pps: Math.max(6, Math.min(800, pps)), scrollMs: Math.max(0, scrollMs) }),
+  setView: (pps, scrollMs) => set({ pps: Math.max(6, Math.min(2000, pps)), scrollMs: Math.max(0, scrollMs) }),
   setRightPanel: (rightPanel) => set({ rightPanel }),
   setSafeZones: (safeZones) => set({ safeZones }),
   openDialog: (dialog) => set({ dialog }),

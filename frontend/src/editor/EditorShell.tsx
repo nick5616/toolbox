@@ -29,6 +29,7 @@ import type { EditorProfile } from "./profile";
 import { EditorProfileProvider, profileTitle } from "./profileContext";
 import { useEditInputs, useEditStudio, useProject } from "./store";
 import { TracksPanel } from "./timeline/TracksPanel";
+import { Ruler } from "./timeline/Ruler";
 import { useEditCommands } from "./transport/commands";
 import { seekTo } from "./transport/player";
 import { Transport } from "./transport/Transport";
@@ -315,6 +316,9 @@ function Editor({ moduleId, profile }: { moduleId: string; profile: EditorProfil
               seekTo(Math.max(0, Math.min(editLength(project), xToMs(x, st.pps, st.scrollMs))));
             }}
           >
+            <ErrorBoundary label="The ruler" compact>
+              <Ruler />
+            </ErrorBoundary>
             {TimelineTop && (
               <ErrorBoundary label="The lanes" compact>
                 <TimelineTop focus={focus} />

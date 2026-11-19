@@ -197,6 +197,10 @@ import {
   Users,
   Pipette,
   Save,
+  Magnet,
+  Flag,
+  Unlink,
+  MoveHorizontal,
 } from "lucide-react";
 
 /** Static map: only these icons end up in the bundle. */
@@ -402,6 +406,11 @@ const icons = {
   users: Users,
   pipette: Pipette,
   save: Save,
+  // Phase 21 (timeline)
+  magnet: Magnet,
+  flag: Flag,
+  unlink: Unlink,
+  "move-horizontal": MoveHorizontal,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;
