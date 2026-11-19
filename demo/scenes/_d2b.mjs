@@ -108,6 +108,21 @@ export function extrasDir(t, role) {
   return path.basename(dir) === "Extras" ? dir : path.join(dir, "Extras");
 }
 
+/**
+ * t.open(), but checks the top bar names the tool and retries otherwise (the sidebar can shift under the cursor
+ * while its Recent group fills in, which sent a click to the neighbouring tool once).
+ */
+export async function openTool(t, id, title, opts) {
+  const onScreen = () =>
+    t.eval(`Array.from(document.querySelectorAll("*")).some((e) => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.top < 40 && r.left > 232 && e.children.length === 0 && e.textContent.trim() === ${JSON.stringify(title)}; })`);
+  for (let i = 0; i < 4; i++) {
+    await t.open(id, opts);
+    await t.hold(700);
+    if (await onScreen()) return;
+  }
+  throw new Error(`could not open ${title}`);
+}
+
 /** Joins the six generated B-roll clips into one reel (Extras/B-roll reel.mp4, no re-encode) and returns its path. */
 export function makeReel(t) {
   const clips = t.roles("video.broll");
