@@ -806,3 +806,4 @@ Newest last. Format: date — decision — why.
   - `deps-cache.json` moved to the tools folder.
   - `workspace_isolation_test.go` fails on new code reaching global folders.
 - **2026-11-19: `RenderPlan` max single-file answer is 256 MB** (was 64 MB) for full-resolution stills.
+- **2026-11-19: Capture-harness incident (D1).** The first smoke launch ran before W1's `TOOLBOX_WORKSPACE` support existed (the Wave 0 `Resolve` stub ignored it), so the app opened the real Personal support folder for a few seconds before the harness stopped it — a normal start, nothing written beyond what any start writes. The harness now refuses to continue unless the app's "starting Toolbox support=…" log line names a capture folder, and W1's real `Resolve` honours the env var.
