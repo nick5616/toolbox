@@ -364,18 +364,11 @@ describe("transport keys", () => {
     expect(player.calls.slice(1)).toEqual(["rate:1.5", "rate:2"]);
   });
 
-  it("J goes back 2 s and plays", () => {
+  it("J plays backwards through the clock (Phase 21)", () => {
     render(<Harness />);
     useEditStudio.getState().setPlayhead(5000);
     key("j");
-    expect(player.calls).toEqual(["seek:3000", "play"]);
-  });
-
-  it("J doesn't go before 0", () => {
-    render(<Harness />);
-    useEditStudio.getState().setPlayhead(500);
-    key("j");
-    expect(player.calls[0]).toBe("seek:0");
+    expect(player.calls).toEqual(["reverse"]);
   });
 
   it("comma and period step one frame (30 fps)", () => {
