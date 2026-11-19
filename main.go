@@ -33,6 +33,7 @@ import (
 	"toolbox/core/packs"
 	"toolbox/core/pdfium"
 	"toolbox/core/pipeline"
+	"toolbox/core/projectdocs"
 	"toolbox/core/sidecar"
 	"toolbox/core/store"
 	"toolbox/core/trash"
@@ -419,6 +420,7 @@ func run() error {
 		func() bool { return searchMod != nil && searchMod.ModelPresent(mediaindex.ModelPreset) },
 		func() bool { return modelPresent(reg, "transcribe", "small") })
 	emitter.attach(searchIdx)
+	projectdocs.SetOnSaved(searchIdx.ProjectSaved)
 	searchMod, err = mediaindex.Register(reg, mediaindex.Deps{Writer: searchIdx, Caller: engine, PDF: pdfRenderer, ModelsDir: paths.ModelsDir})
 	if err != nil {
 		return err
@@ -513,7 +515,7 @@ func run() error {
 			application.NewServiceWithOptions(&api.LibraryService{
 				Outputs: db, Settings: settings, Paths: paths, Em: emitter,
 				Lineage: db, JobStore: db, Projects: db, Reg: reg, Trasher: trash.Default(),
-				SavedMasks: eraserSavedMasks(eraserMod),
+				SavedMasks: eraserSavedMasks(eraserMod), Search: searchIdx,
 			}, opts),
 			application.NewServiceWithOptions(&api.SettingsService{Settings: settings, Paths: paths}, opts),
 			application.NewServiceWithOptions(&api.SearchService{Index: searchIdx, SaveDialog: paintSaveDialog}, opts),

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"unicode/utf8"
 
 	"toolbox/core"
@@ -17,6 +18,26 @@ import (
 
 // MaxName is the longest project name.
 const MaxName = 80
+
+var onSaved atomic.Pointer[func(projectID string)]
+
+// SetOnSaved registers a function called (from the saving goroutine, so it
+// must be quick) after a project is created, saved, duplicated or deleted
+// by any Docs. Smart search uses it to look at the project's thumbnail again.
+// nil removes it.
+func SetOnSaved(fn func(projectID string)) {
+	if fn == nil {
+		onSaved.Store(nil)
+		return
+	}
+	onSaved.Store(&fn)
+}
+
+func notifySaved(id string) {
+	if fn := onSaved.Load(); fn != nil {
+		(*fn)(id)
+	}
+}
 
 // Summarize counts a document's items and missing source files.
 type Summarize func(data string) (items, missing int)
@@ -155,6 +176,7 @@ func (d *Docs) Create(ctx context.Context, name string, doc any) (core.ProjectIn
 	if err := d.Store.PutProject(ctx, p); err != nil {
 		return core.ProjectInfo{}, err
 	}
+	notifySaved(p.ID)
 	return d.Info(p), nil
 }
 
@@ -179,6 +201,7 @@ func (d *Docs) Save(ctx context.Context, id, name string, doc any) (core.Project
 	if err := d.Store.PutProject(ctx, p); err != nil {
 		return core.ProjectInfo{}, err
 	}
+	notifySaved(id)
 	return d.Info(p), nil
 }
 
@@ -202,6 +225,7 @@ func (d *Docs) Duplicate(ctx context.Context, id string) (core.ProjectInfo, erro
 			}
 		}
 	}
+	notifySaved(cp.ID)
 	return d.Info(cp), nil
 }
 
@@ -216,6 +240,7 @@ func (d *Docs) Delete(ctx context.Context, id string) error {
 	if err := os.RemoveAll(d.Dir(id)); err != nil {
 		return fmt.Errorf("remove project folder: %w", err)
 	}
+	notifySaved(id)
 	return nil
 }
 
