@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"toolbox/core"
+	"toolbox/core/deps"
 )
 
-// Service is Caption Writer's Wails service. CONTRACT STUB (Wave 0): the
-// method set is final; C2 implements the bodies marked stub.
+// Service is Caption Writer's Wails service (the method set is final).
 type Service struct {
 	jobs *core.Jobs
 	m    *Module
@@ -37,33 +37,40 @@ func (s *Service) Enqueue(inputs []string, opts Options) ([]core.Job, error) {
 }
 
 // Status says which model will read pictures and what else is available.
-// stub
-func (s *Service) Status() Status { return Status{Problem: "Caption Writer isn't ready yet"} }
-
-// Batches lists past batches, newest first. stub
-func (s *Service) Batches() ([]BatchInfo, error) { return []BatchInfo{}, nil }
-
-// Batch reads one batch's captions.json. stub
-func (s *Service) Batch(dir string) (Batch, error) {
-	return Batch{}, core.Errorf(core.CodeNotImplemented, "Caption Writer isn't ready yet")
+func (s *Service) Status() Status {
+	st := Status{}
+	if model, err := s.m.visionModel(); err != nil {
+		st.Problem = errText(err)
+	} else {
+		st.Model, st.ModelLabel = model, model
+	}
+	if s.m.cfg.Resolve != nil {
+		_, e1 := s.m.cfg.Resolve(deps.ExifTool)
+		_, e2 := s.m.cfg.Resolve(deps.FFmpeg)
+		st.ExifTool, st.FFmpeg = e1 == nil, e2 == nil
+	}
+	st.SearchHints = s.m.cfg.SearchInstalled != nil && s.m.cfg.SearchInstalled()
+	return st
 }
+
+// Batches lists past batches, newest first.
+func (s *Service) Batches() ([]BatchInfo, error) { return s.m.batches() }
+
+// Batch reads one batch's captions.json.
+func (s *Service) Batch(dir string) (Batch, error) { return s.m.readBatch(dir) }
 
 // SaveBatch validates and atomically writes the user's edits (and updates
-// Smart search's caption text). stub
-func (s *Service) SaveBatch(b Batch) error {
-	return core.Errorf(core.CodeNotImplemented, "Caption Writer isn't ready yet")
-}
+// Smart search's caption text).
+func (s *Service) SaveBatch(b Batch) error { return s.m.saveBatch(context.Background(), b) }
 
 // ExportText writes the batch as one .md, or one .txt per file next to the
-// batch file; returns the written paths. stub
+// batch file; returns the written paths.
 func (s *Service) ExportText(dir string, format string) ([]string, error) {
-	return nil, core.Errorf(core.CodeNotImplemented, "Caption Writer isn't ready yet")
+	return s.m.exportText(dir, format)
 }
 
-// DeleteBatch moves a batch folder to the OS trash. stub
-func (s *Service) DeleteBatch(dir string) error {
-	return core.Errorf(core.CodeNotImplemented, "Caption Writer isn't ready yet")
-}
+// DeleteBatch moves a batch folder to the OS trash.
+func (s *Service) DeleteBatch(dir string) error { return s.m.deleteBatch(dir) }
 
 // StepShape keeps the step's option type in the bindings.
 func (s *Service) StepShape() Options { return DefaultOptions() }

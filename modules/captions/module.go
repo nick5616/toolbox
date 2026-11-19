@@ -10,9 +10,12 @@ package captions
 import (
 	"context"
 	"encoding/json"
+	"sync"
+	"time"
 
 	"toolbox/core"
 	"toolbox/core/deps"
+	"toolbox/core/trash"
 )
 
 // ModuleID is Caption Writer's module ID.
@@ -34,7 +37,16 @@ type Config struct {
 }
 
 // Module implements core.Module.
-type Module struct{ cfg Config }
+type Module struct {
+	cfg Config
+
+	// seams for tests
+	probeDuration func(ctx context.Context, ffprobe, path string) (int64, error)
+	now           func() time.Time
+	trasher       trash.Trasher
+
+	batchMu sync.Mutex // serialises read-modify-write of captions.json
+}
 
 // New makes the module.
 func New(cfg Config) *Module {
@@ -47,7 +59,7 @@ func New(cfg Config) *Module {
 	if cfg.Emitter == nil {
 		cfg.Emitter = core.NopEmitter{}
 	}
-	return &Module{cfg: cfg}
+	return &Module{cfg: cfg, probeDuration: defaultProbeDuration, now: time.Now, trasher: trash.Default()}
 }
 
 // Register adds the module to the registry.
