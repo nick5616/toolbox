@@ -469,6 +469,11 @@ func run() error {
 			return
 		}
 		go depSvc.Refresh(ctx)
+		// Phase 20: Smart search returns at once (it reconciles 60 s later, then
+		// runs idle-only batches), so it starts before the slow cache prunes.
+		if err := searchIdx.Start(ctx); err != nil {
+			slog.Warn("smart search", "err", err)
+		}
 		for _, chore := range []func(){
 			eraserMod.ClearMasks,
 			cleanupMod.PrunePreviews,
@@ -483,11 +488,6 @@ func run() error {
 			composerMod.PruneCache, // cache/composer (30 days, 2 GB)
 			editMod.PruneCache,     // cache/editstudio (30 days, 10 GB)
 			paintMod.PruneTmp,      // tmp/paint (Lab crops and results)
-			func() { // Phase 20: Smart search (reconciles 60 s later, then idle-only batches)
-				if err := searchIdx.Start(ctx); err != nil {
-					slog.Warn("smart search", "err", err)
-				}
-			},
 		} {
 			if ctx.Err() != nil {
 				return
