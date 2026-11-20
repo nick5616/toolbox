@@ -34,13 +34,14 @@ const (
 
 // File and folder names (SPEC §A2).
 const (
-	ListFile      = "workspaces.json"        // in the global support dir
-	SupportFolder = ".toolbox"               // <root>/.toolbox = the workspace's support dir
-	LibraryFolder = "Library"                // <root>/Library = the workspace's library
-	InfoFile      = "workspace.json"         // <root>/.toolbox/workspace.json
-	ManifestFile  = "baseline-manifest.json" // <root>/.toolbox/baseline-manifest.json
-	ToolsLockFile = ".toolbox-tools.lock"    // <tools>/.toolbox-tools.lock (SPEC §A6b)
-	ArgWorkspace  = "--workspace"            // command-line: --workspace <root|id>
+	ListFile         = "workspaces.json"        // in the global support dir
+	SupportFolder    = ".toolbox"               // <root>/.toolbox = the workspace's support dir
+	LibraryFolder    = "Library"                // <root>/Library = the workspace's library
+	InfoFile         = "workspace.json"         // <root>/.toolbox/workspace.json
+	ManifestFile     = "baseline-manifest.json" // <root>/.toolbox/baseline-manifest.json
+	ToolsLockFile    = ".toolbox-tools.lock"    // <tools>/.toolbox-tools.lock (SPEC §A6b)
+	InstanceLockFile = ".toolbox-instance.lock" // <support>/.toolbox-instance.lock: held while a Toolbox has the workspace open
+	ArgWorkspace     = "--workspace"            // command-line: --workspace <root|id>
 )
 
 // DefaultKeep are the library folders Tidy never touches.

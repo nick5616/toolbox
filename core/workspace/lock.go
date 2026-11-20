@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -101,4 +102,34 @@ func AcquireTools(ctx context.Context, dir string) (context.Context, func(), err
 		})
 	}
 	return context.WithValue(ctx, heldKey{}, dir), unlock, nil
+}
+
+// LockInstance takes <supportDir>/.toolbox-instance.lock without waiting. It
+// is the first thing main.go does with a workspace: ok is false when another
+// Toolbox process has this support dir open, and then the caller must not
+// touch its state (recovering "running" jobs, clearing tmp, wiping the Vault's
+// open copies would break the running instance) and only hand over to it.
+func LockInstance(supportDir string) (unlock func(), ok bool, err error) {
+	if err := os.MkdirAll(supportDir, 0o755); err != nil {
+		return nil, false, fmt.Errorf("create support dir: %w", err)
+	}
+	f, err := os.OpenFile(filepath.Join(supportDir, InstanceLockFile), os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return nil, false, fmt.Errorf("open instance lock: %w", err)
+	}
+	ok, err = tryLock(f)
+	if err != nil || !ok {
+		f.Close()
+		if err != nil {
+			return nil, false, fmt.Errorf("lock instance: %w", err)
+		}
+		return nil, false, nil
+	}
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			unlockFile(f)
+			f.Close()
+		})
+	}, true, nil
 }

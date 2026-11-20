@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -106,6 +107,16 @@ func run() error {
 	if err := paths.Ensure(); err != nil {
 		return err
 	}
+	// Another Toolbox with this workspace open: hand over before touching any of
+	// its state (job recovery, tmp clean-up, logs, the Vault's open copies).
+	unlockInstance, owner, err := workspace.LockInstance(paths.SupportDir)
+	if err != nil {
+		return err
+	}
+	if !owner {
+		return handOver(boot)
+	}
+	defer unlockInstance()
 	workspace.SetToolsDir(paths.ToolsDir) // the tools lock (SPEC A6b)
 	// Every subprocess (and Go's os.TempDir) uses the workspace's tmp dir
 	// (Phase 21 §A6b), never the user's %TEMP%.
@@ -839,6 +850,19 @@ func instanceID(b workspace.Boot) string {
 	}
 	sum := sha256.Sum256([]byte(strings.ToLower(filepath.Clean(b.Paths.SupportDir))))
 	return "dev.toolbox.app." + hex.EncodeToString(sum[:6])
+}
+
+// handOver runs when another Toolbox already has this workspace open. Wails'
+// single-instance check passes our arguments to it (it focuses its window, or
+// asks to switch workspace) and exits inside application.New. Returning is
+// only reached in the moment between the other process's two locks.
+func handOver(b workspace.Boot) error {
+	application.New(application.Options{
+		Name:           "Toolbox",
+		Assets:         application.AssetOptions{Handler: http.NotFoundHandler()},
+		SingleInstance: &application.SingleInstanceOptions{UniqueID: instanceID(b)},
+	})
+	return nil
 }
 
 // windowTitle is "Toolbox" for Personal and "Toolbox — <Name>" otherwise.
