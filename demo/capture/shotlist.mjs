@@ -49,14 +49,27 @@ export function writeShotlist(dir, entries, ranScenes = null) {
   fs.mkdirSync(dir, { recursive: true });
   const jsonFile = path.join(dir, "shotlist.json");
   let all = entries;
-  if (ranScenes) {
+  if (ranScenes && fs.existsSync(jsonFile)) {
+    // An existing list that can't be read is kept aside, never silently replaced by this run's scenes only
+    // (that once dropped 15 earlier scenes from the Demo shot list).
+    let old;
     try {
-      all = mergeEntries(JSON.parse(fs.readFileSync(jsonFile, "utf8")), entries, ranScenes);
-    } catch {
-      /* first run */
+      old = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+    } catch (e) {
+      const keep = `${jsonFile}.unreadable-${Date.now()}`;
+      fs.copyFileSync(jsonFile, keep);
+      console.warn(`shotlist.json couldn't be read (${e.message}); kept as ${path.basename(keep)}`);
+      old = [];
     }
+    all = mergeEntries(old, entries, ranScenes);
   }
-  fs.writeFileSync(jsonFile, JSON.stringify(all, null, 2) + "\n");
-  fs.writeFileSync(path.join(dir, "shotlist.md"), renderMarkdown(all));
+  writeAtomic(jsonFile, JSON.stringify(all, null, 2) + "\n");
+  writeAtomic(path.join(dir, "shotlist.md"), renderMarkdown(all));
   return all;
+}
+
+function writeAtomic(file, text) {
+  const tmp = `${file}.tmp-${process.pid}`;
+  fs.writeFileSync(tmp, text);
+  fs.renameSync(tmp, file);
 }
