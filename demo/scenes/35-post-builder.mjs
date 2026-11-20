@@ -6,6 +6,12 @@ export default {
   kind: "a",
   roles: ["photo.ferris", "photo.flowers", "photo.dessert"],
   async run(t) {
+    // Untimed: remove earlier takes' carousels (the tool would reopen the last one), so the Demo
+    // workspace ends with one post and the scene starts from the empty state.
+    const P = "toolbox/modules/posts.Service";
+    for (const p of (await t.svc(P, "List")) ?? []) {
+      if (/^Carousel \d{4}-\d{2}-\d{2}/.test(p.name ?? "")) await t.svc(P, "Delete", p.id);
+    }
     await t.rec.start();
     t.note(
       "A three-slide carousel from Library photos; the caption is written inside the post by Caption Writer, then the checks against Instagram's rules and an export folder.",

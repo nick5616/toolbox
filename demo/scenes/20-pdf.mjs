@@ -38,6 +38,8 @@ export default {
     await t.waitJob({ moduleId: "documents" });
     const [second] = await latestOutputs(t, "documents");
     await openTool(t, "pdf", "PDF Toolkit");
+    await t.click(TAB("Merge PDFs")); // the tool reopens on the last action used (untimed)
+    await t.hold(400);
     await scrubPaths(t);
 
     await t.rec.start();
