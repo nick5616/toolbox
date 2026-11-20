@@ -54,7 +54,7 @@ export default {
     await t.type(null, "green screen");
     await t.hold(500);
     await t.key("Enter", { chip: false });
-    await t.hold(1800);
+    await t.hold(1200);
 
     t.note("The eyedropper refines the key: press Pick and click the green on the preview.", "If the green is a different shade, pick it straight from the picture.");
     await t.click({ css: "button", text: "Pick", exact: true });
@@ -69,7 +69,7 @@ export default {
     if (!(await t.exists({ css: 'select[aria-label="View"]' }))) await t.click({ text: "Chroma key", exact: true, nth: 0 });
     await t.hold(500);
     await chooseOption(t, "View", 1, "matte");
-    await t.hold(2200);
+    await t.hold(1400);
     await chooseOption(t, "View", -1, "composite");
     await t.hold(1200);
 
@@ -78,7 +78,7 @@ export default {
     await t.hold(400);
     await t.click({ css: "button", text: "Transform", exact: true });
     await t.hold(700);
-    for (const where of ["Bottom right", "Top left", "Right half"]) {
+    for (const where of ["Bottom right", "Top left"]) {
       await t.click({ css: "button", text: "Picture-in-picture" });
       await t.click({ css: '[role="menuitem"]', text: where });
       await t.hold(1500);
@@ -86,7 +86,7 @@ export default {
     await t.click({ css: "button", text: "Close", exact: true });
     await t.hold(400);
     await t.click({ css: "button", text: "Play", exact: true });
-    await t.hold(4500);
+    await t.hold(2200);
     await t.key("Space", { chip: false });
     await t.hold(600);
     await t.still("Green screen and picture-in-picture");
