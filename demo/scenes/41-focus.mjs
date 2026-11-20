@@ -28,9 +28,24 @@ export default {
     await t.still("Focus Lock");
     if (await t.exists({ css: "button", textRe: "^End" })) {
       await t.click({ css: "button", textRe: "^End" });
-      await t.hold(1500);
+      await t.hold(1200);
+      if (await t.exists({ css: '[role="dialog"] button', text: "Confirm", exact: true })) {
+        await t.click({ css: '[role="dialog"] button', text: "Confirm", exact: true });
+        await t.hold(1500);
+      }
     }
     await t.rec.stop();
+    // Never leave a session running for the next scenes (it would resume on the next launch too).
+    const F = "toolbox/modules/focus.Service";
+    const st = await t.svc(F, "State").catch(() => null);
+    if (st?.session) {
+      const fr = await t.svc(F, "RequestWeaken", "end", null).catch(() => null);
+      if (fr) {
+        await t.hold(Math.max(0, (fr.readyAt ?? 0) - Date.now()) + 300);
+        await t.svc(F, "ConfirmWeaken", "end", fr.phrase ?? "");
+      }
+      if ((await t.svc(F, "State"))?.session) throw new Error("the Focus session is still running");
+    }
     await t.reset();
   },
 };
