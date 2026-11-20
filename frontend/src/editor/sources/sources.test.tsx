@@ -135,8 +135,9 @@ describe("SourcesPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(h.prepare).toHaveBeenCalled());
     expect(h.probe).toHaveBeenCalledWith(["/c/b.mp4", "/c/song.mp3"]);
-    expect(project().sources.map((s) => s.path)).toEqual(["/c/a.mp4", "/c/b.mp4"]);
-    expect(h.prepare).toHaveBeenCalledWith("p1", ["/c/b.mp4"], 30);
+    // Phase 21: sound files are sources too (they go on audio tracks).
+    expect(project().sources.map((s) => s.path)).toEqual(["/c/a.mp4", "/c/b.mp4", "/c/song.mp3"]);
+    expect(h.prepare).toHaveBeenCalledWith("p1", ["/c/b.mp4", "/c/song.mp3"], 30);
     expect(useEditStudio.getState().jobs.prepare).toBe("job1");
   });
 

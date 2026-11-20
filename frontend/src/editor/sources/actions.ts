@@ -12,9 +12,12 @@ import { isActive, useJobs } from "@/state/jobs";
 import { commit, currentDoc } from "../timeline/actions";
 import { useEditStudio } from "@/editor/store";
 import { refreshSources } from "@/editor/useEditData";
+import { AUDIO_EXTENSIONS } from "../transport/logic";
 import { appendSources, MAX_SOURCES, relinkPath } from "./tags";
 
-export const MEDIA_EXTENSIONS = [".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp", ".ogv", ".mpg", ".mpeg", ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic", ".heif"];
+export const VISUAL_EXTENSIONS = [".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".ts", ".mts", ".m2ts", ".wmv", ".flv", ".3gp", ".ogv", ".mpg", ".mpeg", ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic", ".heif"];
+/** Phase 21: audio files are sources too (they go on audio tracks). */
+export const MEDIA_EXTENSIONS = [...VISUAL_EXTENSIONS, ...AUDIO_EXTENSIONS];
 
 /** Prepare jobs this panel follows; each refreshes the source states when it ends. */
 const following = new Set<string>();
@@ -66,9 +69,9 @@ export async function addSourcePaths(paths: readonly string[]): Promise<string[]
   let usable: string[] = [];
   try {
     const infos = (await EditStudioService.Probe(fresh)) ?? [];
-    usable = infos.filter((i) => (i.kind === "video" || i.kind === "image") && !i.error).map((i) => i.path);
+    usable = infos.filter((i) => (i.kind === "video" || i.kind === "image" || i.kind === "audio") && !i.error).map((i) => i.path);
     const skipped = fresh.length - usable.length;
-    if (skipped > 0) toast({ title: `Skipped ${skipped} ${skipped === 1 ? "file" : "files"} that aren't readable photos or videos`, tone: "warn" });
+    if (skipped > 0) toast({ title: `Skipped ${skipped} ${skipped === 1 ? "file" : "files"} that aren't readable photos, videos or sound`, tone: "warn" });
   } catch (e) {
     toast({ title: toAppError(e).message, tone: "danger" });
     return [];
@@ -88,7 +91,7 @@ export async function addSourcePaths(paths: readonly string[]): Promise<string[]
 /** Picks files with the native dialog and adds them. */
 export async function pickAndAddSources(): Promise<void> {
   try {
-    const picked = (await FilesService.PickWith("Add clips and photos", MEDIA_EXTENSIONS, true)) ?? [];
+    const picked = (await FilesService.PickWith("Add clips, photos and sound", MEDIA_EXTENSIONS, true)) ?? [];
     if (picked.length) await addSourcePaths(picked);
   } catch (e) {
     toast({ title: toAppError(e).message, tone: "danger" });
@@ -99,7 +102,7 @@ export async function pickAndAddSources(): Promise<void> {
 export async function pickLibraryAndAddSources(): Promise<void> {
   try {
     const have = currentDoc()?.sources.map((s) => s.path);
-    const picked = await pickFromLibrary({ title: "Add clips and photos from Library", exts: MEDIA_EXTENSIONS, multiple: true, have });
+    const picked = await pickFromLibrary({ title: "Add clips, photos and sound from Library", exts: MEDIA_EXTENSIONS, multiple: true, have });
     if (picked.length) await addSourcePaths(picked);
   } catch (e) {
     toast({ title: toAppError(e).message, tone: "danger" });

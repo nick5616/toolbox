@@ -744,7 +744,7 @@ function Tracks({ project }: { project: NormalProject }) {
         <SongTrack timeWidth={timeWidth} />
         {Overlay && <Overlay />}
         <Playhead durationMs={D} timeLeft={() => (rootRef.current?.getBoundingClientRect().left ?? 0) + HEADER_PX} />
-        {razorX !== null && razorX > HEADER_PX && <div className={tl.razorGuide} style={{ left: razorX }} aria-hidden="true" />}
+        {tool === "razor" && razorX !== null && razorX > HEADER_PX && <div className={tl.razorGuide} style={{ left: razorX }} aria-hidden="true" />}
         {hint && (
           <div className={styles.hint} style={{ left: HEADER_PX + msToX(hint.ms, pps, scrollMs) }} role="status">
             {hint.label}
