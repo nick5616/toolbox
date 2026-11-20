@@ -551,6 +551,15 @@ export function createActions(ctx) {
       // close the job tray once (untimed, before recording), which marks them seen, like a user glancing at it.
       await page(`(()=>{const n=[...document.querySelectorAll("span,button")].some(e=>/\\bnew failures?\\b/.test(e.textContent||""));if(!n)return;const b=document.querySelector('[aria-label="Toggle job tray"]');if(b){b.click();setTimeout(()=>b.click(),400)}})()`);
       await sleep(900);
+      // Jobs "Interrupted when Toolbox quit" are left by an earlier capture app the harness stopped (background
+      // indexing, mostly); they'd show as "N failed" in every clip's footer. They're the harness's doing, not the
+      // scene's, so remove them from the history (untimed).
+      try {
+        const jobs = (await t.svc("toolbox/api.JobsService", "List", { moduleId: "", statuses: ["failed"], limit: 200, pipelineRunId: "" })) ?? [];
+        for (const j of jobs) if (j.errorCode === "interrupted") await t.svc("toolbox/api.JobsService", "Remove", j.id);
+      } catch {
+        /* an older build without the filter: leave them */
+      }
     },
     /** Where this run's clips go (for scenes that make a clip outside the screen recorder). */
     get outDir() {
