@@ -10,6 +10,7 @@ import { ResultRow } from "@/tools/_kit/ResultRow";
 import { revealLabel } from "@/lib/platform";
 import shared from "@/tools/_kit/results.module.css";
 import { basename, parsePdfResult } from "./options";
+import { displayText } from "@/lib/displayPath";
 import styles from "./Results.module.css";
 
 const MAX_GROUPS = 10;
@@ -47,8 +48,8 @@ function Group({ job }: { job: JobView }) {
   return (
     <div className={styles.group}>
       <div className={styles.head}>
-        <span className={styles.title} data-tip={job.title}>
-          {job.title}
+        <span className={styles.title} data-tip={displayText(job.title)}>
+          {displayText(job.title)}
         </span>
         {r.folder && (
           <Button size="sm" variant="secondary" icon="folder-open" data-tip="Open the folder with all the files this job made" onClick={() => void openFolder(r.folder)}>

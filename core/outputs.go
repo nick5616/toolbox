@@ -37,7 +37,7 @@ func init() {
 // Common extension sets, shared by modules' Accepts declarations.
 var (
 	AudioExtensions = []string{".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".aiff", ".aif"}
-	VideoExtensions = []string{".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi"}
+	VideoExtensions = []string{".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi", ".wmv"}
 	ImageExtensions = []string{".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".tif", ".tiff", ".bmp"}
 )
 

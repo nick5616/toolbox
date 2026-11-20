@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import { displayText } from "@/lib/displayPath";
 import { JobsService, JobStatus, type Job, type JobLogBatch, type JobProgress, type LogLine } from "@/lib/api";
 
 /** In-memory cap per job; older lines are dropped from the front. */
@@ -10,7 +11,8 @@ export const MAX_LOG_LINES_IN_MEMORY = 5000;
 export type JobView = Job & { inputs: string[]; outputs: NonNullable<Job["outputs"]> };
 
 export function normalizeJob(j: Job): JobView {
-  return { ...j, inputs: j.inputs ?? [], outputs: j.outputs ?? [] };
+  // Titles are display text and some carry a path (Phase 21 §A5: Hide personal details).
+  return { ...j, title: displayText(j.title), inputs: j.inputs ?? [], outputs: j.outputs ?? [] };
 }
 
 export function isActive(j: Job): boolean {
