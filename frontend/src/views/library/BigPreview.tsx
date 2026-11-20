@@ -4,6 +4,7 @@ import { MediaPlayer, useMediaSource } from "@/components/media";
 import type { MediaPlayerHandle } from "@/components/media/types";
 import { FilesService, PdfService } from "@/lib/api";
 import { releaseImageUrl, wholeImageUrl } from "@/lib/wholeImage";
+import { displayText } from "@/lib/displayPath";
 import { TextActions } from "@/tools/_kit/TextActions";
 import { baseOf, itemIcon, previewKind, type LibItem } from "./items";
 import { useInView } from "./previews/loader";
@@ -143,7 +144,7 @@ function TextPreview({ path }: { path: string }) {
       <div className={styles.textTools}>
         <TextActions text={text} filename={baseOf(path)} what="text" />
       </div>
-      <pre>{text}</pre>
+      <pre>{displayText(text)}</pre>
     </div>
   );
 }

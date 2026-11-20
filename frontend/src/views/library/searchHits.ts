@@ -2,6 +2,7 @@ import type { LibraryProject, MediaText, SearchStatus } from "@/lib/api";
 import { fromOutput, type HitInfo, type LibItem } from "./items";
 import { baseOf } from "./items";
 import { hitKey, type HitView } from "@/state/search";
+import { currentPresenter, rewriteText } from "@/lib/pathRewrite";
 
 /** The pure parts of Smart search's Library UI: snippets, badges, strengths, hit items and the status line. */
 
@@ -16,9 +17,11 @@ export interface SnippetPart {
 /**
  * Splits a snippet at the `\u0002…\u0003` markers into plain and bold parts.
  * The result is only ever rendered as React text (never as HTML), so anything
- * the file said stays text. Stray or unbalanced markers are dropped.
+ * the file said stays text. Stray or unbalanced markers are dropped. Paths in it go through
+ * "Hide personal details" (a file's text can name real folders).
  */
-export function splitSnippet(s: string): SnippetPart[] {
+export function splitSnippet(snippet: string): SnippetPart[] {
+  const s = rewriteText(snippet, currentPresenter());
   const parts: SnippetPart[] = [];
   let bold = false;
   let buf = "";
@@ -40,7 +43,8 @@ export function splitSnippet(s: string): SnippetPart[] {
 }
 
 /** Splits free text around the (case-insensitive) search words, for highlighting in the text panel. */
-export function highlightParts(text: string, query: string): SnippetPart[] {
+export function highlightParts(raw: string, query: string): SnippetPart[] {
+  const text = rewriteText(raw, currentPresenter());
   const words = [...new Set(query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])].filter((w) => w.length > 0).sort((a, b) => b.length - a.length);
   if (words.length === 0 || text === "") return [{ text, bold: false }];
   const lower = text.toLowerCase();

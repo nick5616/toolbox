@@ -1,10 +1,29 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { setCurrentPresenter } from "@/lib/pathRewrite";
 import { OutputKind } from "@/lib/api";
 import { EMPTY_STATUS, hitKey, mergeHits, normalizeHit } from "@/state/search";
 import { hit, img, out, status } from "./testFixtures";
 import { formatMoment, highlightParts, hitToItem, posBadge, sourceIcons, splitSnippet, statusLine, strengthInfo, textBlock } from "./searchHits";
 import { completions, chunkPrefix, visibleLabels } from "./DetailSearch";
 import { groupThings } from "./ThingsView";
+
+describe("Hide personal details in file text", () => {
+  afterEach(() => setCurrentPresenter(null));
+  const win = (...parts: string[]) => parts.join(String.fromCharCode(92)); // Windows paths, without escapes
+  const on = { on: true, root: win("C:", "Users", "me", "Demo"), name: "Demo", home: win("C:", "Users", "me") };
+
+  it("rewrites folder paths inside snippets and highlighted text", () => {
+    setCurrentPresenter(on);
+    const snip = splitSnippet(`copy ${win("C:", "Users", "me", "Demo", "Library", "\u0002IMG_1\u0003.HEIC")}`);
+    expect(snip.map((p) => p.text).join("")).toBe("copy Demo/Library/IMG_1.HEIC");
+    expect(highlightParts(win("C:", "Users", "me", "notes.txt"), "notes").map((p) => p.text).join("")).toBe("~/notes.txt");
+  });
+
+  it("leaves the text alone when it is off", () => {
+    const p = win("C:", "Users", "me", "x.txt");
+    expect(splitSnippet(p)).toEqual([{ text: p, bold: false }]);
+  });
+});
 
 describe("splitSnippet", () => {
   it("bolds the text between the markers", () => {

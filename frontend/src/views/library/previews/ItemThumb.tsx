@@ -2,6 +2,7 @@ import { useEffect, useState, type MouseEvent } from "react";
 import { Icon } from "@/components";
 import { columnPeaks } from "@/components/media/Waveform";
 import { InlinePlay } from "@/tools/_kit/InlinePlay";
+import { displayText } from "@/lib/displayPath";
 import { itemIcon, previewKind, type LibItem } from "../items";
 import { cachedPreview, FILMSTRIP_FRAMES, loadPreview, useInView, type PreviewData } from "./loader";
 import styles from "./ItemThumb.module.css";
@@ -85,7 +86,7 @@ export function ItemThumb({ item, play = false, className }: ItemThumbProps) {
         </div>
       );
     } else {
-      body = <pre className={styles.text}>{firstLines(data.text)}</pre>;
+      body = <pre className={styles.text}>{firstLines(displayText(data.text))}</pre>;
     }
   }
   return (
