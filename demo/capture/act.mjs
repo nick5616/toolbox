@@ -547,6 +547,10 @@ export function createActions(ctx) {
     /** Closes menus and dialogs without recording anything odd. */
     async reset() {
       for (let i = 0; i < 2; i++) await t.key("Escape", { chip: false });
+      // A failure left by an earlier scene (or run) would show "N new failures" in every later clip: open and
+      // close the job tray once (untimed, before recording), which marks them seen, like a user glancing at it.
+      await page(`(()=>{const n=[...document.querySelectorAll("span,button")].some(e=>/\\bnew failures?\\b/.test(e.textContent||""));if(!n)return;const b=document.querySelector('[aria-label="Toggle job tray"]');if(b){b.click();setTimeout(()=>b.click(),400)}})()`);
+      await sleep(900);
     },
     /** Where this run's clips go (for scenes that make a clip outside the screen recorder). */
     get outDir() {

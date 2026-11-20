@@ -27,7 +27,8 @@ export default {
         await t.click({ css: "button", text: "Start recording clipboard history" });
         await t.hold(1200);
       }
-      for (const s of ["https://example.com/demo-page", "Meeting notes: ship the demo on Friday", "#ff6b35"]) {
+      // No links: the "Clipboard link to notes" template pipeline listens for copied links once recording is on.
+      for (const s of ["Brunch spot: the one with the flower ceiling", "Meeting notes: ship the demo on Friday", "#ff6b35"]) {
         await copy(s);
         await t.hold(1600);
       }
