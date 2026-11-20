@@ -3,7 +3,7 @@
  *
  * Loads the analysis and the project, derives the markers, compiles the edit,
  * builds an exact FrameProvider on the export URLs, then per frame i:
- * t = i·1000/fps, await prepare(needs(t)), render(t), encode. The same
+ * t = from + i·1000/fps (from = the export's In point), await prepare(needs(t)), render(t), encode. The same
  * EditEngine as the preview draws the frame, so the export matches it.
  */
 import { applyGradePlan, type GradePlanJson } from "@/grade/plan";
@@ -29,6 +29,18 @@ export function parseProject(json: string): EditProject {
   }
   if (typeof raw !== "object" || raw === null || !Array.isArray((raw as { tracks?: unknown }).tracks)) throw new RenderError("The edit couldn't be read", "no tracks");
   return normalizeProject(raw as EditProject);
+}
+
+/**
+ * Which part of the edit an export renders: the plan's start..end (song ms when the edit has a song, else
+ * timeline ms), the same range and frame count Go checks (`core/viz` plannedFrames). An In/Out export narrows
+ * the plan's range; a plan without one renders the whole edit.
+ */
+export function editFrameRange(plan: Pick<PlanForWorker, "startMs" | "endMs" | "fps">, songStartMs: number | null, durationMs: number): { fromMs: number; frames: number } {
+  if (plan.endMs > plan.startMs) {
+    return { fromMs: Math.max(0, plan.startMs - (songStartMs ?? 0)), frames: Math.max(1, Math.round(((plan.endMs - plan.startMs) / 1000) * plan.fps)) };
+  }
+  return { fromMs: 0, frames: Math.max(1, Math.round((durationMs / 1000) * plan.fps)) };
 }
 
 export async function runEdit(plan: PlanForWorker, forceJpeg: boolean, io: LoopIO): Promise<void> {
@@ -69,11 +81,12 @@ export async function runEdit(plan: PlanForWorker, forceJpeg: boolean, io: LoopI
     engine.setEdit(compiled);
     const eng = engine;
     if (io.flow.cancelled) return void io.post({ type: "cancelled" });
+    const range = editFrameRange(plan, project.song ? project.song.startMs : null, compiled.durationMs);
     await encodeFrames(
       canvas,
-      { fps: plan.fps, frames: Math.max(1, Math.round(((compiled.durationMs) / 1000) * plan.fps)), overlay: false, forceJpeg },
+      { fps: plan.fps, frames: range.frames, overlay: false, forceJpeg },
       async (i) => {
-        const t = (i * 1000) / plan.fps;
+        const t = range.fromMs + (i * 1000) / plan.fps;
         await provider.prepare(eng.needs(t), true);
         eng.render(t, provider);
       },
