@@ -12,7 +12,8 @@ node demo/run.mjs --list                       # scenes, roles, which assets exi
 node demo/run.mjs --fresh --only 00            # film scene 00 from a fresh capture workspace
 node demo/run.mjs                              # every scene whose roles exist (scratch capture workspace)
 node demo/run.mjs --final                      # the real run: films inside workspaces/demo, footage into its Library/Demo Footage
-node --test demo/test/                         # unit tests of the pure parts
+node --test demo/test/*.test.mjs               # unit tests of the pure parts
+node demo/cuts.mjs                             # shorts (9:16), teasers, GIFs, sizzle and showcase reels into Demo Footage/Cuts
 ```
 
 `run.mjs` options: `--only 00,12` (numbers or ids), `--fresh`, `--no-record` (run the scene, film nothing:

@@ -869,3 +869,24 @@ Newest last. Format: date — decision — why.
   - **The window:** it always opened at 1180 × 760, centred. A relaunch now passes `--window=x,y,w,h` (or `--window=max`), and the new window opens in the same place at the same size. `desktop.ParseLaunch` removes both arguments before anything reads the command line, and `LaunchArgs` never carries them into a later relaunch.
   - **The default size:** it's now 1200 × 780, clamped to the screen's work area. The frontend collapses the sidebar below 1180 CSS px, and a 1180-wide window has only ~1164 px of content, so the old default always opened with the sidebar collapsed. At 1200 the content is 1184 px and the sidebar shows its names whenever the screen is wide enough. `MinWidth` stays 960, so you can still make it smaller.
   - **Still a relaunch, not a hot swap** (Phase 21 §F): every service holds the open workspace's database, paths and locks.
+- **2026-11-20: More demo footage (D4) and what filming it found.**
+  - **New scenes:**
+    - **47–52:** Video Editor green screen, keyframes, trim tools, audio, the export dialog; the Visualizer designer.
+    - **54–59, 68:** Color Grader Vibe, regions and depth, Chaos with LUT, video; Paint+ brushes and the Lab; Composer layouts.
+    - **70–79:** Library views, Smart search queries, palette and shortcuts, a Send to chain, building a pipeline, templates, light theme, the job tray, chat about a transcript, transcript export.
+    - **B-roll:** 66 is every Visualizer preset as a real export, into `Showcase/Visualizer`; 67 the live Visualizer; 69 is 16 real Color Grader exports, into `Showcase/Color Grader`; 90–91 the sidebar and palette.
+    - **Dropped:** 53 (lyric looks). The Look panel's preview shows no text before lyrics are detected or timed.
+  - **`demo/cuts.mjs`** makes ready-to-post cuts from the footage:
+    - 9:16 shorts with the tool's name and voice-over line;
+    - 10 s teasers with a lower third;
+    - GIFs;
+    - 2.5 min and 60 s sizzle reels, with and without a music bed;
+    - Visualizer and Color Grader showcase reels.
+
+    FFmpeg runs in a temp dir with the graph in a file and only relative names inside it.
+  - **Fixes:**
+    - **Shot list:** an unreadable `shotlist.json` was treated as "first run" and replaced by one batch's scenes, which dropped 15 earlier scenes (00–06, 09, 10, 12–17). They were rebuilt from the scene files' notes and the clips' real lengths. The list is now written atomically, and an unreadable one is kept aside.
+    - **Menus** (`MenuButton`, so Send to and every "More" menu) open upwards when there's more room above, and scroll instead of running off the window. Send to's long list was cut off at the bottom, so tools near the end couldn't be reached.
+    - **Video Editor In–Out exports** failed with "The renderer is set up differently from the plan": Go narrows the plan to the range, but the export worker rendered the whole edit from 0. The worker now renders the plan's range (`editFrameRange`, the same count as `core/viz` plannedFrames). Checked in the real app: a 2–8 s range exported as a 6.0 s file.
+    - **Capture workspaces** created through the environment had no privacy excludes, so the excluded screenshots were seeded into scratch capture Libraries. The harness now writes `.toolbox/workspace.json` with `roles.json`'s excludes and location stripping before the first seed, and deletes excluded files from an existing capture Library (only under `.dev/workspaces/`). The real Demo workspace always had them.
+    - **The footer's "1 failed":** jobs "Interrupted when Toolbox quit", left when the harness stops a capture app, are removed before each scene.
