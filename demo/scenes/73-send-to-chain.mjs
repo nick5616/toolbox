@@ -1,14 +1,13 @@
-// 73 Send to chain: a photo goes through Background Remover, its cut-out is sent on to Image Batch, and Image Batch's
-// result is sent on to Photo Composer, where the composition bar names the tools it is made of.
-import { openTool, scrubPaths } from "./_d2b.mjs";
+// 73 Send to chain: a photo goes through Background Remover, its cut-out is sent on to Converter (as WebP), and the
+// converted file is sent on to Photo Composer, where the composition bar names the tools it is made of.
+import { openTool, scrubPaths, setValue } from "./_d2b.mjs";
 
 const SEND = { css: 'button[aria-label="Send to…"]' };
 
 async function sendTo(t, toolName) {
-  await t.hover({ css: '[role="listitem"], li, [class*="row"]', nth: 0 }, 300).catch(() => {});
   await t.click(SEND);
   await t.hold(900);
-  await t.click({ css: '[role="menuitem"], [role="menu"] button', text: toolName, exact: true });
+  await t.click({ css: '[role="menuitem"]', text: toolName, exact: true });
   await t.hold(1600);
 }
 
@@ -31,26 +30,24 @@ export default {
     await t.waitJob({ compress: true });
     await t.hold(1200);
 
-    t.note("Send to: the cut-out goes straight into Image Batch, no saving and re-adding.", "Send the result straight to the next tool.");
-    await sendTo(t, "Image Batch");
-    await t.waitFor({ css: "button", textRe: "^Process 1 picture" });
-    await t.hold(1200);
-    await t.click({ text: "Advanced" });
-    await t.hold(600);
-    await t.click({ within: '[role="dialog"], aside', css: "button", text: "Same" });
-    await t.hold(500);
-    await t.key("Escape", { chip: false });
-    await t.hold(500);
-    await t.click({ css: "button", textRe: "^Process 1 picture" });
+    t.note("Send to: the cut-out goes straight into Converter, no saving and re-adding.", "Send the result straight to the next tool.");
+    await sendTo(t, "Converter");
+    await t.waitFor({ css: "button", textRe: "^Convert (files|\\d+ files?)" });
+    await t.hold(1000);
+    await t.hover({ css: "select" }, 500);
+    await setValue(t, "select", "webp");
+    await t.hold(900);
+    await t.click({ css: "button", textRe: "^Convert (files|\\d+ files?)" });
     await t.waitJob({ compress: true });
     await t.hold(1500);
 
-    t.note("And on again: the resized cut-out goes to Photo Composer, which names the tools it is built from.", "And on again, into a composition.");
+    t.note("And on again: the converted picture goes to Photo Composer, which names the tools it is built from.", "And on again, into a composition.");
+    await t.hover({ css: '[role="listitem"], li', nth: 0 }, 400).catch(() => {});
     await sendTo(t, "Photo Composer");
-    await t.waitFor({ css: '[role="group"][aria-label="Uses"]' }).catch(() => {});
-    await t.hold(2500);
-    await t.hover({ css: '[role="group"][aria-label="Uses"] button', nth: 0 }, 2200).catch(() => {});
+    await t.waitFor({ css: "button", text: "Uses" });
     await t.hold(1500);
+    await t.click({ css: "button", text: "Uses" });
+    await t.hold(2500);
     await t.still("Send to chain");
     await t.rec.stop();
     await t.reset();

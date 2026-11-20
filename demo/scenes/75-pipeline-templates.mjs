@@ -1,6 +1,6 @@
 // 75 Pipeline templates: the gallery (Practical, Just cool), the Paper to Word template opened as a graph with its step
 // editor, then run on a picture of a drum chart (text recognition, then a Word document).
-import { removePipelinesNamed } from "./_d4c.mjs";
+import { pickLibraryFile, removePipelinesNamed } from "./_d4c.mjs";
 
 const NAME = "Paper to Word";
 const GALLERY = { css: '[role="dialog"][aria-modal="true"]' };
@@ -18,17 +18,17 @@ export default {
     t.note("The template gallery: Practical pipelines for real jobs, and Just cool ones for fun.", "Start from a ready-made pipeline instead of a blank page.");
     await t.click({ text: "Pipelines" });
     await t.hold(1200);
+    if (await t.exists({ css: "button", text: "Edit", exact: true })) await t.click({ css: "button", text: "Edit", exact: true });
+    await t.hold(600);
     await t.click({ css: '[aria-label="Pipelines"]' });
     await t.hold(700);
     await t.click({ css: '[role="menuitem"], [role="option"], button', text: "New pipeline…" });
     await t.waitFor(GALLERY);
     await t.hold(2000);
-    await t.scroll(GALLERY, 700, 2200);
-    await t.hold(800);
-    await t.scroll(GALLERY, 1400, 2600);
+    await t.scroll(GALLERY, 900, 900);
     await t.hold(1200);
-    await t.scroll(GALLERY, -3000, 2200);
-    await t.hold(800);
+    await t.scroll(GALLERY, -900, 500);
+    await t.hold(500);
 
     t.note("Paper to Word: read the text from photos or scans, save it as a Word document.", "Pick one: this reads a picture of paper and writes it into a Word document.");
     await t.click({ css: `button[aria-label="${NAME}"]` });
@@ -50,9 +50,9 @@ export default {
     await t.hold(900);
     await t.click({ css: "button", text: "From Library" });
     await t.hold(1000);
-    await t.pickFromLibrary("image.drumchart");
+    await pickLibraryFile(t, "image.drumchart");
     await t.hold(700);
-    await t.click({ css: "button", text: "Start" });
+    await t.click({ css: "button", textRe: "^Start( with \\d+ files?)?$" });
     await t.hold(2500);
     await t.still("Pipeline templates running");
     await t.waitJob({ compress: true, timeoutMs: 15 * 60000 });

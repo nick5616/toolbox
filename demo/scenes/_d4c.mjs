@@ -1,6 +1,22 @@
 // Helpers shared by the D4c scenes (70-79, 90-91). Not a scene (the loader only takes NN-*.mjs).
 export { waitIndexed } from "./_d2a.mjs";
 
+/**
+ * In an open "From Library" picker (the pipeline Run dialog's): searches for the file of `role`, picks the card by its
+ * name (card names are cut with an ellipsis on screen, so match the start) and confirms with Add.
+ */
+export async function pickLibraryFile(t, role) {
+  const file = t.roles(role)[0];
+  const stem = file.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
+  const dlg = '[role="dialog"]:has([aria-label="Search the Library"])';
+  await t.type(`${dlg} [aria-label="Search the Library"]`, stem);
+  await t.hold(900);
+  await t.click({ within: dlg, text: stem.slice(0, 12) });
+  await t.hold(500);
+  await t.click({ within: dlg, css: "button", textRe: "^(use|add)( \\d+)?$" });
+  await t.hold(900);
+}
+
 /** Untimed: waits until every picture and document is indexed (Things and labels need that; speech may still run). */
 export async function waitPicturesIndexed(t, { timeoutMs = 40 * 60000 } = {}) {
   const end = Date.now() + timeoutMs;
