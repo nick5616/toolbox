@@ -39,8 +39,9 @@ export default {
     await t.handOff("vault", t.role("photo.dessert"), t.role("doc.pdf"));
     await t.hold(2500);
     await t.still("Vault with files");
-    await t.click({ css: "button", text: "Lock" });
-    await t.hold(1800);
+    await t.click({ css: "button", text: "Lock", exact: true });
+    await t.waitFor({ css: "button", text: "Unlock" });
+    await t.hold(1500);
     await unlock();
     await t.hold(800);
     await t.rec.stop();

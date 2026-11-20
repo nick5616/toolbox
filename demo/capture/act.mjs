@@ -529,6 +529,8 @@ export function createActions(ctx) {
     },
     /** Lists a clip a scene made itself (FFmpeg) in the shot list: `rel` is relative to outDir. */
     registerClip(rel, duration) {
+      const key = rel.replace(/\\/g, "/");
+      state.clips = state.clips.filter((c) => c.file !== key);
       state.clips.push({ file: rel.replace(/\\/g, "/"), duration, compressed: "", segments: [] });
     },
     setListing(l) {

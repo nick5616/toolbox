@@ -26,14 +26,14 @@ export default {
     await t.click({ css: "button", text: "Text", exact: true });
     await t.hold(700);
     await t.type('input[placeholder*="Your name"]', "\u00a9 Demo Studio");
-    await t.hold(1500);
+    await t.hold(1000);
     await t.click({ css: '[aria-label="Close"], button[aria-label*="lose"]' });
-    await t.hold(1200);
+    await t.hold(800);
     await t.click({ css: "button", textRe: "^Process 10 pictures" });
     await t.waitJob({ compress: true });
     await t.hold(800);
     await t.scroll(null, 520, 900);
-    await t.hold(1500);
+    await t.hold(1000);
     await t.still("Image Batch");
     await t.rec.stop();
     await t.reset();

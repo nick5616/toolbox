@@ -12,8 +12,15 @@ export default {
       "Build a post slide by slide, let the local model draft the caption, and export a folder ready to upload."
     );
     await t.open("post-builder");
-    if (await t.exists({ css: "button", text: "New post" })) await t.click({ css: "button", text: "New post" });
-    await t.hold(1200);
+    if (await t.exists({ css: "button", text: "New post" })) {
+      await t.click({ css: "button", text: "New post" });
+      await t.hold(900);
+      // "From a folder" opens a native dialog: start from an empty post and add Library photos instead.
+      await t.click({ css: "button", text: "Empty post" });
+      await t.hold(700);
+      await t.click({ css: "button", text: "Create", exact: true });
+    }
+    await t.hold(1500);
     await t.click({ css: "button", text: "Add", exact: true });
     await t.click({ text: "From Library" });
     const dlg = '[role="dialog"]';

@@ -30,10 +30,12 @@ export default {
     await t.open("grade");
     await t.handOff("grade", "photo.rain");
     await t.waitFor({ css: '[aria-label="Look groups"] button' }, 60000);
-    await group("Film");
-    await t.hold(2500);
+    await t.hold(3500); // the gallery's thumbnails render from the first frame
+    await group("Bonkers");
+    await t.hold(800);
+    await look("Thermal", 1500);
 
-    // The Wildness dial, Tasteful -> Bonkers.
+    // The Wildness dial, Tasteful -> Bonkers, on the same look.
     await wild("Tasteful");
     await t.hold(1800);
     const dial = await t.eval(`(()=>{const s=document.querySelector('input[type="range"][aria-label="Wildness"]');const r=s.getBoundingClientRect();const v=(Number(s.value)-Number(s.min))/(Number(s.max)-Number(s.min));return {y:r.y+r.height/2,x0:r.x+8+(r.width-16)*v,x1:r.right-4}})()`);
@@ -60,8 +62,15 @@ export default {
 
     // Depth looks on the skyline.
     await t.handOff("grade", "photo.skyline");
-    await t.hold(3500);
-    await look("Depth Rainbow", 3500);
+    await t.hold(1500);
+    await look("Depth Rainbow", 800);
+    // The depth maps are made automatically for a picture: wait for them (time compressed).
+    await t.rec.pause();
+    await t.hold(1500);
+    for (let i = 0; i < 120 && (await t.exists({ text: "Preparing" })); i++) await t.hold(1000);
+    await t.hold(1500);
+    await t.rec.resume();
+    await t.hold(3000);
     await look("Inferno by Depth", 3500);
 
     // A look written in words.
@@ -72,8 +81,11 @@ export default {
     await t.type(null, "haunted vaporwave mall at 3 am");
     await t.hold(500);
     await t.click({ css: "button", text: "Write a look" });
-    await t.waitFor({ css: "button", text: "Write a look" }, 120000);
-    await t.hold(8000);
+    await t.hold(1500);
+    await t.rec.pause(); // the local model takes a while: time compressed
+    await t.waitFor({ css: "button", text: "Write a look" }, 240000);
+    await t.rec.resume();
+    await t.hold(6000);
     await t.still("Color Grader vibe");
 
     // Chaos: the same seed always makes the same look.
@@ -98,8 +110,10 @@ export default {
 
     // A video graded with Acid Bath, in motion.
     await t.handOff("grade", "video.green.snoop");
-    await t.hold(4000);
-    await look("Acid Bath", 3500);
+    await t.hold(2500);
+    for (let i = 0; i < 60 && (await t.exists({ text: "Preparing" })); i++) await t.hold(1000);
+    await t.hold(1500);
+    await look("Acid Bath", 4500);
     await t.click({ text: "Motion", exact: true });
     await t.hold(2500);
     await t.still("Color Grader motion");

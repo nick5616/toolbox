@@ -14,15 +14,20 @@ export default {
     await t.hold(1200);
     await t.click({ css: '[role="dialog"] button', text: "16:9" });
     await t.click({ css: "button", text: "Create", exact: true });
-    await t.hold(14000);
-    for (const kind of ["Video track", "Text"]) {
-      await t.click({ css: "button", text: "Add", exact: true });
-      await t.click({ text: kind });
-      await t.hold(600);
+    // The preview copies (media-proxy jobs) must be ready, or the preview is black and the clips are hatched.
+    await t.hold(3000);
+    for (let i = 0; i < 180; i++) {
+      const active = (await t.jobs()).filter((j) => (j.moduleId === "media-proxy" || j.moduleId === "video-studio") && (j.status === "queued" || j.status === "running"));
+      if (active.length === 0) break;
+      await t.hold(2000);
     }
+    await t.hold(3000);
+    await t.click({ css: "button", text: "Add", exact: true });
+    await t.click({ text: "Video track" });
+    await t.hold(600);
     await t.click({ css: "button", text: "Fit", exact: true });
     await t.rec.start({ name: "Editor timeline" });
-    t.note("The editor's multitrack timeline playing: clips on a video track, an empty second video track and a text track, and the song's waveform beneath.", "");
+    t.note("The editor's multitrack timeline playing: clips on a video track, an empty second video track, and the song's waveform beneath.", "");
     await t.hold(800);
     await t.click({ css: '[aria-label="Play"], button[aria-label*="lay"]' });
     await t.hold(14000);

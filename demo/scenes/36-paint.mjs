@@ -16,7 +16,7 @@ export default {
     if (await t.exists({ text: "YOUR PAINTINGS" }) && (await t.exists({ text: "IMG_3946" }))) await t.click({ text: "IMG_3946", nth: 0 });
     else await t.handOff("paint", "photo.plover");
     await t.waitFor({ css: '[aria-label="Brush library"]' }, 30000);
-    await t.hold(1500);
+    await t.hold(1000);
 
     // Canvas-relative points (fractions of the picture): the picture is centred in the canvas area, 80 px margin.
     const at = async (pts) => {
@@ -46,16 +46,16 @@ export default {
     await t.click({ css: "button", text: "Lab", exact: true });
     await t.hold(1000);
     await t.click({ css: '[aria-label="About Growth"]' });
-    await t.hold(3800);
+    await t.hold(2500);
     await t.key("Escape", { chip: false });
     await t.click({ css: '[aria-label="Close Lab"]' });
     await t.hold(700);
     await t.click({ css: '[aria-label^="Growth: "]' });
     await t.hold(700);
     await t.stroke(await at([[0.12, 0.9], [0.3, 0.88], [0.5, 0.9], [0.7, 0.88]]));
-    await t.hold(2200);
+    await t.hold(1200);
     await t.stroke(await at([[0.1, 0.06], [0.3, 0.04], [0.5, 0.06], [0.7, 0.04]]));
-    await t.hold(2800);
+    await t.hold(1000);
     await t.still("Paint+");
     await t.rec.stop();
     await t.reset();

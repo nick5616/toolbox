@@ -11,7 +11,15 @@ export default {
     if (await t.exists({ css: "button", text: "Edit", exact: true })) await t.click({ css: "button", text: "Edit", exact: true });
     await t.hold(600);
     await t.click({ css: '[aria-label="Pipelines"]' });
-    await t.click({ text: "Song to everything" });
+    if (await t.exists({ text: "Song to everything" })) {
+      await t.click({ text: "Song to everything" });
+    } else {
+      await t.click({ text: "New pipeline" });
+      await t.hold(1200);
+      for (let i = 0; i < 14 && !(await t.exists({ text: "Song to everything", exact: true })); i++) await t.scroll({ css: '[role="dialog"]' }, 500, 500);
+      await t.hold(600);
+      await t.click({ text: "Song to everything", exact: true });
+    }
     await t.hold(1500);
     if (await t.exists({ text: "Pick a design" })) {
       await t.click({ text: "Pick a design" });

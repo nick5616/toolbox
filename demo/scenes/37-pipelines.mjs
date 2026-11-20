@@ -17,7 +17,16 @@ export default {
     await t.hold(600);
     await t.click({ css: '[aria-label="Pipelines"]' });
     await t.hold(500);
-    await t.click({ text: "Song to everything" });
+    if (await t.exists({ text: "Song to everything" })) {
+      await t.click({ text: "Song to everything" });
+    } else {
+      // A fresh workspace has two starter pipelines: the rest are templates in the "New pipeline" gallery.
+      await t.click({ text: "New pipeline" });
+      await t.hold(1200);
+      for (let i = 0; i < 14 && !(await t.exists({ text: "Song to everything", exact: true })); i++) await t.scroll({ css: '[role="dialog"]' }, 500, 500);
+      await t.hold(600);
+      await t.click({ text: "Song to everything", exact: true });
+    }
     await t.hold(2200);
     // The template's Visualizer step wants a design picked: remove it for this run.
     if (await t.exists({ text: "Pick a design" })) {

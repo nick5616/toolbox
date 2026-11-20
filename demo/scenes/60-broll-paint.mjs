@@ -1,4 +1,10 @@
 // B-roll: a 20 s Paint+ time-lapse. A new Full HD canvas, flowing strokes with several brushes (no text on screen but the app).
+import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { findFfmpeg } from "../capture/record.mjs";
+import { defaultPaths } from "../capture/app.mjs";
+
 export default {
   id: "broll-paint",
   title: "Paint timelapse",
@@ -49,7 +55,19 @@ export default {
       await t.stroke(wave(fy, amp, ph), { stepPx: 9, delay: 6 });
     }
     await t.hold(1200);
-    await t.rec.stop();
+    const res = await t.rec.stop();
+    // A time-lapse: speed the take up to about 20 s (the clip keeps its name and format).
+    if (res && res.duration > 21) {
+      const rel = path.join("B-roll", "Paint timelapse.mp4");
+      const file = path.join(t.outDir, rel);
+      const tmp = file + ".speed.mp4";
+      const factor = res.duration / 20;
+      const ff = findFfmpeg(defaultPaths().toolsDir);
+      const r = spawnSync(ff, ["-y", "-hide_banner", "-loglevel", "error", "-i", file, "-an", "-vf", `setpts=PTS/${factor.toFixed(4)},fps=30`, "-c:v", "libx264", "-crf", "16", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", tmp], { encoding: "utf8", windowsHide: true });
+      if (r.status !== 0) throw new Error(`ffmpeg failed: ${(r.stderr ?? "").slice(-300)}`);
+      fs.renameSync(tmp, file);
+      t.registerClip(rel, 20);
+    }
     await t.reset();
   },
 };
