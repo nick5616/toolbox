@@ -98,8 +98,14 @@ func main() {
 }
 
 func run() error {
+	// A relaunch (workspace switch, library move) waits for the old process,
+	// then opens its window where the old one was.
+	args, afterPID, winHint := desktop.ParseLaunch(os.Args[1:])
+	if afterPID > 0 {
+		desktop.WaitForExit(afterPID, 15*time.Second)
+	}
 	// Phase 21: which workspace to open (SPEC §A3).
-	boot, err := workspace.Resolve(os.Args[1:])
+	boot, err := workspace.Resolve(args)
 	if err != nil {
 		return err
 	}
@@ -739,10 +745,8 @@ func run() error {
 
 	setupMenu(app, emitter)
 
-	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
+	winOpts := application.WebviewWindowOptions{
 		Title:          windowTitle(boot),
-		Width:          1180,
-		Height:         760,
 		MinWidth:       960,
 		MinHeight:      600,
 		EnableFileDrop: true,
@@ -755,7 +759,10 @@ func run() error {
 		},
 		BackgroundColour: application.NewRGB(11, 12, 14),
 		URL:              startURL(),
-	})
+	}
+	placeMainWindow(&winOpts, app, winHint)
+	win := app.Window.NewWithOptions(winOpts)
+	desktop.SetRelaunchWindow(win)
 	// Keep the native title bar in step with the app theme (Windows).
 	applyTitleBar := func() {
 		t := settings.Current().Theme
@@ -1018,5 +1025,25 @@ func setupLogging(p core.Paths) func() {
 		if f != nil {
 			_ = f.Close()
 		}
+	}
+}
+
+// placeMainWindow sizes the main window: where it was before a relaunch
+// (hint), else the default size (wide enough for the named sidebar when the
+// screen allows), centred.
+func placeMainWindow(o *application.WebviewWindowOptions, app *application.App, hint *desktop.WindowHint) {
+	var workW, workH int
+	if s := app.Screen.GetPrimary(); s != nil {
+		workW, workH = s.WorkArea.Width, s.WorkArea.Height
+	}
+	o.Width, o.Height = desktop.DefaultWindowSize(workW, workH)
+	switch {
+	case hint == nil:
+	case hint.Maximised:
+		o.StartState = application.WindowStateMaximised
+	default:
+		o.Width, o.Height = max(hint.Width, o.MinWidth), max(hint.Height, o.MinHeight)
+		o.InitialPosition = application.WindowXY
+		o.X, o.Y = hint.X, hint.Y
 	}
 }

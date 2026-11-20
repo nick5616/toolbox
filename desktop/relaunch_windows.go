@@ -3,26 +3,31 @@
 package desktop
 
 import (
-	"fmt"
 	"os/exec"
-	"strings"
 	"syscall"
+	"time"
+
+	"golang.org/x/sys/windows"
 )
 
-// relaunchCommand waits a few seconds (ping as a sleep), then starts exe
-// with args through cmd's start, fully detached from this process.
+// relaunchCommand starts exe with args directly, detached from this process.
+// There's no cmd.exe or sleep in between (those flashed a console window):
+// the new process waits for this one itself (--after-pid, WaitForExit).
 func relaunchCommand(exe string, args []string) *exec.Cmd {
-	quoted := []string{syscall.EscapeArg(exe)}
-	for _, a := range args {
-		quoted = append(quoted, syscall.EscapeArg(a))
-	}
-	line := fmt.Sprintf(`cmd.exe /D /S /C "ping -n %d 127.0.0.1 >NUL & start "" %s"`,
-		relaunchDelaySeconds+1, strings.Join(quoted, " "))
-	cmd := exec.Command("cmd.exe")
+	cmd := exec.Command(exe, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		CmdLine:       line,
-		HideWindow:    true,
-		CreationFlags: 0x00000008 | 0x00000200, // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+		CreationFlags: windows.DETACHED_PROCESS | windows.CREATE_NEW_PROCESS_GROUP,
 	}
 	return cmd
+}
+
+// WaitForExit blocks until process pid has exited, or timeout. A PID that
+// can't be opened (already gone) returns at once.
+func WaitForExit(pid int, timeout time.Duration) {
+	h, err := windows.OpenProcess(windows.SYNCHRONIZE, false, uint32(pid))
+	if err != nil {
+		return
+	}
+	defer windows.CloseHandle(h)
+	_, _ = windows.WaitForSingleObject(h, uint32(timeout/time.Millisecond))
 }
