@@ -33,6 +33,30 @@ export interface MenuButtonProps {
   "data-tip"?: string;
 }
 
+export interface MenuPlacement {
+  top?: number;
+  bottom?: number;
+  right: number;
+  maxHeight: number;
+}
+
+const MENU_GAP = 4;
+const MENU_MARGIN = 8;
+/** Below this much room under the trigger, a menu opens upwards when there's more room above. */
+const MENU_MIN_BELOW = 240;
+
+/**
+ * Where a menu opens for a trigger: below it when there's room (or more room than above), else above it, and
+ * never taller than the window allows (the menu scrolls instead of running off the screen).
+ */
+export function placeMenu(r: { top: number; bottom: number; right: number }, vw: number, vh: number): MenuPlacement {
+  const right = Math.max(MENU_MARGIN, vw - r.right);
+  const below = vh - r.bottom - MENU_GAP - MENU_MARGIN;
+  const above = r.top - MENU_GAP - MENU_MARGIN;
+  if (below >= MENU_MIN_BELOW || below >= above) return { top: r.bottom + MENU_GAP, right, maxHeight: Math.max(80, below) };
+  return { bottom: vh - r.top + MENU_GAP, right, maxHeight: Math.max(80, above) };
+}
+
 /**
  * A button that opens a popover menu. With `icon` and the ghost variant it
  * renders icon-only (label becomes the aria-label); otherwise a labelled button.
@@ -43,7 +67,7 @@ export function MenuButton({ label, icon, items, emptyLabel = "Nothing available
   const [loading, setLoading] = useState(false);
   const [list, setList] = useState<MenuItem[]>([]);
   const [active, setActive] = useState(0);
-  const [pos, setPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
+  const [pos, setPos] = useState<MenuPlacement>({ top: 0, right: 0, maxHeight: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const seq = useRef(0);
@@ -57,7 +81,7 @@ export function MenuButton({ label, icon, items, emptyLabel = "Nothing available
   const toggle = () => {
     if (open) return close(false);
     const r = triggerRef.current?.getBoundingClientRect();
-    if (r) setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+    if (r) setPos(placeMenu(r, window.innerWidth, window.innerHeight));
     const my = ++seq.current;
     setOpen(true);
     setLoading(true);
@@ -92,6 +116,11 @@ export function MenuButton({ label, icon, items, emptyLabel = "Nothing available
   useEffect(() => {
     if (open) menuRef.current?.focus();
   }, [open, loading]);
+
+  // Keyboard moves keep the active item in view when the menu scrolls.
+  useEffect(() => {
+    if (open) menuRef.current?.querySelector<HTMLElement>("[data-active]")?.scrollIntoView?.({ block: "nearest" });
+  }, [open, active, list]);
 
   const select = (item: MenuItem) => {
     if (item.disabled) return;
@@ -160,7 +189,7 @@ export function MenuButton({ label, icon, items, emptyLabel = "Nothing available
           tabIndex={-1}
           aria-label={label}
           className={styles.menu}
-          style={{ top: pos.top, right: pos.right }}
+          style={{ top: pos.top, bottom: pos.bottom, right: pos.right, maxHeight: pos.maxHeight || undefined }}
           onKeyDown={onKeyDown}
         >
           {loading ? (
