@@ -9,7 +9,7 @@ import { defaultPaths, launchApp, removeCaptureState, supportsWorkspaceEnv, wait
 import { connect, sleep, VIEWPORT } from "./capture/cdp.mjs";
 import { findFfmpeg, Recorder } from "./capture/record.mjs";
 import { buildEntries, writeShotlist } from "./capture/shotlist.mjs";
-import { copyExtras, seedLibraryFromAssets } from "./capture/workspace.mjs";
+import { copyExtras, ensureCaptureInfo, seedLibraryFromAssets } from "./capture/workspace.mjs";
 import { listFiles, loadRoles, roleStatus, sourceListing } from "./roles.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -140,6 +140,12 @@ async function main() {
     const n = seedLibraryFromAssets(doc, paths.assetsDir, paths.legacyLibrary);
     const e = copyExtras(paths.generatedDir, paths.legacyLibrary);
     console.log(`Library ready (${n} files copied, ${e} generated).`);
+  }
+
+  if (mode === "workspace" && !args.final) {
+    // The privacy excludes must be in place before the app seeds the capture Library.
+    const removed = ensureCaptureInfo(paths.workspaceRoot, doc, paths.assetsDir);
+    if (removed.length) console.log(`Removed ${removed.length} privacy-excluded file(s) from the capture Library.`);
   }
 
   let app = null;
