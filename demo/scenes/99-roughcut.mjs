@@ -58,6 +58,8 @@ export default {
     doc.export = { fps: 30, codec: "h264", quality: "good", audioKbps: 192, inMs: 0, outMs: 0 };
     await svc("Save", info.id, NAME, doc);
     await svc("Prepare", info.id, doc.sources.map((s) => s.path), 30);
+    // Wait for the edit streams, so the project opens ready to play (quitting would interrupt the job).
+    await t.waitJob({ timeoutMs: 40 * 60000 });
     t.note(`"${NAME}": ${aroll.length} A-roll clips (${Math.round(at / 1000)} s), song.alt bed, a marker per scene.`, "");
   },
 };

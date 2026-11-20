@@ -169,7 +169,12 @@ export function stopTree(pid) {
   const list = processList();
   const ids = [...descendants(list, pid).map((p) => p.pid).reverse(), pid];
   if (process.platform === "win32") {
-    ps(`Stop-Process -Id ${ids.join(",")} -Force -ErrorAction SilentlyContinue`);
+    // Some may have exited between the listing and the stop; Stop-Process then reports an error we don't need.
+    try {
+      ps(`Stop-Process -Id ${ids.join(",")} -Force -ErrorAction SilentlyContinue`);
+    } catch {
+      /* already gone */
+    }
   } else {
     for (const id of ids) {
       try {
