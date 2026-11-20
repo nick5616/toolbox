@@ -15,6 +15,8 @@ export default {
     await t.hold(1500);
     await t.click({ css: "button", text: "Lyrics", exact: true });
     await t.hold(900);
+    // A fresh workspace may remember "Paste lyrics": detect from the song (a pasted-lyrics run with no words makes no job).
+    if (await t.exists({ css: "button", text: "Detect from the song" })) await t.click({ css: "button", text: "Detect from the song" });
     if (await t.exists({ css: "button", text: "Get timings" })) {
       await t.click({ css: "button", text: "Get timings" });
       await t.move({ css: "main" });
