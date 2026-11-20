@@ -26,6 +26,7 @@ export default {
     await t.click({ text: "Video track" });
     await t.hold(600);
     await t.click({ css: "button", text: "Fit", exact: true });
+    await t.waitPrepared();
     await t.rec.start({ name: "Editor timeline" });
     t.note("The editor's multitrack timeline playing: clips on a video track, an empty second video track, and the song's waveform beneath.", "");
     await t.hold(800);
