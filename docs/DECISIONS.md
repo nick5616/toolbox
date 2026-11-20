@@ -839,3 +839,11 @@ Newest last. Format: date — decision — why.
   - **Soft miss: Calm ≤ 60% of Wild busyness.** Spectrum Classic (0.71), Oscilloscope Lab (0.66), Vortex (0.76) and Mood Field (0.69) miss it. Their motion comes from spectrum/motif layers that Intensity doesn't scale. Later: scale spectrum amplitude by `0.5 + 0.5·intensity`.
   - **Metric changes.** The lab measures without lyric words (a new line cut the whole frame and counted as a teleport). A teleport needs ≥ 20% of pixels to change. Hue churn is luminance-weighted and smoothed over 0.5 s.
   - **fps** is within 5% everywhere.
+- **2026-11-19: Fixes found while filming (D2/D3).**
+  - **WMV** counts as video everywhere (`core.VideoExtensions`), so the demo's `.wmv` clip appears in the Library and the editors.
+  - **Downloader:** WebM downloads are kept as WebM (`--remux-video webm>webm/mp4`); before, they were remuxed to MP4 and some failed.
+  - **Video Editor sources** accept sound files; they go on audio tracks.
+  - **Job titles** pass through `displayText`, so "Hide personal details" also hides home paths in the job tray and PDF results.
+  - **Color Grader:** a look that uses depth or subject prepares those maps by itself for pictures (once per file and map); videos still prepare them on request, since that's a long job.
+  - **Demo artifacts live in the Demo workspace.** `node demo/run.mjs --final` films into `workspaces/demo/Library/Demo Footage/`, generated stand-in media goes to `Library/Extras/`, and scratch capture workspaces under `.dev/` are deleted afterwards.
+  - **Filming runs in batches** (`--final --only …`, which merges into the shot list). One run of all 50 scenes was stopped for low memory after scene 17; each batch starts a fresh app, so the AI models' memory is released between batches.
