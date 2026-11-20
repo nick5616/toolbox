@@ -108,7 +108,7 @@ func TestBuildArgsVideo(t *testing.T) {
 	for _, seq := range [][]string{
 		{"-f", "bv*[height<=720]+ba/b[height<=720]/bv*+ba/b"},
 		{"-S", "res:720,vcodec:h264,acodec:aac"},
-		{"--merge-output-format", "mp4", "--remux-video", "mp4"},
+		{"--merge-output-format", "mp4", "--remux-video", "webm>webm/mp4"},
 	} {
 		if !contains(a, seq...) {
 			t.Errorf("missing %q in %q", seq, a)

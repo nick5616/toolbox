@@ -101,6 +101,9 @@ func BuildArgs(opts Options, input string, env ArgEnv) []string {
 	return append(args, "--", input)
 }
 
+// videoArgs picks the format. A single-file WebM (VP8/VP9 + Vorbis/Opus) can't be
+// remuxed into MP4, so WebM stays WebM; everything else is remuxed to MP4
+// (Phase 21: a Wikimedia WebM failed with "Conversion failed!").
 func videoArgs(res MaxResolution) []string {
 	format := "bv*+ba/b"
 	sort := "vcodec:h264,acodec:aac"
@@ -109,7 +112,7 @@ func videoArgs(res MaxResolution) []string {
 		format = fmt.Sprintf("bv*[height<=%s]+ba/b[height<=%s]/bv*+ba/b", n, n)
 		sort = "res:" + n + "," + sort
 	}
-	return []string{"-f", format, "-S", sort, "--merge-output-format", "mp4", "--remux-video", "mp4"}
+	return []string{"-f", format, "-S", sort, "--merge-output-format", "mp4", "--remux-video", "webm>webm/mp4"}
 }
 
 func mp3Quality(q AudioQuality) string {
