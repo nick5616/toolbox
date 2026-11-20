@@ -1,6 +1,5 @@
 // 51 Video Editor: the export dialog. Size, frame rate, format, quality and audio are chosen, the export runs, and the
-// finished file is listed with Reveal, Open and Save a copy. (Range In-Out is shown in the dialog but not filmed: an
-// In/Out export failed with "The renderer is set up differently from the plan" in the 2026-11-20 build.)
+// finished file is listed with Reveal, Open and Save a copy. The export is the In-Out range (2 s to 8 s), set with I and O.
 import { newVideo, chooseOption } from "./_d2a.mjs";
 import { ensurePrepared } from "./_d4a.mjs";
 
@@ -18,8 +17,18 @@ export default {
     await ensurePrepared(t);
     await t.key("Home", { chip: false });
     t.markJobs();
+    const seconds = async (n) => {
+      for (let i = 0; i < n; i++) await t.key("Shift+ArrowRight", { chip: false });
+    };
 
     await t.rec.start();
+    t.note("In and Out points (I and O) mark the part to export: 2 s to 8 s.", "Mark In and Out to export just the part you want.");
+    await seconds(2);
+    await t.key("I");
+    await t.hold(500);
+    await seconds(6);
+    await t.key("O");
+    await t.hold(1200);
     t.note("Export opens the dialog: size, frame rate, format, quality, audio and range, with the length and an estimated file size.", "Everything about the file is in one dialog, with an estimate of how big it will be.");
     await t.click({ css: "button", text: "Export", exact: true });
     await t.waitFor({ css: '[role="dialog"] select[aria-label="Size"]' });
@@ -29,6 +38,8 @@ export default {
     await chooseOption(t, "Quality", -1, "draft");
     await t.hold(500);
     await chooseOption(t, "Audio", 1, "320");
+    await t.hold(500);
+    if (!/range/.test((await t.eval(`document.querySelector('[role="dialog"] select[aria-label="Range"]')?.value ?? ""`)) ?? "")) await chooseOption(t, "Range", 1, "In");
     await t.hold(500);
     await t.hold(1800);
     await t.still("Export dialog");
