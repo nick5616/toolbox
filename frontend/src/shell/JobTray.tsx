@@ -3,7 +3,7 @@ import { toAppError } from "@/lib/errors";
 import { Button, Icon, IconButton, Kbd, Meter, toast, cx, type MeterStatus } from "@/components";
 import { JobStatus } from "@/lib/api";
 import { useShallow } from "zustand/react/shallow";
-import { isActive, useJobs, useJobCounts, useOrderedJobs } from "@/state/jobs";
+import { countJobs, isActive, useJobs, useOrderedJobs } from "@/state/jobs";
 import { useUI } from "@/state/ui";
 import { JobRow } from "./JobRow";
 import styles from "./JobTray.module.css";
@@ -21,10 +21,11 @@ export function JobTray() {
   const height = useUI((s) => s.trayHeight);
   const setOpen = useUI((s) => s.setTrayOpen);
   const setHeight = useUI((s) => s.setTrayHeight);
-  const counts = useJobCounts();
   const ordered = useOrderedJobs();
   // Quiet jobs (Paint+'s per-stroke Lab calls) leave the list once finished.
   const jobs = useMemo(() => ordered.filter((j) => isActive(j) || !j.quiet), [ordered]);
+  // The strip counts what the list shows.
+  const counts = useMemo(() => countJobs(jobs), [jobs]);
   const byId = useJobs((s) => s.byId);
   const [resizing, setResizing] = useState(false);
   const rootRef = useRef<HTMLElement>(null);
@@ -37,9 +38,10 @@ export function JobTray() {
     return { value: mean, status: "running" as MeterStatus };
   }, [byId]);
 
-  // Failures count as "new" until the tray has been open with them in the list.
+  // Failures count as "new" until the tray has been open with them in the list. Quiet jobs (background
+  // indexing, Paint+'s Lab calls) never show in the list, so their failures don't count either.
   const seenFailed = useUI((s) => s.seenFailed);
-  const failedIds = useJobs(useShallow((s) => Object.values(s.byId).filter((j) => j.status === JobStatus.JobFailed).map((j) => j.id)));
+  const failedIds = useJobs(useShallow((s) => Object.values(s.byId).filter((j) => j.status === JobStatus.JobFailed && !j.quiet).map((j) => j.id)));
   const newFailures = failedIds.filter((id) => !seenFailed.includes(id)).length;
   useEffect(() => {
     if (open && failedIds.length > 0) useUI.getState().markFailedSeen(failedIds);

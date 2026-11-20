@@ -242,4 +242,13 @@ describe("job tray failures", () => {
     act(() => void useJobs.getState().upsert(job("f3", "stems", JobStatus.JobFailed)));
     expect(screen.getByText("1 new failure")).toBeTruthy();
   });
+
+  it("ignores finished quiet jobs (background indexing) in the counts", () => {
+    useUI.setState({ seenFailed: [] });
+    useJobs.getState().setAll([{ ...job("q1", "media-index", JobStatus.JobFailed), quiet: true }, { ...job("q2", "media-index", JobStatus.JobDone), quiet: true }, job("d1", "stems", JobStatus.JobDone)]);
+    render(<JobTray />);
+    expect(screen.queryByText(/new failure/)).toBeNull();
+    expect(screen.queryByText(/failed/)).toBeNull();
+    expect(screen.getByText("1 done")).toBeTruthy();
+  });
 });
