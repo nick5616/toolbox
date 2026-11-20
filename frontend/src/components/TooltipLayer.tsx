@@ -6,9 +6,11 @@
  *  - for controls with no visible text (icon buttons, sliders, canvases…), its `aria-label`.
  * Tooltips show after a short hover or on keyboard focus, never get clipped
  * (they're portaled and placed in the viewport), and hide on click, scroll or Escape.
+ * Paths in a tooltip follow "Hide personal details" (many tools put a full path in one).
  */
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { currentPresenter, rewriteText } from "@/lib/pathRewrite";
 import { Kbd } from "./Kbd";
 import styles from "./Tooltip.module.css";
 
@@ -175,7 +177,7 @@ export function TooltipLayer() {
   if (!tip) return null;
   return createPortal(
     <div ref={bubble} role="tooltip" className={styles.floating} style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: -9999 }}>
-      <span>{tip.text}</span>
+      <span>{rewriteText(tip.text, currentPresenter())}</span>
       {tip.kbd && <Kbd combo={tip.kbd} />}
     </div>,
     document.body,

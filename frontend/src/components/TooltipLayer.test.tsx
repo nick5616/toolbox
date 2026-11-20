@@ -1,5 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setCurrentPresenter } from "@/lib/pathRewrite";
 import { tipFor, TooltipLayer } from "./TooltipLayer";
 
 afterEach(() => {
@@ -53,5 +54,31 @@ describe("TooltipLayer", () => {
       btn.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     });
     expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+});
+
+describe("TooltipLayer and Hide personal details", () => {
+  afterEach(() => setCurrentPresenter(null));
+
+  it("rewrites folder paths in the tip text", () => {
+    vi.useFakeTimers();
+    const win = (...p: string[]) => p.join(String.fromCharCode(92));
+    setCurrentPresenter({ on: true, root: win("C:", "Users", "me", "Demo"), name: "Demo", home: win("C:", "Users", "me") });
+    render(
+      <>
+        <TooltipLayer />
+        <span data-tip={win("C:", "Users", "me", "Demo", "Library", "Captions", "a.jpg")}>a.jpg</span>
+      </>,
+    );
+    act(() => {
+      screen.getByText("a.jpg").dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByRole("tooltip").textContent).toBe("Demo/Library/Captions/a.jpg");
+    act(() => {
+      screen.getByText("a.jpg").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    });
   });
 });
