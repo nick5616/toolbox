@@ -847,3 +847,11 @@ Newest last. Format: date — decision — why.
   - **Color Grader:** a look that uses depth or subject prepares those maps by itself for pictures (once per file and map); videos still prepare them on request, since that's a long job.
   - **Demo artifacts live in the Demo workspace.** `node demo/run.mjs --final` films into `workspaces/demo/Library/Demo Footage/`, generated stand-in media goes to `Library/Extras/`, and scratch capture workspaces under `.dev/` are deleted afterwards.
   - **Filming runs in batches** (`--final --only …`, which merges into the shot list). One run of all 50 scenes was stopped for low memory after scene 17; each batch starts a fresh app, so the AI models' memory is released between batches.
+- **2026-11-19: More fixes found while filming.**
+  - **Job tray:** its counts and "new failures" now count only what its list shows. Finished quiet jobs (background indexing, Paint+'s Lab calls) never appear in the list, so an interrupted index no longer shows "1 new failure".
+  - **Metadata tool:** tag values go through `displayText`, so ExifTool's "Directory" follows "Hide personal details" like every other path.
+  - **Demo harness:**
+    - Before each scene it marks earlier failures seen (it opens and closes the job tray, untimed).
+    - Editor scenes wait for their edit streams (`t.waitPrepared`) before playing.
+    - The Focus scene confirms ending its dry-run session and fails if one is left running. Sessions resume on the next launch, so one leaked into later scenes.
+    - The clipboard scene copies no links, because the "Clipboard link to notes" template pipeline starts on copied links once recording is on.
