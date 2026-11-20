@@ -150,7 +150,7 @@ The whole shelf is a drop zone: dropped pictures start "From photos", a video st
 
 ### 1.7 Play and present
 - **Play** (Space) plays on the Stage from the current frame, with sound, looping if Loop is on. The Desk keeps showing your current frame, so you can watch and draw.
-- **Stage layouts** (§3.2): **Side by side**, **Stacked**, **Desk only** (the Stage hides; hold `\`` to peek), **Stage in a window** (a pop-out you can make full screen on another monitor; F11 in it).
+- **Stage layouts** (§3.2): **Side by side**, **Stacked**, **Desk only** (the Stage hides; hold V to peek), **Stage in a window** (a pop-out you can make full screen on another monitor; F11 in it).
 - **Swap screens** (W) swaps the screens' places (the order in Stacked, the sides in Side by side).
 
 ### 1.8 Keep and send
