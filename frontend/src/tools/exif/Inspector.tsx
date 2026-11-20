@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Banner, Button, Icon, Spinner, TextField } from "@/components";
 import { FilesService, type MetaGroup, type MetadataView } from "@/lib/api";
 import { copyText } from "@/lib/copy";
+import { displayText } from "@/lib/displayPath";
 import { formatBytes } from "@/lib/format";
 import { TextActions } from "@/tools/_kit";
 import { canThumbnail, formatCoordinates, metadataText } from "./options";
@@ -64,7 +65,7 @@ function Group({
           {shown.map((f, i) => (
             <div key={`${f.tag}:${i}`} className={styles.field}>
               <dt data-tip={`Tag name: ${f.tag}`}>{f.label}</dt>
-              <dd>{f.value}</dd>
+              <dd>{displayText(f.value)}</dd>
             </div>
           ))}
         </dl>

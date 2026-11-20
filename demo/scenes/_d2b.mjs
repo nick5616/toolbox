@@ -173,7 +173,7 @@ export async function scrubPaths(t) {
     if (window.__scrub) return;
     const BS = String.fromCharCode(92);
     const sep = "[" + BS + BS + "/]";
-    const libRe = new RegExp("[A-Za-z]:" + sep + "Users" + sep + ".*?" + sep + "demo-capture" + sep + "Library", "gi");
+    const libRe = new RegExp("[A-Za-z]:" + sep + "Users" + sep + ".*?" + sep + "(?:demo-capture|workspaces" + sep + "demo)" + sep + "Library", "gi");
     const userRe = new RegExp("[A-Za-z]:" + sep + "Users" + sep + "[^" + BS + BS + "/ ]+", "gi");
     const fix = (n) => { const v = n.nodeValue; if (!v || !/[A-Za-z]:/.test(v)) return; const w = v.replace(libRe, "Demo/Library").replace(userRe, "~"); if (w !== v) n.nodeValue = w; };
     const walk = (root) => { const it = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n; while ((n = it.nextNode())) fix(n); };
