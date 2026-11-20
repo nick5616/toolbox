@@ -10,7 +10,8 @@ export default {
   async run(t) {
     // --- untimed setup: the narration video as a new edit, prepared.
     await newVideo(t, [t.role("video.talk")]);
-    await t.hold(20000);
+    await t.hold(2000);
+    await t.waitPrepared();
     await t.click({ css: "button", text: "Fit", exact: true });
     await t.hold(800);
     t.markJobs();

@@ -39,7 +39,8 @@ export default {
     await t.hold(1000);
     await t.click({ css: "button", text: "Apply", exact: true });
     await t.move({ css: "main" });
-    await t.hold(2500);
+    await t.hold(1500);
+    await t.waitPrepared({ compress: true });
     await t.click({ css: "button", text: "Play", exact: true });
     await t.hold(5000);
     await t.key("Space", { chip: false });

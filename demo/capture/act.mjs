@@ -499,6 +499,29 @@ export function createActions(ctx) {
       return relevant;
     },
 
+    /**
+     * Waits until no timeline clip is still preparing its edit stream (the preview is black until then).
+     * With `compress`, recording pauses while waiting.
+     */
+    async waitPrepared({ compress = false, timeoutMs = 10 * 60000, settle = 1500 } = {}) {
+      const busy = () => page(`document.querySelectorAll('[class*="_clip_"][class*="_preparing_"]').length`);
+      const started = Date.now();
+      let paused = false;
+      try {
+        while ((await busy()) > 0) {
+          if (Date.now() - started > timeoutMs) throw new Error("waitPrepared: timed out");
+          if (compress && !paused) {
+            await t.rec.pause();
+            paused = true;
+          }
+          await sleep(1000);
+        }
+      } finally {
+        if (paused) await t.rec.resume();
+      }
+      await sleep(settle);
+    },
+
     // --- outputs ---
     /** A 1920x1080 PNG of the current screen into <out>/Stills. */
     async still(name) {
