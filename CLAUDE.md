@@ -450,10 +450,11 @@ A tool may have **its own design language** when its spec says so. **Paint+ is t
   - **Shared and fixed:** all workspaces share one tools folder. Personal is the old layout and never moves.
   - **Boot order:** `main.go` opens what `workspace.Resolve` returns: `TOOLBOX_SUPPORT_DIR` > `TOOLBOX_WORKSPACE` > `--workspace` > `workspaces.json` > Personal.
   - **Sandboxed runs:** env-launched runs get a Focus dry run, DevTools, their own lock, and never write the global support dir.
+  - **One process per workspace:** `main.go` takes `workspace.LockInstance(<support>)` right after `paths.Ensure`. A second launch hands over (`handOver`: a bare `application.New` with the same single-instance ID) before anything touches the workspace. Never add start-up work with side effects (job recovery, tmp clean-up, logs, prunes) above that lock.
 - **Every piece of app data lives in the workspace** (SPEC §A6b): chat history, jobs and logs, pipelines, projects, settings, clipboard, Vault, search index, LAN identity, caches, tmp and WebView storage.
   - Never use `os.UserHomeDir/UserConfigDir/UserCacheDir/TempDir`, `core.DefaultLibraryDir` or `%TEMP%`-style env vars in new code; `workspace_isolation_test.go` fails on them.
   - `TMP`/`TEMP`/`TMPDIR` point at the workspace's tmp dir.
-  - **Hide personal details** (`Present`): show paths through `lib/displayPath.ts` (frontend) or `workspace.Presenter` (Go).
+  - **Hide personal details** (`Present`): show paths through `lib/displayPath.ts` (frontend) or `workspace.Presenter` (Go). Tooltips are rewritten centrally by `TooltipLayer`; file text a view displays (Library text previews, search snippets, tag values) goes through `displayText`. Copy and Save keep the real text.
 - **Editor document v2** (`modules/editstudio/document.go`). The new fields are `omitempty`, so v1 loads unchanged:
   - audio tracks and clips, `Gain` dB keys, fades, `Link`, `Depth`;
   - `Export` settings;
